@@ -209,14 +209,9 @@
            data-kind="page"
            class="rounded-lg border border-base-light/50 bg-white shadow-sm">
     <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
-      <span class="ml-1 inline-flex items-start gap-3 align-top">
-        <span class="mt-0.5 text-kind-default">{{ render_icon("installation", "icon-lg") }}</span>
-        <span>
-          <span class="block text-lg font-semibold">Delegated installation</span>
-          <span class="block text-sm font-normal leading-relaxed text-base-medium">
-            Open this checklist only when someone outside the business will perform the installation.
-          </span>
-        </span>
+      <span class="ml-1 text-lg font-semibold">Delegated installation</span>
+      <span class="ml-5 block text-sm font-normal leading-relaxed text-base-medium">
+        Open this checklist only when someone outside the business will perform the installation.
       </span>
     </summary>
     <div class="border-t border-base-light/40 px-5 py-5">
@@ -248,8 +243,34 @@
         </li>
         <li>
           Have the installer change the temporary password and enroll that
-          account in 2-Step Verification. Confirm that Google Cloud is enabled
-          for the user or its organizational unit.
+          account in 2-Step Verification.
+          <div class="text-sm mt-2">
+            As a Workspace administrator, open <strong>Apps / Additional Google
+            services / Google Cloud Platform / Service status</strong>. First
+            select <strong>All users in this account</strong>. If the service is
+            <strong>ON for everyone</strong>, the temporary installer already
+            inherits access; leave the setting unchanged and close or cancel
+            the page. Otherwise, select the organizational unit containing the
+            temporary installer. If its status is <strong>Inherited: On</strong>
+            or <strong>On</strong>, no change is needed. If it is off, select
+            <strong>On</strong>, then <strong>Override</strong> or
+            <strong>Save</strong>. Google's
+            {{ link("https://support.google.com/a/users/answer/2655363?hl=en", "service-settings instructions") }}
+            explain inherited and overridden organizational-unit settings.
+            Changes usually apply quickly but can take up to 24 hours.
+          </div>
+          <div class="text-sm mt-2">
+            This enables the Google Cloud service only; it does not make the
+            installer a Workspace administrator or grant access to a Cloud
+            project. The installer does not need permission to create projects
+            because the permanent Owner creates the empty project in the next
+            step. To verify service access, sign in only as the temporary user
+            in a separate browser profile, open the
+            {{ link("https://console.cloud.google.com/", "Google Cloud console") }},
+            accept first-time terms if prompted, and confirm the console loads
+            without a <strong>service disabled</strong> message. Do not create a
+            project from the installer account.
+          </div>
         </li>
         <li>
           Sign in to the
@@ -260,20 +281,36 @@
           {{ link("https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects", "create-project instructions") }}:
           open <strong>Manage Resources / Create Project</strong>, select the
           business organization, name the project, and select
-          <strong>Create</strong>. If project creation is blocked, ask the
+          <strong>Create</strong>. When creation finishes, select the new
+          project in the project picker. On its <strong>Dashboard</strong>, use
+          the <strong>Project info</strong> card to confirm the project name,
+          project number, and project ID, and record the exact
+          <strong>Project ID</strong> for the installer. If project creation is blocked, ask the
           business's Workspace administrator to create it inside the business
           organization. With that project selected, open
           <strong>Navigation menu / Billing</strong>. If no Cloud Billing account
           exists, choose <strong>Manage billing accounts / Create account</strong>
           and add the business's payment details. Link that billing account to
-          the project and confirm that billing is enabled
+          the project and confirm on the Billing page that billing is enabled
           <strong>before</strong> the installer runs setup. Google's
           {{ link("https://docs.cloud.google.com/billing/docs/how-to/verify-billing-enabled", "billing-status instructions") }}
           show the same check.
         </li>
         <li>
-          With the new project still selected, open
-          <strong>Navigation menu / IAM &amp; Admin / IAM / Grant access</strong>.
+          With the new project still selected, use the search box at the top of
+          Google Cloud console to search for <strong>IAM</strong>, then open the
+          <strong>IAM</strong> page under <strong>IAM &amp; Admin</strong>. If it
+          does not appear in search, use
+          <strong>Navigation menu / IAM &amp; Admin / IAM</strong>. In
+          <strong>View by principals</strong>, find the permanent Owner's email
+          and confirm it has <strong>Basic / Owner</strong> on this project
+          directly, with no inherited source or condition. The table can show
+          several roles for one person on separate lines: an inherited
+          organization role is fine, but the <strong>Owner</strong> line itself
+          must have no entry in <strong>Inheritance</strong>. If it does not,
+          select <strong>Grant access</strong>, add the permanent Owner, assign
+          <strong>Basic / Owner</strong>, and select <strong>Save</strong>.
+          Then select <strong>Grant access</strong> again.
           Enter the temporary Workspace email under
           <strong>New principals</strong>, choose
           <strong>Basic / Owner</strong> under <strong>Assign roles</strong>, and
@@ -291,6 +328,15 @@
           Give the installer the project ID and the permanent Lagniappe Owner
           email. <strong>Never give them the Owner's Google password.</strong>
           The installer signs in with the dedicated temporary Google account.
+          When setup asks <strong>Are you installing Lagniappe for a different
+          permanent Owner?</strong>, answer <strong>Y</strong>. Setup lists only
+          active projects where that authenticated installer has a direct,
+          unconditional Project Owner role. Select the business's project by
+          number. Setup uses its project name as the installation name; it does
+          not offer to create a project in delegated mode. If no project is
+          listed, setup stops. Return to the IAM step above and verify that the
+          temporary installer has <strong>Basic / Owner</strong> directly on
+          the intended project, then rerun setup.
         </li>
         <li>
           After deployment, the installer verifies the app using Google sign-in.
@@ -356,10 +402,15 @@
         Google Cloud CLI, and installs the Python packages setup needs.
       </li>
       <li>
-        <strong>Choose and verify the Google Cloud target.</strong> Setup asks
-        for an installation name, account, project ID, and billing account. It
-        opens the Application Default Credentials browser sign-in and verifies
-        that the CLI and local Google clients use the same account and project.
+        <strong>Choose and verify the Google Cloud target.</strong> Setup first
+        asks whether this is a delegated installation. A delegated installer
+        chooses from active projects they own directly; setup never offers to
+        create one for them. For your own installation, setup asks whether the
+        project already exists. Answering yes opens a picker of active projects
+        visible to your account; answering no asks for an installation name and
+        allows setup to create a project. It then checks billing, opens the
+        Application Default Credentials browser sign-in, and verifies that the
+        CLI and local Google clients use the same account and project.
       </li>
       <li>
         <strong>Show the plan before cloud changes.</strong> Setup writes a

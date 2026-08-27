@@ -441,6 +441,207 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     )
 
 
+# @matrix setup : delegated-install existing-project gcloud-config interactive-input project-iam project-picker provider-discovery
+def test_delegated_project_picker_lists_only_direct_owner_projects(
+    monkeypatch,
+    isolated_setup_config,
+    capsys,
+):
+    from installer import create_config
+
+    commands = []
+    discovered = [
+        {
+            "projectId": "zulu-project-1",
+            "name": "Zulu Project",
+            "projectNumber": "300",
+        },
+        {
+            "projectId": "alpha-project-1",
+            "displayName": "Alpha Project",
+            "name": "projects/100",
+            "projectNumber": "100",
+        },
+        {"projectId": "bad", "name": "Invalid ID"},
+    ]
+
+    def run_gcloud(command, check=True):
+        commands.append((command, check))
+        if command[:2] == ["projects", "list"]:
+            return completed_process(command, stdout=json.dumps(discovered))
+        project_id = command[2]
+        condition = (
+            {
+                "title": "temporary",
+                "expression": (
+                    "request.time < timestamp('2030-01-01T00:00:00Z')"
+                ),
+            }
+            if project_id == "alpha-project-1"
+            else None
+        )
+        binding = {
+            "role": "roles/owner",
+            "members": ["user:installer@example.com"],
+        }
+        if condition:
+            binding["condition"] = condition
+        return completed_process(
+            command,
+            stdout=json.dumps({"bindings": [binding]}),
+        )
+
+    monkeypatch.setattr(create_config, "run_gcloud_command", run_gcloud)
+    inspected = []
+    monkeypatch.setattr(
+        create_config,
+        "_project_state",
+        lambda project_id: inspected.append(project_id)
+        or {
+            "state": "available",
+            "details": {"projectId": project_id},
+            "error": None,
+        },
+    )
+    answers = iter(["9", ""])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+
+    assert create_config._select_existing_gcloud_project(
+        "installer@example.com"
+    ) == ("Zulu Project", "zulu-project-1")
+    assert commands[0] == (
+        [
+            "projects",
+            "list",
+            "--filter=lifecycleState=ACTIVE",
+            "--format=json",
+            "--account=installer@example.com",
+        ],
+        False,
+    )
+    assert [command[0][2] for command in commands[1:]] == [
+        "alpha-project-1",
+        "zulu-project-1",
+    ]
+    assert inspected == ["zulu-project-1"]
+    output = capsys.readouterr().out
+    assert "Alpha Project" not in output
+    assert "1. Zulu Project (zulu-project-1)" in output
+    assert "Enter one of the project numbers shown above" in output
+
+    commands.clear()
+    inspected.clear()
+    monkeypatch.setattr("builtins.input", lambda prompt: "1")
+    assert create_config._select_existing_gcloud_project(
+        "installer@example.com", direct_owner_required=False
+    ) == ("Alpha Project", "alpha-project-1")
+    assert commands == [
+        (
+            [
+                "projects",
+                "list",
+                "--filter=lifecycleState=ACTIVE",
+                "--format=json",
+                "--account=installer@example.com",
+            ],
+            False,
+        )
+    ]
+    assert inspected == ["alpha-project-1"]
+    output = capsys.readouterr().out
+    assert "projects accessible to installer@example.com" in output
+    assert "1. Alpha Project (alpha-project-1)" in output
+    assert "2. Zulu Project (zulu-project-1)" in output
+
+    def no_owner_projects(command, check=True):
+        if command[:2] == ["projects", "list"]:
+            return completed_process(
+                command,
+                stdout=json.dumps([discovered[1]]),
+            )
+        return completed_process(
+            command,
+            stdout=json.dumps(
+                {
+                    "bindings": [
+                        {
+                            "role": "roles/owner",
+                            "members": ["user:installer@example.com"],
+                            "condition": {"title": "conditional"},
+                        }
+                    ]
+                }
+            ),
+        )
+
+    monkeypatch.setattr(
+        create_config,
+        "run_gcloud_command",
+        no_owner_projects,
+    )
+    with pytest.raises(
+        RuntimeError,
+        match="direct, unconditional Project Owner role",
+    ):
+        create_config._list_owned_projects("installer@example.com")
+
+
+# @matrix setup : delegated-install interactive-input ordinary-install project-picker
+def test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow(
+    monkeypatch,
+    isolated_setup_config,
+    capsys,
+):
+    from installer import create_config
+
+    selections = []
+
+    def select_existing(account, *, direct_owner_required):
+        selections.append((account, direct_owner_required))
+        return "Existing App", "existing-project-1"
+
+    monkeypatch.setattr(
+        create_config,
+        "_select_existing_gcloud_project",
+        select_existing,
+    )
+    monkeypatch.setattr(
+        create_config,
+        "_get_app_name",
+        lambda: pytest.fail("existing project should supply the app name"),
+    )
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+    assert create_config._select_initial_target("installer@example.com") == (
+        "Existing App",
+        "existing-project-1",
+    )
+    assert selections == [("installer@example.com", True)]
+
+    answers = iter(["n", "y"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    assert create_config._select_initial_target("installer@example.com") == (
+        "Existing App",
+        "existing-project-1",
+    )
+    assert selections[-1] == ("installer@example.com", False)
+
+    monkeypatch.setattr(create_config, "_get_app_name", lambda: "New App")
+    monkeypatch.setattr(
+        create_config,
+        "_get_gcloud_project",
+        lambda project_id, sanitized_name: "new-app-project-1",
+    )
+    answers = iter(["maybe", "n", "maybe", "n"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    assert create_config._select_initial_target("installer@example.com") == (
+        "New App",
+        "new-app-project-1",
+    )
+    output = capsys.readouterr().out
+    assert "Enter Y for a delegated installation" in output
+    assert "Enter Y to select an existing project" in output
+
+
 # @matrix setup : adc gcloud-config
 def test_adc_identity_reports_principal_project_and_quota(
     monkeypatch,
@@ -1193,7 +1394,11 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     adc_events = []
     permission_checks = []
 
-    monkeypatch.setattr(create_config, "_get_app_name", lambda: "Named App")
+    monkeypatch.setattr(
+        create_config,
+        "_select_initial_target",
+        lambda selected_account: ("Named App", project_id),
+    )
     monkeypatch.setattr(
         admin,
         "collect_owner_and_signin_choice",
@@ -1203,11 +1408,6 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
         or True,
     )
     monkeypatch.setattr(create_config, "_get_gcloud_account", lambda saved: account)
-    monkeypatch.setattr(
-        create_config,
-        "_get_gcloud_project",
-        lambda saved, sanitized_name: project_id,
-    )
     monkeypatch.setattr(switcher, "config_gcloud", lambda: None)
     monkeypatch.setattr(
         create_config,

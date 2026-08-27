@@ -622,6 +622,223 @@ def _get_gcloud_project(project_id, sanitized_app_name):
 
 
 # @testable false
+# @covered-by installer/create_config.py::_list_owned_projects
+# @reason per-project policy parsing is exercised through delegated discovery
+def _has_direct_project_owner_binding(project_id, account):
+    result = run_gcloud_command(
+        [
+            "projects",
+            "get-iam-policy",
+            project_id,
+            "--format=json",
+            f"--account={account}",
+        ],
+        check=False,
+    )
+    if result.returncode != 0:
+        error = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(error or "project IAM policy lookup failed")
+    try:
+        policy = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError as error:
+        raise RuntimeError("project IAM policy lookup returned invalid JSON") from error
+    member = f"user:{str(account or '').strip().casefold()}"
+    return any(
+        str(binding.get("role") or "") == "roles/owner"
+        and not binding.get("condition")
+        and member
+        in {
+            str(value or "").strip().casefold()
+            for value in binding.get("members") or ()
+        }
+        for binding in policy.get("bindings") or ()
+        if isinstance(binding, dict)
+    )
+
+
+# @testable false
+# @covered-by installer/create_config.py::_list_owned_projects
+# @covered-by installer/create_config.py::_select_existing_gcloud_project
+# @reason project discovery normalization is exercised through both picker modes
+def _list_active_projects(account):
+    """Return normalized active projects visible to the selected account."""
+    result = run_gcloud_command(
+        [
+            "projects",
+            "list",
+            "--filter=lifecycleState=ACTIVE",
+            "--format=json",
+            f"--account={account}",
+        ],
+        check=False,
+    )
+    if result.returncode != 0:
+        error = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(
+            "Could not list Google Cloud projects accessible to "
+            f"'{account}': {error or 'gcloud projects list failed'}"
+        )
+    try:
+        discovered = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError as error:
+        raise RuntimeError(
+            "Google Cloud project discovery returned invalid JSON."
+        ) from error
+    if not isinstance(discovered, list):
+        raise RuntimeError("Google Cloud project discovery returned invalid data.")
+
+    projects = []
+    seen = set()
+    for project in discovered:
+        if not isinstance(project, dict):
+            continue
+        project_id = str(project.get("projectId") or "").strip()
+        if not PROJECT_ID_PATTERN.fullmatch(project_id) or project_id in seen:
+            continue
+        display_name = str(
+            project.get("displayName") or project.get("name") or project_id
+        ).strip()
+        if not display_name or display_name.startswith("projects/"):
+            display_name = project_id
+        projects.append(
+            {
+                "project_id": project_id,
+                "display_name": display_name,
+                "project_number": str(project.get("projectNumber") or "").strip(),
+            }
+        )
+        seen.add(project_id)
+
+    projects.sort(
+        key=lambda project: (
+            project["display_name"].casefold(),
+            project["project_id"],
+        )
+    )
+    return projects
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_project_picker_lists_only_direct_owner_projects
+# @matrix setup : delegated-install existing-project gcloud-config project-iam project-picker provider-discovery
+def _list_owned_projects(account):
+    """Return active projects directly owned by the selected gcloud account."""
+    projects = []
+    policy_errors = []
+    for project in _list_active_projects(account):
+        try:
+            owner = _has_direct_project_owner_binding(
+                project["project_id"], account
+            )
+        except RuntimeError as error:
+            policy_errors.append(f"{project['project_id']}: {error}")
+            continue
+        if owner:
+            projects.append(project)
+
+    if not projects:
+        if policy_errors:
+            raise RuntimeError(
+                "Could not determine which accessible Google Cloud projects "
+                f"are directly owned by '{account}': {policy_errors[0]}"
+            )
+        raise RuntimeError(
+            f"No active Google Cloud project gives '{account}' a direct, "
+            "unconditional Project Owner role. The permanent business Owner "
+            "must create the project, link billing, and grant this installer "
+            "Basic / Owner before setup can continue."
+        )
+    return projects
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_project_picker_lists_only_direct_owner_projects
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow
+# @matrix setup : delegated-install existing-project interactive-input ordinary-install project-iam project-picker provider-discovery
+def _select_existing_gcloud_project(account, *, direct_owner_required=True):
+    """Let the operator select an active project visible to their account."""
+    if direct_owner_required:
+        projects = _list_owned_projects(account)
+        heading = f"Active Google Cloud projects owned directly by {account}:"
+    else:
+        projects = _list_active_projects(account)
+        if not projects:
+            raise RuntimeError(
+                f"No active Google Cloud projects are accessible to '{account}'. "
+                "Grant this account access to the intended project, or rerun "
+                "setup and choose the new-project path."
+            )
+        heading = f"Active Google Cloud projects accessible to {account}:"
+
+    print(f"\n{heading}")
+    for index, project in enumerate(projects, start=1):
+        print(
+            f"  {index}. {project['display_name']} "
+            f"({project['project_id']})"
+        )
+
+    while True:
+        default = " [1]" if len(projects) == 1 else ""
+        entered = input(
+            "Select the project for this installation by number"
+            f"{default}, or X to cancel: "
+        ).strip()
+        if not entered and len(projects) == 1:
+            entered = "1"
+        if entered.casefold() in {"x", "exit"}:
+            raise SetupCancelled("Setup cancelled during project selection.")
+        if entered.isdigit() and 1 <= int(entered) <= len(projects):
+            selected = projects[int(entered) - 1]
+            state = _project_state(selected["project_id"])
+            if state["state"] != "available":
+                raise RuntimeError(
+                    f"Selected project '{selected['project_id']}' could not be "
+                    "reverified as accessible to the active gcloud account."
+                )
+            print(
+                f"Selected existing project '{selected['display_name']}' "
+                f"({selected['project_id']})."
+            )
+            return selected["display_name"], selected["project_id"]
+        print("Enter one of the project numbers shown above, or X to cancel.")
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow
+# @matrix setup : delegated-install interactive-input ordinary-install project-picker
+def _select_initial_target(account):
+    """Choose the delegated picker or ordinary installation naming flow."""
+    while True:
+        answer = input(
+            "Are you installing Lagniappe for a different permanent Owner? "
+            "[y/N]: "
+        ).strip().casefold()
+        if answer in {"y", "yes"}:
+            return _select_existing_gcloud_project(
+                account, direct_owner_required=True
+            )
+        if answer in {"", "n", "no"}:
+            break
+        print("Enter Y for a delegated installation, or N for your own installation.")
+
+    while True:
+        answer = input(
+            "Has the Google Cloud project for this installation already been "
+            "created? [y/N]: "
+        ).strip().casefold()
+        if answer in {"y", "yes"}:
+            return _select_existing_gcloud_project(
+                account, direct_owner_required=False
+            )
+        if answer in {"", "n", "no"}:
+            app_name = _get_app_name()
+            sanitized_app_name = _gcloud_configuration_name(app_name)
+            project_id = _get_gcloud_project("", sanitized_app_name)
+            return app_name, project_id
+        print("Enter Y to select an existing project, or N to create one.")
+
+
+# @testable false
 # @covered-by installer/create_config.py::set_application_defaults
 # @reason deterministic name normalization exercised through config-file creation
 def _gcloud_configuration_name(name):
@@ -1659,23 +1876,26 @@ def _set_application_defaults():
         else SETTINGS.GCLOUD_CONFIG.get("PROJECT", "")
     )
 
-    if not _validate_app_name(app_name):
-        app_name = _get_app_name()
-        SETTINGS.APP["APP_NAME"] = app_name
+    SETTINGS.GCLOUD_CONFIG["ACCOUNT"] = _get_gcloud_account(account)
+    account = SETTINGS.GCLOUD_CONFIG["ACCOUNT"]
+
+    if not recovery_mode and not _validate_app_name(app_name) and not project_id:
+        app_name, selected_project = _select_initial_target(account)
     else:
-        SETTINGS.APP["APP_NAME"] = app_name
+        if not _validate_app_name(app_name):
+            app_name = _get_app_name()
+        sanitized_app_name = _gcloud_configuration_name(app_name)
+        selected_project = _get_gcloud_project(project_id, sanitized_app_name)
+
     if not _validate_app_name(app_name):
         print(f.error("A name is required for your Lagniappe installation."))
         _fail()
+    SETTINGS.APP["APP_NAME"] = app_name
 
     sanitized_app_name = _gcloud_configuration_name(app_name)
     if gcloud_name != sanitized_app_name:
         SETTINGS.GCLOUD_CONFIG["NAME"] = sanitized_app_name
 
-    SETTINGS.GCLOUD_CONFIG["ACCOUNT"] = _get_gcloud_account(account)
-    selected_project = _get_gcloud_project(
-        project_id, sanitized_app_name
-    )
     if recovery_mode and selected_project != project_id:
         raise RuntimeError(
             "Recovery cannot retarget the saved installation to another project."

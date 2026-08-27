@@ -29,6 +29,19 @@ which are a separate credential used by the Python provider clients. A new
 project is created only after default-no confirmation, then management APIs and
 billing are established before general provider work.
 
+Fresh setup asks whether the operator is installing for a different permanent
+Owner. Delegated mode never creates a project or begins with an application-name
+prompt. It lists the active projects visible to the selected gcloud account,
+reads each project-level IAM policy through that CLI session, and offers only
+projects where the installer has a direct, unconditional `roles/owner` binding.
+The selected project's display name becomes the application name. If no project
+qualifies, setup stops with instructions for the business Owner to create the
+project, link billing, and grant the installer **Basic / Owner**. Ordinary setup
+asks whether its project already exists. An existing-project answer opens a
+picker of active projects visible to the selected gcloud account and also
+derives the application name from the selection. Only the ordinary
+new-project branch asks for an application name and allows project creation.
+
 Fresh installation, settings recovery, repair, update, and upgrade all run the
 same required-API reconciler before API-dependent resource work. Doctor audits
 that exact required-service set read-only, so a disabled prerequisite is
