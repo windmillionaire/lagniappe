@@ -130,9 +130,18 @@ report, fetches the remote, replaces tracked files with `origin/main` or the
 selected remote branch, reconciles setup dependencies, reloads installer
 modules from the new source, and runs the same configuration/update flow.
 
-The command names its exact replacement target and requires confirmation.
-Ignored installation configuration and untracked files remain. Maintained forks
-should merge the desired release themselves and run `update`.
+The command resolves one exact fetched commit and reads its committed
+`package.json` version; release tags are not required, including during branch
+rehearsal. It names that exact replacement target and requires confirmation.
+Ignored installation configuration and untracked files remain. Maintained
+forks should merge the desired release themselves and run `update`.
+
+When the target crosses a major-version boundary, the deployment prompt states
+that setup does not run application migrations and lists the required
+Maintenance workflow. Declining that default-no prompt leaves the deployed
+application unchanged. A compatibility check at the deployment boundary gives
+installations upgrading directly from a pre-1.0 orchestrator the same final
+stop before App Engine deployment.
 
 ## Data migrations and jobs
 

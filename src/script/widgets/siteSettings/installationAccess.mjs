@@ -1,5 +1,10 @@
 import { SiteSetting } from "./base";
 
+/**
+ * @testable false
+ * @covered-by src/script/widgets/siteSettings/installationAccess.mjs::SiteInstallationAccess
+ * @reason display fallback is exercised through the installation-access renderer
+ */
 const display = (value) => value || "None";
 
 /**
@@ -64,7 +69,8 @@ export class SiteInstallationAccess extends SiteSetting {
 		const emailDetails = this.target.querySelector(
 			"[data-role='authentication-email-details']",
 		);
-		if (emailDetails) emailDetails.dataset.visible = email.configured ? "true" : "false";
+		if (emailDetails)
+			emailDetails.dataset.visible = email.configured ? "true" : "false";
 		const emailWarning = this.target.querySelector(
 			"[data-role='installer-email-warning']",
 		);

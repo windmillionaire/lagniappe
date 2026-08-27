@@ -98,6 +98,13 @@ those remain an explicit Owner action under **Admin → Site Settings →
 Maintenance**. Installer commands must not cross into application migrations,
 Flask, request authorization, or broad package export façades.
 
+Source upgrade fetches and inspects the selected remote commit's canonical
+`package.json` version before replacing tracked files. A major-version crossing
+is carried to the deployment prompt. Before App Engine changes, setup explains
+that the Owner must apply application updates and refresh cache after deployment
+and requires a default-no confirmation. The deployed application remains
+unchanged when that confirmation is declined.
+
 ## Focused architecture guides
 
 | Guide | Read before changing |

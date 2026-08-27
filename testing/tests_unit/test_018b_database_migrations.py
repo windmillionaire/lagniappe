@@ -655,7 +655,10 @@ def test_runner_rejects_concurrent_lease_and_recovers_interrupted_attempt():
         return _result(definition, changed=1)
 
     definition = _definition(1, "LEASED", runner)
-    status_key = datastore.key("site", "data-migration:LEASED")
+    status_key = datastore.key(
+        migrations.KINDS.site.value,
+        "data-migration:LEASED",
+    )
     status_record = datastore.entity(key=status_key, exclude_from_indexes=("attempts",))
     status_record.update(
         {
@@ -673,7 +676,9 @@ def test_runner_rejects_concurrent_lease_and_recovers_interrupted_attempt():
         }
     )
     datastore.put(status_record)
-    control = datastore.entity(key=datastore.key("site", "data-migrations-control"))
+    control = datastore.entity(
+        key=datastore.key(migrations.KINDS.site.value, "data-migrations-control")
+    )
     control.update(
         {
             "run_id": "old-run",
@@ -725,7 +730,7 @@ def test_runner_rejects_concurrent_lease_and_recovers_interrupted_attempt():
 def test_legacy_audit_projects_as_completed():
     datastore = _Datastore()
     clock = _Clock()
-    legacy_key = datastore.key("site", "legacy-set")
+    legacy_key = datastore.key(migrations.KINDS.site.value, "legacy-set")
     legacy = datastore.entity(key=legacy_key, exclude_from_indexes=("runs",))
     legacy["runs"] = json.dumps(
         [
@@ -783,7 +788,9 @@ def test_legacy_audit_projects_as_completed():
     )
     assert completed["status"] == "current"
     assert calls == ["new"]
-    assert datastore.get(datastore.key("site", "data-migration:LEGACY"))[
+    assert datastore.get(
+        datastore.key(migrations.KINDS.site.value, "data-migration:LEGACY")
+    )[
         "completion_source"
     ] == "legacy-audit"
 
@@ -792,7 +799,7 @@ def test_legacy_audit_projects_as_completed():
 def test_migration_status_rejects_malformed_ledger():
     datastore = _Datastore()
     definition = _definition(1, "BROKEN", lambda _context: None)
-    key = datastore.key("site", "data-migration:BROKEN")
+    key = datastore.key(migrations.KINDS.site.value, "data-migration:BROKEN")
     record = datastore.entity(key=key, exclude_from_indexes=("attempts",))
     record.update(
         {

@@ -35,7 +35,6 @@ import os
 
 import pytest
 
-from config import SETTINGS
 from runner.testing import (
     cleanup_test_data,
     initialize_test_data,

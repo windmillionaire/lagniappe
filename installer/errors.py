@@ -38,6 +38,9 @@ class ProviderError(SetupError):
     category = "provider"
 
 
+# @testable false
+# @covered-by installer/errors.py::google_service_terms_error
+# @reason typed provider detail container is exercised through terms-error normalization
 class ProviderTermsNotAccepted(ProviderError):
     category = "terms-not-accepted"
 

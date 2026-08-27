@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import ast
 import json
 from pathlib import Path
 import os
@@ -63,6 +64,10 @@ RELEASE_LOCAL_PATHS = (
 RELEASE_BUILD_ID_PATH = "config/constants.py"
 RELEASE_BUILD_METADATA_PATH = "lagniappe/web/static/build.json"
 RELEASE_SERVICE_WORKER_PATH = "lagniappe/web/static/sw.js"
+RELEASE_MIGRATION_CATALOG_PATH = (
+    "lagniappe/core/tools/database/migrations.py"
+)
+RELEASE_MAINTENANCE_HEADING = "## Required post-upgrade maintenance"
 RELEASE_VERSION_PATTERN = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
 )
@@ -584,11 +589,175 @@ def _read_release_json(
     return value
 
 
+# @testable false
+# @covered-by run.py::release_readiness_issues
+# @reason optional Git-object reads are exercised through migration-aware release checks
+def _read_optional_git_text(
+    repo_root: Path,
+    object_spec: str,
+) -> str | None:
+    try:
+        return _run_release_git(repo_root, ["show", object_spec]).stdout
+    except RuntimeError:
+        return None
+
+
+# @testable false
+# @covered-by run.py::release_readiness_issues
+# @reason literal catalog extraction is exercised through release-check acceptance tests
+def _migration_catalog_metadata(content: str) -> dict[str, dict]:
+    """Extract immutable migration metadata without importing application code."""
+    tree = ast.parse(content)
+    catalog_node = None
+    for node in tree.body:
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        if any(
+            isinstance(target, ast.Name) and target.id == "MIGRATION_CATALOG"
+            for target in targets
+        ):
+            catalog_node = node.value
+            break
+    if not isinstance(catalog_node, (ast.Tuple, ast.List)):
+        raise ValueError("MIGRATION_CATALOG must be a literal tuple or list.")
+
+    catalog = {}
+    for entry in catalog_node.elts:
+        if not isinstance(entry, ast.Call):
+            raise ValueError("MIGRATION_CATALOG contains a non-call entry.")
+        call_name = (
+            entry.func.id
+            if isinstance(entry.func, ast.Name)
+            else entry.func.attr
+            if isinstance(entry.func, ast.Attribute)
+            else ""
+        )
+        if call_name != "MigrationDefinition":
+            raise ValueError(
+                "MIGRATION_CATALOG entries must use MigrationDefinition."
+            )
+        keywords = {keyword.arg: keyword.value for keyword in entry.keywords if keyword.arg}
+        try:
+            metadata = {
+                name: ast.literal_eval(keywords[name])
+                for name in ("sequence", "introduced_in", "label")
+            }
+        except (KeyError, ValueError, TypeError) as error:
+            raise ValueError(
+                "MigrationDefinition identity fields must be literal values."
+            ) from error
+        id_node = keywords.get("id")
+        try:
+            migration_id = ast.literal_eval(id_node)
+        except (ValueError, TypeError):
+            migration_id = id_node.id if isinstance(id_node, ast.Name) else None
+        if not isinstance(migration_id, str) or not migration_id:
+            raise ValueError(
+                "MigrationDefinition id must be a string or imported constant."
+            )
+        metadata["id"] = migration_id
+        if migration_id in catalog:
+            raise ValueError(f"Duplicate migration id: {migration_id}.")
+        catalog[migration_id] = metadata
+    return catalog
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_major_version_for_new_migration
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_matching_migration_release_metadata
+# @matrix release migrations : major-version release-note version-metadata
+def _migration_release_issues(
+    repo_root: Path,
+    merge_base: str,
+    candidate_version: str,
+    release_note: str | None,
+) -> list[str]:
+    """Return release-policy problems introduced by new catalog entries."""
+    issues = []
+    candidate_content = _read_optional_git_text(
+        repo_root,
+        f":{RELEASE_MIGRATION_CATALOG_PATH}",
+    )
+    base_content = _read_optional_git_text(
+        repo_root,
+        f"{merge_base}:{RELEASE_MIGRATION_CATALOG_PATH}",
+    )
+    if candidate_content is None and base_content is None:
+        return issues
+    if candidate_content is None:
+        return [f"{RELEASE_MIGRATION_CATALOG_PATH} was removed from the release."]
+
+    try:
+        candidate_catalog = _migration_catalog_metadata(candidate_content)
+        base_catalog = (
+            _migration_catalog_metadata(base_content)
+            if base_content is not None
+            else {}
+        )
+    except (SyntaxError, ValueError) as error:
+        return [f"Migration catalog could not be inspected: {error}"]
+
+    new_ids = sorted(set(candidate_catalog) - set(base_catalog))
+    if not new_ids:
+        return issues
+
+    candidate_match = RELEASE_VERSION_PATTERN.fullmatch(candidate_version)
+    base_package_content = _read_optional_git_text(
+        repo_root,
+        f"{merge_base}:package.json",
+    )
+    try:
+        base_version = json.loads(base_package_content or "{}").get("version")
+    except (AttributeError, json.JSONDecodeError):
+        base_version = None
+    base_match = (
+        RELEASE_VERSION_PATTERN.fullmatch(base_version)
+        if isinstance(base_version, str)
+        else None
+    )
+    if candidate_match is None or base_match is None:
+        issues.append(
+            "New migrations require stable candidate and base X.Y.Z versions."
+        )
+        return issues
+
+    candidate_parts = tuple(int(part) for part in candidate_match.groups())
+    base_parts = tuple(int(part) for part in base_match.groups())
+    if candidate_parts[0] <= base_parts[0]:
+        issues.append(
+            "New migration catalog entries require a major version increase "
+            f"over {base_version}: {', '.join(new_ids)}."
+        )
+
+    expected_release = f"{candidate_parts[0]}.{candidate_parts[1]}"
+    mismatched = [
+        migration_id
+        for migration_id in new_ids
+        if candidate_catalog[migration_id]["introduced_in"] != expected_release
+    ]
+    if mismatched:
+        issues.append(
+            "New migrations must use introduced_in="
+            f"{expected_release!r}: {', '.join(mismatched)}."
+        )
+
+    if release_note is None or RELEASE_MAINTENANCE_HEADING not in release_note:
+        issues.append(
+            "Migration-bearing releases must include the release-note heading "
+            f"{RELEASE_MAINTENANCE_HEADING!r}."
+        )
+    return issues
+
+
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_accepts_complete_release
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_development_build
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_incomplete_release
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_major_version_for_new_migration
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_matching_migration_release_metadata
 # @matrix release : build-mode delivery-tree
+# @matrix migrations release : major-version release-note version-metadata
 def release_readiness_issues(
     repo_root: Path,
     base_ref: str,
@@ -695,6 +864,7 @@ def release_readiness_issues(
     )
     issues.extend(f"Frontend build: {issue}" for issue in frontend_issues)
 
+    release_note = None
     if version:
         release_note_relative = f"documentation/releases/{version}.md"
         release_note = _read_release_text(
@@ -711,6 +881,14 @@ def release_readiness_issues(
                 issues.append(
                     f"{release_note_relative} has no release entries."
                 )
+        issues.extend(
+            _migration_release_issues(
+                repo_root,
+                merge_base,
+                version,
+                release_note,
+            )
+        )
 
     constants_content = (
         _read_release_text(repo_root, RELEASE_BUILD_ID_PATH, issues) or ""

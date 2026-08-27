@@ -153,13 +153,34 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_legacy_upgrade_warning_can_cancel_before_provider_deploy
 # @matrix setup : deploy failure gcloud-command progress
-def deploy_to_app_engine(*, print_final_summary=True):
+# @pairs migrations:deploy setup:legacy-upgrade setup:major-version
+def deploy_to_app_engine(
+    *,
+    print_final_summary=True,
+    upgrade_notice_handled=False,
+):
     from config import SETTINGS
     from installer import FORMATTER
+    from installer.upgrade_notice import (
+        confirm_legacy_upgrade_deployment,
+        legacy_upgrade_deploy_notice_required,
+        print_post_upgrade_maintenance_steps,
+    )
     from runner.deploy import deploy
 
     f = FORMATTER.initialize()
+    legacy_upgrade_notice = (
+        not upgrade_notice_handled
+        and legacy_upgrade_deploy_notice_required(SETTINGS)
+    )
+    if legacy_upgrade_notice:
+        target_version = str(
+            SETTINGS.APP.get("VERSION") or SETTINGS.NODE.get("version") or ""
+        ).strip()
+        confirm_legacy_upgrade_deployment(f, target_version)
+
     progress = f.success(
         "Deploy App Engine indexes and application "
         "(may take up to 10 minutes)"
@@ -190,3 +211,5 @@ def deploy_to_app_engine(*, print_final_summary=True):
     if print_final_summary:
         print("Deployment complete!")
         print_summary()
+    if legacy_upgrade_notice:
+        print_post_upgrade_maintenance_steps(f)

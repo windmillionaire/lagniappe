@@ -1464,7 +1464,7 @@ def test_importer_task_page_lookup_uses_shared_find_page(monkeypatch):
             "errors": [],
         }
 
-    monkeypatch.setattr(file_ingress.files, "find_page", find_page)
+    monkeypatch.setattr(ingress_service.files, "find_page", find_page)
 
     importing = ingress_service.IngressMutationPlanner(entity)
     result = {}

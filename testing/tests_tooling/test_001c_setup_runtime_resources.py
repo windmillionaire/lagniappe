@@ -2055,7 +2055,108 @@ def test_upgrade_repository_handles_clean_status_and_status_failure(monkeypatch)
     )
 
 
+# @matrix setup : branch git-upgrade version-validation
+def test_upgrade_target_fetches_and_reads_exact_remote_version(monkeypatch, tmp_path):
+    import installer as setup_pkg
+    from installer import upgrade
+
+    monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
+    monkeypatch.setattr(upgrade, "GIT_CLI", "git")
+    monkeypatch.setattr(upgrade, "REPOSITORY_ROOT", tmp_path)
+    commit = "a" * 40
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        if command == ["git", "fetch", "--all"]:
+            return completed_process(command)
+        if command == [
+            "git",
+            "rev-parse",
+            "--verify",
+            "origin/release/candidate^{commit}",
+        ]:
+            return completed_process(command, stdout=f"{commit}\n")
+        if command == ["git", "show", f"{commit}:package.json"]:
+            return completed_process(command, stdout='{"version": "2.0.0"}\n')
+        raise AssertionError(f"Unexpected command: {command}")
+
+    monkeypatch.setattr(upgrade.subprocess, "run", fake_run)
+    spinner = SpinnerRecorder()
+
+    assert upgrade._fetch_upgrade_target(
+        spinner,
+        branch="release/candidate",
+    ) == {
+        "branch": "release/candidate",
+        "ref": "origin/release/candidate",
+        "commit": commit,
+        "version": "2.0.0",
+    }
+    assert [command for command, _kwargs in calls] == [
+        ["git", "fetch", "--all"],
+        [
+            "git",
+            "rev-parse",
+            "--verify",
+            "origin/release/candidate^{commit}",
+        ],
+        ["git", "show", f"{commit}:package.json"],
+    ]
+    assert all(kwargs["cwd"] == tmp_path for _command, kwargs in calls)
+    assert spinner.oks == ["[OK]"]
+
+
+# @matrix setup : branch failure-propagation git-upgrade version-validation
+@pytest.mark.parametrize(
+    ("resolved", "package", "expected_message"),
+    [
+        (None, None, "Could not resolve origin/main"),
+        ("b" * 40, '{"version": "2.0"}', "stable X.Y.Z version"),
+    ],
+    ids=["missing-ref", "invalid-version"],
+)
+def test_upgrade_target_rejects_missing_ref_and_invalid_version(
+    monkeypatch,
+    resolved,
+    package,
+    expected_message,
+):
+    import installer as setup_pkg
+    from installer import upgrade
+
+    monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
+    monkeypatch.setattr(upgrade, "GIT_CLI", "git")
+
+    def fake_run(command, **_kwargs):
+        if command == ["git", "fetch", "--all"]:
+            return completed_process(command)
+        if command == [
+            "git",
+            "rev-parse",
+            "--verify",
+            "origin/main^{commit}",
+        ]:
+            return completed_process(
+                command,
+                returncode=0 if resolved else 1,
+                stdout=f"{resolved}\n" if resolved else "",
+                stderr="missing" if not resolved else "",
+            )
+        if resolved and command == ["git", "show", f"{resolved}:package.json"]:
+            return completed_process(command, stdout=package)
+        raise AssertionError(f"Unexpected command: {command}")
+
+    monkeypatch.setattr(upgrade.subprocess, "run", fake_run)
+    spinner = SpinnerRecorder()
+
+    assert upgrade._fetch_upgrade_target(spinner) is None
+    assert spinner.fails == ["[X]"]
+    assert any(expected_message in message for message in spinner.messages)
+
+
 # @matrix setup : branch config-files git-upgrade post-deploy
+# @pairs migrations:major-version setup:major-version
 def test_upgrade_replaces_source_then_applies_update(monkeypatch):
     import installer as setup_pkg
     from installer import upgrade
@@ -2067,10 +2168,36 @@ def test_upgrade_replaces_source_then_applies_update(monkeypatch):
         "activate_installation",
         lambda: events.append("activate"),
     )
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(
+            SETTINGS=_fake_settings(
+                app={"VERSION": "1.4.0"},
+                node={"version": "1.4.0"},
+            )
+        ),
+    )
+    target_commit = "c" * 40
+    monkeypatch.setattr(
+        upgrade,
+        "_fetch_upgrade_target",
+        lambda spinner, branch: (
+            events.append(("inspect", branch))
+            or {
+                "branch": branch,
+                "ref": f"origin/{branch}",
+                "commit": target_commit,
+                "version": "2.0.0",
+            }
+        ),
+    )
     monkeypatch.setattr(
         upgrade,
         "_update_repository",
-        lambda spinner, branch: events.append(("replace", branch)) or True,
+        lambda spinner, branch, target_commit: (
+            events.append(("replace", branch, target_commit)) or True
+        ),
     )
     monkeypatch.setattr(
         upgrade,
@@ -2080,17 +2207,65 @@ def test_upgrade_replaces_source_then_applies_update(monkeypatch):
     monkeypatch.setattr(
         upgrade,
         "_apply_update",
-        lambda *, upgrade: events.append(("apply", upgrade)) or 0,
+        lambda **kwargs: events.append(("apply", kwargs)) or 0,
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: "y")
 
     assert upgrade.upgrade(branch="release/candidate") == 0
     assert events == [
         "activate",
-        ("replace", "release/candidate"),
+        ("inspect", "release/candidate"),
+        ("replace", "release/candidate", target_commit),
         "dependencies",
-        ("apply", True),
+        (
+            "apply",
+            {
+                "upgrade": True,
+                "installed_version": "1.4.0",
+                "target_version": "2.0.0",
+                "maintenance_required": True,
+            },
+        ),
     ]
+
+
+# @matrix migrations setup : major-version unknown-source version-validation
+def test_upgrade_maintenance_notice_version_policy():
+    from installer.upgrade_notice import (
+        parse_release_version,
+        post_upgrade_maintenance_required,
+    )
+
+    assert parse_release_version("2.3.4") == (2, 3, 4)
+    assert parse_release_version("2.3") is None
+    assert post_upgrade_maintenance_required("1.9.0", "2.0.0")
+    assert post_upgrade_maintenance_required("unknown", "2.0.0")
+    assert not post_upgrade_maintenance_required("2.0.0", "2.1.0")
+    with pytest.raises(ValueError, match="stable X.Y.Z"):
+        post_upgrade_maintenance_required("1.0.0", "next")
+
+
+# @matrix migrations setup : legacy-upgrade major-version
+def test_legacy_upgrade_deploy_notice_uses_active_operation(monkeypatch):
+    from installer import state
+    from installer.upgrade_notice import legacy_upgrade_deploy_notice_required
+
+    settings = _fake_settings(
+        app={"VERSION": "1.0.0"},
+        node={"version": "1.0.0"},
+    )
+    monkeypatch.setattr(
+        state,
+        "_ACTIVE_JOURNAL",
+        types.SimpleNamespace(payload={"mode": "upgrade"}),
+    )
+
+    assert legacy_upgrade_deploy_notice_required(settings)
+    settings.APP["VERSION"] = "1.1.0"
+    assert not legacy_upgrade_deploy_notice_required(settings)
+    settings.APP["VERSION"] = "2.0.0"
+    state._ACTIVE_JOURNAL.payload["mode"] = "install"
+    assert not legacy_upgrade_deploy_notice_required(settings)
 
 
 # @matrix setup : dependency-bootstrap git-upgrade
@@ -2126,12 +2301,16 @@ def test_upgrade_refreshes_setup_dependencies_from_replaced_checkout(monkeypatch
 
 
 # @matrix setup : config-files deferred-jobs post-deploy provider-apis public-page-settings storage-buckets
-def test_update_reloads_config_and_setup_helpers(monkeypatch):
+# @pairs migrations:major-version setup:major-version
+def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     import installer as setup_pkg
     from installer import upgrade
 
     events = []
-    settings = _fake_settings(app={}, node={"version": "2.0"})
+    settings = _fake_settings(
+        app={"VERSION": "1.5.0"},
+        node={"version": "2.0.0"},
+    )
     config_module = types.ModuleType("config")
     constants_module = types.ModuleType("config.constants")
     create_config_module = types.ModuleType("installer.create_config")
@@ -2139,7 +2318,9 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
     utils_module = types.ModuleType("installer.utils")
     deploy_module = types.ModuleType("runner.deploy")
 
-    create_config_module.update_config = lambda: events.append("update_config") or "2.0"
+    create_config_module.update_config = (
+        lambda: events.append("update_config") or "2.0.0"
+    )
     create_config_module.verify_application_config = lambda upgrade=False: (
         events.append(("verify_application_config", upgrade))
     )
@@ -2206,6 +2387,11 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
     monkeypatch.setattr(upgrade, "reload", fake_reload)
 
     assert upgrade.update() == 0
+    output = capsys.readouterr().out
+    assert "Required post-upgrade maintenance" in output
+    assert "Apply Updates" in output
+    assert "Refresh Cache" in output
+    assert "Required next steps" in output
 
     assert events == [
         "activate_installation",
@@ -3986,6 +4172,56 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
         utils.deploy_to_app_engine(print_final_summary=False)
     assert deployment_spinner.oks == ["[OK]"]
     assert deployment_spinner.fails == ["[X]"]
+
+
+# @pairs migrations:deploy setup:legacy-upgrade setup:major-version
+def test_legacy_upgrade_warning_can_cancel_before_provider_deploy(
+    monkeypatch,
+    capsys,
+):
+    import installer as setup_pkg
+    from installer import state, utils
+
+    settings = _fake_settings(
+        app={"VERSION": "1.0.0"},
+        node={"version": "1.0.0"},
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(SETTINGS=settings),
+    )
+    monkeypatch.setattr(
+        state,
+        "_ACTIVE_JOURNAL",
+        types.SimpleNamespace(payload={"mode": "upgrade"}),
+    )
+    formatter = _fake_formatter().initialize()
+    monkeypatch.setattr(
+        setup_pkg,
+        "FORMATTER",
+        types.SimpleNamespace(initialize=lambda: formatter),
+    )
+    deploy_calls = []
+    deploy_module = types.ModuleType("runner.deploy")
+    deploy_module.deploy = lambda **kwargs: deploy_calls.append(kwargs)
+    monkeypatch.setitem(sys.modules, "runner.deploy", deploy_module)
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: "n")
+    with pytest.raises(SetupCancelled, match="currently deployed application"):
+        utils.deploy_to_app_engine(print_final_summary=False)
+    assert deploy_calls == []
+    output = capsys.readouterr().out
+    assert "Required post-upgrade maintenance" in output
+    assert "Apply Updates" in output
+    assert "Refresh Cache" in output
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+    utils.deploy_to_app_engine(print_final_summary=False)
+    output = capsys.readouterr().out
+    assert len(deploy_calls) == 1
+    assert "Required next steps" in output
+    assert "  4. Select Refresh Cache." in output
 
 
 # @matrix deferred-jobs setup : cloud-scheduler iam oidc recovery runtime-isolation

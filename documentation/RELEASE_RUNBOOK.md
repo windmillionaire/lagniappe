@@ -55,6 +55,35 @@ An ordinary `next/*` push without an open pull request is skipped by the release
 workflow. Manual hosted runs are useful for diagnosis but do not replace the
 release pull request's hosted gate.
 
+### Promote a train when maintenance becomes required
+
+A train may begin as a minor or patch release before its migration needs are
+known. As soon as the release adds an Owner-run data migration or required
+cache maintenance, promote it to the next major version before opening the
+release pull request or creating hosted evidence. Rename the existing branch;
+do not create parallel histories:
+
+```bash
+git branch -m next/X.0.0
+git mv documentation/releases/A.B.C.md documentation/releases/X.0.0.md
+venv/bin/python run.py version set X.0.0
+```
+
+Update the moved note's title and add a prominent **Required post-upgrade
+maintenance** section. Set each new migration's `introduced_in` value to
+`X.0`, commit the complete retargeting change, then publish the renamed branch:
+
+```bash
+git push -u origin next/X.0.0
+git push origin --delete next/A.B.C
+```
+
+Verify the new remote branch before deleting the old one. `version set`
+updates package metadata, generated application settings, the lockfile, and
+the privacy-notice version; it does not rename an existing release note or Git
+branch. `release-check` rejects new migration catalog entries without a major
+increase, matching `introduced_in`, and the required release-note section.
+
 ## Release `next/X.Y.Z` to `main`
 
 ### 1. Finish release preparation

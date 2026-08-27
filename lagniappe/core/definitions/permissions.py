@@ -2,7 +2,7 @@
 
 from enum import Enum, auto
 
-from ..restrictions import Restriction
+from ..restrictions import Restriction  # noqa: F401 - re-exported by definitions
 from .default import DefaultEnum
 
 

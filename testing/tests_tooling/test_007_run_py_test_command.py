@@ -2219,6 +2219,17 @@ def _release_check_repository(tmp_path: Path) -> Path:
         "documentation/releases/0.1.0.md": (
             "# Version 0.1.0\n\n- Initial test release.\n"
         ),
+        "lagniappe/core/tools/database/migrations.py": (
+            "MIGRATION_CATALOG = (\n"
+            "    MigrationDefinition(\n"
+            "        sequence=1,\n"
+            "        id='BASE-001',\n"
+            "        introduced_in='0.1',\n"
+            "        label='Base migration',\n"
+            "        runner=run_base,\n"
+            "    ),\n"
+            ")\n"
+        ),
         "src/script/example.mjs": "export const value = 1;\n",
         "lagniappe/web/static/script.js": "built-main\n",
         "lagniappe/web/static/sw.js": 'const BUILD_ID = "base1234";\n',
@@ -2249,16 +2260,19 @@ def _write_release_candidate(
     *,
     mode: str = "production",
     build_id: str = "b1234567",
+    version: str = "0.2.0",
+    release_note: str | None = None,
 ):
+    release_note = release_note or (
+        f"# Version {version}\n\n- Added the release workflow.\n"
+    )
     updates = {
-        "package.json": '{"name": "lagniappe", "version": "0.2.0"}\n',
+        "package.json": f'{{"name": "lagniappe", "version": "{version}"}}\n',
         "package-lock.json": (
-            '{"name": "lagniappe", "version": "0.2.0", '
-            '"packages": {"": {"name": "lagniappe", "version": "0.2.0"}}}\n'
+            f'{{"name": "lagniappe", "version": "{version}", '
+            f'"packages": {{"": {{"name": "lagniappe", "version": "{version}"}}}}}}\n'
         ),
-        "documentation/releases/0.2.0.md": (
-            "# Version 0.2.0\n\n- Added the release workflow.\n"
-        ),
+        f"documentation/releases/{version}.md": release_note,
         "lagniappe/web/static/sw.js": f'const BUILD_ID = "{build_id}";\n',
         "config/constants.py": (f'SENTRY_DSN = "test"\nBUILD_ID = "{build_id}"\n'),
     }
@@ -2270,7 +2284,7 @@ def _write_release_candidate(
         repo,
         build_id=build_id,
         mode=mode,
-        version="0.2.0",
+        version=version,
     )
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "Prepare release")
@@ -2333,6 +2347,86 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     )
     assert result.returncode == 0
     assert "Release check passed against main" in result.stdout
+
+
+def _write_candidate_migration(repo: Path, *, introduced_in: str) -> None:
+    path = repo / "lagniappe/core/tools/database/migrations.py"
+    path.write_text(
+        "MIGRATION_CATALOG = (\n"
+        "    MigrationDefinition(\n"
+        "        sequence=1,\n"
+        "        id='BASE-001',\n"
+        "        introduced_in='0.1',\n"
+        "        label='Base migration',\n"
+        "        runner=run_base,\n"
+        "    ),\n"
+        "    MigrationDefinition(\n"
+        "        sequence=2,\n"
+        "        id='NEXT-001',\n"
+        f"        introduced_in={introduced_in!r},\n"
+        "        label='Next migration',\n"
+        "        runner=run_next,\n"
+        "    ),\n"
+        ")\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", str(path.relative_to(repo)))
+
+
+# @matrix migrations release : major-version release-note version-metadata
+def test_run_py_release_check_requires_major_version_for_new_migration(
+    tmp_path,
+    capsys,
+):
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(
+        repo,
+        release_note=(
+            "# Version 0.2.0\n\n"
+            "## Required post-upgrade maintenance\n\n"
+            "Apply updates after deployment.\n\n"
+            "- Added a migration.\n"
+        ),
+    )
+    _write_candidate_migration(repo, introduced_in="0.2")
+
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    output = capsys.readouterr().out
+    assert "require a major version increase over 0.1.0" in output
+    assert "NEXT-001" in output
+
+
+# @matrix migrations release : major-version release-note version-metadata
+def test_run_py_release_check_requires_matching_migration_release_metadata(
+    tmp_path,
+    capsys,
+):
+    release_note = (
+        "# Version 1.0.0\n\n"
+        "## Required post-upgrade maintenance\n\n"
+        "Apply updates and refresh cache after deployment.\n\n"
+        "- Added a migration.\n"
+    )
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(repo, version="1.0.0", release_note=release_note)
+    _write_candidate_migration(repo, introduced_in="0.2")
+
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    assert "must use introduced_in='1.0': NEXT-001" in capsys.readouterr().out
+
+    _write_candidate_migration(repo, introduced_in="1.0")
+    note_path = repo / "documentation/releases/1.0.0.md"
+    note_path.write_text(
+        "# Version 1.0.0\n\n- Added a migration.\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", str(note_path.relative_to(repo)))
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    assert "Required post-upgrade maintenance" in capsys.readouterr().out
+
+    note_path.write_text(release_note, encoding="utf-8")
+    _git(repo, "add", str(note_path.relative_to(repo)))
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 0
     assert "Release check passed against main" in capsys.readouterr().out
 
 

@@ -288,7 +288,7 @@ MIGRATION_CATALOG = (
     MigrationDefinition(
         sequence=3,
         id=ASSET_GENERATION_MIGRATION_ID,
-        introduced_in="0.3",
+        introduced_in="1.0",
         label="Asset generation metadata",
         runner=_run_asset_generation_migration,
     ),
@@ -525,7 +525,7 @@ def _migration_key(datastore, migration_id):
 # @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
 # @reason deterministic control key construction is exercised through lease tests
 def _control_key(datastore):
-    return datastore.key("site", MIGRATION_CONTROL_ID)
+    return datastore.key(KINDS.site.value, MIGRATION_CONTROL_ID)
 
 
 # @testable false
@@ -780,7 +780,7 @@ def _load_views(datastore, catalog):
             for key in definition.legacy_audit_keys
         )
     )
-    legacy_keys = [datastore.key("site", key) for key in legacy_ids]
+    legacy_keys = [datastore.key(KINDS.site.value, key) for key in legacy_ids]
     records = _get_multi(datastore, [*status_keys, *legacy_keys, _control_key(datastore)])
     views = []
     for definition, key in zip(catalog, status_keys):
@@ -788,7 +788,9 @@ def _load_views(datastore, catalog):
         view = _record_view(definition, record)
         if not record:
             for legacy_id in definition.legacy_audit_keys:
-                legacy = records.get(datastore.key("site", legacy_id))
+                legacy = records.get(
+                    datastore.key(KINDS.site.value, legacy_id)
+                )
                 if not legacy:
                     continue
                 legacy_projection = _legacy_view(definition, legacy)

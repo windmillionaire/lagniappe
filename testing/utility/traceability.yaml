@@ -48,6 +48,7 @@ annotated_source_roots:
   - config/ai_models.py
   - config/ai_settings.py
   - config/form_schema.py
+  - config/public_pages.py
   - run.py
   - runner/context.py
   - runner/adc.py

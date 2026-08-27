@@ -1057,7 +1057,6 @@ def _create_email_report(
 ):
     from lagniappe.core.definitions import DeferredJobSpec, DeferredJobType, Fetch
     from lagniappe.core.entities import Entities
-    from lagniappe.core.tools.database import get as database_get
     from lagniappe.core.tools.database import utility as database_utility
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
@@ -1117,7 +1116,6 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
     from lagniappe.core.definitions import Fetch
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools.database import get as database_get
-    from lagniappe.core.tools.database import utility as database_utility
     from lagniappe.core.tools.database import ai_email as email_database
 
     if event.get("type") != "email.received":
