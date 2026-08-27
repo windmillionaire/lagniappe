@@ -20,6 +20,7 @@ import pytest
 from playwright.sync_api import expect
 
 from config import SETTINGS, constants
+from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database.core import DATA, KINDS
 from testing.definitions import SitePages, Users
@@ -130,7 +131,7 @@ def test_navigate_to_manual_from_home_button(get_user):
 
     user.locate(home.MANUAL_BUTTON).click()
 
-    expect(user.page).to_have_title("Manual")
+    expect(user.page).to_have_title(f"Overview — {CONFIG.APP_NAME} Manual")
     source_link = user.locate(f"a[href='{constants.DEFAULT_SOURCE_URL}']")
     expect(source_link).to_be_visible()
     expect(source_link).to_contain_text("Source for this installation")
@@ -321,14 +322,14 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     assert DATA.datastore.get(job.key) is None
 
 
-# @matrix manual : popstate section-navigation
+# @matrix manual : metadata popstate section-navigation
 @pytest.mark.e2e
 def test_manual_ajax_section_navigation_and_popstate(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
 
     user.locate(home.MANUAL_BUTTON).click()
-    expect(user.page).to_have_title("Manual")
+    expect(user.page).to_have_title(f"Overview — {CONFIG.APP_NAME} Manual")
     expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
 
     user.page.evaluate("window.__manualNavigationToken = 'preserved'")
@@ -337,23 +338,27 @@ def test_manual_ajax_section_navigation_and_popstate(get_user):
     with user.page.expect_response("**/manual/section/forms"):
         user.page.locator("button[data-section='forms']").first.click()
     expect(user.page).to_have_url(re.compile(r".*/manual/forms$"))
+    expect(user.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
     expect(content).to_contain_text("What Forms Are For")
     assert user.page.evaluate("window.__manualNavigationToken") == "preserved"
 
     with user.page.expect_response("**/manual/section/tasks"):
         user.page.locator("button[data-section='tasks']").first.click()
     expect(user.page).to_have_url(re.compile(r".*/manual/tasks$"))
+    expect(user.page).to_have_title(f"Tasks — {CONFIG.APP_NAME} Manual")
     expect(content).to_contain_text("Tasks Live on Pages")
     assert user.page.evaluate("window.__manualNavigationToken") == "preserved"
 
     with user.page.expect_response("**/manual/section/forms"):
         user.page.go_back()
     expect(user.page).to_have_url(re.compile(r".*/manual/forms$"))
+    expect(user.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
     expect(content).to_contain_text("What Forms Are For")
 
     with user.page.expect_response("**/manual/section/tasks"):
         user.page.go_forward()
     expect(user.page).to_have_url(re.compile(r".*/manual/tasks$"))
+    expect(user.page).to_have_title(f"Tasks — {CONFIG.APP_NAME} Manual")
     expect(content).to_contain_text("Tasks Live on Pages")
 
 
@@ -483,7 +488,7 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
     )
 
     assert response.ok
-    expect(anonymous.page).to_have_title("Manual")
+    expect(anonymous.page).to_have_title(f"Security — {CONFIG.APP_NAME} Manual")
     expect(anonymous.locate("meta[name='mode']")).to_have_attribute("content", "public")
     expect(anonymous.locate("[lp-view][data-kind='manual']")).to_have_attribute(
         "initialized", ""

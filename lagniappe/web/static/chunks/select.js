@@ -1,2 +1,107 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.0.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="15155662-8c41-401f-a393-07bf45b9f301",e._sentryDebugIdIdentifier="sentry-dbid-15155662-8c41-401f-a393-07bf45b9f301");}catch(e){}}();import{STYLES as r}from"./styles.js?v=b47fb240";import{f as a}from"./foundation.js?v=b47fb240";import"./connectivity.js?v=b47fb240";import{p as l}from"./primitives.js?v=b47fb240";import{S as h}from"./select2.js?v=b47fb240";import{B as n}from"./baseElement.js?v=b47fb240";import"./icons.js?v=b47fb240";import"./combobox.js?v=b47fb240";import"./results.js?v=b47fb240";import"./storage.js?v=b47fb240";import"./formatting.js?v=b47fb240";import"./submitter.js?v=b47fb240";class m extends n{get value(){if(this.combobox?.values.size>0){const e=Array.from(this.combobox.values);return this.schema.multiple?e:e[0]}return null}changed(e){return!a(this.value,e)}active(e){return this.combobox?.values.has(e)??this.values.includes(e)}get values(){return this.hasSubmission?typeof this.submission=="string"?[this.submission]:this.submission:[]}get read(){if(this._read)return this._read;if(!this.schema.options)return null;const e=this.schema.options;return this._read=document.createElement("div"),this._read.className="flex flex-row flex-wrap gap-2",this.values.forEach(t=>{const s=e.find(o=>o.value===t);if(!s)return;const i=this._read.appendChild(document.createElement("div"));i.className=r.form.submission.default,i.textContent=s.label}),this._read.classList.add("group-data-[mode=edit]/element:hidden"),this._read}get edit(){return this._edit?this._edit:this.schema.options?(this._edit=l.select({options:this.schema.options||[],label:this.label,name:this.schema.id||this.schema.name,kind:this.renderer.kind,data:{placeholder:this.schema.placeholder||"select an option...",multiple:this.schema.multiple,preload:this.values?JSON.stringify(this.values.map(t=>({id:t}))):"[]"}}),this.combobox=new h(this._edit),this.combobox.init(),this.destroyables.push(this.combobox),(this._edit.matches?.("[lp-select]")?this._edit:this._edit.querySelector("[lp-select]"))?.classList.add("group-data-[mode=read]/element:hidden"),this._edit):null}clear(){this.combobox&&this.combobox.clear(),this.submission=null,this.edit.querySelector("select").value=""}}export{m as SelectElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=bb55a6e4';
+import { f as areEqual } from './foundation.js?v=bb55a6e4';
+import './connectivity.js?v=bb55a6e4';
+import { p as primitives } from './primitives.js?v=bb55a6e4';
+import { S as SelectBox } from './select2.js?v=bb55a6e4';
+import { B as BaseElement } from './baseElement.js?v=bb55a6e4';
+import './icons.js?v=bb55a6e4';
+import './combobox.js?v=bb55a6e4';
+import './results.js?v=bb55a6e4';
+import './storage.js?v=bb55a6e4';
+import './formatting.js?v=bb55a6e4';
+import './submitter.js?v=bb55a6e4';
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_selection_submission
+ * @matrix pages : read-mode selection-fields submission
+ */
+class SelectElement extends BaseElement {
+	get value() {
+		if (this.combobox?.values.size > 0) {
+			const values = Array.from(this.combobox.values);
+			return this.schema.multiple ? values : values[0];
+		}
+		return null;
+	}
+
+	changed(value) {
+		if (areEqual(this.value, value)) return false;
+		return true;
+	}
+
+	active(value) {
+		return this.combobox?.values.has(value) ?? this.values.includes(value);
+	}
+
+	get values() {
+		if (!this.hasSubmission) return [];
+		return typeof this.submission === "string"
+			? [this.submission]
+			: this.submission;
+	}
+
+	get read() {
+		if (this._read) return this._read;
+		if (!this.schema.options) return null;
+
+		const options = this.schema.options;
+
+		this._read = document.createElement("div");
+		this._read.className = "flex flex-row flex-wrap gap-2";
+
+		this.values.forEach((item) => {
+			const option = options.find((opt) => opt.value === item);
+			if (!option) return;
+
+			const container = this._read.appendChild(document.createElement("div"));
+			container.className = STYLES.form.submission.default;
+			container.textContent = option.label;
+		});
+
+		this._read.classList.add("group-data-[mode=edit]/element:hidden");
+
+		return this._read;
+	}
+
+	get edit() {
+		if (this._edit) return this._edit;
+		if (!this.schema.options) return null;
+
+		this._edit = primitives.select({
+			options: this.schema.options || [],
+			label: this.label,
+			name: this.schema.id || this.schema.name,
+			kind: this.renderer.kind,
+			data: {
+				placeholder: this.schema.placeholder || "select an option...",
+				multiple: this.schema.multiple,
+				preload: this.values
+					? JSON.stringify(this.values.map((value) => ({ id: value })))
+					: "[]",
+			},
+		});
+
+		this.combobox = new SelectBox(this._edit);
+		this.combobox.init();
+		this.destroyables.push(this.combobox);
+
+		const select = this._edit.matches?.("[lp-select]")
+			? this._edit
+			: this._edit.querySelector("[lp-select]");
+		select?.classList.add("group-data-[mode=read]/element:hidden");
+
+		return this._edit;
+	}
+
+	clear() {
+		if (this.combobox) {
+			this.combobox.clear();
+		}
+		this.submission = null;
+		this.edit.querySelector("select").value = "";
+	}
+}
+
+export { SelectElement };

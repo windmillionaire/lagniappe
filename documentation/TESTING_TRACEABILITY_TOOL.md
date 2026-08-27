@@ -47,6 +47,14 @@ full.
 It also folds affected template-contract errors and warnings into the same
 check; use the dedicated template command for exhaustive selector evidence.
 
+Changed-mode findings are guidance about evidence that may have been affected,
+not an instruction to reshape production code around a smaller validation
+scope. Prefer the implementation and test placement that fit the application.
+Run focused checks first for useful feedback, expand locally when that is
+worthwhile, and clearly hand off any affected tests that were not rerun. The
+release workflow still establishes the complete validated evidence set before
+main.
+
 ## Closing the agent feedback loop
 
 Tests run through `run.py test` automatically record outcomes in

@@ -1,2 +1,324 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.0.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="be1f691a-2f54-4813-a977-2690a9e8471b",e._sentryDebugIdIdentifier="sentry-dbid-be1f691a-2f54-4813-a977-2690a9e8471b");}catch(e){}}();import{STYLES as C}from"./styles.js?v=b47fb240";import{b as A}from"./buttons.js?v=b47fb240";import{r as T,w as B,a as U}from"./foundation.js?v=b47fb240";import"./connectivity.js?v=b47fb240";import{Modal as D}from"./modal.js?v=b47fb240";import{S as F}from"./base.js?v=b47fb240";import"./icons.js?v=b47fb240";import"./formatting.js?v=b47fb240";class z extends F{constructor(e){super(e),this._migrationStatus=null}init(){this._initActions(),this._initConfiguration()}updated(e){this._migrationStatus=e.migration_status||null}postreconcile(){this._renderMigrationStatus(this._migrationStatus)}_initActions(){const e=this.target.querySelector("[data-role='rebuild-cache']"),i=this.target.querySelector("[data-role='site-update']");if(!e||!i)return;const a=A.active({existingButton:e,icon:"database",text:"Refresh Cache",processingText:"Refreshing Cache",completedText:"Cache Refreshed",processingIcon:"spinner",completedIcon:"check"});a.element.addEventListener("click",async()=>{a.activate();const c=await T.post(this.endpoints.rebuildCache);if(c?.migration_status&&(this._migrationStatus=c.migration_status),!c.ok){await B(()=>{a.deactivate("Refresh Cache"),this._renderMigrationStatus(this._migrationStatus)},{label:"site-settings:cache-error"});return}a.deactivate(),U()});const s=A.active({existingButton:i,icon:"installation",text:"Apply Updates",processingText:"Applying Site Updates",completedText:"Updates Applied",processingIcon:"spinner",completedIcon:"check"});s.element.addEventListener("click",async()=>{s.activate();const c=await T.post(this.endpoints.siteUpdate);if(c?.migration_status&&(this._migrationStatus=c.migration_status),!c.ok){await B(()=>{s.deactivate("Apply Updates"),this._renderMigrationStatus(this._migrationStatus)},{label:"site-settings:update-error"});return}await B(()=>{s.deactivate(),this._renderMigrationStatus(this._migrationStatus)},{label:"site-settings:update-complete"}),U()})}_initConfiguration(){const e=this.target.querySelector("[data-role='configuration']"),i=e?A.active({existingButton:e,icon:"configuration",text:"Configuration",processingText:"Loading Configuration",completedText:"Configuration",completedIcon:"configuration"}):null;e?.addEventListener("click",async()=>{i.activate();const a=new D(this.view,e);try{await a.load(this.endpoints.siteConfiguration)}finally{i.deactivate()}})}_renderMigrationStatus(e){const i=this.target.querySelector("[data-role='migration-status']");if(!i)return;const a=i.querySelector("[data-role='migration-status-title']"),s=i.querySelector("[data-role='migration-status-summary']"),c=i.querySelector("[data-role='migration-status-results']"),m=i.querySelector("[data-role='migration-status-repairs']"),g=i.querySelector("[data-role='migration-status-errors']"),x=this.target.querySelector("[data-role='site-update']"),v=this.target.querySelector("[data-role='rebuild-cache']");c.replaceChildren(),m?.replaceChildren(),g.replaceChildren(),i.dataset.visible="true";const L=e?.status||"current",S=e?.counts||{},h=(S.pending||0)+(S.failed||0)+(S.interrupted||0)+(S.blocked||0);x&&(x.disabled=!["pending","failed"].includes(L),x.title=h?`Apply ${h} pending site ${h===1?"update":"updates"}`:"All site updates are complete"),v&&(v.disabled=!e?.cache_refresh_allowed,v.title=e?.cache_refresh_allowed?"Refresh cached and search data":"Apply all site updates before refreshing the cache");const u=e?.current_version?`Version ${e.current_version}. `:"",M=(e?.migrations||[]).filter(r=>r.source!=="fresh-install"),k=M.filter(r=>r.state==="complete").length;switch(L){case"pending":a.textContent="Site updates are ready",s.textContent=`${u}${h} pending site ${h===1?"update":"updates"}.`;break;case"running":a.textContent="Site updates are running",s.textContent=`${u}Another update request is currently working through the migration catalog.`;break;case"failed":a.textContent="Site updates need attention",s.textContent=`${u}Fix or retry the first incomplete update; later updates remain blocked.`;break;case"audit-error":a.textContent="Site update history needs repair",s.textContent=`${u}Stored migration identity or history does not match this build.`;break;default:a.textContent="Site updates are current",s.textContent=k?`${u}${k} site ${k===1?"update":"updates"} completed.`:`${u}No site updates are required.`}const w=(r,o,l)=>{if(!r)return;const d=document.createElement("li");if(d.textContent=l.url?`${o}: ${l.message} `:`${o} ${l.key}: ${l.message}`,l.url){const p=document.createElement("a");p.href=l.url,p.textContent=l.link_label||"Open record",p.className=C.link.emphasized,d.appendChild(p)}r.appendChild(d)},N={complete:"Completed",pending:"Pending",running:"Running",failed:"Failed",interrupted:"Interrupted \u2014 retry available",blocked:"Blocked by an earlier update","audit-error":"Audit error"},_=new Map;for(const r of M){const o=r.introduced_in||"Unknown";_.has(o)||_.set(o,[]),_.get(o).push(r)}for(const[r,o]of _){const l=document.createElement("li"),d=document.createElement("details");d.open=o.some(t=>t.state!=="complete");const p=document.createElement("summary"),V=o.filter(t=>t.state==="complete").length;p.textContent=`Version ${r} \u2014 ${V}/${o.length} completed`,p.className=C.siteSettings.migration.releaseSummary,d.appendChild(p);const E=document.createElement("ul");E.className=C.siteSettings.migration.migrationList;for(const t of o){const y=document.createElement("li"),f=t.attempts||[],I=f.length,R=t.state==="complete"?[...f].reverse().find(n=>n.status==="complete"):f.at(-1);if(y.textContent=`${t.id} \u2014 ${t.label}: ${N[t.state]||t.state}`,t.completed_at){const n=document.createElement("div"),b=t.completed_version?`version ${t.completed_version}`:"an earlier version",$=t.completed_build_id?`, build ${t.completed_build_id}`:"";n.textContent=`Completed on ${b}${$} \xB7 ${I} recorded ${I===1?"attempt":"attempts"}`,n.className=C.siteSettings.migration.completion,y.appendChild(n)}if(t.audit_error&&w(g,t.id,{key:"audit",message:t.audit_error}),f.length){const n=document.createElement("ul");n.className=C.siteSettings.migration.attemptList;for(const b of f){const $=document.createElement("li"),q=b.totals||{};$.textContent=`${b.status}: ${q.changed||0} changed, ${q.repaired||0} repaired, ${q.failed||0} failed`,n.appendChild($)}y.appendChild(n)}for(const n of R?.repairs||[])w(m,t.id,n);for(const n of R?.errors||[])w(g,t.id,n);E.appendChild(y)}d.appendChild(E),l.appendChild(d),c.appendChild(l)}m&&(m.dataset.visible=m.childElementCount?"true":"false"),g.dataset.visible=g.childElementCount?"true":"false"}}export{z as SiteMaintenance};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=bb55a6e4';
+import { b as buttons } from './buttons.js?v=bb55a6e4';
+import { r as request, w as withTransition, a as clearRecentSearchResults } from './foundation.js?v=bb55a6e4';
+import './connectivity.js?v=bb55a6e4';
+import { Modal } from './modal.js?v=bb55a6e4';
+import { S as SiteSetting } from './base.js?v=bb55a6e4';
+import './icons.js?v=bb55a6e4';
+import './formatting.js?v=bb55a6e4';
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+ * @pair admin:configuration-modal
+ */
+class SiteMaintenance extends SiteSetting {
+	constructor(attributes) {
+		super(attributes);
+		this._migrationStatus = null;
+	}
+
+	init() {
+		this._initActions();
+		this._initConfiguration();
+	}
+
+	updated(response) {
+		this._migrationStatus = response.migration_status || null;
+	}
+
+	postreconcile() {
+		this._renderMigrationStatus(this._migrationStatus);
+	}
+
+	_initActions() {
+		const cacheButton = this.target.querySelector(
+			"[data-role='rebuild-cache']",
+		);
+		const updateButton = this.target.querySelector("[data-role='site-update']");
+		if (!cacheButton || !updateButton) return;
+
+		const rebuildCache = buttons.active({
+			existingButton: cacheButton,
+			icon: "database",
+			text: "Refresh Cache",
+			processingText: "Refreshing Cache",
+			completedText: "Cache Refreshed",
+			processingIcon: "spinner",
+			completedIcon: "check",
+		});
+
+		rebuildCache.element.addEventListener("click", async () => {
+			rebuildCache.activate();
+			const response = await request.post(this.endpoints.rebuildCache);
+			if (response?.migration_status) {
+				this._migrationStatus = response.migration_status;
+			}
+			if (!response.ok) {
+				await withTransition(
+					() => {
+						rebuildCache.deactivate("Refresh Cache");
+						this._renderMigrationStatus(this._migrationStatus);
+					},
+					{ label: "site-settings:cache-error" },
+				);
+				return;
+			}
+			rebuildCache.deactivate();
+			clearRecentSearchResults();
+		});
+
+		const applyUpdates = buttons.active({
+			existingButton: updateButton,
+			icon: "installation",
+			text: "Apply Updates",
+			processingText: "Applying Site Updates",
+			completedText: "Updates Applied",
+			processingIcon: "spinner",
+			completedIcon: "check",
+		});
+
+		applyUpdates.element.addEventListener("click", async () => {
+			applyUpdates.activate();
+			const response = await request.post(this.endpoints.siteUpdate);
+			if (response?.migration_status) {
+				this._migrationStatus = response.migration_status;
+			}
+			if (!response.ok) {
+				await withTransition(
+					() => {
+						applyUpdates.deactivate("Apply Updates");
+						this._renderMigrationStatus(this._migrationStatus);
+					},
+					{ label: "site-settings:update-error" },
+				);
+				return;
+			}
+			await withTransition(
+				() => {
+					applyUpdates.deactivate();
+					this._renderMigrationStatus(this._migrationStatus);
+				},
+				{ label: "site-settings:update-complete" },
+			);
+			clearRecentSearchResults();
+		});
+	}
+
+	_initConfiguration() {
+		const configurationButton = this.target.querySelector(
+			"[data-role='configuration']",
+		);
+		const configuration = configurationButton
+			? buttons.active({
+					existingButton: configurationButton,
+					icon: "configuration",
+					text: "Configuration",
+					processingText: "Loading Configuration",
+					completedText: "Configuration",
+					completedIcon: "configuration",
+				})
+			: null;
+		configurationButton?.addEventListener("click", async () => {
+			configuration.activate();
+			const modal = new Modal(this.view, configurationButton);
+			try {
+				await modal.load(this.endpoints.siteConfiguration);
+			} finally {
+				configuration.deactivate();
+			}
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_migration_status_uses_generic_release_states
+	 * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repairs running version-history
+	 */
+	_renderMigrationStatus(status) {
+		const panel = this.target.querySelector("[data-role='migration-status']");
+		if (!panel) return;
+
+		const title = panel.querySelector("[data-role='migration-status-title']");
+		const summary = panel.querySelector(
+			"[data-role='migration-status-summary']",
+		);
+		const results = panel.querySelector(
+			"[data-role='migration-status-results']",
+		);
+		const repairs = panel.querySelector(
+			"[data-role='migration-status-repairs']",
+		);
+		const errors = panel.querySelector("[data-role='migration-status-errors']");
+		const updateButton = this.target.querySelector("[data-role='site-update']");
+		const cacheButton = this.target.querySelector(
+			"[data-role='rebuild-cache']",
+		);
+
+		results.replaceChildren();
+		repairs?.replaceChildren();
+		errors.replaceChildren();
+		panel.dataset.visible = "true";
+
+		const state = status?.status || "current";
+		const counts = status?.counts || {};
+		const pendingCount =
+			(counts.pending || 0) +
+			(counts.failed || 0) +
+			(counts.interrupted || 0) +
+			(counts.blocked || 0);
+		if (updateButton) {
+			updateButton.disabled = !["pending", "failed"].includes(state);
+			updateButton.title = pendingCount
+				? `Apply ${pendingCount} pending site ${pendingCount === 1 ? "update" : "updates"}`
+				: "All site updates are complete";
+		}
+		if (cacheButton) {
+			cacheButton.disabled = !status?.cache_refresh_allowed;
+			cacheButton.title = status?.cache_refresh_allowed
+				? "Refresh cached and search data"
+				: "Apply all site updates before refreshing the cache";
+		}
+
+		const version = status?.current_version
+			? `Version ${status.current_version}. `
+			: "";
+		const visibleMigrations = (status?.migrations || []).filter(
+			(migration) => migration.source !== "fresh-install",
+		);
+		const visibleCompleted = visibleMigrations.filter(
+			(migration) => migration.state === "complete",
+		).length;
+		switch (state) {
+			case "pending":
+				title.textContent = "Site updates are ready";
+				summary.textContent = `${version}${pendingCount} pending site ${pendingCount === 1 ? "update" : "updates"}.`;
+				break;
+			case "running":
+				title.textContent = "Site updates are running";
+				summary.textContent = `${version}Another update request is currently working through the migration catalog.`;
+				break;
+			case "failed":
+				title.textContent = "Site updates need attention";
+				summary.textContent = `${version}Fix or retry the first incomplete update; later updates remain blocked.`;
+				break;
+			case "audit-error":
+				title.textContent = "Site update history needs repair";
+				summary.textContent = `${version}Stored migration identity or history does not match this build.`;
+				break;
+			default:
+				title.textContent = "Site updates are current";
+				summary.textContent = visibleCompleted
+					? `${version}${visibleCompleted} site ${visibleCompleted === 1 ? "update" : "updates"} completed.`
+					: `${version}No site updates are required.`;
+		}
+
+		const appendDetail = (list, migrationId, detail) => {
+			if (!list) return;
+			const item = document.createElement("li");
+			item.textContent = detail.url
+				? `${migrationId}: ${detail.message} `
+				: `${migrationId} ${detail.key}: ${detail.message}`;
+			if (detail.url) {
+				const link = document.createElement("a");
+				link.href = detail.url;
+				link.textContent = detail.link_label || "Open record";
+				link.className = STYLES.link.emphasized;
+				item.appendChild(link);
+			}
+			list.appendChild(item);
+		};
+
+		const stateLabels = {
+			complete: "Completed",
+			pending: "Pending",
+			running: "Running",
+			failed: "Failed",
+			interrupted: "Interrupted — retry available",
+			blocked: "Blocked by an earlier update",
+			"audit-error": "Audit error",
+		};
+		const releases = new Map();
+		for (const migration of visibleMigrations) {
+			const release = migration.introduced_in || "Unknown";
+			if (!releases.has(release)) releases.set(release, []);
+			releases.get(release).push(migration);
+		}
+
+		for (const [release, migrations] of releases) {
+			const releaseItem = document.createElement("li");
+			const releaseDetails = document.createElement("details");
+			releaseDetails.open = migrations.some(
+				(migration) => migration.state !== "complete",
+			);
+			const releaseSummary = document.createElement("summary");
+			const completed = migrations.filter(
+				(migration) => migration.state === "complete",
+			).length;
+			releaseSummary.textContent = `Version ${release} — ${completed}/${migrations.length} completed`;
+			releaseSummary.className = STYLES.siteSettings.migration.releaseSummary;
+			releaseDetails.appendChild(releaseSummary);
+			const migrationList = document.createElement("ul");
+			migrationList.className = STYLES.siteSettings.migration.migrationList;
+
+			for (const migration of migrations) {
+				const migrationItem = document.createElement("li");
+				const attempts = migration.attempts || [];
+				const attemptCount = attempts.length;
+				const detailAttempt =
+					migration.state === "complete"
+						? [...attempts]
+								.reverse()
+								.find((attempt) => attempt.status === "complete")
+						: attempts.at(-1);
+				migrationItem.textContent = `${migration.id} — ${migration.label}: ${stateLabels[migration.state] || migration.state}`;
+				if (migration.completed_at) {
+					const completion = document.createElement("div");
+					const completedVersion = migration.completed_version
+						? `version ${migration.completed_version}`
+						: "an earlier version";
+					const completedBuild = migration.completed_build_id
+						? `, build ${migration.completed_build_id}`
+						: "";
+					completion.textContent = `Completed on ${completedVersion}${completedBuild} · ${attemptCount} recorded ${attemptCount === 1 ? "attempt" : "attempts"}`;
+					completion.className = STYLES.siteSettings.migration.completion;
+					migrationItem.appendChild(completion);
+				}
+				if (migration.audit_error) {
+					appendDetail(errors, migration.id, {
+						key: "audit",
+						message: migration.audit_error,
+					});
+				}
+				if (attempts.length) {
+					const history = document.createElement("ul");
+					history.className = STYLES.siteSettings.migration.attemptList;
+					for (const attempt of attempts) {
+						const attemptItem = document.createElement("li");
+						const totals = attempt.totals || {};
+						attemptItem.textContent = `${attempt.status}: ${totals.changed || 0} changed, ${totals.repaired || 0} repaired, ${totals.failed || 0} failed`;
+						history.appendChild(attemptItem);
+					}
+					migrationItem.appendChild(history);
+				}
+				for (const repair of detailAttempt?.repairs || []) {
+					appendDetail(repairs, migration.id, repair);
+				}
+				for (const failure of detailAttempt?.errors || []) {
+					appendDetail(errors, migration.id, failure);
+				}
+				migrationList.appendChild(migrationItem);
+			}
+			releaseDetails.appendChild(migrationList);
+			releaseItem.appendChild(releaseDetails);
+			results.appendChild(releaseItem);
+		}
+		if (repairs) {
+			repairs.dataset.visible = repairs.childElementCount ? "true" : "false";
+		}
+		errors.dataset.visible = errors.childElementCount ? "true" : "false";
+	}
+}
+
+export { SiteMaintenance };

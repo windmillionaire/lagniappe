@@ -40,8 +40,10 @@ These instructions apply to the whole repository unless a more specific
   the runner rejects that selection as ambiguous. Use the path/nodeid alone for
   focused checks.
 - Keep long or risky test runs cancellable: prefer focused real nodeids or one
-  file at a time, expand only after probes pass, and avoid starting broad
-  E2E/full suite runs unless the user explicitly asks for them.
+  file at a time for early feedback, then expand when the affected scope makes
+  a broader run useful. Broad runs are allowed, and a task may also hand off
+  affected tests for the release-wide validation run instead of rerunning
+  everything locally; clearly state what was and was not validated.
 - Do not run E2E pytest, `test-server`, or `browser-review` sessions in
   parallel against the managed testing server. The first session to finish will
   run teardown and clear shared test data/server state out from under the

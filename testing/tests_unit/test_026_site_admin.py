@@ -7,6 +7,7 @@ from google.cloud.datastore import Key
 import pytest
 
 from lagniappe.core.definitions import FetchDepth, FetchReason
+from lagniappe.core.definitions.manual import MANUAL_SECTIONS
 from lagniappe.core.entities.group import UserGroup
 from lagniappe.core.entities.page import Page
 from lagniappe.core.entities.user import User
@@ -185,21 +186,75 @@ def test_public_metadata_uses_safe_fallbacks_and_selected_document_image(monkeyp
     assert result["robots"] == "index, follow"
 
 
+# @matrix manual : canonical-url metadata search-discovery
+# @matrix manual sitemap : canonical-url public-url
+def test_public_manual_metadata_and_urls_are_canonical(monkeypatch):
+    monkeypatch.setattr(
+        public_pages,
+        "absolute_url",
+        lambda path: f"https://site.test{path}",
+    )
+
+    overview = public_pages.manual_metadata(
+        MANUAL_SECTIONS[0],
+        indexing=True,
+        app_name="Demo",
+    )
+    forms = public_pages.manual_metadata(
+        MANUAL_SECTIONS[2],
+        indexing=False,
+        app_name="Demo",
+    )
+
+    assert overview == {
+        "path": "/manual/",
+        "canonical_url": "https://site.test/manual/",
+        "title": "Overview — Demo Manual",
+        "description": "Read the Overview section of the Demo manual.",
+        "robots": "index, follow",
+    }
+    assert forms == {
+        "path": "/manual/forms",
+        "canonical_url": "https://site.test/manual/forms",
+        "title": "Forms — Demo Manual",
+        "description": "Read the Forms section of the Demo manual.",
+        "robots": "noindex, follow",
+    }
+
+    urls = public_pages.discoverable_manual_urls()
+    assert len(urls) == len(MANUAL_SECTIONS)
+    assert urls[0] == "https://site.test/manual/"
+    assert "https://site.test/manual/overview" not in urls
+    assert "https://site.test/manual/security" in urls
+    assert not any("/manual/section/" in url for url in urls)
+
+
 # @matrix public-pages robots : disabled enabled public-assets
+# @matrix manual robots : disabled enabled fragment
 def test_robots_text_allows_public_surface_and_advertises_enabled_sitemap():
     disabled = public_pages.robots_text(
         False,
         sitemap_url="https://site.test/sitemap.xml",
+        public_manual=True,
     )
     enabled = public_pages.robots_text(
         True,
         sitemap_url="https://site.test/sitemap.xml",
+        public_manual=True,
+    )
+    private_manual = public_pages.robots_text(
+        True,
+        sitemap_url="https://site.test/sitemap.xml",
+        public_manual=False,
     )
 
     assert "Disallow: /" in disabled
     assert "Allow: /pages/public/" in disabled
+    assert "Allow: /manual/" in disabled
+    assert "Disallow: /manual/section/" in disabled
     assert "Sitemap:" not in disabled
     assert "Sitemap: https://site.test/sitemap.xml" in enabled
+    assert "Allow: /manual/" not in private_manual
 
 
 # @matrix public-pages sitemap : dedupe limit sorted xml

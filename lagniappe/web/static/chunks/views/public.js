@@ -1,2 +1,110 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.0.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="2ef97ca3-e362-4006-a838-c931f16a5e57",e._sentryDebugIdIdentifier="sentry-dbid-2ef97ca3-e362-4006-a838-c931f16a5e57");}catch(e){}}();function u(e,t){const a=t.createElement("textarea");a.value=e,a.setAttribute("readonly",""),a.style.position="fixed",a.style.opacity="0",t.body.append(a),a.select();let r=!1;try{r=t.execCommand("copy")}finally{a.remove()}return r}async function d(e,t=document){try{if(navigator.clipboard?.writeText)return await navigator.clipboard.writeText(e),!0}catch{}return u(e,t)}async function y(e,t=document){const a=e.closest('[data-role="public-share"]'),r=a?.querySelector('[data-role="share-status"]'),i=a?.querySelector('[data-role="share-fallback"]'),n=i?.querySelector('[data-role="share-url"]'),o={title:e.dataset.shareTitle,text:e.dataset.shareText,url:e.dataset.shareUrl};if(typeof navigator.share=="function"){let c=!0;try{c=typeof navigator.canShare!="function"||navigator.canShare(o)}catch{c=!1}if(c)try{await navigator.share(o);return}catch(s){if(s?.name==="AbortError")return}}if(await d(o.url,t)){r&&(r.textContent="Link copied");return}i&&n&&(i.classList.remove("hidden"),n.focus(),n.select(),r&&(r.textContent="Select and copy the page link"))}function f(e=document){const t=e.querySelector('[data-role="share-button"]');!t||t.dataset.shareInitialized==="true"||(t.dataset.shareInitialized="true",t.addEventListener("click",()=>{y(t,e)}))}function l(){f()}l();export{l as startPublicPage};
 /*! Third-party licenses: /third-party-licenses.txt */
+/**
+ * @testable false
+ * @covered-by src/script/shared/publicShare.mjs::copyPublicUrl
+ * @reason legacy clipboard fallback is exercised through the public copy API
+ */
+function legacyCopy(url, documentRef) {
+	const textarea = documentRef.createElement("textarea");
+	textarea.value = url;
+	textarea.setAttribute("readonly", "");
+	textarea.style.position = "fixed";
+	textarea.style.opacity = "0";
+	documentRef.body.append(textarea);
+	textarea.select();
+	let copied = false;
+	try {
+		copied = documentRef.execCommand("copy");
+	} finally {
+		textarea.remove();
+	}
+	return copied;
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_047_public_sharing.py::test_public_share_uses_native_api_and_clipboard_fallbacks
+ * @matrix public-pages : clipboard fallback sharing
+ */
+async function copyPublicUrl(url, root = document) {
+	try {
+		if (navigator.clipboard?.writeText) {
+			await navigator.clipboard.writeText(url);
+			return true;
+		}
+	} catch {
+		// Continue through the synchronous fallback when clipboard permission fails.
+	}
+	return legacyCopy(url, root);
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_047_public_sharing.py::test_public_share_uses_native_api_and_clipboard_fallbacks
+ * @matrix public-pages : abort clipboard native-share selectable-url
+ */
+async function sharePublicPage(button, root = document) {
+	const container = button.closest('[data-role="public-share"]');
+	const status = container?.querySelector('[data-role="share-status"]');
+	const fallback = container?.querySelector('[data-role="share-fallback"]');
+	const input = fallback?.querySelector('[data-role="share-url"]');
+	const payload = {
+		title: button.dataset.shareTitle,
+		text: button.dataset.shareText,
+		url: button.dataset.shareUrl,
+	};
+
+	if (typeof navigator.share === "function") {
+		let supported = true;
+		try {
+			supported =
+				typeof navigator.canShare !== "function" || navigator.canShare(payload);
+		} catch {
+			supported = false;
+		}
+		if (supported) {
+			try {
+				await navigator.share(payload);
+				return;
+			} catch (error) {
+				if (error?.name === "AbortError") return;
+			}
+		}
+	}
+
+	if (await copyPublicUrl(payload.url, root)) {
+		if (status) status.textContent = "Link copied";
+		return;
+	}
+	if (fallback && input) {
+		fallback.classList.remove("hidden");
+		input.focus();
+		input.select();
+		if (status) status.textContent = "Select and copy the page link";
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_047_public_sharing.py::test_public_share_initialization_binds_one_click_handler
+ * @matrix public-pages : initialization sharing
+ */
+function initializePublicSharing(root = document) {
+	const button = root.querySelector('[data-role="share-button"]');
+	if (!button || button.dataset.shareInitialized === "true") return;
+	button.dataset.shareInitialized = "true";
+	button.addEventListener("click", () => void sharePublicPage(button, root));
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_047_public_sharing.py::test_public_share_entry_initializes_once
+ * @matrix public-pages : entrypoint initialization
+ */
+function startPublicPage() {
+	initializePublicSharing();
+}
+
+startPublicPage();
+
+export { startPublicPage };

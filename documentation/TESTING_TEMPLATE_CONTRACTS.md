@@ -54,9 +54,11 @@ venv/bin/python run.py template-contracts --baseline reports/template-contract-b
 ```
 
 `--changed [BASE]` includes contracts reached from changed tests or templates.
-Any changed frontend module causes the full contract set to be checked because
-handler and widget changes can affect every template. `BASE` defaults to
-`HEAD`.
+For changed frontend modules, it includes contracts whose expanded attributes
+are implemented or consumed by that module, such as widget classes,
+`data-role`/`dataset` selectors, controls, and submit handlers. Source
+traceability remains responsible for tests linked directly to the changed
+frontend symbol. `BASE` defaults to `HEAD`.
 
 JSON uses the same versioned envelope and provenance fields as traceability.
 Markdown defaults to `reports/template-contracts*.md`; use `--no-report` for a

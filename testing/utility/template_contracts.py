@@ -846,7 +846,7 @@ class JsIndex:
     dataset_names: dict[str, list[str]]
     direct_controls: dict[str, list[str]]
     submit_contracts: dict[str, list[str]]
-    generic_control_handler: bool
+    generic_control_handlers: list[str]
 
 
 @dataclass
@@ -862,7 +862,7 @@ def collect_js_index(repo_root: Path) -> JsIndex:
     dataset_names: dict[str, list[str]] = defaultdict(list)
     direct_controls: dict[str, list[str]] = defaultdict(list)
     submit_contracts: dict[str, list[str]] = defaultdict(list)
-    generic_control_handler = False
+    generic_control_handlers: list[str] = []
 
     for path in sorted((repo_root / "src/script").rglob("*.mjs")):
         text = path.read_text(encoding="utf-8")
@@ -881,7 +881,7 @@ def collect_js_index(repo_root: Path) -> JsIndex:
         for match in HAS_ATTRIBUTE_RE.finditer(text):
             submit_contracts[match.group("attr")].append(rel)
         if "control || button?.hasAttribute" in text:
-            generic_control_handler = True
+            generic_control_handlers.append(rel)
 
     return JsIndex(
         classes={key: unique(values) for key, values in classes.items()},
@@ -889,8 +889,36 @@ def collect_js_index(repo_root: Path) -> JsIndex:
         dataset_names={key: unique(values) for key, values in dataset_names.items()},
         direct_controls={key: unique(values) for key, values in direct_controls.items()},
         submit_contracts={key: unique(values) for key, values in submit_contracts.items()},
-        generic_control_handler=generic_control_handler,
+        generic_control_handlers=unique(generic_control_handlers),
     )
+
+
+def contract_js_dependencies(
+    entry: ContractEntry,
+    js_index: JsIndex,
+) -> set[str]:
+    """Return frontend modules that implement or consume an entry's attributes."""
+    dependencies: set[str] = set()
+    for attr in entry.attributes:
+        if attr.name.startswith("data-"):
+            dependencies.update(js_index.dataset_names.get(attr.name[5:], []))
+        if attr.value is None or attr.dynamic:
+            continue
+        if attr.name == "data-role":
+            dependencies.update(js_index.role_consumers.get(attr.value, []))
+        elif attr.name == "data-widget":
+            dependencies.update(js_index.classes.get(attr.value, []))
+        elif attr.name == "lp-control":
+            dependencies.update(js_index.direct_controls.get(attr.value, []))
+            dependencies.update(js_index.generic_control_handlers)
+        elif attr.name in SUBMIT_BUTTON_CONTRACTS.values():
+            dependencies.update(js_index.submit_contracts.get(attr.name, []))
+        elif attr.name in {"data-destination", "lp-show"}:
+            target = attr.value.split(":", 1)[-1]
+            dependencies.update(js_index.classes.get(target, []))
+            if attr.name == "lp-show":
+                dependencies.update(js_index.generic_control_handlers)
+    return dependencies
 
 
 def collect_template_index(repo_root: Path) -> TemplateIndex:
@@ -1732,7 +1760,7 @@ def check_contract(
             checks.append(
                 Check("ok", "lp-control", control, "direct Core._click handler")
             )
-        elif js_index.generic_control_handler:
+        elif js_index.generic_control_handlers:
             checks.append(
                 Check("ok", "lp-control", control, "generic renderComponent path")
             )
@@ -2011,9 +2039,7 @@ def build_report(
             )
         )
 
-    if changed_paths is not None and not any(
-        path.startswith("src/script/") for path in changed_path_list
-    ):
+    if changed_paths is not None:
         changed_set = set(changed_path_list)
 
         def entry_is_changed(entry: ContractEntry) -> bool:
@@ -2022,19 +2048,23 @@ def build_report(
             referenced = f"{TEMPLATE_ROOT.as_posix()}/{entry.reference.template_path}"
             if referenced in changed_set:
                 return True
-            return any(
+            if any(
                 f"{TEMPLATE_ROOT.as_posix()}/{label.split('::', 1)[0]}" in changed_set
                 for label in entry.included_macros
-            )
+            ):
+                return True
+            return bool(contract_js_dependencies(entry, js_index) & changed_set)
 
         entries = [entry for entry in entries if entry_is_changed(entry)]
 
     groups = build_contract_groups(entries, js_index)
     check_counts = Counter(check.status for group in groups for check in group.checks)
     summary = {
-        "template_references": len(references),
-        "tests": len({reference.nodeid for reference in references}),
-        "template_partials": len({reference.template_ref for reference in references}),
+        "template_references": len(entries),
+        "tests": len({entry.reference.nodeid for entry in entries}),
+        "template_partials": len(
+            {entry.reference.template_ref for entry in entries}
+        ),
         "included_macros": sum(len(group.included_macros) for group in groups),
         "contract_attributes": sum(len(group.attributes) for group in groups),
         "checks_ok": check_counts.get("ok", 0),

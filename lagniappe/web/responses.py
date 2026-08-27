@@ -1008,23 +1008,63 @@ def delete_entity(entity=None, key=None):
 # --- Manual & Reference Responses ---
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
+# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_discovery_follows_live_setting
+# @matrix manual : canonical-url metadata search-discovery section-navigation
 def manual_index(section, index):
+    from lagniappe.core.tools.site import public_pages
+
     page_content = smartypants(render_template(f"manual/content/{section}.html"))
     public_page = bool(CONFIG.PUBLIC_MANUAL and not current_user.is_authenticated)
+    indexing = bool(
+        CONFIG.PUBLIC_MANUAL
+        and public_pages.runtime_settings()["PUBLIC_PAGE_INDEXING"]
+    )
+    if CONFIG.PUBLIC_MANUAL:
+        sections = [
+            {
+                **definition,
+                "metadata": public_pages.manual_metadata(
+                    definition,
+                    indexing=indexing,
+                ),
+            }
+            for definition in index
+        ]
+        search_metadata = next(
+            definition["metadata"]
+            for definition in sections
+            if definition["key"] == section
+        )
+    else:
+        sections = index
+        search_metadata = None
+
     context = {
         "content": page_content,
-        "sections": index,
+        "sections": sections,
+        "search_metadata": search_metadata,
         "public_page": public_page,
     }
     if public_page:
         context.update(page_mode="public")
 
-    return render_template("manual/index.html", **context), 200
+    response = make_response(render_template("manual/index.html", **context))
+    if search_metadata:
+        response.headers["X-Robots-Tag"] = search_metadata["robots"]
+    return response
 
 
+# @testable true
+# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
+# @matrix manual : ajax-section noindex
 def manual_content(section):
-    return smartypants(render_template(f"manual/content/{section}.html")), 200
+    response = make_response(
+        smartypants(render_template(f"manual/content/{section}.html"))
+    )
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 def reference_topic(section):

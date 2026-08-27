@@ -51,7 +51,7 @@ def _cached_json(value):
     return json.dumps(value).encode("utf-8")
 
 
-# @matrix cache sitemap : epoch redis-race ttl
+# @matrix cache sitemap : epoch public-manual-variant redis-race ttl
 def test_sitemap_cache_only_publishes_for_unchanged_epoch(monkeypatch):
     built = []
     published = []
@@ -90,17 +90,22 @@ def test_sitemap_cache_only_publishes_for_unchanged_epoch(monkeypatch):
     monkeypatch.setattr(sitemap_cache.cache, "_redis", redis)
 
     result = sitemap_cache.cached_sitemap(
-        lambda: built.append(True) or "<urlset />"
+        lambda: built.append(True) or "<urlset />",
+        public_manual=True,
     )
 
     assert result == "<urlset />"
     assert len(built) == 2
     assert published == [
-        (Keys.SITEMAP.value, sitemap_cache.SITEMAP_TTL_SECONDS, "<urlset />")
+        (
+            sitemap_cache._sitemap_cache_key(True),
+            sitemap_cache.SITEMAP_TTL_SECONDS,
+            "<urlset />",
+        )
     ]
 
 
-# @matrix cache sitemap : invalidation redis-failure
+# @matrix cache sitemap : invalidation public-manual-variant redis-failure
 def test_sitemap_invalidation_advances_epoch_and_deletes_xml(monkeypatch):
     commands = []
 
@@ -117,8 +122,8 @@ def test_sitemap_invalidation_advances_epoch_and_deletes_xml(monkeypatch):
         def expire(self, key, ttl):
             commands.append(("expire", key, ttl))
 
-        def delete(self, key):
-            commands.append(("delete", key))
+        def delete(self, *keys):
+            commands.append(("delete", *keys))
 
         def execute(self):
             commands.append(("execute",))
@@ -133,7 +138,11 @@ def test_sitemap_invalidation_advances_epoch_and_deletes_xml(monkeypatch):
     assert commands == [
         ("incr", Keys.SITEMAP_EPOCH.value),
         ("expire", Keys.SITEMAP_EPOCH.value, sitemap_cache.SITEMAP_EPOCH_TTL_SECONDS),
-        ("delete", Keys.SITEMAP.value),
+        (
+            "delete",
+            sitemap_cache._sitemap_cache_key(False),
+            sitemap_cache._sitemap_cache_key(True),
+        ),
         ("execute",),
     ]
 

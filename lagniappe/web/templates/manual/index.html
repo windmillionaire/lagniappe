@@ -63,7 +63,7 @@
 {% endmacro %}
 
 {% block title %}
-  Manual
+  {{ search_metadata.title if search_metadata else "Manual" }}
 {% endblock title %}
 
 {% block content %}

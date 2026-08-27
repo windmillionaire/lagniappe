@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from config.public_pages import normalize_public_page_settings
 from lagniappe import CONFIG
 from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions.manual import MANUAL_SECTIONS
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import capture
 from lagniappe.core.properties.page_public import normalize_public_settings
@@ -213,10 +214,44 @@ def metadata(page, *, canonical_url, site_image_url, public_image_url, indexing)
     }
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/site/public_pages.py::manual_metadata
+# @covered-by lagniappe/core/tools/site/public_pages.py::discoverable_manual_urls
+# @reason canonical manual paths are exercised through metadata and sitemap URLs
+def _manual_path(section):
+    key = section["key"]
+    return "/manual/" if key == "overview" else f"/manual/{key}"
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_public_manual_metadata_and_urls_are_canonical
+# @matrix manual : canonical-url metadata search-discovery
+def manual_metadata(section, *, indexing, app_name=CONFIG.APP_NAME):
+    """Build public-safe search metadata for one full manual section."""
+    path = _manual_path(section)
+    name = section["name"]
+    return {
+        "path": path,
+        "canonical_url": absolute_url(path),
+        "title": f"{name} — {app_name} Manual",
+        "description": f"Read the {name} section of the {app_name} manual.",
+        "robots": "index, follow" if indexing else "noindex, follow",
+    }
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_public_manual_metadata_and_urls_are_canonical
+# @matrix manual sitemap : canonical-url public-url
+def discoverable_manual_urls():
+    """Return every canonical URL in the static public-manual catalog."""
+    return [absolute_url(_manual_path(section)) for section in MANUAL_SECTIONS]
+
+
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_robots_text_allows_public_surface_and_advertises_enabled_sitemap
 # @matrix public-pages robots : disabled enabled public-assets
-def robots_text(indexing, *, sitemap_url):
+# @matrix manual robots : disabled enabled fragment
+def robots_text(indexing, *, sitemap_url, public_manual=False):
     """Return crawler rules that block the app while allowing public surfaces."""
     lines = [
         "User-agent: *",
@@ -229,6 +264,8 @@ def robots_text(indexing, *, sitemap_url):
         "Allow: /images/",
         "Allow: /favicon.ico",
     ]
+    if public_manual:
+        lines.extend(("Allow: /manual/", "Disallow: /manual/section/"))
     if indexing:
         lines.extend(("Allow: /sitemap.xml", f"Sitemap: {sitemap_url}"))
     return "\n".join(lines) + "\n"
