@@ -19,11 +19,13 @@ from installer.errors import (
     ProviderInvalidInput,
     ProviderNotFound,
     ProviderPermissionDenied,
+    ProviderTermsNotAccepted,
     ProviderTimeout,
     ProviderTransientError,
     SetupCancelled,
     SetupError,
     classify_provider_error,
+    google_service_terms_error,
     retry_provider_call,
 )
 from testing.utility.setup_fakes import (
@@ -80,6 +82,27 @@ def test_setup_error_classification_and_retry_contract():
             message="gcloud create failed: ALREADY_EXISTS: database is being created",
         ),
         ProviderConflict,
+    )
+    maps_terms_detail = (
+        "FAILED_PRECONDITION: The terms of service 'maps' must be accepted. "
+        "tos_id=maps reason: UREQ_TOS_NOT_ACCEPTED Help Token: secret-token"
+    )
+    maps_terms = google_service_terms_error(
+        maps_terms_detail,
+        account="installer@example.com",
+    )
+    assert isinstance(maps_terms, ProviderTermsNotAccepted)
+    assert str(maps_terms) == (
+        "Google Maps Platform terms have not been accepted for "
+        "'installer@example.com'."
+    )
+    assert "https://console.developers.google.com/terms/maps" in (
+        maps_terms.repair_action
+    )
+    assert "secret-token" not in str(maps_terms)
+    assert isinstance(
+        classify_provider_error(RuntimeError(maps_terms_detail)),
+        ProviderTermsNotAccepted,
     )
 
     calls = []
@@ -3565,7 +3588,10 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
                 missing,
                 "--project=project-1",
             ],
-            {"timeout": gcloud.GCLOUD_SERVICE_ENABLE_TIMEOUT},
+            {
+                "check": False,
+                "timeout": gcloud.GCLOUD_SERVICE_ENABLE_TIMEOUT,
+            },
         ),
         (
             [
@@ -3616,6 +3642,74 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
                 "--format=value(config.name)",
             ],
             {"timeout": gcloud.GCLOUD_SERVICE_DISCOVERY_TIMEOUT},
+        )
+    ]
+
+
+# @matrix setup : error-guidance google-service-terms identity provider-apis
+def test_enable_gcloud_apis_reports_maps_terms_without_raw_provider_dump(
+    monkeypatch,
+):
+    import installer as setup_pkg
+    from installer import gcloud
+
+    constants = _load_config_constants()
+    settings = _fake_settings(
+        app={"ADMIN_EMAIL": "owner@business.example"},
+        gcloud={
+            "ACCOUNT": "installer@business.example",
+            "PROJECT": "project-1",
+        }
+    )
+    settings._SETUP_ENABLED_GOOGLE_CLOUD_APIS = set(
+        constants.REQUIRED_GOOGLE_CLOUD_APIS
+    ) - {"places.googleapis.com"}
+    _install_config_package(monkeypatch, constants, settings=settings)
+    spinner = SpinnerRecorder()
+    formatter = _fake_formatter(spinner)
+    monkeypatch.setattr(setup_pkg, "FORMATTER", formatter)
+    monkeypatch.setattr(gcloud, "FORMATTER", formatter)
+    monkeypatch.setattr(gcloud, "constants", constants)
+    provider_detail = (
+        "ERROR: FAILED_PRECONDITION: The terms of service 'maps' for "
+        "places.googleapis.com must be accepted. tos_id=maps "
+        "reason: UREQ_TOS_NOT_ACCEPTED Help Token: do-not-print"
+    )
+    calls = []
+    monkeypatch.setattr(
+        gcloud,
+        "run_gcloud_command",
+        lambda command, **kwargs: calls.append((command, kwargs))
+        or completed_process(command, returncode=1, stderr=provider_detail),
+    )
+
+    with pytest.raises(ProviderTermsNotAccepted) as error:
+        gcloud.enable_gcloud_apis()
+
+    assert str(error.value) == (
+        "Google Maps Platform terms must be accepted by permanent Owner "
+        "'owner@business.example' before the Places API can be enabled."
+    )
+    assert error.value.repair_action == (
+        "Ask permanent Owner 'owner@business.example' to accept the Maps "
+        "Platform terms at https://console.developers.google.com/terms/maps, "
+        "then enable Places API for 'project-1' at "
+        "https://console.cloud.google.com/apis/library/places.googleapis.com"
+        "?project=project-1. Rerun setup afterward."
+    )
+    assert "Help Token" not in str(error.value)
+    assert calls == [
+        (
+            [
+                "services",
+                "enable",
+                "places.googleapis.com",
+                "--project=project-1",
+            ],
+            {
+                "check": False,
+                "timeout": gcloud.GCLOUD_SERVICE_ENABLE_TIMEOUT,
+            },
         )
     ]
 

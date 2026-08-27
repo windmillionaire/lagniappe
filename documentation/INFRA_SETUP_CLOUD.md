@@ -44,6 +44,18 @@ token from its own failure, and reports the exact account plus
 login failures also include that first-use repair action because interactive
 gcloud output cannot be classified reliably after the subprocess exits.
 
+The required Places API is governed by a second, service-specific Google Maps
+Platform agreement at `https://console.developers.google.com/terms/maps`. In a
+delegated installation, the permanent business Owner accepts that agreement
+and enables Places API on the prepared project before the outside installer
+runs setup. This keeps authority to bind the business with its durable Owner.
+Required-API enablement captures `UREQ_TOS_NOT_ACCEPTED`, identifies `tos_id`
+(`cloud`, `maps`, or a future provider value), and raises a concise typed error.
+A delegated Maps failure directs the installer back to the permanent Owner and
+the project-specific Places API page; an owner-install failure names the active
+account and agreement URL. Recoverable probes and this known failure do not
+print gcloud's raw diagnostic or Help Token.
+
 Fresh setup first displays the account marked active by gcloud CLI
 authentication and requires default-no confirmation. It verifies that exact
 account can mint an access token and does not silently infer consent from an

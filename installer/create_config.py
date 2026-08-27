@@ -44,11 +44,8 @@ BOOTSTRAP_GOOGLE_CLOUD_APIS = {
 BOOTSTRAP_API_TIMEOUT = 300
 GOOGLE_AUTH_PERMISSION_GUIDANCE = (
     "On Google's permission screen, choose Select all if it appears, then "
-    "Continue or Allow. In practical terms, you are granting these permissions "
-    "to yourself: they let Google Cloud CLI and the setup code on this computer "
-    "act for you in your project, and do not give the Lagniappe maintainer "
-    "access. Every requested permission is needed to configure, verify, or "
-    "deploy your installation."
+    "Continue or Allow. This authorizes setup on this computer; it does not "
+    "give the Lagniappe maintainer access."
 )
 
 
@@ -136,19 +133,6 @@ def _google_cloud_terms_repair_action(account):
     return (
         f"Sign in as '{account}' at {GOOGLE_CLOUD_TERMS_URL}, accept the "
         f"Google Cloud service terms, then rerun {setup_command()}."
-    )
-
-
-# @testable false
-# @covered-by installer/create_config.py::_ensure_adc_principal
-# @covered-by installer/create_config.py::_set_adc_quota_project
-# @reason shared console guidance immediately precedes interactive ADC login
-def _google_cloud_terms_guidance(account):
-    return (
-        "First-time Google Cloud use requires separate service-terms "
-        f"acceptance for this exact account ({account}). If Google reports "
-        f"UREQ_TOS_NOT_ACCEPTED, visit {GOOGLE_CLOUD_TERMS_URL} as that "
-        "account, accept the terms, and rerun setup."
     )
 
 
@@ -907,7 +891,6 @@ def _set_adc_quota_project(project_id, sp):
         nonlocal adc_refreshed
         sp.write(f.warning(reason))
         sp.write(f.warning(GOOGLE_AUTH_PERMISSION_GUIDANCE))
-        sp.write(f.info(_google_cloud_terms_guidance(account)))
         sp.write("Opening browser to authenticate ADC with the selected CLI account:")
         sp.write(
             f"  {_adc_login_command(account, project_id, force=force)}"
@@ -1001,8 +984,6 @@ def _set_adc_quota_project(project_id, sp):
             sp.fail(f.fail_glyph)
             _fail()
 
-        if detail:
-            sp.write(f.warning(f"ADC quota command returned: {detail}"))
         refresh_adc(
             "ADC is separate from the active gcloud CLI login and could not "
             "use the selected quota project."
@@ -1015,11 +996,18 @@ def _set_adc_quota_project(project_id, sp):
             timeout=ADC_QUOTA_TIMEOUT,
         )
         if quota_project_result.returncode != 0:
+            detail = (
+                quota_project_result.stderr
+                or quota_project_result.stdout
+                or ""
+            ).strip()
             sp.write(
                 f.error(
                     "ADC login completed, but setup still could not set the ADC quota project."
                 )
             )
+            if detail:
+                sp.write(f.warning(f"Google Cloud returned: {detail.splitlines()[0]}"))
             sp.write(
                 "Verify the selected account can access the project, then run setup again."
             )
@@ -1109,7 +1097,6 @@ def _ensure_adc_principal(account, project_id=None):
         )
     )
     print(f.warning(GOOGLE_AUTH_PERMISSION_GUIDANCE))
-    print(f.info(_google_cloud_terms_guidance(account)))
     result = _run_adc_login(account, project_id)
     if result.returncode != 0:
         print(f.error("ADC authentication did not complete."))
@@ -2013,6 +2000,8 @@ def _set_application_defaults():
     # @covered-by installer/create_config.py::set_application_defaults
     # @reason spinner closure for the parent install preflight sequence
     def align_target_adc():
+        if defer_adc_for_api_preparation:
+            _ensure_adc_principal(account, project_id)
         with f.yaspin(text=f.success("Verifying Google Cloud credentials")) as sp:
             identity = _set_adc_quota_project(project_id, sp)
             sp.ok(f.ok_glyph)

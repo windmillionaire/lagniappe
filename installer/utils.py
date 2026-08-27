@@ -135,9 +135,6 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
         )
         return result
     except subprocess.CalledProcessError as e:
-        print(f"Error running command: {' '.join(command)}")
-        if e.stderr:
-            print(f"Error: {e.stderr}")
         if check:
             raise classify_provider_error(
                 e,

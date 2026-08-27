@@ -759,7 +759,6 @@ def test_adc_identity_reports_principal_project_and_quota(
 def test_adc_principal_mismatch_requires_explicit_reauthentication(
     monkeypatch,
     isolated_setup_config,
-    capsys,
 ):
     import installer as setup_pkg
     from installer import create_config
@@ -799,10 +798,6 @@ def test_adc_principal_mismatch_requires_explicit_reauthentication(
 
     assert identity["principal"] == "owner@example.com"
     assert login_calls == [("owner@example.com", "target-project-1")]
-    output = capsys.readouterr().out
-    assert "First-time Google Cloud use" in output
-    assert create_config.GOOGLE_CLOUD_TERMS_URL in output
-    assert "owner@example.com" in output
 
 
 # @matrix setup : billing gcloud-config interactive-input
@@ -1719,9 +1714,7 @@ def test_existing_project_prepares_bootstrap_apis_before_adc(
     monkeypatch.setattr(
         create_config,
         "_ensure_adc_principal",
-        lambda *args: pytest.fail(
-            "ADC must wait until the missing management APIs are prepared"
-        ),
+        lambda *args: events.append("principal") or identity,
     )
     events = []
     identity = {
@@ -1762,6 +1755,7 @@ def test_existing_project_prepares_bootstrap_apis_before_adc(
     assert events == [
         ("summary", "pending"),
         "prepare-apis",
+        "principal",
         "adc",
         "permissions",
     ]
@@ -2629,7 +2623,7 @@ def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkey
     assert not any(
         "Failed to set ADC quota project" in message for message in spinner.messages
     )
-    assert any("quota project mismatch" in message for message in spinner.messages)
+    assert not any("quota project mismatch" in message for message in spinner.messages)
     messages = " ".join(" ".join(spinner.messages).split())
     assert (
         "gcloud auth application-default login owner@example.com --project=project-1 "
@@ -2668,7 +2662,7 @@ def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch
     assert not any(
         "Failed to set ADC quota project" in message for message in spinner.messages
     )
-    assert any("quota project mismatch" in message for message in spinner.messages)
+    assert not any("quota project mismatch" in message for message in spinner.messages)
     assert not any(
         "browser auth cancelled" in message for message in spinner.messages
     )

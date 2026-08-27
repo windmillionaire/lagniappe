@@ -81,6 +81,16 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
     )
     expect(owner_terms).to_have_count(1)
     expect(owner_terms).to_have_text("Google Cloud service-terms page")
+    owner_maps_terms = owner.locator(
+        "a[href='https://console.developers.google.com/terms/maps']"
+    )
+    expect(owner_maps_terms).to_have_count(1)
+    expect(owner_maps_terms).to_have_text("Google Maps Platform terms page")
+    owner_places_api = owner.locator(
+        "a[href='https://console.cloud.google.com/apis/library/places.googleapis.com']"
+    )
+    expect(owner_places_api).to_have_count(1)
+    expect(owner_places_api).to_have_text("Places API library page")
 
     owner.locator("summary").click()
     installer.locator("summary").click()
@@ -120,6 +130,14 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
     )
     expect(installer_terms).to_have_count(1)
     expect(installer_terms).to_have_text("Google Cloud service-terms page")
+    installer_maps_terms = installer.locator(
+        "a[href='https://console.developers.google.com/terms/maps']"
+    )
+    expect(installer_maps_terms).to_have_count(0)
+    expect(installer).to_contain_text(
+        "an outside installer should not accept a business agreement unless "
+        "explicitly authorized to do so"
+    )
     cloud_console_links = delegated.locator(
         "a[href='https://console.cloud.google.com/']"
     )
