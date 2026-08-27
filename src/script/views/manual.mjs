@@ -17,13 +17,10 @@ export default class Manual extends ShellView {
 		this.endpoints = ENDPOINTS.manual;
 
 		if (!this.elt) return;
-		const sectionData = this.elt.querySelector("#manual-nav-button")?.dataset
-			?.sections;
+		const sectionData =
+			this.elt.querySelector("#manual-nav-button")?.dataset?.sections;
 		this.sections = new Map(
-			JSON.parse(sectionData || "[]").map((section) => [
-				section.key,
-				section,
-			]),
+			JSON.parse(sectionData || "[]").map((section) => [section.key, section]),
 		);
 
 		this._manualClick = (e) => {
