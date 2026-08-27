@@ -748,6 +748,7 @@ def test_runtime_upload_boundary_has_no_local_orchestration_imports():
 
 
 # @matrix config : current-schema messaging-removal recovery-export
+# @pair public-pages:recovery-export
 def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch):
     recovery = _load_recovery_module(monkeypatch)
 
@@ -782,6 +783,11 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch
             "AI_LOCATION": "global",
             "version": 4,
         },
+        public_page_settings={
+            "PUBLIC_PAGE_INDEXING": True,
+            "version": 2,
+            "IGNORED_PUBLIC": "not-owned",
+        },
     )
 
     assert snapshot["APP_NAME"] == "Custom Name"
@@ -790,6 +796,7 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch
     assert snapshot["DEPLOY_MAX_INSTANCES"] == "3"
     assert snapshot["AI_MODEL"] == "live-model"
     assert snapshot["AI_LOCATION"] == "global"
+    assert snapshot["PUBLIC_PAGE_INDEXING"] is True
     assert snapshot["CONFIG_KIND"] == recovery.CONFIG_KIND
     assert snapshot["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
     assert snapshot["GOOGLE_SIGNIN_ENABLED"] is True
@@ -798,7 +805,25 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch
     assert "FIREBASE_CONFIG" not in snapshot
     assert "version" not in snapshot
     assert "IGNORED" not in snapshot
+    assert "IGNORED_PUBLIC" not in snapshot
     assert persisted["DEPLOY_MAX_INSTANCES"] == "1"
+
+
+# @matrix config : public-page-indexing validation
+def test_public_page_settings_normalize_boolean_values():
+    from config.public_pages import (
+        ConfigPublicPageSettingsError,
+        normalize_public_page_settings,
+    )
+
+    assert normalize_public_page_settings(
+        {"PUBLIC_PAGE_INDEXING": "true"}
+    ) == {"PUBLIC_PAGE_INDEXING": True}
+    assert normalize_public_page_settings(
+        {"PUBLIC_PAGE_INDEXING": "off"}
+    ) == {"PUBLIC_PAGE_INDEXING": False}
+    with pytest.raises(ConfigPublicPageSettingsError):
+        normalize_public_page_settings({"PUBLIC_PAGE_INDEXING": "sometimes"})
 
 
 # @matrix config : recovery-display secrets

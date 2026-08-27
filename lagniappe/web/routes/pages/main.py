@@ -1,7 +1,8 @@
-from flask import abort, request
+from flask import Response, abort, g, request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
+from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import (
     AI,
@@ -11,6 +12,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.site import public_pages as public_page_service
 from lagniappe.core.tools.auth.references import (
     SubmittedReferenceResolver,
     UNAVAILABLE_REFERENCE_ERROR,
@@ -691,13 +693,31 @@ def delete(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
+# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
 # @matrix pages : document-visibility private public
+# @matrix public-pages : metadata preview
 @pages.route("<key>/visibility", methods=["PUT"])
 @permission(Resource.PAGE, Action.PUBLISH)
 def visibility(key, **kwargs):
     page = kwargs["entity"]
 
-    page.is_public = True if request.form["visibility"] == "public" else False
+    page.is_public = request.form.get("visibility") == "public"
+    if request.form.get("public-settings-present") == "true":
+        preview = request.form.get("preview-image-asset") or None
+        valid_images = {
+            image.name for image in public_page_service.document_images(page)
+        }
+        if preview and preview not in valid_images:
+            return responses.error("Preview image must be used in this page's document.")
+        try:
+            page.public_settings = {
+                "allow_indexing": request.form.get("allow-indexing") == "true",
+                "title": request.form.get("public-title"),
+                "description": request.form.get("public-description"),
+                "preview_image_asset": preview,
+            }
+        except ValidationError as error:
+            return responses.error(error)
     if page.is_public:
         page.public_id
     Entities.save(page)
@@ -722,6 +742,41 @@ def public(public_id):
         abort(404)
 
     return responses.public_document(page)
+
+
+# @testable true
+# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
+# @matrix public-pages : document-image public-route revocation
+@pages.route("public/<public_id>/images/<asset_name>", methods=["GET", "HEAD"])
+def public_image(public_id, asset_name):
+    candidates = Entities.fetch(
+        *database_get.public_pages(public_id),
+        request=Fetch.root(),
+    )
+    page = next((candidate for candidate in candidates if candidate.is_public), None)
+    if not page:
+        abort(404)
+
+    asset_key = asset_name.split(".", 1)[0]
+    referenced = {
+        image.name: image for image in public_page_service.document_images(page)
+    }
+    if asset_key not in referenced:
+        abort(404)
+    asset = page.get_asset(asset_key)
+    if not asset:
+        abort(404)
+
+    g.NO_CACHE = True
+    if request.method == "HEAD":
+        response = Response("", mimetype=asset.content_type)
+        if asset.size is not None:
+            response.headers["Content-Length"] = str(asset.size)
+        return response
+    content = asset.get()
+    if content is None:
+        abort(404)
+    return Response(content, mimetype=asset.content_type)
 
 
 # @testable true

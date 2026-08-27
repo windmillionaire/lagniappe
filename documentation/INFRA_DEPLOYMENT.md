@@ -113,7 +113,8 @@ libraries.
 2. rebuilds generated configuration, indexes, and manifest defaults;
 3. validates required settings and the runtime dependency/upload surface;
 4. reconciles runtime IAM and managed buckets;
-5. restores app-saved deployment settings, AI settings, and site images; and
+5. restores app-saved deployment settings, AI settings, public-page discovery,
+   and site images; and
 6. optionally deploys.
 
 The runtime deploy-surface preflight runs before provider reconciliation, so a

@@ -63,6 +63,7 @@ for (const configPath of [
 ]) {
   const source = readFileSync(configPath, "utf8");
   assert.match(source, /VIEW_ENTRIES/);
+  assert.match(source, /public: "\.\/src\/script\/public\.mjs"/);
   assert.match(source, /chunks\/views\/\[name\]\.js/);
   assert.match(source, /manualChunks: interactionFoundationChunk/);
   assert.match(source, /onlyExplicitManualChunks: true/);

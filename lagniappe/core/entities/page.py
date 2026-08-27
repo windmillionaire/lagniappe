@@ -9,6 +9,7 @@ from ..properties import (
     common_related,
     form_submission,
     page_assets,
+    page_public,
     page_related,
 )
 from lagniappe.core.tools.database import get as database_get
@@ -36,6 +37,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             "assets",
             "schema_version",
             "deferred_job",
+            "public_settings",
         }
         return frozenset(exclude)
 
@@ -112,8 +114,9 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 "document": common_assets.Document,
                 "attributes": common_entity.Attributes,
                 "image": page_assets.Image,
-                "is_public": common_entity.IsPublic,
+                "is_public": page_public.PageIsPublic,
                 "public_id": common_entity.PublicID,
+                "public_settings": page_public.PublicSettings,
                 "submission": form_submission.FormSubmission,
                 "deferred_job": common_entity.DeferredJobReference,
                 "restricted_to": common_entity.RestrictedTo,

@@ -16,6 +16,7 @@ from lagniappe.core.definitions import AI, Action, Fetch, General, Levels, Site
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import site as site_database
+from lagniappe.core.tools.email.notifications.links import absolute_url
 from testing.definitions import Categories, Groups, SitePages, Submissions, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import HomePage, Page
@@ -1718,6 +1719,88 @@ def test_site_settings_ai_form_saves_current_models_through_route(
         )
     assert rejected["status"] == 422
     assert "global" in rejected["text"]
+
+
+# @matrix admin public-pages : live-settings sitemap-invalidation validation
+# @matrix public-pages sitemap : disabled enabled redis-cache
+# @matrix robots : disabled enabled
+# @template home/site_settings.html::site_settings
+def test_site_settings_public_page_indexing_saves_live_setting(
+    get_user,
+    browser_failures,
+):
+    owner = get_user(Users.OWNER)
+    _, settings_panel = _open_owner_site_settings(owner)
+    section = _open_site_settings_section(settings_panel, "public-pages")
+    form = section.locator("[data-role='public-page-settings']")
+    field = form.locator("[name='PUBLIC_PAGE_INDEXING']")
+    stored = site_database.public_pages()
+    original = (
+        bool(stored.get("PUBLIC_PAGE_INDEXING"))
+        if stored
+        else bool(getattr(CONFIG, "PUBLIC_PAGE_INDEXING", False))
+    )
+    loaded = _fetch_status(owner, "/l/site-settings/public-pages", "GET")
+    assert loaded["status"] == 200
+    assert loaded["data"]["public_pages"]["PUBLIC_PAGE_INDEXING"] is original
+
+    def save(enabled):
+        field.set_checked(enabled)
+        with owner.page.expect_response(
+            "**/l/site-settings/public-pages"
+        ) as response_info:
+            form.locator("button[type='submit']").click()
+        response = response_info.value
+        assert response.status == 200
+        assert response.json()["public_pages"]["PUBLIC_PAGE_INDEXING"] is enabled
+        expect(section.locator("[data-role='section-summary']")).to_have_text(
+            f"Search discovery is {'on' if enabled else 'off'}"
+        )
+
+    try:
+        save(True)
+        assert site_database.public_pages()["PUBLIC_PAGE_INDEXING"] is True
+        origin = owner.page.evaluate("location.origin")
+
+        robots = owner.page.context.request.get(f"{origin}/robots.txt")
+        assert robots.status == 200
+        assert "Allow: /pages/public/" in robots.text()
+        assert f"Sitemap: {absolute_url('/sitemap.xml')}" in robots.text()
+
+        first_sitemap = owner.page.context.request.get(
+            f"{origin}/sitemap.xml"
+        )
+        second_sitemap = owner.page.context.request.get(
+            f"{origin}/sitemap.xml"
+        )
+        assert first_sitemap.status == second_sitemap.status == 200
+        assert first_sitemap.text() == second_sitemap.text()
+        assert "<urlset" in first_sitemap.text()
+
+        with browser_failures.expect_http_error(
+            owner,
+            status=422,
+            path="/l/site-settings/public-pages",
+        ):
+            rejected = _fetch_status(
+                owner,
+                "/l/site-settings/public-pages",
+                data={"PUBLIC_PAGE_INDEXING": "sometimes"},
+            )
+        assert rejected["status"] == 422
+
+        save(False)
+        disabled_robots = owner.page.context.request.get(
+            f"{origin}/robots.txt"
+        )
+        assert "Sitemap:" not in disabled_robots.text()
+        disabled_sitemap = owner.page.context.request.get(
+            f"{origin}/sitemap.xml"
+        )
+        assert disabled_sitemap.status == 404
+    finally:
+        if field.is_checked() is not original:
+            save(original)
 
 
 # @matrix admin : site-update success

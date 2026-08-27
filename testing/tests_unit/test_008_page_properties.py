@@ -27,6 +27,7 @@ from lagniappe.core.mutations import plan_mutation
 from lagniappe.core.mixins import ColumnMixin
 from lagniappe.core.properties import page_related
 from lagniappe.core.properties.page_assets import Image
+from lagniappe.core.properties.page_public import normalize_public_settings
 from testing.utility.test_entities import TestEntities
 
 
@@ -196,6 +197,55 @@ def test_page_public(get_test_entities):
 
         # Filter index
         assert page.to_filter_index()["is_public"] is is_public
+
+
+# @matrix page sitemap : visibility
+@pytest.mark.unit
+def test_page_public_visibility_invalidates_sitemap_only_when_changed():
+    page = TestEntities.get("PAGE", {"name": "Public", "hash": "public-page"})
+
+    page.is_public = False
+    assert page.mutation_intents == []
+
+    page.is_public = True
+    assert [intent.intent.value for intent in page.mutation_intents] == [
+        "sitemap-invalidate"
+    ]
+
+    page.is_public = True
+    assert len(page.mutation_intents) == 1
+
+
+# @matrix page sitemap : metadata settings-validation
+@pytest.mark.unit
+def test_page_public_settings_normalize_and_invalidate_sitemap():
+    page = TestEntities.get("PAGE", {"name": "Metadata", "hash": "metadata-page"})
+
+    assert page.public_settings == {
+        "version": 1,
+        "allow_indexing": True,
+        "title": None,
+        "description": None,
+        "preview_image_asset": None,
+    }
+
+    page.public_settings = {
+        "title": "  Public title  ",
+        "description": " Public description ",
+        "preview_image_asset": "image_preview",
+        "allow_indexing": True,
+    }
+    assert page.public_settings["title"] == "Public title"
+    assert page.public_settings["description"] == "Public description"
+    assert page.mutation_intents == []
+    assert "public_settings" in page.exclude_from_index
+
+    page.public_settings = {**page.public_settings, "allow_indexing": False}
+    assert page.public_settings["allow_indexing"] is False
+    assert page.mutation_intents[0].intent.value == "sitemap-invalidate"
+
+    with pytest.raises(Exception, match="120 characters or fewer"):
+        normalize_public_settings({"title": "x" * 121})
 
 
 # @matrix cache page : public-user

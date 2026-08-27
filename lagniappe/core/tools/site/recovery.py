@@ -30,6 +30,7 @@ def load_recovery_snapshot(persisted):
             persisted,
             deployment_settings=site_database.deployment(),
             ai_settings=site_database.ai(),
+            public_page_settings=site_database.public_pages(),
             redis_ca_pem=read_recovery_redis_ca(persisted),
         )
     except Exception as error:

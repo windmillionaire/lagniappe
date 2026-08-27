@@ -1,14 +1,16 @@
 import re
+from urllib.parse import urlsplit
 
 from playwright.sync_api import expect
 import pytest
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Categories, Forms, Pages, Submissions, Users
+from testing.definitions import Categories, Forms, Pages, Submissions, Uploads, Users
 from testing.elements import (
     Attributes,
     Buttons,
+    EditorAddImage,
     FormSelect,
     Modal,
     Select,
@@ -155,7 +157,7 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
     with user.page.expect_response("**/visibility"):
         SpinnerButtons.UPDATE.click(settings)
 
-    expect(settings).to_contain_text("This document is currently public")
+    expect(settings).to_contain_text("This page is public")
     expect(settings.locator("input[value='public']")).to_be_checked()
     public_link = settings.locator("a")
     expect(public_link).to_be_visible()
@@ -167,7 +169,7 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
 
     user.go(page)
     settings = _open_document_settings(user, page)
-    expect(settings).to_contain_text("This document is currently public")
+    expect(settings).to_contain_text("This page is public")
     expect(settings.locator("input[value='public']")).to_be_checked()
     assert settings.locator("a").evaluate("(element) => element.href") == public_url
 
@@ -175,9 +177,78 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
     with user.page.expect_response("**/visibility"):
         SpinnerButtons.UPDATE.click(settings)
 
-    expect(settings).to_contain_text("This document is currently private")
+    expect(settings).to_contain_text("This page is private")
     expect(settings.locator("input[value='private']")).to_be_checked()
     expect(settings.locator("a")).to_have_count(0)
+
+
+# @matrix public-pages : document-image metadata preview public-rendering public-route revocation
+# @template public/nav.html::public_nav
+def test_public_document_images_are_anonymous_and_revocable(
+    get_user,
+    browser,
+    browser_failures,
+):
+    user = get_user(Users.OWNER)
+    page = user.go(Pages.test_document_visibility_page)
+    editor = page.editor
+    editor.clear_text()
+    marker = "Public image route marker"
+    editor.type_text(marker)
+
+    image_form = EditorAddImage(editor).form
+    Uploads.editor_test_image.set(image_form)
+    with user.page.expect_response("**/document/image"):
+        SpinnerButtons.UPLOAD.click(image_form)
+    image = editor.get_element("img")
+    expect(image).to_be_visible()
+    editor.wait_for_render()
+    with user.page.expect_response(_document_save_response(marker)):
+        user.page.evaluate("window.dispatchEvent(new CustomEvent('sync-save'))")
+
+    user.go(page)
+    settings = _open_document_settings(user, page)
+    settings.locator("input[value='public']").check()
+    preview = settings.locator(
+        "input[name='preview-image-asset']:not([value=''])"
+    )
+    expect(preview).to_have_count(1)
+    preview.check()
+    settings.locator("input[name='public-title']").fill("Public image preview")
+    with user.page.expect_response("**/visibility"):
+        SpinnerButtons.UPDATE.click(settings)
+    public_url = settings.locator("a").evaluate("element => element.href")
+
+    anonymous_context = browser.new_context()
+    try:
+        anonymous = anonymous_context.new_page()
+        response = anonymous.goto(public_url)
+        assert response.status == 200
+        expect(anonymous.locator("meta[property='og:title']")).to_have_attribute(
+            "content", "Public image preview"
+        )
+        public_image = anonymous.locator("#content img")
+        expect(public_image).to_be_visible()
+        public_image_url = public_image.get_attribute("src")
+        assert "/pages/public/" in public_image_url
+        assert "/images/image_" in public_image_url
+        public_image_path = urlsplit(public_image_url).path
+        origin = anonymous.evaluate("location.origin")
+        image_response = anonymous_context.request.get(
+            f"{origin}{public_image_path}"
+        )
+        assert image_response.status == 200
+    finally:
+        anonymous_context.close()
+
+    user.go(page)
+    settings = _open_document_settings(user, page)
+    settings.locator("input[value='private']").check()
+    with user.page.expect_response("**/visibility"):
+        SpinnerButtons.UPDATE.click(settings)
+
+    revoked = user.page.context.request.get(f"{origin}{public_image_path}")
+    assert revoked.status == 404
     with browser_failures.expect_http_error(
         user,
         status=404,

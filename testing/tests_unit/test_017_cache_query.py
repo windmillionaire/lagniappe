@@ -3,12 +3,14 @@ from types import SimpleNamespace
 
 import pytest
 from redis import ResponseError
+from redis.exceptions import WatchError
 
 from lagniappe.core.definitions import Restriction
 from lagniappe.core.tools.cache import add as cache_add
 from lagniappe.core.tools.cache import core as cache_core
 from lagniappe.core.tools.cache import details as cache_details
 from lagniappe.core.tools.cache import query, utility
+from lagniappe.core.tools.cache import sitemap as sitemap_cache
 from lagniappe.core.tools.cache.core import Cache, CacheJSON
 from lagniappe.core.tools.cache.keys import SEARCH_SCORE_FIELD, Keys, Search
 from lagniappe.core.tools.hosted_e2e import lease as e2e_lease
@@ -47,6 +49,93 @@ def _highlight(text):
 
 def _cached_json(value):
     return json.dumps(value).encode("utf-8")
+
+
+# @matrix cache sitemap : epoch redis-race ttl
+def test_sitemap_cache_only_publishes_for_unchanged_epoch(monkeypatch):
+    built = []
+    published = []
+
+    class Pipe:
+        attempts = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def watch(self, key):
+            assert key == Keys.SITEMAP_EPOCH.value
+
+        def get(self, key):
+            return b"3"
+
+        def multi(self):
+            return None
+
+        def setex(self, key, ttl, value):
+            published.append((key, ttl, value))
+
+        def execute(self):
+            Pipe.attempts += 1
+            if Pipe.attempts == 1:
+                published.clear()
+                raise WatchError()
+
+    redis = SimpleNamespace(
+        get=lambda key: None,
+        pipeline=lambda: Pipe(),
+    )
+    monkeypatch.setattr(sitemap_cache.cache, "_redis", redis)
+
+    result = sitemap_cache.cached_sitemap(
+        lambda: built.append(True) or "<urlset />"
+    )
+
+    assert result == "<urlset />"
+    assert len(built) == 2
+    assert published == [
+        (Keys.SITEMAP.value, sitemap_cache.SITEMAP_TTL_SECONDS, "<urlset />")
+    ]
+
+
+# @matrix cache sitemap : invalidation redis-failure
+def test_sitemap_invalidation_advances_epoch_and_deletes_xml(monkeypatch):
+    commands = []
+
+    class Pipe:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def incr(self, key):
+            commands.append(("incr", key))
+
+        def expire(self, key, ttl):
+            commands.append(("expire", key, ttl))
+
+        def delete(self, key):
+            commands.append(("delete", key))
+
+        def execute(self):
+            commands.append(("execute",))
+
+    monkeypatch.setattr(
+        sitemap_cache.cache,
+        "_redis",
+        SimpleNamespace(pipeline=lambda: Pipe()),
+    )
+
+    assert sitemap_cache.invalidate_sitemap() is True
+    assert commands == [
+        ("incr", Keys.SITEMAP_EPOCH.value),
+        ("expire", Keys.SITEMAP_EPOCH.value, sitemap_cache.SITEMAP_EPOCH_TTL_SECONDS),
+        ("delete", Keys.SITEMAP.value),
+        ("execute",),
+    ]
 
 
 class _FakeDetailsCache:

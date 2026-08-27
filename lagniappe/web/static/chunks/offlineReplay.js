@@ -1,2 +1,25 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="f9c3dfb4-a6a8-4ddf-9350-09d48b03e8bb",e._sentryDebugIdIdentifier="sentry-dbid-f9c3dfb4-a6a8-4ddf-9350-09d48b03e8bb");}catch(e){}}();const a=async(r,n=null)=>{try{if(r._destroyed)return 0;const e=n||await r.ensureOfflineQueue();if(!e||r._destroyed||!r.online)return 0;const t=await e.replay()||0;return t&&!r._destroyed&&await r.refresh(),t}catch(e){return r.reportStartupError(e,r.elt,"offline-replay"),0}};export{a as replayOfflineQueue};
 /*! Third-party licenses: /third-party-licenses.txt */
+/**
+ * Replay persisted mutations outside the Core startup closure. The queue owns
+ * mounted-form polling; the broad refresh covers collection consumers after
+ * successful writes.
+ *
+ * @testable true
+ * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
+ * @pairs offline:background-replay polling:nonblocking
+ */
+const replayOfflineQueue = async (view, existingQueue = null) => {
+	try {
+		if (view._destroyed) return 0;
+		const queue = existingQueue || (await view.ensureOfflineQueue());
+		if (!queue || view._destroyed || !view.online) return 0;
+		const replayed = (await queue.replay()) || 0;
+		if (replayed && !view._destroyed) await view.refresh();
+		return replayed;
+	} catch (error) {
+		view.reportStartupError(error, view.elt, "offline-replay");
+		return 0;
+	}
+};
+
+export { replayOfflineQueue };

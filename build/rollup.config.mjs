@@ -33,6 +33,7 @@ const thirdPartyLicenseBanner =
 	"/*! Third-party licenses: /third-party-licenses.txt */";
 const mainInputs = {
 	main: "./src/script/main.mjs",
+	public: "./src/script/public.mjs",
 	...Object.fromEntries(
 		Object.entries(VIEW_ENTRIES).map(([entry, source]) => [
 			entry,

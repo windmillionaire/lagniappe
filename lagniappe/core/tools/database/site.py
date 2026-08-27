@@ -2,6 +2,7 @@
 
 from config.ai_settings import AI_SETTING_KEYS
 from config.constants import DEFAULT_DEPLOYMENT_SETTINGS
+from config.public_pages import PUBLIC_PAGE_SETTING_KEYS
 
 from .core import DATA, KINDS
 
@@ -47,6 +48,14 @@ def deployment():
 def ai():
     """Fetch the stored AI model settings metadata entity."""
     return DATA.datastore.get(key("ai"))
+
+
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_save_site_public_pages_persists_canonical_payload
+# @matrix admin : metadata public-page-indexing
+def public_pages():
+    """Fetch the stored public-page discovery settings entity."""
+    return DATA.datastore.get(key("public_pages"))
 
 
 # @testable true
@@ -96,6 +105,25 @@ def save_ai(data):
 
     version = int(entity.get("version", 0)) + 1
     canonical = {name: value for name, value in data.items() if name in AI_SETTING_KEYS}
+    entity.clear()
+    entity.update({**canonical, "version": version})
+    DATA.datastore.put(entity)
+
+
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_save_site_public_pages_persists_canonical_payload
+# @matrix admin : metadata public-page-indexing
+def save_public_pages(data):
+    """Persist canonical public-page settings and increment their version."""
+    settings_key = key("public_pages")
+    entity = DATA.datastore.get(settings_key)
+    if not entity:
+        entity = DATA.datastore.entity(key=settings_key)
+
+    version = int(entity.get("version", 0)) + 1
+    canonical = {
+        name: value for name, value in data.items() if name in PUBLIC_PAGE_SETTING_KEYS
+    }
     entity.clear()
     entity.update({**canonical, "version": version})
     DATA.datastore.put(entity)

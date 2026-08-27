@@ -100,6 +100,20 @@ code separated by projection:
 
 Ingress state is durable and is not represented as Redis authority.
 
+## Public sitemap
+
+`sitemap.py` caches generated XML for one hour under `Keys.SITEMAP`. The
+Datastore public-page query is the durable seed. A separate expiring epoch is
+watched while XML is generated, so a visibility or per-page indexing mutation
+cannot publish a stale build after its post-commit invalidation.
+
+Page publication, page deletion, per-page indexing changes, and the live site
+discovery switch invalidate the sitemap. Metadata text and document edits do
+not, because the v1 sitemap contains only canonical URLs. Redis errors fall
+back to direct generation and never roll back a committed page mutation. The
+single sitemap fails closed above 50,000 URLs rather than silently truncating;
+sharding is the intended expansion point.
+
 ## Design rules
 
 - Every projection must name its durable seed and race contract.

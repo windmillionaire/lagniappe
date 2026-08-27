@@ -67,7 +67,10 @@ def prepare_durable_writes(plan):
     return writes
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_022_mutation_contracts.py::test_public_page_sitemap_invalidation_runs_after_durable_write
+# @matrix mutations : durable-first
+# @matrix public-pages sitemap : invalidation
 def execute_post_commit(plan):
     """Execute declared post-commit effects and return types plus errors."""
     completed = []
@@ -199,6 +202,13 @@ def execute_post_commit(plan):
         for task in scheduled_uncomplete:
             scheduling.dispatch_scheduled_uncomplete(task)
         complete(MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH)
+
+    if any(
+        effect.effect is MutationEffectType.SITEMAP_INVALIDATE
+        for effect in post_commit
+    ):
+        cache.invalidate_sitemap()
+        complete(MutationEffectType.SITEMAP_INVALIDATE)
     return completed, errors
 
 

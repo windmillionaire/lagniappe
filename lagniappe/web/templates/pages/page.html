@@ -201,7 +201,7 @@
           {{ toggles('tabs', false) }}
         </div>
         {{ info_tab(page, is_owner_page, is_admin_viewer, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) }}
-        {% if render_document %}{{ document_tab(page, has_document) }}{% endif %}
+        {% if render_document %}{{ document_tab(page, has_document, public_context) }}{% endif %}
         {% if render_tasks %}{{ task_tab(page, has_tasks) }}{% endif %}
         {% if render_files %}{{ files_tab(page, has_files) }}{% endif %}
       </div>

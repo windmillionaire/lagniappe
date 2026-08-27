@@ -13,9 +13,196 @@ from lagniappe.core.entities.user import User
 from lagniappe.core.tools.site import admin as site_admin
 from lagniappe.core.tools.site import cache_rebuild
 from lagniappe.core.tools.site import recovery
+from lagniappe.core.tools.site import public_pages
 
 
 pytestmark = pytest.mark.unit
+
+
+def _public_page(document, *, assets=None, settings=None, **values):
+    assets = assets or {}
+    page = SimpleNamespace(
+        properties=SimpleNamespace(document=SimpleNamespace(html=document)),
+        assets={name: {"type": "image"} for name in assets},
+        public_settings=settings or {},
+        name=values.pop("name", "Public Page"),
+        active=values.pop("active", True),
+        is_public=values.pop("is_public", True),
+        entity_kind=values.pop("entity_kind", "page"),
+        db=values.pop("db", {"public_id": "public-id"}),
+        **values,
+    )
+    page.get_asset = lambda name: assets.get(name)
+    return page
+
+
+# @matrix public-pages : config-fallback live-settings
+def test_public_page_runtime_settings_prefer_live_datastore_and_fail_closed(
+    monkeypatch,
+):
+    config = SimpleNamespace(PUBLIC_PAGE_INDEXING=False)
+    monkeypatch.setattr(
+        public_pages.site_database,
+        "public_pages",
+        lambda: {"PUBLIC_PAGE_INDEXING": True, "version": 3},
+    )
+    assert public_pages.runtime_settings(config=config)["PUBLIC_PAGE_INDEXING"] is True
+
+    monkeypatch.setattr(
+        public_pages.site_database,
+        "public_pages",
+        lambda: (_ for _ in ()).throw(RuntimeError("Datastore unavailable")),
+    )
+    monkeypatch.setattr(public_pages, "capture", lambda *_args, **_kwargs: None)
+    assert public_pages.runtime_settings(config=config)["PUBLIC_PAGE_INDEXING"] is False
+
+
+# @matrix public-pages : document-image privacy preview
+def test_public_document_images_only_include_embedded_page_assets():
+    first = SimpleNamespace(
+        url="/assets/page/image_first.png",
+        content_type="image/png",
+        fingerprint="first",
+        extension="png",
+    )
+    unused = SimpleNamespace(
+        url="/assets/page/image_unused.jpg",
+        content_type="image/jpeg",
+        fingerprint="unused",
+        extension="jpg",
+    )
+    page = _public_page(
+        '<p><img src="/assets/page/image_first.png" alt="First"></p>'
+        '<img src="https://example.com/external.jpg">',
+        assets={"image_first": first, "image_unused": unused},
+    )
+
+    candidates = public_pages.document_images(page)
+
+    assert [(image.name, image.alt) for image in candidates] == [
+        ("image_first", "First")
+    ]
+
+
+# @matrix public-pages : document-image public-rendering
+def test_public_document_rewrites_only_embedded_page_images():
+    asset = SimpleNamespace(
+        url="/assets/page/image_first.png",
+        content_type="image/png",
+        fingerprint="first",
+        extension="png",
+    )
+    page = _public_page(
+        '<p><img src="/assets/page/image_first.png" alt="First"></p>'
+        '<img src="https://example.com/external.jpg">',
+        assets={"image_first": asset},
+    )
+
+    html, candidates = public_pages.public_document_html(
+        page,
+        lambda image: f"/pages/public/id/images/{image.name}.png",
+    )
+
+    assert "/pages/public/id/images/image_first.png" in html
+    assert "https://example.com/external.jpg" in html
+    assert [image.name for image in candidates] == ["image_first"]
+
+
+# @matrix public-pages : metadata privacy social-preview
+def test_public_metadata_uses_safe_fallbacks_and_selected_document_image(monkeypatch):
+    asset = SimpleNamespace(
+        url="/assets/page/image_first.png",
+        content_type="image/png",
+        fingerprint="first",
+        extension="png",
+    )
+    page = _public_page(
+        '<p>A document-only description.</p><img src="/assets/page/image_first.png" alt="Diagram">',
+        assets={"image_first": asset},
+        settings={"preview_image_asset": "image_first"},
+        name="Internal Name",
+        description="Must not leak",
+    )
+
+    result = public_pages.metadata(
+        page,
+        canonical_url="https://site.test/pages/public/id",
+        site_image_url="https://site.test/images/logo.png",
+        public_image_url=lambda image: f"https://site.test/public/{image.name}.png",
+        indexing=True,
+    )
+
+    assert result["title"] == "Internal Name"
+    assert result["description"] == "A document-only description."
+    assert "Must not leak" not in result.values()
+    assert result["image"] == "https://site.test/public/image_first.png"
+    assert result["image_alt"] == "Diagram"
+    assert result["robots"] == "index, follow"
+
+
+# @matrix public-pages robots : disabled enabled public-assets
+def test_robots_text_allows_public_surface_and_advertises_enabled_sitemap():
+    disabled = public_pages.robots_text(
+        False,
+        sitemap_url="https://site.test/sitemap.xml",
+    )
+    enabled = public_pages.robots_text(
+        True,
+        sitemap_url="https://site.test/sitemap.xml",
+    )
+
+    assert "Disallow: /" in disabled
+    assert "Allow: /pages/public/" in disabled
+    assert "Sitemap:" not in disabled
+    assert "Sitemap: https://site.test/sitemap.xml" in enabled
+
+
+# @matrix public-pages sitemap : dedupe limit sorted xml
+def test_sitemap_xml_is_sorted_deduped_and_fails_closed_at_limit(monkeypatch):
+    xml = public_pages.sitemap_xml(
+        ["https://site.test/z", "https://site.test/a", "https://site.test/z"]
+    )
+    assert xml.index("https://site.test/a") < xml.index("https://site.test/z")
+    assert xml.count("https://site.test/z") == 1
+
+    monkeypatch.setattr(public_pages, "SITEMAP_URL_LIMIT", 1)
+    with pytest.raises(public_pages.SitemapLimitError):
+        public_pages.sitemap_xml(["https://site.test/a", "https://site.test/b"])
+
+
+# @matrix public-pages sitemap : active opt-out public-url
+def test_discoverable_page_urls_filter_nonpage_inactive_and_opted_out_rows(
+    monkeypatch,
+):
+    pages = [
+        _public_page("", db={"public_id": "included"}),
+        _public_page("", active=False, db={"public_id": "inactive"}),
+        _public_page(
+            "",
+            settings={"allow_indexing": False},
+            db={"public_id": "opted-out"},
+        ),
+        _public_page("", entity_kind="project", db={"public_id": "wrong-kind"}),
+    ]
+    monkeypatch.setattr(
+        public_pages.database_get,
+        "discoverable_page_rows",
+        lambda: ["candidate"],
+    )
+    monkeypatch.setattr(
+        public_pages.Entities,
+        "fetch",
+        lambda *_rows, request: pages,
+    )
+    monkeypatch.setattr(
+        public_pages,
+        "absolute_url",
+        lambda path: f"https://site.test{path}",
+    )
+
+    assert public_pages.discoverable_page_urls() == [
+        "https://site.test/pages/public/included"
+    ]
 
 
 # @matrix admin : config deployment-settings metadata
@@ -241,6 +428,11 @@ def test_recovery_snapshot_merges_live_settings(monkeypatch):
         "ai",
         lambda: {"AI_MODEL": "live-model"},
     )
+    monkeypatch.setattr(
+        recovery.site_database,
+        "public_pages",
+        lambda: {"PUBLIC_PAGE_INDEXING": True},
+    )
     monkeypatch.setattr(recovery, "read_recovery_redis_ca", lambda _settings: "ca")
     monkeypatch.setattr(
         recovery,
@@ -249,6 +441,7 @@ def test_recovery_snapshot_merges_live_settings(monkeypatch):
             **settings,
             **kwargs["deployment_settings"],
             **kwargs["ai_settings"],
+            **kwargs["public_page_settings"],
         },
     )
 
@@ -257,6 +450,7 @@ def test_recovery_snapshot_merges_live_settings(monkeypatch):
     assert snapshot["SECRET_KEY"] == "application-secret"
     assert snapshot["DEPLOY_MAX_INSTANCES"] == "4"
     assert snapshot["AI_MODEL"] == "live-model"
+    assert snapshot["PUBLIC_PAGE_INDEXING"] is True
 
 
 # @matrix admin : failure-isolation recovery-export

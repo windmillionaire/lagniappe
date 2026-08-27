@@ -14,7 +14,7 @@ from .verify import activate_installation
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
-# @matrix setup : config-files deferred-jobs post-deploy storage-buckets
+# @matrix setup : config-files deferred-jobs post-deploy public-page-settings storage-buckets
 def update():
     """Apply app-saved configuration without replacing repository code."""
     activate_installation()
@@ -69,7 +69,7 @@ def upgrade(branch=None):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
-# @matrix setup : config-files deferred-jobs git-upgrade post-deploy provider-apis storage-buckets
+# @matrix setup : config-files deferred-jobs git-upgrade post-deploy provider-apis public-page-settings storage-buckets
 def _apply_update(*, upgrade):
     """Apply current-checkout generation and app-saved settings."""
 
@@ -103,6 +103,7 @@ def _apply_update(*, upgrade):
     _update_custom_images(f)
     _update_deployment_settings(f)
     _update_ai_settings(f)
+    _update_public_page_settings(f)
     SETTINGS.save()
     config.verify_generation_manifest()
 
@@ -276,6 +277,44 @@ def _update_ai_settings(f):
             spinner.ok(f.ok_glyph)
         except Exception as error:
             spinner.write(f.warning(f"Could not apply AI settings: {error}"))
+            spinner.fail(f.fail_glyph)
+
+
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_public_page_settings_applies_saved_app_config
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_public_page_settings_continues_when_unavailable
+# @matrix setup : app-yaml public-page-indexing
+def _update_public_page_settings(f):
+    """Apply public-page settings saved from the app, if available."""
+    from config.public_pages import apply_public_page_settings
+    from installer import public_pages as public_pages_module
+
+    try:
+        ensure_datastore_dependency()
+    except Exception as error:
+        print(f.warning(f"Could not update public-page settings: {error}"))
+        return
+
+    with f.yaspin(text=f.success("Checking for public-page settings")) as spinner:
+        try:
+            entity = public_pages_module.get_public_page_settings()
+            spinner.ok(f.ok_glyph)
+        except Exception as error:
+            print(f.warning(f"Could not update public-page settings: {error}"))
+            spinner.fail(f.fail_glyph)
+            return
+
+    if not entity:
+        return
+
+    with f.yaspin(text=f.success("Applying public-page settings")) as spinner:
+        try:
+            apply_public_page_settings(entity)
+            spinner.ok(f.ok_glyph)
+        except Exception as error:
+            spinner.write(
+                f.warning(f"Could not apply public-page settings: {error}")
+            )
             spinner.fail(f.fail_glyph)
 
 

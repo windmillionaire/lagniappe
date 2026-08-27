@@ -15,6 +15,7 @@ from config.constants import (
     REDIS_CA_CERT_RELATIVE_PATH,
     UNSUPPORTED_SETTING_KEYS,
 )
+from config.public_pages import PUBLIC_PAGE_SETTING_KEYS
 from config.redis import redis_tls_enabled, validate_redis_ca_cert
 
 
@@ -66,11 +67,13 @@ def _mapping(value, name):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_recovery_snapshot_is_complete_flat_and_merges_live_settings
 # @matrix config : current-schema messaging-removal recovery-export
+# @pair public-pages:recovery-export
 def build_recovery_snapshot(
     settings,
     *,
     deployment_settings=None,
     ai_settings=None,
+    public_page_settings=None,
     redis_ca_pem=None,
 ):
     """Return a complete flat recovery snapshot without redacting persisted values."""
@@ -124,6 +127,14 @@ def build_recovery_snapshot(
                 key: value
                 for key, value in dict(ai_settings).items()
                 if key in AI_SETTING_KEYS
+            }
+        )
+    if public_page_settings:
+        snapshot.update(
+            {
+                key: value
+                for key, value in dict(public_page_settings).items()
+                if key in PUBLIC_PAGE_SETTING_KEYS
             }
         )
 

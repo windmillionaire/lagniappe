@@ -1,2 +1,263 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="cce74666-ef03-4c47-93c9-7aafd5188136",e._sentryDebugIdIdentifier="sentry-dbid-cce74666-ef03-4c47-93c9-7aafd5188136");}catch(e){}}();import{F as s}from"./form2.js?v=b2021079";import{InputElement as l}from"./input.js?v=b2021079";import{p as a}from"./primitives.js?v=b2021079";import{s as i}from"./sections.js?v=b2021079";import{S as n}from"./sectionToggle.js?v=b2021079";import{TextareaElement as c}from"./textarea.js?v=b2021079";import"./foundation.js?v=b2021079";import"./connectivity.js?v=b2021079";import"./baseForm.js?v=b2021079";import"./icons.js?v=b2021079";import"./loader.js?v=b2021079";import"./styles.js?v=b2021079";import"./baseElement.js?v=b2021079";import"./formatting.js?v=b2021079";import"./baseUpload.js?v=b2021079";import"./buttons.js?v=b2021079";import"./dropdown.js?v=b2021079";import"./combobox.js?v=b2021079";import"./facets.js?v=b2021079";import"./remote.js?v=b2021079";import"./queryLifecycle.js?v=b2021079";import"./results.js?v=b2021079";import"./storage.js?v=b2021079";import"./submitter.js?v=b2021079";class o extends s{get nameElement(){return new l({kind:"category",readonly:this.readonly},{id:"name",title:"Category Name",placeholder:"name this category...",input:"text"},this.target.dataset.name||"").elt}get descriptionElement(){return new c({kind:"category",readonly:this.readonly},{id:"description",label:"Category Description",input:"textarea",placeholder:"describe this category..."},this.target.dataset.description||"").elt}get formSelectElement(){const e=this.target.querySelector('[data-action="select-form"]');if(!e)return null;const t=n.facet(this,e);return t.init(),this.destroyables.push(t),t.elt}}class u extends o{constructor(e){super(e),this.messages={submit:"Update Category",submitting:"Updating Category",submitted:"Category Updated",queued:"Queued Sync"}}offline({data:e,method:t,route:m}){return{id:`update:category:${this.key}`,action:"update",kind:"category",method:t,route:m,target_key:this.key,data:e}}handleOfflineQueue({phase:e,record:t}){t?.kind!=="category"||t.target_key!==this.key||(e==="queued"&&(this.form?.queued(),this.setEntityMetadata()),e==="replayed"&&(this.form?.success(),this.setEntityMetadata()))}get html(){return[this.nameElement,this.descriptionElement,this.formSelectElement,i.attributes(this)]}postreconcile(){super.postreconcile(),this.setEntityMetadata()}}class p extends o{constructor(e){super(e),this.messages={submit:"Create Category",submitting:"Creating Category",submitted:"Category Created"}}async init(){this.target.dataset.mode="manual",this.target.dataset.role="generate",await super.init()}get html(){const e=this.nameElement,t=this.descriptionElement;return e.dataset.role="manual",t.dataset.role="manual",[i.generateEntityForm(this),e,t,this.formSelectElement,i.attributes(this)]}}class d extends s{constructor(e){super(e),this.messages={submit:"Generate Pages",submitting:"Generating Pages",submitted:"Pages Queued"},this.icon="generate",this.formSelect=null,this.textarea=null}get explainElement(){return this.target.querySelector("[data-explain]")}async init(){await super.init(),this.textarea=this.target.querySelector('[name="user_description"]'),this.textarea.addEventListener("input",()=>{this.explainElement.dataset.visible="true"},{once:!0})}get formSelectElement(){const e=this.target.querySelector('[data-action="select-form"]');if(!e)return null;const t=n.facet(this,e);return t.init(),this.destroyables.push(t),t.elt}get html(){const e=a.textarea({name:"user_description",rows:6,label:"Details",placeholder:"Add details about the pages you'd like to generate",kind:"page"}),t=a.input({name:"num_pages",type:"number",kind:"page",label:"Number of Pages"});return[e,t,this.formSelectElement]}success(){this.form?.success(),this._success=!1}async prereconcile(){await super.prereconcile(),this._created&&await this.prepareReset()}postreconcile(){const e=this._created;e&&this.commitReset(),super.postreconcile(),e&&(this.success(),this.target.querySelector("[name='num_pages']").value=0,this.target.querySelector("[name='user_description']").value=""),this.textarea.focus()}}export{u as CategoryInfo,p as CreateCategory,d as GeneratePages};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormElement } from './form2.js?v=b687b680';
+import { InputElement } from './input.js?v=b687b680';
+import { p as primitives } from './primitives.js?v=b687b680';
+import { s as sections } from './sections.js?v=b687b680';
+import { S as SectionToggle } from './sectionToggle.js?v=b687b680';
+import { TextareaElement } from './textarea.js?v=b687b680';
+import './foundation.js?v=b687b680';
+import './connectivity.js?v=b687b680';
+import './baseForm.js?v=b687b680';
+import './icons.js?v=b687b680';
+import './loader.js?v=b687b680';
+import './styles.js?v=b687b680';
+import './baseElement.js?v=b687b680';
+import './formatting.js?v=b687b680';
+import './baseUpload.js?v=b687b680';
+import './buttons.js?v=b687b680';
+import './dropdown.js?v=b687b680';
+import './combobox.js?v=b687b680';
+import './facets.js?v=b687b680';
+import './remote.js?v=b687b680';
+import './queryLifecycle.js?v=b687b680';
+import './results.js?v=b687b680';
+import './storage.js?v=b687b680';
+import './submitter.js?v=b687b680';
+
+/**
+ * @testable infrastructure
+ */
+class CategoryForm extends FormElement {
+	get nameElement() {
+		return new InputElement(
+			{ kind: "category", readonly: this.readonly },
+			{
+				id: "name",
+				title: "Category Name",
+				placeholder: "name this category...",
+				input: "text",
+			},
+			this.target.dataset.name || "",
+		).elt;
+	}
+
+	get descriptionElement() {
+		return new TextareaElement(
+			{
+				kind: "category",
+				readonly: this.readonly,
+			},
+			{
+				id: "description",
+				label: "Category Description",
+				input: "textarea",
+				placeholder: "describe this category...",
+			},
+			this.target.dataset.description || "",
+		).elt;
+	}
+
+	get formSelectElement() {
+		const target = this.target.querySelector('[data-action="select-form"]');
+		if (!target) return null;
+
+		const control = SectionToggle.facet(this, target);
+		control.init();
+		this.destroyables.push(control);
+		return control.elt;
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
+ * @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
+ * @matrix categories : info-form labels readonly update
+ */
+class CategoryInfo extends CategoryForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update Category",
+			submitting: "Updating Category",
+			submitted: "Category Updated",
+			queued: "Queued Sync",
+		};
+	}
+
+	offline({ data, method, route }) {
+		return {
+			id: `update:category:${this.key}`,
+			action: "update",
+			kind: "category",
+			method,
+			route,
+			target_key: this.key,
+			data,
+		};
+	}
+
+	handleOfflineQueue({ phase, record }) {
+		if (record?.kind !== "category" || record.target_key !== this.key) return;
+		if (phase === "queued") {
+			this.form?.queued();
+			this.setEntityMetadata();
+		}
+		if (phase === "replayed") {
+			this.form?.success();
+			this.setEntityMetadata();
+		}
+	}
+
+	get html() {
+		return [
+			this.nameElement,
+			this.descriptionElement,
+			this.formSelectElement,
+			sections.attributes(this),
+		];
+	}
+
+	postreconcile() {
+		super.postreconcile();
+		this.setEntityMetadata();
+	}
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/category.mjs::CreateCategory.html
+ * @covered-by lagniappe/web/routes/categories/main.py::create
+ * @reason category create behavior is split between rendered controls and submit route handling
+ */
+class CreateCategory extends CategoryForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Create Category",
+			submitting: "Creating Category",
+			submitted: "Category Created",
+		};
+	}
+
+	async init() {
+		this.target.dataset.mode = "manual";
+		this.target.dataset.role = "generate";
+
+		await super.init();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_form
+	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_category_form_explain_button
+	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_category_form_generate_toggle
+	 * @matrix categories : ai-form attach-form explain-button manual-form
+	 */
+	get html() {
+		const name = this.nameElement;
+		const description = this.descriptionElement;
+		name.dataset.role = "manual";
+		description.dataset.role = "manual";
+
+		return [
+			sections.generateEntityForm(this),
+			name,
+			description,
+			this.formSelectElement,
+			sections.attributes(this),
+		];
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_explain_prompt_from_category_tools
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_submit_marks_form_successful
+ * @matrix pages : ai-form deferred-submit explain-button generate success-state
+ */
+class GeneratePages extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Generate Pages",
+			submitting: "Generating Pages",
+			submitted: "Pages Queued",
+		};
+		this.icon = "generate";
+		this.formSelect = null;
+		this.textarea = null;
+	}
+
+	get explainElement() {
+		return this.target.querySelector("[data-explain]");
+	}
+
+	async init() {
+		await super.init();
+		this.textarea = this.target.querySelector('[name="user_description"]');
+
+		this.textarea.addEventListener(
+			"input",
+			() => {
+				this.explainElement.dataset.visible = "true";
+			},
+			{ once: true },
+		);
+	}
+
+	get formSelectElement() {
+		const target = this.target.querySelector('[data-action="select-form"]');
+		if (!target) return null;
+
+		const control = SectionToggle.facet(this, target);
+		control.init();
+		this.destroyables.push(control);
+		return control.elt;
+	}
+
+	get html() {
+		const userDescription = primitives.textarea({
+			name: "user_description",
+			rows: 6,
+			label: "Details",
+			placeholder: "Add details about the pages you'd like to generate",
+			kind: "page",
+		});
+
+		const numberOfPages = primitives.input({
+			name: "num_pages",
+			type: "number",
+			kind: "page",
+			label: "Number of Pages",
+		});
+
+		return [userDescription, numberOfPages, this.formSelectElement];
+	}
+
+	success() {
+		this.form?.success();
+		this._success = false;
+	}
+
+	async prereconcile() {
+		await super.prereconcile();
+		if (this._created) await this.prepareReset();
+	}
+
+	postreconcile() {
+		const created = this._created;
+		if (created) this.commitReset();
+		super.postreconcile();
+
+		if (created) {
+			this.success();
+			this.target.querySelector("[name='num_pages']").value = 0;
+			this.target.querySelector("[name='user_description']").value = "";
+		}
+
+		this.textarea.focus();
+	}
+}
+
+export { CategoryInfo, CreateCategory, GeneratePages };

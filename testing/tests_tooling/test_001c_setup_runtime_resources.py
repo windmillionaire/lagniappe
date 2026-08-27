@@ -2125,7 +2125,7 @@ def test_upgrade_refreshes_setup_dependencies_from_replaced_checkout(monkeypatch
     ]
 
 
-# @matrix setup : config-files deferred-jobs post-deploy provider-apis storage-buckets
+# @matrix setup : config-files deferred-jobs post-deploy provider-apis public-page-settings storage-buckets
 def test_update_reloads_config_and_setup_helpers(monkeypatch):
     import installer as setup_pkg
     from installer import upgrade
@@ -2188,6 +2188,11 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
     monkeypatch.setattr(
         upgrade, "_update_ai_settings", lambda f: events.append("ai-settings")
     )
+    monkeypatch.setattr(
+        upgrade,
+        "_update_public_page_settings",
+        lambda f: events.append("public-page-settings"),
+    )
     storage_module = types.ModuleType("installer.storage")
     storage_module.configure_storage = lambda: events.append("storage-config")
     monkeypatch.setitem(sys.modules, "installer.storage", storage_module)
@@ -2220,6 +2225,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
         "images",
         "deployment",
         "ai-settings",
+        "public-page-settings",
         "verify_generation",
         "deploy",
         "deferred-job-reconciler",
@@ -2716,6 +2722,25 @@ def test_ai_settings_apply_preserves_unowned_app_config(monkeypatch):
     }
 
 
+# @matrix config : app-yaml public-page-indexing
+def test_public_page_settings_apply_preserves_unowned_app_config(monkeypatch):
+    constants = types.SimpleNamespace(DEFAULT_PUBLIC_PAGE_INDEXING=False)
+    _install_config_package(monkeypatch, constants)
+
+    from config.public_pages import apply_public_page_settings
+
+    app_settings = {"APP_NAME": "Lagniappe", "PUBLIC_PAGE_INDEXING": False}
+    apply_public_page_settings(
+        app_settings,
+        {"PUBLIC_PAGE_INDEXING": "true", "ignored": "value"},
+    )
+
+    assert app_settings == {
+        "APP_NAME": "Lagniappe",
+        "PUBLIC_PAGE_INDEXING": True,
+    }
+
+
 # @matrix setup : app-yaml datastore deployment-settings
 def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatch):
     from installer import upgrade
@@ -2928,6 +2953,63 @@ def test_upgrade_restore_ai_settings_continues_when_unavailable(monkeypatch):
     upgrade._update_ai_settings(formatter)
 
     assert settings.APP == {"AI_MODEL": "existing"}
+
+
+# @matrix setup : app-yaml datastore public-page-indexing
+def test_upgrade_restore_public_page_settings_applies_saved_app_config(monkeypatch):
+    from installer import upgrade
+    import installer.public_pages as public_pages_module
+
+    events = []
+    settings = _fake_settings(
+        app={"APP_NAME": "Lagniappe", "PUBLIC_PAGE_INDEXING": False}
+    )
+    monkeypatch.setattr(
+        upgrade, "ensure_datastore_dependency", lambda: events.append("datastore")
+    )
+    monkeypatch.setattr(
+        public_pages_module,
+        "get_public_page_settings",
+        lambda: {"PUBLIC_PAGE_INDEXING": True, "version": 2},
+    )
+    formatter = types.SimpleNamespace(
+        success=lambda message: message,
+        warning=lambda message: message,
+        ok_glyph="[OK]",
+        fail_glyph="[X]",
+        yaspin=spinner_factory(),
+    )
+    constants = types.SimpleNamespace(DEFAULT_PUBLIC_PAGE_INDEXING=False)
+    _install_config_package(monkeypatch, constants, settings=settings)
+
+    upgrade._update_public_page_settings(formatter)
+
+    assert events == ["datastore"]
+    assert settings.APP["PUBLIC_PAGE_INDEXING"] is True
+    assert settings.APP["APP_NAME"] == "Lagniappe"
+
+
+# @matrix setup : app-yaml public-page-indexing
+def test_upgrade_restore_public_page_settings_continues_when_unavailable(monkeypatch):
+    import config
+    from installer import upgrade
+
+    monkeypatch.setattr(
+        upgrade,
+        "ensure_datastore_dependency",
+        lambda: (_ for _ in ()).throw(RuntimeError("datastore unavailable")),
+    )
+    settings = _fake_settings(app={"PUBLIC_PAGE_INDEXING": False})
+    formatter = types.SimpleNamespace(
+        success=lambda message: message,
+        warning=lambda message: message,
+        yaspin=spinner_factory(),
+    )
+    monkeypatch.setattr(config, "SETTINGS", settings)
+
+    upgrade._update_public_page_settings(formatter)
+
+    assert settings.APP == {"PUBLIC_PAGE_INDEXING": False}
 
 
 # @matrix setup : dependency-pins package-install

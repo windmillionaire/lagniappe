@@ -60,6 +60,34 @@ Blueprint registration lives in `web/start/blueprints.py`.
 Private asset responses support one `Range: bytes=...` request and return `206
 Partial Content`, allowing PDF preview code to stream data through Flask.
 
+## Anonymous public pages
+
+`/pages/public/<public_id>` is a dedicated server-rendered document surface.
+It publishes a trusted canonical URL, robots policy, description, Open Graph,
+and Twitter card metadata without exposing the Page's internal description or
+photo. The public title/description override is optional; otherwise the page
+name and a document excerpt are used. A selected sharing image must be a
+page-owned image that is currently embedded in the document. The same image is
+already visible in document layout, so public rendering does not add a second
+hero image.
+
+Embedded private images are rewritten to the anonymous, revocable
+`/pages/public/<public_id>/images/<asset>` route. That route serves only image
+assets still referenced by a currently public document. Unpublishing the page
+or removing the image reference makes the URL return 404.
+
+`/robots.txt` always blocks the private application and explicitly allows the
+public page and static asset families. When live site discovery is enabled it
+also advertises `/sitemap.xml`; the sitemap otherwise returns 404. Public page
+responses use both an HTML robots tag and `X-Robots-Tag`, combining the site
+switch with the page opt-out. These controls affect crawler guidance, not
+whether a public link can be opened or shared.
+
+The public navbar initializes a small dynamic sharing module. It uses the Web
+Share API where available, then the Clipboard API, a synchronous copy fallback,
+and finally a selectable URL. It does not load the authenticated lifecycle or
+a third-party sharing library.
+
 ## Jinja environment
 
 `web/start/jinja.py` configures the template environment.

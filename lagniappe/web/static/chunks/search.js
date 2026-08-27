@@ -1,2 +1,100 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="65070f3b-f797-46eb-992e-d93af6d85900",e._sentryDebugIdIdentifier="sentry-dbid-65070f3b-f797-46eb-992e-d93af6d85900");}catch(e){}}();import{STYLES as r}from"./styles.js?v=b2021079";import{E as i,r as n}from"./foundation.js?v=b2021079";import"./connectivity.js?v=b2021079";import{R as a}from"./remote.js?v=b2021079";import{R as l}from"./results.js?v=b2021079";import"./queryLifecycle.js?v=b2021079";import"./combobox.js?v=b2021079";import"./primitives.js?v=b2021079";import"./icons.js?v=b2021079";import"./storage.js?v=b2021079";import"./formatting.js?v=b2021079";class o extends a{constructor(e){super(e),this.index="search",this.results=new l(this.index),this.placement="bottom-end",this.endpoints=i.search}init(){this.styles.panel=`${r.dropdown.panel} right-0 w-64 sm:w-96 mt-2`,super.init(),this.updatePanel(this.results.create())}_input(e){const t=e.target.value.trim();if(t.length>1)return this._search(t);if(t.length===0)return this.settleQueryInput(),this.updatePanel(this.results.create()),this.showPanel();this.settleQueryInput({clear:!0})}elementClick(e){super.elementClick(e),this.showPanel()}_search(e){const t=new URLSearchParams;return t.set("q",e),this.runQuery(e,s=>n.get(this.endpoints.bar,t,{signal:s.signal}),s=>(s?.ok?this.updatePanel(s.results||null):this.clearQueryResults(),this.showPanel()))}selectOption(e){this.results.save(e),this.hidePanel(),window.location.href=e.dataset.url}elementKeydown(e){if(super.elementKeydown(e),!e.defaultPrevented&&e.key==="Enter"){e.preventDefault(),e.stopPropagation();const t=new URLSearchParams;t.set("q",this.element.value),this.element.value&&(window.location.href=`${this.endpoints.page}?${t.toString()}`)}}}export{o as SearchBox};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=b687b680';
+import { E as ENDPOINTS, r as request } from './foundation.js?v=b687b680';
+import './connectivity.js?v=b687b680';
+import { R as RemoteQueryCombobox } from './remote.js?v=b687b680';
+import { R as Results } from './results.js?v=b687b680';
+import './queryLifecycle.js?v=b687b680';
+import './combobox.js?v=b687b680';
+import './primitives.js?v=b687b680';
+import './icons.js?v=b687b680';
+import './storage.js?v=b687b680';
+import './formatting.js?v=b687b680';
+
+/**
+ * @testable true
+ * @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
+ * @tests tests_js/test_046_async_query_lifecycle.py::test_search_threshold_settles_stale_work_and_restores_recent_results
+ * @matrix search : recent-results stale-publication threshold
+ * @pair search:page-navigation
+ */
+class SearchBox extends RemoteQueryCombobox {
+	constructor(element) {
+		super(element);
+		this.index = "search";
+		this.results = new Results(this.index);
+		this.placement = "bottom-end";
+		this.endpoints = ENDPOINTS.search;
+	}
+
+	init() {
+		this.styles.panel = `${STYLES.dropdown.panel} right-0 w-64 sm:w-96 mt-2`;
+		super.init();
+		this.updatePanel(this.results.create());
+	}
+
+	_input(event) {
+		const query = event.target.value.trim();
+		if (query.length > 1) {
+			return this._search(query);
+		} else if (query.length === 0) {
+			this.settleQueryInput();
+			this.updatePanel(this.results.create());
+			return this.showPanel();
+		}
+		this.settleQueryInput({ clear: true });
+	}
+
+	elementClick(event) {
+		super.elementClick(event);
+		this.showPanel();
+	}
+
+	_search(query) {
+		const params = new URLSearchParams();
+		params.set("q", query);
+		return this.runQuery(
+			query,
+			(token) =>
+				request.get(this.endpoints.bar, params, { signal: token.signal }),
+			(response) => {
+				if (response?.ok) {
+					this.updatePanel(response.results || null);
+				} else {
+					this.clearQueryResults();
+				}
+				return this.showPanel();
+			},
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates
+	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_result_links_correct
+	 * @matrix search : result-links result-navigation
+	 * @template nav.html::search_results
+	 */
+	selectOption(option) {
+		this.results.save(option);
+		this.hidePanel();
+		window.location.href = option.dataset.url;
+	}
+
+	elementKeydown(event) {
+		super.elementKeydown(event);
+		if (event.defaultPrevented) return;
+
+		if (event.key === "Enter") {
+			event.preventDefault();
+			event.stopPropagation();
+			const params = new URLSearchParams();
+			params.set("q", this.element.value);
+			if (this.element.value) {
+				window.location.href = `${this.endpoints.page}?${params.toString()}`;
+			}
+		}
+	}
+}
+
+export { SearchBox };

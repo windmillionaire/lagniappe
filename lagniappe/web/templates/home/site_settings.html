@@ -113,6 +113,32 @@
              class="{{ styles.link.default }} w-fit">Open Users to create or permanently delete an account</a>
         </div>
       {% endcall %}
+      {% call site_settings_section('public-pages', 'SitePublicPages', 'Public Pages', 'site_public_pages', 'Search discovery is off') %}
+        <form data-role="public-page-settings" class="flex flex-col gap-4">
+          <div class="rounded-md border border-page-light/70 bg-page-bg p-4 text-sm text-page-dark">
+            <strong class="block">Publishing and search discovery are separate</strong>
+            <p class="mt-1">Public links remain available and shareable either way. This setting lets search crawlers discover eligible public pages in robots.txt and the sitemap.</p>
+          </div>
+          <label class="flex items-start gap-3 rounded-md border border-base-light/70 bg-white p-3 text-sm text-base-dark">
+            <input type="checkbox"
+                   name="PUBLIC_PAGE_INDEXING"
+                   value="true"
+                   class="mt-1 size-4 shrink-0 accent-page-default">
+            <span>
+              <strong class="block">Allow search indexing of public pages</strong>
+              <span class="text-base-medium">Each public page can still opt out and will receive a noindex directive.</span>
+            </span>
+          </label>
+          <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <a class="{{ styles.link.default }}" href="/robots.txt" target="_blank" rel="noopener noreferrer">Open robots.txt</a>
+            <a class="{{ styles.link.default }}" href="/sitemap.xml" target="_blank" rel="noopener noreferrer">Open sitemap.xml</a>
+          </div>
+          <p data-role="public-pages-error"
+             data-visible="false"
+             class="text-sm font-semibold text-delete-default"></p>
+          <button type="submit" data-kind="page" class="{{ styles.button.submit }}">Save Public Page Settings</button>
+        </form>
+      {% endcall %}
       {% set saved_installer = CONFIG.INSTALLER_EMAIL|default('', true)|trim|lower %}
       {% set permanent_owner = CONFIG.ADMIN_EMAIL|default('', true)|trim|lower %}
       {% if current_user.is_owner and saved_installer and saved_installer != permanent_owner %}

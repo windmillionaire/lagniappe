@@ -1,6 +1,6 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "b2021079"
+BUILD_ID = "b687b680"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -32,6 +32,7 @@ DEFAULT_ERROR_MONITORING_ENABLED = False
 DEFAULT_SENTRY_TRACES_SAMPLE_RATE = 1.0
 DEFAULT_SENTRY_PROFILE_SESSION_SAMPLE_RATE = 1.0
 DEFAULT_PUBLIC_MANUAL = False
+DEFAULT_PUBLIC_PAGE_INDEXING = False
 DEFAULT_SOURCE_URL = "https://github.com/windmillionaire/lagniappe"
 DEFAULT_REDIS_TLS_ENABLED = False
 REDIS_CA_CERT_RELATIVE_PATH = "config/files/redis_ca.pem"
@@ -85,6 +86,7 @@ REQUIRED_APPLICATION_SETTINGS = {
     "OCR_PROCESSOR": "Document processing",
     "OCR_PROCESSOR_ID": "Document processing",
     "PUBLIC_MANUAL": "Public manual",
+    "PUBLIC_PAGE_INDEXING": "Public pages",
     "REDIS_HOST": "Redis",
     "REDIS_PORT": "Redis",
     "REDIS_PASSWORD": "Redis",
@@ -682,6 +684,8 @@ APP_ROOT_ROUTE_PREFIXES = (
     "offline",
     "privacy-policy",
     "reporting_privacy",
+    "robots.txt",
+    "sitemap.xml",
 )
 
 
@@ -756,12 +760,6 @@ APP_HANDLERS = [
         "secure": "always",
         "static_files": "lagniappe/web/static/images/favicon.ico",
         "upload": "lagniappe/web/static/images/favicon\\.ico",
-    },
-    {
-        "url": "/robots.txt",
-        "static_files": "lagniappe/web/static/robots.txt",
-        "secure": "always",
-        "upload": "lagniappe/web/static/robots.txt",
     },
     {
         "url": "/images/(.*\\.(bmp|gif|jpeg|jpg|png|pdf))",

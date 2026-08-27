@@ -43,6 +43,7 @@ from .utility import (
     delete,
     delete_cache,
 )
+from .sitemap import cached_sitemap, invalidate_sitemap
 
 __all__ = [
     "initialize",
@@ -82,4 +83,6 @@ __all__ = [
     "normalize_owner_name",
     "owner_search_result",
     "update_owner_projection",
+    "cached_sitemap",
+    "invalidate_sitemap",
 ]

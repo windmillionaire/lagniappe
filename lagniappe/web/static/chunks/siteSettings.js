@@ -1,2 +1,248 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7aafd447-c110-4ab2-ae0c-eaeddd5ba2f7",e._sentryDebugIdIdentifier="sentry-dbid-7aafd447-c110-4ab2-ae0c-eaeddd5ba2f7");}catch(e){}}();import{w as r}from"./foundation.js?v=b2021079";import"./connectivity.js?v=b2021079";const a="lagniappe:site-settings-section",l="maintenance",d={maintenance:"SiteMaintenance",administrators:"SiteAdministrators","installation-access":"SiteInstallationAccess",deployment:"SiteDeployment","ai-models":"SiteAiModels","service-providers":"SiteServiceProviders","site-image":"SiteImage"};class g{constructor(t){Object.assign(this,t),this.sections=new Map,this.settingWidgets=new Map,this._sectionRequest=0,this._click=this._click.bind(this)}async init(){this._collectSections(),await this._loadSettingWidgets(),this.target.addEventListener("click",this._click);const t=localStorage.getItem(a),e=this.sections.has(t)?t:l;await this.settingWidgets.get(e)?.opened?.(),this._setOpenSection(e,{persist:!1}),this.target.setAttribute("initialized","")}_collectSections(){this.target.querySelectorAll("[data-role='site-settings-section']").forEach(t=>{const e=t.dataset.section;e&&this.sections.set(e,t)})}async _loadSettingWidgets(){await Promise.all(Object.entries(d).map(async([t,e])=>{const i=await this.component.loadWidget(e);i&&this.settingWidgets.set(t,i)}))}updated(t){this.settingWidgets.forEach(e=>{e.updated?.(t),e.modified=!0}),this.modified=!0}postreconcile(){}_click(t){const e=t.target.closest("[data-role='site-settings-section']");if(!e||!this.target.contains(e))return;if(t.target.closest("[data-role='expand']")){t.preventDefault(),t.stopPropagation(),this._toggleSection(e.dataset.section);return}const s=t.target.closest("header");!s||!e.contains(s)||t.target.closest("button, a, input, select, textarea")||this._toggleSection(e.dataset.section)}async _toggleSection(t){const i=!this._isSectionOpen(t)?t:null,s=++this._sectionRequest;if(await this.settingWidgets.get(i)?.opened?.(),s===this._sectionRequest)return r(()=>this._setOpenSection(i),{label:"site-settings:toggle-section"})}_setOpenSection(t,{persist:e=!0}={}){this.sections.forEach((i,s)=>{const n=s===t;i.dataset.open=n?"true":"false";const c=i.querySelector("[data-role='section-body']");c&&(c.dataset.visible=n?"true":"false");const o=i.querySelector("[data-role='expand']");o&&(o.dataset.open=n?"true":"false",o.setAttribute("aria-expanded",n?"true":"false"),o.setAttribute("aria-label",n?"Collapse":"Expand"),o.title=n?"Collapse":"Expand")}),e&&(t?localStorage.setItem(a,t):localStorage.removeItem(a))}_isSectionOpen(t){return this.sections.get(t)?.dataset.open==="true"}destroy(){this.target.removeEventListener("click",this._click)}}export{g as SiteSettings};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request, w as withTransition } from './foundation.js?v=b687b680';
+import './connectivity.js?v=b687b680';
+import { b as buttons } from './buttons.js?v=b687b680';
+import { S as SiteSetting } from './base.js?v=b687b680';
+import './styles.js?v=b687b680';
+import './icons.js?v=b687b680';
+import './formatting.js?v=b687b680';
+
+const PUBLIC_PAGE_SETTINGS_ENDPOINT = "/l/site-settings/public-pages";
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
+ * @matrix admin public-pages : live-settings sitemap-invalidation
+ */
+class SitePublicPages extends SiteSetting {
+	constructor(attributes) {
+		super(attributes);
+		this._settings = null;
+		this._save = this._save.bind(this);
+	}
+
+	async init() {
+		this.form = this.target.querySelector("[data-role='public-page-settings']");
+		if (!this.form) return;
+		this.button = buttons.active({
+			existingButton: this.form.querySelector("button[type='submit']"),
+			text: "Save Public Page Settings",
+			processingText: "Saving Public Page Settings",
+			completedText: "Public Page Settings Saved",
+			processingIcon: "spinner",
+			completedIcon: "check",
+		});
+		this.form.addEventListener("submit", this._save);
+		const response = await request.get(PUBLIC_PAGE_SETTINGS_ENDPOINT);
+		if (response.ok) {
+			this._settings = response.public_pages;
+			this._render(response.public_pages);
+		} else {
+			this._showError(response.error || "Unable to load public page settings.");
+		}
+	}
+
+	updated(response) {
+		if (response.public_pages) this._settings = response.public_pages;
+	}
+
+	postreconcile() {
+		if (this._settings) this._render(this._settings);
+	}
+
+	_render(settings) {
+		const enabled = settings.PUBLIC_PAGE_INDEXING === true;
+		const field = this.form?.querySelector("[name='PUBLIC_PAGE_INDEXING']");
+		if (field) field.checked = enabled;
+		this.updateSummary(
+			enabled ? "Search discovery is on" : "Search discovery is off",
+		);
+	}
+
+	_showError(message) {
+		const error = this.form?.querySelector("[data-role='public-pages-error']");
+		if (!error) return;
+		error.textContent = message || "";
+		error.dataset.visible = message ? "true" : "false";
+	}
+
+	async _save(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		this._showError("");
+		this.button.activate();
+		const data = new FormData();
+		data.set(
+			"PUBLIC_PAGE_INDEXING",
+			this.form.querySelector("[name='PUBLIC_PAGE_INDEXING']")?.checked
+				? "true"
+				: "false",
+		);
+		const response = await request.post(PUBLIC_PAGE_SETTINGS_ENDPOINT, data);
+		if (!response.ok) {
+			this._showError(response.error || "Unable to save public page settings.");
+			this.button.deactivate("Save Public Page Settings");
+			return;
+		}
+		this._settings = response.public_pages;
+		this._render(response.public_pages);
+		this.button.deactivate();
+	}
+
+	destroy() {
+		this.form?.removeEventListener("submit", this._save);
+		super.destroy();
+	}
+}
+
+const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";
+const DEFAULT_SECTION = "maintenance";
+const SETTING_WIDGETS = {
+	maintenance: "SiteMaintenance",
+	administrators: "SiteAdministrators",
+	"installation-access": "SiteInstallationAccess",
+	deployment: "SiteDeployment",
+	"ai-models": "SiteAiModels",
+	"service-providers": "SiteServiceProviders",
+	"site-image": "SiteImage",
+};
+
+/**
+ * Coordinates the shared site-settings section chrome while each section body
+ * is owned by a focused persistent widget.
+ *
+ * @testable true
+ * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+ * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
+ * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_coordinates_section_widgets
+ * @matrix admin : composite-widgets persistence sections site-settings
+ * @matrix public-pages : live-settings
+ */
+class SiteSettings {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+		this.sections = new Map();
+		this.settingWidgets = new Map();
+		this._sectionRequest = 0;
+		this._click = this._click.bind(this);
+	}
+
+	async init() {
+		this._collectSections();
+		await this._loadSettingWidgets();
+		this.target.addEventListener("click", this._click);
+
+		const savedSection = localStorage.getItem(SECTION_STORAGE_KEY);
+		const initialSection = this.sections.has(savedSection)
+			? savedSection
+			: DEFAULT_SECTION;
+		await this.settingWidgets.get(initialSection)?.opened?.();
+		this._setOpenSection(initialSection, { persist: false });
+		this.target.setAttribute("initialized", "");
+	}
+
+	_collectSections() {
+		this.target
+			.querySelectorAll("[data-role='site-settings-section']")
+			.forEach((section) => {
+				const name = section.dataset.section;
+				if (name) this.sections.set(name, section);
+			});
+	}
+
+	async _loadSettingWidgets() {
+		await Promise.all(
+			Object.entries(SETTING_WIDGETS).map(async ([section, widgetName]) => {
+				const widget = await this.component.loadWidget(widgetName);
+				if (widget) this.settingWidgets.set(section, widget);
+			}),
+		);
+		const target = this.sections
+			.get("public-pages")
+			?.querySelector("[data-widget='SitePublicPages']");
+		if (target) {
+			const widget = new SitePublicPages({ target, kind: "page" });
+			await widget.init();
+			this.settingWidgets.set("public-pages", widget);
+		}
+	}
+
+	updated(response) {
+		this.settingWidgets.forEach((widget) => {
+			widget.updated?.(response);
+			widget.modified = true;
+		});
+		this.modified = true;
+	}
+
+	// ViewComponent.load() reconciles a loaded inactive widget before activate()
+	// assigns it as current. Child widgets do the actual response rendering.
+	postreconcile() {}
+
+	_click(event) {
+		const section = event.target.closest("[data-role='site-settings-section']");
+		if (!section || !this.target.contains(section)) return;
+
+		const toggle = event.target.closest("[data-role='expand']");
+		if (toggle) {
+			event.preventDefault();
+			event.stopPropagation();
+			void this._toggleSection(section.dataset.section);
+			return;
+		}
+
+		const header = event.target.closest("header");
+		if (!header || !section.contains(header)) return;
+		if (event.target.closest("button, a, input, select, textarea")) return;
+		void this._toggleSection(section.dataset.section);
+	}
+
+	async _toggleSection(name) {
+		const nextOpen = !this._isSectionOpen(name);
+		const nextSection = nextOpen ? name : null;
+		const request = ++this._sectionRequest;
+		await this.settingWidgets.get(nextSection)?.opened?.();
+		if (request !== this._sectionRequest) return;
+
+		return withTransition(() => this._setOpenSection(nextSection), {
+			label: "site-settings:toggle-section",
+		});
+	}
+
+	_setOpenSection(name, { persist = true } = {}) {
+		this.sections.forEach((section, sectionName) => {
+			const open = sectionName === name;
+			section.dataset.open = open ? "true" : "false";
+
+			const body = section.querySelector("[data-role='section-body']");
+			if (body) body.dataset.visible = open ? "true" : "false";
+
+			const toggle = section.querySelector("[data-role='expand']");
+			if (toggle) {
+				toggle.dataset.open = open ? "true" : "false";
+				toggle.setAttribute("aria-expanded", open ? "true" : "false");
+				toggle.setAttribute("aria-label", open ? "Collapse" : "Expand");
+				toggle.title = open ? "Collapse" : "Expand";
+			}
+		});
+
+		if (persist) {
+			if (name) {
+				localStorage.setItem(SECTION_STORAGE_KEY, name);
+			} else {
+				localStorage.removeItem(SECTION_STORAGE_KEY);
+			}
+		}
+	}
+
+	_isSectionOpen(name) {
+		return this.sections.get(name)?.dataset.open === "true";
+	}
+
+	destroy() {
+		this.target.removeEventListener("click", this._click);
+		this.settingWidgets.get("public-pages")?.destroy?.();
+	}
+}
+
+export { SiteSettings };

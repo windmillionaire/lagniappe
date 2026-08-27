@@ -35,6 +35,7 @@ class MutationEffectType(Enum):
     OPERATION_DELETE = "operation-delete"
     BLOB_DELETE = "blob-delete"
     SCHEDULED_UNCOMPLETE_DISPATCH = "scheduled-uncomplete-dispatch"
+    SITEMAP_INVALIDATE = "sitemap-invalidate"
 
 
 class MutationIntentType(Enum):
@@ -46,6 +47,7 @@ class MutationIntentType(Enum):
     CACHE_STATE_DELETE = "cache-state-delete"
     CACHE_SEARCH_DELETE = "cache-search-delete"
     SCHEDULED_UNCOMPLETE_DISPATCH = "scheduled-uncomplete-dispatch"
+    SITEMAP_INVALIDATE = "sitemap-invalidate"
 
 
 class RelationAuthority(Enum):
@@ -311,6 +313,17 @@ class MutationIntent:
         return cls(
             MutationIntentType.SCHEDULED_UNCOMPLETE_DISPATCH,
             entity=entity,
+            reason=reason,
+        )
+
+    @classmethod
+    # @testable false
+    # @covered-by lagniappe/core/mutations/base.py::MutationPlanBuilder.consume_intents
+    # @reason factory is exercised through page visibility mutation planning
+    def invalidate_sitemap(cls, *, reason):
+        return cls(
+            MutationIntentType.SITEMAP_INVALIDATE,
+            refresh_cache=False,
             reason=reason,
         )
 

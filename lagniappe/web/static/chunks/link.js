@@ -1,2 +1,183 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="20e22f3c-3034-4501-8942-c1accc458de5",e._sentryDebugIdIdentifier="sentry-dbid-20e22f3c-3034-4501-8942-c1accc458de5");}catch(e){}}();import{STYLES as s}from"./styles.js?v=b2021079";import{f as r}from"./foundation.js?v=b2021079";import"./connectivity.js?v=b2021079";import{p as l}from"./primitives.js?v=b2021079";import{F as a}from"./facets.js?v=b2021079";import{f as n}from"./formatting.js?v=b2021079";import{B as m}from"./baseElement.js?v=b2021079";import"./icons.js?v=b2021079";import"./remote.js?v=b2021079";import"./queryLifecycle.js?v=b2021079";import"./combobox.js?v=b2021079";import"./results.js?v=b2021079";import"./storage.js?v=b2021079";import"./submitter.js?v=b2021079";class u extends m{constructor(e,i,t){super(e,i,t),this.combobox=null}get value(){if(this.combobox){const e=this.combobox?.values.size>0?Array.from(this.combobox.values)[0]:null;if(this.submission?.id===e)return this.submission;const i=this.combobox.selectedOptions;return i.length>0?i[0]:null}else{const e=this.elt?.querySelectorAll("input");if(!e?.length)return this.submission?.url?{url:this.submission.url,title:this.submission.title??""}:null;const i={};return e.forEach(t=>{const o=t.name.slice(t.name.indexOf(":")+1);i[o]=t.value}),i.url?i:null}}changed(e){return!r(this.value,e)}get read(){if(this._read)return this._read;if(!this.submission)return null;if(this._read=document.createElement("div"),this._read.className=`${s.form.submission.default} group-data-[mode=edit]/element:hidden`,this.submission?.id){if(!this.submission.name)return null;const e=n.name({...this.submission,link:!0});this._read.appendChild(n.iconLabel({icon:"in",kind:this.submission.kind,content:e,classes:s.form.linkLabel,iconClasses:"text-kind-default"}))}else if(this.submission?.url){const e=document.createElement("a");e.dataset.kind="page",e.className=s.link.default,e.target="_blank",e.href=this.submission.url,e.textContent=this.submission.title?this.submission.title:this.submission.url,this._read.appendChild(n.iconLabel({icon:"out",kind:"page",content:e,classes:s.form.linkLabel,iconClasses:"text-base-default"}))}return this._read}get cell(){if(this._cell)return this._cell;const e=this.read;return e?(this._cell=document.createElement("div"),this._cell.classList.add("flex","flex-row","items-baseline"),this._cell.innerHTML=e.innerHTML,this._cell.outerHTML):""}get edit(){if(this._edit)return this._edit;let e;if(this.schema.location==="in")e=l.input({name:this.schema.id,label:this.label,kind:this.renderer.kind,data:{index:"internal",placeholder:"search...",preload:this.submission?JSON.stringify(this.submission):null}}),this.combobox=new a(e),this.combobox.init(),this.destroyables.push(this.combobox),this.combobox.element.classList.add("group-data-[mode=read]/element:hidden");else{if(e=document.createElement("div"),e.classList.add("flex","flex-col","gap-1"),this.label){const t=l.label({label:this.label,tag:"h3"});e.appendChild(t)}const i=e.appendChild(document.createElement("div"));i.classList.add("flex","flex-col","gap-2"),i.append(l.input({name:`${this.schema.id}:url`,type:"url",placeholder:"url",value:this.submission?.url}),l.input({name:`${this.schema.id}:title`,type:"text",placeholder:"name (optional)",value:this.submission?.title})),i.classList.add("group-data-[mode=read]/element:hidden")}return this._edit=e,this._edit}clear(){this.combobox&&this.combobox.clear(),this.submission=null,this.edit.querySelectorAll("input").forEach(e=>{e.value=""})}}export{u as LinkElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=b687b680';
+import { f as areEqual } from './foundation.js?v=b687b680';
+import './connectivity.js?v=b687b680';
+import { p as primitives } from './primitives.js?v=b687b680';
+import { F as FacetsBox } from './facets.js?v=b687b680';
+import { f as formatting } from './formatting.js?v=b687b680';
+import { B as BaseElement } from './baseElement.js?v=b687b680';
+import './icons.js?v=b687b680';
+import './remote.js?v=b687b680';
+import './queryLifecycle.js?v=b687b680';
+import './combobox.js?v=b687b680';
+import './results.js?v=b687b680';
+import './storage.js?v=b687b680';
+import './submitter.js?v=b687b680';
+
+/**
+ * @testable infrastructure
+ */
+class LinkElement extends BaseElement {
+	constructor(renderer, schema, submission) {
+		super(renderer, schema, submission);
+		this.combobox = null;
+	}
+
+	get value() {
+		if (this.combobox) {
+			const id =
+				this.combobox?.values.size > 0
+					? Array.from(this.combobox.values)[0]
+					: null;
+			if (this.submission?.id === id) return this.submission;
+			const selected = this.combobox.selectedOptions;
+			return selected.length > 0 ? selected[0] : null;
+		} else {
+			const inputs = this.elt?.querySelectorAll("input");
+			if (!inputs?.length) {
+				if (this.submission?.url) {
+					return {
+						url: this.submission.url,
+						title: this.submission.title ?? "",
+					};
+				}
+				return null;
+			}
+			const result = {};
+			inputs.forEach((input) => {
+				const key = input.name.slice(input.name.indexOf(":") + 1);
+				result[key] = input.value;
+			});
+			return result.url ? result : null;
+		}
+	}
+
+	changed(value) {
+		if (areEqual(this.value, value)) return false;
+		return true;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_link_submission
+	 * @pair form-link:read-layout
+	 */
+	get read() {
+		if (this._read) return this._read;
+		if (!this.submission) return null;
+
+		this._read = document.createElement("div");
+		this._read.className = `${STYLES.form.submission.default} group-data-[mode=edit]/element:hidden`;
+
+		if (this.submission?.id) {
+			if (!this.submission.name) return null;
+			const name = formatting.name({ ...this.submission, link: true });
+			this._read.appendChild(
+				formatting.iconLabel({
+					icon: "in",
+					kind: this.submission.kind,
+					content: name,
+					classes: STYLES.form.linkLabel,
+					iconClasses: "text-kind-default",
+				}),
+			);
+		} else if (this.submission?.url) {
+			const link = document.createElement("a");
+			link.dataset.kind = "page";
+			link.className = STYLES.link.default;
+			link.target = "_blank";
+			link.href = this.submission.url;
+			link.textContent = this.submission.title
+				? this.submission.title
+				: this.submission.url;
+			this._read.appendChild(
+				formatting.iconLabel({
+					icon: "out",
+					kind: "page",
+					content: link,
+					classes: STYLES.form.linkLabel,
+					iconClasses: "text-base-default",
+				}),
+			);
+		}
+
+		return this._read;
+	}
+
+	get cell() {
+		if (this._cell) return this._cell;
+		const read = this.read;
+		if (!read) return "";
+		this._cell = document.createElement("div");
+		this._cell.classList.add("flex", "flex-row", "items-baseline");
+		this._cell.innerHTML = read.innerHTML;
+		return this._cell.outerHTML;
+	}
+
+	get edit() {
+		if (this._edit) return this._edit;
+
+		let edit;
+		if (this.schema.location === "in") {
+			edit = primitives.input({
+				name: this.schema.id,
+				label: this.label,
+				kind: this.renderer.kind,
+				data: {
+					index: "internal",
+					placeholder: "search...",
+					preload: this.submission ? JSON.stringify(this.submission) : null,
+				},
+			});
+			this.combobox = new FacetsBox(edit);
+			this.combobox.init();
+			this.destroyables.push(this.combobox);
+			this.combobox.element.classList.add(
+				"group-data-[mode=read]/element:hidden",
+			);
+		} else {
+			edit = document.createElement("div");
+			edit.classList.add("flex", "flex-col", "gap-1");
+			if (this.label) {
+				const label = primitives.label({
+					label: this.label,
+					tag: "h3",
+				});
+				edit.appendChild(label);
+			}
+			const inputs = edit.appendChild(document.createElement("div"));
+			inputs.classList.add("flex", "flex-col", "gap-2");
+			inputs.append(
+				primitives.input({
+					name: `${this.schema.id}:url`,
+					type: "url",
+					placeholder: "url",
+					value: this.submission?.url,
+				}),
+				primitives.input({
+					name: `${this.schema.id}:title`,
+					type: "text",
+					placeholder: "name (optional)",
+					value: this.submission?.title,
+				}),
+			);
+			inputs.classList.add("group-data-[mode=read]/element:hidden");
+		}
+
+		this._edit = edit;
+
+		return this._edit;
+	}
+
+	clear() {
+		if (this.combobox) {
+			this.combobox.clear();
+		}
+		this.submission = null;
+		this.edit.querySelectorAll("input").forEach((input) => {
+			input.value = "";
+		});
+	}
+}
+
+export { LinkElement };

@@ -8,6 +8,7 @@ from flask_wtf.csrf import generate_csrf
 from config import SETTINGS
 from config.ai_settings import normalize_ai_settings
 from config.deployment import normalize_deployment_settings
+from config.public_pages import normalize_public_page_settings
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
@@ -15,6 +16,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, collaboration
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.site import images as site_image
+from lagniappe.core.tools.site import public_pages as public_page_service
 from lagniappe.core.tools.services import places
 from lagniappe.core.tools.ai.settings import runtime_ai_settings
 from lagniappe.core.tools.database import site as site_database
@@ -473,6 +475,30 @@ def set_ai_settings():
             "ai_model_options": model_options,
         }
     )
+
+
+# @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
+# @matrix admin public-pages : live-settings sitemap-invalidation validation
+@internal.route("/site-settings/public-pages", methods=["GET", "POST"])
+@permission(Resource.SITE, no_store=True)
+def set_public_page_settings():
+    current = public_page_service.runtime_settings(config=CONFIG)
+    if request.method == "GET":
+        return responses.json_response({"public_pages": current})
+
+    data = request.form if request.form else request.get_json(silent=True) or {}
+    try:
+        settings = normalize_public_page_settings(
+            data,
+            current_settings=current,
+        )
+    except ValueError as error:
+        return responses.error(str(error))
+
+    site_database.save_public_pages(settings)
+    cache.invalidate_sitemap()
+    return responses.json_response({"public_pages": settings})
 
 
 # @testable true

@@ -80,6 +80,47 @@ def test_scheduled_uncomplete_dispatch_is_planned_after_task_write():
     assert task_write < dispatch
 
 
+# @matrix mutations : durable-first
+# @matrix public-pages sitemap : invalidation
+def test_public_page_sitemap_invalidation_runs_after_durable_write(monkeypatch):
+    page = TestEntities.get(
+        "PAGE",
+        {"name": "Discoverable page", "hash": "discoverable-page"},
+    )
+    page.is_public = True
+    page._db = SaveDB(page.db)
+    events = []
+
+    monkeypatch.setattr(
+        mutation_executor.database_utility,
+        "save_mutations",
+        lambda _writes: events.append("datastore"),
+    )
+    monkeypatch.setattr(
+        mutation_executor.cache,
+        "update",
+        lambda *_entities: events.append("entity-cache"),
+    )
+    monkeypatch.setattr(
+        mutation_executor.cache,
+        "update_owner_projection",
+        lambda *_entities: None,
+    )
+    monkeypatch.setattr(
+        mutation_executor.cache,
+        "invalidate_sitemap",
+        lambda: events.append("sitemap"),
+    )
+
+    outcome = execute_mutation(
+        plan_mutation(MutationOperation.SAVE, page, registry=Entities)
+    )
+
+    assert events == ["datastore", "entity-cache", "sitemap"]
+    assert MutationEffectType.SITEMAP_INVALIDATE in outcome.completed_effects
+    assert outcome.complete is True
+
+
 # @matrix mutations : completeness contract lookup planner-registry serialization validation
 def test_mutation_contract_registry_covers_persisted_entities_and_relations(capsys):
     assert mutation_contracts._registry_errors() == []

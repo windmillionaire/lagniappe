@@ -146,6 +146,26 @@ generation summaries.
 Detailed generation and job behavior belongs in [AI_CONTEXT.md](AI_CONTEXT.md)
 and [BACKEND_JOBS.md](BACKEND_JOBS.md), not in runtime configuration.
 
+## Public-page discovery settings
+
+`PUBLIC_PAGE_INDEXING` defaults to `false`. The deployed value is a recovery
+and setup fallback; the Datastore `site/public_pages` row is the live authority
+used by `robots.txt`, the sitemap, public metadata, and Site Settings. Saving
+the Administrator setting takes effect immediately. The normal setup update,
+upgrade, and recovery paths copy the live value into generated application
+configuration for the next deployment.
+
+App Engine handler definitions are owned by `config/constants.py`. The dynamic
+`robots.txt` and `sitemap.xml` prefixes are declared there and the old static
+robots handler is intentionally absent. Do not hand-edit `lagniappe.yaml` to
+change this surface; regenerate it through the normal configuration workflow.
+
+Publishing a page and allowing search discovery are separate decisions. Public
+links work while site discovery is off. Each Page stores a versioned,
+Datastore-unindexed `public_settings` object with an indexing opt-out and
+optional public title, description, and embedded-document preview image.
+Internal page descriptions and page photos are not automatic public metadata.
+
 ## Error reporting and agent access
 
 Backend and browser Sentry destinations are separate settings. Both paths

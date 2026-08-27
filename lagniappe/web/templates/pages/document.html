@@ -1,14 +1,18 @@
 {% import 'controls.html' as controls %}
 
-{% macro document_settings(page) %}
+{% macro document_settings(page, public_context) %}
   <form data-widget="DocumentSettings"
         lp-update
-        data-title="Document Settings"
+        data-title="Public Page"
         data-help="document_settings"
         data-close="document:CollaborativeDocument"
         data-visible="false"
         data-controls="true"
         {% if page.is_public %}data-url="{{ url_for('pages.public', public_id=page.public_id) }}"{% endif %}
+        data-public-settings='{{ public_context.settings|tojson }}'
+        data-preview-images='{{ public_context.images|tojson }}'
+        data-site-indexing="{{ public_context.site_indexing|yesno }}"
+        data-site-image="{{ public_context.site_image }}"
         data-route="{{ url_for('pages.visibility', key=page.urlsafe_key) }}"
         class="{{ styles.form.default }} mt-4 sm:mt-0">
     {{ controls.edited_marker(url_for('pages.document_settings', key=page.urlsafe_key)) }}
@@ -16,7 +20,7 @@
   </form>
 {% endmacro %}
 
-{% macro document_tab(page, active=True) %}
+{% macro document_tab(page, active=True, public_context=None) %}
   <div lp-component
        id="document"
        data-title="Document"
@@ -27,7 +31,7 @@
        data-attribute="document"
        data-has-attribute="{{ active|yesno }}"
        data-parent-nav="tabs">
-    {% if page.allowed(Action.PUBLISH) %}{{ document_settings(page) }}{% endif %}
+    {% if page.allowed(Action.PUBLISH) %}{{ document_settings(page, public_context) }}{% endif %}
     <div data-widget="CollaborativeDocument"
          data-fullscreen="false"
          data-readonly="{{ page.readonly|yesno }}"

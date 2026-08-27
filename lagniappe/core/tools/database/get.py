@@ -318,6 +318,17 @@ def public_pages(public_id):
 
 
 # @testable false
+# @reason sitemap query recipe is persistence-owned and covered by public-route tests
+def discoverable_page_rows():
+    """Fetch candidate public rows; callers enforce active/type/page settings."""
+    return (
+        Query(KINDS.instances)
+        .filter(Filter().eq("public", True))
+        .fetch_all()
+    )
+
+
+# @testable false
 # @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
 def pages(
     category_key,

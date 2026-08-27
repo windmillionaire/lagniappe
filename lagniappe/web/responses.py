@@ -7,6 +7,7 @@ from flask import (
     make_response,
     redirect,
     render_template,
+    url_for,
 )
 from flask_login import current_user
 from smartypants import smartypants
@@ -205,25 +206,52 @@ def rows(entities, parent):
 # --- Document Responses ---
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/mentions/content.py::sanitize_mentions
-# @reason public response delegates mention privacy normalization to the tested sanitizer
+# @testable true
+# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
+# @matrix public-pages : metadata preview public-rendering
 def public_document(entity):
-    from lagniappe.core.tools.mentions.content import sanitize_mentions
+    from lagniappe.core.tools.email.notifications.links import absolute_url
+    from lagniappe.core.tools.site import public_pages
 
-    html = sanitize_mentions(entity.properties.document.html)
-    description = entity.description or f"Public page: {entity.name}"
-    keywords = f"{entity.name}, public page"
-    return (
+    canonical_url = absolute_url(
+        url_for("pages.public", public_id=entity.public_id)
+    )
+
+    # @testable false
+    # @covered-by lagniappe/web/responses.py::public_document
+    # @reason route-specific absolute image adapter is part of public rendering
+    def image_url(candidate):
+        name = candidate.name
+        if candidate.extension:
+            name = f"{name}.{candidate.extension}"
+        return absolute_url(
+            url_for(
+                "pages.public_image",
+                public_id=entity.public_id,
+                asset_name=name,
+            )
+        )
+
+    indexing = public_pages.runtime_settings()["PUBLIC_PAGE_INDEXING"]
+    metadata = public_pages.metadata(
+        entity,
+        canonical_url=canonical_url,
+        site_image_url=absolute_url(
+            f"/images/logo-512x512.png?v={CONFIG.BUILD_ID}"
+        ),
+        public_image_url=image_url,
+        indexing=indexing,
+    )
+    response = make_response(
         render_template(
             "public/public.html",
-            document=html,
+            document=metadata.pop("document"),
             page=entity,
-            description=description,
-            keywords=keywords,
-        ),
-        200,
+            metadata=metadata,
+        )
     )
+    response.headers["X-Robots-Tag"] = metadata["robots"]
+    return response
 
 
 def shared_document(**kwargs):
@@ -340,8 +368,39 @@ def new_form_restriction(group):
 # --- Page Responses ---
 
 
+# @testable false
+# @covered-by lagniappe/web/responses.py::page
+# @covered-by lagniappe/web/responses.py::page_document_settings
+# @reason response context adapter delegates extraction and normalization to tested services
+def _public_page_settings_context(page):
+    from lagniappe.core.tools.site import public_pages
+
+    return {
+        "settings": page.public_settings,
+        "images": [
+            {"name": image.name, "url": image.url, "alt": image.alt}
+            for image in public_pages.document_images(page)
+        ],
+        "site_indexing": public_pages.runtime_settings()[
+            "PUBLIC_PAGE_INDEXING"
+        ],
+        "site_image": f"/images/logo-512x512.png?v={CONFIG.BUILD_ID}",
+    }
+
+
+# @testable infrastructure
 def page(page, focus_task=None):
-    return render_template("pages/page.html", page=page, focus_task=focus_task), 200
+    public_context = (
+        _public_page_settings_context(page)
+        if page.allowed(Action.PUBLISH)
+        else None
+    )
+    return render_template(
+        "pages/page.html",
+        page=page,
+        focus_task=focus_task,
+        public_context=public_context,
+    ), 200
 
 
 def page_tasks(page):
@@ -425,7 +484,10 @@ def page_permissions(page):
 def page_document_settings(entity):
     return entity_response(
         (
-            get_template_attribute("pages/document.html", "document_settings")(entity),
+            get_template_attribute("pages/document.html", "document_settings")(
+                entity,
+                _public_page_settings_context(entity),
+            ),
             200,
         ),
         entity,

@@ -1666,6 +1666,9 @@ def _build_app_settings():
         "PUBLIC_MANUAL": SETTINGS.APP.get(
             "PUBLIC_MANUAL", constants.DEFAULT_PUBLIC_MANUAL
         ),
+        "PUBLIC_PAGE_INDEXING": SETTINGS.APP.get(
+            "PUBLIC_PAGE_INDEXING", constants.DEFAULT_PUBLIC_PAGE_INDEXING
+        ),
         "SOURCE_URL": SETTINGS.APP.get(
             "SOURCE_URL", constants.DEFAULT_SOURCE_URL
         ),

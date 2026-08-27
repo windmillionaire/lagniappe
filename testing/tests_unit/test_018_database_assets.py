@@ -1078,3 +1078,30 @@ def test_save_site_ai_persists_canonical_payload_and_prunes_old_keys(monkeypatch
             "version": 3,
         }
     ]
+
+
+# @matrix admin : metadata public-page-indexing
+@pytest.mark.unit
+def test_save_site_public_pages_persists_canonical_payload(monkeypatch):
+    saved = []
+
+    class Datastore:
+        def key(self, *parts):
+            return parts
+
+        def get(self, key):
+            return {"version": 7, "PUBLIC_PAGE_INDEXING": False, "old": True}
+
+        def entity(self, key):
+            return {}
+
+        def put(self, entity):
+            saved.append(dict(entity))
+
+    monkeypatch.setattr(site_database, "DATA", SimpleNamespace(datastore=Datastore()))
+
+    site_database.save_public_pages(
+        {"PUBLIC_PAGE_INDEXING": True, "unrelated": "ignored"}
+    )
+
+    assert saved == [{"PUBLIC_PAGE_INDEXING": True, "version": 8}]
