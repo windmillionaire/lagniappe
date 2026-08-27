@@ -1170,7 +1170,7 @@ def test_site_settings_requires_administrator(get_user, browser_failures):
         _acknowledge_user_cache_invalidation(user)
 
 
-# @matrix admin : account-preservation demotion failure-state managed-user-search managed-users owner-only privileged-account promotion read-only responsive roster
+# @matrix admin : account-preservation confirmation-modal demotion failure-state managed-user-search managed-users owner-only privileged-account promotion read-only responsive roster
 # @matrix cache : cache-invalidation invalidation-acknowledgement
 # @matrix owner : awaiting-first-sign-in owner-only role-controls
 # @template home/site_settings.html::site_settings
@@ -1251,7 +1251,25 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
         f"[data-role='administrator']:has(button[data-key='{managed.entity.urlsafe_key}'])"
     )
     expect(administrator_row).to_have_class(re.compile(r".*\bsm:flex-row\b.*"))
-    owner.page.once("dialog", lambda dialog: dialog.accept())
+    demote_button = administrator_row.locator(
+        "[data-role='demote-administrator']"
+    )
+    demote_button.click()
+    modal = owner.locate("#modal")
+    expect(modal).to_be_visible()
+    expect(modal.get_by_role("heading")).to_have_text("Remove Administrator")
+    expect(modal).to_contain_text(
+        f"Remove Administrator access from {managed.entity.name}?"
+    )
+    expect(modal).to_contain_text("Their account and content will be kept.")
+    modal.get_by_role("button", name="Cancel").click()
+    expect(modal).not_to_be_attached()
+    expect(administrator_row).to_contain_text(managed.email)
+    assert Entities.USER(database_get.user(managed.email)).is_admin
+
+    demote_button.click()
+    modal = owner.locate("#modal")
+    expect(modal).to_be_visible()
     with owner.page.expect_response(
         lambda response: (
             response.url.endswith(
@@ -1260,8 +1278,9 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
             and response.request.method == "DELETE"
         )
     ) as demotion:
-        administrator_row.locator("[data-role='demote-administrator']").click()
+        modal.get_by_role("button", name="Remove Administrator").click()
     assert demotion.value.status == 200
+    expect(modal).not_to_be_attached()
     expect(roster).not_to_contain_text(managed.email)
     demoted = Entities.USER(database_get.user(managed.email))
     assert not demoted.is_admin

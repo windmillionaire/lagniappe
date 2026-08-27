@@ -1,7 +1,7 @@
 import json
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import abort, request, session, g
+from flask import abort, render_template, request, session, g
 from flask_login import current_user
 from flask_wtf.csrf import generate_csrf
 
@@ -328,12 +328,17 @@ def promote_site_administrator():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
-# @matrix admin : account-preservation demotion
+# @matrix admin : account-preservation confirmation-modal demotion
 # @pairs cache:cache-invalidation owner:owner-only
-@internal.route("/site-administrators/<key>", methods=["DELETE"])
+@internal.route("/site-administrators/<key>", methods=["GET", "DELETE"])
 @owner_only
 def demote_site_administrator(key):
     target = _role_target(key)
+    if request.method == "GET":
+        return render_template(
+            "delete/site_administrator.html",
+            administrator=target,
+        )
     if target.is_admin:
         target.is_admin = False
         target.save()

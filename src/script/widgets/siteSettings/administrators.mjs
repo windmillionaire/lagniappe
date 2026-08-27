@@ -1,5 +1,5 @@
 import { FacetsBox } from "../../elements/combobox";
-import { request } from "../../shared";
+import { Modal, request } from "../../shared";
 import { SiteSetting } from "./base";
 
 /**
@@ -7,7 +7,7 @@ import { SiteSetting } from "./base";
  *
  * @testable true
  * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
- * @matrix admin : demotion failure-state promotion read-only responsive roster
+ * @matrix admin : confirmation-modal demotion failure-state promotion read-only responsive roster
  * @pair owner:role-controls
  */
 export class SiteAdministrators extends SiteSetting {
@@ -16,6 +16,7 @@ export class SiteAdministrators extends SiteSetting {
 		this._administrators = [];
 		this._candidates = [];
 		this._canManage = false;
+		this._demotionModal = null;
 		this._submit = this._submit.bind(this);
 		this._click = this._click.bind(this);
 	}
@@ -115,19 +116,39 @@ export class SiteAdministrators extends SiteSetting {
 	async _click(event) {
 		const button = event.target.closest("[data-role='demote-administrator']");
 		if (!button || !this.list.contains(button)) return;
-		if (
-			!window.confirm(
-				`Remove Administrator access from ${button.dataset.name}?`,
-			)
-		)
-			return;
 		this._showError();
-		const response = await request.delete(
-			this.endpoints.demote(button.dataset.key),
-		);
-		if (!response.ok) return this._showError(response.error);
-		this.updated(response);
-		this._render();
+		this._demotionModal?.destroy();
+		const modal = new Modal(this.view, button);
+		this._demotionModal = modal;
+		await modal.load(this.endpoints.demote(button.dataset.key));
+		if (this._demotionModal !== modal || !modal.modal) return;
+
+		const confirm = modal.modal.querySelector("[data-role='delete']");
+		if (!confirm) return;
+		let submitting = false;
+		confirm.addEventListener("click", async () => {
+			if (submitting) return;
+			submitting = true;
+			confirm.disabled = true;
+			const spinner = confirm.querySelector("#spinner");
+			if (spinner) spinner.dataset.visible = "true";
+
+			const response = await request.delete(
+				this.endpoints.demote(button.dataset.key),
+			);
+			if (!response.ok) {
+				submitting = false;
+				confirm.disabled = false;
+				if (spinner) spinner.dataset.visible = "false";
+				this._showError(response.error);
+				return;
+			}
+
+			await modal.remove();
+			if (this._demotionModal === modal) this._demotionModal = null;
+			this.updated(response);
+			this._render();
+		});
 	}
 
 	_showError(message = "") {
@@ -137,6 +158,8 @@ export class SiteAdministrators extends SiteSetting {
 	}
 
 	destroy() {
+		this._demotionModal?.destroy();
+		this._demotionModal = null;
 		this.form?.removeEventListener("submit", this._submit);
 		this.list?.removeEventListener("click", this._click);
 		this.selector?.destroy();

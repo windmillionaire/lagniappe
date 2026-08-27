@@ -1,0 +1,20 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Remove Administrator
+{%- endblock name %}
+
+{% block description -%}
+  <p class="text-delete-default text-sm">
+    Remove Administrator access from
+    <span class="font-semibold">{{ administrator.name }}</span>?
+    Their account and content will be kept.
+  </p>
+{%- endblock description %}
+
+{% block button -%}
+  {{ delete_action(
+    url_for('internal.demote_site_administrator', key=administrator.urlsafe_key),
+    "Remove Administrator",
+  ) }}
+{%- endblock button %}
