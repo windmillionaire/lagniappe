@@ -152,7 +152,16 @@ def test_create_project_ai_mode(get_user, results):
         project.definition.description_for_ai
     )
 
-    Modal(user.page).open(create_form.locator(Buttons.EXPLAIN)).close()
+    modal = Modal(user.page)
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/projects/create",
+        timeout=15000,
+    ):
+        create_form.locator(Buttons.EXPLAIN).click()
+    expect(modal.element).to_be_visible(timeout=15000)
+    modal.close()
     expect(create_form).to_be_visible()
 
     with expect_successful_response(

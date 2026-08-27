@@ -279,9 +279,13 @@ class HomePage(SitePage):
         return self._open_loaded_list(self.PROJECT_LIST, self.PROJECT_LIST_TOGGLE)
 
     def create_project_form(self):
-        self.user.locate(self.CREATE_PROJECT_TOGGLE).click()
+        toggle = self.user.locate(self.CREATE_PROJECT_TOGGLE)
+        toggle.click()
         create_form = self.user.locate(self.CREATE_PROJECT_FORM)
         expect(create_form).to_be_visible()
+        expect(toggle).not_to_have_attribute(
+            "aria-busy", "true", timeout=15000
+        )
         return create_form
 
     def create_category_form(self):

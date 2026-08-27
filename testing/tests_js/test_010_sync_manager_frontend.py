@@ -383,6 +383,7 @@ const manager = new context.SyncManager(view);
     },
   };
   let merged = false;
+  let renderSettled = false;
   let replayDestroyed = false;
   headlessFactory = async ({ sync_id }) => ({
     syncId: sync_id,
@@ -398,10 +399,15 @@ const manager = new context.SyncManager(view);
         this.remote?.updates?.[0]?.update === "remote-delta" &&
         this.offlineRecord?.ydoc === "offline-state"
       );
+      renderSettled = false;
       this.remote = null;
       this.offlineRecord = null;
     },
+    async waitForRender() { renderSettled = true; },
     get saveData() {
+      if (!renderSettled) {
+        throw new Error("Headless replay serialized before rendering merged state");
+      }
       return merged
         ? {
             update: "merged-update",
@@ -423,6 +429,7 @@ const manager = new context.SyncManager(view);
   const replayRequest = requestCalls.at(-1)?.body?.updates?.[0];
   if (
       !merged ||
+      !renderSettled ||
       replayRequest?.generation !== "generation-1" ||
       replayRequest?.revision !== 4 ||
       replayRequest?.ydoc !== "merged-checkpoint" ||
@@ -433,6 +440,7 @@ const manager = new context.SyncManager(view);
     throw new Error(
       `Headless replay did not fetch, merge, checkpoint, and clear: ${JSON.stringify({
         merged,
+        renderSettled,
         replayRequest,
         deletedSyncIds,
         replayDestroyed,

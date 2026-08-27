@@ -386,6 +386,7 @@ export class SyncManager {
 				widget.remote = current.payload;
 				widget.offlineRecord = offline;
 				await widget.sync();
+				await widget.waitForRender();
 
 				const saveData = widget.saveData;
 				if (!saveData) {

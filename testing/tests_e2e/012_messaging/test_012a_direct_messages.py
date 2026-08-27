@@ -312,6 +312,7 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
         recipient.page,
         subscription_id="view:channel:messages",
         status="changed",
+        timeout=25000,
     ):
         _send_from_modal(sender, recipient, live_body)
     expect(history).to_contain_text(live_body)
