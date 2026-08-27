@@ -284,6 +284,7 @@ def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
         return completed_process(command, stdout="short-lived-token")
 
     monkeypatch.setattr(create_config, "run_gcloud_command", run_gcloud)
+    monkeypatch.setattr(create_config, "GCLOUD_CLI", "gcloud")
     answers = iter(["maybe", "y"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
@@ -1523,6 +1524,11 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
         create_config,
         "_select_initial_target",
         lambda selected_account: ("Named App", project_id),
+    )
+    monkeypatch.setattr(
+        create_config,
+        "_get_gcloud_project",
+        lambda saved_project, sanitized_name: project_id,
     )
     monkeypatch.setattr(
         admin,

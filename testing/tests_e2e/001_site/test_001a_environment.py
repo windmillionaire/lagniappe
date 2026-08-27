@@ -43,7 +43,9 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database
+from lagniappe.core.tools import cache
+from lagniappe.core.tools.database import core as database_core
+from lagniappe.core.tools.database import notifications as notification_database
 
 from testing.definitions import SitePages, Users
 from testing.utility.network import assert_same_etag
@@ -100,10 +102,10 @@ def test_database_setup():
         - FLASK_ENV not set to 'testing' when server started
         - PREFIX not correctly propagated to entity kind definitions
     """
-    for kind in database.core.KINDS:
+    for kind in database_core.KINDS:
         assert kind.value == f"{PREFIX}{kind.name}"
 
-    assert database.core.datastore is not None
+    assert database_core.datastore is not None
 
 
 # @matrix cache : cleanup index-recreation redis-connection
@@ -155,7 +157,7 @@ def test_storage_setup():
         - Storage client unable to access/create buckets
         - PREFIX not correctly applied to bucket names
     """
-    data = database.core.DATA
+    data = database_core.DATA
     data.initialize()
 
     for role in ("public", "private", "history"):
@@ -209,7 +211,7 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
     # cold aggregate repair and leave the projection one revision behind.
     existing = Entities.NOTIFICATION.keys_for_parent(user.entity)
     assert not existing
-    aggregate = database.ensure_notification_aggregate(user.entity)
+    aggregate = notification_database.ensure_notification_aggregate(user.entity)
     cache.repair_notification_state(user.entity, existing, aggregate=aggregate)
 
     notification = Entities.NOTIFICATION.create(

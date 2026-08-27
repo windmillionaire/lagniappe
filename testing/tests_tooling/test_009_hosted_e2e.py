@@ -1293,7 +1293,7 @@ def test_hosted_runner_installs_complete_test_collection_dependencies():
         in dockerfile
     )
     assert "FROM node:24-bookworm-slim AS node-runtime" in dockerfile
-    assert "apt-get install --yes --no-install-recommends git" in dockerfile
+    assert "apt-get install --yes --no-install-recommends git procps" in dockerfile
     assert "ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm" in (
         dockerfile
     )

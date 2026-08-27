@@ -14,10 +14,11 @@ import pytest
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database
+from lagniappe.core.tools import cache
 from lagniappe.core.tools.cache.core import cache as redis_cache
 from lagniappe.core.tools.cache.keys import Search
 from lagniappe.core.tools.database.core import DATA
+from lagniappe.core.tools.database import get as database_get
 
 pytestmark = pytest.mark.e2e
 
@@ -121,14 +122,14 @@ def _cache_key(entity):
 
 
 def _assert_saved(entity):
-    assert database.get.entity(entity.key) is not None
+    assert database_get.entity(entity.key) is not None
     cache_key = _cache_key(entity)
     if cache_key:
         assert redis_cache.redis.exists(cache_key)
 
 
 def _assert_deleted(entity):
-    assert database.get.entity(entity.key) is None
+    assert database_get.entity(entity.key) is None
     cache_key = _cache_key(entity)
     if cache_key:
         assert not redis_cache.redis.exists(cache_key)
@@ -156,7 +157,7 @@ def test_entity_save_persists_relations_process_payloads_and_cache():
 
     page.get_process("lifecycle-save")["status"] = "queued"
     assets = _save_document(page, "save")
-    raw_page = database.get.entity(page.key)
+    raw_page = database_get.entity(page.key)
 
     _assert_saved(form)
     _assert_saved(category)
@@ -168,10 +169,10 @@ def test_entity_save_persists_relations_process_payloads_and_cache():
     assert _blob_exists(assets["document"])
     assert _blob_exists(assets["snapshot"])
 
-    history = database.get.document_history(page)
+    history = database_get.document_history(page)
     assert len(history) == 1
     assert history[0]["type"] == "document_history"
-    assert database.get.entity(history[0].key) is not None
+    assert database_get.entity(history[0].key) is not None
 
     reloaded = Entities.fetch_one(page.key, request=Fetch.direct())
     assert reloaded.name == page.name
@@ -244,9 +245,9 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
     ]:
         _assert_deleted(entity)
 
-    assert not database.get.filters(doomed_category.key)
-    assert not database.get.page_tasks_with_history(doomed_page)
-    assert not database.get.page_files(doomed_page.key)
+    assert not database_get.filters(doomed_category.key)
+    assert not database_get.page_tasks_with_history(doomed_page)
+    assert not database_get.page_files(doomed_page.key)
 
     for definition in [
         doomed_page_private,
@@ -318,10 +319,10 @@ def test_entity_delete_project_cascades_models_forms_filters_and_cache():
     ]:
         _assert_saved(entity)
 
-    assert {m.key for m in database.get.model_tasks(model_only_project)} == {
+    assert {m.key for m in database_get.model_tasks(model_only_project)} == {
         model_only.key
     }
-    assert {m.key for m in database.get.model_tasks(shared_project)} == {
+    assert {m.key for m in database_get.model_tasks(shared_project)} == {
         model_shared.key
     }
 
@@ -338,11 +339,11 @@ def test_entity_delete_project_cascades_models_forms_filters_and_cache():
     ]:
         _assert_deleted(entity)
 
-    assert not database.get.filters(model_only_project.key)
-    assert not database.get.model_tasks(model_only_project)
-    assert not database.get.model_tasks(shared_project)
+    assert not database_get.filters(model_only_project.key)
+    assert not database_get.model_tasks(model_only_project)
+    assert not database_get.model_tasks(shared_project)
 
     _assert_saved(shared_form)
     _assert_saved(shared_category)
-    assert database.get.entity(shared_form.key) is not None
-    assert database.get.entity(shared_category.key) is not None
+    assert database_get.entity(shared_form.key) is not None
+    assert database_get.entity(shared_category.key) is not None

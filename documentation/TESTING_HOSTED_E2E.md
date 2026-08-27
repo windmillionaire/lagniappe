@@ -115,8 +115,9 @@ bounded target again. GitHub exposes only fixed `all` and `full` scopes.
 The job acquires the shared lease, removes stranded test-prefixed state, seeds
 the same persistence prerequisites as local startup, and runs one pytest
 session. Direct fixtures execute from Cloud Run; browser requests target the
-exact App Engine version. Local execution follows status and imports results by
-default.
+exact App Engine version. The runner image includes Git and POSIX process
+inspection tools because repository and test-session contracts run in that
+same container. Local execution follows status and imports results by default.
 
 ## Status and teardown
 

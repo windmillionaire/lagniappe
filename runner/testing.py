@@ -554,10 +554,10 @@ def initialize_test_data(authority):
     from lagniappe import CONFIG
 
     _require_test_cleanup_scope(CONFIG)
-    from lagniappe.core.tools import cache, database
-    from lagniappe.core.tools.database import migrations
+    from lagniappe.core.tools import cache
+    from lagniappe.core.tools.database import migrations, utility as database_utility
 
-    result = _initialize_test_services(database, cache, migrations)
+    result = _initialize_test_services(database_utility, cache, migrations)
     authority.assert_active()
     return result
 
