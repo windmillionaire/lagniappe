@@ -43,7 +43,7 @@ def _enabled(value, *, default=False):
 # @covered-by installer/summary.py::install_summary_lines
 # @reason private aligned display adapter is exercised through the public summary allowlist
 def _install_line(label, value):
-    return f"\t{label + ':':<27}{_value(value)}"
+    return f"{label + ':':<27}{_value(value)}"
 
 
 # @testable false

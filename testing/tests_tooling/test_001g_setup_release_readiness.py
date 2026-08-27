@@ -133,19 +133,19 @@ def test_redacted_install_summary_is_allowlisted():
     )
     text = "\n".join(lines)
 
-    assert "\tApplication:               Demo" in text
-    assert "\tTemporary Administrator:   installer@example.test" in text
-    assert "\tLagniappe version:         0.2" in text
-    assert "\tGoogle sign-in:            enabled" in text
-    assert "\tRedis:                     configured; TLS disabled" in text
-    assert "\tError monitoring:          disabled" in text
-    assert "\tAI observability:          disabled" in text
-    assert "\tAI model:                  gemini-2.5-pro" in text
-    assert "\tDeployment completed:      yes" in text
-    assert "\tHealth check:              ./setup.sh doctor" in text
-    assert "\tRepair if needed:          ./setup.sh repair" in text
+    assert "Application:               Demo" in text
+    assert "Temporary Administrator:   installer@example.test" in text
+    assert "Lagniappe version:         0.2" in text
+    assert "Google sign-in:            enabled" in text
+    assert "Redis:                     configured; TLS disabled" in text
+    assert "Error monitoring:          disabled" in text
+    assert "AI observability:          disabled" in text
+    assert "AI model:                  gemini-2.5-pro" in text
+    assert "Deployment completed:      yes" in text
+    assert "Health check:              ./setup.sh doctor" in text
+    assert "Repair if needed:          ./setup.sh repair" in text
     assert (
-        "\tInstaller handoff:         ./setup.sh handoff after Owner review"
+        "Installer handoff:         ./setup.sh handoff after Owner review"
         in text
     )
     for omitted_detail in (
@@ -159,7 +159,7 @@ def test_redacted_install_summary_is_allowlisted():
     ):
         assert omitted_detail not in text
     assert lines[-1] == (
-        "\tOpen this installation:    https://demo.example.test"
+        "Open this installation:    https://demo.example.test"
     )
     for secret in (
         "bucket-source-secret",
