@@ -1420,6 +1420,14 @@ def test_owner_installation_access_distinguishes_handoff_from_provider_cleanup(
     expect(access.locator("[data-field='email-sender']")).to_have_text(
         installer_email
     )
+    expect(access.locator("[data-role='handoff-instructions']")).to_be_visible()
+    expect(access.locator("[data-role='handoff-instructions']")).to_contain_text(
+        "the installer normally runs"
+    )
+    expect(
+        access.locator("[data-role='handoff-instructions'] code")
+    ).to_have_text("./setup.sh handoff")
+    expect(access.locator("code[data-field]")).to_have_count(8)
     expect(
         access.locator("[data-role='installer-email-warning']")
     ).to_be_visible()
@@ -1454,6 +1462,16 @@ def test_owner_installation_access_distinguishes_handoff_from_provider_cleanup(
     expect(
         access.locator("[data-role='installer-email-warning']")
     ).to_be_visible()
+    expect(access.locator("[data-role='handoff-instructions']")).to_be_hidden()
+
+    monkeypatch.setattr(CONFIG, "INSTALLER_EMAIL", owner_email)
+    _, settings_panel = _open_owner_site_settings(owner)
+    expect(
+        _site_settings_section(settings_panel, "installation-access")
+    ).to_have_count(0)
+    assert "installation_access" not in _fetch_status(
+        owner, "/l/site-settings", "GET"
+    )["data"]
 
 
 # @matrix admin : configuration-display configuration-modal environment-variables external-links recovery-export secrets sections service-providers site-settings web-headers

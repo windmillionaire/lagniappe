@@ -372,7 +372,9 @@ def site_settings():
         "can_view_sensitive_configuration": current_user.is_owner,
     }
     if current_user.is_owner:
-        payload["installation_access"] = _installation_access_payload()
+        installation_access = _installation_access_payload()
+        if installation_access["delegated"]:
+            payload["installation_access"] = installation_access
     return responses.json_response(payload)
 
 

@@ -71,5 +71,12 @@ export class SiteInstallationAccess extends SiteSetting {
 		if (emailWarning) {
 			emailWarning.dataset.visible = email.uses_installer ? "true" : "false";
 		}
+		const handoffInstructions = this.target.querySelector(
+			"[data-role='handoff-instructions']",
+		);
+		if (handoffInstructions) {
+			handoffInstructions.dataset.visible =
+				access.state === "pending" ? "true" : "false";
+		}
 	}
 }

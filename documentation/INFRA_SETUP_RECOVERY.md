@@ -93,6 +93,14 @@ reconciles the installation, and validates the resulting generation.
 Project Owner binding. The active gcloud/ADC principal must be either the saved
 installer or Owner.
 
+The normal operator is the installer using the existing installation working
+copy. If that person is unavailable, the Owner can use the downloaded
+`lagniappe_settings.yaml` to complete **Recover a checkout** above under the
+Owner's own gcloud and ADC identity, then run the same handoff command from the
+recovered working copy. A clean clone alone is insufficient because handoff
+also needs the exact saved settings and generated deployment files. Neither
+path requires the other person's password or credentials.
+
 After default-no review, the command:
 
 1. grants the Owner bucket operator and exact runtime-account act-as/signing
@@ -110,13 +118,14 @@ Cloudflare/DNS, Resend or another mail provider, recovery destinations, or
 credentials left on the installer's computer. A partial handoff can resume
 from the journal.
 
-After the deployed handoff configuration is active, the Owner-only **Admin /
-Site Settings / Installation Access** section names the permanent Owner,
-historical installer, current deployer, bootstrap identity, runtime service
-account, and the non-secret authentication-email identities. It links to live
-project IAM for independent verification and warns when authentication email
-still depends on the installer mailbox. The application does not receive
-authority to remove human Cloud IAM and does not present an IAM-removal button.
+On a delegated installation, the Owner-only **Admin / Site Settings /
+Installation Access** section names the permanent Owner, historical installer,
+current deployer, bootstrap identity, runtime service account, and the
+non-secret authentication-email identities. It links to live project IAM for
+independent verification and warns when authentication email still depends on
+the installer mailbox. It is absent from a non-delegated installation. The
+application does not receive authority to remove human Cloud IAM and does not
+present an IAM-removal button.
 
 ## Secret boundaries
 

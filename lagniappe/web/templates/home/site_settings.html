@@ -113,7 +113,9 @@
              class="{{ styles.link.default }} w-fit">Open Users to create or permanently delete an account</a>
         </div>
       {% endcall %}
-      {% if current_user.is_owner %}
+      {% set saved_installer = CONFIG.INSTALLER_EMAIL|default('', true)|trim|lower %}
+      {% set permanent_owner = CONFIG.ADMIN_EMAIL|default('', true)|trim|lower %}
+      {% if current_user.is_owner and saved_installer and saved_installer != permanent_owner %}
         {% call site_settings_section('installation-access', 'SiteInstallationAccess', 'Installation Access', 'site_installation_access', 'Owner, installer, and provider cleanup') %}
           <div class="flex flex-col gap-4 text-sm text-base-dark">
             <div data-role="handoff-status"
@@ -125,27 +127,27 @@
             <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div class="rounded-md border border-base-light/60 bg-white p-3">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Project</dt>
-                <dd data-field="project" class="mt-1 break-all font-semibold"></dd>
+                <dd class="mt-1 break-all font-semibold"><code data-field="project"></code></dd>
               </div>
               <div class="rounded-md border border-base-light/60 bg-white p-3">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Permanent Owner</dt>
-                <dd data-field="owner" class="mt-1 break-all font-semibold"></dd>
+                <dd class="mt-1 break-all font-semibold"><code data-field="owner"></code></dd>
               </div>
               <div class="rounded-md border border-base-light/60 bg-white p-3">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Historical Installer</dt>
-                <dd data-field="installer" class="mt-1 break-all font-semibold"></dd>
+                <dd class="mt-1 break-all font-semibold"><code data-field="installer"></code></dd>
               </div>
               <div class="rounded-md border border-base-light/60 bg-white p-3">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Current Deployer</dt>
-                <dd data-field="deployer" class="mt-1 break-all font-semibold"></dd>
+                <dd class="mt-1 break-all font-semibold"><code data-field="deployer"></code></dd>
               </div>
               <div class="rounded-md border border-base-light/60 bg-white p-3">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Bootstrap Administrator</dt>
-                <dd data-field="bootstrap" class="mt-1 break-all font-semibold"></dd>
+                <dd class="mt-1 break-all font-semibold"><code data-field="bootstrap"></code></dd>
               </div>
               <div class="rounded-md border border-base-light/60 bg-white p-3">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Runtime Service Account</dt>
-                <dd data-field="runtime" class="mt-1 break-all font-semibold"></dd>
+                <dd class="mt-1 break-all font-semibold"><code data-field="runtime"></code></dd>
               </div>
             </dl>
 
@@ -160,13 +162,22 @@
                 </div>
                 <div>
                   <dt class="text-xs text-base-medium">Sender</dt>
-                  <dd data-field="email-sender" class="break-all font-semibold"></dd>
+                  <dd class="break-all font-semibold"><code data-field="email-sender"></code></dd>
                 </div>
                 <div>
                   <dt class="text-xs text-base-medium">SMTP login</dt>
-                  <dd data-field="email-login" class="break-all font-semibold"></dd>
+                  <dd class="break-all font-semibold"><code data-field="email-login"></code></dd>
                 </div>
               </dl>
+            </div>
+
+            <div data-role="handoff-instructions"
+                 data-visible="false"
+                 class="rounded-md border border-page-light/70 bg-page-bg p-4 text-page-dark">
+              <strong class="block">Complete the delegated handoff</strong>
+              <p class="mt-1">
+                After the Owner verifies the application and removes the installer’s Lagniappe Administrator role, the installer normally runs <code>./setup.sh handoff</code> from the installation working copy. If the installer is unavailable, the permanent Owner may restore a working copy from the downloaded configuration, authenticate gcloud and ADC as the Owner, and run the same command without the installer’s credentials.
+              </p>
             </div>
 
             <div data-role="installer-email-warning"
@@ -200,7 +211,10 @@
                href="https://console.cloud.google.com/iam-admin/iam"
                target="_blank"
                rel="noopener noreferrer"
-               class="{{ styles.link.default }} w-fit">Review project IAM</a>
+               class="inline-flex w-fit flex-row items-center gap-1.5 font-semibold text-page-default underline decoration-page-light underline-offset-2 hover:text-page-dark hover:decoration-page-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-page-light">
+              <span>Review project IAM</span>
+              {{ render_icon("launch") }}
+            </a>
           </div>
         {% endcall %}
       {% endif %}

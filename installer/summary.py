@@ -208,6 +208,18 @@ def install_summary_lines(
         ]
     )
     if deployed:
+        if (
+            installer
+            and settings.get("ADMIN_EMAIL")
+            and str(installer).strip().casefold()
+            != str(settings["ADMIN_EMAIL"]).strip().casefold()
+        ):
+            lines.append(
+                _install_line(
+                    "Installer handoff",
+                    f"{setup_command('handoff')} after Owner review",
+                )
+            )
         lines.append(_install_line("Open this installation", app_url))
     else:
         lines.append(f"After manual deployment: {setup_command('jobs')}")

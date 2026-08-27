@@ -343,8 +343,16 @@
           <strong>Remove Administrator</strong> dialog, or permanently delete
           the installer's application account from Users. Then ask the
           installer to complete the handoff command; if the installer is
-          unavailable, the permanent Owner may run it from the installation
-          working copy instead.
+          unavailable, the permanent Owner may run it instead. The normal path
+          is for the installer to run <code>./setup.sh handoff</code>, or
+          <code>.\setup.cmd handoff</code> in Windows PowerShell, from the
+          existing installation working copy. An Owner preparing a separate
+          computer must first follow <strong>Recover an Existing
+          Installation</strong> below with the downloaded
+          <code>lagniappe_settings.yaml</code>, complete recovery setup while
+          authenticated as the permanent Owner, then run the same handoff
+          command. Handoff accepts either the saved Installer or permanent
+          Owner identity; it never requires the installer's password.
         </li>
         <li>
           After handoff succeeds, open <strong>Admin / Site Settings /
@@ -373,6 +381,12 @@
           organization-level access, and provider accounts. The handoff command
           deliberately does not change or delete them, and the deployed
           application is not authorized to remove human Google Cloud IAM.
+        {% endcall %}
+        {% call callout("note", False) %}
+          <strong>Installation Access</strong> is shown only for delegated
+          installations where the saved Installer and permanent Owner are
+          different accounts. Owner-installed sites do not display that
+          section or return its identity payload.
         {% endcall %}
       </div>
     </details>

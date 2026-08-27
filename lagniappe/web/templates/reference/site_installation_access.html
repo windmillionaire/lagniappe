@@ -14,6 +14,14 @@
     removed. Use the project IAM link to confirm the historical installer is
     absent there.
   </p>
+  <p class="text-sm text-base-dark">
+    The installer normally runs <code>./setup.sh handoff</code> from the
+    installation working copy after the Owner has verified the application and
+    removed the temporary Lagniappe Administrator role. If the installer is
+    unavailable, the Owner may first recover a working copy from the downloaded
+    <code>lagniappe_settings.yaml</code>, authenticate gcloud and Application
+    Default Credentials as the permanent Owner, and run the same command.
+  </p>
   {% call callout("warning") %}
     Do not suspend or delete a temporary installer account while it is still
     used to send authentication email or control billing, Redis, DNS,

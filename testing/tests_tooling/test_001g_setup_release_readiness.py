@@ -144,6 +144,10 @@ def test_redacted_install_summary_is_allowlisted():
     assert "\tDeployment completed:      yes" in text
     assert "\tHealth check:              ./setup.sh doctor" in text
     assert "\tRepair if needed:          ./setup.sh repair" in text
+    assert (
+        "\tInstaller handoff:         ./setup.sh handoff after Owner review"
+        in text
+    )
     for omitted_detail in (
         "runtime@demo-project.iam.gserviceaccount.com",
         "lagniappe-tasks",

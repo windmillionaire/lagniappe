@@ -92,16 +92,18 @@ is part of this contract.
 Application roles and AI entitlement live on User entities, not in these
 identity settings.
 
-The Owner-only **Admin / Site Settings / Installation Access** projection shows
-these non-secret identities and the authentication-email service, sender, and
-SMTP login. It reports application handoff configuration as complete only when
+For delegated installations, the Owner-only **Admin / Site Settings /
+Installation Access** projection shows these non-secret identities and the
+authentication-email service, sender, and SMTP login. The section and its JSON
+payload are absent when Installer and Owner are the same account. It reports
+application handoff configuration as complete only when
 the saved deployer is the distinct permanent Owner and bootstrap access is
 empty. That state does not claim live IAM convergence: the Owner must follow
 the project-IAM link and verify the historical installer separately. The panel
 warns when the authentication-email sender or SMTP login still matches the
 installer, because that Workspace mailbox must be reconfigured before it is
-suspended or deleted. Additional Administrators receive neither the panel nor
-its JSON payload.
+suspended or deleted. Additional Administrators likewise receive neither the
+panel nor its JSON payload.
 
 ## Regions and provider settings
 
