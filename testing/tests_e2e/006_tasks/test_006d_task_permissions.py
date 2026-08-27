@@ -9,6 +9,7 @@ Verified against:
 
 import hashlib
 import json
+import os
 
 import pytest
 import requests
@@ -96,9 +97,14 @@ def test_task_route_is_forbidden_without_model_or_page_permission(
         blocked.navigate(task.url)
         expect(blocked.page).to_have_title("Error 403")
 
+    deployment_id = (
+        os.environ.get("GAE_DEPLOYMENT_ID")
+        or os.environ.get("GAE_VERSION")
+        or CONFIG.VERSION
+    )
     blocked_fingerprint = hashlib.md5(
         (
-            f"{task.entity.fingerprint}-{CONFIG.BUILD_ID}-"
+            f"{task.entity.fingerprint}-{deployment_id}-{CONFIG.BUILD_ID}-"
             f"{blocked.entity.authorization_fingerprint}"
         ).encode("utf-8")
     ).hexdigest()

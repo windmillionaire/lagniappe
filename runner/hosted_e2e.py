@@ -41,6 +41,7 @@ from runner.process import run_command
 
 
 STATE_SCHEMA_VERSION = 1
+SETUP_CONTRACT_REVISION = 1
 SERVICE = "e2e"
 ANCHOR_VERSION = "e2e-anchor"
 ANCHOR_REVISION = "2"
@@ -260,6 +261,22 @@ def _write_json(path: Path, payload: dict, *, owner_only=False):
         f"{json.dumps(payload, indent=2, sort_keys=True)}\n",
         owner_only=owner_only,
     )
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_setup_contract_rejects_stale_runtime_roles
+# @matrix hosted-e2e : iam setup-contract stale-state
+def _setup_contract_fingerprint():
+    """Fingerprint stable cloud requirements that setup must reconcile."""
+    contract = {
+        "revision": SETUP_CONTRACT_REVISION,
+        "hosted_apis": HOSTED_APIS,
+        "runtime_project_roles": RUNTIME_PROJECT_ROLES,
+        "runtime_bucket_roles": RUNTIME_BUCKET_ROLES,
+        "anchor_revision": ANCHOR_REVISION,
+    }
+    encoded = json.dumps(contract, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 # @testable infrastructure
@@ -916,6 +933,7 @@ def setup(github_repository=None):
 
     payload = {
         "schema_version": STATE_SCHEMA_VERSION,
+        "setup_contract": _setup_contract_fingerprint(),
         "configured_at": datetime.now(timezone.utc).isoformat(),
         "github_repository": github_repository,
         **asdict(infrastructure),
@@ -1442,6 +1460,23 @@ def _hosted_app_version_present(infrastructure, state):
     return True
 
 
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_setup_contract_rejects_stale_runtime_roles
+# @matrix hosted-e2e : iam setup-contract stale-state
+def _require_current_setup(infrastructure):
+    """Require setup state that reflects the current stable cloud contract."""
+    setup_state = _load_json(SETUP_PATH)
+    if not setup_state or setup_state.get("schema_version") != STATE_SCHEMA_VERSION:
+        raise HostedE2EError("Run `run.py hosted-e2e setup` first.")
+    if setup_state.get("setup_contract") != _setup_contract_fingerprint():
+        raise HostedE2EError(
+            "Hosted E2E setup is stale for the current APIs, IAM roles, or "
+            "anchor contract; rerun `run.py hosted-e2e setup`."
+        )
+    _validate_state_infrastructure(setup_state, infrastructure)
+    return setup_state
+
+
 # @testable infrastructure
 def create(*, base_ref=None):
     """Deploy one committed production build as a test app and runner."""
@@ -1453,10 +1488,7 @@ def create(*, base_ref=None):
     source_snapshot, _source_paths = behavior_snapshot(APP_DIR)
     _activate(adc=True)
     infrastructure = _infrastructure()
-    setup_state = _load_json(SETUP_PATH)
-    if not setup_state or setup_state.get("schema_version") != STATE_SCHEMA_VERSION:
-        raise HostedE2EError("Run `run.py hosted-e2e setup` first.")
-    _validate_state_infrastructure(setup_state, infrastructure)
+    _require_current_setup(infrastructure)
     _verify_soft_routing_guard(infrastructure)
     previous = _load_json(STATE_PATH)
     state = _resumable_create_state(

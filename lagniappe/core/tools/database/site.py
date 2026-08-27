@@ -59,6 +59,25 @@ def public_pages():
 
 
 # @testable true
+# @tests tests_unit/test_018_database_assets.py::test_public_page_reference_uses_strong_named_lookup
+# @matrix public-pages : immediate-lookup public-route
+def public_page_reference(public_id):
+    """Fetch the strong named-key reference for one public URL identifier."""
+    return DATA.datastore.get(key(f"public_page:{public_id}"))
+
+
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_public_page_reference_uses_strong_named_lookup
+# @matrix public-pages : immediate-lookup public-route
+def save_public_page_reference(public_id, page_key):
+    """Persist the page key behind a public URL using a strong named lookup."""
+    reference_key = key(f"public_page:{public_id}")
+    entity = DATA.datastore.entity(key=reference_key)
+    entity["page"] = page_key
+    DATA.datastore.put(entity)
+
+
+# @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @tests tests_unit/test_018_database_assets.py::test_save_site_image_persists_version_without_mutating_input
 # @matrix admin : metadata site-image-upload

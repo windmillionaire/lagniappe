@@ -24,8 +24,8 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
     expect(
         delegated.get_by_role("heading", name="Delegated Installation")
     ).to_be_visible()
-    owner = delegated.locate("[data-role='delegated-owner-checklist']")
-    installer = delegated.locate("[data-role='delegated-installer-checklist']")
+    owner = delegated.locator("[data-role='delegated-owner-checklist']")
+    installer = delegated.locator("[data-role='delegated-installer-checklist']")
     expect(owner).not_to_have_attribute("open", "")
     expect(installer).not_to_have_attribute("open", "")
     expect(owner.locator("summary")).to_contain_text("Business / permanent Owner")
@@ -74,7 +74,7 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
         "the Owner line itself must have no entry in Inheritance"
     )
     expect(owner).to_contain_text(
-        "Never give the installer the Owner's Google password"
+        "Never give the installer the Owner’s Google password"
     )
     owner_terms = owner.locator(
         "a[href='https://console.developers.google.com/terms/cloud']"
@@ -107,7 +107,7 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
         "it displays the active gcloud CLI email"
     )
     expect(installer).to_contain_text(
-        "verifies that account's CLI token before showing any project choices"
+        "verifies that account’s CLI token before showing any project choices"
     )
     expect(installer).to_contain_text(
         "Are you installing Lagniappe for a different permanent Owner?"

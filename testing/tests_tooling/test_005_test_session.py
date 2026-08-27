@@ -92,12 +92,22 @@ def test_two_subprocess_starts_produce_one_owner(tmp_path):
 import os
 from pathlib import Path
 from time import sleep
+from types import SimpleNamespace
 from runner import test_session
 
 root = Path(os.environ["LAGNIAPPE_SESSION_TEST_ROOT"])
 test_session._state_paths = lambda: (
     root / "test-session.json",
     root / "test-session.lock",
+)
+test_session.SETTINGS = SimpleNamespace(
+    test_config={
+        "BASE_URL": "http://127.0.0.1:9876",
+        "SERVER_PORT": 9876,
+        "GOOGLE_CLOUD_PROJECT": "session-test-project",
+        "PREFIX": "session_test_",
+    },
+    GCLOUD_CONFIG={"PROJECT": "session-test-project"},
 )
 
 class Lease:

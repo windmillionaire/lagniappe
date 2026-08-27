@@ -382,7 +382,7 @@ def site_settings():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
-# @pairs admin:promotion cache:cache-invalidation owner:owner-only
+# @pairs admin:promotion cache:cache-invalidation cache:invalidation-acknowledgement owner:owner-only
 @internal.route("/site-administrators", methods=["POST"])
 @owner_only
 def promote_site_administrator():
@@ -408,7 +408,7 @@ def promote_site_administrator():
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
 # @matrix admin : account-preservation confirmation-modal demotion
-# @pairs cache:cache-invalidation owner:owner-only
+# @pairs cache:cache-invalidation cache:invalidation-acknowledgement owner:owner-only
 @internal.route("/site-administrators/<key>", methods=["GET", "DELETE"])
 @owner_only
 def demote_site_administrator(key):

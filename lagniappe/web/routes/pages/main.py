@@ -11,7 +11,6 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.tools import ai
-from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.site import public_pages as public_page_service
 from lagniappe.core.tools.auth.references import (
     SubmittedReferenceResolver,
@@ -721,6 +720,8 @@ def visibility(key, **kwargs):
     if page.is_public:
         page.public_id
     Entities.save(page)
+    if page.is_public:
+        public_page_service.save_reference(page)
 
     return responses.page_document_settings(page)
 
@@ -733,10 +734,7 @@ def visibility(key, **kwargs):
 # @pair pages:public-document
 @pages.route("public/<public_id>", methods=["GET"])
 def public(public_id):
-    public_pages = Entities.fetch(
-        *database_get.public_pages(public_id), request=Fetch.root()
-    )
-    page = next((page for page in public_pages if page.is_public), None)
+    page = public_page_service.resolve_page(public_id)
 
     if not page:
         abort(404)
@@ -749,11 +747,7 @@ def public(public_id):
 # @matrix public-pages : document-image public-route revocation
 @pages.route("public/<public_id>/images/<asset_name>", methods=["GET", "HEAD"])
 def public_image(public_id, asset_name):
-    candidates = Entities.fetch(
-        *database_get.public_pages(public_id),
-        request=Fetch.root(),
-    )
-    page = next((candidate for candidate in candidates if candidate.is_public), None)
+    page = public_page_service.resolve_page(public_id)
     if not page:
         abort(404)
 

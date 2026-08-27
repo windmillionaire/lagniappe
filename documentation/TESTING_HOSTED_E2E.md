@@ -63,6 +63,11 @@ Artifact Registry repository, result bucket, settings/CA Secret Manager mounts,
 WIF pool/provider, scoped IAM, and App Engine anchor. Non-secret identifiers are
 written to `reports/hosted-e2e/setup.json`.
 
+The setup record includes a fingerprint of the stable API, IAM-role, bucket,
+and anchor requirements. `create` refuses a stale record and tells the operator
+to rerun the idempotent setup command, so a reused runtime service account
+cannot silently miss roles added after its original setup.
+
 Create a protected GitHub environment named `hosted-e2e` and copy these values
 from setup output:
 

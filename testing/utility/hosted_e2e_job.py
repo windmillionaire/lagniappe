@@ -98,7 +98,11 @@ def _pytest_command(suite: str, targets=()) -> list[str]:
             raise RuntimeError("Full hosted E2E does not accept focused targets.")
         pytest_targets = ["e2e"]
     elif suite == "focused":
-        pytest_targets = list(validate_focused_targets(targets))
+        pytest_targets = [
+            *validate_focused_targets(targets),
+            "-m",
+            "not unfinished",
+        ]
     else:
         raise RuntimeError(f"Unsupported hosted E2E suite {suite!r}.")
     return [

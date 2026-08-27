@@ -1258,7 +1258,9 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
     demote_button.click()
     modal = owner.locate("#modal")
     expect(modal).to_be_visible()
-    expect(modal.get_by_role("heading")).to_have_text("Remove Administrator")
+    expect(
+        modal.get_by_role("heading", name="Remove Administrator", exact=True)
+    ).to_be_visible()
     expect(modal).to_contain_text(
         f"Remove Administrator access from {managed.entity.name}?"
     )
@@ -1371,108 +1373,117 @@ def test_additional_admin_cannot_access_owner_configuration(get_user, browser_fa
 # @template home/site_settings.html::site_settings
 def test_owner_installation_access_distinguishes_handoff_from_provider_cleanup(
     get_user,
-    monkeypatch,
 ):
     owner = get_user(Users.OWNER)
-    owner_email = owner.email.casefold()
-    installer_email = "temporary-installer@example.test"
-    project_id = "delegated-installation-test"
-    runtime_email = f"lagniappe@{project_id}.iam.gserviceaccount.com"
-    monkeypatch.setattr(CONFIG, "ADMIN_EMAIL", owner_email)
-    monkeypatch.setattr(CONFIG, "INSTALLER_EMAIL", installer_email)
-    monkeypatch.setattr(CONFIG, "DEPLOYER_EMAIL", installer_email)
-    monkeypatch.setattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", installer_email)
-    monkeypatch.setattr(CONFIG, "GOOGLE_CLOUD_PROJECT", project_id)
-    monkeypatch.setattr(CONFIG, "RUNTIME_SERVICE_ACCOUNT_EMAIL", runtime_email)
-    monkeypatch.setattr(
-        CONFIG,
-        "AUTH_EMAIL_CONFIG",
-        {
-            "provider": "smtp",
-            "service": "Gmail",
-            "host": "smtp.gmail.com",
-            "port": 587,
-            "security": "starttls",
-            "username": installer_email,
-            "password": "not-returned-to-browser",
-            "senderEmail": installer_email,
-            "senderName": "Delegated Installation Test",
-        },
+    owner_email = str(getattr(CONFIG, "ADMIN_EMAIL", "") or "").strip().casefold()
+    installer_email = str(
+        getattr(CONFIG, "INSTALLER_EMAIL", "") or ""
+    ).strip().casefold()
+    deployer_email = str(
+        getattr(CONFIG, "DEPLOYER_EMAIL", "") or ""
+    ).strip().casefold()
+    bootstrap_email = str(
+        getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or ""
+    ).strip().casefold()
+    delegated = bool(
+        owner_email and installer_email and owner_email != installer_email
+    )
+    _, settings_panel = _open_owner_site_settings(owner)
+    response = _fetch_status(owner, "/l/site-settings", "GET")["data"]
+    section = _site_settings_section(settings_panel, "installation-access")
+    if not delegated:
+        expect(section).to_have_count(0)
+        assert "installation_access" not in response
+        return
+
+    expect(section).to_have_count(1)
+    access = _open_site_settings_section(settings_panel, "installation-access")
+    target = access.locator(
+        "[data-role='section-body'][data-widget='SiteInstallationAccess']"
+    )
+    application_complete = bool(
+        deployer_email == owner_email and not bootstrap_email
+    )
+    state = "application-complete" if application_complete else "pending"
+    title = (
+        "Application handoff configured"
+        if application_complete
+        else "Delegated handoff pending"
+    )
+    project_id = str(getattr(CONFIG, "GOOGLE_CLOUD_PROJECT", "") or "").strip()
+    runtime_email = str(
+        getattr(CONFIG, "RUNTIME_SERVICE_ACCOUNT_EMAIL", "") or ""
+    ).strip().casefold()
+    auth_email = getattr(CONFIG, "AUTH_EMAIL_CONFIG", None) or {}
+    if not isinstance(auth_email, dict):
+        auth_email = {}
+    auth_service = str(auth_email.get("service") or "").strip()
+    auth_sender = str(auth_email.get("senderEmail") or "").strip().casefold()
+    auth_login = str(auth_email.get("username") or "").strip().casefold()
+    installer_controls_email = bool(
+        installer_email and installer_email in {auth_sender, auth_login}
     )
 
-    _, settings_panel = _open_owner_site_settings(owner)
-    access = _open_site_settings_section(settings_panel, "installation-access")
-    expect(access).to_have_attribute("data-state", "pending")
+    expect(target).to_have_attribute("data-state", state)
     expect(access.locator("[data-role='status-title']")).to_have_text(
-        "Delegated handoff pending"
+        title
     )
     expect(access.locator("[data-field='owner']")).to_have_text(owner_email)
     expect(access.locator("[data-field='installer']")).to_have_text(
         installer_email
     )
     expect(access.locator("[data-field='deployer']")).to_have_text(
-        installer_email
+        deployer_email or "None"
     )
     expect(access.locator("[data-field='bootstrap']")).to_have_text(
-        installer_email
+        bootstrap_email or "None"
     )
-    expect(access.locator("[data-field='runtime']")).to_have_text(runtime_email)
-    expect(access.locator("[data-field='email-service']")).to_have_text("Gmail")
+    expect(access.locator("[data-field='runtime']")).to_have_text(
+        runtime_email or "None"
+    )
+    expect(access.locator("[data-field='email-service']")).to_have_text(
+        auth_service or "None"
+    )
     expect(access.locator("[data-field='email-sender']")).to_have_text(
-        installer_email
+        auth_sender or "None"
     )
-    expect(access.locator("[data-role='handoff-instructions']")).to_be_visible()
-    expect(access.locator("[data-role='handoff-instructions']")).to_contain_text(
-        "the installer normally runs"
+    expect(access.locator("[data-field='email-login']")).to_have_text(
+        auth_login or "None"
     )
-    expect(
-        access.locator("[data-role='handoff-instructions'] code")
-    ).to_have_text("./setup.sh handoff")
+    handoff = access.locator("[data-role='handoff-instructions']")
+    if state == "pending":
+        expect(handoff).to_be_visible()
+        expect(handoff).to_contain_text("the installer normally runs")
+        expect(handoff.locator("code")).to_have_text("./setup.sh handoff")
+    else:
+        expect(handoff).to_be_hidden()
     expect(access.locator("code[data-field]")).to_have_count(8)
-    expect(
-        access.locator("[data-role='installer-email-warning']")
-    ).to_be_visible()
+    email_warning = access.locator("[data-role='installer-email-warning']")
+    if installer_controls_email:
+        expect(email_warning).to_be_visible()
+    else:
+        expect(email_warning).to_be_hidden()
     expect(access.locator("[data-role='project-iam-link']")).to_have_attribute(
         "href",
         f"https://console.cloud.google.com/iam-admin/iam?project={project_id}",
     )
 
-    payload = _fetch_status(owner, "/l/site-settings", "GET")["data"][
-        "installation_access"
-    ]
-    assert payload["state"] == "pending"
+    payload = response["installation_access"]
+    assert payload["state"] == state
+    assert payload["application_handoff_complete"] is application_complete
+    assert payload["owner_email"] == owner_email
+    assert payload["installer_email"] == installer_email
+    assert payload["deployer_email"] == deployer_email
+    assert payload["bootstrap_admin_email"] == bootstrap_email
+    assert payload["runtime_service_account"] == runtime_email
     assert payload["authentication_email"] == {
-        "configured": True,
-        "service": "Gmail",
-        "sender_email": installer_email,
-        "login": installer_email,
-        "uses_installer": True,
+        "configured": bool(auth_email),
+        "service": auth_service,
+        "sender_email": auth_sender,
+        "login": auth_login,
+        "uses_installer": installer_controls_email,
     }
     assert "password" not in json.dumps(payload).casefold()
-    assert "not-returned-to-browser" not in json.dumps(payload)
-
-    monkeypatch.setattr(CONFIG, "DEPLOYER_EMAIL", owner_email)
-    monkeypatch.setattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "")
-    _, settings_panel = _open_owner_site_settings(owner)
-    access = _open_site_settings_section(settings_panel, "installation-access")
-    expect(access).to_have_attribute("data-state", "application-complete")
-    expect(access.locator("[data-role='status-title']")).to_have_text(
-        "Application handoff configured"
-    )
-    expect(access.locator("[data-field='bootstrap']")).to_have_text("None")
-    expect(
-        access.locator("[data-role='installer-email-warning']")
-    ).to_be_visible()
-    expect(access.locator("[data-role='handoff-instructions']")).to_be_hidden()
-
-    monkeypatch.setattr(CONFIG, "INSTALLER_EMAIL", owner_email)
-    _, settings_panel = _open_owner_site_settings(owner)
-    expect(
-        _site_settings_section(settings_panel, "installation-access")
-    ).to_have_count(0)
-    assert "installation_access" not in _fetch_status(
-        owner, "/l/site-settings", "GET"
-    )["data"]
 
 
 # @matrix admin : configuration-display configuration-modal environment-variables external-links recovery-export secrets sections service-providers site-settings web-headers

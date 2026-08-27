@@ -360,6 +360,33 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
     ]
 
 
+# @matrix hosted-e2e : iam setup-contract stale-state
+def test_hosted_setup_contract_rejects_stale_runtime_roles(tmp_path, monkeypatch):
+    infrastructure = _infrastructure()
+    setup_path = tmp_path / "setup.json"
+    monkeypatch.setattr(hosted_e2e, "SETUP_PATH", setup_path)
+    state = {
+        "schema_version": hosted_e2e.STATE_SCHEMA_VERSION,
+        "setup_contract": hosted_e2e._setup_contract_fingerprint(),
+        "project": infrastructure.project,
+        "region": infrastructure.region,
+        "service": infrastructure.service,
+        "job": infrastructure.job,
+        "artifact_bucket": infrastructure.artifact_bucket,
+    }
+    hosted_e2e._write_json(setup_path, state)
+
+    assert hosted_e2e._require_current_setup(infrastructure) == state
+
+    monkeypatch.setattr(
+        hosted_e2e,
+        "RUNTIME_PROJECT_ROLES",
+        (*hosted_e2e.RUNTIME_PROJECT_ROLES, "roles/example.newRuntimeRole"),
+    )
+    with pytest.raises(HostedE2EError, match="setup is stale.*rerun"):
+        hosted_e2e._require_current_setup(infrastructure)
+
+
 def _evidence(snapshot, paths, test_name, outcome="passed"):
     pairs, snapshots = encode_test_run_snapshots({snapshot: paths})
     return {
@@ -606,7 +633,9 @@ def test_hosted_focused_targets_require_existing_e2e_nodeids():
     )
 
     assert hosted_e2e_job.validate_focused_targets([target]) == (target,)
-    assert target in hosted_e2e_job._pytest_command("focused", [target])
+    focused_command = hosted_e2e_job._pytest_command("focused", [target])
+    assert target in focused_command
+    assert focused_command[focused_command.index("-m") + 1] == "not unfinished"
     with pytest.raises(RuntimeError):
         hosted_e2e_job.validate_focused_targets([target, target])
 
