@@ -55,45 +55,6 @@ def runtime_settings(config=CONFIG):
         return normalize_public_page_settings(fallback)
 
 
-# @testable true
-# @tests tests_unit/test_026_site_admin.py::test_public_page_resolution_prefers_strong_reference_and_falls_back_for_existing_pages
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
-# @matrix public-pages : immediate-lookup legacy-fallback public-route
-def resolve_page(public_id):
-    """Resolve a public page immediately, with a query fallback for older links."""
-    reference = site_database.public_page_reference(public_id)
-    if reference and reference.get("page"):
-        page = Entities.fetch_one(reference["page"], request=Fetch.root())
-        if (
-            page
-            and page.db.get("public_id") == public_id
-            and page.is_public
-        ):
-            return page
-
-    candidates = Entities.fetch(
-        *database_get.public_pages(public_id),
-        request=Fetch.root(),
-    )
-    return next(
-        (
-            page
-            for page in candidates
-            if page.db.get("public_id") == public_id and page.is_public
-        ),
-        None,
-    )
-
-
-# @testable true
-# @tests tests_unit/test_026_site_admin.py::test_public_page_resolution_prefers_strong_reference_and_falls_back_for_existing_pages
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
-# @matrix public-pages : immediate-lookup public-route
-def save_reference(page):
-    """Record the strongly consistent page-key lookup for a public link."""
-    site_database.save_public_page_reference(page.db["public_id"], page.key)
-
-
 # @testable false
 # @covered-by lagniappe/core/tools/site/public_pages.py::document_images
 # @reason URL equivalence is exercised through document-image extraction

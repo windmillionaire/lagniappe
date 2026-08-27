@@ -76,12 +76,6 @@ Embedded private images are rewritten to the anonymous, revocable
 assets still referenced by a currently public document. Unpublishing the page
 or removing the image reference makes the URL return 404.
 
-Publishing also writes a named-key reference from the public identifier to the
-Page key. Public routes use that strongly consistent lookup so the link works
-as soon as the update response displays it. The indexed query remains as a
-compatibility fallback for links published before the reference was added;
-both paths reload the Page and enforce its current public state.
-
 `/robots.txt` always blocks the private application and explicitly allows the
 public page and static asset families. When live site discovery is enabled it
 also advertises `/sitemap.xml`; the sitemap otherwise returns 404. Public page

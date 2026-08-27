@@ -58,51 +58,6 @@ def test_public_page_runtime_settings_prefer_live_datastore_and_fail_closed(
     assert public_pages.runtime_settings(config=config)["PUBLIC_PAGE_INDEXING"] is False
 
 
-# @matrix public-pages : immediate-lookup legacy-fallback public-route
-def test_public_page_resolution_prefers_strong_reference_and_falls_back_for_existing_pages(
-    monkeypatch,
-):
-    current = _public_page("", db={"public_id": "current"}, key="current-key")
-    legacy = _public_page("", db={"public_id": "legacy"}, key="legacy-key")
-    fetched = []
-    queried = []
-
-    monkeypatch.setattr(
-        public_pages.site_database,
-        "public_page_reference",
-        lambda public_id: {"page": "current-key"} if public_id == "current" else None,
-    )
-    monkeypatch.setattr(
-        public_pages.database_get,
-        "public_pages",
-        lambda public_id: queried.append(public_id) or ["legacy-row"],
-    )
-    monkeypatch.setattr(
-        public_pages.Entities,
-        "fetch_one",
-        lambda identifier, *, request: fetched.append(identifier) or current,
-    )
-    monkeypatch.setattr(
-        public_pages.Entities,
-        "fetch",
-        lambda *_rows, request: [legacy],
-    )
-
-    assert public_pages.resolve_page("current") is current
-    assert public_pages.resolve_page("legacy") is legacy
-    assert fetched == ["current-key"]
-    assert queried == ["legacy"]
-
-    saved = []
-    monkeypatch.setattr(
-        public_pages.site_database,
-        "save_public_page_reference",
-        lambda public_id, page_key: saved.append((public_id, page_key)),
-    )
-    public_pages.save_reference(current)
-    assert saved == [("current", "current-key")]
-
-
 # @matrix public-pages : document-image privacy preview
 def test_public_document_images_only_include_embedded_page_assets():
     first = SimpleNamespace(

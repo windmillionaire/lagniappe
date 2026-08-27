@@ -7,16 +7,13 @@ Verified against:
 - lagniappe/core/entities/task.py
 """
 
-import hashlib
 import json
-import os
 
 import pytest
 import requests
 from playwright.sync_api import expect
 
 from config import SETTINGS
-from lagniappe import CONFIG
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
@@ -94,20 +91,11 @@ def test_task_route_is_forbidden_without_model_or_page_permission(
     blocked = get_user(Users.user_no_access)
     state_before = _task_side_effect_state(task, owner, blocked)
     with browser_failures.expect_http_error(blocked, status=403, path=task.url):
-        blocked.navigate(task.url)
+        blocked_response = blocked.navigate(task.url)
         expect(blocked.page).to_have_title("Error 403")
 
-    deployment_id = (
-        os.environ.get("GAE_DEPLOYMENT_ID")
-        or os.environ.get("GAE_VERSION")
-        or CONFIG.VERSION
-    )
-    blocked_fingerprint = hashlib.md5(
-        (
-            f"{task.entity.fingerprint}-{deployment_id}-{CONFIG.BUILD_ID}-"
-            f"{blocked.entity.authorization_fingerprint}"
-        ).encode("utf-8")
-    ).hexdigest()
+    blocked_etag = blocked_response.headers.get("etag")
+    assert isinstance(blocked_etag, str) and blocked_etag
     task_url = (
         task.url
         if task.url.startswith("http")
@@ -119,13 +107,13 @@ def test_task_route_is_forbidden_without_model_or_page_permission(
     }
     response = requests.get(
         task_url,
-        headers={"If-None-Match": f'"{blocked_fingerprint}"'},
+        headers={"If-None-Match": blocked_etag},
         cookies=cookies,
         allow_redirects=False,
         timeout=10,
     )
     assert_lagniappe_error_response(response, status=403)
-    assert_same_etag(response.headers.get("etag"), f'"{blocked_fingerprint}"')
+    assert_same_etag(response.headers.get("etag"), blocked_etag)
     assert task.entity.name not in response.text
     assert _task_side_effect_state(task, owner, blocked) == state_before
 

@@ -1105,35 +1105,3 @@ def test_save_site_public_pages_persists_canonical_payload(monkeypatch):
     )
 
     assert saved == [{"PUBLIC_PAGE_INDEXING": True, "version": 8}]
-
-
-# @matrix public-pages : immediate-lookup public-route
-@pytest.mark.unit
-def test_public_page_reference_uses_strong_named_lookup(monkeypatch):
-    stored = {}
-
-    class Entity(dict):
-        pass
-
-    class Datastore:
-        def key(self, *parts):
-            return parts
-
-        def get(self, key):
-            return stored.get(key)
-
-        def entity(self, key):
-            entity = Entity()
-            entity.key = key
-            return entity
-
-        def put(self, entity):
-            stored[entity.key] = dict(entity)
-
-    monkeypatch.setattr(site_database, "DATA", SimpleNamespace(datastore=Datastore()))
-    page_key = ("test_instances", 123)
-
-    assert site_database.public_page_reference("public-id") is None
-    site_database.save_public_page_reference("public-id", page_key)
-
-    assert site_database.public_page_reference("public-id") == {"page": page_key}

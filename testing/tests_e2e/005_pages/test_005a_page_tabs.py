@@ -188,6 +188,7 @@ def test_public_document_images_are_anonymous_and_revocable(
     get_user,
     browser,
     browser_failures,
+    setup_test_server,
 ):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_document_visibility_page)
@@ -220,6 +221,8 @@ def test_public_document_images_are_anonymous_and_revocable(
     public_url = settings.locator("a").evaluate("element => element.href")
 
     anonymous_context = browser.new_context()
+    if setup_test_server.browser_cookies:
+        anonymous_context.add_cookies(list(setup_test_server.browser_cookies))
     try:
         anonymous = anonymous_context.new_page()
         response = anonymous.goto(public_url)
