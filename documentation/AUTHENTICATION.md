@@ -110,16 +110,18 @@ Until the owner completes a login, `/users/login` presents owner setup. Google
 sign-in is offered when enabled; password setup always uses the email
 verification flow.
 
-For a delegated installation, `BOOTSTRAP_ADMIN_EMAIL` may name the active
-installer. On a private site, that exact address can be provisioned as an
+For a delegated installation, setup enables Google Sign-In and sets
+`BOOTSTRAP_ADMIN_EMAIL` to the confirmed installer automatically. On a private
+site, that exact address can be provisioned as an
 additional Administrator through the Google callback only until the owner has
 a `last_login`. The setting is not an address pattern, does not authorize the
 password handoff, and does not delete an administrator account when cleared.
 The permanent Owner address collected by setup must likewise be the exact
 Google account that will sign in, rather than a forwarding alias. Delegated
-setup also verifies that account's direct Project Owner binding before asking
-whether to enable the temporary application Administrator; the binding is a
-handoff prerequisite, not a source of Lagniappe application authority. This is
+setup also verifies that account's direct Project Owner binding before setting
+the temporary application Administrator. The verified delegated workflow makes
+that scoped bootstrap assignment; the IAM binding itself is a handoff
+prerequisite, not a general source of Lagniappe application authority. This is
 an IAM-policy read performed by the installer session and does not require the
 Owner to authenticate on the installer's computer.
 

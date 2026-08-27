@@ -508,11 +508,11 @@ def configure_google_signin_choice():
 
 
 # @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_collects_owner_and_requires_google_before_confirmation
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_automatically_enables_google_and_installer_bootstrap
 # @matrix admin : google-oauth interactive-input prompt-clarity
 # @matrix setup : owner preconfirmation
-def collect_owner_and_signin_choice():
-    """Collect permanent application ownership before cloud-change confirmation."""
+def collect_owner_and_signin_choice(installer_email=None):
+    """Collect permanent ownership and resolve the Google sign-in requirement."""
     from config import SETTINGS
 
     if not all(
@@ -535,6 +535,11 @@ def collect_owner_and_signin_choice():
         SETTINGS.APP["ADMIN_NAME"] = _get_admin_name()
     if not str(SETTINGS.APP.get("ADMIN_EMAIL") or "").strip():
         SETTINGS.APP["ADMIN_EMAIL"] = _get_admin_email().strip().casefold()
+    installer_email = str(installer_email or "").strip().casefold()
+    owner_email = str(SETTINGS.APP.get("ADMIN_EMAIL") or "").strip().casefold()
+    if installer_email and owner_email != installer_email:
+        SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = True
+        return True
     return configure_google_signin_choice()
 
 

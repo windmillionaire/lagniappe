@@ -8,7 +8,7 @@ from testing.definitions import Users
 
 
 @pytest.mark.e2e
-def test_manual_delegated_installation_explains_workspace_cloud_access(
+def test_manual_delegated_installation_separates_owner_and_installer_checklists(
     get_user,
 ):
     anonymous = get_user(Users.ANONYMOUS)
@@ -21,67 +21,108 @@ def test_manual_delegated_installation_explains_workspace_cloud_access(
 
     assert response.ok
     delegated = anonymous.locate("[data-role='delegated-installation']")
-    expect(delegated).to_contain_text(
+    expect(
+        delegated.get_by_role("heading", name="Delegated Installation")
+    ).to_be_visible()
+    owner = delegated.locate("[data-role='delegated-owner-checklist']")
+    installer = delegated.locate("[data-role='delegated-installer-checklist']")
+    expect(owner).not_to_have_attribute("open", "")
+    expect(installer).not_to_have_attribute("open", "")
+    expect(owner.locator("summary")).to_contain_text("Business / permanent Owner")
+    expect(owner.locator("summary")).to_contain_text(
+        "Create and fund the project, create the installer account, grant "
+        "temporary access, and close the handoff."
+    )
+    expect(installer.locator("summary")).to_contain_text("Installer")
+    expect(installer.locator("summary")).to_contain_text(
+        "Activate the temporary account, run setup, verify the deployment, "
+        "and return access."
+    )
+    expect(owner.locator("ol")).not_to_be_visible()
+    expect(installer.locator("ol")).not_to_be_visible()
+
+    owner.locator("summary").click()
+    expect(owner).to_have_attribute("open", "")
+    expect(owner.locator("ol")).to_be_visible()
+    expect(installer.locator("ol")).not_to_be_visible()
+    expect(owner).to_contain_text(
         "Apps / Additional Google services / Google Cloud Platform / "
         "Service status"
     )
-    expect(delegated).to_contain_text("ON for everyone")
-    expect(delegated).to_contain_text("Inherited: On")
-    expect(delegated).to_contain_text("Override")
-    expect(delegated).to_contain_text(
+    expect(owner).to_contain_text("ON for everyone")
+    expect(owner).to_contain_text("Inherited: On")
+    expect(owner).to_contain_text("Override")
+    expect(owner).to_contain_text(
         "does not need permission to create projects"
     )
-    expect(delegated).to_contain_text("separate browser profile")
-    expect(delegated).to_contain_text("Project info")
-    expect(delegated).to_contain_text(
+    expect(owner).to_contain_text("Project info")
+    expect(owner).to_contain_text(
         "record the exact Project ID for the installer"
     )
-    expect(delegated).to_contain_text(
+    expect(owner).to_contain_text(
         "confirm on the Billing page that billing is enabled"
     )
-    expect(delegated).to_contain_text(
+    expect(owner).to_contain_text(
         "use the search box at the top of Google Cloud console to search for "
         "IAM"
     )
-    expect(delegated).to_contain_text("View by principals")
-    expect(delegated).to_contain_text(
+    expect(owner).to_contain_text("View by principals")
+    expect(owner).to_contain_text(
         "directly, with no inherited source or condition"
     )
-    expect(delegated).to_contain_text(
+    expect(owner).to_contain_text(
         "the Owner line itself must have no entry in Inheritance"
     )
-    expect(delegated).to_contain_text(
-        "setup displays the active gcloud CLI account's exact email"
+    expect(owner).to_contain_text(
+        "Never give the installer the Owner's Google password"
     )
-    expect(delegated).to_contain_text(
-        "confirmed account's CLI token before showing any project choices"
+    owner_terms = owner.locator(
+        "a[href='https://console.developers.google.com/terms/cloud']"
     )
-    expect(delegated).to_contain_text(
+    expect(owner_terms).to_have_count(1)
+    expect(owner_terms).to_have_text("Google Cloud service-terms page")
+
+    owner.locator("summary").click()
+    installer.locator("summary").click()
+    expect(owner.locator("ol")).not_to_be_visible()
+    expect(installer).to_have_attribute("open", "")
+    expect(installer.locator("ol")).to_be_visible()
+    expect(installer).to_contain_text("separate browser profile")
+    expect(installer).to_contain_text(
+        "even if the main Cloud console previously loaded without prompting"
+    )
+    expect(installer).to_contain_text(
+        "it displays the active gcloud CLI email"
+    )
+    expect(installer).to_contain_text(
+        "verifies that account's CLI token before showing any project choices"
+    )
+    expect(installer).to_contain_text(
         "Are you installing Lagniappe for a different permanent Owner?"
     )
-    expect(delegated).to_contain_text(
-        "lists only active projects where that authenticated installer has a "
+    expect(installer).to_contain_text(
+        "lists only active projects where the authenticated installer has a "
         "direct, unconditional Project Owner role"
     )
-    expect(delegated).to_contain_text(
-        "does not offer to create a project in delegated mode"
+    expect(installer).to_contain_text(
+        "never offers project creation in delegated mode"
     )
+    expect(installer).to_contain_text(
+        "automatically enables Google Sign-In, and gives the confirmed "
+        "installer temporary Lagniappe Administrator access"
+    )
+    expect(installer).to_contain_text(
+        "does not ask additional yes-or-no questions for them"
+    )
+    expect(installer).to_contain_text("./setup.sh handoff")
+    installer_terms = installer.locator(
+        "a[href='https://console.developers.google.com/terms/cloud']"
+    )
+    expect(installer_terms).to_have_count(1)
+    expect(installer_terms).to_have_text("Google Cloud service-terms page")
     cloud_console_links = delegated.locator(
         "a[href='https://console.cloud.google.com/']"
     )
     expect(cloud_console_links).to_have_count(2)
     expect(cloud_console_links.first).to_have_text("Google Cloud console")
-    expect(
-        delegated.locator("summary [data-icon='installation']")
-    ).to_have_count(0)
-    summary = delegated.locator("summary")
-    expect(
-        summary.get_by_text("Delegated installation", exact=True)
-    ).to_have_css("display", "inline")
-    expect(
-        summary.get_by_text(
-            "Open this checklist only when someone outside the business "
-            "will perform the installation.",
-            exact=True,
-        )
-    ).to_have_css("display", "block")
+    expect(delegated.locator("summary [data-icon]")).to_have_count(0)

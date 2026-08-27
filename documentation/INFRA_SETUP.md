@@ -79,7 +79,8 @@ The default flow is deliberately ordered:
 5. create App Engine, the runtime service account/IAM, Storage buckets, Cloud
    Tasks queue, and Document AI processor;
 6. configure domain/DNS and authentication email;
-7. initialize Identity Platform and optionally configure Google Sign-In;
+7. initialize Identity Platform and configure Google Sign-In (automatic for a
+   delegated installation, optional otherwise);
 8. configure Redis and optional TLS;
 9. choose error reporting, AI models, and AI observability;
 10. write generated settings, indexes, and PWA metadata;

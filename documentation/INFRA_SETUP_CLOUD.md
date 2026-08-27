@@ -29,6 +29,21 @@ which are a separate credential used by the Python provider clients. A new
 project is created only after default-no confirmation, then management APIs and
 billing are established before general provider work.
 
+Setup passes an explicit ADC scope set to gcloud: `openid`,
+`userinfo.email`, and `cloud-platform`. The gcloud command otherwise adds its
+generic `sqlservice.login` default, but Lagniappe does not use Cloud SQL and
+must not request that scope.
+
+Google Cloud service terms are accepted per human account and are separate
+from gcloud CLI and ADC OAuth consent. A first-time account can load the Cloud
+console without being prompted, then receive `UREQ_TOS_NOT_ACCEPTED` when an
+API is first enabled. Fresh setup defers ADC until the bootstrap management
+APIs have been prepared. It recognizes that provider error, omits the raw help
+token from its own failure, and reports the exact account plus
+`https://console.developers.google.com/terms/cloud` as the repair action. ADC
+login failures also include that first-use repair action because interactive
+gcloud output cannot be classified reliably after the subprocess exits.
+
 Fresh setup first displays the account marked active by gcloud CLI
 authentication and requires default-no confirmation. It verifies that exact
 account can mint an access token and does not silently infer consent from an
@@ -54,12 +69,13 @@ reported as drift before repair or another deployment workflow reaches it.
 
 During delegated setup, the permanent site Owner email must be the exact Google
 account address, not a forwarding alias, and that account must already have a
-direct Project Owner binding. Setup verifies that binding before offering the
-selected installer temporary Lagniappe application Administrator access. That
-bootstrap access affects application login only; it does not authenticate the
-installer to gcloud or add Cloud IAM permissions. The binding check reads the
-existing policy with the installer credential; it never asks the permanent
-Owner to log in or configure ADC on the installer's computer.
+direct Project Owner binding. Setup verifies that binding, enables Google
+Sign-In, and sets the confirmed installer as the temporary Lagniappe application
+Administrator without additional prompts. That bootstrap access affects
+application login only; it does not authenticate the installer to gcloud or add
+Cloud IAM permissions. The binding check reads the existing policy with the
+installer credential; it never asks the permanent Owner to log in or configure
+ADC on the installer's computer.
 
 Billing association is checked through Cloud Billing and Resource Manager
 permissions. Setup may select the sole accessible open billing account; if none
