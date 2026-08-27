@@ -117,8 +117,7 @@
       {% set permanent_owner = CONFIG.ADMIN_EMAIL|default('', true)|trim|lower %}
       {% if current_user.is_owner and saved_installer and saved_installer != permanent_owner %}
         {% call site_settings_section('installation-access', 'SiteInstallationAccess', 'Installation Access', 'site_installation_access', 'Owner, installer, and provider cleanup') %}
-          <div data-role="manual-content"
-               class="flex flex-col gap-4 text-sm text-base-dark">
+          <div class="flex flex-col gap-4 text-sm text-base-dark">
             <div data-role="handoff-status"
                  class="rounded-md border border-page-light/70 bg-page-bg p-4 text-page-dark">
               <strong data-role="status-title" class="block">Loading installation state…</strong>
@@ -176,7 +175,7 @@
                  data-visible="false"
                  class="rounded-md border border-page-light/70 bg-page-bg p-4 text-page-dark">
               <strong class="block">Complete the delegated handoff</strong>
-              <p class="mt-1">
+              <p data-role="manual-content" class="mt-1">
                 After the Owner verifies the application and removes the installer’s Lagniappe Administrator role, the installer normally runs <code>./setup.sh handoff</code> from the installation working copy. If the installer is unavailable, the permanent Owner may restore a working copy from the downloaded configuration, authenticate gcloud and ADC as the Owner, and run the same command without the installer’s credentials.
               </p>
             </div>
@@ -185,7 +184,7 @@
                  data-visible="false"
                  class="rounded-md border border-delete-light/70 bg-delete-bg p-4 text-delete-dark">
               <strong class="block">Keep the installer mailbox active</strong>
-              <p class="mt-1">
+              <p data-role="manual-content" class="mt-1">
                 Authentication email still uses the historical installer as its sender or SMTP login. Reconfigure email with a durable business-controlled identity using <code>./setup.sh email</code> and deploy before suspending or deleting that Workspace account.
               </p>
             </div>
