@@ -790,6 +790,14 @@ def test_uninitialized_owner_starts_google_first_setup(get_user, browser_failure
         owner_title = owner_setup.locator("[data-role='owner-setup-title']")
         expect(owner_title).to_have_text("Finish setting up Lagniappe")
         expect(owner_title).to_have_class(re.compile(r".*\btext-2xl\b.*"))
+        expect(
+            owner_setup.locator(
+                "[data-role='owner-google-setup'] [data-role='guidance']"
+            )
+        ).to_have_text(
+            "To continue with Google, use the account configured as the "
+            "application Owner or delegated installer."
+        )
         expect(owner_setup.locator("#google-signin-owner")).to_be_attached()
         expect(password_setup).not_to_be_visible()
         expect(user.locate(login_page.EMAIL_CHECK_FORM)).not_to_be_visible()

@@ -101,7 +101,7 @@
     {{ heading("Finish setting up Lagniappe", role="owner-setup-title") }}
     <div data-role="owner-google-setup"
          class="{{ 'hidden' if not google_available }}">
-      {{ guidance("Sign in with Google using the account configured as the application owner.") }}
+      {{ guidance("To continue with Google, use the account configured as the application Owner or delegated installer.") }}
       {{ error(auth_error or "", visible=auth_error) }}
       {% if google_available %}
         {{ google_signin("google-signin-owner", next_url) }}
