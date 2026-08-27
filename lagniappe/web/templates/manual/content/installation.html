@@ -347,10 +347,23 @@
           working copy instead.
         </li>
         <li>
-          After handoff succeeds, verify that the installer is absent from
-          project IAM, revoke provider invitations and temporary access tokens,
-          confirm the installer removed local credentials and settings from
-          their machine, then suspend and ultimately delete the temporary
+          After handoff succeeds, open <strong>Admin / Site Settings /
+          Installation Access</strong>. Confirm it reports
+          <strong>Application handoff configured</strong>, then use its
+          <strong>Review project IAM</strong> link to verify that the installer
+          is absent from project IAM. The application state cannot prove that
+          external cleanup finished. Revoke provider invitations and temporary
+          access tokens, and confirm the installer removed local credentials
+          and settings from their machine.
+        </li>
+        <li>
+          Review the authentication-email dependency shown under
+          <strong>Installation Access</strong>. If it says to keep the installer
+          mailbox active, first run <code>./setup.sh email</code> from the
+          installation working copy with a durable business-controlled sender
+          and deploy the change. Also verify ownership of billing, Redis,
+          Cloudflare or DNS, Resend or another mail provider, and recovery
+          destinations. Only then suspend and ultimately delete the temporary
           Workspace user. Rotate any provider secret that could not remain
           under direct business control during installation.
         </li>
@@ -358,7 +371,8 @@
         {% call callout("warning", False) %}
           The business remains responsible for Workspace users, billing IAM,
           organization-level access, and provider accounts. The handoff command
-          deliberately does not change or delete them.
+          deliberately does not change or delete them, and the deployed
+          application is not authorized to remove human Google Cloud IAM.
         {% endcall %}
       </div>
     </details>

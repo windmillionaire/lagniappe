@@ -5,6 +5,7 @@ const DEFAULT_SECTION = "maintenance";
 const SETTING_WIDGETS = {
 	maintenance: "SiteMaintenance",
 	administrators: "SiteAdministrators",
+	"installation-access": "SiteInstallationAccess",
 	deployment: "SiteDeployment",
 	"ai-models": "SiteAiModels",
 	"service-providers": "SiteServiceProviders",

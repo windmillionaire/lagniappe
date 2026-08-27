@@ -105,7 +105,18 @@ After default-no review, the command:
 
 The operation preserves unrelated IAM members/conditions and runtime
 self-bindings. It does not manage Workspace accounts, billing-account IAM, or
-organization-level access. A partial handoff can resume from the journal.
+organization-level access. It also cannot establish who controls Redis,
+Cloudflare/DNS, Resend or another mail provider, recovery destinations, or
+credentials left on the installer's computer. A partial handoff can resume
+from the journal.
+
+After the deployed handoff configuration is active, the Owner-only **Admin /
+Site Settings / Installation Access** section names the permanent Owner,
+historical installer, current deployer, bootstrap identity, runtime service
+account, and the non-secret authentication-email identities. It links to live
+project IAM for independent verification and warns when authentication email
+still depends on the installer mailbox. The application does not receive
+authority to remove human Cloud IAM and does not present an IAM-removal button.
 
 ## Secret boundaries
 

@@ -107,6 +107,79 @@ def _administrator_payload():
     return [role_entry(owner, primary_owner=True), *additional], candidates
 
 
+# @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
+# @matrix owner : authentication-email delegated-handoff identity-metadata provider-cleanup
+def _installation_access_payload():
+    """Return an Owner-safe view of saved operator and provider identities."""
+    owner_email = str(getattr(CONFIG, "ADMIN_EMAIL", "") or "").strip().casefold()
+    installer_email = str(
+        getattr(CONFIG, "INSTALLER_EMAIL", "") or ""
+    ).strip().casefold()
+    deployer_email = str(
+        getattr(CONFIG, "DEPLOYER_EMAIL", "") or ""
+    ).strip().casefold()
+    bootstrap_email = str(
+        getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or ""
+    ).strip().casefold()
+    delegated = bool(
+        owner_email and installer_email and owner_email != installer_email
+    )
+    application_handoff_complete = bool(
+        delegated and deployer_email == owner_email and not bootstrap_email
+    )
+
+    if application_handoff_complete:
+        state = "application-complete"
+        summary = "Owner is the saved deployer; installer bootstrap is closed"
+    elif delegated:
+        state = "pending"
+        summary = "Delegated handoff is still pending"
+    else:
+        state = "owner-managed"
+        summary = "Owner-managed installation"
+
+    auth_email = getattr(CONFIG, "AUTH_EMAIL_CONFIG", None) or {}
+    if not isinstance(auth_email, dict):
+        auth_email = {}
+    auth_service = str(auth_email.get("service") or "").strip()
+    auth_sender = str(auth_email.get("senderEmail") or "").strip().casefold()
+    auth_login = str(auth_email.get("username") or "").strip().casefold()
+    installer_controls_auth_email = bool(
+        installer_email
+        and installer_email in {auth_sender, auth_login}
+    )
+
+    project_id = str(
+        getattr(CONFIG, "GOOGLE_CLOUD_PROJECT", "") or ""
+    ).strip()
+    return {
+        "state": state,
+        "summary": summary,
+        "delegated": delegated,
+        "application_handoff_complete": application_handoff_complete,
+        "project_id": project_id,
+        "project_iam_url": (
+            "https://console.cloud.google.com/iam-admin/iam"
+            f"?project={project_id}"
+        ),
+        "owner_email": owner_email,
+        "installer_email": installer_email,
+        "deployer_email": deployer_email,
+        "bootstrap_admin_email": bootstrap_email,
+        "runtime_service_account": str(
+            getattr(CONFIG, "RUNTIME_SERVICE_ACCOUNT_EMAIL", "") or ""
+        ).strip().casefold(),
+        "authentication_email": {
+            "configured": bool(auth_email),
+            "service": auth_service,
+            "sender_email": auth_sender,
+            "login": auth_login,
+            "uses_installer": installer_controls_auth_email,
+        },
+    }
+
+
 # @testable false
 # @covered-by lagniappe/web/routes/home/site.py::promote_site_administrator
 # @covered-by lagniappe/web/routes/home/site.py::demote_site_administrator
@@ -184,7 +257,8 @@ def site_update():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
-# @matrix admin : admin-only metadata public-preview site-settings
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
+# @matrix admin owner : admin-only identity-metadata public-preview site-settings
 @internal.route("/site-settings", methods=["GET"])
 @permission(Resource.SITE, no_store=True)
 def site_settings():
@@ -285,20 +359,21 @@ def site_settings():
     ai_settings, ai_model_options = load_ai_settings_payload(config=CONFIG)
 
     administrators, administrator_candidates = _administrator_payload()
-    return responses.json_response(
-        {
-            "ai_settings": ai_settings,
-            "ai_model_options": ai_model_options,
-            "deployment": load_deployment_settings(config=CONFIG),
-            "site_image": site_image_response,
-            "service_providers": links,
-            "migration_status": database_migrations.get_migration_status(),
-            "administrators": administrators,
-            "administrator_candidates": administrator_candidates,
-            "can_manage_administrators": current_user.is_owner,
-            "can_view_sensitive_configuration": current_user.is_owner,
-        }
-    )
+    payload = {
+        "ai_settings": ai_settings,
+        "ai_model_options": ai_model_options,
+        "deployment": load_deployment_settings(config=CONFIG),
+        "site_image": site_image_response,
+        "service_providers": links,
+        "migration_status": database_migrations.get_migration_status(),
+        "administrators": administrators,
+        "administrator_candidates": administrator_candidates,
+        "can_manage_administrators": current_user.is_owner,
+        "can_view_sensitive_configuration": current_user.is_owner,
+    }
+    if current_user.is_owner:
+        payload["installation_access"] = _installation_access_payload()
+    return responses.json_response(payload)
 
 
 # @testable true

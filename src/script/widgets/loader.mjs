@@ -60,6 +60,7 @@ const WIDGETS = {
 	SiteAiModels: () => import("./siteSettings/aiModels"),
 	SiteAdministrators: () => import("./siteSettings/administrators"),
 	SiteDeployment: () => import("./siteSettings/deployment"),
+	SiteInstallationAccess: () => import("./siteSettings/installationAccess"),
 	SiteImage: () => import("./siteSettings/image"),
 	SiteMaintenance: () => import("./siteSettings/maintenance"),
 	SiteServiceProviders: () => import("./siteSettings/providers"),

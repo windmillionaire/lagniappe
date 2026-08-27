@@ -1330,6 +1330,12 @@ def test_additional_admin_cannot_access_owner_configuration(get_user, browser_fa
         assert site_settings["status"] == 200
         assert site_settings["data"]["can_manage_administrators"] is False
         assert site_settings["data"]["can_view_sensitive_configuration"] is False
+        assert "installation_access" not in site_settings["data"]
+        expect(
+            settings_panel.locator(
+                "[data-role='site-settings-section'][data-section='installation-access']"
+            )
+        ).to_have_count(0)
         assert (
             _fetch_status(administrator, "/reference/environment-variables", "GET")[
                 "status"
@@ -1360,6 +1366,96 @@ def test_additional_admin_cannot_access_owner_configuration(get_user, browser_fa
         _acknowledge_user_cache_invalidation(administrator)
 
 
+# @matrix owner : authentication-email delegated-handoff identity-metadata provider-cleanup
+# @template home/site_settings.html::site_settings
+def test_owner_installation_access_distinguishes_handoff_from_provider_cleanup(
+    get_user,
+    monkeypatch,
+):
+    owner = get_user(Users.OWNER)
+    owner_email = owner.email.casefold()
+    installer_email = "temporary-installer@example.test"
+    project_id = "delegated-installation-test"
+    runtime_email = f"lagniappe@{project_id}.iam.gserviceaccount.com"
+    monkeypatch.setattr(CONFIG, "ADMIN_EMAIL", owner_email)
+    monkeypatch.setattr(CONFIG, "INSTALLER_EMAIL", installer_email)
+    monkeypatch.setattr(CONFIG, "DEPLOYER_EMAIL", installer_email)
+    monkeypatch.setattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", installer_email)
+    monkeypatch.setattr(CONFIG, "GOOGLE_CLOUD_PROJECT", project_id)
+    monkeypatch.setattr(CONFIG, "RUNTIME_SERVICE_ACCOUNT_EMAIL", runtime_email)
+    monkeypatch.setattr(
+        CONFIG,
+        "AUTH_EMAIL_CONFIG",
+        {
+            "provider": "smtp",
+            "service": "Gmail",
+            "host": "smtp.gmail.com",
+            "port": 587,
+            "security": "starttls",
+            "username": installer_email,
+            "password": "not-returned-to-browser",
+            "senderEmail": installer_email,
+            "senderName": "Delegated Installation Test",
+        },
+    )
+
+    _, settings_panel = _open_owner_site_settings(owner)
+    access = _open_site_settings_section(settings_panel, "installation-access")
+    expect(access).to_have_attribute("data-state", "pending")
+    expect(access.locator("[data-role='status-title']")).to_have_text(
+        "Delegated handoff pending"
+    )
+    expect(access.locator("[data-field='owner']")).to_have_text(owner_email)
+    expect(access.locator("[data-field='installer']")).to_have_text(
+        installer_email
+    )
+    expect(access.locator("[data-field='deployer']")).to_have_text(
+        installer_email
+    )
+    expect(access.locator("[data-field='bootstrap']")).to_have_text(
+        installer_email
+    )
+    expect(access.locator("[data-field='runtime']")).to_have_text(runtime_email)
+    expect(access.locator("[data-field='email-service']")).to_have_text("Gmail")
+    expect(access.locator("[data-field='email-sender']")).to_have_text(
+        installer_email
+    )
+    expect(
+        access.locator("[data-role='installer-email-warning']")
+    ).to_be_visible()
+    expect(access.locator("[data-role='project-iam-link']")).to_have_attribute(
+        "href",
+        f"https://console.cloud.google.com/iam-admin/iam?project={project_id}",
+    )
+
+    payload = _fetch_status(owner, "/l/site-settings", "GET")["data"][
+        "installation_access"
+    ]
+    assert payload["state"] == "pending"
+    assert payload["authentication_email"] == {
+        "configured": True,
+        "service": "Gmail",
+        "sender_email": installer_email,
+        "login": installer_email,
+        "uses_installer": True,
+    }
+    assert "password" not in json.dumps(payload).casefold()
+    assert "not-returned-to-browser" not in json.dumps(payload)
+
+    monkeypatch.setattr(CONFIG, "DEPLOYER_EMAIL", owner_email)
+    monkeypatch.setattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "")
+    _, settings_panel = _open_owner_site_settings(owner)
+    access = _open_site_settings_section(settings_panel, "installation-access")
+    expect(access).to_have_attribute("data-state", "application-complete")
+    expect(access.locator("[data-role='status-title']")).to_have_text(
+        "Application handoff configured"
+    )
+    expect(access.locator("[data-field='bootstrap']")).to_have_text("None")
+    expect(
+        access.locator("[data-role='installer-email-warning']")
+    ).to_be_visible()
+
+
 # @matrix admin : configuration-display configuration-modal environment-variables external-links recovery-export secrets sections service-providers site-settings web-headers
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
@@ -1368,12 +1464,16 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     _, settings_panel = _open_owner_site_settings(owner)
 
     maintenance = _site_settings_section(settings_panel, "maintenance")
+    installation_access = _site_settings_section(
+        settings_panel, "installation-access"
+    )
     deployment = _site_settings_section(settings_panel, "deployment")
     ai_models = _site_settings_section(settings_panel, "ai-models")
     providers = _site_settings_section(settings_panel, "service-providers")
     site_image = _site_settings_section(settings_panel, "site-image")
 
     expect(maintenance).to_have_attribute("data-open", "true")
+    expect(installation_access).to_have_attribute("data-open", "false")
     expect(deployment).to_have_attribute("data-open", "false")
     expect(ai_models).to_have_attribute("data-open", "false")
     expect(providers).to_have_attribute("data-open", "false")
@@ -1382,6 +1482,13 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
         owner,
         maintenance.locator("button[lp-help='site_maintenance']"),
         "Refresh Cache",
+    )
+
+    _open_site_settings_section(settings_panel, "installation-access")
+    _open_help_and_expect(
+        owner,
+        installation_access.locator("button[lp-help='site_installation_access']"),
+        "Why there is no Remove IAM button",
     )
 
     _open_site_settings_section(settings_panel, "deployment")

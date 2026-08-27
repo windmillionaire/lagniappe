@@ -113,6 +113,97 @@
              class="{{ styles.link.default }} w-fit">Open Users to create or permanently delete an account</a>
         </div>
       {% endcall %}
+      {% if current_user.is_owner %}
+        {% call site_settings_section('installation-access', 'SiteInstallationAccess', 'Installation Access', 'site_installation_access', 'Owner, installer, and provider cleanup') %}
+          <div class="flex flex-col gap-4 text-sm text-base-dark">
+            <div data-role="handoff-status"
+                 class="rounded-md border border-page-light/70 bg-page-bg p-4 text-page-dark">
+              <strong data-role="status-title" class="block">Loading installation state…</strong>
+              <p data-role="status-description" class="mt-1 text-sm"></p>
+            </div>
+
+            <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div class="rounded-md border border-base-light/60 bg-white p-3">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Project</dt>
+                <dd data-field="project" class="mt-1 break-all font-semibold"></dd>
+              </div>
+              <div class="rounded-md border border-base-light/60 bg-white p-3">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Permanent Owner</dt>
+                <dd data-field="owner" class="mt-1 break-all font-semibold"></dd>
+              </div>
+              <div class="rounded-md border border-base-light/60 bg-white p-3">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Historical Installer</dt>
+                <dd data-field="installer" class="mt-1 break-all font-semibold"></dd>
+              </div>
+              <div class="rounded-md border border-base-light/60 bg-white p-3">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Current Deployer</dt>
+                <dd data-field="deployer" class="mt-1 break-all font-semibold"></dd>
+              </div>
+              <div class="rounded-md border border-base-light/60 bg-white p-3">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Bootstrap Administrator</dt>
+                <dd data-field="bootstrap" class="mt-1 break-all font-semibold"></dd>
+              </div>
+              <div class="rounded-md border border-base-light/60 bg-white p-3">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-base-medium">Runtime Service Account</dt>
+                <dd data-field="runtime" class="mt-1 break-all font-semibold"></dd>
+              </div>
+            </dl>
+
+            <div data-role="authentication-email-details"
+                 data-visible="false"
+                 class="rounded-md border border-base-light/60 bg-white p-4">
+              <strong class="block">Authentication email dependency</strong>
+              <dl class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-3">
+                <div>
+                  <dt class="text-xs text-base-medium">Service</dt>
+                  <dd data-field="email-service" class="break-all font-semibold"></dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-base-medium">Sender</dt>
+                  <dd data-field="email-sender" class="break-all font-semibold"></dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-base-medium">SMTP login</dt>
+                  <dd data-field="email-login" class="break-all font-semibold"></dd>
+                </div>
+              </dl>
+            </div>
+
+            <div data-role="installer-email-warning"
+                 data-visible="false"
+                 class="rounded-md border border-delete-light/70 bg-delete-bg p-4 text-delete-dark">
+              <strong class="block">Keep the installer mailbox active</strong>
+              <p class="mt-1">
+                Authentication email still uses the historical installer as its sender or SMTP login. Reconfigure email with a durable business-controlled identity using <code>./setup.sh email</code> and deploy before suspending or deleting that Workspace account.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div class="rounded-md border border-task-light/70 bg-task-bg p-4 text-task-dark">
+                <strong class="block">What setup handoff manages</strong>
+                <p class="mt-1">
+                  It transfers Lagniappe’s managed bucket and runtime service-account roles, deploys the permanent Owner configuration, closes installer bootstrap, and removes the installer’s direct project IAM binding last.
+                </p>
+              </div>
+              <div class="rounded-md border border-base-light/70 bg-white p-4 text-base-medium">
+                <strong class="block text-base-dark">What it cannot prove or remove</strong>
+                <p class="mt-1">
+                  Workspace accounts, billing and organization IAM, Redis Cloud, Cloudflare or DNS, Resend or another mail provider, recovery destinations, and credentials on the installer’s computer require separate verification.
+                </p>
+              </div>
+            </div>
+
+            <p class="text-base-medium">
+              Lagniappe deliberately cannot change project IAM from this screen. The application configuration can report its saved handoff state, but the Owner must confirm the historical installer is absent in Google Cloud IAM before treating cloud access removal as complete.
+            </p>
+            <a data-role="project-iam-link"
+               href="https://console.cloud.google.com/iam-admin/iam"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="{{ styles.link.default }} w-fit">Review project IAM</a>
+          </div>
+        {% endcall %}
+      {% endif %}
       {% call site_settings_section('deployment', 'SiteDeployment', 'Deployment', 'site_deployment', 'App Engine scaling and workers') %}
         <form data-role="deployment-settings" class="flex flex-col gap-4">
           <div class="grid grid-cols-1 gap-3 text-sm text-base-dark lg:grid-cols-2">
