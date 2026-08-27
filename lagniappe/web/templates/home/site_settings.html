@@ -117,7 +117,8 @@
       {% set permanent_owner = CONFIG.ADMIN_EMAIL|default('', true)|trim|lower %}
       {% if current_user.is_owner and saved_installer and saved_installer != permanent_owner %}
         {% call site_settings_section('installation-access', 'SiteInstallationAccess', 'Installation Access', 'site_installation_access', 'Owner, installer, and provider cleanup') %}
-          <div class="flex flex-col gap-4 text-sm text-base-dark">
+          <div data-role="manual-content"
+               class="flex flex-col gap-4 text-sm text-base-dark">
             <div data-role="handoff-status"
                  class="rounded-md border border-page-light/70 bg-page-bg p-4 text-page-dark">
               <strong data-role="status-title" class="block">Loading installation state…</strong>
@@ -199,7 +200,7 @@
               <div class="rounded-md border border-base-light/70 bg-white p-4 text-base-medium">
                 <strong class="block text-base-dark">What it cannot prove or remove</strong>
                 <p class="mt-1">
-                  Workspace accounts, billing and organization IAM, Redis Cloud, Cloudflare or DNS, Resend or another mail provider, recovery destinations, and credentials on the installer’s computer require separate verification.
+                  Workspace accounts; billing and organization IAM; the installer’s account access to Redis Cloud, Cloudflare or DNS, Resend, or another mail provider; copies of configuration backups or exported archives stored outside Lagniappe’s managed Google Cloud buckets; and credentials on the installer’s computer require separate verification and cleanup.
                 </p>
               </div>
             </div>
@@ -211,10 +212,7 @@
                href="https://console.cloud.google.com/iam-admin/iam"
                target="_blank"
                rel="noopener noreferrer"
-               class="inline-flex w-fit flex-row items-center gap-1.5 font-semibold text-page-default underline decoration-page-light underline-offset-2 hover:text-page-dark hover:decoration-page-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-page-light">
-              <span>Review project IAM</span>
-              {{ render_icon("launch") }}
-            </a>
+               class="block w-fit font-semibold text-page-default hover:text-page-dark hover:underline focus-visible:outline-none focus-visible:underline">Review project IAM</a>
           </div>
         {% endcall %}
       {% endif %}

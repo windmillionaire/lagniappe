@@ -113,10 +113,12 @@ After default-no review, the command:
 
 The operation preserves unrelated IAM members/conditions and runtime
 self-bindings. It does not manage Workspace accounts, billing-account IAM, or
-organization-level access. It also cannot establish who controls Redis,
-Cloudflare/DNS, Resend or another mail provider, recovery destinations, or
-credentials left on the installer's computer. A partial handoff can resume
-from the journal.
+organization-level access. It also cannot establish who controls the provider
+accounts for Redis Cloud, Cloudflare or DNS, Resend, or another mail service,
+or whether the installer still has account access to them. It cannot remove
+credentials or copies of configuration backups and exported archives stored
+outside Lagniappe's managed Google Cloud buckets from the installer's computer
+or another external destination. A partial handoff can resume from the journal.
 
 On a delegated installation, the Owner-only **Admin / Site Settings /
 Installation Access** section names the permanent Owner, historical installer,

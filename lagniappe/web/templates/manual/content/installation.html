@@ -369,11 +369,14 @@
           <strong>Installation Access</strong>. If it says to keep the installer
           mailbox active, first run <code>./setup.sh email</code> from the
           installation working copy with a durable business-controlled sender
-          and deploy the change. Also verify ownership of billing, Redis,
-          Cloudflare or DNS, Resend or another mail provider, and recovery
-          destinations. Only then suspend and ultimately delete the temporary
-          Workspace user. Rotate any provider secret that could not remain
-          under direct business control during installation.
+          and deploy the change. Also remove the installer’s account access
+          from billing, Redis Cloud, Cloudflare or DNS, Resend, and any other
+          provider where it was invited. Securely transfer or delete any
+          installer-held copy of a configuration backup or exported archive
+          stored outside Lagniappe’s managed Google Cloud buckets. Only then
+          suspend and ultimately delete the temporary Workspace user. Rotate
+          any provider secret that could not remain under direct business
+          control during installation.
         </li>
         </ol>
         {% call callout("warning", False) %}

@@ -24,9 +24,11 @@
   </p>
   {% call callout("warning") %}
     Do not suspend or delete a temporary installer account while it is still
-    used to send authentication email or control billing, Redis, DNS,
-    Cloudflare, Resend, recovery, or another provider. Transfer or reconfigure
-    those dependencies first.
+    used to send authentication email or still has necessary account access to
+    billing, Redis Cloud, Cloudflare or DNS, Resend, or another provider.
+    Transfer or reconfigure those dependencies first. Also account for any
+    configuration backup or exported archive copied outside Lagniappe’s managed
+    Google Cloud buckets.
   {% endcall %}
   {{ subheading("Why there is no Remove IAM button") }}
   <p class="text-sm text-base-dark">
