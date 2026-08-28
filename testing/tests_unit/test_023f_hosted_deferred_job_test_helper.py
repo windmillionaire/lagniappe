@@ -38,7 +38,6 @@ def test_hosted_transition_poll_starts_after_existing_revision():
         page,
         "job-key",
         after_revision=7,
-        timeout=240_000,
     )
 
     assert result == {"status": "succeeded", "terminal": True}
@@ -48,7 +47,9 @@ def test_hosted_transition_poll_starts_after_existing_revision():
         "afterRevision": 7,
     }
     assert "revision: afterRevision" in page.evaluations[0][0]
-    assert page.wait["timeout"] == 240_000
+    assert page.wait["timeout"] == (
+        hosted_deferred_jobs.DEFERRED_JOB_DISPATCH_DEADLINE_SECONDS + 60
+    ) * 1_000
 
 
 # @matrix deferred-jobs hosted-e2e : retry revision scheduling timing
@@ -121,7 +122,10 @@ def test_hosted_retry_waits_for_new_revision_and_scheduled_delay(monkeypatch):
     assert waits == [
         {
             "after_revision": 4,
-            "timeout": 180_000 + created[0]["delay_seconds"] * 1_000,
+            "timeout": (
+                hosted_deferred_jobs.HOSTED_JOB_TRANSITION_TIMEOUT_MS
+                + created[0]["delay_seconds"] * 1_000
+            ),
         }
     ]
     assert deleted == ["retry-task"]

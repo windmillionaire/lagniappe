@@ -14,6 +14,13 @@ from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.tools.services import task_queue
 
 
+# A valid worker may consume the complete Cloud Tasks delivery window. Leave
+# one minute for queue dispatch and the terminal operation projection.
+HOSTED_JOB_TRANSITION_TIMEOUT_MS = (
+    DEFERRED_JOB_DISPATCH_DEADLINE_SECONDS + 60
+) * 1_000
+
+
 # @testable infrastructure
 def _ai_diagnostics(job):
     """Return privacy-bounded provider telemetry for one hosted job."""
@@ -39,7 +46,7 @@ def wait_for_hosted_job_transition(
     job_key,
     *,
     after_revision=0,
-    timeout=180_000,
+    timeout=HOSTED_JOB_TRANSITION_TIMEOUT_MS,
 ):
     """Poll until a worker attempt newer than ``after_revision`` settles."""
     state_key = f"__lagniappeHostedJob{job_key[-24:]}"
@@ -167,7 +174,10 @@ def dispatch_hosted_deferred_job(
                 page,
                 job.urlsafe_key,
                 after_revision=starting_revision,
-                timeout=180_000 + delay_seconds * 1_000,
+                timeout=(
+                    HOSTED_JOB_TRANSITION_TIMEOUT_MS
+                    + delay_seconds * 1_000
+                ),
             )
             current_job = Entities.fetch_one(
                 job.urlsafe_key,
