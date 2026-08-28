@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 from playwright.sync_api import expect
 
+from config.ai_models import AI_REQUEST_TIMEOUT_MS
 from lagniappe.core.entities import Entities
 from testing.definitions import (
     CommonFormFields,
@@ -314,7 +315,10 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     expect(generate).to_be_visible()
     generate.locator("textarea[name='description']").fill(prompt)
 
-    with user.page.expect_response("**/forms/create-schema", timeout=90000) as response:
+    with user.page.expect_response(
+        "**/forms/create-schema",
+        timeout=AI_REQUEST_TIMEOUT_MS + 60_000,
+    ) as response:
         generate.locator("button[type='submit']").click()
 
     generated_response = response.value

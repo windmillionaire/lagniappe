@@ -14,6 +14,7 @@ from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.tools.services import task_queue
 
 
+# @testable infrastructure
 def _ai_diagnostics(job):
     """Return privacy-bounded provider telemetry for one hosted job."""
     telemetry_id = getattr(job, "telemetry_id", None)
@@ -30,11 +31,20 @@ def _ai_diagnostics(job):
     ]
 
 
-def wait_for_hosted_job_transition(page, job_key, *, timeout=180_000):
-    """Poll through the deployed browser session until a worker attempt settles."""
+# @testable true
+# @tests tests_unit/test_023f_hosted_deferred_job_test_helper.py::test_hosted_transition_poll_starts_after_existing_revision
+# @matrix deferred-jobs hosted-e2e : polling revision timing
+def wait_for_hosted_job_transition(
+    page,
+    job_key,
+    *,
+    after_revision=0,
+    timeout=180_000,
+):
+    """Poll until a worker attempt newer than ``after_revision`` settles."""
     state_key = f"__lagniappeHostedJob{job_key[-24:]}"
     page.evaluate(
-        """({ key, stateKey }) => {
+        """({ key, stateKey, afterRevision }) => {
             const state = { payload: null, error: null, stopped: false };
             window[stateKey] = state;
             const poll = async () => {
@@ -55,7 +65,7 @@ def wait_for_hosted_job_transition(page, job_key, *, timeout=180_000):
                                 id: `operation:${key}`,
                                 type: "operation",
                                 key,
-                                revision: 0,
+                                revision: afterRevision,
                             }],
                             closed_documents: [],
                         }),
@@ -80,7 +90,11 @@ def wait_for_hosted_job_transition(page, job_key, *, timeout=180_000):
             };
             void poll();
         }""",
-        {"key": job_key, "stateKey": state_key},
+        {
+            "key": job_key,
+            "stateKey": state_key,
+            "afterRevision": after_revision,
+        },
     )
     try:
         handle = page.wait_for_function(
@@ -104,6 +118,9 @@ def wait_for_hosted_job_transition(page, job_key, *, timeout=180_000):
         )
 
 
+# @testable true
+# @tests tests_unit/test_023f_hosted_deferred_job_test_helper.py::test_hosted_retry_waits_for_new_revision_and_scheduled_delay
+# @matrix deferred-jobs hosted-e2e : retry revision scheduling timing
 def dispatch_hosted_deferred_job(
     page,
     job,
@@ -121,6 +138,7 @@ def dispatch_hosted_deferred_job(
     try:
         current_job = job
         for attempt in range(1, attempt_limit + 1):
+            starting_revision = int(current_job.status_revision or 0)
             delay_seconds = 0
             if current_job.status == DeferredJobStatus.RETRY_WAIT.value:
                 delay_seconds = max(
@@ -145,7 +163,12 @@ def dispatch_hosted_deferred_job(
             )
             assert task_identity
             created_tasks.append(task_identity)
-            transition = wait_for_hosted_job_transition(page, job.urlsafe_key)
+            transition = wait_for_hosted_job_transition(
+                page,
+                job.urlsafe_key,
+                after_revision=starting_revision,
+                timeout=180_000 + delay_seconds * 1_000,
+            )
             current_job = Entities.fetch_one(
                 job.urlsafe_key,
                 request=Fetch.direct(),
