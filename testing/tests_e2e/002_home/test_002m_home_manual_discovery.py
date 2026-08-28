@@ -17,6 +17,37 @@ from testing.definitions import Users
 pytestmark = pytest.mark.e2e
 
 
+# @matrix public-directory : anonymous-access collapsible login manual metadata
+def test_public_directory_lists_manual_in_collapsed_group(get_user):
+    assert CONFIG.PUBLIC_MANUAL is True
+    anonymous = get_user(Users.ANONYMOUS)
+    base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
+
+    response = anonymous.page.goto(f"{base_url}/public/", wait_until="load")
+
+    assert response.status == 200
+    expect(anonymous.page).to_have_title(f"Public — {CONFIG.APP_NAME}")
+    expect(
+        anonymous.page.get_by_role(
+            "heading", name=f"{CONFIG.APP_NAME.upper()} PUBLIC DIRECTORY", exact=True
+        )
+    ).to_be_visible()
+    expect(anonymous.page.locator("nav")).to_have_class(re.compile(r"\bbg-page-default\b"))
+    expect(anonymous.page.get_by_role("link", name="Sign in").first).to_have_attribute(
+        "href", "/users/login"
+    )
+    manual = anonymous.page.locator("details").filter(has_text="Manual")
+    expect(manual).to_have_count(1)
+    expect(manual).not_to_have_class(re.compile(r"\bshadow"))
+    expect(manual).not_to_have_attribute("open", "")
+    manual.locator("summary").click()
+    expect(manual).to_have_attribute("open", "")
+    expect(manual.get_by_role("link", name="Overview")).to_have_attribute(
+        "href", "/manual/"
+    )
+    expect(manual.locator("li")).to_have_count(len(MANUAL_SECTIONS))
+
+
 # @template manual/index.html::main
 # @template manual/index.html::mobile_nav
 # @template manual/index.html::nav_column
@@ -99,7 +130,7 @@ def test_public_manual_discovery_follows_live_setting(get_user):
 
     def set_indexing(enabled):
         site_database.save_public_pages({"PUBLIC_PAGE_INDEXING": enabled})
-        cache.invalidate_sitemap()
+        cache.invalidate_public_discovery()
 
     try:
         set_indexing(True)

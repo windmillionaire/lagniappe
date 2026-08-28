@@ -21,6 +21,9 @@ from lagniappe.core.tools.mentions.content import sanitize_mentions
 
 
 SITEMAP_URL_LIMIT = 50_000
+PUBLIC_DIRECTORY_SCHEMA = 1
+PUBLIC_DIRECTORY_FALLBACK_ID = "public-pages"
+PUBLIC_DIRECTORY_FALLBACK_NAME = "Public Pages"
 
 
 class SitemapLimitError(RuntimeError):
@@ -209,6 +212,25 @@ def discoverable_manual_urls():
 
 
 # @testable true
+# @tests tests_unit/test_026_site_admin.py::test_manual_directory_group_preserves_authored_section_order
+# @matrix manual public-directory : authored-order public-url
+def manual_directory_group():
+    """Return the static manual as one directory group in authored order."""
+    return {
+        "id": "manual",
+        "name": "Manual",
+        "pages": [
+            {
+                "path": _manual_path(section),
+                "title": section["name"],
+                "description": None,
+            }
+            for section in MANUAL_SECTIONS
+        ],
+    }
+
+
+# @testable true
 # @tests tests_unit/test_026_site_admin.py::test_robots_text_allows_public_surface_and_advertises_enabled_sitemap
 # @matrix public-pages robots : disabled enabled public-assets
 # @matrix manual robots : disabled enabled fragment
@@ -217,6 +239,7 @@ def robots_text(indexing, *, sitemap_url, public_manual=False):
     lines = [
         "User-agent: *",
         "Disallow: /",
+        "Allow: /public/",
         "Allow: /pages/public/",
         "Allow: /style.css",
         "Allow: /script.js",
@@ -250,24 +273,85 @@ def sitemap_xml(urls):
 
 
 # @testable true
-# @tests tests_unit/test_026_site_admin.py::test_discoverable_page_urls_filter_nonpage_inactive_and_opted_out_rows
-# @matrix public-pages sitemap : active opt-out public-url
-def discoverable_page_urls():
-    """Return trusted absolute URLs for currently indexable public pages."""
+# @tests tests_unit/test_026_site_admin.py::test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents
+# @tests tests_unit/test_026_site_admin.py::test_public_directory_snapshot_skips_page_query_when_discovery_is_off
+# @matrix public-pages public-directory : active category description disabled opt-out public-url query-avoidance sorting
+def public_directory_snapshot():
+    """Build the privacy-bounded catalog stored for anonymous directory reads."""
+    indexing = runtime_settings()["PUBLIC_PAGE_INDEXING"]
+    snapshot = {
+        "schema": PUBLIC_DIRECTORY_SCHEMA,
+        "site_indexing": indexing,
+        "groups": [],
+    }
+    if not indexing:
+        return snapshot
+
     pages = Entities.fetch(
         *database_get.discoverable_page_rows(),
-        request=Fetch.root(),
+        request=Fetch.direct(),
     )
-    urls = []
+    groups = {}
     for page in pages:
+        settings = normalize_public_settings(getattr(page, "public_settings", None))
         if (
             getattr(page, "entity_kind", None) != "page"
             or not getattr(page, "active", False)
             or not page.is_public
-            or not normalize_public_settings(page.public_settings)["allow_indexing"]
+            or not settings["allow_indexing"]
         ):
             continue
         public_id = page.db.get("public_id")
-        if public_id:
-            urls.append(absolute_url(f"/pages/public/{public_id}"))
-    return urls
+        if not public_id:
+            continue
+
+        selected_key = settings["directory_category"]
+        selected = next(
+            (
+                category
+                for category in page.categories
+                if selected_key and category.urlsafe_key == selected_key
+            ),
+            None,
+        )
+        group_id = (
+            f"category:{selected.urlsafe_key}"
+            if selected
+            else PUBLIC_DIRECTORY_FALLBACK_ID
+        )
+        group = groups.setdefault(
+            group_id,
+            {
+                "id": group_id,
+                "name": selected.name if selected else PUBLIC_DIRECTORY_FALLBACK_NAME,
+                "pages": [],
+            },
+        )
+        group["pages"].append(
+            {
+                "path": f"/pages/public/{public_id}",
+                "title": settings["title"] or page.name,
+                # Directory cards never derive an excerpt from document content.
+                "description": settings["description"],
+            }
+        )
+
+    for group in groups.values():
+        group["pages"].sort(key=lambda page: page["title"].casefold())
+    snapshot["groups"] = sorted(
+        groups.values(),
+        key=lambda group: group["name"].casefold(),
+    )
+    return snapshot
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_discoverable_page_urls_use_cached_directory_snapshot
+# @matrix public-pages sitemap public-directory : shared-catalog public-url
+def discoverable_page_urls(snapshot):
+    """Return absolute page URLs from the shared public-directory catalog."""
+    return [
+        absolute_url(page["path"])
+        for group in snapshot["groups"]
+        for page in group["pages"]
+    ]

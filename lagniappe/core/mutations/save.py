@@ -22,6 +22,23 @@ class PageMutation(StandardMutation):
         )
         for owner in entity.page_list_owners:
             builder.touch(owner, reason="page-list-owner")
+        if entity.is_public:
+            builder.invalidate_public_discovery(reason="public-page-save")
+
+
+# @testable true
+# @tests tests_unit/test_022_mutation_contracts.py::test_category_save_plans_public_discovery_invalidation
+# @matrix categories public-directory : invalidation save
+class CategoryMutation(StandardMutation):
+    # @testable infrastructure
+    def plan_save(self, entity, builder, *, reason, depends_on=()):
+        super().plan_save(
+            entity,
+            builder,
+            reason=reason,
+            depends_on=depends_on,
+        )
+        builder.invalidate_public_discovery(reason="category-save")
 
 
 # @testable infrastructure

@@ -497,7 +497,7 @@ def set_public_page_settings():
         return responses.error(str(error))
 
     site_database.save_public_pages(settings)
-    cache.invalidate_sitemap()
+    cache.invalidate_public_discovery()
     return responses.json_response({"public_pages": settings})
 
 

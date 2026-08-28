@@ -1,3 +1,5 @@
+import { withTransition } from "./utilities";
+
 /**
  * @testable false
  * @covered-by src/script/shared/publicShare.mjs::copyPublicUrl
@@ -38,6 +40,21 @@ export async function copyPublicUrl(url, root = document) {
 }
 
 /**
+ * @testable false
+ * @covered-by src/script/shared/publicShare.mjs::sharePublicPage
+ * @reason share-result labels are exercised through every public sharing outcome
+ */
+function updateShareLabel(label, text) {
+	if (!label) return;
+	void withTransition(
+		() => {
+			label.textContent = text;
+		},
+		{ label: "public-share:feedback" },
+	);
+}
+
+/**
  * @testable true
  * @tests tests_js/test_047_public_sharing.py::test_public_share_uses_native_api_and_clipboard_fallbacks
  * @matrix public-pages : abort clipboard native-share selectable-url
@@ -47,11 +64,13 @@ export async function sharePublicPage(button, root = document) {
 	const status = container?.querySelector('[data-role="share-status"]');
 	const fallback = container?.querySelector('[data-role="share-fallback"]');
 	const input = fallback?.querySelector('[data-role="share-url"]');
+	const label = button.querySelector?.('[data-role="share-label"]');
 	const payload = {
 		title: button.dataset.shareTitle,
 		text: button.dataset.shareText,
 		url: button.dataset.shareUrl,
 	};
+	if (status) status.textContent = "";
 
 	if (typeof navigator.share === "function") {
 		let supported = true;
@@ -64,14 +83,20 @@ export async function sharePublicPage(button, root = document) {
 		if (supported) {
 			try {
 				await navigator.share(payload);
+				updateShareLabel(label, "Shared");
+				if (status) status.textContent = "Page shared";
 				return;
 			} catch (error) {
-				if (error?.name === "AbortError") return;
+				if (error?.name === "AbortError") {
+					updateShareLabel(label, "Share");
+					return;
+				}
 			}
 		}
 	}
 
 	if (await copyPublicUrl(payload.url, root)) {
+		updateShareLabel(label, "Copied");
 		if (status) status.textContent = "Link copied";
 		return;
 	}
@@ -79,7 +104,10 @@ export async function sharePublicPage(button, root = document) {
 		fallback.classList.remove("hidden");
 		input.focus();
 		input.select();
+		updateShareLabel(label, "Copy link");
 		if (status) status.textContent = "Select and copy the page link";
+	} else {
+		updateShareLabel(label, "Share");
 	}
 }
 

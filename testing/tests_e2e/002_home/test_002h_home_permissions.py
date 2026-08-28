@@ -1,7 +1,9 @@
 import pytest
 from playwright.sync_api import expect
 
-from config import SETTINGS
+from lagniappe.web import app
+from lagniappe.web import auth as web_auth
+from lagniappe.web.routes.home import public as public_routes
 from testing.definitions import Categories, Projects, SitePages, Tasks, Users
 from testing.elements import HeaderSearch, List
 from testing.resources import Task
@@ -9,15 +11,71 @@ from testing.resources import Task
 pytestmark = pytest.mark.e2e
 
 
-# @matrix home permissions : anonymous-access
-def test_anonymous_home_redirects_to_login(get_user):
-    """The home permission wrapper redirects an anonymous request to login."""
-    anonymous = get_user(Users.ANONYMOUS)
-    base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
+# @matrix home permissions public-directory : anonymous-access datastore-free-redirect
+def test_anonymous_home_redirects_to_public_directory_without_entity_reads(
+    monkeypatch,
+):
+    """The root redirect does not enter the entity-backed auth loader."""
+    monkeypatch.setattr(
+        web_auth,
+        "_load_request_context",
+        lambda: (_ for _ in ()).throw(AssertionError("unexpected entity read")),
+    )
 
-    anonymous.page.goto(f"{base_url}/")
+    response = app.test_client().get("/", follow_redirects=False)
 
-    expect(anonymous.page).to_have_url(f"{base_url}/users/login?next=/")
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/public/"
+
+
+# @matrix public-directory : collapsible empty-state metadata page-cards redis-cache
+def test_public_directory_renders_cached_page_groups(monkeypatch):
+    snapshot = {
+        "schema": 1,
+        "site_indexing": True,
+        "groups": [
+            {
+                "id": "category:published",
+                "name": "Published Essays",
+                "pages": [
+                    {
+                        "path": "/pages/public/example",
+                        "title": "AI-aided development",
+                        "description": "A public description.",
+                    }
+                ],
+            }
+        ],
+    }
+    monkeypatch.setattr(public_routes.CONFIG, "PUBLIC_MANUAL", False)
+    monkeypatch.setattr(
+        public_routes.cache,
+        "cached_public_directory",
+        lambda builder: snapshot,
+    )
+
+    response = app.test_client().get("/public/")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert response.headers["X-Robots-Tag"] == "index, follow"
+    assert "<details class=" in html
+    assert "<details open" not in html
+    assert "Published Essays" in html
+    assert "AI-aided development" in html
+    assert "A public description." in html
+    assert 'href="/pages/public/example"' in html
+
+    empty = {"schema": 1, "site_indexing": True, "groups": []}
+    monkeypatch.setattr(
+        public_routes.cache,
+        "cached_public_directory",
+        lambda builder: empty,
+    )
+    empty_response = app.test_client().get("/public/")
+
+    assert empty_response.headers["X-Robots-Tag"] == "noindex, follow"
+    assert "No public pages yet" in empty_response.get_data(as_text=True)
 
 
 # @matrix permissions : resource-gates search

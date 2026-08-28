@@ -81,8 +81,8 @@ def test_scheduled_uncomplete_dispatch_is_planned_after_task_write():
 
 
 # @matrix mutations : durable-first
-# @matrix public-pages sitemap : invalidation
-def test_public_page_sitemap_invalidation_runs_after_durable_write(monkeypatch):
+# @matrix public-pages public-directory sitemap : invalidation
+def test_public_discovery_invalidation_runs_after_durable_write(monkeypatch):
     page = TestEntities.get(
         "PAGE",
         {"name": "Discoverable page", "hash": "discoverable-page"},
@@ -108,17 +108,38 @@ def test_public_page_sitemap_invalidation_runs_after_durable_write(monkeypatch):
     )
     monkeypatch.setattr(
         mutation_executor.cache,
-        "invalidate_sitemap",
-        lambda: events.append("sitemap"),
+        "invalidate_public_discovery",
+        lambda: events.append("public-discovery"),
     )
 
     outcome = execute_mutation(
         plan_mutation(MutationOperation.SAVE, page, registry=Entities)
     )
 
-    assert events == ["datastore", "entity-cache", "sitemap"]
-    assert MutationEffectType.SITEMAP_INVALIDATE in outcome.completed_effects
+    assert events == ["datastore", "entity-cache", "public-discovery"]
+    assert (
+        MutationEffectType.PUBLIC_DISCOVERY_INVALIDATE
+        in outcome.completed_effects
+    )
     assert outcome.complete is True
+
+
+# @matrix categories public-directory : invalidation save
+def test_category_save_plans_public_discovery_invalidation():
+    category = TestEntities.get(
+        "CATEGORY",
+        {"name": "Published category", "hash": "published-category"},
+    )
+
+    plan = plan_mutation(MutationOperation.SAVE, category, registry=Entities)
+
+    discovery = [
+        effect
+        for effect in plan.effects
+        if effect.effect is MutationEffectType.PUBLIC_DISCOVERY_INVALIDATE
+    ]
+    assert len(discovery) == 1
+    assert discovery[0].reasons == ("category-save",)
 
 
 # @matrix mutations : completeness contract lookup planner-registry serialization validation

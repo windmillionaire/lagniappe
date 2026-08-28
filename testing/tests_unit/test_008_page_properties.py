@@ -199,9 +199,9 @@ def test_page_public(get_test_entities):
         assert page.to_filter_index()["is_public"] is is_public
 
 
-# @matrix page sitemap : visibility
+# @matrix page public-directory sitemap : visibility
 @pytest.mark.unit
-def test_page_public_visibility_invalidates_sitemap_only_when_changed():
+def test_page_public_visibility_invalidates_discovery_only_when_changed():
     page = TestEntities.get("PAGE", {"name": "Public", "hash": "public-page"})
 
     page.is_public = False
@@ -209,24 +209,25 @@ def test_page_public_visibility_invalidates_sitemap_only_when_changed():
 
     page.is_public = True
     assert [intent.intent.value for intent in page.mutation_intents] == [
-        "sitemap-invalidate"
+        "public-discovery-invalidate"
     ]
 
     page.is_public = True
     assert len(page.mutation_intents) == 1
 
 
-# @matrix page sitemap : metadata settings-validation
+# @matrix page public-directory sitemap : category metadata settings-validation
 @pytest.mark.unit
-def test_page_public_settings_normalize_and_invalidate_sitemap():
+def test_page_public_settings_normalize_and_invalidate_discovery():
     page = TestEntities.get("PAGE", {"name": "Metadata", "hash": "metadata-page"})
 
     assert page.public_settings == {
-        "version": 1,
+        "version": 2,
         "allow_indexing": True,
         "title": None,
         "description": None,
         "preview_image_asset": None,
+        "directory_category": None,
     }
 
     page.public_settings = {
@@ -234,18 +235,22 @@ def test_page_public_settings_normalize_and_invalidate_sitemap():
         "description": " Public description ",
         "preview_image_asset": "image_preview",
         "allow_indexing": True,
+        "directory_category": "category-key",
     }
     assert page.public_settings["title"] == "Public title"
     assert page.public_settings["description"] == "Public description"
-    assert page.mutation_intents == []
+    assert page.public_settings["directory_category"] == "category-key"
+    assert page.mutation_intents[0].intent.value == "public-discovery-invalidate"
     assert "public_settings" in page.exclude_from_index
 
     page.public_settings = {**page.public_settings, "allow_indexing": False}
     assert page.public_settings["allow_indexing"] is False
-    assert page.mutation_intents[0].intent.value == "sitemap-invalidate"
+    assert page.mutation_intents[0].intent.value == "public-discovery-invalidate"
 
     with pytest.raises(Exception, match="120 characters or fewer"):
         normalize_public_settings({"title": "x" * 121})
+    with pytest.raises(Exception, match="URL-safe key"):
+        normalize_public_settings({"directory_category": 123})
 
 
 # @matrix cache page : public-user

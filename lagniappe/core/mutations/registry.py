@@ -2,6 +2,7 @@
 
 from .base import StandardMutation
 from .save import (
+    CategoryMutation,
     FileMutation,
     FilterMutation,
     FormMutation,
@@ -26,7 +27,7 @@ SAVE_PLANNERS = {
     "file": FileMutation(),
     "ingress": STANDARD,
     "form": FormMutation(),
-    "category": STANDARD,
+    "category": CategoryMutation(),
     "users": STANDARD,
     "page": PageMutation(),
     "task": TaskMutation(),

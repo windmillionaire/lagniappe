@@ -696,6 +696,7 @@ def delete(key, **kwargs):
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
 # @matrix pages : document-visibility private public
 # @matrix public-pages : metadata preview
+# @pair public-directory:category
 @pages.route("<key>/visibility", methods=["PUT"])
 @permission(Resource.PAGE, Action.PUBLISH)
 def visibility(key, **kwargs):
@@ -704,17 +705,24 @@ def visibility(key, **kwargs):
     page.is_public = request.form.get("visibility") == "public"
     if request.form.get("public-settings-present") == "true":
         preview = request.form.get("preview-image-asset") or None
+        directory_category = request.form.get("directory-category") or None
         valid_images = {
             image.name for image in public_page_service.document_images(page)
         }
         if preview and preview not in valid_images:
             return responses.error("Preview image must be used in this page's document.")
+        valid_categories = {category.urlsafe_key for category in page.categories}
+        if directory_category and directory_category not in valid_categories:
+            return responses.error(
+                "Directory category must be attached to this page."
+            )
         try:
             page.public_settings = {
                 "allow_indexing": request.form.get("allow-indexing") == "true",
                 "title": request.form.get("public-title"),
                 "description": request.form.get("public-description"),
                 "preview_image_asset": preview,
+                "directory_category": directory_category,
             }
         except ValidationError as error:
             return responses.error(error)

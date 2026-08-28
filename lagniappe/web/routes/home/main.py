@@ -24,7 +24,7 @@ from . import home, internal
 # @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
 # @matrix home : layout load mobile
 @home.route("/")
-@home_permission()
+@home_permission(anonymous_endpoint="home.public_directory")
 def home_page():
     home = Entities.HOME()
     return responses.home_page(home)

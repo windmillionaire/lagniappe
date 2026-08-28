@@ -31,6 +31,7 @@ def _public_page(document, *, assets=None, settings=None, **values):
         is_public=values.pop("is_public", True),
         entity_kind=values.pop("entity_kind", "page"),
         db=values.pop("db", {"public_id": "public-id"}),
+        categories=values.pop("categories", []),
         **values,
     )
     page.get_asset = lambda name: assets.get(name)
@@ -204,6 +205,7 @@ def test_robots_text_allows_public_surface_and_advertises_enabled_sitemap():
     )
 
     assert "Disallow: /" in disabled
+    assert "Allow: /public/" in disabled
     assert "Allow: /pages/public/" in disabled
     assert "Allow: /manual/" in disabled
     assert "Disallow: /manual/section/" in disabled
@@ -225,12 +227,29 @@ def test_sitemap_xml_is_sorted_deduped_and_fails_closed_at_limit(monkeypatch):
         public_pages.sitemap_xml(["https://site.test/a", "https://site.test/b"])
 
 
-# @matrix public-pages sitemap : active opt-out public-url
-def test_discoverable_page_urls_filter_nonpage_inactive_and_opted_out_rows(
-    monkeypatch,
-):
+# @matrix public-pages public-directory : active category description opt-out public-url sorting
+def test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents(monkeypatch):
+    alpha = SimpleNamespace(urlsafe_key="alpha-key", name="Alpha")
+    fetch_requests = []
     pages = [
-        _public_page("", db={"public_id": "included"}),
+        _public_page(
+            "document must not be read",
+            name="Zulu",
+            settings={
+                "title": "A public title",
+                "description": "An explicit public description.",
+                "directory_category": "alpha-key",
+            },
+            categories=[alpha],
+            db={"public_id": "included"},
+        ),
+        _public_page(
+            "private document text",
+            name="Fallback Page",
+            settings={"directory_category": "detached-key"},
+            categories=[alpha],
+            db={"public_id": "fallback"},
+        ),
         _public_page("", active=False, db={"public_id": "inactive"}),
         _public_page(
             "",
@@ -247,17 +266,105 @@ def test_discoverable_page_urls_filter_nonpage_inactive_and_opted_out_rows(
     monkeypatch.setattr(
         public_pages.Entities,
         "fetch",
-        lambda *_rows, request: pages,
+        lambda *_rows, request: fetch_requests.append(request) or pages,
     )
+    monkeypatch.setattr(
+        public_pages,
+        "runtime_settings",
+        lambda: {"PUBLIC_PAGE_INDEXING": True},
+    )
+
+    snapshot = public_pages.public_directory_snapshot()
+
+    assert snapshot == {
+        "schema": 1,
+        "site_indexing": True,
+        "groups": [
+            {
+                "id": "category:alpha-key",
+                "name": "Alpha",
+                "pages": [
+                    {
+                        "path": "/pages/public/included",
+                        "title": "A public title",
+                        "description": "An explicit public description.",
+                    }
+                ],
+            },
+            {
+                "id": "public-pages",
+                "name": "Public Pages",
+                "pages": [
+                    {
+                        "path": "/pages/public/fallback",
+                        "title": "Fallback Page",
+                        "description": None,
+                    }
+                ],
+            },
+        ],
+    }
+    assert "document" not in str(snapshot).lower()
+    assert [request.depth for request in fetch_requests] == [FetchDepth.DIRECT]
+
+
+# @matrix public-pages public-directory : disabled query-avoidance
+def test_public_directory_snapshot_skips_page_query_when_discovery_is_off(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        public_pages,
+        "runtime_settings",
+        lambda: {"PUBLIC_PAGE_INDEXING": False},
+    )
+    monkeypatch.setattr(
+        public_pages.database_get,
+        "discoverable_page_rows",
+        lambda: (_ for _ in ()).throw(AssertionError("unexpected page query")),
+    )
+
+    assert public_pages.public_directory_snapshot() == {
+        "schema": 1,
+        "site_indexing": False,
+        "groups": [],
+    }
+
+
+# @matrix public-pages sitemap public-directory : shared-catalog public-url
+def test_discoverable_page_urls_use_cached_directory_snapshot(monkeypatch):
     monkeypatch.setattr(
         public_pages,
         "absolute_url",
         lambda path: f"https://site.test{path}",
     )
-
-    assert public_pages.discoverable_page_urls() == [
+    snapshot = {
+        "groups": [
+            {
+                "pages": [
+                    {
+                        "path": "/pages/public/included",
+                        "title": "Included",
+                        "description": None,
+                    }
+                ]
+            }
+        ]
+    }
+    assert public_pages.discoverable_page_urls(snapshot) == [
         "https://site.test/pages/public/included"
     ]
+
+
+# @matrix manual public-directory : authored-order public-url
+def test_manual_directory_group_preserves_authored_section_order():
+    group = public_pages.manual_directory_group()
+
+    assert group["name"] == "Manual"
+    assert [page["title"] for page in group["pages"]] == [
+        section["name"] for section in MANUAL_SECTIONS
+    ]
+    assert group["pages"][0]["path"] == "/manual/"
+    assert all(page["description"] is None for page in group["pages"])
 
 
 # @matrix admin : config deployment-settings metadata

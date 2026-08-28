@@ -15,7 +15,7 @@ import hashlib
 import os
 from functools import wraps
 
-from flask import abort, current_app, g, request, session
+from flask import abort, current_app, g, redirect, request, session, url_for
 from flask_login import current_user
 
 from lagniappe import CONFIG
@@ -365,9 +365,9 @@ def permission(resource=None, requested=None, *, no_store=False):
     return decorator
 
 # @testable true
-# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_anonymous_home_redirects_to_login
-# @matrix home permissions : anonymous-access
-def home_permission():
+# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_anonymous_home_redirects_to_public_directory_without_entity_reads
+# @matrix home permissions public-directory : anonymous-access datastore-free-redirect
+def home_permission(*, anonymous_endpoint=None):
     """Permission for home page sections. No entity-level check, just authentication + ETag."""
 
     # @testable false
@@ -379,8 +379,21 @@ def home_permission():
         # @reason route wrapper behavior is owned by the parent decorator contract
         @wraps(f)
         def wrapped(*args, **kwargs):
+            remember_cookie = current_app.config.get(
+                "REMEMBER_COOKIE_NAME",
+                "remember_token",
+            )
+            if (
+                anonymous_endpoint
+                and not session.get("_user_id")
+                and not request.cookies.get(remember_cookie)
+            ):
+                return redirect(url_for(anonymous_endpoint))
+
             user, _entity = _load_request_context()
             if not user.is_authenticated:
+                if anonymous_endpoint:
+                    return redirect(url_for(anonymous_endpoint))
                 abort(401)
 
             if request.method == "GET":

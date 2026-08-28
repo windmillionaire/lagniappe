@@ -606,7 +606,7 @@ def test_ordered_runner_checkpoints_completion_and_resumes_after_failure():
     assert [len(item["attempts"]) for item in second["migrations"]] == [1, 2, 1]
 
 
-# @matrix admin database-migrations : build-history catalog failure-order persistence sticky-completion
+# @matrix admin database-migrations : build-history catalog failure-order persistence release-metadata sticky-completion
 def test_status_reads_completed_migrations_across_builds_and_blocks_after_failure(monkeypatch):
     datastore = _Datastore()
     clock = _Clock()
@@ -629,17 +629,23 @@ def test_status_reads_completed_migrations_across_builds_and_blocks_after_failur
 
     monkeypatch.setattr(migrations.CONFIG, "VERSION", "2.0")
     monkeypatch.setattr(migrations.CONFIG, "BUILD_ID", "build-new")
+    revised_definition = _definition(1, "PINNED", runner, version="2.0")
     status = migrations.get_migration_status(
         datastore=datastore,
-        catalog=(definition,),
+        catalog=(revised_definition,),
         now=clock,
     )
 
     assert status["status"] == "current"
     assert status["current_version"] == "2.0"
+    assert status["migrations"][0]["introduced_in"] == "2.0"
     assert status["migrations"][0]["completed_version"] == "1.5"
     assert status["migrations"][0]["completed_build_id"] == "build-old"
-    migrations.run_data_migrations(datastore=datastore, catalog=(definition,), now=clock)
+    migrations.run_data_migrations(
+        datastore=datastore,
+        catalog=(revised_definition,),
+        now=clock,
+    )
     assert len(calls) == 1
 
 

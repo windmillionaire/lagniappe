@@ -556,11 +556,11 @@ def plan_delete(*entities, registry, preserve_user_pages=False):
         )
     for entity in deleted:
         builder.delete(entity, reason="delete-cascade")
-        if (
-            getattr(entity, "entity_kind", None) == "page"
-            and getattr(entity, "is_public", False)
-        ):
-            builder.invalidate_sitemap(reason="public-page-delete")
+        kind = getattr(entity, "entity_kind", None)
+        if kind == "page" and getattr(entity, "is_public", False):
+            builder.invalidate_public_discovery(reason="public-page-delete")
+        elif kind == "category":
+            builder.invalidate_public_discovery(reason="category-delete")
         if getattr(entity, "entity_kind", None) == "notification":
             entity._notification_count_delta = (
                 -1 if entity.notification_type == "ordinary" else 0

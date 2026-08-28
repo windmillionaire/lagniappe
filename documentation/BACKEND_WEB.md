@@ -62,6 +62,26 @@ Partial Content`, allowing PDF preview code to stream data through Flask.
 
 ## Anonymous public pages
 
+Anonymous requests to `/` take a session-only fast path to `/public/`; they do
+not construct the authenticated Home or load an entity. Authenticated requests
+continue to use `/` as Home. The public directory always offers a sign-in link
+and renders an empty state when it has no content.
+
+The directory is a server-rendered, JavaScript-free set of collapsed native
+`details` groups. Discoverable Pages appear only when site discovery is on and
+the Page is active, public, and has not opted out. A Page may explicitly select
+one of its attached Categories for grouping; otherwise it appears under
+`Public Pages`. This opt-in prevents unrelated internal Category names from
+becoming public. The optional public manual appears as one separate group in
+its authored section order.
+
+Directory cards use only the public ID, optional public title and description,
+and explicitly selected Category label. They never load or excerpt document
+content. Category and Page labels are sorted case-insensitively. The canonical
+directory is indexable only when site discovery is on and it has public
+content; otherwise it emits `noindex, follow` in both HTML and the
+`X-Robots-Tag` header.
+
 `/pages/public/<public_id>` is a dedicated server-rendered document surface.
 It publishes a trusted canonical URL, robots policy, description, Open Graph,
 and Twitter card metadata without exposing the Page's internal description or
@@ -77,7 +97,7 @@ assets still referenced by a currently public document. Unpublishing the page
 or removing the image reference makes the URL return 404.
 
 `/robots.txt` always blocks the private application and explicitly allows the
-public page and static asset families. When live site discovery is enabled it
+public directory, public page, and static asset families. When live site discovery is enabled it
 also advertises `/sitemap.xml`; the sitemap otherwise returns 404. Public page
 responses use both an HTML robots tag and `X-Robots-Tag`, combining the site
 switch with the page opt-out. These controls affect crawler guidance, not

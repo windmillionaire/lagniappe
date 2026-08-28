@@ -11,6 +11,7 @@
         {% if page.is_public %}data-url="{{ url_for('pages.public', public_id=page.public_id) }}"{% endif %}
         data-public-settings='{{ public_context.settings|tojson }}'
         data-preview-images='{{ public_context.images|tojson }}'
+        data-directory-categories='{{ public_context.directory_categories|tojson }}'
         data-site-indexing="{{ public_context.site_indexing|yesno }}"
         data-site-image="{{ public_context.site_image }}"
         data-route="{{ url_for('pages.visibility', key=page.urlsafe_key) }}"

@@ -381,6 +381,13 @@ def _public_page_settings_context(page):
             {"name": image.name, "url": image.url, "alt": image.alt}
             for image in public_pages.document_images(page)
         ],
+        "directory_categories": [
+            {"id": category.urlsafe_key, "name": category.name}
+            for category in sorted(
+                page.categories,
+                key=lambda category: category.name.casefold(),
+            )
+        ],
         "site_indexing": public_pages.runtime_settings()[
             "PUBLIC_PAGE_INDEXING"
         ],

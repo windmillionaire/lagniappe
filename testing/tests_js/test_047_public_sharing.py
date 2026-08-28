@@ -35,6 +35,7 @@ const vm = require("node:vm");
 
 const state = { native: [], clipboard: [], legacy: 0, selected: 0 };
 const status = { textContent: "" };
+const label = { textContent: "Share" };
 const input = { focus() {}, select() { state.selected += 1; } };
 const fallback = {
   classList: { remove(value) { if (value === "hidden") this.visible = true; } },
@@ -54,6 +55,9 @@ const button = {
     shareUrl: "https://site.test/pages/public/id",
   },
   closest() { return container; },
+  querySelector(selector) {
+    return selector.includes("share-label") ? label : null;
+  },
 };
 const root = {
   body: { append() {} },
@@ -76,10 +80,15 @@ const context = {
     async share(payload) { state.native.push(payload); },
     clipboard: { async writeText(value) { state.clipboard.push(value); } },
   },
+  withTransition(callback) { callback(); return Promise.resolve(true); },
 };
 context.globalThis = context;
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/publicShare.mjs", "utf8");
+source = source.replace(
+  'import { withTransition } from "./utilities";',
+  "const withTransition = globalThis.withTransition;",
+);
 source = source.replace(/export /g, "");
 source += `
 globalThis.copyPublicUrl = copyPublicUrl;
@@ -92,11 +101,14 @@ vm.runInContext(source, context);
   if (state.native.length !== 1 || state.clipboard.length !== 0) {
     throw new Error("Native share was not preferred");
   }
+  if (label.textContent !== "Shared" || status.textContent !== "Page shared") {
+    throw new Error("Native share completion was not visible");
+  }
 
   context.navigator.share = async () => { throw new Error("unavailable"); };
   await context.sharePublicPage(button, root);
   if (state.clipboard.join(",") !== button.dataset.shareUrl ||
-      status.textContent !== "Link copied") {
+      status.textContent !== "Link copied" || label.textContent !== "Copied") {
     throw new Error("Clipboard fallback was not used after native failure");
   }
 
@@ -107,20 +119,23 @@ vm.runInContext(source, context);
   };
   status.textContent = "";
   await context.sharePublicPage(button, root);
-  if (state.clipboard.length !== 1 || status.textContent !== "") {
+  if (state.clipboard.length !== 1 || status.textContent !== "" ||
+      label.textContent !== "Share") {
     throw new Error("Cancelled native sharing reported or copied unexpectedly");
   }
 
   context.navigator.share = undefined;
   context.navigator.clipboard.writeText = async () => { throw new Error("denied"); };
   await context.sharePublicPage(button, root);
-  if (state.legacy !== 1 || status.textContent !== "Link copied") {
+  if (state.legacy !== 1 || status.textContent !== "Link copied" ||
+      label.textContent !== "Copied") {
     throw new Error("Legacy copy fallback did not complete");
   }
 
   root.execCommand = () => false;
   await context.sharePublicPage(button, root);
-  if (!fallback.classList.visible || state.selected !== 1) {
+  if (!fallback.classList.visible || state.selected !== 1 ||
+      label.textContent !== "Copy link") {
     throw new Error("Selectable URL fallback was not revealed");
   }
 })().catch((error) => {
@@ -147,10 +162,15 @@ const context = {
   console,
   document: { querySelector() { return button; } },
   navigator: {},
+  withTransition(callback) { callback(); return Promise.resolve(true); },
 };
 context.globalThis = context;
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/publicShare.mjs", "utf8");
+source = source.replace(
+  'import { withTransition } from "./utilities";',
+  "const withTransition = globalThis.withTransition;",
+);
 source = source.replace(/export /g, "");
 source += "\nglobalThis.initializePublicSharing = initializePublicSharing;";
 vm.runInContext(source, context);

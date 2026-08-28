@@ -140,9 +140,11 @@ def _document_save_response(text):
 
 
 # @matrix pages : document-visibility private public public-document
+# @pair public-directory:category
 def test_document_visibility_can_toggle_public_private(get_user, browser_failures):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_document_visibility_page)
+    category = page.definition.category.get(user)
 
     editor = page.editor
     editor.clear_text()
@@ -154,11 +156,26 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
 
     settings = _open_document_settings(user, page)
     settings.locator("input[value='public']").check()
+    directory_category = settings.locator("select[name='directory-category']")
+    directory_category_select = Select(
+        settings.locator("[data-role='directory-category']")
+    )
+    expect(directory_category).to_be_hidden()
+    expect(directory_category.locator("option")).to_contain_text(
+        ["Public Pages", category.definition.name]
+    )
+    expect(directory_category_select.input).to_have_attribute(
+        "placeholder", "Public Pages"
+    )
+    directory_category_select.select_by_key(category.key)
     with user.page.expect_response("**/visibility"):
         SpinnerButtons.UPDATE.click(settings)
 
     expect(settings).to_contain_text("This page is public")
     expect(settings.locator("input[value='public']")).to_be_checked()
+    expect(settings.locator("select[name='directory-category']")).to_have_value(
+        category.key
+    )
     public_link = settings.locator("a")
     expect(public_link).to_be_visible()
     public_url = public_link.evaluate("(element) => element.href")
@@ -172,6 +189,19 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
     expect(settings).to_contain_text("This page is public")
     expect(settings.locator("input[value='public']")).to_be_checked()
     assert settings.locator("a").evaluate("(element) => element.href") == public_url
+
+    directory_category_select = Select(
+        settings.locator("[data-role='directory-category']")
+    )
+    expect(directory_category_select.input).to_have_attribute(
+        "placeholder", category.definition.name
+    )
+    directory_category_select.select_by_name("Public Pages")
+    with user.page.expect_response("**/visibility"):
+        SpinnerButtons.UPDATE.click(settings)
+    expect(
+        Select(settings.locator("[data-role='directory-category']")).input
+    ).to_have_attribute("placeholder", "Public Pages")
 
     settings.locator("input[value='private']").check()
     with user.page.expect_response("**/visibility"):
@@ -225,10 +255,32 @@ def test_public_document_images_are_anonymous_and_revocable(
         anonymous_context.add_cookies(list(setup_test_server.browser_cookies))
     try:
         anonymous = anonymous_context.new_page()
+        anonymous.add_init_script(
+            """
+            Object.defineProperty(navigator, "share", {
+              configurable: true,
+              value: undefined,
+            });
+            Object.defineProperty(navigator, "clipboard", {
+              configurable: true,
+              value: { writeText: async () => {} },
+            });
+            """
+        )
         response = anonymous.goto(public_url)
         assert response.status == 200
         expect(anonymous.locator("meta[property='og:title']")).to_have_attribute(
             "content", "Public image preview"
+        )
+        share_button = anonymous.locator("[data-role='share-button']")
+        expect(share_button).to_contain_class("action-button")
+        expect(share_button.locator("[data-icon='share']")).to_be_visible()
+        share_button.click()
+        expect(share_button.locator("[data-role='share-label']")).to_have_text(
+            "Copied"
+        )
+        expect(anonymous.locator("[data-role='share-status']")).to_have_text(
+            "Link copied"
         )
         public_image = anonymous.locator("#content img")
         expect(public_image).to_be_visible()

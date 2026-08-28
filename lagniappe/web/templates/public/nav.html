@@ -1,4 +1,4 @@
-{% macro public_nav(share) %}
+{% macro public_nav(share=none, login_url=none) %}
   <nav class="main-nav {{ styles.nav.bar.wrapper }}">
     <div class="{{ styles.nav.bar.contents }} max-w-5xl">
       <a class="{{ styles.nav.link }}" href="{{ url_for('home.home_page') }}">
@@ -8,29 +8,34 @@
              width="32"
              height="32">
       </a>
-      <div class="relative ml-auto" data-role="public-share">
-        <button type="button"
-                class="{{ styles.nav.link }} flex items-center gap-2"
-                data-role="share-button"
-                data-share-title="{{ share.title }}"
-                data-share-text="{{ share.description }}"
-                data-share-url="{{ share.url }}"
-                aria-label="Share this page">
-          {{ render_icon("link", "icon-lg") }}
-          <span>Share</span>
-        </button>
-        <div class="absolute right-0 top-full z-20 mt-2 hidden w-72 rounded-md bg-white p-3 shadow-lg"
-             data-role="share-fallback">
-          <label class="block text-sm font-semibold text-slate-900" for="public-share-url">Copy this page link</label>
-          <input id="public-share-url"
-                 class="form-input mt-2 w-full"
-                 type="text"
-                 readonly
-                 value="{{ share.url }}"
-                 data-role="share-url">
+      {% if login_url %}
+        <a class="action-button inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold"
+           href="{{ login_url }}">Sign in</a>
+      {% elif share %}
+        <div class="relative ml-auto" data-role="public-share">
+          <button type="button"
+                  class="action-button inline-flex min-w-28 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold"
+                  data-role="share-button"
+                  data-share-title="{{ share.title }}"
+                  data-share-text="{{ share.description }}"
+                  data-share-url="{{ share.url }}"
+                  aria-label="Share this page">
+            {{ render_icon("share", "icon-lg") }}
+            <span data-role="share-label">Share</span>
+          </button>
+          <div class="absolute right-0 top-full z-20 mt-2 hidden w-72 rounded-md bg-white p-3 shadow-lg"
+               data-role="share-fallback">
+            <label class="block text-sm font-semibold text-slate-900" for="public-share-url">Copy this page link</label>
+            <input id="public-share-url"
+                   class="form-input mt-2 w-full"
+                   type="text"
+                   readonly
+                   value="{{ share.url }}"
+                   data-role="share-url">
+          </div>
+          <span class="sr-only" aria-live="polite" data-role="share-status"></span>
         </div>
-        <span class="sr-only" aria-live="polite" data-role="share-status"></span>
-      </div>
+      {% endif %}
     </div>
   </nav>
 {% endmacro %}

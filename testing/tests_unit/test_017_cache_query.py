@@ -10,7 +10,7 @@ from lagniappe.core.tools.cache import add as cache_add
 from lagniappe.core.tools.cache import core as cache_core
 from lagniappe.core.tools.cache import details as cache_details
 from lagniappe.core.tools.cache import query, utility
-from lagniappe.core.tools.cache import sitemap as sitemap_cache
+from lagniappe.core.tools.cache import public_discovery as discovery_cache
 from lagniappe.core.tools.cache.core import Cache, CacheJSON
 from lagniappe.core.tools.cache.keys import SEARCH_SCORE_FIELD, Keys, Search
 from lagniappe.core.tools.hosted_e2e import lease as e2e_lease
@@ -66,7 +66,7 @@ def test_sitemap_cache_only_publishes_for_unchanged_epoch(monkeypatch):
             return None
 
         def watch(self, key):
-            assert key == Keys.SITEMAP_EPOCH.value
+            assert key == Keys.PUBLIC_DISCOVERY_EPOCH.value
 
         def get(self, key):
             return b"3"
@@ -87,9 +87,9 @@ def test_sitemap_cache_only_publishes_for_unchanged_epoch(monkeypatch):
         get=lambda key: None,
         pipeline=lambda: Pipe(),
     )
-    monkeypatch.setattr(sitemap_cache.cache, "_redis", redis)
+    monkeypatch.setattr(discovery_cache.cache, "_redis", redis)
 
-    result = sitemap_cache.cached_sitemap(
+    result = discovery_cache.cached_sitemap(
         lambda: built.append(True) or "<urlset />",
         public_manual=True,
     )
@@ -98,15 +98,15 @@ def test_sitemap_cache_only_publishes_for_unchanged_epoch(monkeypatch):
     assert len(built) == 2
     assert published == [
         (
-            sitemap_cache._sitemap_cache_key(True),
-            sitemap_cache.SITEMAP_TTL_SECONDS,
+            discovery_cache._sitemap_cache_key(True),
+            discovery_cache.SITEMAP_TTL_SECONDS,
             "<urlset />",
         )
     ]
 
 
-# @matrix cache sitemap : invalidation public-manual-variant redis-failure
-def test_sitemap_invalidation_advances_epoch_and_deletes_xml(monkeypatch):
+# @matrix cache public-directory sitemap : invalidation redis-failure shared-epoch
+def test_public_discovery_invalidation_advances_epoch_and_deletes_outputs(monkeypatch):
     commands = []
 
     class Pipe:
@@ -129,22 +129,112 @@ def test_sitemap_invalidation_advances_epoch_and_deletes_xml(monkeypatch):
             commands.append(("execute",))
 
     monkeypatch.setattr(
-        sitemap_cache.cache,
+        discovery_cache.cache,
         "_redis",
         SimpleNamespace(pipeline=lambda: Pipe()),
     )
 
-    assert sitemap_cache.invalidate_sitemap() is True
+    assert discovery_cache.invalidate_public_discovery() is True
     assert commands == [
-        ("incr", Keys.SITEMAP_EPOCH.value),
-        ("expire", Keys.SITEMAP_EPOCH.value, sitemap_cache.SITEMAP_EPOCH_TTL_SECONDS),
+        ("incr", Keys.PUBLIC_DISCOVERY_EPOCH.value),
+        (
+            "expire",
+            Keys.PUBLIC_DISCOVERY_EPOCH.value,
+            discovery_cache.PUBLIC_DISCOVERY_EPOCH_TTL_SECONDS,
+        ),
         (
             "delete",
-            sitemap_cache._sitemap_cache_key(False),
-            sitemap_cache._sitemap_cache_key(True),
+            Keys.PUBLIC_DIRECTORY.value,
+            discovery_cache._sitemap_cache_key(False),
+            discovery_cache._sitemap_cache_key(True),
         ),
         ("execute",),
     ]
+
+
+# @matrix cache public-directory : epoch json redis-race ttl
+def test_public_directory_cache_only_publishes_for_unchanged_epoch(monkeypatch):
+    snapshot = {"schema": 1, "site_indexing": True, "groups": []}
+    published = []
+
+    class Pipe:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def watch(self, key):
+            assert key == Keys.PUBLIC_DISCOVERY_EPOCH.value
+
+        def multi(self):
+            return None
+
+        def setex(self, key, ttl, value):
+            published.append((key, ttl, json.loads(value)))
+
+        def execute(self):
+            return None
+
+    redis = SimpleNamespace(get=lambda _key: None, pipeline=lambda: Pipe())
+    monkeypatch.setattr(discovery_cache.cache, "_redis", redis)
+
+    assert discovery_cache.cached_public_directory(lambda: snapshot) is snapshot
+    assert published == [
+        (
+            Keys.PUBLIC_DIRECTORY.value,
+            discovery_cache.PUBLIC_DIRECTORY_TTL_SECONDS,
+            snapshot,
+        )
+    ]
+
+    warm = SimpleNamespace(
+        get=lambda _key: json.dumps(snapshot).encode(),
+        pipeline=lambda: (_ for _ in ()).throw(AssertionError("unexpected rebuild")),
+    )
+    monkeypatch.setattr(discovery_cache.cache, "_redis", warm)
+    assert discovery_cache.cached_public_directory(
+        lambda: (_ for _ in ()).throw(AssertionError("unexpected builder"))
+    ) == snapshot
+
+
+# @matrix cache public-directory : durable-fallback redis-failure single-rebuild
+def test_public_directory_publish_failure_does_not_repeat_durable_build(monkeypatch):
+    snapshot = {"schema": 1, "site_indexing": True, "groups": []}
+    builds = []
+
+    class Pipe:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def watch(self, _key):
+            return None
+
+        def multi(self):
+            return None
+
+        def setex(self, *_args):
+            return None
+
+        def execute(self):
+            raise RuntimeError("Redis unavailable")
+
+    monkeypatch.setattr(
+        discovery_cache.cache,
+        "_redis",
+        SimpleNamespace(get=lambda _key: None, pipeline=lambda: Pipe()),
+    )
+    monkeypatch.setattr(discovery_cache, "capture", lambda *_args, **_kwargs: None)
+
+    result = discovery_cache.cached_public_directory(
+        lambda: builds.append(True) or snapshot
+    )
+
+    assert result == snapshot
+    assert builds == [True]
 
 
 class _FakeDetailsCache:

@@ -100,19 +100,30 @@ code separated by projection:
 
 Ingress state is durable and is not represented as Redis authority.
 
-## Public sitemap
+## Public discovery
 
-`sitemap.py` caches generated XML for one hour under `Keys.SITEMAP`. The
-Datastore public-page query is the durable seed. A separate expiring epoch is
-watched while XML is generated, so a visibility or per-page indexing mutation
-cannot publish a stale build after its post-commit invalidation.
+`public_discovery.py` owns two rebuildable projections under one expiring
+revision epoch. The JSON public-directory catalog has a 15-minute TTL; sitemap
+XML has a one-hour TTL. A warm `/public/` request performs one Redis read and
+does not read Datastore. On a miss, the directory's durable seed is one live
+settings read, the public-Page query, and a direct relation batch for the
+explicitly selected Category.
 
-Page publication, page deletion, per-page indexing changes, and the live site
-discovery switch invalidate the sitemap. Metadata text and document edits do
-not, because the v1 sitemap contains only canonical URLs. Redis errors fall
-back to direct generation and never roll back a committed page mutation. The
-single sitemap fails closed above 50,000 URLs rather than silently truncating;
-sharding is the intended expansion point.
+The cached catalog is deliberately privacy-bounded: public IDs, relative
+paths, public titles and descriptions, and explicitly published Category
+labels only. It never includes documents, internal descriptions, photos, or
+unselected Category labels. The sitemap derives Page URLs from this same
+catalog so the two discovery surfaces cannot disagree about eligibility.
+
+Public Page saves or deletes, Category saves or deletes, and the live site
+discovery switch invalidate both outputs after the durable write. The common
+epoch is watched during publication, preventing an older build from winning a
+race with invalidation. Redis errors fall back to a single durable build and
+never roll back a committed mutation. If invalidation itself cannot reach
+Redis, an old directory can survive only until its 15-minute TTL; public Page
+routes still enforce current visibility directly. The single sitemap fails
+closed above 50,000 URLs rather than silently truncating; sharding is the
+intended expansion point.
 
 ## Design rules
 

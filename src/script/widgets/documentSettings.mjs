@@ -1,6 +1,9 @@
 import { STYLES } from "styles";
+import { SelectBox } from "../elements/combobox";
 import { FormElement } from "../elements/form";
 import { primitives } from "../elements/primitives";
+
+const PUBLIC_DIRECTORY_ROOT = "__public_pages__";
 
 const VISIBILITY = {
 	public: "This page is public. It can be viewed at this URL: ",
@@ -13,6 +16,7 @@ const VISIBILITY = {
  * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
  * @matrix pages : document-visibility private public
  * @matrix public-pages : metadata preview
+ * @pair public-directory:category
  */
 export class DocumentSettings extends FormElement {
 	constructor(attributes) {
@@ -40,8 +44,24 @@ export class DocumentSettings extends FormElement {
 		}
 	}
 
+	get directoryCategories() {
+		try {
+			return JSON.parse(this.target?.dataset.directoryCategories || "[]");
+		} catch {
+			return [];
+		}
+	}
+
 	get url() {
 		return this.target?.dataset.url || null;
+	}
+
+	get formData() {
+		const data = super.formData;
+		if (data.get("directory-category") === PUBLIC_DIRECTORY_ROOT) {
+			data.set("directory-category", "");
+		}
+		return data;
 	}
 
 	set url(value) {
@@ -101,14 +121,14 @@ export class DocumentSettings extends FormElement {
 
 		const heading = document.createElement("h3");
 		heading.className = "font-semibold text-base-dark";
-		heading.textContent = "Search and sharing preview";
+		heading.textContent = "Public discovery and sharing preview";
 
 		const siteState = document.createElement("p");
 		siteState.className = "text-sm text-base-medium";
 		siteState.textContent =
 			this.target?.dataset.siteIndexing === "true"
-				? "Site search discovery is on. This page can opt out below."
-				: "Site search discovery is off. These settings will be ready if it is enabled later.";
+				? "Site discovery is on. This page can opt out or choose how it is grouped in the public directory."
+				: "Site discovery is off. These settings will be ready if it is enabled later.";
 
 		const marker = document.createElement("input");
 		marker.type = "hidden";
@@ -142,7 +162,49 @@ export class DocumentSettings extends FormElement {
 		});
 		description.querySelector("textarea").maxLength = 300;
 
-		wrapper.append(heading, siteState, marker, indexing, title, description);
+		const directoryCategory = primitives.select({
+			label: "Public directory category",
+			name: "directory-category",
+			kind: this.kind,
+			data: {
+				preload: JSON.stringify([
+					{
+						id: settings.directory_category || PUBLIC_DIRECTORY_ROOT,
+					},
+				]),
+			},
+			options: [
+				{
+					label: "Public Pages",
+					value: PUBLIC_DIRECTORY_ROOT,
+					selected: !settings.directory_category,
+				},
+				...this.directoryCategories.map((category) => ({
+					label: category.name,
+					value: category.id,
+					selected: category.id === settings.directory_category,
+				})),
+			],
+		});
+		directoryCategory.dataset.role = "directory-category";
+		const directoryCategorySelect = new SelectBox(directoryCategory);
+		directoryCategorySelect.init();
+		this.destroyables.push(directoryCategorySelect);
+		const categoryGuidance = document.createElement("p");
+		categoryGuidance.className = "text-sm text-base-medium";
+		categoryGuidance.textContent =
+			"Choosing a category publishes that category name in the directory. Only categories already attached to this page are available.";
+
+		wrapper.append(
+			heading,
+			siteState,
+			marker,
+			indexing,
+			title,
+			description,
+			directoryCategory,
+			categoryGuidance,
+		);
 		const previews = this.previewPickerElement;
 		if (previews) wrapper.append(previews);
 		return wrapper;
@@ -214,6 +276,7 @@ export class DocumentSettings extends FormElement {
 			for (const name of [
 				"publicSettings",
 				"previewImages",
+				"directoryCategories",
 				"siteIndexing",
 				"siteImage",
 			]) {

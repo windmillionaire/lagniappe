@@ -150,21 +150,26 @@ and [BACKEND_JOBS.md](BACKEND_JOBS.md), not in runtime configuration.
 
 `PUBLIC_PAGE_INDEXING` defaults to `false`. The deployed value is a recovery
 and setup fallback; the Datastore `site/public_pages` row is the live authority
-used by `robots.txt`, the sitemap, public metadata, and Site Settings. Saving
-the Administrator setting takes effect immediately. The normal setup update,
+used by the public directory, `robots.txt`, the sitemap, public metadata, and
+Site Settings. Saving the Administrator setting takes effect immediately. The normal setup update,
 upgrade, and recovery paths copy the live value into generated application
 configuration for the next deployment.
 
 App Engine handler definitions are owned by `config/constants.py`. The dynamic
-`robots.txt` and `sitemap.xml` prefixes are declared there and the old static
-robots handler is intentionally absent. Do not hand-edit `lagniappe.yaml` to
-change this surface; regenerate it through the normal configuration workflow.
+`public`, `robots.txt`, and `sitemap.xml` prefixes are declared there and the
+old static robots handler is intentionally absent. Do not hand-edit
+`lagniappe.yaml` to change this surface; regenerate it through the normal
+configuration workflow.
 
 Publishing a page and allowing search discovery are separate decisions. Public
 links work while site discovery is off. Each Page stores a versioned,
-Datastore-unindexed `public_settings` object with an indexing opt-out and
-optional public title, description, and embedded-document preview image.
-Internal page descriptions and page photos are not automatic public metadata.
+Datastore-unindexed `public_settings` object. Schema version 2 contains an
+indexing opt-out, optional public title, description, embedded-document preview
+image, and nullable `directory_category` URL-safe key. The route accepts that
+key only when it identifies a Category currently attached to the Page. A null,
+missing, or no-longer-valid selection uses the generic `Public Pages` group.
+Internal page descriptions, page photos, and unselected Category labels are
+not automatic public metadata.
 
 ## Error reporting and agent access
 

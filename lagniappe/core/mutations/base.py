@@ -243,12 +243,12 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def invalidate_sitemap(self, *, reason):
-        key = (MutationEffectType.SITEMAP_INVALIDATE,)
+    def invalidate_public_discovery(self, *, reason):
+        key = (MutationEffectType.PUBLIC_DISCOVERY_INVALIDATE,)
         existing = self._effects.get(key)
         reasons = _unique((*(existing.reasons if existing else ()), reason))
         self._effects[key] = MutationEffect(
-            MutationEffectType.SITEMAP_INVALIDATE,
+            MutationEffectType.PUBLIC_DISCOVERY_INVALIDATE,
             MutationPhase.POST_COMMIT,
             reasons=reasons,
         )
@@ -362,8 +362,8 @@ class MutationPlanBuilder:
                     intent.entity,
                     reason=intent.reason,
                 )
-            elif intent.intent is MutationIntentType.SITEMAP_INVALIDATE:
-                self.invalidate_sitemap(reason=intent.reason)
+            elif intent.intent is MutationIntentType.PUBLIC_DISCOVERY_INVALIDATE:
+                self.invalidate_public_discovery(reason=intent.reason)
             else:
                 raise ValueError(f"Unsupported mutation intent: {intent.intent}")
 

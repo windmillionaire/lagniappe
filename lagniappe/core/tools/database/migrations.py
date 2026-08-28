@@ -673,7 +673,6 @@ def _record_view(definition, record):
         "ledger_schema": LEDGER_SCHEMA_VERSION,
         "migration_id": definition.id,
         "sequence": definition.sequence,
-        "introduced_in": definition.introduced_in,
     }
     for field, expected_value in expected.items():
         if record.get(field) != expected_value:
@@ -827,7 +826,7 @@ def _status_counts(views):
 # @tests tests_unit/test_018b_database_migrations.py::test_status_reads_completed_migrations_across_builds_and_blocks_after_failure
 # @tests tests_unit/test_018b_database_migrations.py::test_legacy_audit_projects_as_completed
 # @tests tests_unit/test_018b_database_migrations.py::test_migration_status_rejects_malformed_ledger
-# @matrix admin database-migrations : audit build-history catalog failure-order identity invalid-storage legacy-audit persistence read-through sticky-completion
+# @matrix admin database-migrations : audit build-history catalog failure-order identity invalid-storage legacy-audit persistence read-through release-metadata sticky-completion
 def get_migration_status(
     *,
     datastore=None,

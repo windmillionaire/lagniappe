@@ -36,8 +36,11 @@ values. Each entry has:
 - an idempotent `runner`.
 
 Append new work to the catalog. Once an entry ships, do not reuse its ID,
-change its sequence or release, or redefine its purpose. Follow-up corrections
-belong in a new entry so every installation sees the same ordered catalog.
+change its sequence, or redefine its purpose. Follow-up corrections belong in
+a new entry so every installation sees the same ordered catalog. The
+`introduced_in` value is catalog metadata used to group migrations in the
+Maintenance UI; correcting it does not invalidate an existing completion
+record or cause the migration to run again.
 
 Each entry has a Datastore ledger record:
 
@@ -45,10 +48,12 @@ Each entry has a Datastore ledger record:
 site/data-migration:<migration-id>
 ```
 
-The record stores catalog identity, execution state, completion version and
-build, timestamps, and bounded attempt details. Absence means pending;
+The record stores catalog identity and release metadata, execution state,
+completion version and build, timestamps, and bounded attempt details. The
+ledger schema, migration ID, and sequence are audited against the catalog;
+`introduced_in` is not part of execution identity. Absence means pending;
 persisted states are `running`, `failed`, and `complete`. Completion remains
-sticky across application releases.
+sticky across application releases and catalog release-metadata corrections.
 
 `site/data-migrations-control` is the renewable execution lease. It prevents
 concurrent owner requests. A stale `running` entry is presented as interrupted;

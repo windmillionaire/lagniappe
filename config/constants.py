@@ -1,6 +1,6 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "b1dbdc81"
+BUILD_ID = "b902197a"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -683,6 +683,7 @@ APP_ROOT_ROUTE_PREFIXES = (
     "admin",
     "offline",
     "privacy-policy",
+    "public",
     "reporting_privacy",
     "robots.txt",
     "sitemap.xml",
