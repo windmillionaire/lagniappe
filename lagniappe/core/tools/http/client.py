@@ -226,8 +226,12 @@ def _accepted_media_type(media_type: str | None, accepted: frozenset[str]) -> bo
             return True
         if pattern.endswith("/*") and media_type.startswith(pattern[:-1]):
             return True
-        if pattern == "application/*+json" and media_type.startswith("application/"):
-            return media_type.endswith("+json")
+        if (
+            pattern == "application/*+json"
+            and media_type.startswith("application/")
+            and media_type.endswith("+json")
+        ):
+            return True
     return False
 
 
@@ -556,8 +560,9 @@ def _trusted_url(policy: TrustedProviderPolicy, path: str) -> str:
 
 # @testable true
 # @tests tests_unit/test_032_outbound_http.py::test_trusted_client_enforces_fixed_host_bounds_deadline_and_closure
+# @tests tests_unit/test_032_outbound_http.py::test_trusted_client_media_acceptance_checks_every_pattern
 # @tests tests_unit/test_032_outbound_http.py::test_trusted_client_retries_only_explicit_method_and_status
-# @matrix outbound-http : bounds closure deadline fixed-host privacy proxy-isolation redirects retry streaming trusted-provider
+# @matrix outbound-http : bounds closure deadline fixed-host media privacy proxy-isolation redirects retry streaming trusted-provider
 def request_trusted_content(
     method: str,
     path: str,

@@ -712,6 +712,37 @@ def test_trusted_client_enforces_fixed_host_bounds_deadline_and_closure(monkeypa
     assert "private cleanup text" not in repr(cleanup_result)
 
 
+# @matrix outbound-http : media trusted-provider
+def test_trusted_client_media_acceptance_checks_every_pattern(monkeypatch):
+    class WildcardFirstMediaTypes(frozenset):
+        def __iter__(self):
+            return iter(("application/*+json", "application/json"))
+
+    response = FakeResponse(
+        headers={"Content-Type": "application/json"},
+        chunks=[b'{"ok":true}'],
+    )
+    session = FakeSession([response])
+    monkeypatch.setattr(client.requests, "Session", lambda: session)
+    policy = TrustedProviderPolicy(
+        name="provider",
+        host="provider.example",
+        accepted_media_types=WildcardFirstMediaTypes(
+            {"application/json", "application/*+json"}
+        ),
+        max_bytes=20,
+        connect_timeout=2,
+        read_timeout=3,
+        deadline=4,
+    )
+
+    result = request_trusted_content("GET", "v1/items", policy)
+
+    assert result.status is OutboundStatus.OK
+    assert result.media_type == "application/json"
+    assert response.closed and session.closed
+
+
 # @matrix outbound-http : closure retry trusted-provider
 def test_trusted_client_retries_only_explicit_method_and_status(monkeypatch):
     first = FakeResponse(503, {"Content-Type": "application/json"})
