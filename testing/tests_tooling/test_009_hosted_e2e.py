@@ -929,6 +929,7 @@ def test_hosted_execute_summary_reports_unique_junit_failures(tmp_path):
     assert "Additional error records: 1" in summary
     assert "testing/tests_e2e/test_example.py::test_fails" in summary
     assert "assert 500 == 200" in summary
+    assert "…and" not in summary
     assert str(destination.resolve()) in summary
 
 

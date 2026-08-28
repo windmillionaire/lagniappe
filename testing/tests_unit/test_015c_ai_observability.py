@@ -327,6 +327,12 @@ def test_nested_model_repair_gets_its_own_summary(monkeypatch):
 # @matrix observability : disabled exception-transparency persistence-failure pruning-failure
 @pytest.mark.unit
 def test_observability_failures_never_change_generation_result_or_error(monkeypatch):
+    warnings = []
+
+    def record_warning(message, *args, **kwargs):
+        warnings.append((message, args, kwargs))
+
+    monkeypatch.setattr(observability.LOGGER, "warning", record_warning)
     monkeypatch.setattr(
         ai_core,
         "runtime_ai_settings",
@@ -351,6 +357,7 @@ def test_observability_failures_never_change_generation_result_or_error(monkeypa
         lambda summary: pytest.fail("disabled collection wrote a record"),
     )
     assert generator.generate_content(prompt) == "Success"
+    assert warnings == []
 
     monkeypatch.setattr(observability.CONFIG, "AI_OBSERVABILITY", True, raising=False)
     monkeypatch.setattr(
@@ -379,6 +386,12 @@ def test_observability_failures_never_change_generation_result_or_error(monkeypa
     with pytest.raises(RuntimeError) as caught:
         generator.generate_content(prompt)
     assert caught.value is original
+    assert [message for message, _args, _kwargs in warnings] == [
+        "Unable to persist AI observability summary.",
+        "Unable to prune AI observability summaries.",
+        "Unable to prune AI observability summaries.",
+    ]
+    assert all(kwargs == {"exc_info": True} for _message, _args, kwargs in warnings)
 
 
 class _Entity(dict):

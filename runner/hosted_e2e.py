@@ -1914,7 +1914,7 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
                     if message:
                         lines.append(f"    {message}")
                 remaining = len(failed) - 12
-                if remaining:
+                if remaining > 0:
                     lines.append(f"  - …and {remaining} more; see JUnit XML below.")
 
     if imported:
