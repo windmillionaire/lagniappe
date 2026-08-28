@@ -27,6 +27,16 @@ TRACEBACK_TRUNCATION_MARKER = "\n... traceback truncated ...\n"
 PARAMETER_SUFFIX_RE = re.compile(r"\[.*\]$")
 
 
+def pytest_addoption(parser) -> None:
+    """Register validation-only control over tracked test evidence."""
+    group = parser.getgroup("lagniappe")
+    group.addoption(
+        "--no-test-evidence",
+        action="store_true",
+        help="Run tests without updating testing/evidence/latest.json.",
+    )
+
+
 def _repo_root(config) -> Path:
     configured = Path(str(config.rootpath)).resolve()
     if configured.name == "testing":
@@ -84,6 +94,8 @@ def pytest_runtest_logreport(report) -> None:
 
 
 def pytest_sessionfinish(session, exitstatus: int) -> None:
+    if session.config.getoption("no_test_evidence", default=False):
+        return
     repo_root = _repo_root(session.config)
     command = os.environ.get("LAGNIAPPE_TEST_COMMAND")
     recorded_command = json.loads(command) if command else [sys.executable, *sys.argv]

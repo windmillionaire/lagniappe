@@ -22,6 +22,26 @@ from testing.utility import (
 pytestmark = pytest.mark.tooling
 
 
+def test_traceability_result_plugin_can_skip_manifest_output(monkeypatch, tmp_path):
+    writes = []
+    monkeypatch.setattr(
+        traceability_results,
+        "_write_manifest",
+        lambda *arguments: writes.append(arguments),
+    )
+    config = types.SimpleNamespace(
+        rootpath=tmp_path,
+        getoption=lambda name, default=False: name == "no_test_evidence",
+    )
+
+    traceability_results.pytest_sessionfinish(
+        types.SimpleNamespace(config=config),
+        0,
+    )
+
+    assert writes == []
+
+
 @pytest.mark.parametrize("phase", ["setup", "call", "teardown"])
 def test_traceability_result_plugin_records_failure_tracebacks(
     monkeypatch, tmp_path, phase
@@ -639,6 +659,12 @@ def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
                 "testing/tests_tooling/",
             ),
             ("testing/tests_unit/", "testing/tests_tooling/"),
+            False,
+        ),
+        (
+            ["--no-test-evidence", "tooling"],
+            ("--no-test-evidence", "testing/tests_tooling/"),
+            ("testing/tests_tooling/",),
             False,
         ),
     ),

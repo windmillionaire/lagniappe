@@ -308,7 +308,11 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
     command_arguments = [list(map(str, command)) for command, _options in commands]
     assert command_arguments[0] == ["npm", "run", "check"]
     assert command_arguments[1][1:] == ["-m", "ruff", "check", "."]
-    assert command_arguments[2][2:] == ["test", "tooling"]
+    assert command_arguments[2][2:] == [
+        "test",
+        "--no-test-evidence",
+        "tooling",
+    ]
     assert command_arguments[3][2:4] == ["traceability", "--check"]
     assert "--changed" not in command_arguments[3]
     assert command_arguments[4][2:] == [

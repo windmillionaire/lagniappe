@@ -77,6 +77,12 @@ identifies generated assets rather than a source change; hosted provenance
 records the concrete deployed build ID separately. Changing any other
 referenced implementation or template does invalidate evidence.
 
+Validation-only orchestration may pass `--no-test-evidence` to `run.py test`
+when a later authoritative test run will replace the evidence. Hosted-candidate
+creation uses this option for its tooling preflight so checking a clean release
+candidate does not dirty the working tree before deployment. Ordinary developer
+test runs should continue to record evidence.
+
 The manifest is excluded from its own behavior snapshot, so recording a test
 result does not immediately make that result stale. GitHub workflow files are
 also excluded because they do not change application behavior. Main release CI

@@ -400,7 +400,10 @@ def _run_create_preflight(source, *, base_ref=None):
     gates = (
         ("authored frontend source", [NPM_CLI, "run", "check"]),
         ("Python source", [python, "-m", "ruff", "check", "."]),
-        ("tooling tests", [python, run_py, "test", "tooling"]),
+        (
+            "tooling tests",
+            [python, run_py, "test", "--no-test-evidence", "tooling"],
+        ),
         (
             "full source traceability",
             [python, run_py, "traceability", *traceability_options],
