@@ -82,5 +82,5 @@ def test_builder_save_failure_releases_control_for_retry(
     expect(user.locate(builder.SAVED)).to_be_visible()
     expect(notification).not_to_be_visible()
 
-    user.page.reload()
+    form.reload()
     assert Builder(user).schema_field(title=field.title) is not None

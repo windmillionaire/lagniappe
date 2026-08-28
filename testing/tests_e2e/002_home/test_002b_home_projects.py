@@ -47,6 +47,7 @@ from testing.elements import (
     SpinnerButtons,
 )
 from testing.utility.network import expect_successful_response
+from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
 
 pytestmark = pytest.mark.e2e
 
@@ -138,8 +139,7 @@ def test_create_project_ai_mode(get_user, results):
     Verify project creation in AI mode.
 
     Uses AI to generate project name and description from a prompt.
-    The provider-backed create request gets the same 90-second budget as the
-    other live AI generation stories.
+    The provider-backed create request gets the complete configured retry budget.
     """
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -168,7 +168,7 @@ def test_create_project_ai_mode(get_user, results):
         user.page,
         method="POST",
         path="/projects/create",
-        timeout=90000,
+        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS,
     ) as response_info:
         SpinnerButtons.CREATE.click(create_form)
 

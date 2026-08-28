@@ -14,6 +14,7 @@ from testing.utility.network import (
     multipart_form_fields,
     scoped_browser_route,
 )
+from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
 
 pytestmark = pytest.mark.e2e
 
@@ -339,7 +340,10 @@ def test_generate_text_live_page_context_with_tasks_and_files(get_user, request)
     form = EditorGenerateText(editor)
     form.set_mode(EditorGenerateTextMode.APPEND_TO_DOCUMENT)
     form.fill_prompt(prompt)
-    with user.page.expect_response("**/document/generate", timeout=90000) as response:
+    with user.page.expect_response(
+        "**/document/generate",
+        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS,
+    ) as response:
         form.submit()
 
     generated_response = response.value

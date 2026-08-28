@@ -44,6 +44,7 @@ from testing.elements import (
     SpinnerButtons,
 )
 from testing.utility.network import expect_successful_response
+from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
 
 
 def _create_category(user, home, definition):
@@ -71,7 +72,7 @@ def _create_category(user, home, definition):
         user.page,
         method="POST",
         path="/categories/create",
-        timeout=90000 if definition.description_for_ai else None,
+        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS if definition.description_for_ai else None,
     ) as response_info:
         SpinnerButtons.CREATE.click(create_form)
 
@@ -202,8 +203,7 @@ def test_create_category_ai_mode(get_user, results):
     Verify category creation in AI mode.
 
     Uses AI to generate category name and description from a prompt.
-    The provider-backed create request gets the same 90-second budget as the
-    other live AI generation stories.
+    The provider-backed create request gets the complete configured retry budget.
     """
     user = get_user(Users.OWNER)
     category = Categories.test_create_category_ai_mode.get(user, create=False)

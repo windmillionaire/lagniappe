@@ -1,6 +1,6 @@
 """Live-AI Ask stories grounded in seeded workspace evidence."""
 
-from html import unescape
+from html import escape, unescape
 import re
 from uuid import uuid4
 
@@ -21,6 +21,7 @@ from testing.elements import List
 from testing.resources import Report
 from testing.utility.network import expect_successful_response
 from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
+from testing.utility.live_ai import inject_quota_fallback_checkpoint
 from testing.utility.organize_submission_eval import load_cases
 
 
@@ -86,7 +87,7 @@ def _start_ask_report(user, question):
     return item, report, job
 
 
-def _run_ask_job(page, report, job, ai_results):
+def _run_ask_job(page, report, job, ai_results, *, quota_fallback):
     """Run Ask with one bounded, production-classified provider retry."""
     attempt_records = []
     if CONFIG.hosted_e2e_runner:
@@ -124,6 +125,49 @@ def _run_ask_job(page, report, job, ai_results):
             if current_job.status != DeferredJobStatus.RETRY_WAIT.value:
                 break
 
+    if (
+        current_job.status == DeferredJobStatus.RETRY_WAIT.value
+        and (current_job.error or {}).get("type") == "AIQuotaError"
+    ):
+        checkpoint = inject_quota_fallback_checkpoint(
+            current_job,
+            quota_fallback,
+        )
+        ai_results.record(
+            "provider_quota_fallback",
+            {
+                "used": True,
+                "reason": "AIQuotaError",
+                "provider_attempts": list(attempt_records),
+                "checkpoint": checkpoint,
+            },
+        )
+        if CONFIG.hosted_e2e_runner:
+            current_job, fallback_attempts = dispatch_hosted_deferred_job(
+                page,
+                current_job,
+                attempt_limit=1,
+                task_suffix="hosted-e2e-quota-fallback",
+            )
+            attempt_records.extend(fallback_attempts)
+        else:
+            with web_app.test_request_context("/"):
+                DeferredJobs.run(
+                    job.urlsafe_key,
+                    now=current_job.next_attempt_at,
+                )
+            current_job = Entities.fetch_one(
+                job.urlsafe_key,
+                request=Fetch.direct(),
+            )
+            attempt_records.append(
+                {
+                    "attempt": current_job.attempt,
+                    "status": current_job.status,
+                    "fallback": "AIQuotaError",
+                }
+            )
+
     saved_job = current_job
     saved_report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
     response = saved_report.proposal
@@ -143,6 +187,15 @@ def _run_ask_job(page, report, job, ai_results):
 def _answer_text(response):
     text = f"{response.get('summary') or ''} {response.get('answer_html') or ''}"
     return " ".join(unescape(re.sub(r"<[^>]+>", " ", text)).split())
+
+
+def _quota_fallback_answer(answer):
+    """Return a recorded provider substitute for quota-only E2E recovery."""
+    return {
+        "summary": answer,
+        "answer_html": f"<p>{escape(answer)}</p>",
+        "actions": [],
+    }
 
 
 def _answer_usability_failures(
@@ -281,6 +334,10 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request):
         report,
         job,
         request.node.ai_results,
+        quota_fallback=_quota_fallback_answer(
+            "The attached receipt shows merchant Acme Hardware, purchase date "
+            "2026-07-10, and total $42.00."
+        ),
     )
     failures = _answer_usability_failures(
         response,
@@ -332,6 +389,9 @@ def test_ask_uses_structured_filter_for_form_submission_query(
         report,
         job,
         request.node.ai_results,
+        quota_fallback=_quota_fallback_answer(
+            f"The exact matching task is {matching.name}."
+        ),
     )
     failures = _answer_usability_failures(
         response,
