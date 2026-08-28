@@ -936,6 +936,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 let captured = 0;
+const calls = [];
 const results = [];
 const context = {
   console,
@@ -946,7 +947,12 @@ const context = {
   queueMicrotask,
   sessionStorage: { getItem() { return null; }, setItem() {} },
   captureError() { captured += 1; },
-  request: { async post() { return { ok: false, error: "Failed to fetch" }; } },
+  request: {
+    async post(url, body, options = {}) {
+      calls.push({ url, body, options });
+      return { ok: false, error: "Failed to fetch" };
+    },
+  },
   window: { clearTimeout() {}, setTimeout() { return 1; } },
 };
 context.globalThis = context;
@@ -967,9 +973,20 @@ coordinator.subscribe(
 
 (async () => {
   await coordinator.trigger();
+  await coordinator.closeDocuments(["one:document"]);
   if (captured !== 0) throw new Error("Transport failure was captured as a defect");
   if (results.length !== 1 || results[0].status !== "error") {
     throw new Error(`Transport failure did not schedule an error result: ${JSON.stringify(results)}`);
+  }
+  if (
+    calls.length !== 2 ||
+    calls.some(({ url, options }) =>
+      url !== "/l/poll" || options.replaceErrorPage !== false
+    ) ||
+    calls[0].options.keepalive === true ||
+    calls[1].options.keepalive !== true
+  ) {
+    throw new Error(`Polling requests were allowed to replace the page: ${JSON.stringify(calls)}`);
   }
 })().catch((error) => {
   console.error(error);

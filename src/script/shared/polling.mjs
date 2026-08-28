@@ -431,8 +431,9 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_captures_and_isolates_contract_failures
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_temporarily_boosts_a_subscription
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement
+ * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_treats_failed_transport_as_retryable
  * @matrix notifications : acknowledgement bounded-backoff cold-seed zero-subscriptions
- * @matrix polling : acknowledgement batching blur cadence coalescing diagnostics foreground freshness lifecycle presence protocol reentrancy requested-cycle revision scheduled-initial terminal-operation-order validation visibility
+ * @matrix polling : acknowledgement batching blur cadence coalescing diagnostics foreground freshness lifecycle presence protocol reentrancy requested-cycle revision scheduled-initial terminal-operation-order transport-error validation visibility
  * @pairs deferred-jobs:polling messaging:active-polling
  */
 export class PollingCoordinator {
@@ -752,7 +753,10 @@ export class PollingCoordinator {
 					offset + MAX_SUBSCRIPTIONS_PER_REQUEST,
 				),
 			});
-			response = await request.post(ENDPOINTS.poll, body, { keepalive: true });
+			response = await request.post(ENDPOINTS.poll, body, {
+				keepalive: true,
+				replaceErrorPage: false,
+			});
 			if (response?.status === 422) {
 				this._captureContract(
 					new PollContractError(
@@ -949,7 +953,9 @@ export class PollingCoordinator {
 			});
 			seededNotification = notificationState?.seed === true;
 			if (seededNotification) this.notificationSeedActive = true;
-			this.inflight = request.post(ENDPOINTS.poll, body);
+			this.inflight = request.post(ENDPOINTS.poll, body, {
+				replaceErrorPage: false,
+			});
 			const response = await this.inflight;
 			if (!response?.ok) {
 				if (

@@ -373,6 +373,7 @@ def test_add_category_to_page(get_user):
 def test_delete_page_from_title_menu(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_delete_page)
+    page.wait_for_interaction_readiness()
 
     trigger = user.page.get_by_role("button", name="Page actions")
     trigger.hover()
