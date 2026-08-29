@@ -27,6 +27,7 @@ from lagniappe.core.entities import Entities
 from testing.definitions import Projects, Users
 from testing.elements import EditorMenuOptions, EditorToggleOptions, Tabs
 from testing.utility.network import expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 
 MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(
@@ -48,6 +49,7 @@ def test_untouched_document_does_not_save_or_touch_project(get_user):
     project = Projects.test_untouched_document.get(user)
     before = Entities.fetch_one(project.key, request=Fetch.direct()).modified
     sync_updates = []
+    document_sync_id = project.entity.sync_ids["document"]["id"]
 
     def record_sync_updates(request):
         if request.method != "POST" or not request.url.endswith("/l/sync"):
@@ -55,11 +57,16 @@ def test_untouched_document_does_not_save_or_touch_project(get_user):
         sync_updates.extend((request.post_data_json or {}).get("updates", []))
 
     user.page.on("request", record_sync_updates)
-    user.go(project)
+    user.page.bring_to_front()
+    with expect_poll_result(
+        user.page,
+        subscription_id=f"document:{document_sync_id}",
+        status=None,
+    ):
+        user.go(project, query_params={"tab": "document"})
     editor = project.editor
     assert editor.get_text() == ""
 
-    document_sync_id = project.entity.sync_ids["document"]["id"]
     with expect_successful_response(
         user.page,
         method="POST",
