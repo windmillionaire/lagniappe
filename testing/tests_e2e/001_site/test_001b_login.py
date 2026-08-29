@@ -1479,7 +1479,7 @@ def test_logout_clears_session_and_returns_login(get_user):
     """
     owner = get_user(Users.OWNER)
     user = get_user(Users.logout_navigation, creator=owner)
-    home = SitePages.HOME.get(user)
+    protected_page = SitePages.TASK_INDEX.get(user)
     login_page = user.go(SitePages.LOGIN_PAGE)
 
     expect(user.page).to_have_title("Logged In")
@@ -1495,7 +1495,7 @@ def test_logout_clears_session_and_returns_login(get_user):
     expect(user.page).to_have_title("Login")
     expect(user.locate(login_page.AUTH_METHOD_FORM)).to_be_visible()
 
-    user.navigate(home.url)
+    user.navigate(protected_page.url)
     expect(user.page).to_have_title("Login")
 
     login_url = _site_url(f"/users/login?test_user={quote(user.email)}")
@@ -1512,7 +1512,7 @@ def test_logout_clears_session_and_returns_login(get_user):
     assert validation.status == 200
     assert validation.json()["cacheCleared"] is True
     assert Entities.USER.load(user.email).invalidate_cache is False
-    expect(user.page).to_have_title("Home")
+    expect(user.page).to_have_url(re.compile(r"/tasks/index$"))
 
 
 # @matrix login : ajax invalidation logout redirect
