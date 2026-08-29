@@ -157,8 +157,8 @@ class FilterCache:
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_model_task
-    # @matrix filters : entity-condition model-task run-results string-condition
-    # @matrix filters : all-tasks restrictions shared-key
+    # @matrix cache filters project task : all-tasks completed restrictions source-query
+    # @matrix filters : entity-condition model-task run-results string-condition shared-key
     def cache(self):
         """Build or incrementally refresh the filter cache."""
         # filter_cache.delete(self.cache_key)

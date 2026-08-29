@@ -20,7 +20,7 @@ from ..tools.files.html import strip_tags
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_legacy_task_history_snapshot_text_defaults_to_none
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_fingerprint_ignores_later_form_versions
-# @matrix task-completion : asset-copy description history immutable-fingerprint linked-pages name schema-version snapshot submission
+# @matrix task-completion : asset-copy description history immutable-fingerprint legacy linked-pages name schema-version snapshot submission
 class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     """Immutable task snapshot with a stable entity fingerprint.
 

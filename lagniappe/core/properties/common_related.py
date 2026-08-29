@@ -309,7 +309,7 @@ class RelatedForms(RelatedEntityListMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_skips_primary_form_and_registers_relation
     # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_rejects_value_without_key
-    # @matrix category form : add duplicate-primary related-forms relation-registration
+    # @matrix category form : add duplicate-primary related-forms relation-registration validation
     def add(self, value):
         key = getattr(value, "key", None)
         if not key:

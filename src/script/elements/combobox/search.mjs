@@ -73,6 +73,11 @@ export class SearchBox extends RemoteQueryCombobox {
 		window.location.href = option.dataset.url;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
+	 * @pair search:navbar-submit
+	 */
 	elementKeydown(event) {
 		super.elementKeydown(event);
 		if (event.defaultPrevented) return;

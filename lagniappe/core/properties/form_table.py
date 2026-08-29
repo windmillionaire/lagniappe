@@ -123,7 +123,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_exact_match
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_no_match_records_error
-    # @matrix form-table : fuzzy-match import internal no-match validation
+    # @matrix form-table link submission : entity-resolution fuzzy-match import internal no-match validation weak-match
     def validate_import(self, rows):
         # rows should be a list of lists, each list containing the values for a single row
         # rows should be in the same order as the column fields

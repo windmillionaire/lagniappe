@@ -325,7 +325,7 @@ def extract_ooxml(content, filename=None, mimetype=None, *, max_characters=None)
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_reports_ooxml_extraction_errors
 # @tests tests_unit/test_015_ai_tools.py::test_ooxml_xlsx_extraction_preserves_rows_tabs_and_shared_strings
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_happy_paths_preserve_docx_and_xlsx_order
-# @matrix files : compatibility docx ooxml summary-fallback xlsx
+# @matrix ai files : compatibility docx ooxml rows shared-strings summary-fallback tabs xlsx
 # @pair ai:ooxml
 def extract_ooxml_text(content, filename=None, mimetype=None):
     """Compatibility wrapper returning only bounded extracted text."""

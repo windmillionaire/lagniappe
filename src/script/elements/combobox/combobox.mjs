@@ -19,7 +19,7 @@ import { primitives } from "../primitives";
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_copies_only_supported_dataset_configuration
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_positioning_stops_after_destroy
- * @matrix combobox : aria dataset-configuration dismissal empty-results keyboard pointer positioning readiness teardown transition-race
+ * @matrix combobox : aria dataset-configuration dismissal empty-results keyboard pointer positioning positioning-readiness readiness teardown transition-race
  */
 export class Combobox {
 	constructor(element) {

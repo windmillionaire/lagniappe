@@ -5,7 +5,7 @@ import pytest
 import lagniappe.core.properties.home as home_properties
 
 
-# @matrix ai-report home : pagination projects restrictions
+# @matrix home : pagination projects restrictions
 @pytest.mark.unit
 def test_home_project_list_restrictions_and_cursor(monkeypatch):
     user = SimpleNamespace(
@@ -385,7 +385,8 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
     assert section.count == 3
 
 
-# @matrix ai-report home : ingress list notes query tools
+# @matrix home : ingress list notes query tools
+# @matrix ai-report : list query tools
 @pytest.mark.unit
 def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")

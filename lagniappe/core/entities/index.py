@@ -386,8 +386,8 @@ class UserIndex(Index):
     # @tests tests_unit/test_009_user_index.py::test_user_index_regular_mode_excludes_public_users
     # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_loads_public_group_users_and_preserves_append_mode
     # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_returns_empty_when_public_users_disabled
-    # @matrix public-users : mode pagination public-mode
-    # @matrix user-index : mode pagination public-mode public-users regular-mode restrictions
+    # @matrix public-users : disabled enabled mode pagination public-mode public-users
+    # @matrix user-index : disabled mode pagination public-mode public-users regular-mode restrictions
     @property
     def users(self):
         if self._users is not None:

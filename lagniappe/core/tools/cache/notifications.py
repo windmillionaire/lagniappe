@@ -49,7 +49,7 @@ def _default_keys_loader(user):
 # @testable true
 # @tests tests_unit/test_025_notification_state.py::test_cold_seed_runs_one_keys_only_query_and_is_race_safe
 # @tests tests_unit/test_025_notification_state.py::test_notification_list_keys_repair_warm_projection
-# @matrix notifications : authoritative-repair cold-seed membership race-safety revision
+# @matrix notifications : authoritative-repair cold-seed keys-only membership race-safety revision
 def seed_notification_state(
     user,
     notification_keys=None,

@@ -415,7 +415,8 @@ class Requires(CacheMixin, DetailsMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires
     # @tests tests_unit/test_006b_ingress_entity.py::test_model_task_required_reports_unloaded_project_relation
-    # @matrix requires : property validation
+    # @tests tests_unit/test_009f_page_view_access.py::test_page_allowed_uses_stored_requirements_without_loading_categories
+    # @matrix page permissions requires : no-category-expansion property shallow-page stored-requires validation
     @property
     def value(self):
         value = super().value
@@ -868,7 +869,8 @@ class RestrictedTo(CacheMixin, DBProperty):
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_group_restricted_form_opens_for_group_member_only
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_index_lists_group_restricted_form_only_for_group_member
     # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources
-    # @matrix forms : access-restrictions group-restricted index-filter inheritance owner-restricted side-effect-free stable-order
+    # @tests tests_unit/test_007_category_properties.py::test_category_restricted_to_follows_attached_form
+    # @matrix category form forms permissions : access-restrictions attached-form cache group-restricted index-filter inheritance owner-restricted restricted-access side-effect-free stable-order
     @property
     def value(self):
         if self.is_set:

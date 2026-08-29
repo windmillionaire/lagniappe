@@ -15,8 +15,8 @@ import { areEqual, withTransition } from "./utilities";
  * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_reconciles_independent_field_selections
  * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_form_submission_reconciliation_uses_latest_schema
- * @matrix edited-entity-notice : active-state clean-state coalescing comparison dirty-state focused-state latest-schema local-values overlap-follow-up owned-deferred-completion per-field-selection reload-fallback renderer-capability schema-only submission-choice targeted-reset transition whole-form-selection
- * @matrix forms : latest-schema per-field-selection submission-choice
+ * @matrix edited-entity-notice : active-state clean-state coalescing comparison dirty-state focused-state latest-schema local-values mixed-submission overlap-follow-up owned-deferred-completion per-field-selection reload-fallback renderer-capability saved-default schema-only submission-choice targeted-reset transition whole-form-selection
+ * @matrix forms : latest-schema mixed-submission per-field-selection saved-default submission-choice
  * @pairs form-schema:notice reconnect-refresh:dirty-form-preservation
  */
 export class EditReconciler {

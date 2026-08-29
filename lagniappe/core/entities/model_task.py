@@ -6,7 +6,7 @@ from .entity import Entity
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_model_task_entity_create_update_order_and_save_relations
 # @tests tests_unit/test_005_project_properties.py::test_model_task_allowed_inherits_attached_form_restrictions
-# @matrix model-task project : attached-form create ordering relation-save restricted-access update
+# @matrix model-task permissions project : attached-form create ordering relation-save restricted-access update
 class ModelTask(Entity):
     entity_kind = "model"
 

@@ -13,7 +13,7 @@ from .base_db import DBProperty
 # @tests tests_unit/test_009a_user.py::test_user_groups_membership_changes_recalculate_permissions
 # @tests tests_unit/test_009a_user.py::test_user_groups_reject_invalid_relation_inputs
 # @tests tests_unit/test_009a_user.py::test_public_user_groups_force_public_group_only
-# @matrix user-groups : membership-change permission-recalc public-user relation-storage
+# @matrix user-groups : membership-change permission-recalc public-group-only public-user relation-storage sync validation
 class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
     """Groups a user belongs to.
 
@@ -98,7 +98,8 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
 # @tests tests_unit/test_009a_user.py::test_user_page_auto_create_lazy_load_and_owner_link
 # @tests tests_unit/test_009a_user.py::test_user_page_missing_key_raises_runtime_error
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
-# @matrix user : auto-create lazy-load owner-link personal-page
+# @matrix user : auto-create lazy-load limited-attrs owner-link personal-page public-user validation
+# @matrix public-users : auto-create lazy-load owner-link public-user
 # @pair user-settings:page-remove
 class UserPage(RelatedEntityMixin, DBProperty):
     """The page entity associated with a user.

@@ -40,9 +40,10 @@ class EntityRegistry:
         return self._types[entity_type.upper()].value(entity)
 
     # @testable true
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_reuses_cached_attached_relations
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_preserves_explicit_root_over_shallow_attached_copy
+    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_reuses_cached_attached_relations
     # @matrix entities relations : attached-cache load no-extra-read
+    # @pairs entities:explicit-fetch-depth relations:root-precedence
     def _load(self, *identifiers, related=True, _fetch=None, _fetch_stage=None):
         """Batch-load typed entities and attach resolved relationships."""
         if not identifiers:
@@ -133,9 +134,13 @@ class EntityRegistry:
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_applies_total_depth_to_key_and_typed_entity
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_batches_unresolved_roots_once
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_deduplicates_mixed_roots_and_skips_missing
+    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_attaches_survivors_from_fully_resolved_relation
+    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_root_does_not_attach_cross_root_relations
+    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_root_reuses_typed_entity_without_database_fetch
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_reuses_attached_direct_relations
     # @matrix entities : batch explicit-fetch-depth
     # @matrix relations : direct nested root
+    # @pairs entities:fetch entities:no-extra-read entities:typed-entity relations:stale-key
     def fetch(self, *identifiers, request):
         """Load roots and expand only to the requested total relationship depth."""
         if not isinstance(request, Fetch):

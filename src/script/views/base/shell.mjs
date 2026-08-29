@@ -70,6 +70,11 @@ export default class ShellView {
 		this.servicesReady = Promise.resolve(this);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @pair startup:performance-marks
+	 */
 	async init() {
 		if (this._interactive) return this;
 		this._interactive = true;
@@ -256,6 +261,11 @@ export default class ShellView {
 		else await this.PollingCoordinator?.resume();
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @pair startup:performance-marks
+	 */
 	publish() {
 		if (this._destroyed || this._published) return this;
 		this._published = true;
@@ -386,6 +396,11 @@ export default class ShellView {
 		);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @pair forms:submit-interception
+	 */
 	_handleSubmit(event) {
 		if (!this.ensureSubmissionManager || event.defaultPrevented) return;
 		const form = event.target;
@@ -410,6 +425,11 @@ export default class ShellView {
 		});
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @pair startup:single-flight
+	 */
 	runColdAction(owner, load, activate, busyOwner = owner) {
 		if (!owner || this._destroyed) return Promise.resolve(null);
 		if (this._coldActions.has(owner)) return this._coldActions.get(owner);
@@ -437,6 +457,11 @@ export default class ShellView {
 		return pending;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @pair startup:destroy-safety
+	 */
 	destroy() {
 		this._destroyed = true;
 		for (const timer of this.copyResetTimers.values()) clearTimeout(timer);

@@ -9,7 +9,7 @@ from runner.process import run_command
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_activation_uses_complete_saved_target
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_activation_skips_unconfigured_repository
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_activation_rejects_partial_saved_target
-# @matrix setup : gcloud-config gcloud-token unconfigured
+# @matrix auth development setup testing : activation gcloud-config gcloud-token unconfigured validation
 def activate_repository_gcloud(
     *,
     ensure_adc=False,

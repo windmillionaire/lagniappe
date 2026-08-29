@@ -11,7 +11,7 @@ from .base_property import UNSET
 # @tests tests_unit/test_003c_submission_complex.py::test_signature_field_projections_reflect_asset_presence
 # @tests tests_unit/test_013_task_properties.py::test_task_signature_form_submission_saves_asset_id
 # @tests tests_unit/test_013_task_properties.py::test_task_signature_form_submission_saves_multiple_assets_by_field_id
-# @matrix signature submission task : asset-lifecycle db-value multiple-fields schema-id
+# @matrix signature submission task : ai-value asset-lifecycle column db-value filter-value multiple-fields schema-id sort
 # @pair signature:form-value
 class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty):
     """Signature image field. Stored as an image asset.

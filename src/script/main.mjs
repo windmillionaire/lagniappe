@@ -318,6 +318,7 @@ async function syncViewOnce({
  * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
  * @tests tests_js/test_017_main_lifecycle.py::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
  * @matrix offline : browser-state server-health settled-boundary transitions
+ * @pairs connectivity:error-recovery offline:error-recovery
  */
 async function syncView(options = {}) {
 	queueSync(options);
@@ -422,6 +423,9 @@ function startErrorHandling() {
 /**
  * @testable true
  * @tests tests_js/test_017_main_lifecycle.py::test_service_worker_registration_starts_immediately
+ * @tests tests_js/test_017_main_lifecycle.py::test_controller_replacement_receives_current_versioned_connectivity_state
+ * @tests tests_js/test_017_main_lifecycle.py::test_public_page_skips_authenticated_lifecycle
+ * @matrix connectivity service-worker : controller-replacement state-publication version
  * @pairs service-worker:registration startup:interaction-ready
  */
 function startServiceWorker() {

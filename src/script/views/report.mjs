@@ -36,6 +36,11 @@ export default class Report extends Core {
 		return this;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_038_startup_specializations.py::test_report_loads_base_form_only_for_present_forms_and_in_parallel
+	 * @matrix ai-report : concurrent-form-init lazy-form-runtime
+	 */
 	ensureReportForms() {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;

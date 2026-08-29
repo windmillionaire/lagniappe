@@ -44,11 +44,14 @@ annotated_source_roots:
   - config/recovery.py
   - config/datastore.py
   - config/deployment.py
+  - config/data_migrations.py
   - config/ai_email.py
   - config/ai_models.py
   - config/ai_settings.py
   - config/form_schema.py
   - config/public_pages.py
+  - testing/utility/runtime_outbound_http.py
+  - testing/utility/hosted_deferred_jobs.py
   - run.py
   - runner/context.py
   - runner/adc.py

@@ -6,8 +6,9 @@ from .base_property import Property, UNSET
 
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_document
+# @tests tests_unit/test_005_project_properties.py::test_project_document_state_uses_markup_when_no_ydoc
 # @tests tests_unit/test_008_page_properties.py::test_page_document
-# @matrix page project : document
+# @matrix page project : document document-state markup-fallback
 class Document(CacheMixin, FilterMixin, AIMixin, Property):
     """Collaborative rich-text document (HTML + YDoc).
 

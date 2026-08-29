@@ -64,7 +64,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_external_link_column
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_internal_link_column
     # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_internal_link_missing_target_clears_value
-    # @matrix link : entity-resolution external internal metadata row-submission stale-target
+    # @matrix link submission : entity-resolution external internal metadata row-submission stale-target
     @property
     def value(self):
         return super().value
@@ -116,7 +116,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_exact_match
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_fuzzy_match_warning
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_no_match_records_error
-    # @matrix link : external fuzzy-match import internal no-match
+    # @matrix link submission : entity-resolution external fuzzy-match import internal no-match weak-match
     def validate_import(self, value):
         try:
             if self["location"] == "in":

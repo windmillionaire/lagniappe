@@ -705,8 +705,13 @@ def tool_report(report):
     return render_template("tools/report.html", report=report), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/main.py::home_page
+# @testable true
+# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_category_home_rows_only_offer_star_controls
+# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_empty_home_model_lists_settle_to_disabled_zero_state
+# @pairs permissions:active-tasks-directory permissions:home-actions permissions:own-page-only
+# @template home/categories.html::category
+# @template home/directory.html::list
+# @template home/home.html::create
 def home_page(home):
     poll_revisions = channel_revisions(("home-notes", "tasks"), current_user)
     return (

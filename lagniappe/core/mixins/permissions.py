@@ -190,7 +190,7 @@ class PublicPermissionsMixin(PermissionsMixin):
 
     # @testable true
     # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
-    # @matrix permissions public-groups : default-denial permission-form
+    # @matrix permissions public-groups user-groups : default-denial form-data permission-form
     def permissions_form(self):
         """Build section config for the public permissions UI."""
         specific_permissions = self.get_specific_permissions()

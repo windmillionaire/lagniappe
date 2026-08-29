@@ -198,6 +198,11 @@ export class BaseElement {
 		return true;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+	 * @pair forms:direct-fields
+	 */
 	create() {
 		let elt;
 		if (this.readonly && this.schema.type !== "table") {

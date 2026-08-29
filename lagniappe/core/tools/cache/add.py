@@ -56,7 +56,9 @@ def delete_entity_from_search(kind, entity):
     cache.delete(key)
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_017_cache_query.py::test_cache_update_writes_pointer_search_rows_and_parent_free_details
+# @matrix cache : details parent-key redis-storage
 def update(*entities, update=True):
     """Write entity data to the hash cache and update JSON indexes."""
     cacheable = [e for e in entities if getattr(e, "to_cache", None)]

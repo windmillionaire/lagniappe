@@ -12,9 +12,10 @@ from .base_property import UNSET
 
 
 # @testable true
+# @tests tests_unit/test_006_file_properties.py::test_direct_upload_file_asset_sniffs_generic_video_from_sample_without_full_read
 # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_records_metadata_before_asset_save
 # @tests tests_unit/test_006_file_properties.py::test_file_asset_detects_mislabeled_png_upload
-# @matrix file : asset-extension asset-lifecycle encoding metadata mimetype upload
+# @matrix file storage : asset-extension asset-lifecycle direct-upload encoding large-video metadata mimetype upload
 class FileAsset(AssetProperty):
     """The uploaded file for a File entity.
 

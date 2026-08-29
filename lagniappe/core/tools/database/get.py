@@ -736,7 +736,7 @@ def activity(parent, types=("note", "notification")):
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_home_notes_return_only_visible_notes
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_note_visibility_across_users
-# @matrix notes permissions : home ordering owner private shared
+# @matrix activity notes permissions : home ordering owner private shared
 def home_notes(user):
     """Fetch Home-scope notes visible to ``user``."""
     note_filter = Filter().eq("type", "note").eq("scope", "home")

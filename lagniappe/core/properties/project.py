@@ -60,7 +60,7 @@ class ModelTasks(RelatedEntityListMixin, Property):
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_filters
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_conditions_include_task_fields
-# @matrix filters : completed conditions entity-fields filter-value
+# @matrix filters project : completed conditions entity-fields filter-value
 class ProjectFilters(Filters):
     def __init__(self, *args, entity=None, **kwargs):
         super().__init__(*args, entity=entity, **kwargs)

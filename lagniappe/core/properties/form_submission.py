@@ -62,7 +62,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
     # @tests tests_unit/test_004e_submission_behavior.py::test_missing_stored_checkbox_is_unset_and_omitted
     # @tests tests_unit/test_004e_submission_behavior.py::test_stored_explicit_checkbox_false_survives_load_save
     # @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
-    # @matrix submission : cache empty-field fields load-save missing-field normalization projection stale-db stored-false stored-null unset
+    # @matrix submission : cache column empty-field empty-value fields load-save missing-field normalization projection stale-db stored-false stored-null unset
     @property
     def fields(self):
         if getattr(self, "_fields", None):

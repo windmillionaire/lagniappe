@@ -58,9 +58,9 @@ class FormType(AIMixin, ColumnMixin, DetailsMixin, CacheMixin, DBProperty):
         return "type"
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/form.py::FormFilters.fields
-# @covered-by lagniappe/core/properties/form.py::FormFilters.conditions
+# @testable true
+# @tests tests_unit/test_012b_form_conditions.py::test_form_status_filters
+# @matrix filters status : form-filters status-excluded
 class FormFilters(Filters):
     _filter_fields = []
 

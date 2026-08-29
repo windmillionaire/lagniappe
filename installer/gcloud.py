@@ -605,7 +605,7 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_app_engine_creation_prompt_and_bounded_failures
-# @matrix setup : app-engine immutable-location interactive-input provider-state timeout
+# @matrix setup : app-engine failure-isolation immutable-location interactive-input provider-state timeout
 def create_app_engine_app():
     """Get the immutable App Engine application or create it after confirmation."""
     from config import SETTINGS

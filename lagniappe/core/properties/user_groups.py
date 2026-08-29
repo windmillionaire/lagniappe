@@ -34,7 +34,7 @@ class GroupPermissions(GroupPermissionsMixin, Permissions):
     # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
     # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_owner_only_and_unauthenticated_defaults
     # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
-    # @matrix permissions user-groups : default-denial form-data restricted views
+    # @matrix permissions user-groups : default-denial form-data restricted unauthenticated views
     # @pair user-groups:owner-only
     def create(self, form_data=None, user=None):
         user = current_context_user(user)
@@ -95,7 +95,7 @@ class PublicPermissions(PublicPermissionsMixin, Permissions):
     # @tests tests_unit/test_009e_user_groups.py::test_public_permissions_default_forms_view_is_stored
     # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_owner_only_and_unauthenticated_defaults
     # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
-    # @matrix permissions public-groups : active permissions public
+    # @matrix permissions public-groups user-groups : active default-forms-view explicit-none permissions public storage unauthenticated
     # @pairs permissions:owner-only public-groups:default-forms-view
     def create(self, form_data=None, user=None):
         user = current_context_user(user)

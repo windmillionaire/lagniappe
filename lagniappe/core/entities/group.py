@@ -48,7 +48,7 @@ class UserGroup(Entity):
 
     # @testable true
     # @tests tests_unit/test_009e_user_groups.py::test_save_permissions_refreshes_member_users_with_current_group
-    # @matrix permissions user-groups : cache-invalidation member-refresh permission-update
+    # @matrix permissions public-groups user-groups : cache-invalidation member-refresh permission-update
     def save_permissions(self, form_data=None):
         self.properties.permissions.create(form_data)
 

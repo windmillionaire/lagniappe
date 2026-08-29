@@ -262,6 +262,9 @@ class Entity:
         self._details = details
         return self._details
 
+    # @testable true
+    # @tests tests_unit/test_001_test_general_and_utilities.py::test_reference_details_does_not_derive_requirements_from_unloaded_relations
+    # @pairs entities:reference-details relations:direct
     @property
     def reference_details(self):
         """Return a non-recursive display projection for an entity reference."""
@@ -314,6 +317,10 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
+    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_ai_merges_submission_fields_without_nested_duplicate
+    # @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
+    # @matrix ai entity submission : single-merge submission-fields
+    # @matrix ai file : metadata permissions
     # @pair permissions:authenticated-user
     def to_ai(self, user=None):
         user = current_context_user(user)
@@ -358,7 +365,7 @@ class Entity:
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
     # @tests tests_unit/test_013_task_properties.py::test_task_filter_index_includes_restricted_related_values
     # @tests tests_unit/test_004e_submission_behavior.py::test_unset_submission_fields_do_not_erase_entity_filter_metadata
-    # @matrix filter-index : entity-metadata unset-values
+    # @matrix filter-index permissions task : column-view entity-metadata permission-neutral related-values unset-values
     # @pairs filter-index:related-values permissions:filter-index-neutral
     def to_filter_index(self, user=None):
         values = {"id": self.urlsafe_key}

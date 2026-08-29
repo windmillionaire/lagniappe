@@ -14,9 +14,11 @@ EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input
+# @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input_empty_column_value_is_blank
 # @tests tests_unit/test_004d_submitter.py::test_text_input_validate_import_space_joins_list_values
+# @tests tests_unit/test_004d_submitter.py::test_import_submission_space_joins_input_list_values
 # @tests tests_unit/test_004b_schema_core.py::test_schema_create_field_known_text_input
-# @matrix text-input : ai-value field-factory filter-value import list-normalization search-value
+# @matrix text-input : ai-value column empty-field empty-value field-factory filter-value import list-normalization save search-value
 class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     """Plain text input field.
 

@@ -183,6 +183,9 @@ class Asset:
         )
         return f"gs://{storage_bucket_name(bucket)}/{self.path}"
 
+    # @testable true
+    # @tests tests_unit/test_006_file_properties.py::test_file_asset_definition_records_size_and_large_flag
+    # @matrix file storage : asset-size large-asset
     @property
     def definition(self):
         definition = {

@@ -120,7 +120,10 @@ class ChooseType(ProcessProperty):
     label = "Select Entity Type"
     attributes = ("entity_type",)
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_006b_ingress_entity.py::test_choose_type_update_via_current_stage_property
+    # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_restarts_downstream_choices_when_entity_type_changes
+    # @matrix ingress : choose-type clear-downstream update
     def update(self, form_data):
         return IngressService(self.entity).update_stage(
             IngressStage.CHOOSE_TYPE,

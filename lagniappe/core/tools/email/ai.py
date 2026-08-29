@@ -180,7 +180,7 @@ def _svix_secret_bytes(secret):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_uses_raw_body_timestamp_and_any_v1_signature
 # @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_invalid_or_stale_requests
-# @matrix ai-email webhook : raw-body rotation signature timestamp webhook
+# @matrix ai-email webhook : invalid raw-body rotation signature stale timestamp webhook
 def verify_svix_signature(
     raw_body,
     headers,
@@ -229,7 +229,7 @@ def verify_svix_signature(
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_parse_resend_event_rejects_malformed_shapes
-# @matrix ai-email : event-shape json webhook
+# @matrix ai-email webhook : event-shape json malformed webhook
 def parse_resend_event(raw_body):
     """Decode one signed Resend event without retaining its raw payload."""
     try:
@@ -295,7 +295,7 @@ def _parameter_domain(value):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_authentication_results_candidates_require_aligned_dmarc_pass
 # @tests tests_unit/test_028_ai_email.py::test_authentication_results_candidates_handle_folding_comments_and_multiple_values
-# @matrix ai-email sender-auth : alignment authentication-results dmarc sender-auth telemetry
+# @matrix ai-email sender-auth : alignment authentication-results comments dmarc folding multiple-results sender-auth telemetry
 def authentication_results_candidates(headers, visible_from_domain):
     """Return authserv IDs reporting aligned DMARC pass as optional telemetry."""
     expected_domain = _parameter_domain(visible_from_domain)
@@ -335,7 +335,8 @@ def _provider_id(value, label):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key
-# @matrix ai-email provider-adapter : attachments authorization idempotency outbound-email provider-adapter retrieval
+# @tests tests_unit/test_028_ai_email.py::test_resend_attachment_download_is_bounded_and_does_not_return_signed_url
+# @matrix ai-email attachments provider-adapter : attachments authorization bounded-stream idempotency outbound-email provider-adapter retrieval signed-url size
 class ResendAIEmailClient:
     """Small runtime Resend adapter for received messages, files, and feedback."""
 
@@ -731,7 +732,7 @@ def _normalize_attachment(value):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
 # @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
-# @matrix ai-email : attachments inline
+# @matrix ai-email normalization : attachments exact-local html-fallback inline reply-marker routing sender
 def normalize_resend_message(message, attachments, config):
     """Validate a Resend response and return only provider-neutral fields."""
     if not isinstance(message, dict):

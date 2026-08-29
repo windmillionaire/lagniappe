@@ -137,7 +137,8 @@ export class OfflineQueue {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_offline_submit_record_keeps_originating_entity_fingerprint
-	 * @matrix offline : fingerprint immutable-command queue-submit
+	 * @tests tests_js/test_028_form_state_split.py::test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload
+	 * @matrix offline : fingerprint immutable-command queue-submit renderer-snapshot
 	 */
 	async queueSubmit(component, data, route, method = "POST") {
 		const widget = component.active;
@@ -226,13 +227,14 @@ export class OfflineQueue {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_polls_mounted_form_without_direct_acknowledgement
+	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_keeps_stale_submission_queued_for_reconciliation
 	 * @tests tests_js/test_045_offline_queue.py::test_offline_replay_blocks_later_records_after_the_oldest_record_fails
 	 * @tests tests_js/test_045_offline_queue.py::test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_record
 	 * @tests tests_js/test_045_offline_queue.py::test_offline_replay_retries_rebased_record_before_later_record
 	 * @tests tests_js/test_045_offline_queue.py::test_offline_replay_releases_ownership_after_handler_errors
 	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_retries_a_conflict_rebased_by_the_form
 	 * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
-	 * @matrix offline : conflict-rebase queue-preserved queue-submit reload replay replay-order replay-reconciliation retry-boundary
+	 * @matrix offline : conflict-durability conflict-rebase dispatch queue-preserved queue-submit reload replay replay-order replay-reconciliation retry-boundary
 	 * @pair edited-entity-notice:replayed-response
 	 */
 	async replay() {
@@ -474,6 +476,12 @@ export class OfflineQueue {
 		return [...this.records].sort((a, b) => a.created_at - b.created_at);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_keeps_stale_submission_queued_for_reconciliation
+	 * @tests tests_js/test_028_form_state_split.py::test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload
+	 * @matrix offline : fingerprint-precondition reload replay-payload
+	 */
 	async _send(record) {
 		if (record.method === "DELETE") return request.delete(record.route);
 

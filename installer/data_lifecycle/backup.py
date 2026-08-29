@@ -227,7 +227,7 @@ def _publish_catalog(context, object_name, payload):
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_backup_resumes_provider_operation_and_publishes_manifest_last
 # @tests tests_tooling/test_008_data_lifecycle.py::test_backup_selects_completed_whole_minute_without_runtime_action
-# @matrix data-lifecycle : backup manifest-last point-in-time resume
+# @matrix data-lifecycle : backup framework-neutral manifest-last point-in-time resume
 def create_backup(
     context: ProviderContext | None = None,
     *,

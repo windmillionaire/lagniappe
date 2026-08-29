@@ -122,6 +122,7 @@ def _run_pytest_subprocess(command: list[str]) -> int:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_e2e_aligns_adc_before_pytest
 # @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
+# @matrix hosted-e2e testing : cli-routing
 # @pairs hosted-e2e:frontend-build testing:adc
 def run_tests(test_args: list[str]) -> int:
     """Run pytest through the repo wrapper.
@@ -340,7 +341,7 @@ def run_test_server_command(command_args: list[str]) -> int:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_auth_runs_interactive_human_adc_alignment
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_auth_reports_alignment_failure
-# @matrix auth : explicit-command interactive
+# @matrix auth : adc explicit-command interactive runtime-identity
 def run_auth_command(command_args: list[str]) -> int:
     """Interactively align human ADC for local runtime impersonation."""
     parser = argparse.ArgumentParser(

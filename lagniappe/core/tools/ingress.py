@@ -69,7 +69,7 @@ def _form_data(data):
 
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns
-# @pair ingress:process-csv
+# @pairs ingress:process-csv ingress:upload-counts
 class IngressParser:
     """Pure parsing boundary for an ingress upload or stored text asset."""
 
@@ -85,9 +85,11 @@ class IngressParser:
 
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_maps_csv_columns_to_page_task_and_table_fields
+# @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_internal_link_fields_offer_fuzzy_import
+# @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_stale_form_field_mapping_is_ignored
 # @tests tests_unit/test_006b_ingress_entity.py::test_task_import_story_chooses_page_lookup_fields_before_rows_are_imported
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-# @matrix ingress : assign-columns guessed-fields ignored-columns multiple-columns table-fields task-name verify-import
+# @matrix ingress link : assign-columns fuzzy-match guessed-fields ignored-columns internal multiple-columns page-lookup stale-field table-fields task-name verify-import
 class IngressMapping:
     """Canonical projection from stored ingress configuration to row mappings."""
 
@@ -984,7 +986,9 @@ class IngressService:
         elif stage == IngressStage.CHOOSE_FORM:
             self.entity.form = None
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_006b_ingress_entity.py::test_finalize_sets_choose_type_complete
+    # @matrix ingress : finalize process-complete stage
     def finalize(self, data=None):
         self.require_supported()
         stage = self.stage
@@ -1040,7 +1044,10 @@ class IngressService:
         self.save()
         return self.progress()
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_existing_model_parent_loads_project_for_required
+    # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_reuses_or_creates_the_parent_before_form_mapping
+    # @matrix ingress relations : choose-parent existing-parent form-reset model model-load parent required-validation
     def _apply_parent_choice(self):
         status = self.entity.properties.choose_parent
         entity_type = self.entity.properties.choose_type.entity_type

@@ -275,7 +275,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_preserves_table_row_lists_during_input_list_normalization
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_fuzzy_match_warning
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
-    # @matrix form-table submission : error-message fuzzy-match import list-normalization validation
+    # @matrix form-table submission text-input : error-message fuzzy-match import list-normalization save validation
     def import_submission(self, imported_submission, import_process):
         for field_id, field in self.properties.submission.fields.items():
             try:
@@ -379,7 +379,7 @@ class SubmitterMixin:
 
     # @testable true
     # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
-    # @pair submission:derived-page-keys
+    # @pairs form-table:derived-page-keys submission:derived-page-keys
     @property
     def derived_page_keys(self):
         keys = []

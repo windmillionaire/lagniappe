@@ -875,7 +875,7 @@ def validate_project_id(project_id):
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_new_project_forces_transactional_adc_refresh
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_refreshes_adc_login_after_quota_failure
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_exits_when_adc_login_refresh_fails
-# @matrix setup : gcloud-config new-project
+# @matrix setup : adc gcloud-config new-project transactional-state
 def _set_adc_quota_project(project_id, sp):
     from installer import FORMATTER
     from config import SETTINGS
@@ -1302,6 +1302,7 @@ def _target_preflight(project_id):
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_creates_and_bills_confirmed_project
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_authorizes_billing_after_project_creation_when_cli_list_is_empty
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_rediscovers_and_links_existing_billing_account
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
 # @matrix setup : billing browser preflight project-create provider-apis
 def _apply_target_preflight(project_id, preflight, project_ready=None):
     """Apply the already-confirmed project creation and billing mutations."""
@@ -1681,9 +1682,9 @@ def _build_app_settings():
     SETTINGS.APP.update(default_settings)
 
 
-# @testable false
-# @covered-by installer/create_config.py::_set_default_config
-# @reason config-file build step owned by the default config creation flow
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_app_engine_pdfjs_wasm_handlers_precede_general_js
+# @matrix deploy : app-yaml pdf-preview static-assets
 def _build_deploy_yaml():
     from config import constants, SETTINGS
 
@@ -1850,7 +1851,7 @@ def _active_cli_identity():
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_persists_prompted_name_before_cloud_change
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_existing_project_prepares_bootstrap_apis_before_adc
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_write
-# @matrix setup : config-files gcloud-config interactive-input recovery
+# @matrix setup : adc config-files existing-project gcloud-config interactive-input preconfirmation provider-apis recovery
 def set_application_defaults():
     with _adc_auth_transaction():
         return _set_application_defaults()

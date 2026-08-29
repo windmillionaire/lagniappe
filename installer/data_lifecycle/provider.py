@@ -426,6 +426,9 @@ class ProviderContext:
             raise DataLifecycleError("Provider did not return a valid restore operation name.")
         return name, payload
 
+    # @testable true
+    # @tests tests_tooling/test_008_data_lifecycle.py::test_database_import_uses_export_output_prefix
+    # @matrix data-lifecycle : database-import provider-contract
     def start_import(self, output_prefix: str, database_id: str):
         parse_gs_uri(output_prefix)
         database_id = validate_database_id(database_id)

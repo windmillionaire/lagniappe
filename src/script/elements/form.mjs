@@ -146,6 +146,11 @@ export class FormElement {
 		};
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_local_revision_uses_latest_schema_and_merges_submission_values
+	 * @matrix edited-entity-notice form-schema forms : latest-schema local-values no-schema-version-choice remote-added-values
+	 */
 	buildLocalRevision(response, state = this.captureFormState()) {
 		const latestSchema = response.schema ?? [];
 		const latestIds = new Set(
@@ -361,6 +366,11 @@ export class FormElement {
 		}
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_active_deferred_form_waits_for_root_operation_scan
+	 * @matrix deferred-jobs : form-lock reload
+	 */
 	async _initForm({ replace = true } = {}) {
 		if (replace && this.initialTarget) {
 			const visible = this.target?.dataset.visible;
@@ -386,6 +396,11 @@ export class FormElement {
 		}
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+	 * @matrix forms : clear direct-fields
+	 */
 	_click(e) {
 		if (this.readonly) return;
 

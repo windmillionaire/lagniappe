@@ -70,7 +70,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_user_page_permissions_follow_users_only_or_attached_categories
     # @tests tests_unit/test_009f_page_view_access.py::test_user_page_uses_users_permissions_not_models_permissions
-    # @matrix permissions users : models-scope user-page users-scope
+    # @matrix page permissions users : models-scope user-page users-scope
     @property
     def required(self):
         required = []
@@ -179,7 +179,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_009f_page_view_access.py::test_page_view_access_returns_attached_groups
     # @tests tests_unit/test_009f_page_view_access.py::test_page_view_access_from_group_views
     # @tests tests_unit/test_009f_page_view_access.py::test_user_page_uses_users_permissions_not_models_permissions
-    # @matrix page : attached-groups db-load group-views owner user-page view-access
+    # @matrix page permissions users : attached-groups db-load group-views owner user-page view-access
     @property
     def view_access(self):
         if "owner" in self.properties.restricted_to.stored:

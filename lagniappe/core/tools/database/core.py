@@ -32,9 +32,9 @@ def expected_storage_cors(config=CONFIG):
     return storage_contract.expected_storage_cors(config)
 
 
-# @testable false
-# @covered-by config/storage.py::_normalized_cors
-# @reason compatibility wrapper retained for existing runtime callers
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_storage_cors_comparison_is_order_insensitive
+# @matrix storage : cors idempotent
 def _normalized_cors(cors):
     return storage_contract._normalized_cors(cors)
 

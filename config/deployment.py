@@ -40,7 +40,7 @@ def _deployment_int(settings, defaults, key, label, min_value=1):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_normalize_validation
-# @matrix config : app-yaml deployment-settings validation
+# @matrix config user-settings : app-yaml deployment-settings validation
 def normalize_deployment_settings(deployment_settings):
     from config import constants
 

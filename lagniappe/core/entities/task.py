@@ -126,8 +126,10 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_assigned_user_page_override
+    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_models_view_requires_models_marker
+    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_restricted_form_blocks_page_permission
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_skips_unloaded_page_when_stored_permission_suffices
-    # @matrix permissions task : allowed assignee-override
+    # @matrix permissions task users : allowed assignee-override lazy-parent-check models-scope parent-page restricted-access shallow-page stored-requires user-page
     # @pair task:stored-requires
     def allowed(self, action, user=None):
         user = current_context_user(user)
@@ -308,7 +310,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_restores_default_submission_and_assignment
     # @tests tests_unit/test_003g_todo_lists.py::test_uncomplete_archives_then_clears_todo_items
     # @matrix task-completion : assignment history repeating-default uncomplete
-    # @pair form-todo:field-reset
+    # @pairs form-todo:field-reset signature:history
     def uncomplete(self, history_key=None):
         """Archive the current completion as TaskHistory and reset the task."""
         self._clear_scheduled_uncomplete()
@@ -375,7 +377,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_013_task_properties.py::test_task_update_tracks_project_model_and_uploaded_file
     # @tests tests_unit/test_013_task_properties.py::test_task_update_saves_file_relations_from_upload_assets
     # @tests tests_unit/test_031_submitted_references.py::test_task_update_preserves_unchanged_assignee_eligibility
-    # @matrix task : assignee-preservation tracking update uploaded-files
+    # @matrix task : assignee-preservation file-assets tracking update uploaded-files
     def update(self, data):
         previous_form_key = self.properties.form.key
         self.page = data.get("page", self.page)

@@ -21,6 +21,11 @@ export class TextareaElement extends BaseElement {
 		return true;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+	 * @matrix forms : clear input textarea
+	 */
 	clear() {
 		this.submission = null;
 		const textarea = this._edit?.matches?.("textarea")

@@ -33,7 +33,7 @@ WEBHOOK_EVENTS = ["email.received"]
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_client_uses_full_key_for_provider_administration
-# @matrix ai-email : authorization resend-api setup
+# @matrix ai-email setup : authorization resend-api setup
 class ResendSetupClient:
     """Bounded Resend administration adapter for the focused installer."""
 
@@ -218,7 +218,7 @@ def _open_resend_page(label, url):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_guides_full_receiving_key_creation
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt
-# @matrix ai-email : authorization browser instructions resend secrets setup
+# @matrix ai-email resend setup : authorization browser instructions resend secrets setup
 def guide_resend_receiving_key(*, existing=False):
     """Explain the exact dashboard steps for the receiving administration key."""
     print("\nConfigure the Resend receiving administration key:")
@@ -284,7 +284,7 @@ def _domain_id(domain):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_reconcile_receiving_domain_creates_or_reuses_one_exact_domain
-# @matrix ai-email : domain idempotence receiving-only resend setup
+# @matrix ai-email setup : domain idempotence receiving-only resend resend-domain setup
 def reconcile_receiving_domain(client, domain):
     """Find/create one exact receiving domain without touching unrelated domains."""
     matches = [
@@ -346,7 +346,7 @@ def _print_domain_records(domain):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_receiving_dns_guidance_prefers_cloudflare_and_keeps_manual_fallback
-# @matrix ai-email : browser cloudflare-dns instructions manual-dns receiving-domain setup
+# @matrix ai-email setup : browser cloudflare-dns instructions manual-dns receiving-domain setup
 def guide_resend_receiving_dns(domain, *, cloudflare_default=False):
     """Guide assisted or manual DNS without dumping records unnecessarily."""
     domain_name = str(domain.get("name") or "").strip()
@@ -431,7 +431,7 @@ def _wait_for_domain(client, domain_id, *, attempts=12, sleep=time.sleep):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_reconcile_webhook_reuses_endpoint_and_disables_before_deploy
-# @matrix ai-email : disabled-first idempotence resend secret-retrieval setup webhook
+# @matrix ai-email setup : disabled-first idempotence resend resend-webhook secret-retrieval setup webhook
 def reconcile_webhook(client, endpoint):
     """Return one exact webhook and leave it disabled for safe deployment."""
     matches = [
@@ -514,7 +514,7 @@ def _setup_config(
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_requires_custom_domain_and_supporting_services
-# @matrix ai-email : custom-domain prerequisites setup supporting-services
+# @matrix ai-email setup : custom-domain prerequisites setup supporting-services
 def _prerequisites(settings):
     custom_domain = str(settings.get("CUSTOM_DOMAIN") or "").strip()
     auth_email = settings.get("AUTH_EMAIL_CONFIG") or {}
@@ -546,7 +546,7 @@ def _prerequisites(settings):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_disable_turns_off_provider_before_saving_and_deploying
-# @matrix ai-email : deploy disable disabled-first provider-state secrets setup
+# @matrix ai-email setup : deploy disable disabled-first provider-state secrets setup
 def _disable(existing):
     from config import SETTINGS
     from installer import utils

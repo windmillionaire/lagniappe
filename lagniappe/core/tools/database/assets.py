@@ -311,8 +311,10 @@ def delete_direct_upload(record):
         return False
 
 
-# @testable false
-# @reason cloud storage behavior is owned by E2E coverage against configured services
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_save_file_preserves_direct_upload_source_when_requested
+# @tests tests_unit/test_018_database_assets.py::test_save_file_returns_reloaded_blob_metadata
+# @matrix direct-upload file storage : asset-size deferred-cleanup metadata
 def save_file(file, path, content_type, visibility):
     """Upload a file object to the specified bucket.
 

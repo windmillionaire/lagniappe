@@ -95,7 +95,7 @@ def _hydrate_details(details, requested_hashes):
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_search_results_are_hydrated_from_details_hashes
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_parent_details_refresh_after_category_rename
-# @matrix search : details-hydration parent-key parent-refresh snippets
+# @matrix cache search : details-hydration parent-key parent-refresh snippets
 def hydrate_search_results(results):
     """Attach hydrated details to formatted search results."""
     detail_hashes = []

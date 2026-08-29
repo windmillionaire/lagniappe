@@ -46,7 +46,8 @@ def _truthy(value):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_file_tools_return_summary_and_content
 # @tests tests_unit/test_015_ai_tools.py::test_ai_get_file_skips_large_original_unless_requested
-# @matrix ai files : attachments content get-file large-file summary
+# @tests tests_unit/test_015_ai_tools.py::test_ai_get_file_reports_unsupported_original_file
+# @matrix ai files : attachments content get-file large-file summary unsupported
 def execute_get_file(args, user):
     file_id = args.get("id")
     if not file_id:

@@ -57,7 +57,7 @@ class TaskStatus(ColumnMixin, Property):
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_filters
 # @tests tests_unit/test_013_task_properties.py::test_task_categories_follow_parent_page_categories
-# @matrix task : categories filter-value parent-derived
+# @matrix task : categories conditions entity-fields filter-value parent-derived
 class TaskCategories(
     RelatedEntityListMixin, FilterMixin, ColumnMixin, AIMixin, Property
 ):
@@ -104,7 +104,8 @@ class TaskCategories(
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_related_lists_replace_linked_pages_and_report_unloaded_files
-# @matrix task : related-files unloaded-fallback
+# @tests tests_unit/test_013_task_properties.py::test_task_update_saves_file_relations_from_upload_assets
+# @matrix task : file-assets file-details preload related-files unloaded-fallback
 class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
     """Files related to a task.
 

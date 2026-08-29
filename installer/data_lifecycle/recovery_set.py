@@ -134,7 +134,7 @@ def _asset_definitions(entity, source_database_id):
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_inventory_uses_one_read_time_and_requires_asset_generations
 # @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_inventory_includes_uploaded_file_asset_generations
-# @matrix data-lifecycle disaster-recovery : asset-generation inventory point-in-time
+# @matrix data-lifecycle disaster-recovery file : asset-generation inventory point-in-time uploaded-file
 def inventory_database(
     client,
     *,

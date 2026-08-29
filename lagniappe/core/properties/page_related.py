@@ -17,7 +17,7 @@ from .base_property import Property
 # @tests tests_unit/test_008_page_properties.py::test_page_categories_model_restricted_and_cache_invalidation
 # @tests tests_unit/test_008_page_properties.py::test_page_categories_preserve_users_model_and_default_after_removing_only_model
 # @tests tests_unit/test_008_page_properties.py::test_page_categories_reject_invalid_related_values
-# @matrix page : cache-invalidation categories default-category model-category model-removal restrictions users-model
+# @matrix page : cache-invalidation categories default-category model-category model-removal restrictions users-model validation
 class PageCategories(
     RelatedEntityListMixin, FilterMixin, ColumnMixin, AIMixin, DBProperty
 ):
@@ -160,7 +160,7 @@ class PageCategories(
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_files_loads_database_files
 # @tests tests_unit/test_008_page_properties.py::test_page_files_reloads_query_results_and_skips_unlinked_files
-# @matrix page : db-load files
+# @matrix page : db-load files stale-query
 class PageFiles(RelatedEntityListMixin, Property):
     """Files attached to a page. Loaded from the database on first access.
 
