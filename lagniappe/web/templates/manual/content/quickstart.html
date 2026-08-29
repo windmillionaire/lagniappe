@@ -28,7 +28,6 @@
     <div class="border-t border-base-light/40 px-5 py-5">{{ caller() }}</div>
   </details>
 {% endmacro %}
-
 <div class="space-y-6">
   {% call card() %}
     <p class="mb-3 text-lg leading-relaxed text-base-medium">
@@ -44,68 +43,64 @@
       show their name when you hover on desktop.
     {% endcall %}
   {% endcall %}
-
   {{ heading("When the Server Is Waking Up", icon="offline", kind="page") }}
   {% call card() %}
     <p class="text-base-medium leading-relaxed mb-3">
       Lagniappe uses basic scaling by default, which lets App Engine stop the
       server after it has been idle instead of charging to keep it running all
-      day. The first request after that is a cold start. The server usually
-      wakes in less than a minute; once it is awake, Lagniappe should respond
-      quickly. Continuing slowness is not an expected part of this setting.
+      day. The first request after that is a cold start. The server usually takes
+      less than a minute to become responsive.
     </p>
     <p class="text-base-medium leading-relaxed mb-3">
-      While the server wakes, you can view only pages that have already been
-      opened in this browser. The offline icon appears next to the search bar
-      and inside the submit buttons of forms that cannot be submitted offline.
-      Those buttons become available again when the server reconnects.
+      While the server is waking up (or if you are offline), you can still view
+      pages that have already been opened in this browser. The offline icon appears
+      next to the search bar and inside the submit buttons of forms that cannot be
+      submitted offline. Those buttons become available again when the server reconnects.
     </p>
     <p class="text-base-medium leading-relaxed">
       If immediate first-page responses matter more than the additional cost,
       the owner can choose automatic scaling under <strong>Admin</strong>,
       <strong>Settings</strong>, then <strong>Deployment</strong>. Follow the
       {{ link(
-        url_for("manual.index", section="personalization"),
-        "Deployment Settings"
+      url_for("manual.index", section="personalization"),
+      "Deployment Settings"
       ) }}
       instructions to apply and deploy that choice.
     </p>
   {% endcall %}
-
-  {{ heading("Saving: the Important Difference", icon="builder.saved", kind="page") }}
+  {{ heading("Saving Work: Forms and Documents", icon="builder.saved", kind="page") }}
   <div class="grid gap-4 md:grid-cols-2">
     {{ guide_item(
-      "document",
-      "Documents save themselves",
-      "Page and project documents sync in the background, save when you leave the editor, and merge edits from other people. There is no Save button.",
-      "page"
+    "document",
+    "Documents save themselves",
+    "Page and project documents sync in the background, save when you leave the editor, and merge edits from other people. There is no Save button.",
+    "page"
     ) }}
     {{ guide_item(
-      "form",
-      "Forms wait for you",
-      "Page information, task forms, settings, and other structured forms do not autosave. Use their Save, Update, or Create button.",
-      "form"
+    "form",
+    "Forms wait for you",
+    "Page information, task forms, settings, and other structured forms do not autosave. Use their Save, Update, or Create button.",
+    "form"
     ) }}
     {{ guide_item(
-      "builder.unsaved",
-      "Cloud alert means unsaved",
-      "The alert appears after a local form change. In a task row or the form builder, the cloud control itself can be used to save.",
-      "task"
+    "builder.unsaved",
+    "Cloud alert means unsaved",
+    "The alert appears after a local form change. In a task row or the form builder, the cloud control itself can be used to save.",
+    "task"
     ) }}
     {{ guide_item(
-      "selected",
-      "Task completion is immediate",
-      "The checkbox records completion right away. If an attached task form is open, its current values are included with that completion.",
-      "task"
+    "selected",
+    "Task completion is immediate",
+    "The checkbox records completion right away. If an attached task form is open, its current values are included with that completion.",
+    "task"
     ) }}
   </div>
-
   {% call disclosure(
     "Common controls",
     "The small actions that repeat throughout the app.",
     "menu",
     "page"
-  ) %}
+    ) %}
     <div class="grid gap-3 sm:grid-cols-2">
       {{ guide_item("menu", "Actions", "Opens the actions beside a title, such as Star, Add note, Copy, Move, or Delete.") }}
       {{ guide_item("star.active", "Star", "Adds or removes the record from the Starred list on Home.", "starred") }}
@@ -117,13 +112,12 @@
       {{ guide_item("offline", "Offline", "The server cannot be reached. Supported edits are queued; other save buttons stay disabled until reconnection.") }}
     </div>
   {% endcall %}
-
   {% call disclosure(
     "Home",
     "What expands in place, what opens a new page, and what the plus buttons create.",
     "home",
     "page"
-  ) %}
+    ) %}
     <p class="mb-4 text-base-medium">
       Select the main label for <strong>Starred, Directory, AI Tools, Pages,
       Notes, Tasks, Projects,</strong> or <strong>Categories</strong> to expand
@@ -147,13 +141,12 @@
       are direct links rather than expandable lists.
     </p>
   {% endcall %}
-
   {% call disclosure(
     "Pages",
     "One durable record with optional structured information, a live document, tasks, files, notes, and an image.",
     "page",
     "page"
-  ) %}
+    ) %}
     <p class="mb-4 text-base-medium">
       A page is the thing you are keeping track of: a person, property, client,
       asset, event, or anything else. The category name above its title returns
@@ -176,13 +169,12 @@
       access settings.
     </p>
   {% endcall %}
-
   {% call disclosure(
     "Tasks",
     "Work that stays attached to its page and builds a completion history over time.",
     "tasks",
     "task"
-  ) %}
+    ) %}
     <p class="mb-4 text-base-medium">
       Tasks are designed to be updated and reused, especially for recurring
       work. They can hold a due date, schedule, assignee, project link, files,
@@ -200,13 +192,12 @@
       {{ guide_item("menu", "Task actions", "Provides Move to Page, Combine with Task, and Delete when permitted.", "task") }}
     </div>
   {% endcall %}
-
   {% call disclosure(
     "Categories and index tables",
     "Browse many records, choose columns, sort and filter, or open creation and settings tools.",
     "category",
     "category"
-  ) %}
+    ) %}
     <p class="mb-4 text-base-medium">
       A category is a collection of pages and can provide their default form
       and features. Select a table row to open its record. Active Tasks, Forms,
@@ -221,13 +212,12 @@
       {{ guide_item("trash.inactive", "Row delete", "Deletes that row after confirmation when you have permission.", "delete") }}
     </div>
   {% endcall %}
-
   {% call disclosure(
     "Projects",
     "Coordinate a kind of work across many pages without moving tasks away from their original context.",
     "project",
     "project"
-  ) %}
+    ) %}
     <p class="mb-4 text-base-medium">
       Projects collect matching work across pages. Model tasks are reusable task
       templates: each can carry a default form and link to its In Progress and
@@ -240,13 +230,12 @@
       {{ guide_item("filter.list", "Task Filters", "Builds and saves cross-page views of tasks tracked by the project.", "task") }}
     </div>
   {% endcall %}
-
   {% call disclosure(
     "Forms and the form builder",
     "Define reusable structured fields, then attach the form to pages or tasks where people enter data.",
     "form",
     "form"
-  ) %}
+    ) %}
     <p class="mb-4 text-base-medium">
       A form is a reusable schema, not a filled record by itself. Opening a row
       in the Form Index opens the desktop builder. Page forms describe a page;
@@ -265,13 +254,12 @@
       typing is local and is not collaborative document editing.
     </p>
   {% endcall %}
-
   {% call disclosure(
     "Files",
     "Preview or download an upload, inspect extracted text, and see the pages or tasks it belongs to.",
     "file",
     "file"
-  ) %}
+    ) %}
     <div class="grid gap-3 sm:grid-cols-2">
       {{ guide_item("document", "Preview", "Displays a PDF, image, audio file, or video when a browser preview is available.", "file") }}
       {{ guide_item("document", "Text Content", "Displays searchable text extracted from the file. The tab heading distinguishes it from Preview.", "file") }}
@@ -283,13 +271,12 @@
       badges under the summary link back to related pages and tasks.
     </p>
   {% endcall %}
-
   {% call disclosure(
     "Search, users, and Admin",
     "The remaining workspace-wide views follow the same list, table, and save patterns.",
     "search",
     "user"
-  ) %}
+    ) %}
     <div class="grid gap-3 sm:grid-cols-2">
       {{ guide_item("search", "Search", "Type in the top bar for quick results; open All Results to filter matches by record kind.") }}
       {{ guide_item("users", "Users", "User rows open user pages. Owners can use Tools for new users, groups, and permissions.", "user") }}
@@ -297,16 +284,14 @@
       {{ guide_item("siteSettings", "Admin", "Opens Administrator site settings, exports, imports, and deployment information; secret-bearing Configuration remains Owner-only.") }}
     </div>
   {% endcall %}
-
   {% call callout("success") %}
     A practical first pass is: create a category, create one page inside it,
     enter its Info, write a few lines in its Document, then add a task. That
     short loop demonstrates the difference between structured forms,
     autosaving documents, and work that accumulates history.
   {% endcall %}
-
   {{ nav_buttons(
-    prev={"key": "overview", "name": "Overview", "kind": "category"},
-    next={"key": "forms", "name": "Forms", "kind": "form"}
+  prev={"key": "overview", "name": "Overview", "kind": "category"},
+  next={"key": "forms", "name": "Forms", "kind": "form"}
   ) }}
 </div>

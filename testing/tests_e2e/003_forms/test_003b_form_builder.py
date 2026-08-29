@@ -1,14 +1,17 @@
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Forms, Pages, Schemas, Uploads, Users
+from testing.definitions import Forms, Pages, Schemas, SitePages, Uploads, Users
+from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields
+from testing.definitions.user_definitions import UserDefinition
 from testing.elements import EditorAddImage, Select, SpinnerButtons
-from testing.resources.form import Builder
+from testing.resources.form import Builder, Form
 from testing.resources.task import Task as TaskResource
 
 pytestmark = pytest.mark.e2e
@@ -62,11 +65,16 @@ def _html_editor_text_entry(builder):
     return text_entry
 
 
-# @features forms
-# @dimensions builder-preview
+def _set_forms_permission(user, action):
+    entity = Entities.USER.load(user.email)
+    entity.permissions = {**entity.permissions, "forms": action.name}
+    entity.save()
+    user.entity = entity
+
+
+# @pair forms:builder-preview
 # @template forms/builder.html::header
 def test_preview_panel(get_user):
-    """Preview panel renders the existing saved schema."""
     user = get_user(Users.OWNER)
     form = Forms.test_preview_panel.get(user)
     form.schema = Schemas.add_fields.get()
@@ -86,10 +94,8 @@ def test_preview_panel(get_user):
     expect(preview_toggle).to_have_attribute("aria-checked", "false")
 
 
-# @features forms
-# @dimensions builder-delete-components
+# @pair forms:builder-delete-components
 def test_delete_components(get_user):
-    """Deleting a selected component removes it from the builder schema."""
     user = get_user(Users.OWNER)
     form = Forms.test_delete_components.get(user)
     builder = form.builder
@@ -115,10 +121,9 @@ def test_delete_components(get_user):
     ).not_to_be_attached()
 
 
-# @pairs forms:builder-select-options forms:builder-field-title
-# @pairs frontend-icons:material-icon-preservation
+# @matrix forms : builder-field-title builder-select-options
+# @pair frontend-icons:material-icon-preservation
 def test_change_select_options(get_user):
-    """Select labels and icons survive title edits while options remain editable."""
     user = get_user(Users.OWNER)
     form = Forms.test_change_select_options.get(user)
     builder = form.builder
@@ -176,10 +181,8 @@ def test_change_select_options(get_user):
     ]
 
 
-# @features forms
-# @dimensions builder-field-visibility
+# @pair forms:builder-field-visibility
 def test_field_visibility(get_user):
-    """A field visibility condition is stored in schema and drives preview state."""
     user = get_user(Users.OWNER)
     form = Forms.test_field_visibility.get(user)
     builder = form.builder
@@ -215,10 +218,8 @@ def test_field_visibility(get_user):
     )
 
 
-# @features forms
-# @dimensions builder-field-visibility select-or-values
+# @matrix forms : builder-field-visibility select-or-values
 def test_field_visibility_select_multiple_values(get_user):
-    """A field can be visible for multiple values from the same select."""
     user = get_user(Users.OWNER)
     form = Forms.test_field_visibility_select_multiple_values.get(user)
     builder = form.builder
@@ -258,10 +259,8 @@ def test_field_visibility_select_multiple_values(get_user):
     expect(target).to_have_attribute("data-visible", "true")
 
 
-# @features forms
-# @dimensions builder-table-column
+# @pair forms:builder-table-column
 def test_table_column_condition_editor(get_user):
-    """Table columns can be created, validated while editing, and reloaded."""
     user = get_user(Users.OWNER)
     form = Forms.test_table_column_condition_editor.get(user)
     builder = form.builder
@@ -307,10 +306,8 @@ def test_table_column_condition_editor(get_user):
     expect(saved_column.locator("[data-icon='number']")).to_be_visible()
 
 
-# @features forms
-# @dimensions builder-status-message
+# @pair forms:builder-status-message
 def test_status_message_condition_editor(get_user):
-    """Status message conditions store schema and update the builder preview."""
     user = get_user(Users.OWNER)
     form = Forms.test_status_message_condition_editor.get(user)
     builder = form.builder
@@ -371,10 +368,8 @@ def test_status_message_condition_editor(get_user):
     )
 
 
-# @features forms signature
-# @dimensions builder-signature-field unique-component builder-preview
+# @matrix forms signature : builder-preview builder-signature-field unique-component
 def test_signature_field_builder_unique_component(get_user):
-    """Task-form signature components render in preview and remain unique."""
     user = get_user(Users.OWNER)
     form = Forms.test_signature_field_builder_unique_component.get(user)
     builder = form.builder
@@ -404,10 +399,8 @@ def test_signature_field_builder_unique_component(get_user):
     expect(builder.model.locator(f"[id='{signature.id}']")).to_be_visible()
 
 
-# @features html-field
-# @dimensions builder-html-field image-upload unsaved-schema asset-lifecycle render-fetch submitter-key form-asset
+# @matrix html-field : asset-lifecycle builder-html-field form-asset image-upload render-fetch submitter-key unsaved-schema
 def test_html_field(get_user):
-    """Rich HTML fields save assets and render from a submitter form context."""
     user = get_user(Users.OWNER)
     form = Forms.test_html_field.get(user)
     builder = form.builder
@@ -483,10 +476,112 @@ def test_html_field(get_user):
     expect(html_content.locator("img")).to_be_visible()
 
 
-# @features forms
-# @dimensions builder-drag-component
+# @matrix editor : authoritative-content error-reporting initial-load intentional-clear retry server-acknowledgement
+# @matrix html-field : authoritative-content builder-html-field error-reporting form-asset initial-load intentional-clear retry server-acknowledgement
+# @style message
+# @style editor.container
+def test_html_editor_recovers_from_failed_load_and_save(
+    get_user, browser_failures
+):
+    owner = get_user(Users.OWNER)
+    html = SchemaFields.HTML.get(title="Resilient instructions")
+    form = Form(
+        user=owner,
+        definition=FormDefinition(
+            name="Builder HTML Persistence Recovery",
+            form_type="task",
+            schema=(html,),
+        ),
+    ).create()
+    user = get_user(
+        UserDefinition(
+            name="Builder HTML Recovery Editor",
+            email=f"builder-html-recovery-{uuid4().hex}@example.test",
+        ),
+        creator=owner,
+    )
+    user.go(SitePages.HOME).wait_for_interaction_readiness()
+    _set_forms_permission(user, Action.EDIT)
+    form.user = user
+    builder = form.builder
+    load_path = f"/assets/{form.key}/html/{html.id}"
+    _set_forms_permission(user, Action.NONE)
+    with browser_failures.expect_http_error(user, status=403, path=load_path):
+        with user.page.context.expect_event(
+            "response",
+            predicate=lambda response: response.url.endswith(load_path)
+            and response.request.method == "GET"
+            and response.status == 403,
+        ):
+            builder.select_field(html)
+            builder.open_condition("html", role="edit")
+
+        status = builder.condition.locator("[data-role='editor-status']")
+        editor = builder.condition.locator("[data-role='editor']")
+        expect(status).to_be_visible()
+        expect(status).to_contain_text("Error 403")
+        expect(editor).to_have_attribute("inert", "")
+        expect(editor).not_to_have_attribute("aria-busy", "true")
+        expect(editor.locator(".ProseMirror")).to_have_count(0)
+
+    _set_forms_permission(user, Action.EDIT)
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: response.url.endswith(load_path)
+        and response.request.method == "GET"
+        and response.status == 200,
+    ):
+        status.locator("[data-role='retry']").click()
+
+    text_entry = _html_editor_text_entry(builder)
+    expect(status).to_be_hidden()
+
+    save_path = f"/assets/{form.key}/form-html/{html.id}"
+    text = "Retry this durable text."
+    text_entry.press_sequentially(text)
+    _set_forms_permission(user, Action.VIEW)
+    with browser_failures.expect_http_error(user, status=403, path=save_path):
+        with user.page.context.expect_event(
+            "response",
+            predicate=lambda response: response.url.endswith(save_path)
+            and response.request.method == "PUT"
+            and response.status == 403,
+        ):
+            text_entry.blur()
+
+        expect(status).to_be_visible()
+        expect(status).to_contain_text("Error 403")
+
+    _set_forms_permission(user, Action.EDIT)
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: response.url.endswith(save_path)
+        and response.request.method == "PUT"
+        and response.status == 200,
+    ):
+        status.locator("[data-role='retry']").click()
+    expect(status).to_be_hidden()
+
+    saved_form = Entities.fetch_one(form.key, request=Fetch.root())
+    assert text in saved_form.get_html_field(html.id)
+
+    text_entry.click()
+    text_entry.press("Control+A")
+    text_entry.press("Backspace")
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: response.url.endswith(save_path)
+        and response.request.method == "PUT"
+        and response.status == 200
+    ):
+        text_entry.blur()
+
+    cleared_form = Entities.fetch_one(form.key, request=Fetch.root())
+    assert cleared_form.get_html_field(html.id) is None
+
+
+# @pair forms:builder-drag-component
 def test_drag_component(get_user):
-    """Dragging components into the model panel creates schema entries in order."""
     user = get_user(Users.OWNER)
     form = Forms.test_drag_component.get(user)
     builder = form.builder

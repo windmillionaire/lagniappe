@@ -1,8 +1,7 @@
 import pytest
 
 
-# @features task-scheduling
-# @dimensions next-due-date recurring
+# @matrix task-scheduling : next-due-date recurring
 @pytest.mark.unit
 def test_next_due_date_recurring(get_test_entities):
     """Test set_next_due_date for recurring schedules.
@@ -19,8 +18,12 @@ def test_next_due_date_recurring(get_test_entities):
     tz = ZoneInfo("America/Chicago")
     mock_today = datetime(2025, 6, 15, 0, 0, 0, tzinfo=tz)
 
-    with patch("lagniappe.core.tools.dates.user_today", return_value=mock_today):
-        with patch("lagniappe.core.tools.dates.user_timezone", return_value=tz):
+    with patch(
+        "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
+    ):
+        with patch(
+            "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
+        ):
             for task in get_test_entities():
                 schedule_data = task.test_spec.get("schedule", {})
                 expected = task.test_spec.get("expected", {})
@@ -52,8 +55,7 @@ def test_next_due_date_recurring(get_test_entities):
                 )
 
 
-# @features task-scheduling
-# @dimensions next-due-date scheduled postponed
+# @matrix task-scheduling : next-due-date postponed scheduled
 @pytest.mark.unit
 def test_next_due_date_scheduled(get_test_entities):
     """Test set_next_due_date for scheduled schedules.
@@ -70,8 +72,12 @@ def test_next_due_date_scheduled(get_test_entities):
     # Use Wednesday June 18, 2025 as mock_today (same as test_013b)
     mock_today = datetime(2025, 6, 18, 0, 0, 0, tzinfo=tz)
 
-    with patch("lagniappe.core.tools.dates.user_today", return_value=mock_today):
-        with patch("lagniappe.core.tools.dates.user_timezone", return_value=tz):
+    with patch(
+        "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
+    ):
+        with patch(
+            "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
+        ):
             for task in get_test_entities():
                 schedule_data = task.test_spec.get("schedule", {})
                 expected = task.test_spec.get("expected", {})
@@ -123,8 +129,7 @@ def test_next_due_date_scheduled(get_test_entities):
                 )
 
 
-# @features task-scheduling
-# @dimensions next-due-date periodic postponed
+# @matrix task-scheduling : next-due-date periodic postponed
 @pytest.mark.unit
 def test_next_due_date_periodic(get_test_entities):
     """Test set_next_due_date for periodic schedules.
@@ -142,8 +147,12 @@ def test_next_due_date_periodic(get_test_entities):
     # Use Wednesday June 18, 2025 as mock_today
     mock_today = datetime(2025, 6, 18, 0, 0, 0, tzinfo=tz)
 
-    with patch("lagniappe.core.tools.dates.user_today", return_value=mock_today):
-        with patch("lagniappe.core.tools.dates.user_timezone", return_value=tz):
+    with patch(
+        "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
+    ):
+        with patch(
+            "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
+        ):
             for task in get_test_entities():
                 schedule_data = task.test_spec.get("schedule", {})
                 expected = task.test_spec.get("expected", {})

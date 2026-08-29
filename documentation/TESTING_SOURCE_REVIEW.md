@@ -46,8 +46,8 @@ large fake coverage database.
    ```
 
 2. Open the source symbol and read what it actually does.
-3. Read its `@testable`, `@tests`, `@scaffolding`, `@features`,
-   `@dimensions`, `@pair`, `@covered-by`, and `@reason` tags.
+3. Read its `@testable`, `@tests`, `@scaffolding`, `@matrix`, `@pair`,
+   `@covered-by`, and `@reason` tags.
 4. Open every referenced test, including tests matched by globs and tests
    inferred from any referenced scaffold helpers.
 5. Check each declared `feature:dimension` pair against real assertions or E2E
@@ -60,9 +60,9 @@ Ask these questions:
 - Should this helper point to a more load-bearing symbol with `@covered-by`?
 - Does each referenced test assert the behavior, or does it merely execute the
   code along the way?
-- Are the features broad and the dimensions reusable? Use exact `@pair` tags
-  when separate feature/dimension lists would imply combinations the symbol
-  does not own.
+- Are the features broad and the dimensions reusable? Use separate `@matrix`
+  clauses for regular regions and exact `@pair` tags for sparse cells the
+  symbol owns.
 - Would the report tell a future reader where to focus?
 
 ## E2E Source Ownership
@@ -145,8 +145,7 @@ If the test mostly covers the source behavior but misses a small edge case, add
 `@todo` to the relevant test.
 
 ```python
-# @features cache
-# @dimensions redis-connection
+# @matrix cache : redis-connection
 # @todo cover cache index recreation after cleanup/reset
 def test_cache_setup():
     ...
@@ -165,8 +164,8 @@ Preferred pattern:
 1. Add a focused new dimension to the source symbol.
 2. Leave the existing `@tests` list pointing only at tests that currently
    provide real coverage.
-3. Add an `@pytest.mark.unfinished` test stub with matching `@features`,
-   `@dimensions`, and a clear `@todo`.
+3. Add an `@pytest.mark.unfinished` test stub with a matching `@matrix` or
+   `@pair`, plus a clear `@todo`.
 4. Run `venv/bin/python run.py traceability --changed --check`.
 
 Because the unfinished stub is not referenced by the source yet, the reporter
@@ -177,8 +176,7 @@ records the intended future test.
 # Source annotation
 # @testable true
 # @tests tests_unit/test_permissions.py::test_allowed_action_lattice
-# @features permissions
-# @dimensions action-lattice owner-override
+# @matrix permissions : action-lattice owner-override
 def allowed(...):
     ...
 ```
@@ -187,8 +185,7 @@ def allowed(...):
 import pytest
 
 
-# @features permissions
-# @dimensions owner-override
+# @matrix permissions : owner-override
 # @todo assert owner-specific resource access before inherited fallback
 @pytest.mark.unfinished
 def test_allowed_owner_override():
@@ -206,13 +203,13 @@ signal.
 
 ## What Not To Do
 
-- Do not tag a test with a feature/dimension pair just because it executes the
+- Do not tag a test with a behavior cell just because it executes the
   source symbol.
-- Do not add many features and dimensions to one symbol to describe every
+- Do not add many matrices and pairs to one symbol to describe every
   downstream workflow.
 - Do not use `@covered-by` as a dumping ground. Point to the best behavior owner.
 - Do not add a skipped or unfinished test just to silence the report.
-- Do not remove a source dimension because it is inconvenient if it describes a
+- Do not remove a source axis because it is inconvenient if it describes a
   real missing expectation.
 
 ## Finish

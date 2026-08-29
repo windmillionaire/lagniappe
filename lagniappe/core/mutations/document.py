@@ -16,8 +16,7 @@ def _advance_parent(builder, entity):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_document_checkpoint_masks_parent_state_and_optionally_advances_lists
-# @features mutations sync
-# @dimensions document checkpoint property-mask history parent-fingerprint list-owner
+# @matrix mutations sync : checkpoint document history list-owner parent-fingerprint property-mask
 def plan_document_checkpoint(entity, *, advance_parent=False, registry=None):
     """Persist document assets/history without writing unrelated parent fields."""
     builder = MutationPlanBuilder(
@@ -40,8 +39,7 @@ def plan_document_checkpoint(entity, *, advance_parent=False, registry=None):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_document_parent_touch_only_advances_parent_and_list_fingerprints
-# @features mutations sync
-# @dimensions document parent-fingerprint property-mask list-owner
+# @matrix mutations sync : document list-owner parent-fingerprint property-mask
 def plan_document_parent_touch(entity, *, registry=None):
     """Advance document ownership metadata without rewriting document/form state."""
     builder = MutationPlanBuilder(

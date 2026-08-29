@@ -53,8 +53,7 @@ class CategoryForm extends FormElement {
  * @testable true
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
  * @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
- * @features categories
- * @dimensions info-form update readonly labels
+ * @matrix categories : info-form labels readonly update
  */
 export class CategoryInfo extends CategoryForm {
 	constructor(attributes) {
@@ -134,8 +133,7 @@ export class CreateCategory extends CategoryForm {
 	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_form
 	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_category_form_explain_button
 	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_category_form_generate_toggle
-	 * @features categories
-	 * @dimensions manual-form attach-form ai-form explain-button
+	 * @matrix categories : ai-form attach-form explain-button manual-form
 	 */
 	get html() {
 		const name = this.nameElement;
@@ -157,8 +155,7 @@ export class CreateCategory extends CategoryForm {
  * @testable true
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_explain_prompt_from_category_tools
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_submit_marks_form_successful
- * @features pages
- * @dimensions generate ai-form explain-button deferred-submit success-state
+ * @matrix pages : ai-form deferred-submit explain-button generate success-state
  */
 export class GeneratePages extends FormElement {
 	constructor(attributes) {

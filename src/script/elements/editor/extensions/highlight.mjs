@@ -4,8 +4,7 @@ import { Decoration, Extension } from "@tiptap/core";
  * @testable true
  * @tests tests_js/test_041_editor_decorations.py::test_selection_highlight_decorations_and_range_mapping
  * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_replaces_selection_and_posts_selected_text
- * @features editor ai
- * @dimensions selected-text replace-selection
+ * @matrix ai editor : replace-selection selected-text
  */
 export const SelectionHighlight = Extension.create({
 	name: "selectionHighlight",

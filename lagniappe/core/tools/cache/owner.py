@@ -3,6 +3,7 @@
 from contextvars import ContextVar
 import unicodedata
 
+from config.datastore import encode_urlsafe_key
 from lagniappe import CONFIG
 
 from .core import cache
@@ -14,7 +15,7 @@ _REQUEST_OWNER = ContextVar("owner_projection", default=None)
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
 # @pair owner-projection:normalization
 def normalize_owner_name(value):
     value = unicodedata.normalize("NFKC", str(value or ""))
@@ -22,7 +23,7 @@ def normalize_owner_name(value):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
 # @pair owner-projection:request-memo
 def clear_request_owner_projection():
     _REQUEST_OWNER.set(None)
@@ -68,9 +69,7 @@ def _project(values):
 # @covered-by lagniappe/core/tools/cache/owner.py::update_owner_projection
 # @reason mapping construction is asserted through the published projection
 def _mapping(user, revision):
-    page_key = user.properties.page.key.to_legacy_urlsafe()
-    if isinstance(page_key, bytes):
-        page_key = page_key.decode()
+    page_key = encode_urlsafe_key(user.properties.page.key)
     return {
         "schema": OWNER_SCHEMA_VERSION,
         "key": user.urlsafe_key,
@@ -87,8 +86,8 @@ def _mapping(user, revision):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
-# @pairs owner-projection:revision owner-projection:fail-closed
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
+# @matrix owner-projection : fail-closed revision
 def update_owner_projection(*users):
     """Publish an owner row only after its durable mutation has committed."""
     owner = next((user for user in users if getattr(user, "is_owner", False)), None)
@@ -103,8 +102,8 @@ def update_owner_projection(*users):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
-# @pairs owner-projection:repair owner-projection:request-memo
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
+# @matrix owner-projection : repair request-memo
 def get_owner_projection(*, repair=True):
     """Read the request memo/Redis projection and repair from User on a miss."""
     memo = _REQUEST_OWNER.get()
@@ -117,9 +116,9 @@ def get_owner_projection(*, repair=True):
 
     from lagniappe.core.entities import Entities
     from lagniappe.core.definitions import Fetch
-    from lagniappe.core.tools import database
+    from lagniappe.core.tools.database import get as database_get
 
-    raw = database.get.user(CONFIG.ADMIN_EMAIL)
+    raw = database_get.user(CONFIG.ADMIN_EMAIL)
     owner = Entities.fetch_one(raw, request=Fetch.root()) if raw else None
     if owner and not owner.is_owner and not owner.db.get("owner"):
         # Schema-compatible repair for an old canonical row that predates the
@@ -132,7 +131,7 @@ def get_owner_projection(*, repair=True):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
 # @pair owner-projection:selector-shape
 def owner_search_result(projection):
     """Return the selector shape used by user facets."""

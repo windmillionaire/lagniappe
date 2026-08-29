@@ -17,9 +17,7 @@ ADC_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_identity_is_secret_free_and_project_bound
-# @pairs setup:adc setup:identity setup:project-identity
-# @pairs testing:adc testing:identity testing:project-identity
-# @pairs development:adc development:identity development:project-identity
+# @matrix development setup testing : adc identity project-identity
 def read_adc_identity(
     *,
     auth_default=None,
@@ -100,8 +98,8 @@ def _identity_mismatches(identity, *, principals, project):
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_source_login_refreshes_stale_token
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_source_login_stops_before_authentication_by_default
-# @pairs setup:gcloud-token setup:safe-failure
-# @pairs auth:gcloud-token auth:interactive auth:refresh
+# @matrix auth : gcloud-token interactive refresh
+# @matrix setup : gcloud-token safe-failure
 def ensure_gcloud_source_login(account, *, allow_login=False):
     """Verify that the saved gcloud account can mint a fresh access token."""
     token_check = run_command(
@@ -169,10 +167,7 @@ def _select_gcloud_auth_target(account, project):
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_auth_selects_account_then_project_before_login
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_local_adc_mismatch_directs_to_auth_command
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_alignment_updates_only_stale_quota_project
-# @pairs setup:adc setup:identity setup:project-identity setup:automatic-activation setup:quota-project
-# @pairs testing:adc testing:identity testing:project-identity testing:automatic-activation testing:quota-project
-# @pairs development:adc development:identity development:project-identity development:automatic-activation development:quota-project
-# @pairs auth:adc auth:identity auth:project-identity auth:automatic-activation auth:quota-project
+# @matrix auth development setup testing : adc automatic-activation identity project-identity quota-project
 def ensure_adc_target(
     account,
     project,

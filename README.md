@@ -34,7 +34,7 @@ To customize the code or work on Lagniappe itself, complete the ordinary guided 
 ./setup.sh development
 ```
 
-Development workflows support Linux, macOS, and WSL2; use WSL2 when developing on Windows. Start with the [development setup](documentation/INFRA_SETUP.md#development-installation), [testing guide](documentation/TESTING.md), and the [documentation index](documentation/OVERVIEW.md).
+Development workflows support Linux, macOS, and WSL2; use WSL2 when developing on Windows. Start with the [development setup](documentation/INFRA_SETUP_DEVELOPMENT.md), [testing guide](documentation/TESTING.md), and the [documentation index](documentation/OVERVIEW.md).
 
 The backend is Flask on Google Cloud Platform. The frontend is vanilla ES modules bundled with Rollup and styled with Tailwind CSS.
 

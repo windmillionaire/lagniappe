@@ -17,7 +17,10 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import agent_access, auth_email, database, identity_platform
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.auth import agent_access
+from lagniappe.core.tools.email import smtp as auth_email
+from lagniappe.core.tools.services import identity_platform
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.web import csrf
 from lagniappe.web.auth import (
@@ -51,8 +54,7 @@ def _login_and_seed(user, remember=False):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
-# @features login
-# @dimensions remember-cookie
+# @pair login:remember-cookie
 def _remember_preference(default=True):
     """Read the user's remember-me preference from a lightweight cookie."""
     preference = request.cookies.get(REMEMBER_PREFERENCE_COOKIE)
@@ -64,15 +66,14 @@ def _remember_preference(default=True):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
-# @features login
-# @dimensions owner-bootstrap
+# @pair login:owner-bootstrap
 def _owner_requires_first_login():
     """Return whether the configured owner still needs an initial login."""
     owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
     if not owner_email:
         return False
 
-    exists = database.get.user(owner_email)
+    exists = database_get.user(owner_email)
     if not exists:
         return True
 
@@ -81,12 +82,13 @@ def _owner_requires_first_login():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_owner_login
-# @pairs login:bootstrap admin:exact-email login:owner-first-login admin:google-only
+# @matrix admin : exact-email google-only
+# @matrix login : bootstrap owner-first-login
 def _bootstrap_admin_allowed(email):
     """Allow exactly the configured installer while the Owner is uninitialized."""
-    bootstrap_email = str(
-        getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or ""
-    ).strip().casefold()
+    bootstrap_email = (
+        str(getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or "").strip().casefold()
+    )
     candidate = str(email or "").strip().casefold()
     return bool(
         bootstrap_email
@@ -97,8 +99,7 @@ def _bootstrap_admin_allowed(email):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
-# @features login
-# @dimensions redirect-target
+# @pair login:redirect-target
 def _safe_redirect_target(target):
     """Return an internal redirect target, or None if the target is unsafe."""
     if not target:
@@ -126,8 +127,7 @@ def _safe_redirect_target(target):
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_accepts_google_state_redirect_target
-# @features login
-# @dimensions redirect-target
+# @pair login:redirect-target
 def _login_redirect_url():
     """Choose the post-login destination, falling back to home."""
     targets = (
@@ -146,8 +146,7 @@ def _login_redirect_url():
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_google_buttons_carry_safe_next_state
-# @features login
-# @dimensions redirect-target
+# @pair login:redirect-target
 def _store_safe_next_from_query():
     """Persist a safe next query parameter for redirect-based auth handoffs."""
     target = request.args.get("next")
@@ -211,8 +210,7 @@ def _rate_limit_response(message, retry_after, json_mode=True):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_returns_rate_limit_response
-# @features login
-# @dimensions rate-limit
+# @pair login:rate-limit
 def _enforce_auth_rate_limit(scope, limit, window_seconds, json_mode=True):
     """Apply a small fixed-window auth rate limit keyed by client IP."""
     ip = client_ip(request)
@@ -241,8 +239,7 @@ def _enforce_auth_rate_limit(scope, limit, window_seconds, json_mode=True):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_auth_action_url_preserves_safe_login_destination
-# @features login
-# @dimensions authentication-email redirect-target
+# @matrix login : authentication-email redirect-target
 def _auth_action_url(mode, oob_code, next_target=None):
     """Build a Lagniappe action URL on the configured login origin."""
     login_uri = str(getattr(CONFIG, "GOOGLE_LOGIN_URI", "") or "").strip()
@@ -282,12 +279,13 @@ def _send_auth_action_email(email, action, *, user_ip=None, next_target=None):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_owner_login
-# @pairs login:provisioning login:bootstrap admin:exact-email admin:google-only
+# @matrix admin : exact-email google-only
+# @matrix login : bootstrap provisioning
 # @pair owner:provisioning
 def verify_user(email, name, picture, *, allow_bootstrap_admin=False):
     """Verify and create/update user based on authentication."""
     email = str(email or "").strip().lower()
-    exists = database.get.user(email)
+    exists = database_get.user(email)
 
     owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
     if not exists and email == owner_email:
@@ -337,8 +335,7 @@ def verify_user(email, name, picture, *, allow_bootstrap_admin=False):
 # @tests tests_e2e/001_site/test_001b_login.py::test_disabled_google_error_returns_to_method_chooser
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_hides_google_when_provider_is_disabled
 # @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_setting_disables_ui_and_callback
-# @features login
-# @dimensions page-load form-state test-user session cookie-hardening owner-bootstrap authorization-error google-oauth disabled-account disabled-provider operator-intent auth-method safe-error
+# @matrix login : auth-method authorization-error cookie-hardening disabled-account disabled-provider form-state google-oauth operator-intent owner-bootstrap page-load safe-error session test-user
 @users.route("/login", methods=["GET"])
 def login():
     test_user = request.values.get("test_user", "").strip()
@@ -352,7 +349,7 @@ def login():
 
         name = test_user.split("@")[0] or CONFIG.ADMIN_NAME
         remember = _remember_preference(default=True)
-        exists = database.get.user(email)
+        exists = database_get.user(email)
         if exists:
             user = Entities.USER(exists)
         else:
@@ -364,7 +361,7 @@ def login():
         record_login(user, "development")
         return redirect(_login_redirect_url(), code=302)
     elif CONFIG.testing and test_user:
-        exists = database.get.user(test_user)
+        exists = database_get.user(test_user)
         if not exists and test_user == CONFIG.ADMIN_EMAIL:
             user = Entities.USER.create({"email": test_user, "name": CONFIG.ADMIN_NAME})
             user.save()
@@ -426,8 +423,7 @@ def login():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_agent_access_login_form_creates_session
-# @features login
-# @dimensions agent-access session user-page
+# @matrix login : agent-access session user-page
 @users.route("/agent-login", methods=["GET", "POST"])
 def login_agent():
     if not agent_access.enabled():
@@ -487,7 +483,7 @@ def login_google():
         )
         google_email = str(google_claims.get("email") or "").strip().lower()
         owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
-        registered = bool(database.get.user(google_email))
+        registered = bool(database_get.user(google_email))
         if (
             not registered
             and google_email != owner_email
@@ -566,8 +562,8 @@ def login_google():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_returns_rate_limit_response
-# @features login
-# @dimensions identity-platform rate-limit
+# @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
+# @matrix login : email-password hosted-e2e identity-platform rate-limit token-verification
 @users.route("/login-identity", methods=["POST"])
 def login_identity():
     """Handle Identity Platform email/password authentication."""
@@ -768,8 +764,7 @@ def send_verification_email():
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_does_not_enumerate_accounts
 # @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_returns_first_time_setup
-# @features login
-# @dimensions account-enumeration first-time-setup endpoint
+# @matrix login : account-enumeration endpoint first-time-setup
 @users.route("/check-user-status", methods=["GET"])
 def check_user_status():
     """Return the next login step without exposing detailed account metadata."""
@@ -784,7 +779,7 @@ def check_user_status():
             return jsonify({"success": False, "error": "Email required"}), 400
 
         next_step = "signin"
-        exists = database.get.user(email)
+        exists = database_get.user(email)
         if exists:
             user = Entities.USER(exists)
             if user.last_login is None:
@@ -830,8 +825,7 @@ def _mark_logout_cache_invalidation():
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_clears_session_and_returns_login
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
-# @features login
-# @dimensions logout session invalidation ajax redirect
+# @matrix login : ajax invalidation logout redirect session
 @users.route("/logout", methods=["POST"])
 def logout():
     """Log the user out and return the normal login-page redirect target."""

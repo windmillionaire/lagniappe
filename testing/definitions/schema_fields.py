@@ -6,7 +6,7 @@ import string
 from playwright.sync_api import Locator, expect
 
 from ..elements.combobox import Select
-from lagniappe.core.tools.utility import short_uuid
+from lagniappe.core.definitions.identifiers import short_uuid
 
 
 @dataclass
@@ -234,7 +234,9 @@ class OptionField(SchemaField):
         base = super().to_dict()
         if self.options:
             base["options"] = [
-                opt if isinstance(opt, dict) else {"label": opt, "value": f"o{short_uuid()}"}
+                opt
+                if isinstance(opt, dict)
+                else {"label": opt, "value": f"o{short_uuid()}"}
                 for opt in self.options
             ]
         return base

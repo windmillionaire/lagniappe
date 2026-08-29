@@ -3,13 +3,13 @@ from ..mixins import ColumnMixin, DateMixin
 from .base_db import DBProperty
 from .base_asset import AssetProperty
 from .base_property import UNSET
-from ..tools import utility
+from ..tools.files.downloads import download_image, downloaded_image_file
+from ..tools.http import PROFILE_IMAGE_POLICY
 
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_last_login
-# @features user
-# @dimensions last-login, date, column
+# @matrix user : column date last-login
 class LastLogin(DateMixin, ColumnMixin, DBProperty):
     """User's last login timestamp.
 
@@ -30,8 +30,7 @@ class LastLogin(DateMixin, ColumnMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_email
-# @features user
-# @dimensions email, column, sort
+# @matrix user : column email sort
 class Email(ColumnMixin, DBProperty):
     """User's email address.
 
@@ -55,8 +54,7 @@ class Email(ColumnMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_profile_photo_value_asset_lifecycle_and_google_download
-# @features user
-# @dimensions profile-photo default-image asset-lifecycle google-download
+# @matrix user : asset-lifecycle default-image google-download profile-photo
 class ProfilePhoto(AssetProperty):
     """User profile photo. Stored as an image asset. Downloaded on first access if logged in from Google."""
 
@@ -81,9 +79,12 @@ class ProfilePhoto(AssetProperty):
 
     def save_google_photo(self):
         if self.entity.db.get("photo"):
-            image = utility.download_image(self.entity.db["photo"])
-            if image["success"]:
-                self.value = image["file"]
+            result = download_image(
+                self.entity.db["photo"], policy=PROFILE_IMAGE_POLICY
+            )
+            image = downloaded_image_file(result)
+            if image is not None:
+                self.value = image
 
 
 # @testable false
@@ -106,8 +107,7 @@ class InvalidateCache(DBProperty):
 
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_user_invalidate_cache
-    # @features user, cache
-    # @dimensions invalidation, test-user
+    # @matrix cache user : invalidation test-user
     @property
     def value(self):
         return super().value
@@ -119,8 +119,7 @@ class InvalidateCache(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_009f_user_ai_access.py::test_user_ai_access_legacy_defaults_validation_and_invalidation
-# @features ai-access
-# @dimensions persistence legacy-default public validation cache-invalidation
+# @matrix ai-access : cache-invalidation legacy-default persistence public validation
 class AIAccess(DBProperty):
     """Canonical per-user AI entitlement name."""
 
@@ -150,8 +149,8 @@ class AIAccess(DBProperty):
 
 
 # @testable true
-# @tests tests_unit/test_029_notification_email.py::test_notification_email_preference_defaults_and_eligibility
-# @pairs notification-email:preference notification-email:eligibility
+# @tests tests_unit/test_029a_notification_email_policy.py::test_notification_email_preference_defaults_and_eligibility
+# @matrix notification-email : eligibility preference
 class NotificationEmailPreference(DBProperty):
     """Canonical per-user notification email mode."""
 
@@ -180,15 +179,16 @@ class NotificationEmailPreference(DBProperty):
         previous = self.value
         DBProperty.value.fset(self, name)
         if name == NotificationEmailMode.NONE.name and previous != name:
-            self.entity.db["notification_email_opt_out_epoch"] = int(
-                self.entity.db.get("notification_email_opt_out_epoch") or 0
-            ) + 1
+            self.entity.db["notification_email_opt_out_epoch"] = (
+                int(self.entity.db.get("notification_email_opt_out_epoch") or 0) + 1
+            )
 
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_is_owner
 # @tests tests_unit/test_009a_user.py::test_user_admin_role_is_separate_from_owner_and_invalidates_cache
-# @pairs user:owner user:property owner:singleton
+# @matrix user : owner property
+# @pair owner:singleton
 class IsOwner(DBProperty):
     """Whether this row is the configured singleton primary Owner."""
 
@@ -203,14 +203,12 @@ class IsOwner(DBProperty):
         email = str(self.entity.db.get("email") or "").strip().casefold()
         from ..entities import user as user_module
 
-        owner_email = str(
-            getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or ""
-        ).strip().casefold()
+        owner_email = (
+            str(getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or "").strip().casefold()
+        )
         validated_email = getattr(self, "_validated_owner_email", "")
         return bool(
-            stored
-            and email
-            and (email == owner_email or email == validated_email)
+            stored and email and (email == owner_email or email == validated_email)
         )
 
     @value.setter
@@ -220,9 +218,11 @@ class IsOwner(DBProperty):
             email = str(self.entity.db.get("email") or "").strip().casefold()
             from ..entities import user as user_module
 
-            owner_email = str(
-                getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or ""
-            ).strip().casefold()
+            owner_email = (
+                str(getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or "")
+                .strip()
+                .casefold()
+            )
             if enabled and (not owner_email or email != owner_email):
                 raise ValueError("Only the configured primary Owner can be an owner.")
             if not enabled and self.value:
@@ -234,8 +234,8 @@ class IsOwner(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_admin_role_is_separate_from_owner_and_invalidates_cache
-# @pairs admin:role admin:legacy-default admin:ai-independent
-# @pairs user:property cache:cache-invalidation
+# @matrix admin : ai-independent legacy-default role
+# @pairs cache:cache-invalidation user:property
 class IsAdmin(DBProperty):
     """Stored additional-Administrator role, with Owner inheritance."""
 
@@ -243,7 +243,9 @@ class IsAdmin(DBProperty):
 
     @property
     def value(self):
-        return bool(getattr(self.entity, "is_owner", False) or DBProperty.value.fget(self))
+        return bool(
+            getattr(self.entity, "is_owner", False) or DBProperty.value.fget(self)
+        )
 
     @value.setter
     def value(self, value):
@@ -255,7 +257,7 @@ class IsAdmin(DBProperty):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
 # @pair messaging:owner-opt-in
 class OwnerInboundToggle(DBProperty):
     """Fail-closed owner opt-in for a collaboration channel."""
@@ -263,7 +265,7 @@ class OwnerInboundToggle(DBProperty):
     _truthy = {True, "true", "True", "1", 1, "on", "yes"}
 
     # @testable true
-    # @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
     # @pair messaging:owner-opt-in
     @property
     def value(self):

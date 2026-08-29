@@ -19,8 +19,7 @@ GENERIC_MESSAGE = "Generation failed. Please try again. "
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
 # @tests tests_unit/test_015_ai_tools.py::test_page_generation_reconciles_page_and_form_default_fields
-# @features ai
-# @dimensions validation pages form-defaults no-form
+# @matrix ai : form-defaults no-form pages validation
 def validate_examples(examples, form_schema=None):
     """Validate generated pages and reconcile form-backed default fields."""
 
@@ -77,8 +76,7 @@ def validate_examples(examples, form_schema=None):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
 # @tests tests_unit/test_015_ai_tools.py::test_page_generation_reconciles_page_and_form_default_fields
-# @features ai
-# @dimensions pages validation form-defaults no-form
+# @matrix ai : form-defaults no-form pages validation
 def generate_pages(prompt, form_schema=None):
     """Generate and validate example pages from a Prompt."""
     try:
@@ -97,8 +95,7 @@ def generate_pages(prompt, form_schema=None):
 
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @features ai
-# @dimensions prompt-builders search tools output-format
+# @matrix ai : output-format prompt-builders search tools
 def page_generation_prompt(**kwargs):
     """Build the AI prompt for generating example pages for a category.
 

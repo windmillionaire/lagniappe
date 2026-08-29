@@ -71,8 +71,7 @@ def run_error_tracking_check(run_node, assertion: str):
     run_node(script)
 
 
-# @features error-tracking login
-# @dimensions shared-capture login-context
+# @matrix error-tracking login : login-context shared-capture
 def test_login_error_delegates_to_shared_capture(run_node):
     run_node(
         """
@@ -118,8 +117,7 @@ if (!captureContext.login.timestamp) {
     )
 
 
-# @features error-tracking
-# @dimensions sentry-context normalization
+# @matrix error-tracking : normalization sentry-context
 def test_capture_error_normalizes_sentry_context_values(run_node):
     run_error_tracking_check(
         run_node,
@@ -165,8 +163,7 @@ for (const omitted of ["missing", "skip", "marker"]) {
 	    )
 
 
-# @features error-tracking
-# @dimensions malformed-blocking-operation sentry-context
+# @matrix error-tracking : malformed-blocking-operation sentry-context
 def test_configure_sentry_drops_malformed_blocking_operation_warning(run_node):
     run_error_tracking_check(
         run_node,
@@ -200,8 +197,7 @@ if (result !== null) {
     )
 
 
-# @features error-tracking
-# @dimensions sentry-context trace-normalization
+# @matrix error-tracking : sentry-context trace-normalization
 def test_configure_sentry_removes_invalid_trace_context_without_dropping_event(run_node):
     run_error_tracking_check(
         run_node,
@@ -233,8 +229,7 @@ if (result.contexts.browser.name !== "Chrome") {
     )
 
 
-# @features error-tracking
-# @dimensions blocking-operation notification-transaction
+# @matrix error-tracking : blocking-operation notification-transaction
 def test_configure_sentry_filters_notification_long_task_spans(run_node):
     run_error_tracking_check(
         run_node,
@@ -263,8 +258,7 @@ if (result.spans[0].op !== "http.client") {
     )
 
 
-# @features error-tracking
-# @dimensions privacy redaction request-context payload-bounds
+# @matrix error-tracking : payload-bounds privacy redaction request-context
 def test_configure_sentry_redacts_browser_request_and_context_payloads(run_node):
     run_error_tracking_check(
         run_node,
@@ -368,8 +362,7 @@ if (result.spans[0].data["http.response.status_code"] !== 500) {
     )
 
 
-# @features error-tracking
-# @dimensions malformed-breadcrumbs privacy
+# @matrix error-tracking : malformed-breadcrumbs privacy
 def test_configure_sentry_drops_malformed_breadcrumb_container(run_node):
     run_error_tracking_check(
         run_node,
@@ -388,8 +381,7 @@ if ("breadcrumbs" in result) {
     )
 
 
-# @features error-tracking
-# @dimensions configured-dsn privacy
+# @matrix error-tracking : configured-dsn privacy
 def test_configure_sentry_uses_installation_dsn_without_default_pii(run_node):
     run_error_tracking_check(
         run_node,
@@ -411,8 +403,7 @@ if (options.sendDefaultPii !== false) {
     )
 
 
-# @features error-tracking
-# @dimensions disabled configured-dsn
+# @matrix error-tracking : configured-dsn disabled
 def test_configure_sentry_does_not_initialize_without_dsn(run_node):
     run_error_tracking_check(
         run_node,

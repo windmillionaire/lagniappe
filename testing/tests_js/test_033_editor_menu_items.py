@@ -3,8 +3,7 @@
 import textwrap
 
 
-# @features editor
-# @dimensions menu-active-state dropdown-rerender
+# @matrix editor : dropdown-rerender menu-active-state
 def test_editor_menu_item_serializes_current_active_state(run_node):
     run_node(
         textwrap.dedent(

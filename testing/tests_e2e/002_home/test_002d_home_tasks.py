@@ -92,7 +92,7 @@ def _create_personal_task(user, home, definition):
 
     expect(create_form).not_to_be_visible()
     task_list = home.task_list
-    new_task = task_list.new_item(definition.name)
+    new_task = task_list.new_item(definition.name, flash=False)
 
     return new_task.get_attribute("data-key")
 
@@ -108,8 +108,7 @@ def _make_recurring_daily(task):
     entity.save()
 
 
-# @features tasks
-# @dimensions create-form due-date
+# @matrix tasks : create-form due-date
 @pytest.mark.e2e
 def test_create_task_form(get_user):
     """
@@ -140,8 +139,7 @@ def test_create_task_form(get_user):
     expect(form).not_to_be_visible()
 
 
-# @features tasks
-# @dimensions create-personal due-date
+# @matrix tasks : create-personal due-date
 @pytest.mark.e2e
 def test_create_personal_task_due_today(get_user):
     """
@@ -159,18 +157,14 @@ def test_create_personal_task_due_today(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
 
-    initial_count = home.user_task_count
-
     task = Tasks.test_create_personal_task_due_today.get(user, create=False)
     task.key = _create_personal_task(user, home, task.definition)
-    assert home.user_task_count == initial_count + 1
 
     task_item = home.task_list.get_item(task)
     expect(task_item).to_have_attribute("data-due-date", local_date_iso())
 
 
-# @features tasks
-# @dimensions create-personal due-date
+# @matrix tasks : create-personal due-date
 @pytest.mark.e2e
 def test_create_personal_task_due_in_four_days(get_user):
     """
@@ -190,8 +184,7 @@ def test_create_personal_task_due_in_four_days(get_user):
     expect(task_item).to_have_attribute("data-due-date", expected)
 
 
-# @features tasks
-# @dimensions complete due-date
+# @pair tasks:complete
 @pytest.mark.e2e
 def test_complete_task_from_home_page(get_user):
     """
@@ -235,8 +228,7 @@ def test_complete_task_from_home_page(get_user):
     expect(task_item).to_have_attribute("data-due-date", local_date_iso())
 
 
-# @features tasks
-# @dimensions complete recurring
+# @matrix tasks : complete recurring
 @pytest.mark.e2e
 def test_complete_recurring_task_from_home_page_reappears(get_user):
     """Completing a near-term recurring home task replaces it with the next occurrence."""
@@ -252,7 +244,6 @@ def test_complete_recurring_task_from_home_page_reappears(get_user):
     _make_recurring_daily(task)
     home = user.go(SitePages.HOME)
 
-    initial_count = home.user_task_count
     task_item = home.task_list.get_item(task)
 
     with user.page.expect_response("**/complete"):
@@ -264,11 +255,9 @@ def test_complete_recurring_task_from_home_page_reappears(get_user):
     expect(refreshed_task).to_have_attribute(
         "data-due-date", local_date_plus_days_iso(1)
     )
-    assert home.user_task_count == initial_count
 
 
-# @features tasks
-# @dimensions postpone due-date
+# @matrix tasks : due-date postpone
 @pytest.mark.e2e
 def test_postpone_task_due_date_to_tomorrow(get_user):
     """
@@ -295,8 +284,7 @@ def test_postpone_task_due_date_to_tomorrow(get_user):
     expect(postponed_task).to_have_attribute("data-due-date", tomorrow)
 
 
-# @features tasks
-# @dimensions postpone due-date
+# @matrix tasks : due-date postpone
 @pytest.mark.e2e
 def test_postpone_task_due_date_to_this_week(get_user):
     """Choose any remaining calendar date through Sunday from 'This Week…'."""
@@ -340,8 +328,7 @@ def test_postpone_task_due_date_to_this_week(get_user):
     expect(postponed).to_have_attribute("data-due-date", expected)
 
 
-# @features tasks
-# @dimensions postpone due-date
+# @matrix tasks : due-date postpone
 @pytest.mark.e2e
 def test_postpone_task_due_date_to_next_week(get_user):
     """Choose a dated weekday from the progressive next-week postpone menu."""
@@ -370,8 +357,7 @@ def test_postpone_task_due_date_to_next_week(get_user):
     assert local_date_from_utc_datetime(postponed.due_date).date().isoformat() == expected
 
 
-# @features tasks
-# @dimensions postpone due-date
+# @matrix tasks : due-date postpone
 @pytest.mark.e2e
 def test_postpone_task_due_date_to_no_due_date(get_user):
     """

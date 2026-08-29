@@ -5,19 +5,20 @@ from types import SimpleNamespace
 import pytest
 
 from lagniappe.core.definitions import FileConsumer, FileConsumerLimitError
-from lagniappe.core.tools import (
-    autofill_jobs,
-    deferred_job_adapters,
-    form_state,
-    notifications,
-    polling,
+from lagniappe.core.entities import Entities
+from lagniappe.core.tools.deferred_jobs.adapters import (
+    autofill as deferred_job_adapters,
 )
+from lagniappe.core.tools.deferred_jobs import autofill as autofill_jobs
+from lagniappe.core.tools.notifications import service as notifications
+from lagniappe.core.tools.polling import forms as form_state
+from lagniappe.core.tools.polling import projections as polling
 
 
 pytestmark = pytest.mark.unit
 
 
-# @pairs deferred-jobs:form-lock ai:autofill
+# @pairs ai:autofill deferred-jobs:form-lock
 def test_autofill_explicit_lock_opt_out_skips_target_lock():
     adapter = deferred_job_adapters.AutofillAdapter()
     spec = SimpleNamespace(
@@ -29,7 +30,7 @@ def test_autofill_explicit_lock_opt_out_skips_target_lock():
     assert adapter.start_lock(spec, job) is None
 
 
-# @pairs deferred-jobs:form-revision ai:autofill
+# @pairs ai:autofill deferred-jobs:form-revision
 def test_lockless_autofill_keeps_revision_drift_guard(monkeypatch):
     target = SimpleNamespace(autofill_revision="revision-one")
     context = SimpleNamespace(
@@ -55,7 +56,8 @@ def test_lockless_autofill_keeps_revision_drift_guard(monkeypatch):
         deferred_job_adapters.AutofillAdapter().validate_apply(context)
 
 
-# @pairs sync:validation sync:document-only sync:client-identity forms:no-live-sync
+# @matrix sync : client-identity document-only validation
+# @pair forms:no-live-sync
 def test_sync_payload_validation_is_document_only_and_bounded():
     invalid = {
         "client_id": "form-contract-test",
@@ -112,7 +114,7 @@ def test_sync_payload_validation_is_document_only_and_bounded():
     )
 
 
-# @pairs offline:replay-precondition forms:conflict-review
+# @pairs forms:conflict-review offline:replay-precondition
 def test_offline_replay_conflict_requires_stale_origin_fingerprint():
     entity = SimpleNamespace(fingerprint="current")
 
@@ -130,7 +132,7 @@ def test_offline_replay_conflict_requires_stale_origin_fingerprint():
     )
 
 
-# @pairs deferred-jobs:form-lock deferred-jobs:quick-edit
+# @matrix deferred-jobs : form-lock quick-edit
 def test_form_field_membership_uses_the_attached_schema():
     entity = SimpleNamespace(form=SimpleNamespace(schema=[{"id": "form-field"}]))
 
@@ -138,7 +140,7 @@ def test_form_field_membership_uses_the_attached_schema():
     assert not form_state.is_form_field(entity, "task-setting")
 
 
-# @pairs polling:channel polling:revision polling:permissions polling:mounted-scope polling:batching
+# @matrix polling : batching channel mounted-scope permissions revision
 # @pair messaging:polling-revision
 def test_channel_revisions_batch_only_requested_site_fingerprints():
     user = SimpleNamespace(
@@ -202,12 +204,11 @@ def test_channel_revisions_batch_only_requested_site_fingerprints():
     assert len(loads) == load_count
 
 
-# @pairs deferred-jobs:server-render deferred-jobs:status polling:batching
-# @source lagniappe/core/tools/polling.py::render_operation_statuses
+# @matrix deferred-jobs : server-render status
+# @pair polling:batching
 def test_render_operation_statuses_batches_and_attaches_known_jobs():
     reports = [
-        SimpleNamespace(deferred_job={"key": f"job-{index}"})
-        for index in range(51)
+        SimpleNamespace(deferred_job={"key": f"job-{index}"}) for index in range(51)
     ]
     loads = []
 
@@ -231,15 +232,13 @@ def test_render_operation_statuses_batches_and_attaches_known_jobs():
     }
 
 
-# @pairs polling:revision polling:batching polling:permissions
-# @pairs deferred-jobs:redis-projection deferred-jobs:owner deferred-jobs:cache-failure-isolation
+# @matrix deferred-jobs : cache-failure-isolation owner redis-projection
+# @matrix polling : batching permissions revision
 def test_operation_statuses_skip_fresh_cached_jobs_and_batch_stale_jobs(monkeypatch):
     from google.cloud.datastore import Key
 
     actor_key = Key("users", "owner", project="poll-test")
-    user = SimpleNamespace(
-        urlsafe_key=actor_key.to_legacy_urlsafe().decode("utf-8")
-    )
+    user = SimpleNamespace(urlsafe_key=actor_key.to_legacy_urlsafe().decode("utf-8"))
     loaded = []
 
     def statuses(keys, actor):
@@ -250,9 +249,9 @@ def test_operation_statuses_skip_fresh_cached_jobs_and_batch_stale_jobs(monkeypa
         {
             "id": f"operation:{index}",
             "type": "operation",
-            "key": Key(
-                "jobs", str(index), parent=actor_key
-            ).to_legacy_urlsafe().decode("utf-8"),
+            "key": Key("jobs", str(index), parent=actor_key)
+            .to_legacy_urlsafe()
+            .decode("utf-8"),
             "revision": 1,
         }
         for index in range(51)
@@ -305,17 +304,17 @@ def test_operation_statuses_skip_fresh_cached_jobs_and_batch_stale_jobs(monkeypa
         state_writer=lambda *_statuses: None,
         now=100,
     )
-    assert projected == {
-        stale[0]["key"]: {"key": stale[0]["key"], "revision": 3}
-    }
+    assert projected == {stale[0]["key"]: {"key": stale[0]["key"], "revision": 3}}
     assert unchanged == set()
     assert loaded == [([stale[0]["key"]], user)]
     assert str(captured[0][0]) == "redis unavailable"
 
     collaborator_key = Key("users", "collaborator", project="poll-test")
-    collaborator_job = Key(
-        "jobs", "shared", parent=collaborator_key
-    ).to_legacy_urlsafe().decode("utf-8")
+    collaborator_job = (
+        Key("jobs", "shared", parent=collaborator_key)
+        .to_legacy_urlsafe()
+        .decode("utf-8")
+    )
     loaded.clear()
     projected, unchanged = polling.operation_statuses(
         [
@@ -334,9 +333,7 @@ def test_operation_statuses_skip_fresh_cached_jobs_and_batch_stale_jobs(monkeypa
         state_writer=lambda *_statuses: None,
         now=100,
     )
-    assert projected == {
-        collaborator_job: {"key": collaborator_job, "revision": 3}
-    }
+    assert projected == {collaborator_job: {"key": collaborator_job, "revision": 3}}
     assert unchanged == set()
     assert loaded == [([collaborator_job], user)]
 
@@ -387,7 +384,8 @@ def test_form_lock_revision_is_independent_of_entity_fingerprint():
     }
 
 
-# @pairs ai:autofill ai:deferred pages:autofill tasks:autofill
+# @matrix ai : autofill deferred
+# @matrix pages tasks : autofill
 def test_autofill_job_spec_contains_only_durable_inputs(monkeypatch):
     class Task:
         pass
@@ -425,7 +423,8 @@ def test_autofill_job_spec_contains_only_durable_inputs(monkeypatch):
     }
 
 
-# @pairs ai:autofill ai:deferred notifications:autofill
+# @matrix ai : autofill deferred
+# @pair notifications:autofill
 def test_autofill_upload_is_validated_before_job_start(monkeypatch):
     started = []
     error = FileConsumerLimitError(
@@ -455,23 +454,21 @@ def test_autofill_upload_is_validated_before_job_start(monkeypatch):
     assert started == []
 
 
-# @pairs notifications:task-queue notifications:create notifications:body
+# @matrix notifications : body create task-queue
 def test_process_notification_requires_a_valid_user(monkeypatch):
     user = SimpleNamespace(kind="user")
     saved = []
     monkeypatch.setattr(
-        notifications.Entities,
+        Entities,
         "fetch_one",
         lambda key, request: user if key == "user-key" else None,
     )
     monkeypatch.setattr(
-        notifications.Entities.NOTIFICATION,
+        Entities.NOTIFICATION,
         "create",
         lambda data: SimpleNamespace(**data),
     )
-    monkeypatch.setattr(
-        notifications.Entities, "save", lambda value: saved.append(value)
-    )
+    monkeypatch.setattr(Entities, "save", lambda value: saved.append(value))
 
     assert notifications.create_process_notification({}, "Ignored") is None
     created = notifications.create_process_notification(

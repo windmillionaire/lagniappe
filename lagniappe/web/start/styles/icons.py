@@ -566,6 +566,10 @@ ICONS = {
 		"glyph": "check_box",
 		"fill": 1
 	},
+	"share": {
+		"glyph": "share",
+		"fill": 1
+	},
 	"settings": {
 		"page": {
 			"glyph": "settings",

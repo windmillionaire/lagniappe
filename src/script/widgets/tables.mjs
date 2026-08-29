@@ -55,8 +55,7 @@ export class IndexTable extends BaseTable {
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
 	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @pair reconnect-refresh:manifest
-	 * @pair indexes:fingerprint-gate
+	 * @pairs indexes:fingerprint-gate reconnect-refresh:manifest
 	 */
 	refreshDescriptor() {
 		if (
@@ -139,7 +138,7 @@ export class IndexTable extends BaseTable {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_022_refresh_frontend.py::test_index_table_row_updates_rebuild_active_sort
-	 * @pairs form-index:destination-refresh form-index:sorting form-index:delete-target
+	 * @matrix form-index : delete-target destination-refresh sorting
 	 */
 	refresh(response) {
 		if (!response?.html) return;
@@ -178,8 +177,7 @@ export class IndexTable extends BaseTable {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_022_refresh_frontend.py::test_index_table_row_updates_rebuild_active_sort
-	 * @features form-index
-	 * @dimensions created-row sorting
+	 * @matrix form-index : created-row sorting
 	 */
 	async prereconcile() {
 		const loaded = this.target.hasAttribute("loaded");
@@ -232,8 +230,8 @@ export class IndexTable extends BaseTable {
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_appears_after_completion_cycle
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell
- * @pairs tasks:history tasks:completion-cycle tasks:reload
- * @pairs embedded-table:table-cell-expand
+ * @matrix tasks : completion-cycle history reload
+ * @pair embedded-table:table-cell-expand
  */
 export class TaskHistory extends EmbeddedTable {
 	constructor(attributes) {
@@ -267,8 +265,7 @@ export class TaskHistory extends EmbeddedTable {
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_results_expands_table_submission_cell
- * @pairs embedded-table:run-results embedded-table:table-cell-expand
- * @pairs embedded-table:horizontal-scroll
+ * @matrix embedded-table : horizontal-scroll run-results table-cell-expand
  */
 export class FilterResults extends EmbeddedTable {
 	constructor(attributes) {

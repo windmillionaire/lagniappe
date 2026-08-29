@@ -1,6 +1,6 @@
 from ..definitions import Fetch
 from ..properties import user_groups
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from .entity import Entity
 from . import Entities
 
@@ -8,8 +8,8 @@ from . import Entities
 # @testable true
 # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
 # @tests tests_unit/test_009e_user_groups.py::test_user_group_create_rejects_public_and_initializes_permissions
-# @features user-groups
-# @dimensions permissions create reserved-name save
+# @matrix user-groups : create permissions reserved-name save
+# @pair user-groups:views
 class UserGroup(Entity):
     entity_kind = "group"
 
@@ -48,12 +48,11 @@ class UserGroup(Entity):
 
     # @testable true
     # @tests tests_unit/test_009e_user_groups.py::test_save_permissions_refreshes_member_users_with_current_group
-    # @features user-groups permissions
-    # @dimensions permission-update member-refresh cache-invalidation
+    # @matrix permissions public-groups user-groups : cache-invalidation member-refresh permission-update
     def save_permissions(self, form_data=None):
         self.properties.permissions.create(form_data)
 
-        users_in_group = database.get.users(group=self.key, limit=None)
+        users_in_group = database_get.users(group=self.key, limit=None)
         loaded = Entities.fetch(self, *users_in_group.results, request=Fetch.direct())
         users = [entity for entity in loaded if entity.key != self.key]
         for user in users:
@@ -65,8 +64,7 @@ class UserGroup(Entity):
 # @testable true
 # @tests tests_unit/test_009e_user_groups.py::test_public_permissions
 # @tests tests_unit/test_009e_user_groups.py::test_public_group_get_create_and_enabled_state
-# @features public-groups
-# @dimensions permissions get create enabled
+# @matrix public-groups : create enabled get permissions
 class PublicGroup(UserGroup):
     entity_kind = "public_group"
 
@@ -85,7 +83,7 @@ class PublicGroup(UserGroup):
 
     @classmethod
     def enabled(cls):
-        exists = database.get.public_group()
+        exists = database_get.public_group()
         if not exists:
             return False
         public_group = cls(exists)
@@ -97,7 +95,7 @@ class PublicGroup(UserGroup):
 
     @classmethod
     def get(cls):
-        exists = database.get.public_group()
+        exists = database_get.public_group()
         if exists:
             return cls(exists)
         else:

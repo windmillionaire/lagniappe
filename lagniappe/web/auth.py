@@ -1,23 +1,28 @@
 """Route authorization decorators.
 
-Every decorator follows a common pattern:
+Permission decorators normally follow this pattern:
 1. Check authentication (401 if not logged in)
 2. Load the entity from the URL key (404 if missing)
 3. Set g.fingerprint for ETag caching on GET requests (304 if unchanged)
 4. Check permission (403 if denied)
 5. Pass the loaded entity to the route via ``entity=`` kwarg
+
+Routes declared ``no_store=True`` set the response cache policy before loading
+authorization context and skip ETag handling entirely.
 """
 
 import hashlib
+import os
 from functools import wraps
 
-from flask import abort, current_app, g, request, session
+from flask import abort, current_app, g, redirect, request, session, url_for
 from flask_login import current_user
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 
 LOGIN_USER_KEY = CONFIG.LOGIN_USER_KEY
 LOGIN_USER_PAGE_KEY = CONFIG.LOGIN_USER_PAGE_KEY
@@ -27,12 +32,8 @@ AUTH_SESSION_CACHE_KEYS = CONFIG.AUTH_SESSION_CACHE_KEYS
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_enforces_double_submit_csrf_before_provider_auth
+# @matrix csrf : double-submit match mismatch missing-body missing-cookie
 # @pair login:google-signin
-# @pair csrf:double-submit
-# @pair csrf:missing-cookie
-# @pair csrf:missing-body
-# @pair csrf:mismatch
-# @pair csrf:match
 def verify_google_csrf(response):
     """Verify Google's double-submit CSRF token (cookie vs. body)."""
     csrf_token_cookie = response.cookies.get("g_csrf_token")
@@ -54,21 +55,28 @@ def verify_google_csrf(response):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
+# @tests tests_e2e/001_site/test_001a_environment.py::test_dynamic_etag_changes_with_deployment_identity
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_route_is_forbidden_without_model_or_page_permission
-# @pairs cache:etag cache:permissions cache:build-id
+# @matrix cache : build-id deployment-id etag permissions
 def _etag_fingerprint(base_fingerprint, user):
-    """Hash the resource fingerprint, build id, and viewer authorization."""
+    """Hash resource, deployment, frontend build, and viewer authorization."""
     authorization = getattr(user, "authorization_fingerprint", None)
     if authorization is None:
         authorization = user.permissions_fingerprint
-    value = f"{base_fingerprint}-{CONFIG.BUILD_ID}-{authorization}"
+    deployment_id = (
+        os.environ.get("GAE_DEPLOYMENT_ID")
+        or os.environ.get("GAE_VERSION")
+        or CONFIG.VERSION
+    )
+    value = (
+        f"{base_fingerprint}-{deployment_id}-{CONFIG.BUILD_ID}-{authorization}"
+    )
     return hashlib.md5(value.encode("utf-8")).hexdigest()
 
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_download_uses_original_filename_and_mimetype
-# @pairs cache:etag cache:standard-header cache:missing-fingerprint cache:byte-range
+# @matrix cache : etag missing-fingerprint standard-header
 def _fingerprint_matches_etag():
     """Check if the client's If-None-Match header matches the current fingerprint."""
     if not getattr(g, "fingerprint", None):
@@ -90,8 +98,8 @@ def _fingerprint_matches_etag():
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_stale_preloaded_session_keys_fall_back_to_flask_login_user
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_clears_session_and_returns_login
-# @features login
-# @dimensions session-keys clear
+# @matrix login : clear session-keys
+# @pair auth:session-keys
 def clear_login_session():
     """Clear request-auth helper keys and derived permission caches."""
     for key in AUTH_SESSION_CACHE_KEYS:
@@ -101,8 +109,8 @@ def clear_login_session():
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_switching_session_user_requests_client_cache_invalidation
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
-# @features auth
-# @dimensions session-keys invalidation
+# @matrix auth : invalidation session-keys
+# @pair login:invalidation
 def request_client_cache_invalidation(user=None, persist_user=False):
     """Mark this session response as requiring a client response-cache clear."""
     session[LOGIN_INVALIDATE_CACHE_KEY] = True
@@ -121,8 +129,7 @@ def clear_client_cache_invalidation():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_switching_session_user_requests_client_cache_invalidation
-# @features auth
-# @dimensions session-user switch
+# @matrix auth : session-user switch
 def login_cache_invalidation_required(user):
     """Return True when login is switching an existing session to another user."""
     session_user_key = session.get(LOGIN_USER_KEY)
@@ -139,8 +146,7 @@ def login_cache_invalidation_required(user):
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_switching_session_user_requests_client_cache_invalidation
 # @tests tests_e2e/001_site/test_001b_login.py::test_stale_preloaded_session_keys_fall_back_to_flask_login_user
-# @features auth
-# @dimensions session-keys user-key page-key invalidation
+# @matrix auth : invalidation page-key session-keys user-key
 def seed_login_session(user, invalidate_cache=False):
     """Store direct entity keys for faster auth loads on later requests."""
     clear_login_session()
@@ -159,8 +165,7 @@ def seed_login_session(user, invalidate_cache=False):
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_ai_actions_are_forbidden
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_file_and_photo_actions_are_forbidden
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
-# @features public-users
-# @dimensions metered-actions restriction-gate
+# @matrix public-users : metered-actions restriction-gate
 def abort_public_user_action():
     """Reject actions that public users may not invoke despite edit access."""
     if getattr(current_user, "is_public", False):
@@ -170,8 +175,7 @@ def abort_public_user_action():
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_ai_actions_are_forbidden
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
-# @features ai-access
-# @dimensions route-gate
+# @pairs ai-access:route-gate public-users:metered-actions
 def require_ai_access(required):
     """Reject a request unless the current user has the required AI tier."""
     if not getattr(current_user, "access", lambda _required: False)(required):
@@ -180,8 +184,7 @@ def require_ai_access(required):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
-# @features ai-access
-# @dimensions authentication route-gate
+# @matrix ai-access : authentication route-gate
 def ai_access(required):
     """Authorize an AI-only route before invoking its handler."""
     if not isinstance(required, AI) or required is AI.NONE:
@@ -224,8 +227,7 @@ def _session_protection_failed():
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_stale_preloaded_session_keys_fall_back_to_flask_login_user
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
-# @pairs auth:session-preload auth:stale-session auth:flask-login-skip auth:batch-load
-# @pairs auth:session-keys auth:clear auth:user-key auth:page-key auth:canonical-page
+# @matrix auth : batch-load canonical-page clear flask-login-skip page-key session-keys session-preload stale-session user-key
 # @pair cache:invalidation-acknowledgement
 def _load_session_user_context(entity_identifier=None):
     if not session.get("_user_id"):
@@ -269,7 +271,7 @@ def _load_session_user_context(entity_identifier=None):
         clear_login_session()
         return None, None
 
-    canonical_page_identifier = database.get.urlsafe_key(user.db.get("page"))
+    canonical_page_identifier = database_get.urlsafe_key(user.db.get("page"))
     if canonical_page_identifier != user_page_identifier:
         clear_login_session()
         return None, None
@@ -282,8 +284,7 @@ def _load_session_user_context(entity_identifier=None):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_stale_preloaded_session_keys_fall_back_to_flask_login_user
-# @features auth
-# @dimensions session-preload fallback
+# @matrix auth : fallback session-preload
 def _load_request_context(entity_identifier=None):
     user, entity = _load_session_user_context(entity_identifier)
     if user:
@@ -303,10 +304,10 @@ def _load_request_context(entity_identifier=None):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
+# @tests tests_e2e/008_users/test_008d_admin_data_protection.py::test_backups_tab_reveals_static_status_panel
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_route_is_forbidden_without_model_or_page_permission
-# @features permissions
-# @dimensions resource-gates etag authorization-before-cache
-def permission(resource=None, requested=None):
+# @matrix permissions : authorization-before-cache etag no-store resource-gates
+def permission(resource=None, requested=None, *, no_store=False):
     """Check route access using the fixed direct request-auth graph."""
 
     # @testable false
@@ -318,6 +319,8 @@ def permission(resource=None, requested=None):
         # @reason route wrapper behavior is owned by the parent decorator contract
         @wraps(f)
         def wrapped(*args, **kwargs):
+            if no_store:
+                g.NO_CACHE = True
             user, entity = _load_request_context(kwargs.get("key"))
             if not user.is_authenticated:
                 abort(401)
@@ -329,11 +332,11 @@ def permission(resource=None, requested=None):
             if kwargs.get("key") and not entity:
                 abort(404)
 
-            if request.method == "GET":
+            if request.method == "GET" and not no_store:
                 base_fingerprint = (
                     entity.fingerprint
                     if entity
-                    else database.site_fingerprint(request.path)
+                    else database_utility.site_fingerprint(request.path)
                 )
                 g.fingerprint = _etag_fingerprint(base_fingerprint, user)
 
@@ -345,7 +348,11 @@ def permission(resource=None, requested=None):
             if not allowed:
                 abort(403)
 
-            if request.method == "GET" and _fingerprint_matches_etag():
+            if (
+                request.method == "GET"
+                and not no_store
+                and _fingerprint_matches_etag()
+            ):
                 return "", 304
 
             if entity:
@@ -358,10 +365,9 @@ def permission(resource=None, requested=None):
     return decorator
 
 # @testable true
-# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_anonymous_home_redirects_to_login
-# @features home permissions
-# @dimensions anonymous-access
-def home_permission():
+# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_anonymous_home_redirects_to_public_directory_without_entity_reads
+# @matrix home permissions public-directory : anonymous-access datastore-free-redirect
+def home_permission(*, anonymous_endpoint=None):
     """Permission for home page sections. No entity-level check, just authentication + ETag."""
 
     # @testable false
@@ -373,15 +379,28 @@ def home_permission():
         # @reason route wrapper behavior is owned by the parent decorator contract
         @wraps(f)
         def wrapped(*args, **kwargs):
+            remember_cookie = current_app.config.get(
+                "REMEMBER_COOKIE_NAME",
+                "remember_token",
+            )
+            if (
+                anonymous_endpoint
+                and not session.get("_user_id")
+                and not request.cookies.get(remember_cookie)
+            ):
+                return redirect(url_for(anonymous_endpoint))
+
             user, _entity = _load_request_context()
             if not user.is_authenticated:
+                if anonymous_endpoint:
+                    return redirect(url_for(anonymous_endpoint))
                 abort(401)
 
             if request.method == "GET":
                 if kwargs.get("kind") == "starred":
                     base_fingerprint = user.modified.timestamp()
                 else:
-                    site_fingerprint = database.site_fingerprint(request.path)
+                    site_fingerprint = database_utility.site_fingerprint(request.path)
                     user_fingerprint = user.modified.timestamp()
                     base_fingerprint = f"{site_fingerprint}:{user_fingerprint}"
 
@@ -399,8 +418,7 @@ def home_permission():
 
 # @testable true
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_page_requires_login
-# @features search
-# @dimensions anonymous-access
+# @pair search:anonymous-access
 def logged_in(f):
     """Simple authentication check with no entity loading or ETag."""
 
@@ -420,7 +438,7 @@ def logged_in(f):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
-# @pairs owner:route-gate owner:sensitive-configuration
+# @matrix owner : route-gate sensitive-configuration
 def owner_only(f):
     """Require the configured primary Owner, not an additional Admin."""
 
@@ -442,8 +460,7 @@ def owner_only(f):
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_manual_keeps_account_addresses_authenticated
-# @features manual
-# @dimensions section-navigation anonymous-access no-auth-bootstrap
+# @matrix manual : anonymous-access no-auth-bootstrap section-navigation
 def manual_permission():
     """Permission for the user manual. Public if CONFIG.PUBLIC_MANUAL is set."""
 

@@ -32,9 +32,9 @@ def expected_storage_cors(config=CONFIG):
     return storage_contract.expected_storage_cors(config)
 
 
-# @testable false
-# @covered-by config/storage.py::_normalized_cors
-# @reason compatibility wrapper retained for existing runtime callers
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_storage_cors_comparison_is_order_insensitive
+# @matrix storage : cors idempotent
 def _normalized_cors(cors):
     return storage_contract._normalized_cors(cors)
 
@@ -94,7 +94,7 @@ class KINDS(Enum):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_data_services_initialize_uses_shared_adc
-# @features database storage
+# @matrix database storage : adc
 class DataServices:
     """Lazy-initialized singleton for Datastore and Cloud Storage clients."""
 
@@ -103,12 +103,10 @@ class DataServices:
     _private_bucket = None
     _public_bucket = None
     _history_bucket = None
-    _export_bucket = None
 
     # @testable true
     # @tests tests_unit/test_018_database_assets.py::test_data_services_initialize_uses_shared_adc
-    # @features database storage
-    # @dimensions adc
+    # @matrix database storage : adc
     def initialize(self):
         """Create project-bound Datastore and Storage clients with shared ADC."""
         if self._datastore_client and self._storage_client:
@@ -118,7 +116,6 @@ class DataServices:
         project = getattr(CONFIG, "GOOGLE_CLOUD_PROJECT", None)
         client_kwargs = {"project": project} if project else {}
         client_kwargs["credentials"] = credentials
-
         self._datastore_client = datastore.Client(**client_kwargs)
         self._storage_client = storage.Client(**client_kwargs)
 
@@ -140,8 +137,7 @@ class DataServices:
 
     # @testable true
     # @tests tests_unit/test_018_database_assets.py::test_runtime_storage_only_reads_setup_provisioned_buckets
-    # @features storage iam
-    # @dimensions runtime provisioning-boundary
+    # @matrix iam storage : provisioning-boundary runtime
     def _create_bucket(self, name):
         bucket_name = f"{PREFIX}{name}"
 
@@ -164,14 +160,12 @@ class DataServices:
                 ("history", CONFIG.HISTORY_BUCKET),
                 ("private", CONFIG.PRIVATE_BUCKET),
                 ("public", CONFIG.PUBLIC_BUCKET),
-                ("export", CONFIG.EXPORT_BUCKET),
             )
         }
 
     # @testable true
     # @tests tests_unit/test_018_database_assets.py::test_runtime_storage_only_reads_setup_provisioned_buckets
-    # @features storage
-    # @dimensions runtime provisioning-boundary
+    # @matrix storage : provisioning-boundary runtime
     def bucket(self, name):
         """Return the named storage bucket (history, private, or public)."""
         if name == "history":
@@ -180,15 +174,12 @@ class DataServices:
             return self.private_bucket
         elif name == "public":
             return self.public_bucket
-        elif name == "export":
-            return self.export_bucket
         else:
             raise ValueError(f"Invalid bucket name: {name}")
 
     # @testable true
     # @tests tests_unit/test_018_database_assets.py::test_test_cleanup_deletes_objects_without_deleting_buckets
-    # @features storage iam
-    # @dimensions test-cleanup provisioning-boundary
+    # @matrix iam storage : provisioning-boundary test-cleanup
     def delete_buckets(self):
         """Delete test objects while preserving setup-owned bucket resources."""
         self.initialize()
@@ -197,7 +188,6 @@ class DataServices:
             CONFIG.HISTORY_BUCKET,
             CONFIG.PRIVATE_BUCKET,
             CONFIG.PUBLIC_BUCKET,
-            CONFIG.EXPORT_BUCKET,
         ):
             bucket_name = f"{PREFIX}{config_name}"
             try:
@@ -210,7 +200,6 @@ class DataServices:
         self._history_bucket = None
         self._private_bucket = None
         self._public_bucket = None
-        self._export_bucket = None
 
     @property
     def history_bucket(self):
@@ -239,14 +228,6 @@ class DataServices:
         self._public_bucket = self._create_bucket(CONFIG.PUBLIC_BUCKET)
         return self._public_bucket
 
-    @property
-    def export_bucket(self):
-        """Return the setup-provisioned export bucket."""
-        if self._export_bucket:
-            return self._export_bucket
-
-        self._export_bucket = self._create_bucket(CONFIG.EXPORT_BUCKET)
-        return self._export_bucket
 
 
 DATA = DataServices()

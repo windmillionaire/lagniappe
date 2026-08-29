@@ -141,8 +141,7 @@ def _expected_cache_requires(entity):
     return entity.required
 
 
-# @features active
-# @dimensions property, public-user
+# @matrix active : property public-user
 def test_entity_active(get_test_entities):
     """Test that Active property returns correct boolean value.
 
@@ -163,8 +162,7 @@ def test_entity_active(get_test_entities):
         assert entity.active == test_value == entity.properties.active.value
 
 
-# @features active
-# @dimensions validation
+# @pair active:validation
 def test_entity_active_rejects_non_bool():
     entity = TestEntities.get("PROJECT", {"name": "Active Validation", "hash": "actv"})
 
@@ -172,8 +170,7 @@ def test_entity_active_rejects_non_bool():
         entity.active = "yes"
 
 
-# @features permissions
-# @dimensions authenticated-user filter-index-neutral
+# @matrix permissions : authenticated-user filter-index-neutral
 def test_context_exports_authentication_and_filter_index_neutrality():
     entity = TestEntities.get("PROJECT", {"name": "Auth Export", "hash": "authx"})
     anonymous = SimpleNamespace(is_authenticated=False)
@@ -184,8 +181,7 @@ def test_context_exports_authentication_and_filter_index_neutrality():
     assert entity.to_filter_index(user=anonymous)["name"] == "Auth Export"
 
 
-# @features entity submission ai
-# @dimensions submission-fields single-merge
+# @matrix ai entity submission : single-merge submission-fields
 def test_entity_to_ai_merges_submission_fields_without_nested_duplicate():
     form = TestEntities.get("FORM", {"name": "Contact Form", "hash": "aiform"})
     form.schema = [
@@ -217,8 +213,7 @@ def test_entity_to_ai_merges_submission_fields_without_nested_duplicate():
     assert "submission" not in ai_values
 
 
-# @features entity
-# @dimensions key-validation
+# @pair entity:key-validation
 def test_entity_key_access_without_key_raises_runtime_error():
     entity = _KeylessEntity(testing=True)
     entity._testing = False
@@ -233,8 +228,7 @@ def test_entity_key_access_without_key_raises_runtime_error():
         _ = entity.db
 
 
-# @features entity
-# @dimensions typed-intent validation key-validation dedupe
+# @matrix entity : dedupe key-validation typed-intent validation
 def test_entity_add_mutation_intents_requires_typed_intents_and_dedupes():
     entity = _KeylessEntity(testing=True)
     relation = SimpleNamespace(key="relation-key")
@@ -253,16 +247,14 @@ def test_entity_add_mutation_intents_requires_typed_intents_and_dedupes():
         entity.add_mutation_intents(relation)
 
 
-# @pair entities:save-order
-# @pair requires:hash-before-requires
-# @source lagniappe/core/mutations/executor.py::_prepare_write
+# @pairs entities:save-order requires:hash-before-requires
 def test_save_entities_updates_hash_before_requires():
     entity = _SaveOrderEntity()
 
     with (
         patch.object(mutation_executor.cache, "update") as cache_update,
         patch.object(
-            mutation_executor.database, "save_mutations"
+            mutation_executor.database_utility, "save_mutations"
         ) as database_save,
     ):
         Entities.save(entity)
@@ -273,9 +265,7 @@ def test_save_entities_updates_hash_before_requires():
     assert list(database_save.call_args.args[0]) == [(entity, None)]
 
 
-# @pair users:user-before-page
-# @pair requires:persisted-requires
-# @source lagniappe/core/mutations/executor.py::_prepare_write
+# @pairs requires:persisted-requires users:user-before-page
 def test_save_entities_updates_and_persists_user_before_owned_page():
     class EntityDict(dict):
         pass
@@ -302,7 +292,7 @@ def test_save_entities_updates_and_persists_user_before_owned_page():
         patch.object(Entities, "fetch", return_value=[user]),
         patch.object(mutation_executor.cache, "update"),
         patch.object(
-            mutation_executor.database, "save_mutations"
+            mutation_executor.database_utility, "save_mutations"
         ) as database_save,
     ):
         Entities.save(page, user)
@@ -312,15 +302,13 @@ def test_save_entities_updates_and_persists_user_before_owned_page():
     assert list(database_save.call_args.args[0]) == [(user, None), (page, None)]
 
 
-# @features entity
-# @dimensions initialization validation
+# @matrix entity : initialization validation
 def test_entity_requires_subclass_entity_kind():
     with pytest.raises(NotImplementedError, match="requires entity_kind"):
         _MissingKindEntity(testing=True)
 
 
-# @features entity
-# @dimensions initialization empty-datastore-entity key-preservation
+# @matrix entity : empty-datastore-entity initialization key-preservation
 def test_entity_preserves_key_from_empty_datastore_entity():
     raw = DatastoreEntity(
         key=Key(
@@ -336,8 +324,7 @@ def test_entity_preserves_key_from_empty_datastore_entity():
     assert entity.key == raw.key
 
 
-# @features property
-# @dimensions initialization validation
+# @matrix property : initialization validation
 def test_property_contract_errors_are_explicit():
     entity = SimpleNamespace(entity_kind="fake")
 
@@ -355,8 +342,7 @@ def test_property_contract_errors_are_explicit():
         _ = _SiteLazyProperty(entity=entity).icon
 
 
-# @features property
-# @dimensions unset explicit-false explicit-none
+# @matrix property : explicit-false explicit-none unset
 def test_property_unset_state_is_distinct_from_explicit_values():
     entity = SimpleNamespace(entity_kind="fake")
     prop = _SiteLazyProperty(entity=entity)
@@ -380,8 +366,7 @@ def test_property_unset_state_is_distinct_from_explicit_values():
     assert prop.value is None
 
 
-# @features db-property
-# @dimensions missing-key explicit-false blank-values
+# @matrix db-property : blank-values explicit-false missing-key
 def test_db_property_blanks_pop_but_explicit_false_persists():
     entity = SimpleNamespace(entity_kind="fake", db={})
     prop = _DBBlankProperty(entity=entity)
@@ -407,8 +392,7 @@ def test_db_property_blanks_pop_but_explicit_false_persists():
     assert "blank" not in entity.db
 
 
-# @features db-property
-# @dimensions custom-blank-values
+# @pair db-property:custom-blank-values
 def test_db_property_custom_blank_values_can_keep_empty_lists():
     entity = SimpleNamespace(entity_kind="fake", db={})
     prop = _DBKeepListProperty(entity=entity)
@@ -423,8 +407,7 @@ def test_db_property_custom_blank_values_can_keep_empty_lists():
     assert "keep" not in entity.db
 
 
-# @features forms
-# @dimensions access-restrictions inheritance side-effect-free stable-order stored-projection
+# @matrix forms : access-restrictions inheritance side-effect-free stable-order stored-projection
 @pytest.mark.parametrize("parent_name", ["page", "form"])
 def test_restricted_to_effective_projection_does_not_alias_sources(parent_name):
     stored = ["stored-group", "stored-group"]
@@ -477,8 +460,7 @@ def test_restricted_to_effective_projection_does_not_alias_sources(parent_name):
     ]
 
 
-# @features forms
-# @dimensions access-restrictions owner-restricted stable-order side-effect-free
+# @matrix forms : access-restrictions owner-restricted side-effect-free stable-order
 def test_restricted_to_add_preserves_first_seen_order():
     stored = ["group-two", "group-one", "group-two"]
     entity = SimpleNamespace(
@@ -503,8 +485,7 @@ def test_restricted_to_add_preserves_first_seen_order():
     ]
 
 
-# @features property
-# @dimensions column filter validation
+# @matrix property : column filter validation
 def test_column_and_filter_contract_errors_are_explicit():
     entity = SimpleNamespace(entity_kind="fake")
     column = _ColumnProperty(entity=entity)
@@ -526,12 +507,11 @@ def test_column_and_filter_contract_errors_are_explicit():
         _ = _BadColumns(entity=entity).fields
 
 
-# @features site
-# @dimensions db-key validation
+# @matrix site : db-key validation
 def test_site_missing_key_raises_runtime_error():
     site = _TestSite("missing-site")
 
-    with patch.object(site_module.database.get, "site_key", return_value=None):
+    with patch.object(site_module.site_database, "key", return_value=None):
         with pytest.raises(RuntimeError, match="no key assigned"):
             _ = site.urlsafe_key
 
@@ -539,8 +519,7 @@ def test_site_missing_key_raises_runtime_error():
             _ = site.db
 
 
-# @features requires
-# @dimensions property, details, cache
+# @matrix requires : cache details property
 def test_entity_requires(get_test_entities):
     """Test Requires property returns list and cache_value is comma-separated.
 
@@ -574,8 +553,7 @@ def test_entity_requires(get_test_entities):
         assert entity.details["requires"] == entity.required
 
 
-# @features hash
-# @dimensions property, details, cache, filter
+# @matrix hash : cache details filter property
 def test_entity_hash(get_test_entities):
     """Test that Hash property returns correct value."""
     for entity in get_test_entities():
@@ -599,8 +577,7 @@ def test_entity_hash(get_test_entities):
             assert cache["hash"] == test_value
 
 
-# @features name
-# @dimensions property, details, cache, filter, column, ai, sort
+# @matrix name : ai cache column details filter property sort
 def test_entity_name(get_test_entities):
     """Test Name property with all mixins: Cache, Column, Details, AI, Filter.
 
@@ -639,8 +616,7 @@ def test_entity_name(get_test_entities):
         assert entity.column("name").column_value == entity.details
 
 
-# @features name
-# @dimensions list-normalization import
+# @matrix name : import list-normalization
 def test_entity_name_list_values_normalized_on_write_and_import():
     entity = TestEntities.get("PAGE", {"name": "Original", "hash": "name_list"})
 
@@ -655,8 +631,7 @@ def test_entity_name_list_values_normalized_on_write_and_import():
     assert entity.db["name"] == "Grace Hopper"
 
 
-# @features db-property
-# @dimensions cache-invalidation
+# @pair db-property:cache-invalidation
 def test_db_property_write_refreshes_entity_details_and_cache():
     entity = TestEntities.get(
         "PROJECT",
@@ -674,8 +649,7 @@ def test_db_property_write_refreshes_entity_details_and_cache():
     assert entity.to_cache["name"] == "Updated Cache Name"
 
 
-# @features related-properties cache
-# @dimensions cache-invalidation details column-value parent-pointer
+# @matrix cache related-properties : cache-invalidation column-value details parent-pointer
 def test_related_property_writes_refresh_entity_and_column_projections():
     page = TestEntities.get(
         "PAGE",
@@ -739,8 +713,7 @@ def test_related_property_writes_refresh_entity_and_column_projections():
     }
 
 
-# @features cache
-# @dimensions details-key parent-key
+# @matrix cache : details-key parent-key
 def test_entity_to_cache_stores_detail_parent_pointers():
     page = TestEntities.get(
         "PAGE",
@@ -758,8 +731,7 @@ def test_entity_to_cache_stores_detail_parent_pointers():
     assert "details" not in cache
 
 
-# @features modified
-# @dimensions property, date, column, filter
+# @matrix modified : column date filter property
 def test_entity_modified(get_test_entities):
     """Test Modified property with DateMixin, ColumnMixin, FilterMixin.
 
@@ -797,8 +769,7 @@ def test_entity_modified(get_test_entities):
             assert entity.column("modified").column_value == user_dt
 
 
-# @features created
-# @dimensions update initialized-once
+# @matrix created : initialized-once update
 def test_entity_created_update_initializes_once():
     entity = TestEntities.get(
         "PROJECT",
@@ -823,8 +794,7 @@ def test_entity_created_update_initializes_once():
     assert entity.db["created"] == first_created
 
 
-# @features public-id
-# @dimensions generation uniqueness persistence
+# @matrix public-id : generation persistence uniqueness
 def test_public_id_generation_is_unique_and_persisted():
     entity = TestEntities.get(
         "PROJECT",
@@ -833,12 +803,12 @@ def test_public_id_generation_is_unique_and_persisted():
 
     with (
         patch.object(
-            common_entity.utility,
+            common_entity,
             "short_uuid",
             side_effect=["duplicate-id", "unique-id"],
         ) as short_uuid,
         patch.object(
-            common_entity.database.get,
+            common_entity.database_get,
             "public_pages",
             side_effect=[object(), None],
         ) as public_pages,
@@ -859,14 +829,13 @@ def test_public_id_generation_is_unique_and_persisted():
     )
     existing.db["public_id"] = "existing-id"
 
-    with patch.object(common_entity.utility, "short_uuid") as short_uuid:
+    with patch.object(common_entity, "short_uuid") as short_uuid:
         assert existing.properties.public_id.value == "existing-id"
 
     short_uuid.assert_not_called()
 
 
-# @features property
-# @dimensions error-wrapping descriptor
+# @matrix property : descriptor error-wrapping
 def test_property_getattribute_wraps_descriptor_attribute_error():
     class BrokenProperty(Property):
         _id = "broken"
@@ -888,16 +857,15 @@ def test_property_getattribute_wraps_descriptor_attribute_error():
     assert getattr(prop, "missing", "fallback") == "fallback"
 
 
-# @features site
-# @dimensions lazy-properties db-key error-wrapping
+# @matrix site : db-key error-wrapping lazy-properties
 def test_site_lazy_properties_database_key_and_error_context():
     site_key = object()
     site_db = {"name": "Site DB"}
 
     with (
-        patch.object(site_module.database.get, "site_key", return_value=site_key),
-        patch.object(site_module.database.get, "urlsafe_key", return_value="safe-site"),
-        patch.object(site_module.database.get, "site", return_value=site_db),
+        patch.object(site_module.site_database, "key", return_value=site_key),
+        patch.object(site_module.database_get, "urlsafe_key", return_value="safe-site"),
+        patch.object(site_module.site_database, "get_or_create", return_value=site_db),
     ):
         site = _TestSite("main")
 
@@ -919,8 +887,7 @@ def test_site_lazy_properties_database_key_and_error_context():
     assert "_TestSite" in str(error.value)
 
 
-# @features kind
-# @dimensions property, db-key, details, cache
+# @matrix kind : cache db-key details property
 def test_entity_kind(get_test_entities):
     """Test Kind property with DetailsMixin, CacheMixin.
 

@@ -47,8 +47,7 @@ const INDIVIDUAL_FILES_ONLY_ERROR = "Only individual files are supported";
 /**
  * @testable true
  * @tests tests_js/test_014_direct_upload_retry.py::test_directory_drop_is_rejected_before_file_processing
- * @features upload
- * @dimensions drag-drop directory-rejection
+ * @matrix upload : directory-rejection drag-drop
  */
 async function containsDroppedDirectory(dataTransfer) {
 	const items = Array.from(dataTransfer?.items || []).filter(
@@ -199,8 +198,7 @@ export class BaseUpload {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
-	 * @features editor
-	 * @dimensions image-upload image-selection
+	 * @matrix editor : image-selection image-upload
 	 */
 	_processImage(file) {
 		return new Promise((resolve, reject) => {
@@ -363,8 +361,7 @@ export class BaseUpload {
 	 * @testable true
 	 * @tests tests_js/test_014_direct_upload_retry.py::test_single_file_keeps_compatibility_multipart_fallback
 	 * @tests tests_js/test_014_direct_upload_retry.py::test_large_multi_file_retry_preserves_completed_direct_uploads
-	 * @features direct-upload
-	 * @dimensions multipart-fallback single-file compatibility aggregate-limit partial-resume
+	 * @matrix direct-upload : aggregate-limit compatibility multipart-fallback partial-resume single-file
 	 */
 	async prepareSubmit({ route = null } = {}) {
 		const files = Array.from(this.fileInput?.element?.files || []);
@@ -455,8 +452,7 @@ export class BaseUpload {
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
 	 * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
-	 * @features ingress
-	 * @dimensions file-input drag-drop upload-counts
+	 * @matrix ingress : drag-drop file-input upload-counts
 	 */
 	async _processNewFile(file, options = {}) {
 		const context = { source: options.source || "unknown" };
@@ -572,8 +568,7 @@ export class BaseUpload {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_paste_image_on_page
-	 * @features pages
-	 * @dimensions image-paste
+	 * @pair pages:image-paste
 	 */
 	async processPaste() {
 		const processFile = async (item, type) => {

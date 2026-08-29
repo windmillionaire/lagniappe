@@ -75,7 +75,7 @@ def _stub_existing_install_preflight(
         "project": {"state": "available", "details": {}, "error": None},
         "billing_account": "billing-1",
         "billing_enabled": True,
-        "enabled_apis": set(),
+        "enabled_apis": set(create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS),
         "missing_apis": [],
     }
     identity = {
@@ -95,6 +95,11 @@ def _stub_existing_install_preflight(
         },
     )
     monkeypatch.setattr(create_config, "_target_preflight", lambda target: preflight)
+    monkeypatch.setattr(
+        create_config,
+        "_preflight_operator_authority",
+        lambda selected_account, target, **kwargs: types.SimpleNamespace(),
+    )
     monkeypatch.setattr(
         create_config,
         "_ensure_adc_principal",
@@ -127,8 +132,7 @@ def _stub_existing_install_preflight(
     monkeypatch.setattr("builtins.input", lambda prompt: "y")
 
 
-# @features setup
-# @dimensions validation
+# @pair setup:validation
 def test_setup_validators_cover_expected_inputs():
     from installer import admin
     from installer.domain.validation import (
@@ -144,8 +148,7 @@ def test_setup_validators_cover_expected_inputs():
     assert not admin.validate_oauth_client_id("not-google")
 
 
-# @features setup
-# @dimensions interactive-input
+# @pair setup:interactive-input
 def test_validate_input_retries_allows_empty_and_exits(monkeypatch):
     from installer.utils import validate_input
 
@@ -192,8 +195,7 @@ def test_validate_input_retries_allows_empty_and_exits(monkeypatch):
         never_returns()
 
 
-# @features setup
-# @dimensions project-id
+# @pair setup:project-id
 def test_validate_project_id_and_project_state_are_non_mutating(
     monkeypatch,
     isolated_setup_config,
@@ -259,8 +261,86 @@ def test_validate_project_id_and_project_state_are_non_mutating(
     }
 
 
-# @features setup
-# @dimensions project-id interactive-input
+# @matrix setup : gcloud-config gcloud-token interactive-input
+def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
+    monkeypatch,
+    isolated_setup_config,
+    capsys,
+):
+    from installer import create_config
+    from runner import gcloud
+
+    checked = []
+    commands = []
+    monkeypatch.setattr(
+        gcloud,
+        "check_account_authentication",
+        lambda account: checked.append(account),
+    )
+    def run_gcloud(command, **kwargs):
+        commands.append((command, kwargs))
+        if command[:2] == ["auth", "list"]:
+            return completed_process(command, stdout="installer@example.com\n")
+        return completed_process(command, stdout="short-lived-token")
+
+    monkeypatch.setattr(create_config, "run_gcloud_command", run_gcloud)
+    monkeypatch.setattr(create_config, "GCLOUD_CLI", "gcloud")
+    answers = iter(["maybe", "y"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+
+    assert create_config._get_gcloud_account("") == "installer@example.com"
+    assert checked == ["installer@example.com"]
+    assert commands == [
+        (
+            [
+                "auth",
+                "list",
+                "--filter=status:ACTIVE",
+                "--format=value(account)",
+            ],
+            {"check": False},
+        ),
+        (
+            ["auth", "print-access-token", "installer@example.com"],
+            {"check": False, "timeout": 60},
+        )
+    ]
+    output = capsys.readouterr().out
+    assert "The active gcloud CLI account is: installer@example.com" in output
+    assert "Enter Y to confirm this account" in output
+    assert (
+        "[OK] Verified gcloud CLI installation account: installer@example.com"
+        in output
+    )
+
+    commands.clear()
+    checked.clear()
+    assert create_config._get_gcloud_account("saved@example.com") == (
+        "saved@example.com"
+    )
+    assert checked == ["saved@example.com"]
+    assert commands == []
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "n")
+    with pytest.raises(SetupCancelled, match="account confirmation"):
+        create_config._get_gcloud_account("")
+    assert "gcloud auth login" in capsys.readouterr().out
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+    monkeypatch.setattr(
+        create_config,
+        "run_gcloud_command",
+        lambda command, **kwargs: (
+            completed_process(command, stdout="installer@example.com\n")
+            if command[:2] == ["auth", "list"]
+            else completed_process(command, returncode=1, stderr="login expired")
+        ),
+    )
+    with pytest.raises(RuntimeError, match="could not be verified"):
+        create_config._get_gcloud_account("")
+
+
+# @matrix setup : interactive-input project-id
 def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     monkeypatch,
     isolated_setup_config,
@@ -440,8 +520,208 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     )
 
 
-# @features setup
-# @dimensions gcloud-config adc
+# @matrix setup : delegated-install existing-project gcloud-config interactive-input project-iam project-picker provider-discovery
+def test_delegated_project_picker_lists_only_direct_owner_projects(
+    monkeypatch,
+    isolated_setup_config,
+    capsys,
+):
+    from installer import create_config
+
+    commands = []
+    discovered = [
+        {
+            "projectId": "zulu-project-1",
+            "name": "Zulu Project",
+            "projectNumber": "300",
+        },
+        {
+            "projectId": "alpha-project-1",
+            "displayName": "Alpha Project",
+            "name": "projects/100",
+            "projectNumber": "100",
+        },
+        {"projectId": "bad", "name": "Invalid ID"},
+    ]
+
+    def run_gcloud(command, check=True):
+        commands.append((command, check))
+        if command[:2] == ["projects", "list"]:
+            return completed_process(command, stdout=json.dumps(discovered))
+        project_id = command[2]
+        condition = (
+            {
+                "title": "temporary",
+                "expression": (
+                    "request.time < timestamp('2030-01-01T00:00:00Z')"
+                ),
+            }
+            if project_id == "alpha-project-1"
+            else None
+        )
+        binding = {
+            "role": "roles/owner",
+            "members": ["user:installer@example.com"],
+        }
+        if condition:
+            binding["condition"] = condition
+        return completed_process(
+            command,
+            stdout=json.dumps({"bindings": [binding]}),
+        )
+
+    monkeypatch.setattr(create_config, "run_gcloud_command", run_gcloud)
+    inspected = []
+    monkeypatch.setattr(
+        create_config,
+        "_project_state",
+        lambda project_id: inspected.append(project_id)
+        or {
+            "state": "available",
+            "details": {"projectId": project_id},
+            "error": None,
+        },
+    )
+    answers = iter(["9", ""])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+
+    assert create_config._select_existing_gcloud_project(
+        "installer@example.com"
+    ) == ("Zulu Project", "zulu-project-1")
+    assert commands[0] == (
+        [
+            "projects",
+            "list",
+            "--filter=lifecycleState=ACTIVE",
+            "--format=json",
+            "--account=installer@example.com",
+        ],
+        False,
+    )
+    assert [command[0][2] for command in commands[1:]] == [
+        "alpha-project-1",
+        "zulu-project-1",
+    ]
+    assert inspected == ["zulu-project-1"]
+    output = capsys.readouterr().out
+    assert "Alpha Project" not in output
+    assert "1. Zulu Project (zulu-project-1)" in output
+    assert "Enter one of the project numbers shown above" in output
+
+    commands.clear()
+    inspected.clear()
+    monkeypatch.setattr("builtins.input", lambda prompt: "1")
+    assert create_config._select_existing_gcloud_project(
+        "installer@example.com", direct_owner_required=False
+    ) == ("Alpha Project", "alpha-project-1")
+    assert commands == [
+        (
+            [
+                "projects",
+                "list",
+                "--filter=lifecycleState=ACTIVE",
+                "--format=json",
+                "--account=installer@example.com",
+            ],
+            False,
+        )
+    ]
+    assert inspected == ["alpha-project-1"]
+    output = capsys.readouterr().out
+    assert "projects accessible to installer@example.com" in output
+    assert "1. Alpha Project (alpha-project-1)" in output
+    assert "2. Zulu Project (zulu-project-1)" in output
+
+    def no_owner_projects(command, check=True):
+        if command[:2] == ["projects", "list"]:
+            return completed_process(
+                command,
+                stdout=json.dumps([discovered[1]]),
+            )
+        return completed_process(
+            command,
+            stdout=json.dumps(
+                {
+                    "bindings": [
+                        {
+                            "role": "roles/owner",
+                            "members": ["user:installer@example.com"],
+                            "condition": {"title": "conditional"},
+                        }
+                    ]
+                }
+            ),
+        )
+
+    monkeypatch.setattr(
+        create_config,
+        "run_gcloud_command",
+        no_owner_projects,
+    )
+    with pytest.raises(
+        RuntimeError,
+        match="direct, unconditional Project Owner role",
+    ):
+        create_config._list_owned_projects("installer@example.com")
+
+
+# @matrix setup : delegated-install interactive-input ordinary-install project-picker
+def test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow(
+    monkeypatch,
+    isolated_setup_config,
+    capsys,
+):
+    from installer import create_config
+
+    selections = []
+
+    def select_existing(account, *, direct_owner_required):
+        selections.append((account, direct_owner_required))
+        return "Existing App", "existing-project-1"
+
+    monkeypatch.setattr(
+        create_config,
+        "_select_existing_gcloud_project",
+        select_existing,
+    )
+    monkeypatch.setattr(
+        create_config,
+        "_get_app_name",
+        lambda: pytest.fail("existing project should supply the app name"),
+    )
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+    assert create_config._select_initial_target("installer@example.com") == (
+        "Existing App",
+        "existing-project-1",
+    )
+    assert selections == [("installer@example.com", True)]
+
+    answers = iter(["n", "y"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    assert create_config._select_initial_target("installer@example.com") == (
+        "Existing App",
+        "existing-project-1",
+    )
+    assert selections[-1] == ("installer@example.com", False)
+
+    monkeypatch.setattr(create_config, "_get_app_name", lambda: "New App")
+    monkeypatch.setattr(
+        create_config,
+        "_get_gcloud_project",
+        lambda project_id, sanitized_name: "new-app-project-1",
+    )
+    answers = iter(["maybe", "n", "maybe", "n"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    assert create_config._select_initial_target("installer@example.com") == (
+        "New App",
+        "new-app-project-1",
+    )
+    output = capsys.readouterr().out
+    assert "Enter Y for a delegated installation" in output
+    assert "Enter Y to select an existing project" in output
+
+
+# @matrix setup : adc gcloud-config
 def test_adc_identity_reports_principal_project_and_quota(
     monkeypatch,
     isolated_setup_config,
@@ -476,8 +756,7 @@ def test_adc_identity_reports_principal_project_and_quota(
     assert "https://www.googleapis.com/auth/cloud-platform" in requested_scopes
 
 
-# @features setup
-# @dimensions gcloud-config adc identity
+# @matrix setup : adc gcloud-config identity
 def test_adc_principal_mismatch_requires_explicit_reauthentication(
     monkeypatch,
     isolated_setup_config,
@@ -522,8 +801,7 @@ def test_adc_principal_mismatch_requires_explicit_reauthentication(
     assert login_calls == [("owner@example.com", "target-project-1")]
 
 
-# @features setup
-# @dimensions billing interactive-input gcloud-config
+# @matrix setup : billing gcloud-config interactive-input
 def test_billing_selection_defers_to_project_console_when_cli_returns_no_open_account(
     monkeypatch,
     capsys,
@@ -551,8 +829,7 @@ def test_billing_selection_defers_to_project_console_when_cli_returns_no_open_ac
     assert capsys.readouterr().out == ""
 
 
-# @features setup
-# @dimensions billing interactive-input browser
+# @matrix setup : billing browser interactive-input
 def test_project_billing_authorization_uses_existing_account_and_project_console(
     monkeypatch,
     capsys,
@@ -610,8 +887,7 @@ def test_project_billing_authorization_uses_existing_account_and_project_console
     assert "create a billing account" not in output
 
 
-# @features setup
-# @dimensions preflight billing provider-apis
+# @matrix setup : billing preflight provider-apis
 def test_target_preflight_selects_billing_and_reports_required_apis(
     monkeypatch,
     isolated_setup_config,
@@ -675,8 +951,7 @@ def test_target_preflight_selects_billing_and_reports_required_apis(
     assert preflight["missing_apis"] == ["missing.googleapis.com"]
 
 
-# @features setup
-# @dimensions preflight project-create billing provider-apis
+# @matrix setup : billing preflight project-create provider-apis
 def test_target_preflight_defers_billing_discovery_until_new_project_exists(
     monkeypatch,
     isolated_setup_config,
@@ -710,8 +985,7 @@ def test_target_preflight_defers_billing_discovery_until_new_project_exists(
     assert preflight["missing_apis"] == ["one.googleapis.com"]
 
 
-# @features setup
-# @dimensions preflight project-create billing
+# @matrix setup : billing preflight project-create
 def test_apply_target_preflight_creates_and_bills_confirmed_project(
     monkeypatch,
     isolated_setup_config,
@@ -781,8 +1055,7 @@ def test_apply_target_preflight_creates_and_bills_confirmed_project(
     ]
 
 
-# @features setup
-# @dimensions preflight project-create billing browser
+# @matrix setup : billing browser preflight project-create
 def test_apply_target_preflight_authorizes_billing_after_project_creation_when_cli_list_is_empty(
     monkeypatch,
     isolated_setup_config,
@@ -852,8 +1125,7 @@ def test_apply_target_preflight_authorizes_billing_after_project_creation_when_c
     assert ["authorize-billing", "target-project-1"] in events
 
 
-# @features setup
-# @dimensions preflight project-create billing provider-apis
+# @matrix setup : billing preflight project-create provider-apis
 def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
     monkeypatch,
     isolated_setup_config,
@@ -941,8 +1213,54 @@ def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
     ] in events
 
 
-# @features setup
-# @dimensions validation app-name
+# @matrix setup : error-guidance google-cloud-terms identity provider-apis
+def test_google_cloud_terms_failure_has_account_specific_repair(
+    monkeypatch,
+    isolated_setup_config,
+):
+    import config
+    import installer as setup_pkg
+    from installer import create_config
+
+    monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
+    config.SETTINGS.GCLOUD_CONFIG["ACCOUNT"] = "installer@business.example"
+    provider_detail = (
+        "ERROR: The terms of service 'cloud' must be accepted. "
+        "violations: tos_id=cloud reason: UREQ_TOS_NOT_ACCEPTED "
+        "Help Token: do-not-repeat-this-token"
+    )
+    monkeypatch.setattr(
+        create_config,
+        "run_gcloud_command",
+        lambda command, **kwargs: completed_process(
+            command,
+            returncode=1,
+            stderr=provider_detail,
+        ),
+    )
+    preflight = {
+        "project": {"state": "available", "details": {}, "error": None},
+        "billing_account": "billing-1",
+        "billing_enabled": True,
+        "enabled_apis": set(),
+        "missing_apis": sorted(create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS),
+    }
+
+    assert create_config._is_google_cloud_terms_error(provider_detail)
+    assert not create_config._is_google_cloud_terms_error("permission denied")
+    with pytest.raises(SetupError) as error:
+        create_config._apply_target_preflight("project-1", preflight)
+
+    assert "installer@business.example" in str(error.value)
+    assert "Help Token" not in str(error.value)
+    assert error.value.repair_action == (
+        "Sign in as 'installer@business.example' at "
+        f"{create_config.GOOGLE_CLOUD_TERMS_URL}, accept the Google Cloud "
+        "service terms, then rerun ./setup.sh."
+    )
+
+
+# @matrix setup : app-name validation
 def test_app_name_validation_rejects_control_characters_and_long_names(
     isolated_setup_config,
 ):
@@ -957,8 +1275,7 @@ def test_app_name_validation_rejects_control_characters_and_long_names(
     assert create_config._gcloud_configuration_name("A") == "a-setup"
 
 
-# @features setup
-# @dimensions gcloud-config identity
+# @matrix setup : gcloud-config identity
 def test_cli_identity_snapshot_fails_closed_on_unset_or_error(
     monkeypatch,
     isolated_setup_config,
@@ -1015,8 +1332,7 @@ def test_cli_identity_snapshot_fails_closed_on_unset_or_error(
     }
 
 
-# @features setup
-# @dimensions config-files
+# @pair setup:config-files
 def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
     _use_isolated_app_dir(monkeypatch, tmp_path)
 
@@ -1032,6 +1348,9 @@ def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
     config.SETTINGS.APP.update(
         {
             "APP_NAME": "My App",
+            "ADMIN_NAME": "Owner",
+            "ADMIN_EMAIL": "admin@example.com",
+            "GOOGLE_SIGNIN_ENABLED": True,
             "DEPLOY_SCALING_TYPE": "automatic",
             "DEPLOY_MAX_INSTANCES": "2",
             "DEPLOY_IDLE_TIMEOUT": "15m",
@@ -1082,8 +1401,7 @@ def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
     assert dev_config["gcloud_config"]["ACCOUNT"] == "admin@example.com"
 
 
-# @features setup
-# @dimensions config-files
+# @pair setup:config-files
 def test_set_application_defaults_generates_fresh_settings(monkeypatch, tmp_path):
     _use_isolated_app_dir(monkeypatch, tmp_path)
 
@@ -1166,8 +1484,7 @@ def test_set_application_defaults_generates_fresh_settings(monkeypatch, tmp_path
     }
 
 
-# @features setup
-# @dimensions config-files interactive-input gcloud-config
+# @matrix setup : config-files gcloud-config interactive-input
 def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     monkeypatch,
     tmp_path,
@@ -1203,21 +1520,25 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     adc_events = []
     permission_checks = []
 
-    monkeypatch.setattr(create_config, "_get_app_name", lambda: "Named App")
+    monkeypatch.setattr(
+        create_config,
+        "_select_initial_target",
+        lambda selected_account: ("Named App", project_id),
+    )
+    monkeypatch.setattr(
+        create_config,
+        "_get_gcloud_project",
+        lambda saved_project, sanitized_name: project_id,
+    )
     monkeypatch.setattr(
         admin,
         "collect_owner_and_signin_choice",
-        lambda: config.SETTINGS.APP.update(
+        lambda selected_installer: config.SETTINGS.APP.update(
             {"ADMIN_NAME": "Owner", "ADMIN_EMAIL": account}
         )
         or True,
     )
     monkeypatch.setattr(create_config, "_get_gcloud_account", lambda saved: account)
-    monkeypatch.setattr(
-        create_config,
-        "_get_gcloud_project",
-        lambda saved, sanitized_name: project_id,
-    )
     monkeypatch.setattr(switcher, "config_gcloud", lambda: None)
     monkeypatch.setattr(
         create_config,
@@ -1342,11 +1663,114 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     assert "setup_draft" not in config.File.DEV_YAML.load()
 
 
-# @pairs setup:owner setup:preconfirmation admin:google-oauth admin:interactive-input
-# @pairs setup:delegated-install setup:existing-project setup:billing
-# @pairs admin:google-signin admin:bootstrap-email admin:preserved-empty
-def test_delegated_setup_collects_owner_and_requires_google_before_confirmation(
-    monkeypatch, tmp_path
+# @matrix setup : adc existing-project interactive-input preconfirmation provider-apis
+def test_existing_project_prepares_bootstrap_apis_before_adc(
+    monkeypatch,
+    tmp_path,
+):
+    _use_isolated_app_dir(monkeypatch, tmp_path)
+
+    import config
+    import installer as setup_pkg
+    import runner.gcloud as switcher
+    from installer import create_config
+
+    (tmp_path / "package.json").write_text(json.dumps({"version": "1.0.0"}))
+    config.SETTINGS.NODE = config.File.PACKAGE_JSON.load()
+    monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
+    account = "owner@example.com"
+    project_id = "existing-project-1"
+    config.SETTINGS.APP.update(
+        {
+            "APP_NAME": "Existing App",
+            "ADMIN_NAME": "Owner",
+            "ADMIN_EMAIL": account,
+            "GOOGLE_SIGNIN_ENABLED": True,
+        }
+    )
+    monkeypatch.setattr(create_config, "_get_gcloud_account", lambda saved: account)
+    monkeypatch.setattr(
+        create_config,
+        "_get_gcloud_project",
+        lambda saved, generated: project_id,
+    )
+    monkeypatch.setattr(switcher, "config_gcloud", lambda: None)
+    monkeypatch.setattr(
+        create_config,
+        "_active_cli_identity",
+        lambda: {
+            "configuration": "existing-app",
+            "account": account,
+            "project": project_id,
+        },
+    )
+    preflight = {
+        "project": {"state": "available", "details": {}, "error": None},
+        "billing_account": "billing-1",
+        "billing_enabled": True,
+        "enabled_apis": set(),
+        "missing_apis": sorted(create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS),
+    }
+    monkeypatch.setattr(create_config, "_target_preflight", lambda target: preflight)
+    monkeypatch.setattr(
+        create_config,
+        "_preflight_operator_authority",
+        lambda selected_account, target: object(),
+    )
+    monkeypatch.setattr(
+        create_config,
+        "_ensure_adc_principal",
+        lambda *args: events.append("principal") or identity,
+    )
+    events = []
+    identity = {
+        "state": "success",
+        "principal": account,
+        "project": project_id,
+        "quota_project": project_id,
+        "error": None,
+    }
+    monkeypatch.setattr(
+        create_config,
+        "_set_adc_quota_project",
+        lambda target, spinner: events.append("adc") or identity,
+    )
+    monkeypatch.setattr(
+        create_config,
+        "_require_operator_permissions",
+        lambda target, **kwargs: events.append("permissions") or {},
+    )
+    monkeypatch.setattr(
+        create_config,
+        "_display_install_identity_summary",
+        lambda target_preflight, adc: events.append(("summary", adc["state"])),
+    )
+
+    def apply_preflight(target, target_preflight, project_ready=None):
+        events.append("prepare-apis")
+        assert project_ready is not None
+        target_preflight["enabled_apis"].update(
+            create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS
+        )
+        project_ready()
+
+    monkeypatch.setattr(create_config, "_apply_target_preflight", apply_preflight)
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+
+    assert create_config.set_application_defaults()
+    assert events == [
+        ("summary", "pending"),
+        "prepare-apis",
+        "principal",
+        "adc",
+        "permissions",
+    ]
+
+
+# @matrix admin : bootstrap-email google-oauth google-signin interactive-input prompt-clarity
+# @matrix setup : billing delegated-install existing-project owner preconfirmation project-iam
+def test_delegated_setup_automatically_enables_google_and_installer_bootstrap(
+    monkeypatch, tmp_path, capsys
 ):
     _use_isolated_app_dir(monkeypatch, tmp_path)
 
@@ -1357,11 +1781,31 @@ def test_delegated_setup_collects_owner_and_requires_google_before_confirmation(
     monkeypatch.setattr(
         admin, "_get_admin_email", lambda: "OWNER@business.example"
     )
-    monkeypatch.setattr(admin, "configure_google_signin_choice", lambda: True)
+    monkeypatch.setattr(
+        admin,
+        "configure_google_signin_choice",
+        lambda: pytest.fail(
+            "delegated setup must not ask whether to enable Google sign-in"
+        ),
+    )
 
-    assert admin.collect_owner_and_signin_choice() is True
+    assert admin.collect_owner_and_signin_choice(
+        "INSTALLER@business.example"
+    ) is True
     assert config.SETTINGS.APP["ADMIN_NAME"] == "Business Owner"
     assert config.SETTINGS.APP["ADMIN_EMAIL"] == "owner@business.example"
+    assert config.SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] is True
+    owner_prompt = capsys.readouterr().out
+    normalized_owner_prompt = " ".join(owner_prompt.split())
+    assert "Permanent site Owner" in normalized_owner_prompt
+    assert (
+        "exact Google account email, not a forwarding alias"
+        in normalized_owner_prompt
+    )
+    assert (
+        "Owner does not need to sign in on this computer"
+        in normalized_owner_prompt
+    )
 
     new_project = {
         "project": {"state": "absent"},
@@ -1369,46 +1813,182 @@ def test_delegated_setup_collects_owner_and_requires_google_before_confirmation(
     }
     with pytest.raises(RuntimeError, match="existing Google Cloud project"):
         create_config._configure_delegated_bootstrap(
-            new_project, "INSTALLER@business.example", True
+            new_project, "INSTALLER@business.example"
         )
 
     ready_project = {
         "project": {"state": "available"},
         "billing_enabled": True,
     }
-    with pytest.raises(RuntimeError, match="requires Google sign-in"):
-        create_config._configure_delegated_bootstrap(
-            ready_project, "installer@business.example", False
-        )
+    events = []
+    project_client = object()
 
-    prompts = []
+    def check_owner(project_id, owner_email, *, client=None):
+        events.append(("owner", project_id, owner_email, client))
+        return True
+
     monkeypatch.setattr(
-        "builtins.input", lambda prompt: prompts.append(prompt) or ""
+        "builtins.input",
+        lambda prompt: pytest.fail(
+            "delegated bootstrap access must not require another prompt"
+        ),
     )
+    config.SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = False
+    config.SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] = ""
     assert create_config._configure_delegated_bootstrap(
-        ready_project, "INSTALLER@business.example", True
+        ready_project,
+        "INSTALLER@business.example",
+        project_id="project-1",
+        project_client=project_client,
+        owner_checker=check_owner,
     )
     assert config.SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] == (
         "installer@business.example"
     )
-    assert prompts == [
-        "Temporarily allow the installer to sign in as an application "
-        "Administrator? [Y/n]: "
+    assert config.SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] is True
+    assert events == [
+        (
+            "owner",
+            "project-1",
+            "owner@business.example",
+            project_client,
+        )
+    ]
+    output = capsys.readouterr().out
+    assert "Delegated installer application access is ready" in output
+    assert "permanent Owner binding was read" not in output
+    assert "Allow this installer account" not in output
+
+    signin_choices = []
+    config.SETTINGS.APP["ADMIN_EMAIL"] = "installer@business.example"
+    monkeypatch.setattr(
+        admin,
+        "configure_google_signin_choice",
+        lambda: signin_choices.append("asked") or False,
+    )
+    assert admin.collect_owner_and_signin_choice(
+        "installer@business.example"
+    ) is False
+    assert signin_choices == ["asked"]
+
+
+# @matrix setup : adc gcloud-token operator-permissions preflight
+def test_existing_project_checks_cli_installer_permissions_before_adc_authentication(
+    monkeypatch,
+    capsys,
+):
+    from installer import create_config
+
+    events = []
+    project_client = object()
+
+    monkeypatch.setattr(
+        create_config,
+        "_gcloud_project_client",
+        lambda account: events.append(("cli-token", account)) or project_client,
+    )
+    monkeypatch.setattr(
+        create_config,
+        "_require_operator_permissions",
+        lambda project_id, **kwargs: events.append(
+            ("permissions", project_id, kwargs.get("client"))
+        ),
+    )
+    monkeypatch.setattr(
+        create_config,
+        "_ensure_adc_principal",
+        lambda *args, **kwargs: pytest.fail(
+            "CLI authority preflight must not read or authenticate ADC"
+        ),
+    )
+
+    assert create_config._preflight_operator_authority(
+        "installer@example.test",
+        "project-1",
+    ) is project_client
+    assert events == [
+        ("cli-token", "installer@example.test"),
+        ("permissions", "project-1", project_client),
+    ]
+    assert "gcloud CLI installer access is ready" in capsys.readouterr().out
+
+    def reject_permissions(*args, **kwargs):
+        raise RuntimeError("missing required permission")
+
+    monkeypatch.setattr(
+        create_config,
+        "_require_operator_permissions",
+        reject_permissions,
+    )
+    with pytest.raises(RuntimeError, match="before ADC authentication") as error:
+        create_config._preflight_operator_authority(
+            "installer@example.test",
+            "project-1",
+            client=project_client,
+        )
+    assert "Application Default Credentials were not changed" in str(error.value)
+    assert "missing required permission" in str(error.value)
+
+
+# @matrix setup : adc gcloud-token identity
+def test_gcloud_project_client_uses_selected_cli_account_without_adc(monkeypatch):
+    from google.cloud import resourcemanager_v3
+    from google.oauth2 import credentials as oauth_credentials
+    from installer import create_config
+    from installer import utils
+
+    events = []
+    project_client = object()
+    credential = object()
+
+    monkeypatch.setattr(utils, "install_if_missing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        create_config,
+        "run_gcloud_command",
+        lambda command, **kwargs: events.append(
+            ("gcloud", command, kwargs)
+        )
+        or completed_process(command, stdout="short-lived-token\n"),
+    )
+    monkeypatch.setattr(
+        oauth_credentials,
+        "Credentials",
+        lambda *, token: events.append(("credential", token)) or credential,
+    )
+    monkeypatch.setattr(
+        resourcemanager_v3,
+        "ProjectsClient",
+        lambda *, credentials: events.append(("client", credentials))
+        or project_client,
+    )
+
+    assert create_config._gcloud_project_client(
+        "installer@example.test"
+    ) is project_client
+    assert events == [
+        (
+            "gcloud",
+            ["auth", "print-access-token", "installer@example.test"],
+            {"check": False, "timeout": 60},
+        ),
+        ("credential", "short-lived-token"),
+        ("client", credential),
     ]
 
-    config.SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] = ""
     monkeypatch.setattr(
-        "builtins.input",
-        lambda prompt: pytest.fail("an explicit empty bootstrap must be preserved"),
+        create_config,
+        "run_gcloud_command",
+        lambda command, **kwargs: completed_process(
+            command,
+            returncode=1,
+            stderr="expired login",
+        ),
     )
-    assert create_config._configure_delegated_bootstrap(
-        ready_project, "installer@business.example", True
-    )
-    assert config.SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] == ""
+    with pytest.raises(RuntimeError, match=r"setup\.sh auth"):
+        create_config._gcloud_project_client("installer@example.test")
 
 
-# @features setup
-# @dimensions config-files config-version
+# @matrix setup : config-files config-version
 def test_update_config_sets_application_version_from_package(monkeypatch):
     from installer import create_config
 
@@ -1437,8 +2017,7 @@ def test_update_config_sets_application_version_from_package(monkeypatch):
     assert calls == [("defaults", "2.0")]
 
 
-# @features setup
-# @dimensions config-files agent-access ai-defaults source-link
+# @matrix setup : agent-access ai-defaults config-files source-link
 def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_path):
     _use_isolated_app_dir(monkeypatch, tmp_path)
 
@@ -1481,9 +2060,12 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     assert settings.APP["AGENT_ACCESS_EMAIL"] == constants.DEFAULT_AGENT_ACCESS_EMAIL
     assert settings.APP["AGENT_ACCESS_NAME"] == "Review Agent"
     assert settings.APP["AGENT_ACCESS_CODE"] == "generated-agent-code"
+    assert settings.APP["AI_MODEL"] == constants.DEFAULT_AI_MODEL
     assert settings.APP["AI_UTILITY_MODEL"] == constants.DEFAULT_UTILITY_AI_MODEL
     assert settings.APP["AI_IMAGE_MODEL"] == constants.DEFAULT_AI_IMAGE_MODEL
     assert settings.APP["SOURCE_URL"] == constants.DEFAULT_SOURCE_URL
+    assert settings.APP["SENTRY_TRACES_SAMPLE_RATE"] == 1.0
+    assert settings.APP["SENTRY_PROFILE_SESSION_SAMPLE_RATE"] == 1.0
     assert settings.APP["REDIS_TLS"] is False
     assert settings.APP["VERSION"] == "2.0"
     assert settings.APP["INSTALLER_EMAIL"] == "owner@example.com"
@@ -1509,6 +2091,8 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
             "AI_UTILITY_MODEL": "custom-utility-model",
             "AI_IMAGE_MODEL": "custom-image-model",
             "AI_OBSERVABILITY": True,
+            "SENTRY_TRACES_SAMPLE_RATE": 0.25,
+            "SENTRY_PROFILE_SESSION_SAMPLE_RATE": 0.5,
             "SOURCE_URL": "https://example.test/custom-source",
             "REDIS_TLS": True,
             "REDIS_CA_CERT": "config/files/redis_ca.pem",
@@ -1524,14 +2108,15 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     assert settings.APP["AI_UTILITY_MODEL"] == "custom-utility-model"
     assert settings.APP["AI_IMAGE_MODEL"] == "custom-image-model"
     assert settings.APP["AI_OBSERVABILITY"] is True
+    assert settings.APP["SENTRY_TRACES_SAMPLE_RATE"] == 0.25
+    assert settings.APP["SENTRY_PROFILE_SESSION_SAMPLE_RATE"] == 0.5
     assert settings.APP["SOURCE_URL"] == "https://example.test/custom-source"
     assert settings.APP["REDIS_TLS"] is True
     assert settings.APP["REDIS_CA_CERT"] == "config/files/redis_ca.pem"
     assert token_calls == []
 
 
-# @features setup
-# @dimensions config-files gcloud-config
+# @matrix setup : config-files gcloud-config
 def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path):
     app_dir = tmp_path
     _use_isolated_app_dir(monkeypatch, app_dir)
@@ -1562,6 +2147,7 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
                 "login",
                 "configured@example.com",
                 "--project=project-1",
+                "--scopes=openid,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/cloud-platform",
             ]
         )
     )
@@ -1578,8 +2164,13 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
                 "application-default",
                 "login",
                 "--project=project-1",
+                "--scopes=openid,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/cloud-platform",
             ]
         )
+    )
+    assert "sqlservice.login" not in create_config._adc_login_command(
+        "configured@example.com",
+        "project-1",
     )
 
     monkeypatch.setattr(
@@ -1611,8 +2202,7 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
     }
 
 
-# @features setup
-# @dimensions gcloud-config deploy-surface transactional-state activation
+# @matrix setup : activation deploy-surface gcloud-config transactional-state
 def test_verify_installation_is_read_only_and_activation_is_explicit(monkeypatch):
     from installer import verify
 
@@ -1651,8 +2241,7 @@ def test_verify_installation_is_read_only_and_activation_is_explicit(monkeypatch
     assert calls == ["generation", "deploy-surface", "activate"]
 
 
-# @features setup
-# @dimensions config-files validation
+# @matrix setup : config-files validation
 def test_verify_application_config_reports_missing_areas(monkeypatch, capsys):
     import installer as setup_pkg
     from installer import create_config
@@ -1683,8 +2272,7 @@ def test_verify_application_config_reports_missing_areas(monkeypatch, capsys):
     assert "SECRET_KEY" not in output
 
 
-# @features setup
-# @dimensions config-files validation google-oauth optional
+# @matrix setup : config-files google-oauth optional validation
 def test_verify_application_config_requires_google_client_only_when_enabled(
     monkeypatch,
     capsys,
@@ -1715,8 +2303,7 @@ def test_verify_application_config_requires_google_client_only_when_enabled(
     assert create_config.verify_application_config()
 
 
-# @features setup
-# @dimensions config-files validation keyless-config project-identity
+# @matrix setup : config-files keyless-config project-identity validation
 def test_verify_application_config_rejects_keyless_identity_mismatch(
     monkeypatch,
     capsys,
@@ -1755,8 +2342,7 @@ def test_verify_application_config_rejects_keyless_identity_mismatch(
     assert "Google Cloud keyless identity" in capsys.readouterr().out
 
 
-# @features setup
-# @dimensions config-files validation redis-tls
+# @matrix setup : config-files redis-tls validation
 def test_verify_application_config_reports_invalid_redis_tls(monkeypatch, capsys):
     import installer as setup_pkg
     from installer import create_config
@@ -1828,8 +2414,7 @@ def _configure_adc_quota_test(monkeypatch, spinner):
     return create_config
 
 
-# @features setup
-# @dimensions adc transactional-state permissions
+# @matrix setup : adc permissions transactional-state
 def test_adc_authentication_is_kept_only_after_project_permission_confirmation(
     monkeypatch,
     tmp_path,
@@ -1897,8 +2482,7 @@ def test_adc_authentication_is_kept_only_after_project_permission_confirmation(
     assert adc_path.read_text(encoding="utf-8") == new_credentials
 
 
-# @features setup
-# @dimensions adc new-project transactional-state
+# @matrix setup : adc new-project transactional-state
 def test_new_project_forces_transactional_adc_refresh(monkeypatch):
     spinner = SpinnerRecorder()
     create_config = _configure_adc_quota_test(monkeypatch, spinner)
@@ -1975,8 +2559,7 @@ def test_new_project_forces_transactional_adc_refresh(monkeypatch):
     assert delays == [2, 4]
 
 
-# @features setup
-# @dimensions config-files gcloud-config interactive-input
+# @matrix setup : config-files gcloud-config interactive-input
 def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkeypatch):
     spinner = SpinnerRecorder()
     create_config = _configure_adc_quota_test(monkeypatch, spinner)
@@ -2046,16 +2629,17 @@ def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkey
     assert not any(
         "Failed to set ADC quota project" in message for message in spinner.messages
     )
-    assert any("quota project mismatch" in message for message in spinner.messages)
+    assert not any("quota project mismatch" in message for message in spinner.messages)
     messages = " ".join(" ".join(spinner.messages).split())
     assert (
-        "gcloud auth application-default login owner@example.com --project=project-1"
+        "gcloud auth application-default login owner@example.com --project=project-1 "
+        "--scopes=openid,https://www.googleapis.com/auth/userinfo.email,"
+        "https://www.googleapis.com/auth/cloud-platform"
         in messages
     )
 
 
-# @features setup
-# @dimensions config-files gcloud-config interactive-input
+# @matrix setup : config-files gcloud-config interactive-input
 def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch):
     spinner = SpinnerRecorder()
     create_config = _configure_adc_quota_test(monkeypatch, spinner)
@@ -2074,7 +2658,7 @@ def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch
             returncode=1, stderr="browser auth cancelled"
         ),
     )
-    with pytest.raises(SetupError):
+    with pytest.raises(SetupError) as error:
         create_config._set_adc_quota_project("project-1", spinner)
 
     assert spinner.fails == ["[X]"]
@@ -2084,21 +2668,24 @@ def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch
     assert not any(
         "Failed to set ADC quota project" in message for message in spinner.messages
     )
-    assert any("quota project mismatch" in message for message in spinner.messages)
+    assert not any("quota project mismatch" in message for message in spinner.messages)
     assert not any(
         "browser auth cancelled" in message for message in spinner.messages
     )
     assert any("Opening browser" in message for message in spinner.messages)
     assert any("ADC login did not complete" in message for message in spinner.messages)
+    assert create_config.GOOGLE_CLOUD_TERMS_URL in error.value.repair_action
+    assert "owner@example.com" in error.value.repair_action
     messages = " ".join(" ".join(spinner.messages).split())
     assert (
-        "gcloud auth application-default login owner@example.com --project=project-1"
+        "gcloud auth application-default login owner@example.com --project=project-1 "
+        "--scopes=openid,https://www.googleapis.com/auth/userinfo.email,"
+        "https://www.googleapis.com/auth/cloud-platform"
         in messages
     )
 
 
-# @features setup
-# @dimensions gcloud-config env-export
+# @matrix setup : env-export gcloud-config
 def test_gcloud_switcher_exports_project_for_child_processes(monkeypatch):
     import os
     import config

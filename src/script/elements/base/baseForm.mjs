@@ -190,6 +190,11 @@ export class BaseForm {
 		this.syncOfflineState();
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_024_edit_watcher.py::test_base_form_tracks_unsaved_state_without_sync
+	 * @matrix forms unsaved-state : change input non-sync reset
+	 */
 	_initUnsavedState() {
 		if (this.readonly || !this.submitButton || this._unsavedStateListener)
 			return;
@@ -236,6 +241,11 @@ export class BaseForm {
 		}
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_024_edit_watcher.py::test_base_form_tracks_unsaved_state_without_sync
+	 * @matrix forms unsaved-state : success
+	 */
 	success() {
 		if (!this.submitButton) return;
 
@@ -453,6 +463,11 @@ export class BaseForm {
 	}
 
 	destroy() {
+		const submitButton = this.submitButton;
+		if (submitButton?.__initialized) {
+			submitButton.removeEventListener("click", this.submitting);
+			delete submitButton.__initialized;
+		}
 		if (this._offlineListener) {
 			this._widget.view?.elt?.removeEventListener(
 				"offline-status",

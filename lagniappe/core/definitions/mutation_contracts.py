@@ -341,16 +341,14 @@ PERSISTED_ENTITY_KINDS = frozenset(ENTITY_MUTATION_CONTRACTS)
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @features mutations
-# @dimensions contract lookup
+# @matrix mutations : contract lookup
 def mutation_contract(kind):
     return ENTITY_MUTATION_CONTRACTS.get(kind)
 
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @features mutations
-# @dimensions contract completeness validation
+# @matrix mutations : completeness contract validation
 def validate_mutation_contracts():
     """Return stable validation messages for registry drift."""
     errors = []

@@ -1,5 +1,5 @@
 import { primitives } from "../elements/primitives";
-import { withTransition } from "../shared";
+import { sessionStore, withTransition } from "../shared";
 
 /**
  * @testable infrastructure
@@ -140,15 +140,17 @@ export class TableSorting {
 	}
 
 	_loadState() {
-		const saved = sessionStorage.getItem(this.storageKey);
-		return saved ? JSON.parse(saved) : null;
+		const saved = sessionStore.getJSON(this.storageKey);
+		if (saved === null) return null;
+		if (typeof saved === "object" && !Array.isArray(saved)) return saved;
+		sessionStore.remove(this.storageKey);
+		return null;
 	}
 
 	/**
 	 * @testable true
 	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_persists_after_back_navigation
-	 * @features table-controls
-	 * @dimensions sorting persistence
+	 * @matrix table-controls : persistence sorting
 	 */
 	_saveState() {
 		const sorts = {};
@@ -159,20 +161,17 @@ export class TableSorting {
 		});
 
 		if (Object.keys(sorts).length) {
-			sessionStorage.setItem(
-				this.storageKey,
-				JSON.stringify({
-					lastReorderColumn: this.lastReorderColumn,
-					sorts: sorts,
-				}),
-			);
+			sessionStore.setJSON(this.storageKey, {
+				lastReorderColumn: this.lastReorderColumn,
+				sorts: sorts,
+			});
 		} else {
 			this._clearState();
 		}
 	}
 
 	_clearState() {
-		sessionStorage.removeItem(this.storageKey);
+		sessionStore.remove(this.storageKey);
 	}
 
 	_restoreLastReorderColumn(saved) {
@@ -204,8 +203,7 @@ export class TableSorting {
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_filter_button_opens_sorting_panel
 	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_filter_button_opens_sorting_panel
-	 * @features table-controls
-	 * @dimensions mobile-controls sorting
+	 * @matrix table-controls : mobile-controls sorting
 	 */
 	_setSortingToggles() {
 		const container = this.view.mobile
@@ -286,8 +284,7 @@ export class TableSorting {
 	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_exists_column_filter_treats_phone_values_as_present
 	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_name_sort_ascending_reorders_rows
 	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_due_date_sort_filters_to_dated_rows
-	 * @features table-controls
-	 * @dimensions sorting sort-asc sort-desc sort-clear name filtering due-date boolean-column exists-column phone
+	 * @matrix table-controls : boolean-column due-date exists-column filtering name phone sort-asc sort-clear sort-desc sorting
 	 */
 	sort() {
 		let reorderRows = false;
@@ -487,8 +484,7 @@ class RadioSort {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_image_column_sort_panel_offers_presence_options
-	 * @features table-controls
-	 * @dimensions sorting exists-column
+	 * @matrix table-controls : exists-column sorting
 	 */
 	get options() {
 		const setOptions = (options) => {

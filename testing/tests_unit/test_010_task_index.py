@@ -12,8 +12,7 @@ from lagniappe.core.tools.database import get as database_get
 from testing.utility.test_entities import TestEntities
 
 
-# @features task-index
-# @dimensions query-filter completed active
+# @matrix task-index : active completed query-filter
 @pytest.mark.unit
 def test_task_query_filter_uses_completed_status_not_active_status():
     incomplete = {
@@ -29,8 +28,7 @@ def test_task_query_filter_uses_completed_status_not_active_status():
     assert completed == {"type": "task", "active": True, "completed": True}
 
 
-# @features task-index
-# @dimensions query-filter assignee-visibility
+# @matrix task-index : assignee-visibility query-filter
 @pytest.mark.unit
 def test_task_query_filter_includes_assignee_visibility_branch():
     assignee = TestEntities.get(
@@ -64,8 +62,7 @@ def test_task_query_filter_includes_assignee_visibility_branch():
     assert unrestricted._requires is None
 
 
-# @features home task-index
-# @dimensions due-tasks restrictions unrestricted
+# @matrix home task-index : due-tasks restrictions unrestricted
 @pytest.mark.unit
 def test_due_tasks_does_not_add_requires_filter_for_unrestricted(monkeypatch):
     captured = {}
@@ -102,8 +99,7 @@ def test_due_tasks_does_not_add_requires_filter_for_unrestricted(monkeypatch):
     assert captured["order"] == "due_date"
 
 
-# @features task-index
-# @dimensions table columns
+# @matrix task-index : columns table
 @pytest.mark.unit
 def test_task_index(get_test_entities):
     """Test TaskIndex produces correct column structure for UI.
@@ -204,8 +200,7 @@ def test_task_index(get_test_entities):
             assert task.column("name").editable is False
 
 
-# @features task-index status
-# @dimensions mixed-forms computed-column
+# @matrix status task-index : computed-column mixed-forms
 @pytest.mark.unit
 def test_task_index_status_column_derives_messages_from_mixed_forms(get_schema):
     """TaskTable exposes one status column that resolves each task's own form."""
@@ -317,8 +312,7 @@ def test_task_index_status_column_derives_messages_from_mixed_forms(get_schema):
     assert plain_task.column("status").sort_value is None
 
 
-# @features tasks
-# @dimensions history table columns attachments
+# @matrix tasks : attachments columns history table
 @pytest.mark.unit
 def test_task_history_index_includes_attachments_column():
     """Task history tables expose attachments as an optional column."""
@@ -345,8 +339,7 @@ def test_task_history_index_includes_attachments_column():
     assert table.fields["files"].selected is False
 
 
-# @features tasks
-# @dimensions history table columns name description
+# @matrix tasks : columns description history name table
 @pytest.mark.unit
 def test_task_history_index_includes_snapshot_columns(get_schema):
     """Only completion date and preserved text are selected by default."""
@@ -379,8 +372,7 @@ def test_task_history_index_includes_snapshot_columns(get_schema):
     assert table.fields["description"].selected is True
 
 
-# @features index
-# @dimensions pagination state user-scope
+# @matrix index : pagination state user-scope
 @pytest.mark.unit
 def test_index_base_cursor_limit_user_and_append_state():
     """Base Index stores pagination and user state without owning queries."""
@@ -406,8 +398,7 @@ def test_index_base_cursor_limit_user_and_append_state():
     assert index.append == "/rows?cursor=next"
 
 
-# @features task-index
-# @dimensions pagination dated undated restrictions
+# @matrix task-index : dated pagination restrictions undated
 @pytest.mark.unit
 def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
     """TaskIndex coordinates dated/undated task streams and row append URLs."""
@@ -439,11 +430,11 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
 
     with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
         with patch(
-            "lagniappe.core.entities.index.database.get.tasks_with_due_dates",
+            "lagniappe.core.entities.index.database_get.tasks_with_due_dates",
             return_value=SimpleNamespace(results=["dated-key"], next_cursor=None),
         ) as dated_query:
             with patch(
-                "lagniappe.core.entities.index.database.get.tasks_without_due_dates"
+                "lagniappe.core.entities.index.database_get.tasks_without_due_dates"
             ) as undated_query:
                 with patch(
                     "lagniappe.core.entities.index.Entities.fetch",
@@ -473,11 +464,11 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
 
     with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
         with patch(
-            "lagniappe.core.entities.index.database.get.tasks_with_due_dates",
+            "lagniappe.core.entities.index.database_get.tasks_with_due_dates",
             return_value=SimpleNamespace(results=[], next_cursor="ignored"),
         ) as dated_query:
             with patch(
-                "lagniappe.core.entities.index.database.get.tasks_without_due_dates",
+                "lagniappe.core.entities.index.database_get.tasks_without_due_dates",
                 return_value=SimpleNamespace(
                     results=["undated-key"], next_cursor="cursor-2"
                 ),

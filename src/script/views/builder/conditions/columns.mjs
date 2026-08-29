@@ -7,8 +7,7 @@ import { Condition } from "./base";
 /**
  * @testable true
  * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_table_column_condition_editor
- * @features forms
- * @dimensions builder-table-column
+ * @pair forms:builder-table-column
  */
 export default class Columns extends Condition {
 	constructor(builder) {
@@ -17,6 +16,7 @@ export default class Columns extends Condition {
 		this.messages = {
 			submit: "Add Column",
 		};
+		this._updated = this._updated.bind(this);
 	}
 
 	init() {
@@ -105,13 +105,22 @@ export default class Columns extends Condition {
 		this.destroyables.push(selectBox);
 		this.focusTarget = selectElt;
 
-		this.target.addEventListener("updated", (e) => {
-			const options = Object.values(e.detail.options);
-			const value = options[0].id;
-			this._updateSetting(value);
-			this.addColumnName();
-			this.showProgress();
-		});
+		this.target.removeEventListener("updated", this._updated);
+		this.target.addEventListener("updated", this._updated);
+	}
+
+	_updated(e) {
+		const options = Object.values(e.detail.options);
+		const value = options[0]?.id;
+		if (!value) return;
+		this._updateSetting(value);
+		this.addColumnName();
+		this.showProgress();
+	}
+
+	destroy() {
+		this.target.removeEventListener("updated", this._updated);
+		super.destroy();
 	}
 
 	validate() {

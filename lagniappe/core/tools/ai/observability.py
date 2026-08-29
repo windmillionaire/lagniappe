@@ -11,10 +11,8 @@ import logging
 import time
 import uuid
 
-from google.cloud.datastore import query as datastore_query
-
 from lagniappe import CONFIG
-from lagniappe.core.tools.database.core import DATA, KINDS
+from lagniappe.core.tools.database import analytics as analytics_database
 
 
 LOGGER = logging.getLogger(__name__)
@@ -93,11 +91,8 @@ EXCLUDE_FROM_INDEXES = (
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
-# @pair observability:job-type
-# @pair observability:attempt
-# @pair observability:contract-version
-# @pair observability:no-job-key
+# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
+# @matrix observability : attempt contract-version job-type no-job-key
 @dataclass(frozen=True)
 class AIExecutionContext:
     """Allowlisted deferred-job metadata available during one preparation pass."""
@@ -114,7 +109,7 @@ _CURRENT_OBSERVER = ContextVar("ai_generation_observer", default=None)
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
+# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
 # @pair deferred-jobs:preparation-context
 @contextmanager
 def ai_execution_context(
@@ -153,9 +148,8 @@ def current_execution_control():
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_summary_persistence_uses_uuid_key_and_bounded_pruning
 # @tests tests_unit/test_015c_ai_observability.py::test_generation_summary_aggregates_visible_calls_and_redacts_payload
+# @matrix datastore : index-exclusions uuid-key
 # @pair observability:privacy
-# @pair datastore:uuid-key
-# @pair datastore:index-exclusions
 @dataclass
 class GenerationSummaryV1:
     """Exact allowlist for the version-1 persisted summary contract."""
@@ -230,7 +224,7 @@ def diagnostic_record(record):
 
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_operation_diagnostic_payload_is_correlated_and_privacy_bounded
-# @pairs ai-observability:job-correlation ai-observability:privacy
+# @matrix ai-observability : job-correlation privacy
 def operation_diagnostic_payload(operation, records, *, query_limit=QUERY_LIMIT):
     """Build a transferable, privacy-bounded job/provider snapshot."""
     telemetry_id = operation.get("telemetry_id")
@@ -341,25 +335,7 @@ def _error_category(error):
 # @tests tests_unit/test_015c_ai_observability.py::test_nested_model_repair_gets_its_own_summary
 # @tests tests_unit/test_015c_ai_observability.py::test_observability_failures_never_change_generation_result_or_error
 # @tests tests_unit/test_015c_ai_observability.py::test_deferred_generation_overwrites_correlated_live_snapshots
-# @pair observability:privacy
-# @pair observability:provider-calls
-# @pair observability:tools
-# @pair observability:tokens
-# @pair observability:validation
-# @pair observability:cache
-# @pair observability:deferred-context
-# @pair observability:empty-response
-# @pair observability:quota
-# @pair observability:error-normalization
-# @pair observability:nested-generation
-# @pair observability:correlation
-# @pair observability:review-fallback
-# @pair observability:disabled
-# @pair observability:persistence-failure
-# @pair observability:pruning-failure
-# @pair observability:exception-transparency
-# @pair observability:in-flight
-# @pair observability:provider-stage
+# @matrix observability : cache correlation deferred-context disabled empty-response error-normalization exception-transparency in-flight nested-generation persistence-failure privacy provider-calls provider-stage pruning-failure quota review-fallback tokens tools validation
 class GenerationObserver:
     """Mutable in-memory reducer for one public ``generate_content`` call."""
 
@@ -608,8 +584,7 @@ def current_observer():
 
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_nested_model_repair_gets_its_own_summary
-# @pair observability:model-repair
-# @pair observability:review-fallback
+# @matrix observability : model-repair review-fallback
 def mark_outcome(value):
     observer = current_observer()
     if observer is not None:
@@ -618,17 +593,13 @@ def mark_outcome(value):
 
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_summary_persistence_uses_uuid_key_and_bounded_pruning
-# @pair datastore:uuid-key
-# @pair datastore:index-exclusions
+# @matrix datastore : index-exclusions uuid-key
 def _write_summary(summary):
-    key = DATA.datastore.key(KINDS.ai_observability.value, summary.correlation_id)
-    entity = DATA.datastore.entity(
-        key=key,
+    return analytics_database.create_ai_observability(
+        summary.correlation_id,
+        summary.payload(),
         exclude_from_indexes=EXCLUDE_FROM_INDEXES,
     )
-    entity.update(summary.payload())
-    DATA.datastore.put(entity)
-    return entity
 
 
 # @testable true
@@ -636,22 +607,17 @@ def _write_summary(summary):
 # @pair datastore:retention-bound
 def prune_old_records(*, now=None, limit=PRUNE_LIMIT):
     cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=RETENTION_DAYS)
-    query = DATA.datastore.query(kind=KINDS.ai_observability.value)
-    query.add_filter(filter=datastore_query.PropertyFilter("created", "<", cutoff))
-    query.order = ["created"]
-    query.keys_only()
-    keys = [record.key for record in query.fetch(limit=min(int(limit), PRUNE_LIMIT))]
-    if keys:
-        DATA.datastore.delete_multi(keys)
-    return len(keys)
+    return analytics_database.delete_ai_observability(
+        before=cutoff,
+        batch_size=min(int(limit), PRUNE_LIMIT),
+        once=True,
+    )
 
 
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_ai_observability_dashboard_aggregation
+# @matrix analytics : groups outcomes query-limit
 # @pair observability:aggregation
-# @pair analytics:groups
-# @pair analytics:outcomes
-# @pair analytics:query-limit
 def aggregate_records(records, *, query_limit=QUERY_LIMIT):
     """Build the owner dashboard view model from already-windowed summaries."""
     records = list(records)

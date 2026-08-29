@@ -30,8 +30,7 @@ export class TableVisibility {
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_controls_open_with_task_columns
 	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_open_with_page_columns
-	 * @features table-controls
-	 * @dimensions mobile-controls columns
+	 * @matrix table-controls : columns mobile-controls
 	 */
 	get visibleColumns() {
 		return this.state.visibleColumns;
@@ -44,8 +43,7 @@ export class TableVisibility {
 	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_hiding_column_updates_visible_headers_and_cells
 	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_visibility_panel_includes_category_form_columns
 	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_visibility_toggle_hides_column
-	 * @features table-controls
-	 * @dimensions mobile-controls column-visibility quick-edit checkbox-cell
+	 * @matrix table-controls : checkbox-cell column-visibility mobile-controls quick-edit
 	 */
 	_toggleColumn(column, visible) {
 		this.state.toggle(column, visible);
@@ -56,8 +54,7 @@ export class TableVisibility {
 	 *
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_keeps_revealed_completed_column_editable
-	 * @features task-index table-controls
-	 * @dimensions quick-edit column-visibility checkbox-cell
+	 * @matrix table-controls task-index : checkbox-cell column-visibility quick-edit
 	 */
 	preserveEditor(editor) {
 		this._preservedEditor = editor;
@@ -79,8 +76,7 @@ export class TableVisibility {
 	 * @testable true
 	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_column_visibility_panel_opens
 	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_visibility_panel_includes_category_form_columns
-	 * @features table-controls
-	 * @dimensions visibility-panel columns form-columns
+	 * @matrix table-controls : columns form-columns visibility-panel
 	 */
 	_createController() {
 		const cell = this.target.appendChild(document.createElement("td"));

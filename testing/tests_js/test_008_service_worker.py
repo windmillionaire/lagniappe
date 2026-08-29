@@ -127,8 +127,7 @@ checkForCacheInvalidation = async () => {{}};
     run_node(script)
 
 
-# @features cache
-# @dimensions no-store service-worker
+# @matrix cache : no-store service-worker
 def test_no_store_304_discards_cached_response(run_node):
     run_service_worker_check(
         run_node,
@@ -184,12 +183,7 @@ if (fetchCalls[0].headers.get("If-None-Match") !== '"cached-etag"') {
     )
 
 
-# @pair cache:service-worker
-# @pair cache:token
-# @pair cache:network-only
-# @pair csrf:service-worker
-# @pair csrf:token
-# @pair csrf:network-only
+# @matrix cache csrf : network-only service-worker token
 def test_token_request_is_network_only_without_client_cache_directives(run_node):
     run_service_worker_check(
         run_node,
@@ -236,8 +230,7 @@ if (responseCache.puts !== 0) {
     )
 
 
-# @features cache request
-# @dimensions service-worker conditional-response dom-refresh
+# @matrix cache request : conditional-response dom-refresh service-worker
 def test_cached_304_marks_response_not_updated(run_node):
     run_service_worker_check(
         run_node,
@@ -274,8 +267,7 @@ if (fetchCalls[0].headers.get("If-None-Match") !== '"tasks-etag"') {
     )
 
 
-# @features offline cache
-# @dimensions service-worker response-shape ajax
+# @matrix cache offline : ajax response-shape service-worker
 def test_application_get_failure_returns_503_instead_of_offline_html(run_node):
     run_service_worker_check(
         run_node,
@@ -307,8 +299,7 @@ if (body.ok !== false || body.error !== "You are offline") {
     )
 
 
-# @features offline cache
-# @dimensions service-worker response-shape navigation
+# @matrix cache offline : navigation response-shape service-worker
 def test_navigation_failure_uses_offline_document(run_node):
     run_service_worker_check(
         run_node,
@@ -328,8 +319,7 @@ if (response.status !== 200 || await response.text() !== "offline document") {
     )
 
 
-# @features cache
-# @dimensions service-worker activation ownership
+# @matrix cache : activation ownership service-worker
 def test_activation_clears_only_application_owned_caches(run_node):
     run_service_worker_check(
         run_node,
@@ -347,8 +337,7 @@ if (deleted.has("third-party-cache")) {
     )
 
 
-# @features cache
-# @dimensions invalidation service-worker
+# @matrix cache : invalidation service-worker
 def test_304_response_with_invalidation_header_fetches_fresh_response(run_node):
     run_service_worker_check(
         run_node,
@@ -413,8 +402,7 @@ if (fetchCalls[1].headers.has("If-None-Match")) {
     )
 
 
-# @features cache
-# @dimensions service-worker browser-validators
+# @matrix cache : browser-validators service-worker
 def test_dynamic_fetch_preserves_browser_validators_without_stored_etag(run_node):
     run_service_worker_check(
         run_node,
@@ -457,8 +445,7 @@ if (fetchCalls.length !== 1) {
     )
 
 
-# @features cache
-# @dimensions service-worker cached-response network-validation
+# @matrix cache : cached-response network-validation service-worker
 def test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response(
     run_node,
 ):
@@ -510,8 +497,7 @@ if (fetchCalls.length !== 1) {
     )
 
 
-# @features cache
-# @dimensions invalidation service-worker
+# @matrix cache : invalidation service-worker
 def test_redirect_response_with_invalidation_header_clears_cache(run_node):
     run_service_worker_check(
         run_node,
@@ -560,8 +546,7 @@ if (responseCache.puts !== 0) {
     )
 
 
-# @features cache
-# @dimensions invalidation service-worker
+# @matrix cache : invalidation service-worker
 def test_cache_invalidation_confirmation_posts_after_local_clear(run_node):
     run_service_worker_check(
         run_node,
@@ -579,7 +564,10 @@ context.fetch = async (url, options = {}) => {
   }
   if (url === "/l/validate-user") {
     validateCalls.push(options);
-    return new Response("", { status: 200 });
+    return new Response(JSON.stringify({ cacheCleared: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   }
   throw new Error(`Unexpected fetch ${url}`);
 };
@@ -593,7 +581,7 @@ const result = await context.checkForCacheInvalidation(
   }),
 );
 
-if (!result.invalidated || !result.cacheCleared) {
+if (!result.invalidated || !result.cacheCleared || !result.acknowledged) {
   throw new Error("cache invalidation did not report a confirmed clear");
 }
 if (validateCalls.length !== 1) {
@@ -610,8 +598,104 @@ if (validateCalls[0].headers["X-CSRFToken"] !== "csrf-token") {
     )
 
 
-# @features cache
-# @dimensions service-worker redirect-mode etag
+# @matrix cache : acknowledgement failure invalidation retry service-worker
+def test_cache_invalidation_requires_explicit_server_acknowledgement(run_node):
+    run_service_worker_check(
+        run_node,
+        """
+const captures = [];
+context.self.Sentry = {
+  captureException(error, options) {
+    captures.push({ message: error.message, ...options });
+  },
+};
+
+const scenarios = [
+  {
+    stage: "token-response",
+    fetch: async (url) => new Response("", { status: url === "/l/token" ? 500 : 200 }),
+    validateCalls: 0,
+  },
+  {
+    stage: "token-empty",
+    fetch: async (url) => new Response(url === "/l/token" ? "   " : "", { status: 200 }),
+    validateCalls: 0,
+  },
+  {
+    stage: "validation-response",
+    fetch: async (url) => url === "/l/token"
+      ? new Response("csrf-token")
+      : new Response("", { status: 503 }),
+    validateCalls: 1,
+  },
+  {
+    stage: "validation-body",
+    fetch: async (url) => url === "/l/token"
+      ? new Response("csrf-token")
+      : new Response("not-json", { status: 200 }),
+    validateCalls: 1,
+  },
+  {
+    stage: "validation-acknowledgement",
+    fetch: async (url) => url === "/l/token"
+      ? new Response("csrf-token")
+      : new Response(JSON.stringify({ cacheCleared: false }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    validateCalls: 1,
+  },
+];
+
+vm.runInContext(`checkForCacheInvalidation = realCheckForCacheInvalidation;`, context);
+for (const scenario of scenarios) {
+  let validateCalls = 0;
+  context.fetch = async (url, options = {}) => {
+    if (url === "/l/validate-user") validateCalls += 1;
+    return scenario.fetch(url, options);
+  };
+  const before = captures.length;
+  const result = await context.checkForCacheInvalidation(
+    new Response("", {
+      headers: { "X-Lagniappe-Invalidate-Cache": "true" },
+    }),
+  );
+  if (result.acknowledged !== false) {
+    throw new Error(`Expected failed acknowledgement for ${scenario.stage}`);
+  }
+  if (validateCalls !== scenario.validateCalls) {
+    throw new Error(`Unexpected validate calls for ${scenario.stage}: ${validateCalls}`);
+  }
+  if (captures.length !== before + 1 || captures.at(-1).stage !== scenario.stage) {
+    throw new Error(`Expected one ${scenario.stage} capture: ${JSON.stringify(captures)}`);
+  }
+  if (captures.at(-1).message.includes("csrf-token") || "body" in captures.at(-1)) {
+    throw new Error("Validation diagnostics included sensitive response data");
+  }
+}
+
+let validationAttempts = 0;
+context.fetch = async (url) => {
+  if (url === "/l/token") return new Response("csrf-token");
+  validationAttempts += 1;
+  return new Response(JSON.stringify({ cacheCleared: validationAttempts > 1 }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+};
+const invalidation = new Response("", {
+  headers: { "X-Lagniappe-Invalidate-Cache": "true" },
+});
+const first = await context.checkForCacheInvalidation(invalidation.clone());
+const second = await context.checkForCacheInvalidation(invalidation.clone());
+if (first.acknowledged !== false || second.acknowledged !== true || validationAttempts !== 2) {
+  throw new Error("A failed acknowledgement did not reset for the next invalidation header");
+}
+""",
+    )
+
+
+# @matrix cache : etag redirect-mode service-worker
 def test_conditional_fetch_preserves_original_request_redirect_mode(run_node):
     run_service_worker_check(
         run_node,
@@ -661,8 +745,7 @@ if (fetchCalls.length !== 1) {
     )
 
 
-# @features cache
-# @dimensions service-worker redirected-response
+# @matrix cache : redirected-response service-worker
 def test_redirected_responses_are_discarded_and_not_cached(run_node):
     run_service_worker_check(
         run_node,
@@ -702,8 +785,7 @@ if (!responseCache.deletes.includes(request.url)) {
     )
 
 
-# @features cache
-# @dimensions no-store service-worker static-assets
+# @matrix cache : no-store service-worker static-assets
 def test_no_store_static_response_is_not_cached(run_node):
     run_service_worker_check(
         run_node,
@@ -747,8 +829,7 @@ if (!staticCache.deletes.includes(request.url)) {
     )
 
 
-# @features cache
-# @dimensions service-worker static-assets precache
+# @matrix cache : precache service-worker static-assets
 def test_precache_static_assets_warms_configured_urls_and_ignores_failures(run_node):
     run_service_worker_check(
         run_node,
@@ -805,8 +886,7 @@ if (!fetchCalls.every((request) => request.url.includes("?v=btest123"))) {
     )
 
 
-# @features cache
-# @dimensions service-worker sibling-invalidation route-class etag query
+# @matrix cache : etag query route-class service-worker sibling-invalidation
 def test_changed_validators_clear_only_same_path_query_siblings_for_configured_routes(
     run_node,
 ):
@@ -862,8 +942,7 @@ if (!responseCache.entries.has(ordinarySibling)) {
     )
 
 
-# @features cache
-# @dimensions service-worker quota eviction throttle batch
+# @matrix cache : batch eviction quota service-worker throttle
 def test_quota_eviction_is_throttled_and_bounded_to_oldest_entries(run_node):
     run_service_worker_check(
         run_node,
@@ -906,8 +985,7 @@ if (estimateCalls !== 1 || responseCache.deletes.length !== 200) {
     )
 
 
-# @features cache
-# @dimensions service-worker quota eviction unavailable failure
+# @matrix cache : eviction failure quota service-worker unavailable
 def test_quota_eviction_tolerates_unavailable_and_failed_estimates(run_node):
     run_service_worker_check(
         run_node,
@@ -937,8 +1015,7 @@ if (responseCache.deletes.length !== 0) {
     )
 
 
-# @features offline cache
-# @dimensions service-worker navigation fallback cache-miss
+# @matrix cache offline : cache-miss fallback navigation service-worker
 def test_navigation_failure_without_cached_offline_document_returns_503(run_node):
     run_service_worker_check(
         run_node,
@@ -954,8 +1031,7 @@ if (response.headers.get("Content-Type")?.includes("application/json")) {
     )
 
 
-# @features offline request
-# @dimensions service-worker mutation response-shape
+# @matrix offline request : mutation response-shape service-worker
 def test_mutation_failure_returns_json_503(run_node):
     run_service_worker_check(
         run_node,
@@ -979,8 +1055,7 @@ if (body.ok !== false || body.error !== "You are offline") {
     )
 
 
-# @features connectivity browser-protocol
-# @dimensions service-worker validation version controller
+# @matrix browser-protocol connectivity : controller service-worker validation version
 def test_worker_accepts_only_versioned_valid_connectivity_messages(run_node):
     run_service_worker_check(
         run_node,

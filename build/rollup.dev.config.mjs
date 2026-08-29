@@ -7,6 +7,7 @@ import * as yaml from "js-yaml";
 import postcss from "rollup-plugin-postcss";
 import { visualizer } from "rollup-plugin-visualizer";
 import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
+import { recordBuildArtifacts } from "./publication.mjs";
 import {
 	buildStyles,
 	emitMaterialSymbols,
@@ -16,7 +17,6 @@ import {
 	interactionFoundationChunk,
 	resolveMaterialSymbolsFont,
 	STYLE_PIPELINE,
-	updateConstantsBuildId,
 	updateServiceWorker,
 	versionChunkImports,
 } from "./utility.mjs";
@@ -27,6 +27,7 @@ const thirdPartyLicenseBanner =
 	"/*! Third-party licenses: /third-party-licenses.txt */";
 const mainInputs = {
 	main: "./src/script/main.mjs",
+	public: "./src/script/public.mjs",
 	...Object.fromEntries(
 		Object.entries(VIEW_ENTRIES).map(([entry, source]) => [
 			entry,
@@ -38,8 +39,7 @@ const devVersion = new Date().toISOString();
 const settings = yaml.load(
 	readFileSync("./config/files/lagniappe_settings.yaml", "utf8"),
 );
-const buildId = generateBuildId();
-updateConstantsBuildId(buildId);
+const buildId = process.env.LAGNIAPPE_FRONTEND_BUILD_ID || generateBuildId();
 
 export default [
 	{
@@ -65,6 +65,7 @@ export default [
 					__VERSION__: JSON.stringify(devVersion),
 				},
 			}),
+			recordBuildArtifacts(),
 		],
 		onwarn(warning, warn) {
 			if (warning.code === "EVAL" && warning.id.includes("node_modules"))
@@ -94,6 +95,7 @@ export default [
 					__VERSION__: JSON.stringify(devVersion),
 				},
 			}),
+			recordBuildArtifacts(),
 		],
 		onwarn(warning, warn) {
 			if (warning.code === "EVAL" && warning.id.includes("node_modules"))
@@ -141,11 +143,22 @@ export default [
 			emitMaterialSymbols(),
 			emitPdfWorker(),
 			emitThirdPartyLicenses(),
-			updateServiceWorker(buildId, settings.VERSION, "development"),
+			updateServiceWorker(buildId),
 			visualizer({
 				filename: `${reportsDir}/bundle-stats-dev.html`,
 				gzipSize: true,
 				template: "treemap",
+			}),
+			recordBuildArtifacts({
+				final: true,
+				buildId,
+				mode: "development",
+				version: settings.VERSION,
+				extraArtifacts: [
+					"lagniappe/web/start/styles/icons.py",
+					"lagniappe/web/start/styles/styles.py",
+					"lagniappe/web/static/sw.js",
+				],
 			}),
 		],
 		onwarn(warning, warn) {

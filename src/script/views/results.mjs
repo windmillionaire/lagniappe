@@ -10,8 +10,7 @@ export default class Results extends ShellView {
 	 * @testable true
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_facets_displayed
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_facet_selection_visual_state
-	 * @features search
-	 * @dimensions facets facet-state
+	 * @matrix search : facet-state facets
 	 * @template search/search.html::facet_button
 	 */
 	async init() {
@@ -54,8 +53,7 @@ export default class Results extends ShellView {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_pagination_controls_visible
-	 * @features search
-	 * @dimensions pagination
+	 * @pair search:pagination
 	 * @template search/results.html::footer
 	 */
 	addPagination() {
@@ -85,8 +83,7 @@ export default class Results extends ShellView {
 	 * @testable true
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_next_page
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_previous_page
-	 * @features search
-	 * @dimensions pagination-next pagination-previous
+	 * @matrix search : pagination-next pagination-previous
 	 * @template search/results.html::footer
 	 */
 	async handlePaginationClick(e) {
@@ -111,8 +108,7 @@ export default class Results extends ShellView {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_clear_facet_filter
-	 * @features search
-	 * @dimensions clear-facet
+	 * @pair search:clear-facet
 	 * @template search/search.html::main
 	 */
 	async handleResetClick(e) {
@@ -144,8 +140,7 @@ export default class Results extends ShellView {
 	 * @testable true
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_click_facet_filters_results
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_facet_selection_visual_state
-	 * @features search
-	 * @dimensions facet-filter url-state results facet-state
+	 * @matrix search : facet-filter facet-state results url-state
 	 * @template search/search.html::facet_button
 	 */
 	async handleFacetClick(e, facet) {

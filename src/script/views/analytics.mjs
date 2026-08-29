@@ -6,8 +6,8 @@ import ShellView from "./base/shell";
  * @testable true
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
- * @features analytics
- * @dimensions dashboard accordion retention-clear
+ * @matrix analytics : accordion dashboard retention-clear
+ * @pair analytics:page-tracking
  */
 export default class Analytics extends ShellView {
 	_click(event) {

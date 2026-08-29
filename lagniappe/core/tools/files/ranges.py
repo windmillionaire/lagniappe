@@ -13,8 +13,7 @@ class UnsatisfiableByteRange(ValueError):
 # @testable true
 # @tests tests_unit/test_006d_file_ranges.py::test_parse_byte_range_standard_and_suffix_forms
 # @tests tests_unit/test_006d_file_ranges.py::test_parse_byte_range_rejects_invalid_headers
-# @features file preview
-# @dimensions byte-range
+# @matrix file preview : byte-range
 @dataclass(frozen=True)
 class ByteRange:
     start: int
@@ -34,8 +33,7 @@ class ByteRange:
 # @tests tests_unit/test_006d_file_ranges.py::test_parse_byte_range_standard_and_suffix_forms
 # @tests tests_unit/test_006d_file_ranges.py::test_parse_byte_range_rejects_invalid_headers
 # @tests tests_unit/test_006d_file_ranges.py::test_parse_byte_range_raises_for_unsatisfiable_ranges
-# @features file preview
-# @dimensions byte-range
+# @matrix file preview : byte-range invalid-header unsatisfiable
 def parse_byte_range(header, size):
     """Parse a single HTTP byte range against a known resource size."""
     if not header or not isinstance(header, str):

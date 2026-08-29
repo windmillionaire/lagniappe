@@ -83,7 +83,7 @@ def _icon_definition(key):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002a_home.py::test_home_material_symbols_use_semantic_span_markup
-# @pairs home:material-symbol-markup icons:material-symbol-markup
+# @matrix home icons : material-symbol-markup
 def render_icon(key, classes="", kind=None):
     """Render one decorative Material Symbol from its semantic registry ID."""
     definition = _icon_definition(key)
@@ -137,8 +137,7 @@ def is_before_today(value):
 
 # @testable true
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
-# @features template-formatting
-# @dimensions tojson safe-json
+# @matrix template-formatting : safe-json tojson
 def initialize(app):
     app.json_provider_class = SafeJSONProvider
     app.json = SafeJSONProvider(app)

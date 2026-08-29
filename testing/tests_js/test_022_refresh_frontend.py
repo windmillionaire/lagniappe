@@ -1,8 +1,7 @@
 """Node-backed checks for batched Core refresh orchestration."""
 
 
-# @pairs form-index:destination-refresh form-index:created-row
-# @pairs form-index:sorting form-index:delete-target
+# @matrix form-index : created-row delete-target destination-refresh sorting
 def test_index_table_row_updates_rebuild_active_sort(run_node):
     run_node(
         r'''
@@ -132,15 +131,7 @@ const makeTable = (target) => {
     )
 
 
-# @pair reconnect-refresh:manifest
-# @pair reconnect-refresh:batching
-# @pair reconnect-refresh:fallback
-# @pair reconnect-refresh:delta-apply
-# @pair reconnect-refresh:legacy-fallback
-# @pair reconnect-refresh:cache-invalidation
-# @pair reconnect-refresh:mounted-collection
-# @pair reconnect-refresh:committed-delete
-# @pair reconnect-refresh:destination-invalidation
+# @matrix reconnect-refresh : batching cache-invalidation committed-delete delta-apply destination-invalidation fallback legacy-fallback manifest mounted-collection
 # @pair polling:reentrancy
 def test_core_refresh_batches_supported_widgets_and_falls_back_per_target(run_node):
     run_node(

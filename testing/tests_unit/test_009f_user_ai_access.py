@@ -10,8 +10,7 @@ from lagniappe.core.entities.user import User
 from testing.utility.test_entities import TestEntities
 
 
-# @features ai-access
-# @dimensions hierarchy validation fail-closed
+# @matrix ai-access : fail-closed hierarchy validation
 # @source lagniappe/core/definitions/ai_access.py::AI.implies
 @pytest.mark.unit
 def test_ai_access_tiers_are_hierarchical_and_fail_closed():
@@ -30,9 +29,7 @@ def test_ai_access_tiers_are_hierarchical_and_fail_closed():
         AI.name_for("DEFAULT")
 
 
-# @features ai-access
-# @dimensions persistence legacy-default public validation cache-invalidation
-# @source lagniappe/core/properties/user_entity.py::AIAccess
+# @matrix ai-access : cache-invalidation legacy-default persistence public validation
 @pytest.mark.unit
 def test_user_ai_access_legacy_defaults_validation_and_invalidation():
     regular = TestEntities.get(
@@ -73,9 +70,7 @@ def test_user_ai_access_legacy_defaults_validation_and_invalidation():
     assert "ai_access" in public.exclude_from_index
 
 
-# @features ai-access
-# @dimensions authentication hierarchy permissions-independent owner-no-bypass
-# @source lagniappe/core/entities/user.py::User.access
+# @matrix ai-access : authentication hierarchy owner-no-bypass permissions-independent
 @pytest.mark.unit
 def test_user_access_is_independent_hierarchical_and_fail_closed():
     powerful = TestEntities.get(
@@ -113,9 +108,7 @@ def test_user_access_is_independent_hierarchical_and_fail_closed():
     assert not anonymous.access(AI.ASK)
 
 
-# @features ai-access cache
-# @dimensions authorization-fingerprint permissions entitlement
-# @source lagniappe/core/entities/user.py::User.authorization_fingerprint
+# @matrix ai-access cache : authorization-fingerprint entitlement permissions
 @pytest.mark.unit
 def test_authorization_fingerprint_tracks_ai_access():
     user = TestEntities.get(
@@ -136,9 +129,7 @@ def test_authorization_fingerprint_tracks_ai_access():
     assert user.permissions_fingerprint == permissions_before
 
 
-# @features user
-# @dimensions new-user-default
-# @source lagniappe/core/entities/user.py::User.create
+# @pair user:new-user-default
 @pytest.mark.unit
 def test_user_create_defaults_non_owner_to_none():
     page = TestEntities.get(
@@ -157,17 +148,17 @@ def test_user_create_defaults_non_owner_to_none():
             "lagniappe.core.entities.user.CONFIG.ADMIN_EMAIL",
             "owner@example.test",
         ),
-        patch("lagniappe.core.entities.user.database.get.user", return_value=None),
+        patch("lagniappe.core.entities.user.database_get.user", return_value=None),
         patch(
-            "lagniappe.core.entities.entity.database.create_key",
+            "lagniappe.core.entities.entity.database_utility.create_key",
             return_value=new_key,
         ),
         patch(
-            "lagniappe.core.entities.entity.database.get.entity",
+            "lagniappe.core.entities.entity.database_get.entity",
             return_value=None,
         ),
         patch(
-            "lagniappe.core.entities.entity.database.create_entity",
+            "lagniappe.core.entities.entity.database_utility.create_entity",
             return_value=new_entity,
         ),
         patch(

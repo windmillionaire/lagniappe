@@ -3,7 +3,8 @@ from flask import redirect, request
 from lagniappe.core.definitions import Action, AssetTypes, Fetch
 from lagniappe.core.definitions.asset import LARGE_ASSET_BYTES
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database, files as file_tools
+from lagniappe.core.tools.files import ranges as file_ranges
+from lagniappe.core.tools.database import assets as database_assets
 from lagniappe.web.auth import permission
 from lagniappe.web import responses
 
@@ -16,7 +17,7 @@ from . import assets
 def _asset_size(asset):
     if asset.size is not None:
         return asset.size
-    return database.assets.file_size(asset.path, asset.visibility.value)
+    return database_assets.file_size(asset.path, asset.visibility.value)
 
 
 # @testable false
@@ -54,7 +55,7 @@ def _asset_redirect(asset, mimetype):
     disposition = f'inline; filename="{filename}"'
 
     if asset.visibility.value == "private":
-        url = database.assets.get_signed_url(
+        url = database_assets.get_signed_url(
             asset.path,
             response_disposition=disposition,
             response_type=response_type,
@@ -76,12 +77,12 @@ def _file_response(asset, mimetype):
     if range_header:
         size = _asset_size(asset)
         try:
-            byte_range = file_tools.parse_byte_range(range_header, size)
-        except file_tools.UnsatisfiableByteRange:
+            byte_range = file_ranges.parse_byte_range(range_header, size)
+        except file_ranges.UnsatisfiableByteRange:
             return responses.file_range_not_satisfiable(size, mimetype)
 
     if byte_range:
-        content = database.assets.download_file(
+        content = database_assets.download_file(
             asset.path,
             asset.visibility.value,
             start=byte_range.start,
@@ -109,9 +110,9 @@ def _file_response(asset, mimetype):
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
 # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_download_uses_original_filename_and_mimetype
-# @features file
-# @dimensions byte-range etag partial-content
+# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_renders_pdf_preview_widget
+# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_toolbar_navigates_pages
+# @pairs editor:image-upload file:preview page:asset-lifecycle
 @assets.route("<key>/<name>", methods=["GET", "HEAD"])
 @permission(requested=Action.VIEW)
 def get_image(key, name, **kwargs):

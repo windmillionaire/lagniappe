@@ -32,8 +32,7 @@ PERIODIC_REQUIRED_FIELDS = ["unit", "interval", "text"]
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
-# @features ai
-# @dimensions validation schedule
+# @matrix ai : schedule validation
 def validate_schedule(schedule_data, mode):
     """Validate generated schedule data against the expected mode schema.
 
@@ -113,8 +112,7 @@ def generate_schedule(prompt):
 
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @features ai
-# @dimensions prompt-builders output-format thinking
+# @matrix ai : output-format prompt-builders thinking
 def scheduling_prompt(**kwargs):
     """Build the AI prompt for parsing natural language scheduling descriptions"""
 

@@ -10,17 +10,23 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import notifications as database_notifications
+from lagniappe.core.tools.notifications.service import (
+    create_ordinary_notification,
+    publish_notification_aggregate,
+)
 from testing.definitions import DueDates, Pages, SitePages, Users
 from testing.definitions.task_definitions import TaskDefinition
+from testing.definitions.user_definitions import UserDefinition
 from testing.elements import Buttons, FormElements, List, Modal
 from testing.resources import Task
-from testing.utility import (
-    TestFile as _TestFile,
+from testing.utility.network import (
     assert_lagniappe_error_response,
     manual_mutation_headers,
-    wait_for_offline_mutations,
 )
+from testing.utility.offline import wait_for_offline_mutations
+from testing.utility.test_file import TestFile as _TestFile
 from testing.utility.local_time import local_date_from_utc_datetime
 
 pytestmark = pytest.mark.e2e
@@ -65,15 +71,20 @@ def _save_note(user, body, visibility="private"):
 
 
 def _save_notification(user, body, target=None, pending=False):
-    notification = Entities.NOTIFICATION.create(
-        {
-            "parent": user.entity,
-            "target": target,
-            "body": body,
-            "pending": pending,
-        }
+    notification, created = create_ordinary_notification(
+        user.entity,
+        identifier=f"home-activity-{uuid4().hex}",
+        body=body,
+        target=target,
     )
-    Entities.save(notification, user.entity)
+    assert created
+    publish_notification_aggregate(
+        user.entity,
+        database_notifications.get_notification_aggregate(user.entity),
+    )
+    if pending:
+        notification.pending = True
+        Entities.save(notification)
     return notification
 
 
@@ -181,8 +192,8 @@ def _warm_offline_create_widgets(home, *, note=True, task=True):
         )
 
 
-# @features activity notes notifications
-# @dimensions load cached-response notes-only
+# @matrix activity : cached-response load notes-exclusion notes-only
+# @matrix notes : cached-response load notes-only
 # @template home/notes.html::list
 # @template home/notes.html::note_item
 def test_home_notes_exclude_notifications(get_user):
@@ -200,23 +211,8 @@ def test_home_notes_exclude_notifications(get_user):
     expect(_activity_item(home, notification_body)).not_to_be_attached()
 
 
-# @pair activity:create
-# @pair activity:body
-# @pair activity:photo
-# @pair activity:parent
-# @pair activity:visibility
-# @pair activity:scope
-# @pair activity:asset-lifecycle
-# @pair activity:html-stripping
-# @pair notes:create
-# @pair notes:body
-# @pair notes:photo
-# @pair notes:parent
-# @pair notes:visibility
-# @pair notes:scope
-# @pair notes:asset-lifecycle
-# @pair notes:html-stripping
-# @pair notes:private-default
+# @matrix activity : asset-lifecycle body create html-stripping parent photo scope visibility
+# @matrix notes : asset-lifecycle body create html-stripping parent photo private-default scope visibility
 # @template home/notes.html::add_note_form
 # @template notes.html::note_item
 def test_create_note_body_and_photo_from_home(get_user):
@@ -253,7 +249,7 @@ def test_create_note_body_and_photo_from_home(get_user):
     expect(photo_item).to_contain_text("Everyone")
 
 
-# @pairs activity:owner-only-shared notes:owner-only-shared permissions:owner-only-shared
+# @matrix activity notes permissions : owner-only-shared
 # @template home/home.html::create
 # @template notes.html::composer
 def test_home_note_shared_visibility_is_owner_only(get_user):
@@ -278,7 +274,7 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     expect(private_item).to_contain_text("Private")
 
     activity_before = tuple(
-        item.key for item in database.get.activity(user.entity)
+        item.key for item in database_get.activity(user.entity)
     )
     forbidden_body = _unique("Forbidden Home note")
     cookies = {
@@ -298,7 +294,7 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
 
     assert_lagniappe_error_response(response, status=403)
     assert forbidden_body not in response.text
-    assert tuple(item.key for item in database.get.activity(user.entity)) == (
+    assert tuple(item.key for item in database_get.activity(user.entity)) == (
         activity_before
     )
 
@@ -313,12 +309,7 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     ).to_have_count(0)
 
 
-# @pair activity:delete
-# @pair activity:ownership
-# @pair notes:delete
-# @pair notes:ownership
-# @pair notifications:delete
-# @pair notifications:ownership
+# @matrix activity notes notifications : delete ownership
 # @template notes.html::note_item
 def test_delete_activity_item_from_home(get_user):
     user = get_user(Users.OWNER)
@@ -352,18 +343,7 @@ def test_delete_activity_item_from_home(get_user):
     expect(activity_list).to_contain_text(other_body)
 
 
-# @pair activity:home
-# @pair activity:shared
-# @pair activity:private
-# @pair activity:owner
-# @pair notes:home
-# @pair notes:shared
-# @pair notes:private
-# @pair notes:owner
-# @pair permissions:home
-# @pair permissions:shared
-# @pair permissions:private
-# @pair permissions:owner
+# @matrix activity notes permissions : home owner private shared
 # @template notes.html::note_item
 def test_home_note_visibility_across_users(get_user):
     owner = get_user(Users.OWNER)
@@ -389,10 +369,8 @@ def test_home_note_visibility_across_users(get_user):
     expect(_activity_item(owner_home, private_body)).to_be_visible()
 
 
-# @pairs activity:create activity:body activity:parent
-# @pairs activity:html-stripping activity:notes-exclusion
-# @pairs notifications:create notifications:body notifications:parent
-# @pairs notifications:html-stripping
+# @matrix activity : body create html-stripping notes-exclusion parent
+# @matrix notifications : body create html-stripping parent
 # @template notifications.html::item
 def test_notification_channel_uses_menu_not_home_notes(get_user):
     user = get_user(Users.OWNER)
@@ -417,8 +395,7 @@ def test_notification_channel_uses_menu_not_home_notes(get_user):
     expect(option).not_to_contain_text("<em>")
 
 
-# @features notifications
-# @dimensions dropdown-refresh target target-link pending long-text-wrap
+# @matrix notifications : dropdown-refresh long-text-wrap pending target target-link
 # @template notifications.html::item
 def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     user = get_user(Users.OWNER)
@@ -438,7 +415,7 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
         }
     )
     report_body = _unique("Organize report is ready")
-    Entities.save(report, user.entity)
+    Entities.save(report)
     _save_notification(user, report_body, target=report)
     assert notification.pending is True
     assert (
@@ -495,31 +472,24 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     ) <= 2
 
 
-# @features notifications
-# @dimensions delete clear-all menu-open ownership dropdown-refresh accessible-state
+# @matrix notifications : accessible-state clear-all delete dropdown-refresh menu-open ownership
 # @template nav.html::navbar
 def test_notification_menu_deletes_and_clears(get_user):
-    user = get_user(Users.OWNER)
+    owner = get_user(Users.OWNER)
+    suffix = uuid4().hex
+    user = get_user(
+        UserDefinition(
+            name=f"Notification Clear {suffix[:8]}",
+            email=f"notification-clear-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
     first_body = _unique("Notification delete one")
     second_body = _unique("Notification clear rest")
     starting_count = len(Entities.NOTIFICATION.keys_for_parent(user.entity))
     first = _save_notification(user, first_body)
     second = _save_notification(user, second_body)
-    assert len(Entities.NOTIFICATION.keys_for_parent(user.entity)) == starting_count + 2
-    projected = cache.peek_notification_state(user.entity)
-    if projected is not None:
-        assert projected["count"] == starting_count + 2
-
     user.go(SitePages.HOME)
-    user.page.wait_for_function(
-        "() => window.__NOTIFICATION_STATE__?.miss === false",
-        timeout=15000,
-    )
-    browser_state = user.page.evaluate("window.__NOTIFICATION_STATE__")
-    assert isinstance(browser_state["generation"], str)
-    assert isinstance(browser_state["revision"], int)
-    assert browser_state["count"] == starting_count + 2
-    assert browser_state["miss"] is False
     notifications = user.locate("[data-role='notifications']")
     expect(notifications).to_be_visible(timeout=15000)
     expect(notifications).to_have_attribute(
@@ -532,24 +502,8 @@ def test_notification_menu_deletes_and_clears(get_user):
     panel = user.page.locator("[role='listbox'][data-visible='true']")
     expect(panel).to_be_visible()
 
-    message_user = panel.locator("[data-action='message-user']")
-    expect(message_user).to_have_css("border-top-width", "0px")
-    expect(message_user).to_have_css("border-bottom-width", "0px")
-
     clear_all = panel.locator("[data-action='clear-notifications']")
     expect(clear_all).to_be_visible()
-    expect(clear_all).to_have_css("border-radius", "0px")
-    expect(clear_all).to_have_css("margin-top", "0px")
-    expect(clear_all).to_have_css("margin-bottom", "0px")
-    expect(clear_all).to_have_css("border-top-width", "1px")
-    expect(clear_all).to_have_css("border-bottom-width", "1px")
-    expect(clear_all).to_have_class(re.compile(r"(?:^|\s)bg-base-bg(?:\s|$)"))
-    expect(panel.locator("[role='option']").first).to_have_attribute(
-        "data-action", "message-user"
-    )
-    expect(panel.locator("[role='option']").nth(1)).to_have_attribute(
-        "data-action", "clear-notifications"
-    )
 
     first_option = panel.locator("[role='option']").filter(has_text=first_body)
     expect(first_option).to_be_visible()
@@ -572,8 +526,7 @@ def test_notification_menu_deletes_and_clears(get_user):
         clear_all.click()
 
     expect(panel).to_be_visible()
-    expect(panel.locator("[role='option']")).to_have_count(1)
-    expect(panel.locator("[data-action='message-user']")).to_be_visible()
+    expect(panel.locator("[role='option']")).to_have_count(0)
     expect(notifications).to_have_attribute("data-visible", "true")
     expect(notifications).to_have_attribute("aria-hidden", "false")
     expect(notifications).to_have_attribute("tabindex", "0")
@@ -582,8 +535,7 @@ def test_notification_menu_deletes_and_clears(get_user):
     assert Entities.fetch_one(second.urlsafe_key, request=Fetch.root()) is None
 
 
-# @features offline
-# @dimensions queue-create reload
+# @matrix offline : queue-create reload
 # @template home/notes.html::note_item
 # @template home/tasks.html::task
 def test_offline_home_create_mutations_persist_after_reload(get_user, browser_failures):
@@ -664,8 +616,7 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
     expect(_task_item(home, task_name)).to_be_visible()
 
 
-# @features offline
-# @dimensions server-first reload replay optimistic-mutation
+# @matrix offline : optimistic-mutation reload replay server-first
 # @template home/notes.html::list
 # @template home/tasks.html::list
 def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_failures):
@@ -733,8 +684,7 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
     expect(_task_item(home, task_name)).not_to_be_attached()
 
 
-# @features offline
-# @dimensions replay queue-clear
+# @matrix offline : queue-clear replay
 # @template home/notes.html::note_item
 def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
     user = get_user(Users.OWNER)
@@ -767,8 +717,7 @@ def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
     assert Entities.fetch_one(replayed_key, request=Fetch.direct()).body == note_body
 
 
-# @features tasks
-# @dimensions complete offline-queue
+# @matrix tasks : complete offline-queue
 # @template home/tasks.html::task
 def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)

@@ -51,8 +51,7 @@ export class BaseElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
-	 * @features tasks
-	 * @dimensions history-fill element-matrix
+	 * @matrix tasks : element-matrix history-fill
 	 */
 	get historyFillable() {
 		return !NON_HISTORY_FILLABLE_TYPES.has(this.schema?.type);
@@ -199,6 +198,11 @@ export class BaseElement {
 		return true;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+	 * @pair forms:direct-fields
+	 */
 	create() {
 		let elt;
 		if (this.readonly && this.schema.type !== "table") {

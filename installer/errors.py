@@ -1,5 +1,6 @@
 """Typed setup failures and bounded provider retry helpers."""
 
+import re
 import subprocess
 import time
 
@@ -12,8 +13,7 @@ PLAYWRIGHT_TIMEOUT = 1200
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @features setup
-# @dimensions errors exit-status
+# @matrix setup : errors exit-status
 class SetupError(RuntimeError):
     """Base failure mapped to a nonzero process status by ``python -m installer``."""
 
@@ -36,6 +36,25 @@ class SetupInterrupted(SetupError):
 
 class ProviderError(SetupError):
     category = "provider"
+
+
+# @testable false
+# @covered-by installer/errors.py::google_service_terms_error
+# @reason typed provider detail container is exercised through terms-error normalization
+class ProviderTermsNotAccepted(ProviderError):
+    category = "terms-not-accepted"
+
+    def __init__(
+        self,
+        message="Google service terms have not been accepted.",
+        *,
+        terms_id=None,
+        terms_url=None,
+        repair_action=None,
+    ):
+        super().__init__(message, repair_action=repair_action)
+        self.terms_id = terms_id
+        self.terms_url = terms_url
 
 
 class ProviderNotFound(ProviderError):
@@ -63,6 +82,50 @@ class ProviderTimeout(ProviderTransientError):
 
 
 _TRANSIENT_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+_GOOGLE_SERVICE_TERMS_NAMES = {
+    "cloud": "Google Cloud service terms",
+    "maps": "Google Maps Platform terms",
+}
+
+
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_guides_maps_terms_then_retries_activation
+# @matrix setup : error-guidance google-service-terms identity provider-errors
+def google_service_terms_error(detail, *, account=None):
+    """Return a concise actionable error for Google's per-service agreements."""
+    detail = str(detail or "")
+    normalized = detail.casefold()
+    if "ureq_tos_not_accepted" not in normalized:
+        return None
+    match = re.search(r"tos_id=([a-z0-9_-]+)", normalized)
+    if match is None:
+        match = re.search(
+            r"terms of service ['\"]([a-z0-9_-]+)['\"]",
+            normalized,
+        )
+    terms_id = match.group(1) if match is not None else "cloud"
+    terms_name = _GOOGLE_SERVICE_TERMS_NAMES.get(
+        terms_id,
+        f"Google service terms ({terms_id})",
+    )
+    terms_url = f"https://console.developers.google.com/terms/{terms_id}"
+    selected_account = str(account or "").strip()
+    account_clause = f" for '{selected_account}'" if selected_account else ""
+    account_instruction = (
+        f"Sign in as '{selected_account}'" if selected_account else "Sign in"
+    )
+    from runner.context import setup_command
+
+    return ProviderTermsNotAccepted(
+        f"{terms_name} have not been accepted{account_clause}.",
+        terms_id=terms_id,
+        terms_url=terms_url,
+        repair_action=(
+            f"{account_instruction} at {terms_url}, accept the {terms_name}, "
+            f"then rerun {setup_command()}."
+        ),
+    )
 
 
 # @testable false
@@ -85,16 +148,19 @@ def _status_code(error):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @features setup
-# @dimensions provider-errors classification
+# @matrix setup : classification provider-errors
 def classify_provider_error(error, *, message=None, status_code=None):
     """Return one typed provider failure without confusing access with absence."""
-    if isinstance(error, ProviderError):
+    if isinstance(error, SetupError):
         return error
     detail = str(message or error or "Provider operation failed.").strip()
     status = status_code if status_code is not None else _status_code(error)
     name = type(error).__name__.casefold()
-    text = f"{name} {error}".casefold()
+    text = f"{name} {error} {detail}".casefold()
+
+    terms_error = google_service_terms_error(text)
+    if terms_error is not None:
+        return terms_error
 
     if isinstance(error, (subprocess.TimeoutExpired, TimeoutError)) or (
         "timeout" in name or "timed out" in text
@@ -131,7 +197,9 @@ def classify_provider_error(error, *, message=None, status_code=None):
         or "not_found" in text
     ):
         return ProviderNotFound(detail)
-    if status == 409 or "alreadyexists" in name or "conflict" in text:
+    if status == 409 or "alreadyexists" in name or any(
+        marker in text for marker in ("already_exists", "already exists", "conflict")
+    ):
         return ProviderConflict(detail)
     if status in (400, 422) or any(
         marker in text for marker in ("badrequest", "invalidargument")
@@ -142,8 +210,7 @@ def classify_provider_error(error, *, message=None, status_code=None):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @features setup
-# @dimensions provider-errors retry timeout
+# @matrix setup : provider-errors retry timeout
 def retry_provider_call(
     operation,
     *,

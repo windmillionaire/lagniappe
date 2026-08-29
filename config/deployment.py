@@ -40,8 +40,7 @@ def _deployment_int(settings, defaults, key, label, min_value=1):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_normalize_validation
-# @features config
-# @dimensions deployment-settings validation app-yaml
+# @matrix config user-settings : app-yaml deployment-settings validation
 def normalize_deployment_settings(deployment_settings):
     from config import constants
 
@@ -105,8 +104,7 @@ def normalize_deployment_settings(deployment_settings):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_config
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config
-# @features config
-# @dimensions deployment-settings app-yaml
+# @matrix config : app-yaml deployment-settings
 def apply_deployment_settings(app_config=None, app_settings=None, updated_settings=None):
     from config import constants
 

@@ -14,10 +14,7 @@ const CLEAR_ALL_KEY = "__clear_all_notifications__";
  * @tests tests_js/test_042_messaging_frontend.py::test_notification_menu_keeps_authoritative_aggregate_count
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
- * @pairs notifications:menu-open notifications:dropdown-refresh notifications:delete
- * @pairs notifications:clear-all notifications:long-text-wrap notifications:accessible-state
- * @pairs notifications:exact-count notifications:bounded-page
- * @pair notifications:message-ordering
+ * @matrix notifications : accessible-state bounded-page clear-all delete dropdown-refresh exact-count long-text-wrap menu-open message-ordering
  */
 export class Notifications {
 	constructor(view) {
@@ -100,8 +97,7 @@ export class Notifications {
 	 * @testable false
 	 * @covered-by src/script/elements/notifications.mjs::Notifications
 	 * @reason pending/completed replacement is covered through dropdown refresh
-	 * @features notifications
-	 * @dimensions upsert pending-complete
+	 * @matrix notifications : pending-complete upsert
 	 */
 	upsertNotification(html) {
 		if (!this.dropdown || !html) return;

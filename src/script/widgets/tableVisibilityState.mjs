@@ -6,8 +6,7 @@
  * @testable true
  * @tests tests_js/test_038_startup_specializations.py::test_column_visibility_state_applies_before_lazy_panel
  * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_column_visibility_persists_after_reload
- * @pairs table-controls:eager-column-state table-controls:lazy-checkbox-panel
- * @pairs table-controls:column-visibility table-controls:persistence
+ * @matrix table-controls : column-visibility eager-column-state lazy-checkbox-panel persistence
  */
 export class TableVisibilityState {
 	constructor({ component, view, selected = [], columns = [] }) {

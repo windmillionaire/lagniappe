@@ -8,7 +8,7 @@ from ..mixins import (
     RelatedEntityListMixin,
     RelatedEntityMixin,
 )
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from .base_db import DBProperty
 from .base_property import Property
 
@@ -17,8 +17,7 @@ from .base_property import Property
 # @tests tests_unit/test_008_page_properties.py::test_page_categories_model_restricted_and_cache_invalidation
 # @tests tests_unit/test_008_page_properties.py::test_page_categories_preserve_users_model_and_default_after_removing_only_model
 # @tests tests_unit/test_008_page_properties.py::test_page_categories_reject_invalid_related_values
-# @features page
-# @dimensions categories model-category model-removal users-model restrictions cache-invalidation default-category
+# @matrix page : cache-invalidation categories default-category model-category model-removal restrictions users-model validation
 class PageCategories(
     RelatedEntityListMixin, FilterMixin, ColumnMixin, AIMixin, DBProperty
 ):
@@ -161,8 +160,7 @@ class PageCategories(
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_files_loads_database_files
 # @tests tests_unit/test_008_page_properties.py::test_page_files_reloads_query_results_and_skips_unlinked_files
-# @features page
-# @dimensions files db-load
+# @matrix page : db-load files stale-query
 class PageFiles(RelatedEntityListMixin, Property):
     """Files attached to a page. Loaded from the database on first access.
 
@@ -181,7 +179,7 @@ class PageFiles(RelatedEntityListMixin, Property):
 
         file_keys = [
             getattr(file, "key", file)
-            for file in database.get.page_files(self.entity.key)
+            for file in database_get.page_files(self.entity.key)
             if getattr(file, "key", file)
         ]
         loaded = (
@@ -209,8 +207,7 @@ class PageFiles(RelatedEntityListMixin, Property):
 
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_user_and_model_category_parent_keys
-# @features page
-# @dimensions user-key
+# @pair page:user-key
 class PageUser(RelatedEntityMixin, DBProperty):
     """The user who owns this page (only set for user pages).
 
@@ -227,14 +224,13 @@ class PageUser(RelatedEntityMixin, DBProperty):
 
     @property
     def urlsafe_key(self):
-        return database.get.urlsafe_key(self.entity.db.get(self.id))
+        return database_get.urlsafe_key(self.entity.db.get(self.id))
 
 
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_details
 # @tests tests_unit/test_008_page_properties.py::test_page_user_and_model_category_parent_keys
-# @features page
-# @dimensions details attach fallback-parent cache-parent
+# @matrix page : attach cache-parent details fallback-parent
 class PageModelCategory(RelatedEntityMixin, DetailsMixin, DBProperty):
     """The primary/model category for a page.
 

@@ -38,6 +38,10 @@
         polling for live updates.
       </li>
       <li>
+        <strong>Google Places</strong> for address autocomplete and verified
+        location details in location fields.
+      </li>
+      <li>
         <strong>Email</strong> through Gmail, Google Workspace, or an email
         provider for your custom domain.
       </li>
@@ -205,26 +209,15 @@
       available.
     {% endcall %}
   {% endcall %}
-  <details data-role="delegated-installation"
-           data-kind="page"
-           class="rounded-lg border border-base-light/50 bg-white shadow-sm">
-    <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
-      <span class="ml-1 inline-flex items-start gap-3 align-top">
-        <span class="mt-0.5 text-kind-default">{{ render_icon("installation", "icon-lg") }}</span>
-        <span>
-          <span class="block text-lg font-semibold">Delegated installation</span>
-          <span class="block text-sm font-normal leading-relaxed text-base-medium">
-            Open this checklist only when someone outside the business will perform the installation.
-          </span>
-        </span>
-      </span>
-    </summary>
-    <div class="border-t border-base-light/40 px-5 py-5">
+  <section data-role="delegated-installation" class="space-y-3">
+    {{ heading("Delegated Installation") }}
+    {% call card() %}
       <p class="text-base-medium mb-4">
-        Use this checklist when a consultant, developer, or other installer will
-        deploy Lagniappe for a business. The business keeps permanent ownership;
-        the installer receives broad access only to a new, empty project and
-        never receives the permanent Owner's password.
+        When a consultant, developer, or other outside installer deploys
+        Lagniappe, the business keeps permanent ownership and the installer
+        receives broad access only to a new, empty project. Use the two
+        checklists below separately: each person should open only the list for
+        their role.
       </p>
       {% call callout("note", False) %}
         Google Workspace and Google Cloud are separate services. Workspace owns
@@ -232,7 +225,18 @@
         access controls used to run Lagniappe. No prior Google Cloud experience
         is required—the checklist names each page and button.
       {% endcall %}
-      <ol class="text-base-medium space-y-4 list-decimal ml-5 mt-4">
+    {% endcall %}
+    <details data-role="delegated-owner-checklist"
+             data-kind="page"
+             class="rounded-lg border border-base-light/50 bg-white shadow-sm">
+      <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
+        <span class="ml-1 text-lg font-semibold">Business / permanent Owner</span>
+        <span class="ml-5 block text-sm font-normal leading-relaxed text-base-medium">
+          Create and fund the project, create the installer account, grant temporary access, and close the handoff.
+        </span>
+      </summary>
+      <div class="border-t border-base-light/40 px-5 py-5">
+        <ol class="text-base-medium space-y-4 list-decimal ml-5">
         <li>
           Choose one permanent, business-controlled Google account to be both
           the <strong>Lagniappe primary Owner</strong> and a
@@ -243,37 +247,78 @@
           In Google Admin Console, open <strong>Directory / Users / Add new
           user</strong>. Create a dedicated temporary installer account, enter a
           secondary delivery email, and assign it no Workspace administrator
-          role. Follow Google's
+          role. Give its initial sign-in information only to the installer and
+          ask them to change the temporary password and enroll in 2-Step
+          Verification. Follow Google's
           {{ link("https://support.google.com/a/answer/33310", "user-creation instructions") }}.
         </li>
         <li>
-          Have the installer change the temporary password and enroll that
-          account in 2-Step Verification. Confirm that Google Cloud is enabled
-          for the user or its organizational unit.
+          As a Workspace administrator, open <strong>Apps / Additional Google
+          services / Google Cloud Platform / Service status</strong>. First
+          select <strong>All users in this account</strong>. If the service is
+          <strong>ON for everyone</strong>, the temporary installer already
+          inherits access; leave the setting unchanged and close or cancel the
+          page. Otherwise, select the organizational unit containing the
+          temporary installer. If its status is <strong>Inherited: On</strong>
+          or <strong>On</strong>, no change is needed. If it is off, select
+          <strong>On</strong>, then <strong>Override</strong> or
+          <strong>Save</strong>. Google's
+          {{ link("https://support.google.com/a/users/answer/2655363?hl=en", "service-settings instructions") }}
+          explain inherited and overridden organizational-unit settings.
+          Changes usually apply quickly but can take up to 24 hours. This does
+          not make the installer a Workspace administrator or grant access to
+          a Cloud project. The installer does not need permission to create
+          projects because the business creates the empty project below.
         </li>
         <li>
-          Sign in to the
-          {{ link("https://console.cloud.google.com/", "Google Cloud console") }}
-          with the permanent Owner account and accept Google's first-time terms
-          if prompted. A Google Workspace subscription does not automatically
-          create a Google Cloud billing account. Follow Google's
+          In the permanent Owner's browser profile, open Google's
+          {{ link("https://console.developers.google.com/terms/cloud", "Google Cloud service-terms page") }}
+          and complete any agreement it presents for that account. Also open
+          the
+          {{ link("https://console.developers.google.com/terms/maps", "Google Maps Platform terms page") }}
+          and accept those separate terms. Lagniappe uses the Places API for
+          address autocomplete and location verification. Explicitly authorize
+          the installer to acknowledge the same agreement later with the
+          temporary, business-controlled Workspace account. Google records
+          acceptance against the account that runs API activation, so this
+          second acknowledgement is technically required; setup will enable
+          Places API itself. Then open
+          the {{ link("https://console.cloud.google.com/", "Google Cloud console") }}.
+          A Google Workspace subscription does not automatically create a
+          Google Cloud billing account. Follow Google's
           {{ link("https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects", "create-project instructions") }}:
           open <strong>Manage Resources / Create Project</strong>, select the
           business organization, name the project, and select
-          <strong>Create</strong>. If project creation is blocked, ask the
+          <strong>Create</strong>. When creation finishes, select the new
+          project in the project picker. On its <strong>Dashboard</strong>, use
+          the <strong>Project info</strong> card to confirm the project name,
+          project number, and project ID, and record the exact
+          <strong>Project ID</strong> for the installer. If project creation is blocked, ask the
           business's Workspace administrator to create it inside the business
           organization. With that project selected, open
           <strong>Navigation menu / Billing</strong>. If no Cloud Billing account
           exists, choose <strong>Manage billing accounts / Create account</strong>
           and add the business's payment details. Link that billing account to
-          the project and confirm that billing is enabled
+          the project and confirm on the Billing page that billing is enabled
           <strong>before</strong> the installer runs setup. Google's
           {{ link("https://docs.cloud.google.com/billing/docs/how-to/verify-billing-enabled", "billing-status instructions") }}
           show the same check.
         </li>
         <li>
-          With the new project still selected, open
-          <strong>Navigation menu / IAM &amp; Admin / IAM / Grant access</strong>.
+          With the new project still selected, use the search box at the top of
+          Google Cloud console to search for <strong>IAM</strong>, then open the
+          <strong>IAM</strong> page under <strong>IAM &amp; Admin</strong>. If it
+          does not appear in search, use
+          <strong>Navigation menu / IAM &amp; Admin / IAM</strong>. In
+          <strong>View by principals</strong>, find the permanent Owner's email
+          and confirm it has <strong>Basic / Owner</strong> on this project
+          directly, with no inherited source or condition. The table can show
+          several roles for one person on separate lines: an inherited
+          organization role is fine, but the <strong>Owner</strong> line itself
+          must have no entry in <strong>Inheritance</strong>. If it does not,
+          select <strong>Grant access</strong>, add the permanent Owner, assign
+          <strong>Basic / Owner</strong>, and select <strong>Save</strong>.
+          Then select <strong>Grant access</strong> again.
           Enter the temporary Workspace email under
           <strong>New principals</strong>, choose
           <strong>Basic / Owner</strong> under <strong>Assign roles</strong>, and
@@ -285,47 +330,164 @@
         <li>
           Keep billing, the authentication-email mailbox, Redis, Cloudflare or
           domain control, and recovery ownership in permanent business accounts.
-          Invite the installer only where a setup step truly requires it.
+          Invite the installer only where a setup step truly requires it. Give
+          the installer the exact Cloud <strong>Project ID</strong> and the
+          permanent Lagniappe Owner's exact Google account email.
+          <strong>Never give the installer the Owner's Google password.</strong>
         </li>
         <li>
-          Give the installer the project ID and the permanent Lagniappe Owner
-          email. <strong>Never give them the Owner's Google password.</strong>
-          The installer signs in with the dedicated temporary Google account.
+          After deployment, sign in as the permanent Owner and download a
+          secure configuration backup from <strong>Admin / Site Settings /
+          Maintenance / Configuration</strong>. Remove the installer's
+          Lagniappe Administrator role and confirm the in-app
+          <strong>Remove Administrator</strong> dialog, or permanently delete
+          the installer's application account from Users. Then ask the
+          installer to complete the handoff command; if the installer is
+          unavailable, the permanent Owner may run it instead. The normal path
+          is for the installer to run <code>./setup.sh handoff</code>, or
+          <code>.\setup.cmd handoff</code> in Windows PowerShell, from the
+          existing installation working copy. An Owner preparing a separate
+          computer must first follow <strong>Recover an Existing
+          Installation</strong> below with the downloaded
+          <code>lagniappe_settings.yaml</code>, complete recovery setup while
+          authenticated as the permanent Owner, then run the same handoff
+          command. Handoff accepts either the saved Installer or permanent
+          Owner identity; it never requires the installer's password.
         </li>
         <li>
-          After deployment, the installer verifies the app using Google sign-in.
-          Then the permanent Owner signs in and downloads a secure configuration
-          backup from <strong>Admin / Site Settings / Maintenance /
-          Configuration</strong>.
+          After handoff succeeds, open <strong>Admin / Site Settings /
+          Installation Access</strong>. Confirm it reports
+          <strong>Application handoff configured</strong>, then use its
+          <strong>Review project IAM</strong> link to verify that the installer
+          is absent from project IAM. The application state cannot prove that
+          external cleanup finished. Revoke provider invitations and temporary
+          access tokens, and confirm the installer removed local credentials
+          and settings from their machine.
         </li>
         <li>
-          The Owner removes the installer's Administrator role, or permanently
-          deletes the installer's application account from Users. From the
-          installation working copy, either the installer or permanent Owner
-          signs in to gcloud and Application Default Credentials, then runs
-          <code>./setup.sh handoff</code>, or <code>.\setup.cmd handoff</code> in
-          Windows PowerShell. The command rejects any other active account. The
-          business verifies the installer is absent from project IAM, revokes
-          provider invitations and tokens, removes local credentials and settings
-          from the installer's machine, then suspends and ultimately deletes the
-          temporary Workspace user. After a successful handoff, only the Owner
-          can rerun the command because the installer no longer has cloud access.
-        </li>
-        <li>
-          Rotate any provider secret that could not remain under direct business
+          Review the authentication-email dependency shown under
+          <strong>Installation Access</strong>. If it says to keep the installer
+          mailbox active, first run <code>./setup.sh email</code> from the
+          installation working copy with a durable business-controlled sender
+          and deploy the change. Without a custom application domain, this
+          command opens Google App Passwords, defaults to the permanent Owner's
+          Gmail or Workspace address, tests the replacement before saving, and
+          then offers to deploy. With a custom domain it guides the configured
+          SMTP-provider path instead. Also remove the installer’s account access
+          from billing, Redis Cloud, Cloudflare or DNS, Resend, and any other
+          provider where it was invited. Securely transfer or delete any
+          installer-held copy of a configuration backup or exported archive
+          stored outside Lagniappe’s managed Google Cloud buckets. Only then
+          suspend and ultimately delete the temporary Workspace user. Rotate
+          any provider secret that could not remain under direct business
           control during installation.
         </li>
-      </ol>
-      {% call callout("warning", False) %}
-        The handoff command previews the Owner, installer, project, service
-        account, buckets, and IAM changes, then asks for default-no confirmation.
-        It first establishes Owner access and deploys the closed bootstrap
-        configuration. It removes the installer's direct project IAM only as the
-        final cloud change. It does not delete Workspace users, alter billing IAM,
-        or remove organization-level access.
-      {% endcall %}
-    </div>
-  </details>
+        </ol>
+        {% call callout("warning", False) %}
+          The business remains responsible for Workspace users, billing IAM,
+          organization-level access, and provider accounts. The handoff command
+          deliberately does not change or delete them, and the deployed
+          application is not authorized to remove human Google Cloud IAM.
+        {% endcall %}
+        {% call callout("note", False) %}
+          <strong>Installation Access</strong> is shown only for delegated
+          installations where the saved Installer and permanent Owner are
+          different accounts. Owner-installed sites do not display that
+          section or return its identity payload.
+        {% endcall %}
+      </div>
+    </details>
+    <details data-role="delegated-installer-checklist"
+             data-kind="page"
+             class="rounded-lg border border-base-light/50 bg-white shadow-sm">
+      <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
+        <span class="ml-1 text-lg font-semibold">Installer</span>
+        <span class="ml-5 block text-sm font-normal leading-relaxed text-base-medium">
+          Activate the temporary account, run setup, verify the deployment, and return access.
+        </span>
+      </summary>
+      <div class="border-t border-base-light/40 px-5 py-5">
+        <ol class="text-base-medium space-y-4 list-decimal ml-5">
+          <li>
+            Sign in with the dedicated temporary Workspace account, change its
+            temporary password, and enroll it in 2-Step Verification. Use a
+            separate browser profile containing only this account; never ask
+            for or use the permanent Owner's password.
+          </li>
+          <li>
+            In that installer-only browser profile, open the
+            {{ link("https://console.cloud.google.com/", "Google Cloud console") }}.
+            If Google displays a welcome agreement, confirm the account shown
+            is the temporary installer, select the business's country, select
+            the agreement checkbox, and choose <strong>Agree and
+            continue</strong>. You do not need to
+            select <strong>Start free</strong>; the business has already linked
+            billing to its project. Do not create a project or manually enable
+            any APIs. If setup later finds another account-specific agreement,
+            it opens the exact terms page, tells you which account must be
+            active, waits for you to complete it, and then retries API
+            activation itself. Complete the Maps acknowledgement only after
+            the permanent Owner has reviewed the agreement and explicitly
+            authorized you to do so.
+          </li>
+          <li>
+            Clone Lagniappe and follow <strong>Authenticate with Google
+            Cloud</strong> below using the temporary account. Before setup asks
+            about installation type, it displays the active gcloud CLI email.
+            Confirm it only if it is the temporary installer address. If it is
+            wrong, answer <strong>N</strong>, rerun
+            <code>gcloud auth login</code>, choose the temporary account, and
+            restart setup. Setup verifies that account's CLI token before
+            showing any project choices.
+          </li>
+          <li>
+            When setup asks <strong>Are you installing Lagniappe for a
+            different permanent Owner?</strong>, answer <strong>Y</strong>.
+            Setup lists only active projects where the authenticated installer
+            has a direct, unconditional Project Owner role. Select the
+            business's project by number. Setup uses the project's name as the
+            installation name and never offers project creation in delegated
+            mode. If the project is missing, ask the business to verify your
+            direct <strong>Basic / Owner</strong> role in project IAM, then
+            rerun setup.
+          </li>
+          <li>
+            Enter the permanent Owner's exact Google account email. Setup
+            verifies the existing direct Owner binding, automatically enables
+            Google Sign-In, and gives the confirmed installer temporary
+            Lagniappe Administrator access. These are required parts of the
+            delegated flow, so setup does not ask additional yes-or-no
+            questions for them.
+          </li>
+          <li>
+            Complete the remaining guided provider and deployment steps. Use
+            business-controlled accounts or temporary invitations supplied by
+            the business. After deployment, sign in to Lagniappe with the
+            temporary installer account. The initial setup screen says that
+            either the configured application Owner or delegated installer may
+            continue with Google. The temporary installer bootstrap is
+            Google-only, while the permanent Owner may instead choose the
+            separate-password path. Verify the app, then ask the permanent
+            Owner to sign in and take their configuration backup.
+          </li>
+          <li>
+            After the Owner confirms application control and removes your
+            Lagniappe Administrator access, authenticate the installation
+            working copy as the saved installer and run
+            <code>./setup.sh handoff</code>, or
+            <code>.\setup.cmd handoff</code> in Windows PowerShell. The command
+            previews the Owner, installer, project, service account, buckets,
+            and IAM changes, then asks for default-no confirmation. It grants
+            managed-resource access to the permanent Owner, deploys the closed
+            bootstrap configuration, and removes your direct project IAM only
+            as its final cloud change. When it succeeds, securely remove the
+            checkout's local credentials and settings as directed by the
+            business.
+          </li>
+        </ol>
+      </div>
+    </details>
+  </section>
   {{ heading("Running the Commands") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
@@ -356,10 +518,17 @@
         Google Cloud CLI, and installs the Python packages setup needs.
       </li>
       <li>
-        <strong>Choose and verify the Google Cloud target.</strong> Setup asks
-        for an installation name, account, project ID, and billing account. It
-        opens the Application Default Credentials browser sign-in and verifies
-        that the CLI and local Google clients use the same account and project.
+        <strong>Choose and verify the Google Cloud target.</strong> Setup first
+        displays the active gcloud CLI account, requires you to confirm its
+        exact email, and verifies its login. It then asks whether this is a
+        delegated installation. A delegated installer chooses from active
+        projects they own directly; setup never offers to create one for them.
+        For your own installation, setup asks whether the project already
+        exists. Answering yes opens a picker of active projects visible to your
+        account; answering no asks for an installation name and allows setup to
+        create a project. It then checks billing, opens the Application Default
+        Credentials browser sign-in, and verifies that the CLI and local Google
+        clients use the same account and project.
       </li>
       <li>
         <strong>Show the plan before cloud changes.</strong> Setup writes a
@@ -412,13 +581,44 @@
         <code>gcloud</code> command, while the second authorizes the local
         Google client libraries used by setup.
       </p>
+      <p class="text-base-medium text-sm mt-2">
+        Provider service terms are separate from both sign-ins. In the same
+        browser profile as the installation account, open the
+        {{ link("https://console.cloud.google.com/", "Google Cloud console") }}
+        and complete any welcome agreement it presents. A new Cloud user can
+        otherwise reach part of setup before API activation reports
+        <code>UREQ_TOS_NOT_ACCEPTED</code>. Some services have an additional
+        agreement; Lagniappe uses Google Places, which is governed by the Maps
+        Platform terms. When setup encounters one, it opens the exact terms
+        page, names the required account, waits for acceptance, and retries API
+        activation itself. In a delegated installation, the permanent Owner
+        first reviews and authorizes the Maps agreement as described above;
+        the installer then completes Google's account-specific acknowledgement
+        with the temporary business account. Neither person manually enables
+        Places API.
+      </p>
+      <p class="text-base-medium text-sm mt-2">
+        The second sign-in requests your basic Google account identity and
+        access to manage Google Cloud resources. Lagniappe does not use Cloud
+        SQL, and its setup command explicitly excludes Google Cloud CLI's
+        otherwise-default Cloud SQL login permission.
+      </p>
+      <p class="text-base-medium text-sm mt-2">
+        At the start of a fresh installation, setup displays the exact account
+        marked active by this gcloud login and asks whether it is correct. Read
+        the email rather than assuming the browser changed it. If it is wrong,
+        answer <strong>N</strong>, rerun the command above, choose the intended
+        installation account, and restart setup. Setup verifies the confirmed
+        account before asking about installation type or listing projects.
+      </p>
       {% call callout("warning", False) %}
         If Google shows permission checkboxes or a <strong>Select all</strong>
         option during either sign-in, choose <strong>Select all</strong> before
         clicking <strong>Continue</strong> or <strong>Allow</strong>. Do not
         deselect individual permissions: Google supports partial approval, but
         every permission requested here is needed to configure, verify, or
-        deploy your installation.
+        deploy your installation. The list should not include permission to
+        connect to Cloud SQL instances.
         <br>
         <br>
         In practical terms, you are granting these permissions to

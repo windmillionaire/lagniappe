@@ -1,10 +1,14 @@
 from types import SimpleNamespace
 
 from flask import request
+from flask_login import current_user
 
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, database
+from lagniappe.core import exceptions
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,
@@ -25,8 +29,7 @@ from . import files
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_preview_uses_preview_tab
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_pdf_preview_renders_canvas
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_page_shows_linked_page_and_task_badges
-# @features file
-# @dimensions load tabs text-tab text-asset preview pdf-preview pdf-toolbar file-upload page-upload file-mobile linked-entities reverse-links badges
+# @matrix file : badges file-mobile file-upload linked-entities load page-upload pdf-preview pdf-toolbar preview reverse-links tabs text-asset text-tab
 @files.route("/<key>", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW)
 def view(key, **kwargs):
@@ -46,10 +49,10 @@ def info(key, **kwargs):
 # @testable true
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_download_uses_original_filename_and_mimetype
 # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_lists_pages_that_reference_it
-# @features file
-# @dimensions download filename mimetype
+# @matrix file : download filename mimetype
+# @pair file:attached-pages
 @files.route("/<key>/download", methods=["GET"])
-@permission(Resource.FILE, Action.VIEW)
+@permission(Resource.FILE, Action.VIEW, no_store=True)
 def download(key, **kwargs):
     entity = kwargs["entity"]
     if not isinstance(entity, Entities.FILE):
@@ -62,8 +65,7 @@ def download(key, **kwargs):
 # @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
 # @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_file_to_page
-# @features ingress pages
-# @dimensions delete
+# @matrix ingress pages : delete
 @files.route("/<key>/delete", methods=["DELETE"])
 @permission(Resource.FILE, Action.DELETE)
 def delete(key, **kwargs):
@@ -95,8 +97,7 @@ def delete(key, **kwargs):
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_page_links_can_be_added_and_removed
 # @tests tests_unit/test_006_file_properties.py::test_extract_process
 # @tests tests_unit/test_006_file_properties.py::test_summarize_process
-# @features file
-# @dimensions info-update display-name summary extract summarize linked-pages add remove reload
+# @matrix file : add display-name extract info-update linked-pages reload remove summarize summary
 @files.route("/<key>/update", methods=["PUT"])
 @permission(Resource.FILE, Action.EDIT)
 def update(key, **kwargs):
@@ -131,7 +132,7 @@ def _update_file_pages(file, form):
     submitted_ids = set(form.getlist("page"))
     submitted_keys = {
         key
-        for key in (database.get.datastore_key(identifier) for identifier in submitted_ids)
+        for key in (database_get.datastore_key(identifier) for identifier in submitted_ids)
         if key
     }
     loaded_pages = Entities.fetch(
@@ -223,6 +224,7 @@ def _summarize_page_uploads(files):
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_as_html
 # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
+# @matrix file : html-preview text-asset
 @files.route("/<key>/html", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW)
 def get_html(key, **kwargs):
@@ -237,15 +239,9 @@ def get_html(key, **kwargs):
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_page_editor_without_ai_create_is_rejected_before_batch_summary
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_text_file_renders_original_content_in_text_tab
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview
-# @pair file:file-upload
-# @pair file:page-upload
-# @pair file:multi-file
-# @pair pages:file-upload
-# @pair pages:page-upload
-# @pair pages:multi-file
-# @pair ai:batch-summary
-# @pair ai:access-gate
-# @pair ai:provider-boundary
+# @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page
+# @matrix ai : access-gate batch-summary provider-boundary
+# @matrix file pages : file-upload multi-file page-upload submitted-reference
 @files.route("/<key>/upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def upload(key, **kwargs):
@@ -280,7 +276,19 @@ def upload(key, **kwargs):
         ]
         _summarize_page_uploads(uploaded_files)
     elif existing_file:
-        uploaded_files = [Entities.FILE(existing_file)]
+        try:
+            existing = SubmittedReferenceResolver(
+                current_user,
+                existing_file,
+            ).one(
+                existing_file,
+                expected=Entities.FILE,
+                action=Action.VIEW,
+                required=True,
+            )
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
+        uploaded_files = [existing]
         uploaded_files[0].properties.pages.add(page)
 
     Entities.save(*uploaded_files, page)

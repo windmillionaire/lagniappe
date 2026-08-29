@@ -1,5 +1,6 @@
 """Update configuration or replace and upgrade an existing installation."""
 
+import json
 import subprocess
 from datetime import datetime
 from importlib import reload
@@ -9,13 +10,18 @@ from installer.image import get_images, save_images
 from installer.utils import ensure_datastore_dependency, ensure_storage_dependency
 
 from .errors import SetupError
+from .upgrade_notice import (
+    parse_release_version,
+    post_upgrade_maintenance_required,
+    print_post_upgrade_maintenance_notice,
+    print_post_upgrade_maintenance_steps,
+)
 from .verify import activate_installation
 
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
-# @features setup
-# @dimensions config-files storage-buckets deferred-jobs post-deploy
+# @matrix setup : config-files deferred-jobs post-deploy public-page-settings storage-buckets
 def update():
     """Apply app-saved configuration without replacing repository code."""
     activate_installation()
@@ -24,24 +30,40 @@ def update():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
-# @features setup
-# @dimensions git-upgrade branch config-files post-deploy
+# @matrix setup : branch config-files git-upgrade post-deploy
+# @pairs migrations:major-version setup:major-version
 def upgrade(branch=None):
     """Replace tracked source from a remote branch, then apply and deploy it."""
     activate_installation()
 
+    from config import SETTINGS
     import installer
 
     formatter = installer.FORMATTER.initialize()
     branch = str(branch or "main").strip()
     reset_target = _reset_target_for_branch(branch)
+    installed_version = str(
+        SETTINGS.APP.get("VERSION") or SETTINGS.NODE.get("version") or ""
+    ).strip()
+
+    with formatter.yaspin(text=formatter.success("Inspecting upgrade target")) as spinner:
+        target = _fetch_upgrade_target(spinner, branch=branch)
+    if target is None:
+        return 1
+    maintenance_required = post_upgrade_maintenance_required(
+        installed_version,
+        target["version"],
+    )
 
     print(f"\n{formatter.info('Lagniappe Software Upgrade')}")
     print("=" * 40)
     print(
         "\nThis will replace the installed Lagniappe source with "
-        f"{reset_target}, apply saved settings, and offer to deploy it."
+        f"{reset_target} at {target['commit'][:12]}, apply saved settings, "
+        "and offer to deploy it."
     )
+    print(f"  Installed version: {installed_version or 'unknown'}")
+    print(f"  Target version: {target['version']}")
 
     print(f"\n{formatter.success('What will be preserved:')}")
     print("  • All app data, users, and uploaded files")
@@ -60,20 +82,35 @@ def upgrade(branch=None):
         print(formatter.success("Upgrade cancelled."))
         return 1
 
-    with formatter.yaspin(text=formatter.success("Fetching latest code")) as spinner:
-        if not _update_repository(spinner, branch=branch):
+    with formatter.yaspin(text=formatter.success("Replacing tracked source")) as spinner:
+        if not _update_repository(
+            spinner,
+            branch=branch,
+            target_commit=target["commit"],
+        ):
             return 1
 
     _refresh_setup_dependencies()
-    return _apply_update(upgrade=True)
+    return _apply_update(
+        upgrade=True,
+        installed_version=installed_version,
+        target_version=target["version"],
+        maintenance_required=maintenance_required,
+    )
 
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
-# @features setup
-# @dimensions config-files storage-buckets deferred-jobs post-deploy git-upgrade
-def _apply_update(*, upgrade):
+# @matrix setup : config-files deferred-jobs git-upgrade post-deploy provider-apis public-page-settings storage-buckets
+# @pairs migrations:major-version setup:major-version
+def _apply_update(
+    *,
+    upgrade,
+    installed_version=None,
+    target_version=None,
+    maintenance_required=None,
+):
     """Apply current-checkout generation and app-saved settings."""
 
     import config
@@ -89,27 +126,59 @@ def _apply_update(*, upgrade):
     create_config = reload(create_config)
     gcloud = reload(gcloud)
     utils = reload(utils)
+    from runner.deploy import verify_runtime_deploy_surface
+
+    installed_version = str(
+        installed_version
+        or SETTINGS.APP.get("VERSION")
+        or SETTINGS.NODE.get("version")
+        or ""
+    ).strip()
+    target_version = str(target_version or SETTINGS.NODE.get("version") or "").strip()
+    if maintenance_required is None:
+        maintenance_required = post_upgrade_maintenance_required(
+            installed_version,
+            target_version,
+        )
 
     new_version = create_config.update_config()
+    if target_version and new_version != target_version:
+        raise SetupError(
+            "The inspected upgrade target changed while preparing the deployment: "
+            f"expected {target_version}, loaded {new_version}."
+        )
     create_config.verify_application_config(upgrade=upgrade)
+    verify_runtime_deploy_surface()
     if upgrade:
         print(f.success(f"Upgrading to version {new_version}"))
     else:
         print(f.success(f"Updating configuration for version {new_version}"))
 
+    gcloud.enable_gcloud_apis()
     gcloud.setup_app_engine()
     gcloud.configure_storage_buckets()
+    gcloud.configure_data_protection()
     _update_custom_images(f)
     _update_deployment_settings(f)
     _update_ai_settings(f)
+    _update_public_page_settings(f)
     SETTINGS.save()
     config.verify_generation_manifest()
 
     completion = "Upgrade complete!" if upgrade else "Update complete!"
     print(f"\n{f.success(completion)}")
+    if maintenance_required:
+        print_post_upgrade_maintenance_notice(
+            f,
+            installed_version,
+            new_version,
+        )
     consent = input(f.info("Would you like to deploy the app now? [y/N]: "))
     if consent.casefold() == "y":
-        utils.deploy_to_app_engine(print_final_summary=False)
+        utils.deploy_to_app_engine(
+            print_final_summary=False,
+            upgrade_notice_handled=True,
+        )
         print(f"\n{f.info('Wrapping up installation...')}")
         recovery_ready = _configure_deferred_job_recovery(f, gcloud)
         print(f"\n{f.success('Deployment complete!')}")
@@ -123,17 +192,21 @@ def _apply_update(*, upgrade):
                 "Your app is available at: "
                 f"{SETTINGS.APP.get('APP_URL', 'your App Engine URL')}"
             )
+        if maintenance_required:
+            print_post_upgrade_maintenance_steps(f)
         return 0 if recovery_ready else 1
 
     print(f.success(f"Remember to deploy when ready: {setup_command()}"))
     print(f"After deployment, run: {setup_command('jobs')}")
+    if maintenance_required:
+        print("The currently deployed application was not changed.")
+        print_post_upgrade_maintenance_steps(f)
     return 0
 
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_post_deploy_deferred_job_recovery_failure_is_nonfatal
-# @features setup deferred-jobs
-# @dimensions recovery post-deploy failure-isolation
+# @matrix deferred-jobs setup : failure-isolation post-deploy recovery
 def _configure_deferred_job_recovery(f, gcloud):
     """Provision recovery without invalidating an otherwise successful deploy."""
     try:
@@ -154,8 +227,7 @@ def _configure_deferred_job_recovery(f, gcloud):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_images_installs_storage_before_restore_spinner
-# @features setup
-# @dimensions site-image image-restore
+# @matrix setup : image-restore site-image
 def _update_custom_images(f):
     """Restore site images uploaded through the app, if any are present."""
     from config import SETTINGS
@@ -209,8 +281,7 @@ def _update_custom_images(f):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_deployment_settings_applies_saved_app_config
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_deployment_settings_continues_when_unavailable
-# @features setup
-# @dimensions deployment-settings app-yaml
+# @matrix setup : app-yaml deployment-settings
 def _update_deployment_settings(f):
     """Apply deployment settings saved from the app, if available."""
     from config.deployment import apply_deployment_settings
@@ -248,8 +319,7 @@ def _update_deployment_settings(f):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_ai_settings_applies_saved_app_config
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_ai_settings_continues_when_unavailable
-# @features setup
-# @dimensions ai-settings app-yaml
+# @matrix setup : ai-settings app-yaml
 def _update_ai_settings(f):
     """Apply AI model settings saved from the app, if available."""
     from config.ai_settings import apply_ai_settings
@@ -283,9 +353,46 @@ def _update_ai_settings(f):
 
 
 # @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_public_page_settings_applies_saved_app_config
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_public_page_settings_continues_when_unavailable
+# @matrix setup : app-yaml public-page-indexing
+def _update_public_page_settings(f):
+    """Apply public-page settings saved from the app, if available."""
+    from config.public_pages import apply_public_page_settings
+    from installer import public_pages as public_pages_module
+
+    try:
+        ensure_datastore_dependency()
+    except Exception as error:
+        print(f.warning(f"Could not update public-page settings: {error}"))
+        return
+
+    with f.yaspin(text=f.success("Checking for public-page settings")) as spinner:
+        try:
+            entity = public_pages_module.get_public_page_settings()
+            spinner.ok(f.ok_glyph)
+        except Exception as error:
+            print(f.warning(f"Could not update public-page settings: {error}"))
+            spinner.fail(f.fail_glyph)
+            return
+
+    if not entity:
+        return
+
+    with f.yaspin(text=f.success("Applying public-page settings")) as spinner:
+        try:
+            apply_public_page_settings(entity)
+            spinner.ok(f.ok_glyph)
+        except Exception as error:
+            spinner.write(
+                f.warning(f"Could not apply public-page settings: {error}")
+            )
+            spinner.fail(f.fail_glyph)
+
+
+# @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_refreshes_setup_dependencies_from_replaced_checkout
-# @features setup
-# @dimensions git-upgrade dependency-bootstrap
+# @matrix setup : dependency-bootstrap git-upgrade
 def _refresh_setup_dependencies():
     """Reload dependency bootstrap code from the replaced checkout and reconcile it."""
     from installer import package_install
@@ -307,11 +414,104 @@ def _reset_target_for_branch(branch):
 
 
 # @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_target_fetches_and_reads_exact_remote_version
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_target_rejects_missing_ref_and_invalid_version
+# @matrix setup : branch failure-propagation git-upgrade version-validation
+def _fetch_upgrade_target(spinner, branch="main"):
+    """Fetch and inspect one exact remote commit without replacing source."""
+    from installer import FORMATTER
+
+    formatter = FORMATTER.initialize()
+    branch = str(branch or "").strip()
+    if not branch:
+        spinner.write(formatter.error("Upgrade branch cannot be empty."))
+        spinner.fail(formatter.fail_glyph)
+        return None
+    reset_target = _reset_target_for_branch(branch)
+    git = GIT_CLI or "git"
+
+    try:
+        fetched = subprocess.run(
+            [git, "fetch", "--all"],
+            cwd=REPOSITORY_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if fetched.returncode != 0:
+            spinner.write(formatter.error(f"Git fetch failed: {fetched.stderr}"))
+            spinner.fail(formatter.fail_glyph)
+            return None
+
+        resolved = subprocess.run(
+            [git, "rev-parse", "--verify", f"{reset_target}^{{commit}}"],
+            cwd=REPOSITORY_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        commit = resolved.stdout.strip()
+        if resolved.returncode != 0 or not commit:
+            detail = resolved.stderr.strip() or "remote branch was not found"
+            spinner.write(
+                formatter.error(f"Could not resolve {reset_target}: {detail}")
+            )
+            spinner.fail(formatter.fail_glyph)
+            return None
+
+        package = subprocess.run(
+            [git, "show", f"{commit}:package.json"],
+            cwd=REPOSITORY_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if package.returncode != 0:
+            spinner.write(
+                formatter.error(
+                    f"Could not read package.json from {reset_target}: "
+                    f"{package.stderr.strip()}"
+                )
+            )
+            spinner.fail(formatter.fail_glyph)
+            return None
+        try:
+            version = json.loads(package.stdout).get("version")
+        except (AttributeError, json.JSONDecodeError) as error:
+            spinner.write(
+                formatter.error(
+                    f"Could not parse package.json from {reset_target}: {error}"
+                )
+            )
+            spinner.fail(formatter.fail_glyph)
+            return None
+        if parse_release_version(version) is None:
+            spinner.write(
+                formatter.error(
+                    f"{reset_target} package.json must use a stable X.Y.Z version."
+                )
+            )
+            spinner.fail(formatter.fail_glyph)
+            return None
+
+        spinner.ok(formatter.ok_glyph)
+        return {
+            "branch": branch,
+            "ref": reset_target,
+            "commit": commit,
+            "version": str(version),
+        }
+    except (OSError, subprocess.SubprocessError) as error:
+        spinner.write(formatter.error(f"Failed to inspect upgrade target: {error}"))
+        spinner.fail(formatter.fail_glyph)
+        return None
+
+
+# @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_repository_preserves_report_before_branch_reset
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_repository_handles_clean_status_and_status_failure
-# @features setup
-# @dimensions git-upgrade branch local-change-report failure-propagation
-def _update_repository(spinner, branch="main"):
+# @matrix setup : branch failure-propagation git-upgrade local-change-report
+def _update_repository(spinner, branch="main", *, target_commit=None):
     """Fetch remotes and replace tracked files with the requested remote ref."""
     from installer import FORMATTER
 
@@ -322,6 +522,7 @@ def _update_repository(spinner, branch="main"):
         spinner.fail(formatter.fail_glyph)
         return False
     reset_target = _reset_target_for_branch(branch)
+    replacement_target = str(target_commit or reset_target).strip()
     git = GIT_CLI or "git"
 
     try:
@@ -341,32 +542,33 @@ def _update_repository(spinner, branch="main"):
             spinner.write(
                 formatter.warning(
                     "Local changes detected. Upgrade will discard tracked "
-                    f"changes with git reset --hard {reset_target}."
+                    f"changes with git reset --hard {replacement_target}."
                 )
             )
             report_path = _write_local_changes_report(
                 status.stdout,
-                reset_target=reset_target,
+                reset_target=replacement_target,
             )
             if report_path:
                 spinner.write(
                     formatter.warning(f"Saved local changes report: {report_path}")
                 )
 
-        fetched = subprocess.run(
-            [git, "fetch", "--all"],
-            cwd=REPOSITORY_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if fetched.returncode != 0:
-            spinner.write(formatter.error(f"Git fetch failed: {fetched.stderr}"))
-            spinner.fail(formatter.fail_glyph)
-            return False
+        if target_commit is None:
+            fetched = subprocess.run(
+                [git, "fetch", "--all"],
+                cwd=REPOSITORY_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if fetched.returncode != 0:
+                spinner.write(formatter.error(f"Git fetch failed: {fetched.stderr}"))
+                spinner.fail(formatter.fail_glyph)
+                return False
 
         replaced = subprocess.run(
-            [git, "reset", "--hard", reset_target],
+            [git, "reset", "--hard", replacement_target],
             cwd=REPOSITORY_ROOT,
             capture_output=True,
             text=True,

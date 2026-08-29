@@ -89,8 +89,7 @@ def _write_generation(root):
         (root / relative).chmod(0o600)
 
 
-# @features setup
-# @dimensions operator-summary secret-redaction
+# @matrix setup : operator-summary secret-redaction
 def test_redacted_install_summary_is_allowlisted():
     settings = {
         "APP_NAME": "Demo",
@@ -103,6 +102,12 @@ def test_redacted_install_summary_is_allowlisted():
         "APP_ENGINE_LOCATION": "us-central",
         "RESOURCE_REGION": "us-central1",
         "OCR_LOCATION": "us",
+        "AI_MODEL": "gemini-2.5-pro",
+        "AI_UTILITY_MODEL": "gemini-2.5-flash",
+        "AI_IMAGE_MODEL": "gemini-3.1-flash-image",
+        "AI_OBSERVABILITY": False,
+        "CAPTURE_ERRORS": "False",
+        "REDIS_TLS": False,
         "TASK_QUEUE_NAME": "lagniappe-tasks",
         "OCR_PROCESSOR_ID": "projects/demo/locations/us/processors/123",
         "REDIS_HOST": "redis.example.test",
@@ -128,17 +133,33 @@ def test_redacted_install_summary_is_allowlisted():
     )
     text = "\n".join(lines)
 
-    assert "Demo" in text
-    assert "Temporary application Administrator: installer@example.test" in text
-    assert "runtime@demo-project.iam.gserviceaccount.com" in text
-    assert "lagniappe-tasks" in text
-    assert "python314" in text
-    assert "Google sign-in: enabled" in text
-    assert "Optional health check: ./setup.sh doctor" in text
-    assert "Repair if needed: ./setup.sh repair" in text
+    assert "Application:               Demo" in text
+    assert "Temporary Administrator:   installer@example.test" in text
+    assert "Lagniappe version:         0.2" in text
+    assert "Google sign-in:            enabled" in text
+    assert "Redis:                     configured; TLS disabled" in text
+    assert "Error monitoring:          disabled" in text
+    assert "AI observability:          disabled" in text
+    assert "AI model:                  gemini-2.5-pro" in text
+    assert "Deployment completed:      yes" in text
+    assert "Health check:              ./setup.sh doctor" in text
+    assert "Repair if needed:          ./setup.sh repair" in text
+    assert (
+        "Installer handoff:         ./setup.sh handoff after Owner review"
+        in text
+    )
+    for omitted_detail in (
+        "runtime@demo-project.iam.gserviceaccount.com",
+        "lagniappe-tasks",
+        "python314",
+        "Signed URL API",
+        "bucket:",
+        "OCR processor",
+        "Identity Platform project",
+    ):
+        assert omitted_detail not in text
     assert lines[-1] == (
-        "Lagniappe has been installed successfully. "
-        "Log in at https://demo.example.test"
+        "Open this installation:    https://demo.example.test"
     )
     for secret in (
         "bucket-source-secret",
@@ -152,8 +173,52 @@ def test_redacted_install_summary_is_allowlisted():
     assert manual_lines[-1] == "After manual deployment: ./setup.sh jobs"
 
 
-# @features setup
-# @dimensions doctor adc keyless-config project-identity
+# @matrix doctor setup : operator-summary provider-resources secret-redaction
+def test_expected_resource_summary_is_allowlisted():
+    settings = {
+        "APP_NAME": "Demo",
+        "APP_URL": "https://demo.example.test",
+        "GOOGLE_CLOUD_PROJECT": "demo-project",
+        "APP_ENGINE_LOCATION": "us-central",
+        "RESOURCE_REGION": "us-central1",
+        "OCR_LOCATION": "us",
+        "TASK_QUEUE_NAME": "lagniappe-tasks",
+        "OCR_PROCESSOR_ID": "projects/demo/locations/us/processors/123",
+        "REDIS_HOST": "redis.example.test",
+        "REDIS_PORT": 6379,
+        "REDIS_PASSWORD": "redis-secret",
+        "GIBBERISH": "bucket-source-secret",
+        "SECRET_KEY": "flask-secret",
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
+            "runtime@demo-project.iam.gserviceaccount.com"
+        ),
+        "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": (
+            "runtime@demo-project.iam.gserviceaccount.com"
+        ),
+    }
+
+    lines = summary.expected_resource_lines(
+        settings,
+        deploy={"runtime": "python314"},
+        gcloud_config={"PROJECT": "demo-project"},
+    )
+    text = "\n".join(lines)
+
+    assert "Runtime service account: runtime@demo-project" in text
+    assert "Internal caller service account: runtime@demo-project" in text
+    assert "Task queue: lagniappe-tasks" in text
+    assert "OCR processor: projects/demo/locations/us/processors/123" in text
+    assert "App Engine runtime: python314" in text
+    assert "History bucket:" in text
+    for secret in (
+        "bucket-source-secret",
+        "redis-secret",
+        "flask-secret",
+    ):
+        assert secret not in text
+
+
+# @matrix setup : adc doctor keyless-config project-identity
 def test_doctor_reports_keyless_identity_drift():
     runtime_email = "runtime@demo-project.iam.gserviceaccount.com"
     assert doctor._keyless_identity_issues(
@@ -181,8 +246,7 @@ def test_doctor_reports_keyless_identity_drift():
     assert "RUNTIME_SERVICE_ACCOUNT_EMAIL is not configured" in issues
 
 
-# @features setup
-# @dimensions doctor read-only drift provider-identity
+# @matrix setup : doctor drift independent-provider-check provider-identity read-only
 def test_doctor_reports_drift_without_writing(tmp_path, capsys):
     _write_generation(tmp_path)
     active_values = {
@@ -256,7 +320,7 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
         )
         == 1
     )
-    assert provider_calls == []
+    assert provider_calls == [("Demo", "demo-project")]
     assert constants_path.read_bytes() == drift_before
     assert "Local generated state: DRIFT" in capsys.readouterr().out
 
@@ -272,8 +336,7 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
     }
 
 
-# @features setup
-# @dimensions doctor adc provider-identity read-only
+# @matrix setup : adc doctor provider-identity read-only
 def test_doctor_reads_adc_identity_without_changing_it():
     events = []
     credentials = types.SimpleNamespace(
@@ -294,13 +357,20 @@ def test_doctor_reads_adc_identity_without_changing_it():
     assert events and "userinfo.email" in events[0][1]
 
 
-# @features setup
-# @dimensions doctor provider-discovery project-identity
+# @matrix setup : doctor operator-permissions project-identity provider-apis provider-discovery
 def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
     calls = []
 
     def gcloud(command, check=False):
         calls.append((command, check))
+        if command[:3] == ["services", "list", "--enabled"]:
+            from config import constants
+
+            return types.SimpleNamespace(
+                returncode=0,
+                stdout="\n".join(constants.REQUIRED_GOOGLE_CLOUD_APIS),
+                stderr="",
+            )
         return types.SimpleNamespace(
             returncode=0,
             stdout='{"projectNumber": "123456"}',
@@ -311,15 +381,33 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
         calls.append((settings, project, project_details))
         return {"app-engine": {"state": "AVAILABLE"}}
 
+    def inspect_permissions(project):
+        calls.append(("permissions", project))
+        return {"installer": [], "billing": [], "deployer": []}
+
     monkeypatch.setattr("installer.utils.run_gcloud_command", gcloud)
     monkeypatch.setattr(
         "installer.recovery.verify_recovery_resources",
         verify_resources,
     )
+    monkeypatch.setattr(
+        "installer.iam.inspect_operator_permissions",
+        inspect_permissions,
+    )
 
     settings = {"APP_NAME": "Demo"}
     assert doctor._default_provider_checker(settings, "demo-project") == {
-        "app-engine": {"state": "AVAILABLE"}
+        "app-engine": {"state": "AVAILABLE"},
+        "operator-permissions": {
+            "state": "AVAILABLE",
+            "details": {"installer": [], "billing": [], "deployer": []},
+            "error": None,
+        },
+        "required-apis": {
+            "state": "AVAILABLE",
+            "details": {"missing": []},
+            "error": None,
+        },
     }
     assert calls == [
         (
@@ -332,11 +420,21 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
             False,
         ),
         (settings, "demo-project", {"projectNumber": "123456"}),
+        ("permissions", "demo-project"),
+        (
+            [
+                "services",
+                "list",
+                "--enabled",
+                "--project=demo-project",
+                "--format=value(config.name)",
+            ],
+            False,
+        ),
     ]
 
 
-# @features setup
-# @dimensions repair explicit-mutation validation
+# @matrix setup : explicit-mutation repair validation
 def test_repair_runs_reconciliation_then_validation(monkeypatch):
     events = []
     monkeypatch.setattr(

@@ -32,8 +32,9 @@ GET_CATEGORY_FORMS = types.FunctionDeclaration(
 )
 
 
-# @testable false
-# @reason category/form loading and schema projection are data/E2E-owned for AI tool stories
+# @testable true
+# @tests tests_unit/test_015_ai_tools.py::test_get_category_forms_returns_full_form_schema
+# @matrix ai form-schema : autofill category-forms schema
 def execute_get_category_forms(args, user):
     identifier = args.get("id")
     if not identifier:

@@ -99,8 +99,9 @@ export default class ViewComponent {
 	}
 
 	/**
-	 * @testable false
-	 * @reason foundational view lifecycle plumbing
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_static_component_without_default_widget_activates
+	 * @matrix navigation tabs : static-component visibility
 	 */
 	async activate(show) {
 		if (this._destroyed) return false;
@@ -112,7 +113,10 @@ export default class ViewComponent {
 			return false;
 		} else if (["default", "active"].includes(show)) {
 			show = this.default;
-			if (!show) return false;
+			if (!show) {
+				this.active = null;
+				return true;
+			}
 		} else if (show === "nav" && this.nav?.standalone) {
 			this.active = this.nav;
 			return true;
@@ -153,8 +157,7 @@ export default class ViewComponent {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_component_refresh_only_loads_collection_widgets
-	 * @features reconnect-refresh collections forms
-	 * @dimensions explicit-collection-scope form-exclusion
+	 * @matrix collections forms reconnect-refresh : explicit-collection-scope form-exclusion
 	 */
 	async prepareCollectionRefresh(skip = new Set()) {
 		const widgets = Object.values(this.widgets);
@@ -465,10 +468,8 @@ export default class ViewComponent {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_component_render_does_not_wait_for_polling_reconciliation
-	 * @features startup polling
-	 * @dimensions component-render subscription-lifecycle nonblocking
-	 * @pairs startup:deferred-services startup:component-render startup:nonblocking
-	 * @pairs polling:subscription-lifecycle polling:component-render polling:nonblocking
+	 * @matrix polling : component-render nonblocking subscription-lifecycle
+	 * @matrix startup : component-render deferred-services nonblocking
 	 */
 	render(visible) {
 		const open = visible ? this.active?.name || "true" : false;

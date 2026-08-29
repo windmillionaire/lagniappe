@@ -43,6 +43,11 @@ from .utility import (
     delete,
     delete_cache,
 )
+from .public_discovery import (
+    cached_public_directory,
+    cached_sitemap,
+    invalidate_public_discovery,
+)
 
 __all__ = [
     "initialize",
@@ -82,4 +87,7 @@ __all__ = [
     "normalize_owner_name",
     "owner_search_result",
     "update_owner_projection",
+    "cached_public_directory",
+    "cached_sitemap",
+    "invalidate_public_discovery",
 ]

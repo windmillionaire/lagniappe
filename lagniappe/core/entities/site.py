@@ -1,14 +1,15 @@
 from google.cloud import datastore
 
 from ..exceptions import PropertyError
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
+from ..tools.database import site as site_database
 
 
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_site_lazy_properties_database_key_and_error_context
 # @tests tests_unit/test_002_entity_general_properties.py::test_site_missing_key_raises_runtime_error
-# @features site
-# @dimensions lazy-properties db-key error-wrapping validation
+# @matrix site : db-key error-wrapping lazy-properties validation
 class Site:
     """Base class for non-Entity site-level objects (Home, Index).
 
@@ -63,7 +64,7 @@ class Site:
         if self._db and not self._key:
             self._key = self._db.key
         elif self._site_id:
-            self._key = database.get.site_key(self._site_id)
+            self._key = site_database.key(self._site_id)
         else:
             raise ValueError("Site identifier not set")
 
@@ -77,7 +78,7 @@ class Site:
         if getattr(self, "_urlsafe_key", None):
             return self._urlsafe_key
 
-        self._urlsafe_key = database.get.urlsafe_key(self.key)
+        self._urlsafe_key = database_get.urlsafe_key(self.key)
         return self._urlsafe_key
 
     @property
@@ -88,9 +89,9 @@ class Site:
         if not self.key:
             raise RuntimeError("no key assigned")
 
-        self._db = database.get.site(self.key)
+        self._db = site_database.get_or_create(self.key)
 
         return self._db
 
     def save(self):
-        database.save(self)
+        database_utility.save(self)

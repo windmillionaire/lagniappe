@@ -10,8 +10,7 @@ const UPLOAD_DROPZONE_TEXT =
 /**
  * @testable true
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_file
- * @features tasks
- * @dimensions create file-upload
+ * @matrix tasks : create file-upload
  */
 export class TaskUpload extends BaseUpload {
 	constructor(button, widget) {

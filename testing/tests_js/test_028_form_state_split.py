@@ -1,8 +1,7 @@
 """Node-backed checks for the document/form state boundary."""
 
 
-# @features offline
-# @dimensions database-upgrade legacy-record-discard mutation-store
+# @matrix offline : database-upgrade legacy-record-discard mutation-store
 def test_offline_database_upgrade_discards_legacy_activity_records(run_node):
     run_node(
         r'''
@@ -26,7 +25,7 @@ const db = {
   deleteObjectStore(name) { stores.delete(name); },
   transaction(storeNames) {
     const names = Array.isArray(storeNames) ? storeNames : [storeNames];
-    return {
+    const tx = {
       objectStore(name) {
         if (!names.includes(name) || !stores.has(name)) {
           throw new Error(`Unknown store ${name}`);
@@ -37,12 +36,14 @@ const db = {
             queueMicrotask(() => {
               request.result = [...stores.get(name)];
               request.onsuccess?.();
+              queueMicrotask(() => tx.oncomplete?.());
             });
             return request;
           },
         };
       },
     };
+    return tx;
   },
 };
 const indexedDB = {
@@ -84,8 +85,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features forms submission deferred-jobs
-# @dimensions deliberate-submit form-lock no-live-sync
+# @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync
 def test_form_submit_is_guarded_only_by_durable_autofill_lock(run_node):
     run_node(
         r'''
@@ -166,7 +166,7 @@ vm.runInContext(source, context);
     )
 
 
-# @pairs deferred-jobs:form-lock deferred-jobs:reload
+# @matrix deferred-jobs : form-lock reload
 def test_active_deferred_form_waits_for_root_operation_scan(run_node):
     run_node(
         r'''
@@ -238,8 +238,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features forms form-schema edited-entity-notice
-# @dimensions latest-schema local-values remote-added-values no-schema-version-choice
+# @matrix edited-entity-notice form-schema forms : latest-schema local-values no-schema-version-choice remote-added-values
 def test_local_revision_uses_latest_schema_and_merges_submission_values(run_node):
     run_node(
         r'''
@@ -310,8 +309,7 @@ if (local.response.schema.length !== 2 || local.response.schema[1].id !== "added
     )
 
 
-# @features offline
-# @dimensions queue-submit fingerprint immutable-command
+# @matrix offline : fingerprint immutable-command queue-submit
 def test_offline_submit_record_keeps_originating_entity_fingerprint(run_node):
     run_node(
         r'''
@@ -392,8 +390,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features offline
-# @dimensions renderer-snapshot replay-payload reload
+# @matrix offline : reload renderer-snapshot replay-payload
 def test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload(
     run_node,
 ):
@@ -504,8 +501,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features offline
-# @dimensions fingerprint-precondition conflict-durability dispatch
+# @matrix offline : conflict-durability dispatch fingerprint-precondition
 def test_offline_replay_keeps_stale_submission_queued_for_reconciliation(run_node):
     run_node(
         r'''
@@ -594,10 +590,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features offline
-# @dimensions replay dispatch mounted-form-poll no-direct-acknowledgement
-# @pair offline:replay-reconciliation
-# @pair edited-entity-notice:replayed-response
+# @pairs edited-entity-notice:replayed-response offline:replay-reconciliation
 def test_offline_replay_polls_mounted_form_without_direct_acknowledgement(run_node):
     run_node(
         r'''
@@ -707,8 +700,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features offline
-# @dimensions replay conflict-rebase
+# @matrix offline : conflict-rebase replay
 def test_offline_replay_retries_a_conflict_rebased_by_the_form(run_node):
     run_node(
         r'''
@@ -820,10 +812,7 @@ vm.runInContext(source, context);
     )
 
 
-# @pairs edited-entity-notice:renderer-capability edited-entity-notice:schema-only
-# @pairs edited-entity-notice:local-values edited-entity-notice:submission-choice
-# @pairs edited-entity-notice:latest-schema edited-entity-notice:whole-form-selection
-# @pairs edited-entity-notice:active-state
+# @matrix edited-entity-notice : active-state latest-schema local-values renderer-capability schema-only submission-choice whole-form-selection
 def test_edit_watcher_separates_schema_and_renderer_value_changes(
     run_node,
 ):
@@ -1129,8 +1118,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features edited-entity-notice forms
-# @dimensions per-field-selection saved-default mixed-submission
+# @matrix edited-entity-notice forms : mixed-submission per-field-selection saved-default
 def test_edit_watcher_reconciles_independent_field_selections(run_node):
     run_node(
         r'''
@@ -1226,8 +1214,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features edited-entity-notice deferred-jobs
-# @dimensions active-operation reload form-lock
+# @matrix deferred-jobs edited-entity-notice : active-operation form-lock reload
 def test_edit_watcher_restores_active_autofill_without_form_sync(run_node):
     run_node(
         r'''
@@ -1303,9 +1290,8 @@ vm.runInContext(source, context);
     )
 
 
-# @pairs edited-entity-notice:owned-deferred-completion
-# @pairs deferred-jobs:owned-deferred-completion
-# @pairs edited-entity-notice:active-state edited-entity-notice:dirty-state
+# @matrix edited-entity-notice : active-state dirty-state owned-deferred-completion
+# @pair deferred-jobs:owned-deferred-completion
 def test_owned_deferred_completion_replaces_clean_active_form(run_node):
     run_node(
         r'''
@@ -1445,11 +1431,8 @@ vm.runInContext(source, context);
 
 
 
-# @features reconnect-refresh edited-entity-notice forms
-# @dimensions visibility ordering catch-up dirty-form-preservation
-# @pair offline:dirty-form-preservation
-# @pair offline:background-replay
-# @pairs polling:nonblocking polling:catch-up
+# @matrix offline : background-replay dirty-form-preservation
+# @matrix polling : catch-up nonblocking
 def test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay(
     run_node,
 ):
@@ -1593,8 +1576,7 @@ view.refresh = async (navigation, options) => {
     )
 
 
-# @features reconnect-refresh collections forms
-# @dimensions explicit-collection-scope form-exclusion
+# @matrix collections forms reconnect-refresh : explicit-collection-scope form-exclusion
 def test_component_refresh_only_loads_collection_widgets(run_node):
     run_node(
         r'''
@@ -1659,8 +1641,7 @@ component.view = {
     )
 
 
-# @features user-groups
-# @dimensions single-reconciliation
+# @pair user-groups:single-reconciliation
 def test_permissions_form_does_not_rebuild_for_visibility_only_reconciliation(
     run_node,
 ):
@@ -1725,8 +1706,7 @@ widget.commitReset = () => {
     )
 
 
-# @features user-groups
-# @dimensions initialization authoritative-sections
+# @matrix user-groups : authoritative-sections initialization
 def test_permissions_form_waits_for_authoritative_sections_before_initializing(
     run_node,
 ):
@@ -1813,8 +1793,7 @@ Object.defineProperty(widget, "html", { get: () => [{}] });
     )
 
 
-# @features user-groups
-# @dimensions rebuild-serialization single-reconciliation
+# @matrix user-groups : rebuild-serialization single-reconciliation
 def test_permissions_form_serializes_overlapping_section_rebuilds(run_node):
     run_node(
         r'''
@@ -1886,8 +1865,7 @@ widget.commitReset = () => {
     )
 
 
-# @features user-groups
-# @dimensions unsaved-preservation background-update
+# @matrix user-groups : background-update unsaved-preservation
 def test_permissions_form_preserves_unsaved_values_during_background_update(
     run_node,
 ):
@@ -1939,8 +1917,7 @@ widget.setSections = () => events.push("setSections");
     )
 
 
-# @features user-groups
-# @dimensions conditional-response
+# @pair user-groups:conditional-response
 def test_permissions_form_ignores_validated_cached_response_after_initialization(
     run_node,
 ):
@@ -2010,11 +1987,7 @@ widget.target = { inert: false };
     )
 
 
-# @features tasks reconnect-refresh forms offline
-# @dimensions active-row dirty-row queued-row staged-review replacement removal preservation
-# @pair tasks:active-form-preservation
-# @pair tasks:dirty-form-preservation
-# @pair tasks:stale-widget
+# @matrix tasks : active-form-preservation dirty-form-preservation stale-widget
 def test_task_list_refresh_preserves_rows_with_local_form_state(run_node):
     run_node(
         r'''
@@ -2136,7 +2109,7 @@ Object.defineProperty(list, "completedCount", { value: 0 });
     )
 
 
-# @pairs tasks:create tasks:refresh tasks:dedupe
+# @matrix tasks : create dedupe refresh
 def test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh(
     run_node,
 ):
@@ -2271,8 +2244,7 @@ if (completedHeader.dataset.visible !== "false") {
     )
 
 
-# @features tasks
-# @dimensions complete active-widget route-override
+# @matrix tasks : active-widget complete route-override
 def test_task_completion_keeps_component_update_route_when_history_is_active(
     run_node,
 ):
@@ -2337,7 +2309,7 @@ if (submitted.detail.role !== "complete-toggle" || !submitted.detail.update) {
     )
 
 
-# @pairs tasks:create-close tasks:empty-state tasks:completed-only
+# @matrix tasks : completed-only create-close empty-state
 def test_task_list_empty_marker_requires_closed_create_form_and_no_tasks(run_node):
     run_node(
         r'''
@@ -2464,8 +2436,7 @@ list._setListVisibility();
     )
 
 
-# @features forms
-# @dimensions direct-fields clear input textarea
+# @matrix forms : clear direct-fields input textarea
 def test_direct_form_controls_clear_inputs_and_textareas(run_node):
     run_node(
         r'''

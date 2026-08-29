@@ -14,8 +14,7 @@ const REPORT_FORM_SELECTOR =
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_report_detail_shows_revision_and_manual_execution
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
- * @features ai-report
- * @dimensions detail skip-action result-json ask answer-html links no-actions create revision execute failure reload deferred-refresh pending delete-modal
+ * @matrix ai-report : answer-html ask create deferred-refresh delete-modal detail execute failure links no-actions pending reload result-json revision skip-action
  */
 export default class Report extends Core {
 	async init() {
@@ -37,6 +36,11 @@ export default class Report extends Core {
 		return this;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_038_startup_specializations.py::test_report_loads_base_form_only_for_present_forms_and_in_parallel
+	 * @matrix ai-report : concurrent-form-init lazy-form-runtime
+	 */
 	ensureReportForms() {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;

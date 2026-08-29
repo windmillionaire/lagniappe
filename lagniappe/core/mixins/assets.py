@@ -3,7 +3,7 @@
 import json
 
 from ..definitions import AssetTypes
-from ..tools import database
+from lagniappe.core.tools.database import assets as database_assets
 
 
 # @testable infrastructure
@@ -112,8 +112,7 @@ class AssetMixin:
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_asset_mixin_copy_asset_copies_storage_and_updates_definition
-    # @features asset-storage
-    # @dimensions copy metadata visibility
+    # @matrix asset-storage : copy metadata visibility
     def copy_asset(self, asset, name=None):
         if not asset:
             return None
@@ -136,7 +135,7 @@ class AssetMixin:
         if not copied.extension and source_extension:
             copied._path = f"{self.hash}_{name}.{source_extension}"
 
-        blob = database.copy_file(
+        blob = database_assets.copy_file(
             source_path,
             source_visibility,
             copied.path,

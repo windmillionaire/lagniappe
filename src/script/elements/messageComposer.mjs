@@ -25,8 +25,7 @@ class ComposerModal extends Modal {
  * @testable true
  * @tests tests_js/test_042_messaging_frontend.py::test_message_composer_prefills_peer_and_reuses_operation_on_submit
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
- * @pairs messaging:compose-modal messaging:prefilled-peer messaging:operation-id
- * @pairs messaging:user-kind messaging:selection-focus
+ * @matrix messaging : compose-modal operation-id prefilled-peer selection-focus user-kind
  */
 export class MessageComposer {
 	constructor(view, { onSent = null } = {}) {

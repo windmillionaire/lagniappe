@@ -21,8 +21,7 @@ let _tokenRefresh = null;
 /**
  * @testable true
  * @tests tests_js/test_009_request_csrf.py::test_non_csrf_bad_request_is_not_retried
- * @features csrf request-errors
- * @dimensions retry-classification
+ * @matrix csrf request-errors : retry-classification
  */
 const csrfFailed = (response) =>
 	response.status === 400 &&
@@ -41,24 +40,10 @@ const _getToken = () => document.getElementById("token")?.value;
  * @tests tests_js/test_009_request_csrf.py::test_request_exposes_client_cache_invalidation_marker
  * @tests tests_js/test_009_request_csrf.py::test_request_dispatches_entity_fingerprint_acknowledgement
  * @tests tests_js/test_009_request_csrf.py::test_request_supports_conditional_post_not_modified
- * @pair cache:conditional-response
- * @pair cache:etag
- * @pair cache:dom-refresh
- * @pair cache:invalidation
- * @pair cache:reload
- * @pair request:conditional-response
- * @pair request:etag
- * @pair request:dom-refresh
- * @pair request:invalidation
- * @pair request:reload
- * @pair request:acknowledgement
- * @pair request:response-headers
- * @pair request:multiple-entities
- * @pair edited-entity-notice:acknowledgement
- * @pair edited-entity-notice:response-headers
- * @pair edited-entity-notice:multiple-entities
- * @pair deferred-jobs:conditional-response
- * @pair deferred-jobs:etag
+ * @matrix cache : conditional-response dom-refresh etag invalidation reload
+ * @matrix deferred-jobs : conditional-response etag
+ * @matrix edited-entity-notice : acknowledgement multiple-entities response-headers
+ * @matrix request : acknowledgement conditional-response dom-refresh etag invalidation multiple-entities reload response-headers
  */
 const _formatResponse = async (
 	response,
@@ -155,9 +140,8 @@ const _friendlyError = (message, { body = null } = {}) => {
  * @testable true
  * @tests tests_js/test_009_request_csrf.py::test_plain_text_upstream_error_stays_in_request_error_path
  * @tests tests_js/test_009_request_csrf.py::test_request_can_return_html_error_without_replacing_page
- * @pairs request-errors:proxy-text-error request-errors:ajax-upload
- * @pairs request-errors:non-invasive-probe request-errors:reload-fallback
- * @pairs edited-entity-notice:non-invasive-probe edited-entity-notice:reload-fallback
+ * @matrix edited-entity-notice : non-invasive-probe reload-fallback
+ * @matrix request-errors : ajax-upload non-invasive-probe proxy-text-error reload-fallback
  */
 const _formatError = async (
 	response,
@@ -249,8 +233,7 @@ const _refreshToken = async () => {
 /**
  * @testable true
  * @tests tests_js/test_009_request_csrf.py::test_concurrent_stale_writes_share_server_controlled_token_refresh
- * @features csrf
- * @dimensions stale-token concurrent-refresh
+ * @matrix csrf : concurrent-refresh stale-token
  */
 const refreshToken = async () => {
 	if (!_tokenRefresh) {
@@ -321,11 +304,10 @@ const putRequest = async (url, body, options = {}) => {
  * @tests tests_js/test_009_request_csrf.py::test_request_supports_conditional_post_not_modified
  * @tests tests_js/test_009_request_csrf.py::test_request_preserves_structured_validation_error
  * @tests tests_js/test_009_request_csrf.py::test_request_preserves_plain_validation_error
- * @pair request:post-headers
- * @pair deferred-jobs:post-headers
- * @pairs request-errors:structured-validation request-errors:diagnostics
- * @pair request-errors:plain-validation
- * @pairs polling:structured-validation polling:diagnostics
+ * @matrix deferred-jobs request : post-headers
+ * @matrix polling : diagnostics structured-validation
+ * @matrix request-errors : diagnostics plain-validation structured-validation
+ * @pair request:abort-signal
  */
 const _request = async (
 	url,
@@ -336,6 +318,7 @@ const _request = async (
 		requestHeaders = {},
 		acknowledgeEntities = true,
 		replaceErrorPage = true,
+		signal = undefined,
 	} = {},
 ) => {
 	method = method.toUpperCase();
@@ -351,6 +334,7 @@ const _request = async (
 		method,
 		headers,
 		credentials: "include",
+		...(signal ? { signal } : {}),
 		...(keepalive ? { keepalive: true } : {}),
 	};
 

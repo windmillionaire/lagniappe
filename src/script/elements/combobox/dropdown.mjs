@@ -5,17 +5,13 @@ import { Combobox } from "./combobox";
 /**
  * @testable true
  * @tests tests_js/test_016_combobox_frontend.py::test_dynamic_dropdown_rerenders_each_open_and_keeps_mixed_option_indexes
- * @pair dropdown:dynamic-options
- * @pair dropdown:rerender
- * @pair dropdown:mixed-options
- * @pair dropdown:callback-index
+ * @matrix dropdown : callback-index dynamic-options mixed-options rerender
  */
 export class Dropdown extends Combobox {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_016_combobox_frontend.py::test_combobox_positioning_uses_live_element_by_default_and_explicit_reference_when_configured
-	 * @features dropdown
-	 * @dimensions positioning
+	 * @pair dropdown:positioning
 	 */
 	init(menu) {
 		this.placement = menu.placement ?? "bottom-start";

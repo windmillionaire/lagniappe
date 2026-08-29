@@ -14,10 +14,11 @@ EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input
+# @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input_empty_column_value_is_blank
 # @tests tests_unit/test_004d_submitter.py::test_text_input_validate_import_space_joins_list_values
+# @tests tests_unit/test_004d_submitter.py::test_import_submission_space_joins_input_list_values
 # @tests tests_unit/test_004b_schema_core.py::test_schema_create_field_known_text_input
-# @features text-input
-# @dimensions ai-value, filter-value, search-value, import, list-normalization, field-factory
+# @matrix text-input : ai-value column empty-field empty-value field-factory filter-value import list-normalization save search-value
 class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     """Plain text input field.
 
@@ -74,8 +75,7 @@ class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_date_input
-# @features date-input
-# @dimensions ai-value, filter-value, import, column
+# @matrix date-input : ai-value column filter-value import
 class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     """Date input field. Stored as UTC datetime.
 
@@ -128,8 +128,7 @@ class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_time_input
-# @features time-input
-# @dimensions ai-value, filter-value, import, column
+# @matrix time-input : ai-value column filter-value import
 class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     """Time input field. Stored as a datetime with only the time component.
 
@@ -153,8 +152,7 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     # Form Attributes
     # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_time_form_invalid_format_raises
-    # @features time-input
-    # @dimensions form-submission, validation
+    # @matrix time-input : form-submission validation
     def validate_submission(self, value):
         """Parse form-submitted time string (HH:MM format)."""
         if value:
@@ -214,8 +212,7 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_number_input
-# @features number-input
-# @dimensions ai-value, filter-value, import
+# @matrix number-input : ai-value filter-value import
 class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     """Numeric input field. Stored as a float.
 
@@ -242,8 +239,7 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     # Form Attributes
     # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_number_form_accepts_zero
-    # @features number-input
-    # @dimensions form-submission, zero
+    # @matrix number-input : form-submission zero
     def validate_submission(self, value):
         """Parse form-submitted number string to float."""
         try:
@@ -293,8 +289,7 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_email_input
 # @tests tests_unit/test_004e_submission_behavior.py::test_submission_email_form_accepts_non_matching_string
-# @features email-input
-# @dimensions ai-value, filter-value, import, form-submission, validation
+# @matrix email-input : ai-value filter-value form-submission import validation
 class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     """Email input field. Validates format against EMAIL_REGEX on import.
 
@@ -337,8 +332,7 @@ class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_tel_input
-# @features tel-input
-# @dimensions ai-value, filter-value, import, formatting
+# @matrix tel-input : ai-value filter-value formatting import
 class TelInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     """Telephone input field. Normalizes to E.164 format.
 

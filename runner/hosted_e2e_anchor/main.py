@@ -3,8 +3,7 @@
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_anchor_marks_every_rejection
-# @features hosted-e2e
-# @dimensions anchor soft-routing deletion-safety
+# @matrix hosted-e2e : anchor deletion-safety soft-routing
 def app(environ, start_response):
     body = b"Not Found\n"
     start_response(

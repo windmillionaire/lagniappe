@@ -1,5 +1,3 @@
-"""E2E coverage for Page note visibility, composition, and deletion."""
-
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -9,7 +7,7 @@ from playwright.sync_api import expect
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Users
 from testing.elements import Buttons, Modal
-from testing.utility import TestFile as _TestFile
+from testing.utility.test_file import TestFile as _TestFile
 
 
 pytestmark = pytest.mark.e2e
@@ -61,23 +59,8 @@ def _open_note_composer(user):
     return composer
 
 
-# @pair notes:attribute-gate
-# @pair pages:attribute-gate
-# @pair notes:load
-# @pair notes:shared
-# @pair notes:private
-# @pair notes:viewer
-# @pair notes:owner
-# @pair pages:load
-# @pair pages:shared
-# @pair pages:private
-# @pair pages:viewer
-# @pair pages:owner
-# @pair permissions:load
-# @pair permissions:shared
-# @pair permissions:private
-# @pair permissions:viewer
-# @pair permissions:owner
+# @matrix notes pages : attribute-gate load owner private shared viewer
+# @matrix permissions : load owner private shared viewer
 # @template pages/page.html::view_header
 # @template pages/notes.html::notes_section
 # @template pages/notes.html::note_list
@@ -120,18 +103,7 @@ def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
         expect(owner.page).to_have_title("Error 404")
 
 
-# @pair notes:create
-# @pair notes:body
-# @pair notes:photo
-# @pair notes:visibility
-# @pair notes:scope
-# @pair notes:validation
-# @pair pages:create
-# @pair pages:body
-# @pair pages:photo
-# @pair pages:visibility
-# @pair pages:scope
-# @pair pages:validation
+# @matrix notes pages : body create photo scope validation visibility
 # @pair request-errors:plain-validation
 # @template pages/page.html::view_header
 # @template pages/notes.html::notes_section

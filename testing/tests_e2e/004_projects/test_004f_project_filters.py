@@ -29,6 +29,7 @@ Test Framework:
 
 from dataclasses import replace
 from datetime import datetime
+import json
 from uuid import uuid4
 
 import pytest
@@ -48,10 +49,8 @@ from testing.resources import Task
 pytestmark = pytest.mark.e2e
 
 
-# @features filters
-# @dimensions tab-open
+# @pair filters:tab-open
 def test_filters_tab_opens(get_user):
-    """Test that clicking filters tab opens filter panel."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)
@@ -63,10 +62,8 @@ def test_filters_tab_opens(get_user):
     expect(filters.conditions).to_be_visible()
 
 
-# @features filters
-# @dimensions conditions completed
+# @matrix filters : completed conditions
 def test_project_filter_conditions_include_task_fields(get_user):
-    """Project filters expose task completion status."""
     user = get_user(Users.OWNER)
     project = Projects.test_filter_project.get(user)
     user.go(project)
@@ -79,13 +76,61 @@ def test_project_filter_conditions_include_task_fields(get_user):
     expect(panel.get_by_role("option", name="Completed", exact=True)).to_be_visible()
 
 
+# @matrix filters : malformed-contract unavailable-source
+# @pairs permissions:unavailable-source request-errors:stable-status
+def test_filter_preview_rejects_malformed_and_forged_contracts(
+    get_user,
+    browser_failures,
+):
+    user = get_user(Users.OWNER)
+    project = Projects.test_filter_project.get(user)
+    user.go(project)
+    endpoint = f"{project.url.rsplit('/projects/', 1)[0]}/filters/{project.key}/test"
+    path = f"/filters/{project.key}/test"
+
+    def request_contract(value):
+        return user.page.evaluate(
+            """async ({endpoint, contract}) => {
+                const query = new URLSearchParams({contract});
+                const response = await fetch(`${endpoint}?${query}`, {
+                    headers: {"X-Lagniappe-Request": "true"},
+                });
+                return {status: response.status, text: await response.text()};
+            }""",
+            {"endpoint": endpoint, "contract": value},
+        )
+
+    with browser_failures.expect_http_error(user, status=400, path=path):
+        malformed = request_contract("{not-json")
+    assert malformed == {
+        "status": 400,
+        "text": "Filter contract contains malformed JSON.",
+    }
+
+    forged_contract = json.dumps(
+        {
+            "version": 1,
+            "conditions": [
+                {
+                    "source_id": "unrelated-source",
+                    "field": "name",
+                    "comparator": "substring",
+                    "values": ["Filter"],
+                }
+            ],
+        }
+    )
+    with browser_failures.expect_http_error(user, status=422, path=path):
+        forged = request_contract(forged_contract)
+    assert forged["status"] == 422
+    assert "unavailable field" in forged["text"]
+
+
 # --- String conditions (Task Name) ---
 
 
-# @features filters
-# @dimensions string-condition run-results
+# @matrix filters : run-results string-condition
 def test_filter_by_task_name(get_user):
-    """Test filtering by task name substring."""
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
@@ -104,10 +149,8 @@ def test_filter_by_task_name(get_user):
     expect(row).to_be_visible()
 
 
-# @features filters
-# @dimensions string-condition exact-match run-results
+# @matrix filters : exact-match run-results string-condition
 def test_filter_by_task_name_exact(get_user):
-    """Test filtering by exact task name match."""
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
@@ -117,6 +160,10 @@ def test_filter_by_task_name_exact(get_user):
 
     badges = filters.name_equals(task.definition.name).add_filter()
     expect(badges).to_be_visible()
+    definition = json.loads(
+        badges.locator("input[name='definition']").input_value()
+    )
+    assert definition["values"] == [task.definition.name]
 
     results = filters.run()
     expect(results).to_be_visible()
@@ -127,10 +174,8 @@ def test_filter_by_task_name_exact(get_user):
 # --- Timestamp conditions (Due Date) ---
 
 
-# @features filters
-# @dimensions date-condition run-results
+# @matrix filters : date-condition run-results
 def test_filter_by_due_date(get_user):
-    """Test filtering by due date (is on or after today)."""
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_due_date.get(user)
     project = user.go(task.project)
@@ -176,10 +221,8 @@ def _attached_form_filter_context(user):
     return filters, matching_task, excluded_task
 
 
-# @features filters
-# @dimensions string-condition run-results view-access
+# @matrix filters : run-results string-condition view-access
 def test_project_filter_results_respect_task_permissions(get_user):
-    """Project filters return only matching tasks the viewer can see."""
     owner = get_user(Users.OWNER)
     visible_task = Tasks.test_filter_permission_visible.get(owner)
     hidden_task = Tasks.test_filter_permission_hidden.get(owner)
@@ -202,10 +245,8 @@ def test_project_filter_results_respect_task_permissions(get_user):
     _expect_only_matching_task(results, visible_task, hidden_task)
 
 
-# @features filters
-# @dimensions entity-condition category run-results
+# @matrix filters : category entity-condition run-results
 def test_filter_by_category(get_user):
-    """Test filtering by category (facets picker)."""
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_task_name.get(user)
     category = Categories.test_create_page_task.get(user)
@@ -223,10 +264,8 @@ def test_filter_by_category(get_user):
     expect(row).to_be_visible()
 
 
-# @features filters
-# @dimensions entity-condition assigned-user run-results
+# @matrix filters : assigned-user entity-condition run-results
 def test_filter_by_assigned_user(get_user):
-    """Test filtering by assigned user (facets picker)."""
     user = get_user(Users.OWNER)
     assignee = Users.create_user.get(user)
     task = Tasks.test_filter_by_assigned_user.get(user)
@@ -248,10 +287,8 @@ def test_filter_by_assigned_user(get_user):
 # --- Dynamic entity conditions (Model Task) ---
 
 
-# @features filters
-# @dimensions entity-condition model-task run-results
+# @matrix filters : entity-condition model-task run-results
 def test_filter_by_model_task(get_user):
-    """Test filtering by model task (dynamic condition, no options panel)."""
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_model_task.get(user)
     model_task = ModelTasks.test_filter_by_model_task.get(user)
@@ -271,10 +308,8 @@ def test_filter_by_model_task(get_user):
 # --- Dynamic attached-form field conditions ---
 
 
-# @features filters
-# @dimensions attached-form string-condition run-results
+# @matrix filters : attached-form run-results string-condition
 def test_filter_by_attached_form_text_condition(get_user):
-    """Test filtering by a text field from a model task's attached form."""
     user = get_user(Users.OWNER)
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
@@ -290,10 +325,8 @@ def test_filter_by_attached_form_text_condition(get_user):
     _expect_only_matching_task(results, matching_task, excluded_task)
 
 
-# @features filters
-# @dimensions attached-form number-condition run-results
+# @matrix filters : attached-form number-condition run-results
 def test_filter_by_attached_form_number_condition(get_user):
-    """Test filtering by a number field from a model task's attached form."""
     user = get_user(Users.OWNER)
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
@@ -309,10 +342,8 @@ def test_filter_by_attached_form_number_condition(get_user):
     _expect_only_matching_task(results, matching_task, excluded_task)
 
 
-# @features filters
-# @dimensions attached-form boolean-condition run-results
+# @matrix filters : attached-form boolean-condition run-results
 def test_filter_by_attached_form_checkbox_condition(get_user):
-    """Test filtering by a checkbox field from a model task's attached form."""
     user = get_user(Users.OWNER)
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
@@ -326,9 +357,8 @@ def test_filter_by_attached_form_checkbox_condition(get_user):
     _expect_only_matching_task(results, matching_task, excluded_task)
 
 
-# @pairs filters:quick-edit filters:attached-form filters:checkbox filters:reload-persistence
+# @matrix filters : attached-form checkbox quick-edit reload-persistence
 def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_user):
-    """A task form checkbox edited in a saved filter persists after reload."""
     user = get_user(Users.OWNER)
     task = Task(
         user=user,
@@ -395,10 +425,9 @@ def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_user):
     expect(cell.locator("[aria-label='True']")).to_be_visible()
 
 
-# @features filters
-# @dimensions attached-form select-condition run-results
+# @matrix filters : attached-form selector
+# @pair permissions:relationship
 def test_filter_by_attached_form_select_condition(get_user):
-    """Test filtering by a select field from a model task's attached form."""
     user = get_user(Users.OWNER)
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
@@ -414,12 +443,10 @@ def test_filter_by_attached_form_select_condition(get_user):
     _expect_only_matching_task(results, matching_task, excluded_task)
 
 
-# @features embedded-table
-# @dimensions run-results table-cell-expand visibility horizontal-scroll
+# @matrix embedded-table : horizontal-scroll run-results table-cell-expand visibility
 # @template cell.html::table_cell
 # @template controls.html::expand
 def test_filter_results_expands_table_submission_cell(get_user):
-    """Filter results can show and expand a table-valued attached-form column."""
     user = get_user(Users.OWNER)
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
@@ -466,10 +493,9 @@ def test_filter_results_expands_table_submission_cell(get_user):
     expect(embedded).to_contain_text("Escalated item")
 
 
-# @pairs status:boolean-condition status:run-results status:computed-column
-# @pairs filters:boolean-condition filters:run-results
+# @matrix filters : boolean-condition run-results
+# @matrix status : boolean-condition computed-column run-results
 def test_filter_by_has_status_renders_status_column(get_user):
-    """Has Status filters active computed statuses and renders the status column."""
     user = get_user(Users.OWNER)
     matching_task = Tasks.test_filter_by_has_status_active.get(user)
     excluded_task = Tasks.test_filter_by_has_status_inactive.get(user)
@@ -506,10 +532,8 @@ def test_filter_by_has_status_renders_status_column(get_user):
 # --- Edge cases and compound filters ---
 
 
-# @features filters
-# @dimensions empty-results
+# @pair filters:empty-results
 def test_filter_no_results(get_user):
-    """Test filter that matches nothing."""
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
@@ -523,10 +547,8 @@ def test_filter_no_results(get_user):
     expect(results).to_contain_text("No matching tasks found")
 
 
-# @features filters
-# @dimensions reset
+# @pair filters:reset
 def test_filter_reset(get_user):
-    """Test reset button clears filters and hides results."""
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
@@ -542,10 +564,8 @@ def test_filter_reset(get_user):
     expect(filters.badges).not_to_be_visible()
 
 
-# @features filters
-# @dimensions saved-filters save delete reload-persistence shared-viewer
+# @matrix filters : delete reload-persistence save saved-filters shared-viewer
 def test_filter_save(get_user):
-    """Saved project filters persist and are visible to users who can view them."""
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
@@ -588,10 +608,8 @@ def test_filter_save(get_user):
     expect(reloaded_saved.locator(f"li[data-key='{filter_key}']")).to_have_count(0)
 
 
-# @features filters
-# @dimensions compound run-results
+# @matrix filters : compound run-results
 def test_filter_multiple_conditions(get_user):
-    """Test combining two filter conditions (name + due date)."""
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_due_date.get(user)
     project = user.go(task.project)
@@ -616,7 +634,6 @@ def test_filter_multiple_conditions(get_user):
 def test_saved_in_progress_filter_removes_completed_task_after_back_navigation(
     get_user,
 ):
-    """Back navigation omits a completed task from its saved in-progress filter."""
     user = get_user(Users.OWNER)
     task = Task(
         user=user,

@@ -101,7 +101,8 @@
                   data-creatable="true"
                   data-form-type="task"
                   data-title="Default Form"
-                  {% if t.form %}data-preload='{{ t.form.details|tojson }}'{% endif %}
+                  {% set form_preload = t.properties.form.column_value if t.form else none %}
+                  {% if form_preload %}data-preload='{{ form_preload|tojson }}'{% endif %}
                   class="{{ styles.select.button }}"></button>
         </div>
       {% endif %}

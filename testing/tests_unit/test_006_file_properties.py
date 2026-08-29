@@ -19,8 +19,7 @@ from lagniappe.core.properties.file_assets import FileAsset
 from testing.utility.test_entities import TestEntities
 
 
-# @features file
-# @dimensions display-name filename-fallback
+# @matrix file : display-name filename-fallback
 @pytest.mark.unit
 def test_display_name(get_test_entities):
     """Test DisplayName property returns name if set, otherwise filename without extension."""
@@ -41,8 +40,7 @@ def test_display_name(get_test_entities):
         )
 
 
-# @features file
-# @dimensions property mimetype encoding
+# @matrix file : encoding mimetype property
 @pytest.mark.unit
 def test_filename_mimetype_encoding(get_test_entities):
     """Test simple DBProperty getters/setters for filename, mimetype, encoding."""
@@ -59,8 +57,7 @@ def test_filename_mimetype_encoding(get_test_entities):
         assert file.encoding == expected["encoding"]
 
 
-# @features file
-# @dimensions summary cache
+# @matrix file : cache summary
 @pytest.mark.unit
 def test_summary(get_test_entities):
     """Test Summary property with conditional description cache projection."""
@@ -76,8 +73,7 @@ def test_summary(get_test_entities):
         assert file.properties.summary.cache_value == expected.get("cache_value")
 
 
-# @features file
-# @dimensions description cache
+# @matrix file : cache description
 @pytest.mark.unit
 def test_file_description_form_field_populates_search_cache():
     """File info's description field should save to the searchable cache desc."""
@@ -90,8 +86,7 @@ def test_file_description_form_field_populates_search_cache():
     assert file.to_cache["desc"] == "Generated permit packet description."
 
 
-# @features file
-# @dimensions option-preservation update
+# @matrix file : option-preservation update
 @pytest.mark.unit
 def test_file_update_preserves_processing_options_when_controls_absent():
     """File info saves should not clear search flags when option controls are absent."""
@@ -109,8 +104,7 @@ def test_file_update_preserves_processing_options_when_controls_absent():
     assert file.properties.summarize.search is True
 
 
-# @features file ai
-# @dimensions metadata uri mimetype permissions large-file
+# @matrix ai file : large-file metadata mimetype permissions uri
 @pytest.mark.unit
 def test_file_to_ai_exports_metadata_and_uri_to_ai():
     user = SimpleNamespace(
@@ -163,8 +157,7 @@ def test_file_to_ai_exports_metadata_and_uri_to_ai():
     assert file.properties.file.uri_to_ai is None
 
 
-# @features file
-# @dimensions large-file asset-metadata size
+# @matrix file : asset-metadata large-file size
 @pytest.mark.unit
 def test_file_size_and_large_use_asset_metadata():
     stored_size = asset_defs.LARGE_ASSET_BYTES + 1
@@ -187,12 +180,11 @@ def test_file_size_and_large_use_asset_metadata():
     assert file.large is True
 
 
-# @features file
-# @dimensions html-preview text-asset
+# @matrix file : html-preview text-asset
 @pytest.mark.unit
 def test_as_html(get_test_entities):
-    """Test AsHTML property converts text to HTML using files.htmlize."""
-    with patch("lagniappe.core.properties.file_assets.files.htmlize") as mock_htmlize:
+    """Test AsHTML property converts text to HTML using the focused helper."""
+    with patch("lagniappe.core.properties.file_assets.file_html.htmlize") as mock_htmlize:
         for file in get_test_entities():
             expected = file.test_spec["expected"]
 
@@ -213,8 +205,7 @@ def test_as_html(get_test_entities):
             mock_htmlize.reset_mock()
 
 
-# @features file
-# @dimensions text-asset fallback html-preview
+# @matrix file : fallback html-preview text-asset
 @pytest.mark.unit
 def test_text_asset_falls_back_to_original_text_file():
     """TextAsset should treat uploaded text files as available text content."""
@@ -226,7 +217,7 @@ def test_text_asset_falls_back_to_original_text_file():
     file.mimetype = "text/markdown"
     file.encoding = "utf-8"
 
-    with patch("lagniappe.core.properties.file_assets.files.htmlize") as mock_htmlize:
+    with patch("lagniappe.core.properties.file_assets.file_html.htmlize") as mock_htmlize:
         mock_htmlize.return_value = "<h1>Markdown Content</h1>"
 
         assert file.properties.text.value is True
@@ -235,6 +226,7 @@ def test_text_asset_falls_back_to_original_text_file():
         assert file.html == "<h1>Markdown Content</h1>"
 
 
+# @pair file:text-asset
 @pytest.mark.unit
 def test_text_asset_skips_oversized_original_before_download():
     file_asset = SimpleNamespace(
@@ -254,8 +246,7 @@ def test_text_asset_skips_oversized_original_before_download():
     assert file.properties.text.markup is None
 
 
-# @features file
-# @dimensions text-asset extractable mimetype
+# @matrix file : extractable mimetype text-asset
 @pytest.mark.unit
 def test_text_asset_extractable_only_for_non_text_document_ai_mimetypes():
     """Only non-text OCR-supported mimetypes should be considered extractable."""
@@ -272,8 +263,7 @@ def test_text_asset_extractable_only_for_non_text_document_ai_mimetypes():
     assert markdown.properties.text.extractable is False
 
 
-# @features file
-# @dimensions extract text-asset process-complete
+# @matrix file : extract process-complete text-asset
 @pytest.mark.unit
 def test_extract_update_completes_immediately_for_text_files():
     """Enabling extract on a text file should complete without async work."""
@@ -295,8 +285,7 @@ def test_extract_update_completes_immediately_for_text_files():
     assert file.properties.extract.error is None
 
 
-# @features file
-# @dimensions extract process update
+# @matrix file : extract process update
 @pytest.mark.unit
 def test_extract_process(get_test_entities):
     """Test Extract ProcessProperty attributes and extract kickoff behavior."""
@@ -334,8 +323,7 @@ def test_extract_process(get_test_entities):
             assert file.properties.extract.enabled is True
 
 
-# @features file
-# @dimensions summarize process update
+# @matrix file : process summarize update
 @pytest.mark.unit
 def test_summarize_process(get_test_entities):
     """Test Summarize ProcessProperty attributes and summarize kickoff behavior."""
@@ -367,8 +355,7 @@ def test_summarize_process(get_test_entities):
             assert file.properties.summarize.enabled is True
 
 
-# @features file
-# @dimensions summarize update
+# @matrix file : summarize update
 @pytest.mark.unit
 def test_summarize_update_uses_enable_field_name():
     """File-info summarize enablement should make generated descriptions searchable."""
@@ -382,8 +369,7 @@ def test_summarize_update_uses_enable_field_name():
     summarize.assert_called_once_with(file, dispatch=False)
 
 
-# @features file
-# @dimensions summarize update search-opt-in
+# @matrix file : search-opt-in summarize update
 @pytest.mark.unit
 def test_summarize_update_upload_search_summary_remains_opt_in():
     """Upload summarize search should still follow the search-summary checkbox."""
@@ -408,8 +394,7 @@ def test_summarize_update_upload_search_summary_remains_opt_in():
     assert indexed_file.properties.summarize.search is True
 
 
-# @features file deferred-jobs
-# @dimensions post-save-dispatch summary-first extraction-follow-up deferred-dispatch
+# @matrix deferred-jobs file : deferred-dispatch extraction-follow-up post-save-dispatch summary-first
 @pytest.mark.unit
 def test_file_processing_dispatches_summary_before_extraction():
     """Selecting both operations queues one summary with extraction as its successor."""
@@ -469,7 +454,7 @@ def test_file_processing_dispatches_summary_before_extraction():
     start_extract.assert_not_called()
 
 
-# @pairs file:summarize file:update
+# @matrix file : summarize update
 @pytest.mark.unit
 def test_summarize_update_starts_without_browser_routing_identity():
     """Summarization starts without any browser-specific client identity."""
@@ -482,8 +467,7 @@ def test_summarize_update_starts_without_browser_routing_identity():
     assert file.properties.summarize.enabled is True
 
 
-# @features file
-# @dimensions preview mimetype asset
+# @matrix file : asset mimetype preview
 @pytest.mark.unit
 def test_preview_url_when_mimetype_supported_and_file_present():
     """Preview returns file URL when mimetype is in PREVIEW_MIMETYPES and asset exists."""
@@ -496,8 +480,7 @@ def test_preview_url_when_mimetype_supported_and_file_present():
     assert file.preview == "https://example.test/signed-file"
 
 
-# @features file
-# @dimensions preview mimetype unsupported
+# @matrix file : mimetype preview unsupported
 @pytest.mark.unit
 def test_preview_none_when_mimetype_not_supported():
     """Preview is None when mimetype is not eligible for inline preview."""
@@ -510,8 +493,7 @@ def test_preview_none_when_mimetype_not_supported():
     assert file.preview is None
 
 
-# @features file
-# @dimensions preview missing-asset
+# @matrix file : missing-asset preview
 @pytest.mark.unit
 def test_preview_none_when_no_file_asset():
     """Preview is None when preview mimetype is set but file asset is missing."""
@@ -521,8 +503,7 @@ def test_preview_none_when_no_file_asset():
     assert file.preview is None
 
 
-# @features file
-# @dimensions options extract summarize
+# @matrix file : extract options summarize
 @pytest.mark.unit
 def test_options(get_test_entities):
     """Test Options property returns combined extract/summarize options."""
@@ -542,8 +523,7 @@ def test_options(get_test_entities):
         assert ("summarize" in options) == expected["has_summarize"]
 
 
-# @features file
-# @dimensions upload metadata encoding asset-lifecycle
+# @matrix file : asset-lifecycle encoding metadata upload
 @pytest.mark.unit
 def test_uploaded_file_story_records_metadata_before_asset_save():
     class FakeFile:
@@ -582,11 +562,11 @@ def test_uploaded_file_story_records_metadata_before_asset_save():
 
     with (
         patch(
-            "lagniappe.core.properties.file_assets.files.determine_mimetype",
+            "lagniappe.core.properties.file_assets.file_utility.determine_mimetype",
             return_value="text/plain",
         ) as determine_mimetype,
         patch(
-            "lagniappe.core.properties.file_assets.files.determine_encoding",
+            "lagniappe.core.properties.file_assets.file_utility.determine_encoding",
             return_value="utf-8",
         ) as determine_encoding,
     ):
@@ -620,10 +600,10 @@ def test_uploaded_file_story_records_metadata_before_asset_save():
 
     with (
         patch(
-            "lagniappe.core.properties.file_assets.files.determine_mimetype",
+            "lagniappe.core.properties.file_assets.file_utility.determine_mimetype",
             return_value="image/png",
         ),
-        patch("lagniappe.core.properties.file_assets.files.determine_encoding")
+        patch("lagniappe.core.properties.file_assets.file_utility.determine_encoding")
         as determine_encoding,
     ):
         image_asset.value = image_upload
@@ -635,8 +615,7 @@ def test_uploaded_file_story_records_metadata_before_asset_save():
     assert image_asset.uri == "gs://bucket/file"
 
 
-# @features file storage
-# @dimensions direct-upload metadata large-video
+# @matrix file storage : direct-upload large-video metadata
 @pytest.mark.unit
 def test_direct_upload_file_asset_sniffs_generic_video_from_sample_without_full_read():
     class FakeFile:
@@ -702,8 +681,7 @@ def test_direct_upload_file_asset_sniffs_generic_video_from_sample_without_full_
     ]
 
 
-# @features file storage
-# @dimensions asset-uri bucket-prefix public-url
+# @matrix file storage : asset-uri bucket-prefix public-url
 @pytest.mark.unit
 def test_asset_uri_and_public_url_include_bucket_prefix(monkeypatch):
     monkeypatch.setattr(asset_defs, "BUCKET_PREFIX", "test-")
@@ -726,8 +704,7 @@ def test_asset_uri_and_public_url_include_bucket_prefix(monkeypatch):
     )
 
 
-# @features file storage
-# @dimensions asset-size large-asset
+# @matrix file storage : asset-size large-asset
 @pytest.mark.unit
 def test_file_asset_definition_records_size_and_large_flag(monkeypatch):
     entity = SimpleNamespace(hash="asset123", key=None)
@@ -737,7 +714,7 @@ def test_file_asset_definition_records_size_and_large_flag(monkeypatch):
     stored_size = asset_defs.LARGE_ASSET_BYTES + 1
 
     with patch(
-        "lagniappe.core.definitions.asset.database.assets.save_file",
+        "lagniappe.core.definitions.asset.database_assets.save_file",
         return_value=SimpleNamespace(size=stored_size),
     ):
         assert asset.save(upload) is True
@@ -783,7 +760,7 @@ def test_file_asset_direct_upload_uses_storage_copy_without_seek_or_read():
 
     upload = DirectUpload()
     with patch(
-        "lagniappe.core.definitions.asset.database.assets.save_file",
+        "lagniappe.core.definitions.asset.database_assets.save_file",
         return_value=SimpleNamespace(size=LARGE_ASSET_BYTES + 1),
     ) as save_file:
         assert asset.save(upload) is True
@@ -797,12 +774,11 @@ def test_file_asset_direct_upload_uses_storage_copy_without_seek_or_read():
     assert asset.large is True
 
 
-# @features file storage
-# @dimensions private-url shared-asset-path
+# @matrix file storage : private-url shared-asset-path
 @pytest.mark.unit
 def test_private_asset_url_uses_asset_name_for_shared_storage_path(monkeypatch):
     monkeypatch.setattr(
-        asset_defs.database.get,
+        asset_defs.database_get,
         "urlsafe_key",
         lambda key: "history-key",
     )
@@ -819,8 +795,7 @@ def test_private_asset_url_uses_asset_name_for_shared_storage_path(monkeypatch):
     assert asset.url == "/assets/history-key/task-signature-field.png"
 
 
-# @features file storage
-# @dimensions asset-extension mimetype
+# @matrix file storage : asset-extension mimetype
 @pytest.mark.unit
 def test_text_plain_asset_uses_txt_extension():
     """Text/plain storage paths should use a familiar .txt extension."""
@@ -831,8 +806,7 @@ def test_text_plain_asset_uses_txt_extension():
     assert asset.path == "assettext_file.txt"
 
 
-# @features file
-# @dimensions upload mimetype asset-extension
+# @matrix file : asset-extension mimetype upload
 @pytest.mark.unit
 def test_file_asset_detects_mislabeled_png_upload():
     """Magic-byte detection corrects pasted images mislabeled by the browser."""
@@ -869,8 +843,7 @@ def test_file_asset_detects_mislabeled_png_upload():
     assert asset.value.path == "pasteimg_file.png"
 
 
-# @features file
-# @dimensions image content-type
+# @matrix file : content-type image
 @pytest.mark.unit
 def test_image_asset_content_type_falls_back_without_recursing():
     """New image assets with no upload mimetype should still get a path."""
@@ -888,8 +861,7 @@ def test_image_asset_content_type_falls_back_without_recursing():
     assert png_asset.content_type == "image/png"
 
 
-# @features file
-# @dimensions attached-pages permissions
+# @matrix file : attached-pages permissions
 @pytest.mark.unit
 def test_uploaded_file_story_lists_pages_that_reference_it():
     file = TestEntities.get("FILE", {"filename": "linked.pdf", "hash": "linkedfile"})
@@ -906,8 +878,7 @@ def test_uploaded_file_story_lists_pages_that_reference_it():
     assert file.properties.pages.column_value == [visible.reference_details]
 
 
-# @features file
-# @dimensions attached-tasks permissions references reverse-links badges task-history
+# @matrix file : attached-tasks badges permissions references reverse-links task-history
 @pytest.mark.unit
 def test_file_reverse_task_links_drive_permissions_and_references():
     parent = TestEntities.get("PAGE", {"name": "Parent", "hash": "pgfile1"})

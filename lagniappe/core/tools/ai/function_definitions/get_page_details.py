@@ -47,8 +47,7 @@ GET_PAGE_DETAILS = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_page_details_includes_file_summaries_by_default
-# @features ai files pages tasks
-# @dimensions page-details summary projection exclusions
+# @matrix ai files pages tasks : exclusions page-details projection summary
 def execute_get_page_details(args, user):
     page_id = args.get("page_id")
     if not page_id:

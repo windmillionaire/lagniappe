@@ -169,6 +169,7 @@ def _install_harness(
         setup_app_engine=step("setup_app_engine"),
         configure_storage_buckets=step("configure_storage_buckets"),
         create_task_queue=step("create_task_queue"),
+        configure_data_protection=step("configure_data_protection"),
         create_ocr_processor=step("create_ocr_processor"),
         create_deferred_job_reconciler=step("create_deferred_job_reconciler", True),
     )
@@ -251,8 +252,7 @@ def _install_harness(
     return install_module, settings, events
 
 
-# @features setup
-# @dimensions prerequisites virtualenv
+# @matrix setup : prerequisites virtualenv
 def test_default_install_characterization_starts_empty_and_reaches_all_boundaries(
     monkeypatch,
     capsys,
@@ -270,6 +270,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
         "setup_app_engine",
         "configure_storage_buckets",
         "create_task_queue",
+        "configure_data_protection",
         "create_ocr_processor",
         "setup_auth_email",
         "setup_identity_platform",
@@ -289,6 +290,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
     assert "Manual deployment steps:" not in output
 
 
+# @matrix setup : explicit-project manual-deploy
 def test_default_install_only_prints_manual_deployment_steps_when_declined(
     monkeypatch,
     capsys,
@@ -302,12 +304,13 @@ def test_default_install_only_prints_manual_deployment_steps_when_declined(
     output = capsys.readouterr().out
     assert "Manual deployment steps:" in output
     assert "Review the generated YAML files" in output
+    assert "index.yaml --project project-1" in output
+    assert "lagniappe.yaml --project project-1" in output
     assert "Wrapping up installation..." not in output
     assert "deploy_to_app_engine" not in events
 
 
-# @pair setup:main-install
-# @pair ai-email:activation
+# @pairs ai-email:activation setup:main-install
 def test_default_install_activates_ai_email_after_deploy_and_jobs(
     monkeypatch,
 ):
@@ -339,8 +342,7 @@ def test_recovery_install_skips_optional_reconfiguration(monkeypatch):
     assert "settings.save" in events
 
 
-# @features setup
-# @dimensions recovery failure-isolation
+# @matrix setup : failure-isolation recovery
 def test_recovery_is_announced_before_dependency_or_provider_mutation(
     monkeypatch,
     tmp_path,
@@ -376,8 +378,7 @@ def test_recovery_is_announced_before_dependency_or_provider_mutation(
     assert "Recovery mode detected" in events[0][1]
 
 
-# @features setup
-# @dimensions prerequisites portability python-version virtualenv dependency-bootstrap focused-mode operation-journal gcloud-token
+# @matrix setup : dependency-bootstrap focused-mode gcloud-token operation-journal portability prerequisites python-version virtualenv
 def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
     from runner import gcloud as runner_gcloud
     import installer as setup_package
@@ -466,8 +467,7 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
     assert setup_package.verify_setup_runtime() is None
 
 
-# @features setup auth
-# @dimensions gcloud-token adc interactive explicit-command
+# @matrix auth setup : adc explicit-command gcloud-token interactive
 def test_setup_auth_uses_explicit_browser_flow(monkeypatch, capsys):
     from installer import auth
     from runner import gcloud as runner_gcloud
@@ -495,8 +495,7 @@ def test_setup_auth_uses_explicit_browser_flow(monkeypatch, capsys):
     )
 
 
-# @features setup
-# @dimensions gcloud-token safe-failure
+# @matrix setup : gcloud-token safe-failure
 def test_stale_gcloud_token_stops_with_setup_auth_instruction(
     monkeypatch,
     capsys,
@@ -527,8 +526,7 @@ def test_stale_gcloud_token_stops_with_setup_auth_instruction(
     assert "gcloud auth login" not in output
 
 
-# @features setup
-# @dimensions portability repository-root virtualenv generated-command instructions
+# @matrix setup : generated-command instructions portability repository-root virtualenv
 def test_portable_runtime_paths_commands_and_virtualenv_instructions():
     from runner import context as runner_context
 
@@ -582,8 +580,7 @@ def test_portable_runtime_paths_commands_and_virtualenv_instructions():
     assert "%*" in windows_launcher
 
 
-# @features setup
-# @dimensions recovery
+# @pair setup:recovery
 def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_write(
     monkeypatch,
     tmp_path,
@@ -702,8 +699,18 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         create_config,
         "_require_operator_permissions",
         lambda project_id, **kwargs: events.append(
-            ("permissions", project_id)
+            (
+                "permissions",
+                project_id,
+                "cli" if kwargs.get("client") is project_client else "adc",
+            )
         ),
+    )
+    project_client = object()
+    monkeypatch.setattr(
+        create_config,
+        "_gcloud_project_client",
+        lambda account: events.append(("cli-token", account)) or project_client,
     )
     monkeypatch.setattr(
         create_config,
@@ -730,17 +737,17 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         "_target_preflight",
         lambda project_id: events.append(("preflight", project_id)) or preflight,
     )
-    monkeypatch.setattr(
-        create_config,
-        "_ensure_adc_principal",
-        lambda account, project_id=None: {
+    def ensure_adc(account, project_id=None):
+        events.append(("adc-auth", account, project_id))
+        return {
             "state": "success",
             "principal": deployer,
             "project": recovered_project,
             "quota_project": recovered_project,
             "error": None,
-        },
-    )
+        }
+
+    monkeypatch.setattr(create_config, "_ensure_adc_principal", ensure_adc)
     monkeypatch.setattr(
         create_config,
         "_display_install_identity_summary",
@@ -800,9 +807,13 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         f"runtime@{recovered_project}.iam.gserviceaccount.com"
     )
     assert ("preflight", recovered_project) in events
-    assert ("permissions", recovered_project) in events
+    assert ("permissions", recovered_project, "cli") in events
+    assert ("permissions", recovered_project, "adc") in events
     assert ("verify", recovered_project, {"projectNumber": "123456"}) in events
-    assert events.index(("permissions", recovered_project)) < events.index(
+    assert events.index(
+        ("permissions", recovered_project, "cli")
+    ) < events.index(("adc-auth", deployer, recovered_project))
+    assert events.index(("permissions", recovered_project, "adc")) < events.index(
         ("verify", recovered_project, {"projectNumber": "123456"})
     )
     assert events.index(
@@ -843,8 +854,7 @@ def _recovery_provider_settings():
     }
 
 
-# @features setup
-# @dimensions recovery provider-discovery failure-isolation
+# @matrix setup : failure-isolation provider-discovery recovery
 def test_recovery_provider_states_distinguish_absent_from_unavailable(monkeypatch):
     from installer import recovery
 
@@ -870,8 +880,7 @@ def test_recovery_provider_states_distinguish_absent_from_unavailable(monkeypatc
     assert recovery._probe_gcloud_json(["three"])["state"] == recovery.UNAVAILABLE
 
 
-# @features setup
-# @dimensions recovery provider-discovery project-identity project-number
+# @matrix setup : project-identity project-number provider-discovery recovery
 def test_recovery_provider_discovery_targets_only_recovered_project(monkeypatch):
     from installer import recovery
 
@@ -1045,8 +1054,7 @@ def test_recovery_provider_discovery_targets_only_recovered_project(monkeypatch)
     assert ocr_calls == []
 
 
-# @features setup
-# @dimensions recovery provider-discovery repair keyless-config
+# @matrix setup : keyless-config provider-discovery recovery repair
 def test_recovery_reports_missing_signing_setup_as_repairable_drift(monkeypatch):
     from installer import recovery
 
@@ -1153,8 +1161,7 @@ def test_recovery_reports_missing_signing_setup_as_repairable_drift(monkeypatch)
     }
 
 
-# @features setup
-# @dimensions recovery provider-discovery project-identity failure-isolation
+# @matrix setup : failure-isolation project-identity provider-discovery recovery
 def test_recovery_provider_mismatch_or_unavailable_stops_before_mutation(
     monkeypatch,
 ):
@@ -1241,8 +1248,7 @@ def test_recovery_provider_mismatch_or_unavailable_stops_before_mutation(
         recovery.verify_recovery_resources(settings, "recovered-project-1")
 
 
-# @features setup
-# @dimensions cli-routing cli-status lazy-imports
+# @matrix setup : cli-routing cli-status lazy-imports
 @pytest.mark.parametrize(("arguments", "entry_point"), CLI_MODES)
 def test_cli_subprocess_routes_every_mode_and_returns_status(arguments, entry_point):
     status = 7
@@ -1255,8 +1261,7 @@ def test_cli_subprocess_routes_every_mode_and_returns_status(arguments, entry_po
         assert "CALL verify" in result.stdout
 
 
-# @features setup
-# @dimensions failure-propagation unexpected-errors
+# @matrix setup : failure-propagation unexpected-errors
 @pytest.mark.parametrize(("arguments", "entry_point"), CLI_MODES)
 def test_cli_subprocess_provider_failures_are_nonzero(arguments, entry_point):
     result = _run_cli(arguments, behavior="raise")
@@ -1266,8 +1271,7 @@ def test_cli_subprocess_provider_failures_are_nonzero(arguments, entry_point):
     assert "provider failure" in result.stdout
 
 
-# @features setup
-# @dimensions cli-status failure-propagation
+# @matrix setup : cli-status failure-propagation
 def test_cli_subprocess_treats_none_cancellation_as_failure():
     result = _run_cli([], behavior="cancel")
 
@@ -1275,8 +1279,7 @@ def test_cli_subprocess_treats_none_cancellation_as_failure():
     assert "CALL install" in result.stdout
 
 
-# @features setup
-# @dimensions argument-validation cli-routing
+# @matrix setup : argument-validation cli-routing
 def test_cli_subprocess_rejects_multiple_or_dashed_commands():
     result = _run_cli(["url", "ai"], status=0)
 
@@ -1319,6 +1322,7 @@ REMOTE_MUTATION_BOUNDARIES = (
     "setup_app_engine",
     "configure_storage_buckets",
     "create_task_queue",
+    "configure_data_protection",
     "create_ocr_processor",
     "setup_auth_email",
     "setup_identity_platform",
@@ -1433,8 +1437,7 @@ def test_settings_save_targets_only_requested_file(monkeypatch):
     assert writes == ["APP_SETTINGS_YAML"]
 
 
-# @features setup
-# @dimensions process-lock operation-journal recovery
+# @matrix setup : operation-journal process-lock recovery
 def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
     lock_path = tmp_path / "installer.lock"
     journal_path = tmp_path / "operation.json"

@@ -30,8 +30,7 @@ GET_PAGE_TASKS = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_page_tasks_returns_active_and_completed_tasks
-# @features ai tasks
-# @dimensions page-task-context active completed
+# @matrix ai tasks : active completed page-task-context
 def execute_get_page_tasks(args, user):
     page_id = args.get("page_id")
     if not page_id:

@@ -1,6 +1,6 @@
 import json
 
-from flask import abort, g, request
+from flask import abort, request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
@@ -15,8 +15,20 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.entities import Entities, index
-from lagniappe.core.tools import ai, database, dates, task_combine
-from lagniappe.core.tools.form_state import is_form_field, offline_replay_conflicts
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools import collaboration
+from lagniappe.core.tools.auth.references import (
+    SubmittedReferenceResolver,
+    UNAVAILABLE_REFERENCE_ERROR,
+)
+from lagniappe.core.tools.auth.task_attachments import (
+    sign_task_attachment_claim,
+    valid_task_attachment_claim,
+)
+from lagniappe.core.tools.tasks import combine as task_combine
+from lagniappe.core.tools.tasks import scheduling
+from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
 from lagniappe.web.auth import (
     abort_public_user_action,
     logged_in,
@@ -32,8 +44,7 @@ from . import tasks
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
-# @features public-users
-# @dimensions ai-schedule-guard
+# @pair public-users:ai-schedule-guard
 def _ai_schedule_requested(form):
     schedule_type = form.get("schedule-type")
     return bool(
@@ -47,10 +58,7 @@ def _ai_schedule_requested(form):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_tasks_table_columns
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_allows_own_page_only_users
-# @features task-index
-# @dimensions columns
-# @pair task-index:columns
-# @pair task-index:authenticated-access
+# @matrix task-index : authenticated-access columns
 # @pair permissions:own-page-only
 @tasks.route("/index", methods=["GET"])
 @logged_in
@@ -63,10 +71,7 @@ def task_index():
 # @testable true
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_name_sort_ascending_reorders_rows
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_allows_own_page_only_users
-# @features table-controls
-# @dimensions sorting sort-asc name
-# @pair task-index:authenticated-access
-# @pair permissions:own-page-only
+# @pairs permissions:own-page-only table-controls:sort-asc task-index:authenticated-access
 @tasks.route("/rows", methods=["GET"])
 @logged_in
 def rows():
@@ -80,7 +85,9 @@ def rows():
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
-# @pairs ai:completion-refresh tasks:autofill tasks:deferred
+# @matrix tasks : autofill deferred
+# @matrix tasks : create readonly
+# @pair ai:completion-refresh
 @tasks.route("/<key>/replace", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW)
 def get(key, **kwargs):
@@ -110,8 +117,8 @@ def settings(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_empty_form_structure_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_title_link_opens_backing_page_task
-# @features tasks
-# @dimensions permission-gates readonly assignee attached-form empty-fields row-link page-task focus
+# @matrix tasks : assignee attached-form empty-fields focus page-task permission-gates readonly row-link
+# @pair permissions:resource-gates
 @tasks.route("<key>", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW)
 def view(key, **kwargs):
@@ -125,6 +132,7 @@ def view(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
+# @pair entities:delete
 @tasks.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.TASK, Action.DELETE)
 def delete(key, **kwargs):
@@ -144,8 +152,7 @@ def delete(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_can_move_to_another_page
-# @features tasks
-# @dimensions move completed title-menu
+# @matrix tasks : completed move title-menu
 @tasks.route("<key>/move", methods=["PUT"])
 @permission(Resource.TASK, Action.EDIT)
 def move(key, **kwargs):
@@ -173,14 +180,10 @@ def move(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_history_routes_are_forbidden_without_permission
-# @pairs task-combine:compatible task-combine:same-page
-# @pairs task-combine:same-model task-combine:no-model
-# @pairs task-combine:view-page task-combine:linked-page
-# @pairs web-headers:no-store
-# @pairs task-combine:migrate-history task-combine:delta
-# @pairs task-combine:authorization
+# @matrix task-combine : authorization compatible delta linked-page migrate-history no-model same-model same-page view-page
+# @pair web-headers:no-store
 @tasks.route("<key>/combine", methods=["GET", "PUT"])
-@permission(Resource.TASK, Action.DELETE)
+@permission(Resource.TASK, Action.DELETE, no_store=True)
 def combine(key, **kwargs):
     task = kwargs["entity"]
     page_key = request.args.get("page")
@@ -189,7 +192,6 @@ def combine(key, **kwargs):
         abort(404)
 
     if request.method == "GET":
-        g.NO_CACHE = True
         compatible = task_combine.compatible_tasks(task, page, current_user)
         return responses.task_combine_form(task, compatible)
 
@@ -221,10 +223,12 @@ def _upload_assets_payload(request):
 
     try:
         assets = json.loads(raw_assets or "{}")
-    except json.JSONDecodeError:
-        return {}
+    except json.JSONDecodeError as error:
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR) from error
 
-    return assets if isinstance(assets, dict) else {}
+    if not isinstance(assets, dict):
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+    return assets
 
 
 # @testable false
@@ -251,10 +255,26 @@ def _asset_file_keys(assets):
 # @testable false
 # @covered-by lagniappe/web/routes/tasks/main.py::upload_file
 # @reason upload route response shaping owns task asset entry creation
-def _add_file_to_assets(assets, file):
+def _add_file_to_assets(assets, file, *, attachment_claim=None):
     assets = dict(assets or {})
-    assets[file.filename or file.name or file.hash] = file.details
+    details = dict(file.details)
+    if attachment_claim:
+        details["attachment_claim"] = attachment_claim
+    assets[file.filename or file.name or file.hash] = details
     return assets
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/tasks/main.py::task_data
+# @reason claim lookup is exercised through task mutation data assembly
+def _asset_claims(assets, file_key):
+    return [
+        definition.get("attachment_claim")
+        for definition in (assets or {}).values()
+        if isinstance(definition, dict)
+        and (definition.get("key") or definition.get("id")) == file_key
+        and definition.get("attachment_claim")
+    ]
 
 
 # @testable false
@@ -301,8 +321,7 @@ def _task_base_data(request):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_form
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
-# @features tasks
-# @dimensions create attach-form
+# @matrix tasks : attach-form create
 def _task_form_data(loaded, request):
     return {"form": loaded.get(request.form.get("form"))}
 
@@ -310,8 +329,7 @@ def _task_form_data(loaded, request):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_project
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
-# @features tasks
-# @dimensions create project-link model-task-link badge
+# @matrix tasks : badge create model-task-link project-link
 def _task_project_data(loaded, request):
     return {
         "model": loaded.get(request.form.get("model")),
@@ -321,8 +339,7 @@ def _task_project_data(loaded, request):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
-# @features tasks
-# @dimensions create assignee badge
+# @matrix tasks : assignee badge create
 def _task_assignee_data(loaded, request):
     return {"assigned_to": loaded.get(request.form.get("assigned_to"))}
 
@@ -331,16 +348,14 @@ def _task_assignee_data(loaded, request):
 # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_due_date
 # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_remove_due_date
 # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_due_today
-# @features task-scheduling
-# @dimensions due-date add remove today
+# @matrix task-scheduling : add due-date remove today
 def _task_scheduling_due_date_data(request):
     return request.form.get("due-date")
 
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_due_date
-# @features tasks
-# @dimensions create due-date badge
+# @matrix tasks : badge create due-date
 def _task_create_due_date_data(request):
     return _task_scheduling_due_date_data(request)
 
@@ -354,59 +369,194 @@ def task_data(request, page, task=None):
     """Resolve form data into a dict suitable for Task.create() or Task.update()."""
     assets = _upload_assets_payload(request)
     asset_file_keys = _asset_file_keys(assets)
-    submitted_page_key = request.form.get("page")
+    if "page" in request.form:
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
 
-    entities = [page, task]
-    for e in ["form", "assigned_to", "project", "model"]:
-        entities.extend(request.form.getlist(e))
-    if submitted_page_key:
-        entities.append(submitted_page_key)
-    entities.extend(asset_file_keys)
-    loaded = {
-        e.urlsafe_key: e for e in Entities.fetch(*entities, request=Fetch.direct())
-    }
+    form_key = request.form.get("form")
+    assignee_key = request.form.get("assigned_to")
+    project_key = request.form.get("project")
+    model_key = request.form.get("model")
+    resolver = SubmittedReferenceResolver(
+        current_user,
+        form_key,
+        assignee_key,
+        project_key,
+        model_key,
+        *asset_file_keys,
+    )
 
-    if submitted_page_key:
-        page = loaded.get(submitted_page_key)
-    elif page and page.urlsafe_key in loaded:
-        page = loaded[page.urlsafe_key]
+    current_form = task.form if task else None
+    form = resolver.one(
+        form_key,
+        expected=Entities.FORM,
+        action=Action.VIEW,
+        existing=current_form,
+        predicate=lambda selected: selected.form_type == "task",
+    )
+    if not form_key and current_form and not current_form.allowed(
+        Action.VIEW, user=current_user
+    ):
+        form = current_form
+
+    current_tracking = (task.model or task.project) if task else None
+
+    # @testable false
+    # @covered-by lagniappe/web/routes/tasks/main.py::task_data
+    # @reason tracking constraints are part of aggregate task reference validation
+    def tracking_reference_valid(selected):
+        if not isinstance(selected, Entities.MODEL_TASK) or not selected.form:
+            return True
+        return bool(
+            selected.form.form_type == "task"
+            and selected.form.allowed(Action.VIEW, user=current_user)
+        )
+
+    project_selection = resolver.one(
+        project_key,
+        expected=(Entities.PROJECT, Entities.MODEL_TASK),
+        action=Action.VIEW,
+        existing=[task.model, task.project] if task else None,
+        predicate=tracking_reference_valid,
+    )
+    model_selection = resolver.one(
+        model_key,
+        expected=Entities.MODEL_TASK,
+        action=Action.VIEW,
+        existing=task.model if task else None,
+        predicate=tracking_reference_valid,
+    )
+    model = (
+        project_selection
+        if isinstance(project_selection, Entities.MODEL_TASK)
+        else model_selection
+    )
+    project = (
+        project_selection
+        if isinstance(project_selection, Entities.PROJECT)
+        else model.project if model else None
+    )
+    if model_selection and model and model_selection.key != model.key:
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+    model = model_selection or model
+    if model and project and (
+        not model.project or model.project.key != project.key
+    ):
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+    if not model_key and not project_key and current_tracking and not current_tracking.allowed(
+        Action.VIEW, user=current_user
+    ):
+        model = task.model
+        project = task.project
+
+    current_assignee = task.assigned_to if task else None
+
+    # @testable false
+    # @covered-by lagniappe/web/routes/tasks/main.py::task_data
+    # @reason assignment policy is part of aggregate task reference validation
+    def assignee_authorized(selected):
+        return bool(
+            selected.user
+            and collaboration.recipient_allowed(
+                current_user,
+                selected.user,
+                channel="assign",
+            )
+        )
+
+    assigned_to = resolver.one(
+        assignee_key,
+        expected=Entities.PAGE,
+        existing=current_assignee,
+        predicate=lambda selected: bool(selected.user),
+        authorize=assignee_authorized,
+    )
+    if (
+        not assignee_key
+        and current_assignee
+        and (
+            not current_assignee.allowed(Action.VIEW, user=current_user)
+            or not assignee_authorized(current_assignee)
+        )
+    ):
+        assigned_to = current_assignee
 
     task_data = {
         **_task_base_data(request),
         "page": page,
-        "task": loaded.get(request.form.get("task")),
-        **_task_form_data(loaded, request),
-        **_task_project_data(loaded, request),
-        **_task_assignee_data(loaded, request),
+        "task": None,
+        "form": form,
+        "model": model,
+        "project": project,
+        "assigned_to": assigned_to,
         "due_date": _task_create_due_date_data(request),
     }
 
     if assets is not None:
-        task_data["asset_files"] = [
-            loaded[key]
-            for key in asset_file_keys
-            if key in loaded and isinstance(loaded[key], Entities.FILE)
+        existing_files = list(task.files) if task else []
+        scope = task or page
+
+        def file_authorized(file):
+            return file.allowed(Action.VIEW, user=current_user) or any(
+                valid_task_attachment_claim(
+                    claim,
+                    actor=current_user,
+                    file=file,
+                    scope=scope,
+                )
+                for claim in _asset_claims(assets, file.urlsafe_key)
+            )
+
+        selected_files = resolver.many(
+            asset_file_keys,
+            expected=Entities.FILE,
+            existing=existing_files,
+            authorize=file_authorized,
+        )
+        selected_keys = {file.key for file in selected_files}
+        preserved_files = [
+            file
+            for file in existing_files
+            if file.key not in selected_keys
+            and not file.allowed(Action.VIEW, user=current_user)
         ]
+        task_data["asset_files"] = [*selected_files, *preserved_files]
 
     return task_data
 
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_file
-# @features tasks
-# @dimensions file-upload async-upload
+# @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_new_task_attachment_claim_is_required_and_scope_bound
+# @matrix tasks : async-upload file-upload signed-claim
 @tasks.route("<key>/upload-file", methods=["POST"])
 @permission(requested=Action.EDIT)
 def upload_file(key, **kwargs):
     abort_public_user_action()
 
+    try:
+        existing_assets = _upload_assets_payload(request)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
+
     file = _create_task_file()
     if not file:
         return responses.error("No file uploaded")
 
-    assets = _add_file_to_assets(_upload_assets_payload(request), file)
+    scope = kwargs["entity"]
+    attachment_claim = sign_task_attachment_claim(
+        actor=current_user,
+        file=file,
+        scope=scope,
+    )
+    assets = _add_file_to_assets(
+        existing_assets,
+        file,
+        attachment_claim=attachment_claim,
+    )
+    details = dict(file.details)
+    details["attachment_claim"] = attachment_claim
 
-    return responses.json_response({"assets": assets, "file": file.details})
+    return responses.json_response({"assets": assets, "file": details})
 
 
 # @testable false
@@ -447,7 +597,7 @@ def _autofill_data(task, request):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
-# @pairs tasks:complete tasks:readonly tasks:partial-submission
+# @matrix tasks : complete partial-submission readonly
 def _should_submit_task_form(active, role, task):
     if "TaskForm" not in active:
         return False
@@ -457,14 +607,13 @@ def _should_submit_task_form(active, role, task):
 # @testable true
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_task_from_home_page
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task
+# @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_due_date
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_empty_form_is_readonly
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
-# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_offline_replay_rejects_a_stale_origin_fingerprint
-# @features tasks
-# @dimensions complete due-date readonly assignee permission-gates attached-form empty-fields partial-submission
-# @pairs tasks:no-mutation offline:replay-precondition forms:conflict-review
+# @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page
+# @matrix tasks : assignee attached-form complete due-date empty-fields partial-submission permission-gates readonly submitted-reference
 @tasks.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.TASK, Action.EDIT)
 def update(key, **kwargs):
@@ -494,11 +643,20 @@ def update(key, **kwargs):
             "The autofill attachment was not uploaded. Try attaching it again."
         )
 
+    update_data = None
+    if "TaskSettings" in active:
+        try:
+            update_data = task_data(request, task.page, task)
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
+
     if _should_submit_task_form(active, role, task):
-        task.form_submission(request)
+        try:
+            task.form_submission(request, actor=current_user)
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
 
     if "TaskSettings" in active:
-        update_data = task_data(request, task.page, task)
         try:
             task.update(update_data)
         except exceptions.ValidationError as e:
@@ -568,8 +726,7 @@ def update_direct(key, **kwargs):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_creates_task_with_reduced_schedule_options
-# @features tasks
-# @dimensions create basic
+# @matrix tasks : basic create
 @tasks.route("<key>/create", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def create(key, **kwargs):
@@ -615,15 +772,14 @@ def create_direct(key, **kwargs):
 # @testable true
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_today
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_in_four_days
-# @features tasks
-# @dimensions create-personal due-date
+# @matrix tasks : create-personal due-date
 @tasks.route("<key>/personal", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def personal(key, **kwargs):
     """Create a quick task on the current user's own page (from home)."""
     page = kwargs["entity"]
-    create_data = task_data(request, page)
     try:
+        create_data = task_data(request, page)
         task = Entities.TASK.create(create_data)
     except exceptions.ValidationError as e:
         return responses.error(str(e))
@@ -646,8 +802,7 @@ def personal_direct(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_appears_after_completion_cycle
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_history_routes_are_forbidden_without_permission
-# @features tasks
-# @dimensions history completion-cycle reload
+# @matrix tasks : completion-cycle history reload
 @tasks.route("<key>/history", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW)
 def history(key, **kwargs):
@@ -666,7 +821,7 @@ def history(key, **kwargs):
 # @reason response shaping is exercised through the home task mutation routes
 def _home_task_response(task):
     due = task.properties.due_date.value
-    if not task.completed and dates.due_in_home_task_window(due):
+    if not task.completed and scheduling.due_in_home_task_window(due):
         return responses.home_task(task)
 
     return responses.home_task_removed()
@@ -675,14 +830,14 @@ def _home_task_response(task):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_history_routes_are_forbidden_without_permission
-# @features tasks
-# @dimensions history-fill latest-submission
+# @matrix tasks : history-fill latest-submission
+# @pair tasks:history
 @tasks.route("<key>/history/latest-submission", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW)
 def latest_history_submission(key, **kwargs):
     task = kwargs["entity"]
     history = Entities.fetch_one(
-        database.get.latest_task_history(task), request=Fetch.direct()
+        database_get.latest_task_history(task), request=Fetch.direct()
     )
     submission = history.properties.submission.form_value if history else {}
     return responses.json_response({"latest_submission": submission})
@@ -690,8 +845,7 @@ def latest_history_submission(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-# @features tasks
-# @dimensions history-fill repeating-default patch
+# @matrix tasks : history-fill patch repeating-default
 @tasks.route("<key>/default-submission", methods=["PATCH"])
 @permission(Resource.TASK, Action.EDIT)
 def save_default_field(key, **kwargs):
@@ -704,7 +858,7 @@ def save_default_field(key, **kwargs):
         return responses.error("A submission field is required")
 
     history = Entities.fetch_one(
-        database.get.latest_task_history(task), request=Fetch.direct()
+        database_get.latest_task_history(task), request=Fetch.direct()
     )
     if not history:
         return responses.error("No task history is available")
@@ -726,8 +880,7 @@ def _delete_file_if_unreferenced(file):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_file
-# @features tasks
-# @dimensions file-upload remove attachment
+# @matrix tasks : attachment file-upload remove
 @tasks.route("<key>/files/<file_key>", methods=["DELETE"])
 @permission(Resource.TASK, Action.EDIT)
 def delete_file(key, file_key, **kwargs):
@@ -736,10 +889,17 @@ def delete_file(key, file_key, **kwargs):
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
     file = Entities.fetch_one(file_key, request=Fetch.direct())
-    if not file or file.key not in task.properties.files.keys:
+    if (
+        not isinstance(file, Entities.FILE)
+        or file.key not in task.properties.files.keys
+        or not file.allowed(Action.VIEW, user=current_user)
+    ):
         return responses.not_found("File not found")
 
-    assets = _upload_assets_payload(request) or task.properties.files.preload
+    try:
+        assets = _upload_assets_payload(request) or task.properties.files.preload
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     assets = _remove_file_from_assets(assets, file.urlsafe_key)
     task.properties.files.remove(file)
     task.save()
@@ -760,9 +920,8 @@ def delete_file(key, file_key, **kwargs):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_updates_editable_cell
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_saved_filter_quick_edit_persists_attached_form_checkbox
-# @features task-index
-# @dimensions quick-edit editable-cell
-# @pairs filters:quick-edit filters:attached-form filters:checkbox filters:reload-persistence
+# @matrix filters : attached-form checkbox quick-edit reload-persistence
+# @pair task-index:quick-edit
 @tasks.route("<key>/patch", methods=["PATCH"])
 @permission(Resource.TASK, Action.EDIT)
 def patch(key, **kwargs):
@@ -803,6 +962,14 @@ def patch(key, **kwargs):
             return responses.error("Field cannot be edited")
         if not field.editable:
             return responses.error("Field cannot be edited")
+        try:
+            task.validate_browser_submission_references(
+                {schema_id: value},
+                actor=current_user,
+                normalized=True,
+            )
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
         field = task.properties.submission.patch(schema_id, value)
         task.save_submission()
 
@@ -818,8 +985,7 @@ def patch(key, **kwargs):
 # @testable true
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_task_from_home_page
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_recurring_task_from_home_page_reappears
-# @features tasks
-# @dimensions complete recurring
+# @matrix tasks : complete recurring
 @tasks.route("/<key>/complete", methods=["PUT"])
 @permission(Resource.TASK, Action.EDIT)
 def complete(key, **kwargs):
@@ -849,8 +1015,7 @@ def complete(key, **kwargs):
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_this_week
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_next_week
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_no_due_date
-# @features tasks
-# @dimensions postpone due-date
+# @matrix tasks : due-date postpone
 @tasks.route("/<key>/change-due-date", methods=["PUT"])
 @permission(Resource.TASK, Action.EDIT)
 def change_due_date(key, **kwargs):

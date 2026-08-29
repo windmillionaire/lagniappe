@@ -13,6 +13,7 @@ FormBuilder
   ├── ConditionPanel     (overlay for editing conditions/options/columns)
   │     └── Condition instances (visibility, status, options, columns, html)
   ├── Header             (form name, save button, preview toggle)
+  ├── SearchBox + OfflineModal (standalone shell services)
   └── Sortable instances (drag-and-drop via SortableJS)
 ```
 
@@ -20,7 +21,9 @@ The builder is a standalone view -- it does not use the Core/Component/Widget sy
 
 ## FormBuilder (`builder.mjs`)
 
-The main controller class. Owns the element map, sortable instances, and all panel references.
+The main controller class. Owns the element map, sortable instances, all panel
+references, the global SearchBox mounted for this standalone view, and its
+OfflineModal.
 
 ### State
 
@@ -38,6 +41,12 @@ The main controller class. Owns the element map, sortable instances, and all pan
 3. Creates `ModelElement` DOM nodes and element entries for each schema item
 4. Initializes SortableJS on both the components palette and the model panel
 5. Sets up the global click handler
+
+Search initialization may finish after the rest of the view. The Builder
+stores the instance before awaiting initialization; teardown destroys it
+immediately, and the late completion path destroys it again safely rather than
+publishing. OfflineModal enablement similarly uses one removable trigger
+listener.
 
 ### Schema Management
 
@@ -63,6 +72,10 @@ Two linked SortableJS groups:
 ### Conditions
 
 **`showCondition(name, index)`** -- loads or retrieves a condition editor for the given schema property (`visibility`, `status`, `options`, `columns`, `html`). Opens it in the condition panel. The `index` parameter determines whether it's creating new (-1) or editing existing.
+
+Async condition loading and initialization retain the selected element as the
+publication owner. If selection changes or the Builder is destroyed, a newly
+loaded condition is destroyed instead of being opened.
 
 **`getEligibleConditionTargets()`** -- returns checkbox, radio, and select elements (excluding the selected element) as potential visibility/status condition targets.
 
@@ -124,9 +137,15 @@ restrictions.
 and appended to the model. Supports an "explain" mode that shows the AI's prompt
 interpretation in an Initial Prompt modal. The modal shows only the starting
 prompt; later tool or search context is dynamic and is not part of the preview.
+Generation is single-flight. Failure leaves its form error visible and releases
+the submitter for retry. Because schema generation persists its response on the
+server, the Builder only accepts that response as a saved acknowledgement when
+generation began from a saved form and the live schema/name still exactly match
+the acknowledged response; otherwise the Builder stays unsaved.
 
 It also wires group restriction selection through `FacetsBox` and updates
-restriction rows through the route configured in the template.
+restriction rows through the route configured in the template. A failed row
+removal restores its button, opacity, and pointer behavior so it can be retried.
 
 ### ConditionPanel (`panels/condition.mjs`)
 
@@ -142,7 +161,20 @@ Controls for the form name (inline editable), save button, and preview toggle.
 
 **Preview toggle**: Creates a `Renderer` instance with the current schema and renders a live preview of the form. Expands the builder layout and hides the model panel while previewing.
 
-**Save button**: PUTs the save form data to the server. Disables during save, shows saved/error state.
+Preview rendering uses a generation guard. A renderer that finishes after a
+new toggle or Builder teardown destroys its detached resources and cannot
+reopen the preview.
+
+**Save button**: PUTs the schema/name snapshot to the server through one
+single-flight promise. While pending, it is disabled and exposes `aria-busy`.
+Only an explicit successful response can acknowledge the submitted snapshot;
+if the live schema or name changed in the meantime, the form remains unsaved.
+Failure leaves an error in the Builder's polite live region and releases the
+connected button in `finally`, including its accessibility and focus state, so
+the same action can be retried. Connectivity continues to own whether the save
+control is visible. Copy and restriction actions use the same retryable-failure
+rule, except successful copy navigation and successful row removal are terminal
+and do not restore the old control.
 
 Readonly builders keep the component palette, settings, schema manipulation,
 and preview interactions available for exploration. Persistence controls are
@@ -174,6 +206,12 @@ Conditions are property editors that open in the ConditionPanel. Each condition 
 | `Columns` | `columns` | `Condition` | Add/edit table columns. Select for column type (from `CONFIG.TABLE_COLUMNS`), input for column name, auto-generates a hashed ID. |
 | `HtmlEditor` | `html` | `Condition` | Opens an `IndependentDocument` editor for rich text content. Expands the builder layout. Only initializes once. |
 
+`HtmlEditor` registers its `IndependentDocument` with `FormBuilder`. The builder
+owns hidden-view and reconnect flushes, while condition destruction unregisters
+the document before cleanup. This keeps teardown from initiating an untracked
+save and gives pending HTML one explicit keepalive flush opportunity when the
+page is hidden.
+
 ### Progressive Disclosure
 
 Conditions use a progressive UI pattern -- each step reveals the next input:
@@ -183,6 +221,18 @@ Conditions use a progressive UI pattern -- each step reveals the next input:
 3. Submit button appears when `this.complete = true`
 
 The `showProgress()` method is called after each step to check if new inputs should be shown and whether the form is complete.
+
+## Teardown
+
+`FormBuilder.destroy()` is idempotent and owns the complete standalone view
+inventory: SearchBox, OfflineModal, Components/Model/Settings/Condition/Form
+Settings/Header panels, EntityMenu, active element conditions, independent
+documents, and the document click listener. Panel classes remove the exact
+delegated listeners they installed and destroy Sortable/combobox/form/modal
+children. Conditions destroy their current `BaseForm`, child controls, and
+feedback timers; rebuilt column editors replace their exact `updated` handler
+instead of accumulating listeners. Async saves and mutation responses may
+finish, but re-check destruction before changing connected UI or navigating.
 
 ## Config (`config.mjs`)
 

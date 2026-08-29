@@ -11,8 +11,7 @@ from ..mixins import ColumnMixin
 
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_task_index
-# @features task-index
-# @dimensions table, columns
+# @matrix task-index : columns table
 class TaskTable(Columns):
     _id = "table"
     _kind = "task"
@@ -40,8 +39,7 @@ class TaskTable(Columns):
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
 # @tests tests_unit/test_010_task_index.py::test_task_history_index_includes_attachments_column
 # @tests tests_unit/test_010_task_index.py::test_task_history_index_includes_snapshot_columns
-# @features tasks
-# @dimensions history completion-cycle reload table columns name description attachments
+# @matrix tasks : attachments columns completion-cycle description history name reload table
 class TaskHistoryTable(Columns):
     _id = "table"
     _kind = "task"
@@ -89,8 +87,7 @@ class TaskHistoryTable(Columns):
 
 # @testable true
 # @tests tests_unit/test_004a_form_index.py::test_form_index_table
-# @features form-index
-# @dimensions table, columns
+# @matrix form-index : columns table
 class FormTable(Columns):
     _id = "table"
     _kind = "form"
@@ -105,8 +102,7 @@ class FormTable(Columns):
 
 # @testable true
 # @tests tests_unit/test_009_user_index.py::test_user_index
-# @features user-index
-# @dimensions table, columns
+# @matrix user-index : columns table
 class UserTable(Columns):
     _id = "table"
     _kind = "user"

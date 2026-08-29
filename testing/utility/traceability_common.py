@@ -12,7 +12,7 @@ import subprocess
 from typing import Iterable
 
 
-TRACEABILITY_SCHEMA_VERSION = 2
+TRACEABILITY_SCHEMA_VERSION = 3
 TEST_RUN_SCHEMA_VERSION = 3
 TEST_EVIDENCE_DIR = Path("testing/evidence")
 LATEST_TEST_RUN = TEST_EVIDENCE_DIR / "latest.json"

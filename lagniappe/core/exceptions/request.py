@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 import re
+from urllib.parse import urlsplit
 
 from flask import has_request_context, request
 
@@ -172,8 +173,50 @@ def _sanitize_text(value, *, limit=MAX_CONTEXT_STRING_LENGTH):
 
 # @testable false
 # @covered-by lagniappe/core/exceptions/request.py::sanitize_error_context
+# @reason URL parsing is exercised through the public context sanitizer
+def _sanitize_url(value):
+    metadata = {
+        "parseable": False,
+        "has_path": False,
+        "has_query": False,
+        "has_fragment": False,
+        "has_credentials": False,
+    }
+    if not isinstance(value, str):
+        return metadata
+
+    try:
+        parsed = urlsplit(value)
+        host = parsed.hostname
+        port = parsed.port
+    except (TypeError, ValueError):
+        return metadata
+
+    metadata.update(
+        {
+            "parseable": bool(parsed.scheme and host),
+            "has_path": bool(parsed.path),
+            "has_query": bool(parsed.query),
+            "has_fragment": bool(parsed.fragment),
+            "has_credentials": parsed.username is not None
+            or parsed.password is not None,
+        }
+    )
+    if parsed.scheme:
+        metadata["scheme"] = _sanitize_text(parsed.scheme.casefold(), limit=16)
+    if host:
+        metadata["host"] = _sanitize_text(host.casefold(), limit=MAX_CONTEXT_KEY_LENGTH)
+    if port is not None:
+        metadata["port"] = port
+    return metadata
+
+
+# @testable false
+# @covered-by lagniappe/core/exceptions/request.py::sanitize_error_context
 # @reason recursion details are owned by the public context sanitizer
 def _sanitize_value(value, *, key=None, depth=0):
+    if key is not None and _normalized_key(key) == "url":
+        return _sanitize_url(value)
     if key is not None and _is_sensitive_key(key):
         return REDACTED
     if depth >= MAX_CONTEXT_DEPTH:
@@ -209,8 +252,8 @@ def _sanitize_value(value, *, key=None, depth=0):
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_error_context_sanitizer_redacts_nested_secrets_and_bounds_payloads
-# @features error-reporting
-# @dimensions privacy redaction payload-bounds
+# @tests tests_unit/test_001_test_general_and_utilities.py::test_error_context_sanitizer_replaces_urls_with_bounded_metadata
+# @matrix error-reporting : payload-bounds privacy redaction url-metadata
 def sanitize_error_context(value):
     """Return a bounded, serialization-safe copy with sensitive values removed."""
     return _sanitize_value(value)
@@ -247,8 +290,7 @@ def _bounded_content_length(content_length):
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_request_info_uses_bounded_structural_allowlist
-# @features error-reporting
-# @dimensions privacy request-context payload-bounds
+# @matrix error-reporting : payload-bounds privacy request-context
 def extract_request_info():
     """Extract bounded request structure without payload or identifier values."""
     if not has_request_context():
@@ -291,8 +333,7 @@ def extract_request_info():
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_sentry_event_sanitizer_removes_sdk_request_payloads
-# @features error-reporting
-# @dimensions privacy sentry-event request-context redaction payload-bounds
+# @matrix error-reporting : payload-bounds privacy redaction request-context sentry-event
 def sanitize_sentry_event(event, _hint=None):
     """Apply the privacy boundary to SDK-generated Sentry event fields."""
     if not isinstance(event, Mapping):
@@ -359,8 +400,7 @@ def _is_expected_ai_document_limit(event):
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_sentry_filter_drops_only_expected_ai_document_page_limit
-# @features error-reporting ai files
-# @dimensions expected-provider-failure pdf-page-limit privacy
+# @matrix ai error-reporting files : expected-provider-failure pdf-page-limit privacy
 def filter_sentry_event(event, hint=None):
     """Drop known user-input limits, then sanitize every reported error."""
     if _is_expected_ai_document_limit(event):

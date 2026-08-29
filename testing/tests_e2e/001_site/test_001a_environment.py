@@ -32,6 +32,8 @@ Test Isolation Strategy:
 """
 
 import json
+import os
+from types import SimpleNamespace
 from urllib.parse import urlsplit
 
 import pytest
@@ -41,10 +43,12 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database, notification_service
+from lagniappe.core.tools import cache
+from lagniappe.core.tools.database import core as database_core
+from lagniappe.core.tools.database import notifications as notification_database
 
 from testing.definitions import SitePages, Users
-from testing.utility import assert_same_etag
+from testing.utility.network import assert_same_etag
 
 pytestmark = pytest.mark.e2e
 
@@ -52,8 +56,36 @@ pytestmark = pytest.mark.e2e
 PREFIX = SETTINGS.test_config["PREFIX"]
 
 
-# @features database
-# @dimensions datastore-creation
+# @matrix test-session : health-nonce readiness server-identity
+# @matrix hosted-e2e : readiness server-identity
+def test_testing_health_identifies_the_exact_session(setup_test_server):
+    response = requests.get(f"{CONFIG.BASE_URL}/testing/health", timeout=5)
+    response.raise_for_status()
+    health = response.json()
+
+    if CONFIG.hosted_e2e_runner:
+        assert health == {
+            "ready": True,
+            "service": CONFIG.HOSTED_E2E_SERVICE,
+            "version": CONFIG.HOSTED_E2E_VERSION,
+            "source": CONFIG.HOSTED_E2E_SOURCE,
+            "source_snapshot": CONFIG.HOSTED_E2E_SOURCE_SNAPSHOT,
+            "build_id": CONFIG.HOSTED_E2E_BUILD_ID,
+        }
+        return
+
+    from runner.test_session import load_session_state
+
+    state = load_session_state()
+    assert health == {
+        "ready": True,
+        "mode": "local-e2e",
+        "session_nonce": os.environ["LAGNIAPPE_TEST_SESSION_NONCE"],
+        "pid": state["server"]["pid"],
+    }
+    assert setup_test_server.run_id == health["session_nonce"]
+
+
 def test_database_setup():
     """
     Verify test database entity kinds use the test prefix.
@@ -70,15 +102,13 @@ def test_database_setup():
         - FLASK_ENV not set to 'testing' when server started
         - PREFIX not correctly propagated to entity kind definitions
     """
-    for kind in database.core.KINDS:
+    for kind in database_core.KINDS:
         assert kind.value == f"{PREFIX}{kind.name}"
 
-    assert database.core.datastore is not None
+    assert database_core.datastore is not None
 
 
-# @pair cache:redis-connection
-# @pair cache:cleanup
-# @pair cache:index-recreation
+# @matrix cache : cleanup index-recreation redis-connection
 def test_cache_setup():
     """
     Verify Redis cache is connected and using test-prefixed index.
@@ -110,8 +140,6 @@ def test_cache_setup():
     assert cache.core.filter_cache.redis.ft(cache.core.filter_cache.INDEX).info()
 
 
-# @features storage
-# @dimensions bucket-creation
 def test_storage_setup():
     """
     Verify test GCS buckets exist in Cloud Storage with the test prefix.
@@ -129,10 +157,10 @@ def test_storage_setup():
         - Storage client unable to access/create buckets
         - PREFIX not correctly applied to bucket names
     """
-    data = database.core.DATA
+    data = database_core.DATA
     data.initialize()
 
-    for role in ("public", "private", "history", "export"):
+    for role in ("public", "private", "history"):
         data.bucket(role)
 
     storage = data.storage
@@ -140,7 +168,6 @@ def test_storage_setup():
         CONFIG.PUBLIC_BUCKET,
         CONFIG.PRIVATE_BUCKET,
         CONFIG.HISTORY_BUCKET,
-        CONFIG.EXPORT_BUCKET,
     ):
         bucket_name = f"{PREFIX}{config_name}"
         assert bucket_name.startswith(PREFIX)
@@ -148,8 +175,7 @@ def test_storage_setup():
         assert bucket.name == bucket_name
 
 
-# @features server
-# @dimensions initialization
+# @pair server:initialization
 def test_server_running(get_user):
     """
     Verify Flask test server is running and responding.
@@ -173,7 +199,7 @@ def test_server_running(get_user):
     expect(user.locate("body")).to_contain_text("pong")
 
 
-# @pairs notifications:ping notifications:redis-projection
+# @matrix notifications : ping redis-projection
 # @pair web-headers:notification-state
 def test_ping_notification_state_is_redis_only_and_optional(get_user):
     """A real notification reaches a reloaded page through the ping header."""
@@ -185,7 +211,7 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
     # cold aggregate repair and leave the projection one revision behind.
     existing = Entities.NOTIFICATION.keys_for_parent(user.entity)
     assert not existing
-    aggregate = notification_service.ensure_notification_aggregate(user.entity)
+    aggregate = notification_database.ensure_notification_aggregate(user.entity)
     cache.repair_notification_state(user.entity, existing, aggregate=aggregate)
 
     notification = Entities.NOTIFICATION.create(
@@ -224,9 +250,8 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
     assert notification_requests == []
 
 
-# @pairs web-headers:etag web-headers:security web-headers:conditional-request
-# @pairs web-headers:missing-fingerprint cache:etag cache:build-id
-# @pairs cache:missing-fingerprint cache:standard-header
+# @matrix cache : build-id etag missing-fingerprint standard-header
+# @matrix web-headers : conditional-request etag missing-fingerprint security
 def test_authenticated_home_response_headers_include_etag(get_user):
     """Authenticated app responses should carry the common header envelope."""
     user = get_user(Users.OWNER)
@@ -260,9 +285,7 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     assert "content-security-policy-report-only" not in headers
     assert '<div lp-view data-kind="home"' in direct.text
     csp = headers["content-security-policy"]
-    assert (
-        "script-src 'self' https://accounts.google.com/gsi/client" in csp
-    )
+    assert "script-src 'self' https://accounts.google.com/gsi/client" in csp
     assert (
         "style-src 'self' 'unsafe-inline' "
         "https://accounts.google.com/gsi/style" in csp
@@ -313,8 +336,102 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     assert '<div lp-view data-kind="home"' in uncached.text
 
 
-# @features privacy public-pages
-# @dimensions anonymous-access document-load
+# @matrix cache : deployment-id etag
+def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):
+    """Backend/template-only deploys must invalidate dynamic response ETags."""
+    from lagniappe.web import auth
+
+    user = SimpleNamespace(authorization_fingerprint="viewer")
+    monkeypatch.setenv("GAE_DEPLOYMENT_ID", "deployment-a")
+    first = auth._etag_fingerprint("resource", user)
+
+    monkeypatch.setenv("GAE_DEPLOYMENT_ID", "deployment-b")
+    second = auth._etag_fingerprint("resource", user)
+
+    assert first != second
+
+
+# @matrix location session timezone : atomic-update coordinates validation
+def test_update_session_rejects_invalid_timezone_and_location_atomically(
+    get_user, browser_failures
+):
+    user = get_user(Users.OWNER)
+    user.go(SitePages.HOME)
+    persisted = Entities.USER.load(user.email)
+    timezone_before = persisted.db.get("timezone")
+    location_before = persisted.db.get("location")
+
+    def update_session(raw_body):
+        return user.page.evaluate(
+            """async (body) => {
+                const token = await (await fetch("/l/token")).text();
+                const response = await fetch("/l/update-session", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": token,
+                        "X-Lagniappe-Request": "true",
+                    },
+                    body,
+                });
+                return { status: response.status, body: await response.text() };
+            }""",
+            raw_body,
+        )
+
+    invalid_payloads = [
+        "{",
+        json.dumps({"timezone": "Mars/Olympus"}),
+        json.dumps({"location": "not-an-object"}),
+        json.dumps({"location": {"latitude": True, "longitude": 1}}),
+        '{"location":{"latitude":1e999,"longitude":1}}',
+        json.dumps(
+            {
+                "timezone": "UTC",
+                "location": {"latitude": 91, "longitude": -90},
+            }
+        ),
+    ]
+    with browser_failures.expect_http_error(
+        user,
+        status=422,
+        path="/l/update-session",
+        count=len(invalid_payloads),
+    ):
+        results = [update_session(payload) for payload in invalid_payloads]
+
+    assert [result["status"] for result in results] == [422] * len(invalid_payloads)
+    persisted = Entities.USER.load(user.email)
+    assert persisted.db.get("timezone") == timezone_before
+
+    valid = update_session(
+        json.dumps(
+            {
+                "timezone": "UTC",
+                "location": {
+                    "latitude": 29.9511,
+                    "longitude": -90.0715,
+                    "ignored": "not persisted",
+                },
+            }
+        )
+    )
+    assert valid["status"] == 200
+    assert Entities.USER.load(user.email).db.get("timezone") == "UTC"
+
+    persisted = Entities.USER.load(user.email)
+    if timezone_before is None:
+        persisted.db.pop("timezone", None)
+    else:
+        persisted.db["timezone"] = timezone_before
+    if location_before is None:
+        persisted.db.pop("location", None)
+    else:
+        persisted.db["location"] = location_before
+    persisted.save()
+
+
+# @matrix privacy public-pages : anonymous-access document-load
 def test_privacy_policy_is_public(get_user):
     """Verify anonymous visitors can load the public privacy policy."""
     user = get_user(Users.ANONYMOUS)
@@ -327,8 +444,7 @@ def test_privacy_policy_is_public(get_user):
     expect(body).to_contain_text("Optional Analytics and Error Reporting")
 
 
-# @features privacy public-pages error-reporting
-# @dimensions anonymous-access document-load maintainer-destination
+# @matrix error-reporting privacy public-pages : anonymous-access document-load maintainer-destination
 def test_reporting_privacy_notice_is_public(get_user):
     """Verify anonymous visitors can load the maintainer reporting notice."""
     user = get_user(Users.ANONYMOUS)
@@ -346,8 +462,7 @@ def test_reporting_privacy_notice_is_public(get_user):
     expect(body).to_contain_text("supplies a Sentry DSN")
 
 
-# @features error-handling
-# @dimensions http-404 error-page
+# @matrix error-handling : error-page http-404
 def test_error_handling(get_user, browser_failures):
     """
     Verify 404 error page renders correctly.
@@ -376,8 +491,6 @@ def test_error_handling(get_user, browser_failures):
     expect(user.page).to_have_title("Error 404")
 
 
-# @features e2e browser-failures
-# @dimensions harness pageerror teardown
 def test_browser_failure_guard_detects_unhandled_page_errors(
     get_user, browser_failures
 ):

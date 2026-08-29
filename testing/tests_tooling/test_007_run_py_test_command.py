@@ -1,5 +1,7 @@
 """Tooling tests for the ``run.py test`` command wrapper."""
 
+import ast
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -11,9 +13,33 @@ import pytest
 import yaml
 
 import run
-from testing.utility import traceability_common, traceability_results
+from runner import pytest_routing
+from testing.utility import (
+    traceability_common,
+    traceability_results,
+)
 
 pytestmark = pytest.mark.tooling
+
+
+def test_traceability_result_plugin_can_skip_manifest_output(monkeypatch, tmp_path):
+    writes = []
+    monkeypatch.setattr(
+        traceability_results,
+        "_write_manifest",
+        lambda *arguments: writes.append(arguments),
+    )
+    config = types.SimpleNamespace(
+        rootpath=tmp_path,
+        getoption=lambda name, default=False: name == "no_test_evidence",
+    )
+
+    traceability_results.pytest_sessionfinish(
+        types.SimpleNamespace(config=config),
+        0,
+    )
+
+    assert writes == []
 
 
 @pytest.mark.parametrize("phase", ["setup", "call", "teardown"])
@@ -503,20 +529,20 @@ def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
 def test_behavior_fingerprint_ignores_python_and_javascript_comments(tmp_path):
     python_path = tmp_path / "sample.py"
     python_path.write_text(
-        '"""first module note"""\n# @features old\ndef value():\n    """old note"""\n    return 1\n'
+        '"""first module note"""\n# @matrix old : behavior\ndef value():\n    """old note"""\n    return 1\n'
     )
     python_before = traceability_common.behavior_file_fingerprint(python_path)
     python_path.write_text(
-        '"""new module note"""\n# @features new\ndef value():\n    """new note"""\n    return 1\n'
+        '"""new module note"""\n# @matrix new : behavior\ndef value():\n    """new note"""\n    return 1\n'
     )
 
     javascript_path = tmp_path / "sample.mjs"
     javascript_path.write_text(
-        "/** @features old */\nexport function value() { return 'https://a.test'; }\n"
+        "/** @matrix old : behavior */\nexport function value() { return 'https://a.test'; }\n"
     )
     javascript_before = traceability_common.behavior_file_fingerprint(javascript_path)
     javascript_path.write_text(
-        "// @features new\nexport function value() { return 'https://a.test'; }\n"
+        "// @matrix new : behavior\nexport function value() { return 'https://a.test'; }\n"
     )
 
     assert traceability_common.behavior_file_fingerprint(python_path) == python_before
@@ -566,36 +592,137 @@ def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
     assert before["@style/label.default"] == after["@style/label.default"]
 
 
-def test_normalize_test_args_expands_supported_suite_aliases_only():
-    assert run.normalize_test_args(["unit"]) == (
-        False,
-        ["testing/tests_unit/"],
+# @matrix testing : cli-routing pytest-options target-selection
+@pytest.mark.parametrize(
+    ("arguments", "expected_args", "expected_targets", "includes_e2e"),
+    (
+        (
+            ["unit"],
+            ("testing/tests_unit/",),
+            ("testing/tests_unit/",),
+            False,
+        ),
+        (
+            ["--color", "yes"],
+            ("--color", "yes"),
+            (str(Path(run.__file__).parent),),
+            True,
+        ),
+        (
+            ["--durations", "10", "unit"],
+            ("--durations", "10", "testing/tests_unit/"),
+            ("testing/tests_unit/",),
+            False,
+        ),
+        (
+            ["e2e", "--browser", "chromium"],
+            ("--browser", "chromium", "testing/tests_e2e/"),
+            ("testing/tests_e2e/",),
+            True,
+        ),
+        (
+            ["--browser=chromium", "e2e"],
+            ("--browser=chromium", "testing/tests_e2e/"),
+            ("testing/tests_e2e/",),
+            True,
+        ),
+        (
+            ["--browser-failure-diagnostics", "e2e"],
+            ("--browser-failure-diagnostics", "testing/tests_e2e/"),
+            ("testing/tests_e2e/",),
+            True,
+        ),
+        (
+            ["unit", "-k", "unit"],
+            ("-k", "unit", "testing/tests_unit/"),
+            ("testing/tests_unit/",),
+            False,
+        ),
+        (
+            ["-k", "unit"],
+            ("-k", "unit"),
+            (str(Path(run.__file__).parent),),
+            True,
+        ),
+        (
+            ["-k=-unit", "unit"],
+            ("-k=-unit", "testing/tests_unit/"),
+            ("testing/tests_unit/",),
+            False,
+        ),
+        (
+            ["unit", "tooling", "-m", "not unfinished"],
+            (
+                "-m",
+                "not unfinished",
+                "testing/tests_unit/",
+                "testing/tests_tooling/",
+            ),
+            ("testing/tests_unit/", "testing/tests_tooling/"),
+            False,
+        ),
+        (
+            ["--no-test-evidence", "tooling"],
+            ("--no-test-evidence", "testing/tests_tooling/"),
+            ("testing/tests_tooling/",),
+            False,
+        ),
+    ),
+)
+def test_normalize_pytest_invocation_routes_registered_option_values(
+    arguments, expected_args, expected_targets, includes_e2e
+):
+    invocation = pytest_routing.normalize_pytest_invocation(
+        arguments, Path(run.__file__).parent
     )
-    assert run.normalize_test_args(["e2e"]) == (
-        False,
-        ["testing/tests_e2e/"],
-    )
-    assert run.normalize_test_args(["js"]) == (
-        False,
-        ["testing/tests_js/"],
-    )
-    assert run.normalize_test_args(["tooling"]) == (
-        False,
-        ["testing/tests_tooling/"],
-    )
-    assert run.normalize_test_args(["setup"]) == (
-        False,
-        run.TEST_SUITE_ALIASES["setup"],
-    )
-    assert all("setup_drift" not in path for path in run.TEST_SUITE_ALIASES["setup"])
-    opt_in_targets = {
-        target for targets in run.SETUP_OPT_IN_TESTS.values() for target in targets
+
+    assert invocation.pytest_args == expected_args
+    assert invocation.collection_targets == expected_targets
+    assert invocation.includes_e2e is includes_e2e
+
+
+def test_setup_suite_inventory_classifies_every_setup_module_once():
+    repository_root = Path(run.__file__).parent
+    discovered = {
+        path.relative_to(repository_root).as_posix()
+        for path in (repository_root / "testing/tests_tooling").glob(
+            "test_*_setup_*.py"
+        )
     }
-    assert opt_in_targets.isdisjoint(run.TEST_SUITE_ALIASES["setup"])
+    configured = [
+        target
+        for targets in pytest_routing.SETUP_TEST_GROUPS.values()
+        for target in targets
+    ]
+    configured_tooling = {
+        target for target in configured if target.startswith("testing/tests_tooling/")
+    }
+
+    assert discovered == configured_tooling
+    assert len(configured) == len(set(configured))
+    assert all((repository_root / target).is_file() for target in configured)
+    assert (
+        "testing/tests_tooling/test_001h_setup_ai_email.py"
+        in pytest_routing.TEST_SUITE_ALIASES["setup"]
+    )
 
 
-# @features testing setup
-# @dimensions cli-routing pytest-markers opt-in
+def test_pytest_cli_options_are_not_registered_in_suite_conftests():
+    repository_root = Path(run.__file__).parent
+    violations = []
+    for path in (repository_root / "testing").rglob("conftest.py"):
+        module = ast.parse(path.read_text(encoding="utf-8"))
+        if any(
+            isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef))
+            and node.name == "pytest_addoption"
+            for node in ast.walk(module)
+        ):
+            violations.append(path.relative_to(repository_root).as_posix())
+
+    assert violations == []
+
+
+# @matrix setup testing : cli-routing opt-in pytest-markers
 @pytest.mark.parametrize(
     ("marker_expression", "expected_markers"),
     (
@@ -608,71 +735,308 @@ def test_normalize_test_args_expands_supported_suite_aliases_only():
         ("provider", ("setup_drift", "setup_provider")),
     ),
 )
-def test_normalize_test_args_adds_setup_opt_in_targets_without_filenames(
+def test_normalize_pytest_invocation_adds_setup_opt_in_targets_without_filenames(
     marker_expression, expected_markers
 ):
-    _, normalized = run.normalize_test_args(["setup", "-m", marker_expression])
+    invocation = pytest_routing.normalize_pytest_invocation(
+        ["setup", "-m", marker_expression], Path(run.__file__).parent
+    )
 
-    expected_targets = [
+    expected_targets = tuple(pytest_routing.TEST_SUITE_ALIASES["setup"]) + tuple(
         target
         for marker in expected_markers
-        for target in run.SETUP_OPT_IN_TESTS[marker]
-    ]
-    assert normalized[: len(run.TEST_SUITE_ALIASES["setup"])] == (
-        run.TEST_SUITE_ALIASES["setup"]
+        for target in pytest_routing.SETUP_OPT_IN_TESTS[marker]
     )
-    assert normalized[
-        len(run.TEST_SUITE_ALIASES["setup"]) : -2
-    ] == expected_targets
-    assert normalized[-2] == "-m"
-    assert normalized[-1] == (
-        "setup_drift or setup_provider"
-        if marker_expression == "provider"
-        else marker_expression
-    )
+    assert invocation.collection_targets == expected_targets
+    assert invocation.pytest_args[:2] == ("-m", marker_expression)
+    assert invocation.pytest_args[2:] == expected_targets
+    assert invocation.includes_e2e is ("setup_provider" in expected_markers)
 
 
-def test_normalize_test_args_preserves_real_nodeids_and_drops_redundant_scope():
+def test_normalize_pytest_invocation_preserves_real_nodeids():
     target = "testing/tests_tooling/test_007_run_py_test_command.py::test_example"
 
-    assert run.normalize_test_args([target]) == (False, [target])
-    assert run.normalize_test_args(["tooling", target, "--tb=short"]) == (
-        False,
-        [target, "--tb=short"],
+    invocation = pytest_routing.normalize_pytest_invocation(
+        [target, "--tb=short"], Path(run.__file__).parent
+    )
+    assert invocation.pytest_args == ("--tb=short", target)
+    assert invocation.collection_targets == (target,)
+    assert invocation.includes_e2e is False
+
+
+def test_normalize_pytest_invocation_handles_strict_and_pytest_separator():
+    strict = pytest_routing.normalize_pytest_invocation(
+        ["--strict", "unit", "--tb=short"], Path(run.__file__).parent
+    )
+    assert strict.strict_relations is True
+    assert strict.pytest_args == ("--tb=short", "testing/tests_unit/")
+
+    passthrough = pytest_routing.normalize_pytest_invocation(
+        ["--", "-k", "category"], Path(run.__file__).parent
+    )
+    assert passthrough.pytest_args == ("-k", "category")
+    assert passthrough.includes_e2e is True
+
+    literal_target = pytest_routing.normalize_pytest_invocation(
+        ["--", "--", "--strict"], Path(run.__file__).parent
+    )
+    assert literal_target.strict_relations is False
+    assert literal_target.pytest_args == ("--", "--strict")
+    assert literal_target.collection_targets == ("--strict",)
+
+
+# @matrix testing : cli-routing pytest-options target-selection
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ["tooling", "testing/tests_tooling/test_007_run_py_test_command.py"],
+        ["--pyargs", "testing.tests_unit"],
+        ["@test-targets.txt"],
+        ["-p", "no:runner.pytest_routing", "unit"],
+    ),
+)
+def test_normalize_pytest_invocation_rejects_ambiguous_or_indirect_targets(
+    arguments,
+):
+    with pytest.raises(pytest_routing.PytestRoutingError):
+        pytest_routing.normalize_pytest_invocation(
+            arguments, Path(run.__file__).parent
+        )
+
+
+def test_normalize_pytest_invocation_rejects_hidden_addopts_targets(monkeypatch):
+    monkeypatch.setenv("PYTEST_ADDOPTS", "testing/tests_unit/")
+
+    with pytest.raises(pytest_routing.PytestRoutingError, match="PYTEST_ADDOPTS"):
+        pytest_routing.normalize_pytest_invocation([], Path(run.__file__).parent)
+
+
+def _configured_value_option_cases(tmp_path):
+    from _pytest.config import _prepareconfig
+
+    repository_root = Path(run.__file__).parent
+    config = _prepareconfig(
+        ["-c", pytest_routing.PYTEST_CONFIG, "--noconftest"],
+        plugins=[pytest_routing, traceability_results],
+        prog="run.py test",
+    )
+    special_values = {
+        "basetemp": str(tmp_path / "pytest-base"),
+        "base_url": "https://example.test",
+        "cacheshow": "*",
+        "confcutdir": str(repository_root),
+        "debug": str(tmp_path / "pytest-debug.log"),
+        "inifilename": str(repository_root / pytest_routing.PYTEST_CONFIG),
+        "keyword": "unit-value",
+        "log_auto_indent": "1",
+        "log_cli_level": "INFO",
+        "log_file": str(tmp_path / "pytest.log"),
+        "log_file_level": "INFO",
+        "log_level": "INFO",
+        "markexpr": "not unfinished",
+        "override_ini": "addopts=",
+        "plugins": "no:terminalprogress",
+        "pythonwarnings": "default",
+        "rootdir": str(repository_root),
+        "usepdb_cls": "pdb:Pdb",
+        "xmlpath": str(tmp_path / "junit.xml"),
+    }
+    try:
+        cases = []
+        for action in config._parser.optparser._actions:
+            if not action.option_strings or action.nargs == 0:
+                continue
+            option = next(
+                (
+                    candidate
+                    for candidate in action.option_strings
+                    if candidate.startswith("--")
+                ),
+                action.option_strings[0],
+            )
+            if action.dest in special_values:
+                value = special_values[action.dest]
+            elif action.choices:
+                value = str(next(iter(action.choices)))
+            elif action.type is int:
+                value = "1"
+            elif action.type is float:
+                value = "0.1"
+            else:
+                value = "routing-value"
+            cases.append((option, value, action.nargs))
+        return cases
+    finally:
+        config._ensure_unconfigure()
+
+
+def test_normalize_pytest_invocation_routes_every_registered_valued_option(
+    tmp_path,
+):
+    repository_root = Path(run.__file__).parent
+    cases = _configured_value_option_cases(tmp_path)
+    option_names = {option for option, _value, _nargs in cases}
+
+    assert {
+        "--base-url",
+        "--browser",
+        "--color",
+        "--durations",
+    }.issubset(option_names)
+    assert len(cases) >= 50
+
+    for option, value, nargs in cases:
+        invocation = pytest_routing.normalize_pytest_invocation(
+            [option, value, "unit"], repository_root
+        )
+        assert invocation.collection_targets == ("testing/tests_unit/",), option
+        assert invocation.pytest_args[-1] == "testing/tests_unit/", option
+        assert invocation.includes_e2e is False, option
+
+        if option.startswith("--") and nargs in {None, "?"}:
+            equals_invocation = pytest_routing.normalize_pytest_invocation(
+                [f"{option}={value}", "unit"], repository_root
+            )
+            assert equals_invocation.collection_targets == (
+                "testing/tests_unit/",
+            ), option
+
+
+def test_normalize_pytest_invocation_isolates_parser_imports_and_cwd(
+    monkeypatch, tmp_path
+):
+    repository_root = Path(run.__file__).parent
+    monkeypatch.chdir(tmp_path)
+    before = set(sys.modules)
+
+    invocation = pytest_routing.normalize_pytest_invocation(
+        ["--color", "yes", "unit"], repository_root
+    )
+
+    assert Path.cwd() == tmp_path
+    assert invocation.collection_targets == ("testing/tests_unit/",)
+    imported = set(sys.modules) - before
+    assert not any(
+        module == "config"
+        or module.startswith("lagniappe")
+        or module.startswith("testing.tests_e2e.conftest")
+        or module.startswith("testing.tests_unit.conftest")
+        for module in imported
     )
 
 
-def test_normalize_test_args_handles_strict_and_pytest_separator():
-    assert run.normalize_test_args(["--strict", "unit"]) == (
-        True,
-        ["testing/tests_unit/"],
+# @matrix testing : cli-routing target-selection
+def test_normalized_targets_control_actual_pytest_collection(
+    monkeypatch, tmp_path
+):
+    (tmp_path / "testing/tests_unit").mkdir(parents=True)
+    (tmp_path / "testing/tests_e2e").mkdir(parents=True)
+    (tmp_path / "pytest.ini").write_text(
+        "[pytest]\n"
+        "testpaths =\n"
+        "    testing/tests_unit\n"
+        "    testing/tests_e2e\n",
+        encoding="utf-8",
     )
-    assert run.normalize_test_args(["--", "-k", "category"]) == (
-        False,
-        ["-k", "category"],
+    (tmp_path / "testing/tests_unit/test_unit_sample.py").write_text(
+        "def test_unit_sample():\n    pass\n", encoding="utf-8"
     )
-    assert run.normalize_test_args(["-k", "unit"]) == (
-        False,
-        ["-k", "unit"],
+    (tmp_path / "testing/tests_e2e/test_e2e_sample.py").write_text(
+        "def test_e2e_sample():\n    pass\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(pytest_routing, "PYTEST_CONFIG", "pytest.ini")
+
+    requests = (
+        (
+            ["--color", "no", "unit"],
+            "test_unit_sample.py::test_unit_sample",
+            "test_e2e_sample.py::test_e2e_sample",
+            False,
+        ),
+        (
+            ["e2e", "--browser", "chromium"],
+            "test_e2e_sample.py::test_e2e_sample",
+            "test_unit_sample.py::test_unit_sample",
+            True,
+        ),
+    )
+    environment = os.environ.copy()
+    environment.pop("PYTEST_ADDOPTS", None)
+    repository_root = Path(run.__file__).parent
+    existing_pythonpath = environment.get("PYTHONPATH")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        part
+        for part in (str(repository_root), existing_pythonpath)
+        if part
+    )
+    for arguments, selected, excluded, includes_e2e in requests:
+        invocation = pytest_routing.normalize_pytest_invocation(
+            arguments, tmp_path
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-c",
+                "pytest.ini",
+                "-p",
+                pytest_routing.PYTEST_ROUTING_PLUGIN,
+                "--collect-only",
+                "-q",
+                *invocation.pytest_args,
+            ],
+            cwd=tmp_path,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, result.stderr + result.stdout
+        assert selected in result.stdout
+        assert excluded not in result.stdout
+        assert invocation.includes_e2e is includes_e2e
+
+
+# @matrix setup testing : pytest-markers
+def test_pytest_routing_plugin_normalizes_provider_marker_tokens():
+    config = types.SimpleNamespace(
+        option=types.SimpleNamespace(markexpr="provider and not ai_provider")
+    )
+
+    pytest_routing.pytest_configure(config)
+
+    assert config.option.markexpr == (
+        "(setup_drift or setup_provider) and not ai_provider"
     )
 
 
-def test_normalize_test_args_does_not_expand_legacy_shorthand():
-    legacy_args = [
-        "003b",
-        "003b::test_preview_panel",
-        "home",
-        "pages",
-        "-unit",
-        "-e2e",
-        "-js",
-        "-tooling",
-    ]
+def test_run_py_test_argument_errors_stop_before_preflight(monkeypatch, capsys):
+    monkeypatch.setattr(
+        run,
+        "configure_test_environment",
+        lambda **kwargs: pytest.fail("argument errors must skip environment setup"),
+    )
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: pytest.fail("argument errors must skip gcloud setup"),
+    )
+    monkeypatch.setattr(
+        run,
+        "_run_pytest_subprocess",
+        lambda command: pytest.fail("argument errors must skip pytest"),
+    )
 
-    assert run.normalize_test_args(legacy_args) == (False, legacy_args)
+    assert run.run_tests(
+        ["tooling", "testing/tests_tooling/test_007_run_py_test_command.py"]
+    ) == 4
+    assert "suite aliases cannot be combined" in capsys.readouterr().err
 
 
-def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
+# @pair testing:environment
+def test_configure_test_environment_only_sets_import_environment(monkeypatch):
     calls = []
     config_module = types.ModuleType("config")
     config_module.__path__ = ["config"]
@@ -682,19 +1046,16 @@ def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
     monkeypatch.setitem(sys.modules, "config", config_module)
     monkeypatch.setitem(sys.modules, "runner.testing", testing_module)
 
-    run.configure_test_environment(["testing/tests_unit/"])
+    run.configure_test_environment(includes_e2e=False)
     assert calls == []
 
-    run.configure_test_environment(
-        ["testing/tests_e2e/001_site/test_001d_offline.py::test_offline"]
-    )
-    run.configure_test_environment([])
+    run.configure_test_environment(includes_e2e=True)
+    run.configure_test_environment(includes_e2e=True)
 
-    assert calls == ["bundle", "bundle"]
+    assert calls == []
 
 
-# @features testing hosted-e2e
-# @dimensions cli-routing provider-auth frontend-build
+# @matrix hosted-e2e testing : cli-routing frontend-build provider-auth
 def test_hosted_e2e_runner_skips_local_build_and_gcloud_activation(monkeypatch):
     calls = []
     from runner import testing as testing_module
@@ -720,8 +1081,7 @@ def test_hosted_e2e_runner_skips_local_build_and_gcloud_activation(monkeypatch):
     assert [name for name, *_rest in calls] == ["pytest"]
 
 
-# @features testing hosted-e2e
-# @dimensions cleanup prefix fail-closed
+# @matrix hosted-e2e testing : cleanup fail-closed prefix
 def test_cleanup_scope_requires_the_reserved_test_prefix():
     from runner import testing as testing_module
 
@@ -737,8 +1097,7 @@ def test_cleanup_scope_requires_the_reserved_test_prefix():
             testing_module._require_test_cleanup_scope(config)
 
 
-# @features testing hosted-e2e
-# @dimensions initialization database cache migrations
+# @matrix hosted-e2e testing : cache database initialization migrations
 def test_initialize_test_services_replays_server_persistence_startup():
     from runner import testing as testing_module
 
@@ -791,12 +1150,9 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
     )
     monkeypatch.setattr(run.subprocess, "Popen", fake_popen)
 
-    assert (
-        run.run_tests(
-            ["tooling", "testing/tests_tooling/test_007_run_py_test_command.py"]
-        )
-        == 3
-    )
+    assert run.run_tests(
+        ["testing/tests_tooling/test_007_run_py_test_command.py"]
+    ) == 3
 
     command, kwargs = calls[0]
     assert command == [
@@ -807,6 +1163,8 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
         "testing/pytest.ini",
         "-p",
         "testing.utility.traceability_results",
+        "-p",
+        "runner.pytest_routing",
         "testing/tests_tooling/test_007_run_py_test_command.py",
     ]
     assert kwargs == {
@@ -817,8 +1175,44 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
     assert os.environ["LAGNIAPPE_TEST_COMMAND"] == '["outer", "test"]'
 
 
+# @pair testing:adc
 def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
     calls = []
+
+    class FakeAuthority:
+        nonce = "nonce-01234567890123456789"
+        mode = "local-e2e"
+
+        def update(self, **changes):
+            calls.append(("update", changes))
+
+        def complete(self):
+            calls.append("complete")
+
+        def mark_recovery_required(self):
+            calls.append("recovery")
+
+    fake_authority = FakeAuthority()
+    fake_session = types.ModuleType("runner.test_session")
+    fake_session.SESSION_MODE_ENV = "LAGNIAPPE_TEST_SESSION_MODE"
+    fake_session.SESSION_NONCE_ENV = "LAGNIAPPE_TEST_SESSION_NONCE"
+    fake_session.acquire_test_session = (
+        lambda mode, command: calls.append(("acquire", mode, command))
+        or fake_authority
+    )
+    fake_testing = types.ModuleType("runner.testing")
+    fake_testing.require_legacy_test_server_clear = lambda: calls.append("legacy")
+    fake_testing.require_server_port_available = lambda url: calls.append(("port", url))
+    fake_testing.ensure_test_frontend_bundle = lambda authority: calls.append("bundle")
+    fake_testing.prepare_test_artifacts = lambda authority: calls.append("artifacts")
+    fake_testing.cleanup_test_data = lambda authority: calls.append("cleanup")
+    fake_testing.run_test_server = lambda authority: types.SimpleNamespace(pid=5000)
+    fake_testing.terminate_test_server_process = lambda process: calls.append("stop")
+    fake_config = types.ModuleType("config")
+    fake_config.__path__ = []
+    fake_config.SETTINGS = types.SimpleNamespace(
+        test_config={"BASE_URL": "http://127.0.0.1:5000"}
+    )
 
     class FakeProcess:
         pid = 8642
@@ -829,7 +1223,7 @@ def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
     monkeypatch.setattr(
         run,
         "configure_test_environment",
-        lambda args: calls.append(("environment", args)),
+        lambda **kwargs: calls.append(("environment", kwargs)),
     )
     monkeypatch.setattr(
         run,
@@ -842,10 +1236,13 @@ def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
         lambda command, **kwargs: calls.append(("pytest", command))
         or FakeProcess(),
     )
+    monkeypatch.setitem(sys.modules, "runner.test_session", fake_session)
+    monkeypatch.setitem(sys.modules, "runner.testing", fake_testing)
+    monkeypatch.setitem(sys.modules, "config", fake_config)
 
     assert run.run_tests(["e2e"]) == 0
     assert calls[:2] == [
-        ("environment", ["testing/tests_e2e/"]),
+        ("environment", {"includes_e2e": True}),
         (
             "gcloud",
             {
@@ -858,7 +1255,7 @@ def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
 
 
 def test_run_py_e2e_adc_mismatch_stops_before_pytest(monkeypatch, capsys):
-    monkeypatch.setattr(run, "configure_test_environment", lambda args: None)
+    monkeypatch.setattr(run, "configure_test_environment", lambda **kwargs: None)
     monkeypatch.setattr(
         run,
         "activate_repository_gcloud",
@@ -878,8 +1275,7 @@ def test_run_py_e2e_adc_mismatch_stops_before_pytest(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @features development
-# @dimensions gcloud-config adc launch-order
+# @matrix development : adc gcloud-config launch-order
 def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
     from runner import development
 
@@ -895,13 +1291,17 @@ def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
         "activate_repository_gcloud",
         lambda **kwargs: calls.append(("gcloud", kwargs)),
     )
+    class FakeProcess:
+        pid = 5050
+
+        def wait(self):
+            return 0
+
     monkeypatch.setattr(
         development.subprocess,
-        "run",
-        lambda command, **kwargs: calls.append(
-            ("flask", command, kwargs)
-        )
-        or types.SimpleNamespace(returncode=0),
+        "Popen",
+        lambda command, **kwargs: calls.append(("flask", command, kwargs))
+        or FakeProcess(),
     )
     monkeypatch.setenv("FLASK_ENV", "testing")
 
@@ -935,14 +1335,13 @@ def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
                     "FLASK_ENV": "development",
                 },
                 "cwd": Path("/app"),
-                "timeout": 900,
+                "start_new_session": True,
             },
         ),
     ]
 
 
-# @features development
-# @dimensions gcloud-config adc launch-order noninteractive
+# @matrix development : adc gcloud-config launch-order noninteractive
 def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     from runner import development
 
@@ -955,7 +1354,7 @@ def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     )
     monkeypatch.setattr(
         development.subprocess,
-        "run",
+        "Popen",
         lambda *args, **kwargs: pytest.fail("Flask must not start"),
     )
 
@@ -965,8 +1364,93 @@ def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @features auth
-# @dimensions adc runtime-identity interactive explicit-command
+# @matrix development : lifecycle process-ownership signals
+def test_run_dev_server_forwards_signals_and_restores_handlers(monkeypatch):
+    from runner import development
+
+    installed = {}
+    restored = []
+    sent = []
+    previous = {
+        development.signal.SIGINT: object(),
+        development.signal.SIGTERM: object(),
+    }
+
+    class FakeProcess:
+        pid = 8642
+
+        def wait(self):
+            installed[development.signal.SIGINT](development.signal.SIGINT, None)
+            installed[development.signal.SIGTERM](development.signal.SIGTERM, None)
+            return 7
+
+    def fake_signal(signum, handler):
+        if handler is previous[signum]:
+            restored.append(signum)
+        else:
+            installed[signum] = handler
+
+    monkeypatch.setattr(
+        development,
+        "SETTINGS",
+        types.SimpleNamespace(dev_config={"SERVER_PORT": "5050"}),
+    )
+    monkeypatch.setattr(development, "activate_repository_gcloud", lambda **kwargs: None)
+    monkeypatch.setattr(development.subprocess, "Popen", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(development.signal, "getsignal", lambda signum: previous[signum])
+    monkeypatch.setattr(development.signal, "signal", fake_signal)
+    monkeypatch.setattr(development.os, "killpg", lambda pid, signum: sent.append((pid, signum)))
+
+    assert development.run_dev_server() == 7
+    assert sent == [
+        (8642, development.signal.SIGINT),
+        (8642, development.signal.SIGTERM),
+    ]
+    assert restored == [development.signal.SIGINT, development.signal.SIGTERM]
+
+
+# @matrix development : escalation exceptional-cleanup process-ownership
+def test_run_dev_server_cleans_up_process_group_after_runner_failure(monkeypatch):
+    from runner import development
+
+    sent = []
+
+    class FakeProcess:
+        pid = 9753
+
+        def __init__(self):
+            self.waits = 0
+
+        def wait(self, timeout=None):
+            self.waits += 1
+            if self.waits == 1:
+                raise RuntimeError("runner wait failed")
+            if timeout == 5:
+                raise development.subprocess.TimeoutExpired("flask", timeout)
+            return -9
+
+        def poll(self):
+            return None
+
+    monkeypatch.setattr(
+        development,
+        "SETTINGS",
+        types.SimpleNamespace(dev_config={"SERVER_PORT": "5050"}),
+    )
+    monkeypatch.setattr(development, "activate_repository_gcloud", lambda **kwargs: None)
+    monkeypatch.setattr(development.subprocess, "Popen", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(development.os, "killpg", lambda pid, signum: sent.append((pid, signum)))
+
+    with pytest.raises(RuntimeError, match="runner wait failed"):
+        development.run_dev_server()
+
+    assert sent == [
+        (9753, development.signal.SIGTERM),
+        (9753, development.signal.SIGKILL),
+    ]
+
+
+# @matrix auth : adc explicit-command interactive runtime-identity
 def test_run_py_auth_runs_interactive_human_adc_alignment(
     monkeypatch,
     capsys,
@@ -993,8 +1477,7 @@ def test_run_py_auth_runs_interactive_human_adc_alignment(
     )
 
 
-# @features auth
-# @dimensions adc runtime-identity interactive explicit-command
+# @matrix auth : adc explicit-command interactive runtime-identity
 def test_run_py_auth_reports_alignment_failure(monkeypatch, capsys):
     monkeypatch.setattr(run, "GCLOUD_CLI", "/usr/bin/gcloud")
     monkeypatch.setattr(
@@ -1081,8 +1564,6 @@ def test_run_py_test_forwards_signals_to_pytest_process_group(monkeypatch):
     assert restored_handlers == [run.signal.SIGINT, run.signal.SIGTERM]
 
 
-# @features setup testing development auth
-# @dimensions gcloud-config activation
 # @pair setup:gcloud-token
 def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     from runner import adc as runner_adc
@@ -1165,7 +1646,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     ]
 
 
-# @pairs auth:gcloud-token auth:interactive auth:refresh
+# @matrix auth : gcloud-token interactive refresh
 def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
     from runner import adc as runner_adc
 
@@ -1226,7 +1707,7 @@ def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
     ]
 
 
-# @pairs setup:gcloud-token setup:safe-failure
+# @matrix setup : gcloud-token safe-failure
 def test_runner_gcloud_source_login_stops_before_authentication_by_default(
     monkeypatch,
 ):
@@ -1261,9 +1742,7 @@ def test_runner_gcloud_source_login_stops_before_authentication_by_default(
     ]
 
 
-# @pairs setup:adc setup:identity setup:project-identity
-# @pairs testing:adc testing:identity testing:project-identity
-# @pairs development:adc development:identity development:project-identity
+# @matrix development setup testing : adc identity project-identity
 def test_runner_adc_identity_is_secret_free_and_project_bound():
     from runner import adc as runner_adc
 
@@ -1300,8 +1779,7 @@ def test_runner_adc_identity_is_secret_free_and_project_bound():
     assert "secret-access-token" not in repr(identity)
 
 
-# @pairs setup:adc setup:identity setup:project-identity setup:automatic-activation setup:quota-project
-# @pairs testing:adc testing:identity testing:project-identity testing:automatic-activation testing:quota-project
+# @matrix setup testing : adc automatic-activation identity project-identity quota-project
 def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch):
     from runner import adc as runner_adc
 
@@ -1372,7 +1850,7 @@ def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch
     ]
 
 
-# @pairs auth:adc auth:identity auth:project-identity auth:automatic-activation auth:quota-project
+# @matrix auth : adc automatic-activation identity project-identity quota-project
 def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
     from runner import adc as runner_adc
 
@@ -1506,10 +1984,7 @@ def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
     ]
 
 
-# @pairs testing:adc testing:identity testing:project-identity
-# @pairs development:adc development:identity development:project-identity
-# @pairs testing:automatic-activation testing:quota-project
-# @pairs development:automatic-activation development:quota-project
+# @matrix development testing : adc automatic-activation identity project-identity quota-project
 @pytest.mark.parametrize(
     "identity",
     [
@@ -1558,8 +2033,7 @@ def test_runner_local_adc_mismatch_directs_to_auth_command(
         )
 
 
-# @pairs setup:adc setup:automatic-activation setup:quota-project
-# @pairs testing:adc testing:automatic-activation testing:quota-project
+# @matrix setup testing : adc automatic-activation quota-project
 def test_runner_adc_alignment_updates_only_stale_quota_project(monkeypatch):
     from runner import adc as runner_adc
 
@@ -1611,8 +2085,7 @@ def test_runner_adc_alignment_updates_only_stale_quota_project(monkeypatch):
     ]
 
 
-# @features setup testing development auth
-# @dimensions gcloud-config activation unconfigured
+# @matrix auth development setup testing : activation gcloud-config unconfigured
 def test_runner_gcloud_activation_skips_unconfigured_repository(monkeypatch):
     from runner import gcloud as runner_gcloud
 
@@ -1623,8 +2096,7 @@ def test_runner_gcloud_activation_skips_unconfigured_repository(monkeypatch):
     assert runner_gcloud.activate_repository_gcloud() is False
 
 
-# @features setup testing development auth
-# @dimensions gcloud-config activation validation
+# @matrix auth development setup testing : activation gcloud-config validation
 def test_runner_gcloud_activation_rejects_partial_saved_target(monkeypatch):
     from runner import gcloud as runner_gcloud
 
@@ -1668,6 +2140,67 @@ def _git(repo: Path, *args: str):
     )
 
 
+def _release_frontend_contract():
+    return {
+        "schema": 1,
+        "source_roots": ["src/script"],
+        "source_files": [
+            "build/publication.json",
+            "package-lock.json",
+            "package.json",
+        ],
+        "exclusive_artifact_roots": ["lagniappe/web/static/chunks"],
+        "required_artifacts": [
+            "lagniappe/web/static/script.js",
+            "lagniappe/web/static/sw.js",
+        ],
+        "required_artifact_prefixes": ["lagniappe/web/static/"],
+    }
+
+
+def _write_release_frontend_metadata(repo, *, build_id, mode, version):
+    contract = _release_frontend_contract()
+    contract_path = repo / "build/publication.json"
+    contract_path.parent.mkdir(parents=True, exist_ok=True)
+    contract_path.write_text(f"{json.dumps(contract, sort_keys=True)}\n")
+
+    source_paths = set()
+    for relative_root in contract["source_roots"]:
+        source_paths.update(
+            path.relative_to(repo).as_posix()
+            for path in (repo / relative_root).rglob("*")
+            if path.is_file()
+        )
+    source_paths.update(contract["source_files"])
+    source_digest = hashlib.sha256(b"frontend-source-v1\0")
+    for relative in sorted(source_paths):
+        source_digest.update(relative.encode())
+        source_digest.update(b"\0")
+        source_digest.update((repo / relative).read_bytes())
+        source_digest.update(b"\0")
+
+    artifacts = []
+    for relative in contract["required_artifacts"]:
+        content = (repo / relative).read_bytes()
+        artifacts.append(
+            {
+                "path": relative,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+            }
+        )
+    metadata = {
+        "schema": 1,
+        "build_id": build_id,
+        "mode": mode,
+        "version": version,
+        "source": {"sha256": source_digest.hexdigest()},
+        "artifacts": artifacts,
+    }
+    metadata_path = repo / "lagniappe/web/static/build.json"
+    metadata_path.write_text(f"{json.dumps(metadata, indent=2)}\n")
+
+
 def _release_check_repository(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -1693,6 +2226,16 @@ def _release_check_repository(tmp_path: Path) -> Path:
                 encoding="utf-8"
             )
         ),
+        "runner/frontend_build.py": (
+            (Path(run.__file__).parent / "runner" / "frontend_build.py").read_text(
+                encoding="utf-8"
+            )
+        ),
+        "runner/pytest_routing.py": (
+            (
+                Path(run.__file__).parent / "runner" / "pytest_routing.py"
+            ).read_text(encoding="utf-8")
+        ),
         "run.py": Path(run.__file__).read_text(encoding="utf-8"),
         "package.json": '{"name": "lagniappe", "version": "0.1.0"}\n',
         "package-lock.json": (
@@ -1702,12 +2245,19 @@ def _release_check_repository(tmp_path: Path) -> Path:
         "documentation/releases/0.1.0.md": (
             "# Version 0.1.0\n\n- Initial test release.\n"
         ),
+        "lagniappe/core/tools/database/migrations.py": (
+            "MIGRATION_CATALOG = (\n"
+            "    MigrationDefinition(\n"
+            "        sequence=1,\n"
+            "        id='BASE-001',\n"
+            "        introduced_in='0.1',\n"
+            "        label='Base migration',\n"
+            "        runner=run_base,\n"
+            "    ),\n"
+            ")\n"
+        ),
         "src/script/example.mjs": "export const value = 1;\n",
         "lagniappe/web/static/script.js": "built-main\n",
-        "lagniappe/web/static/build.json": (
-            '{"build_id": "base1234", "mode": "production", '
-            '"version": "0.1.0"}\n'
-        ),
         "lagniappe/web/static/sw.js": 'const BUILD_ID = "base1234";\n',
         "lagniappe/web/start/styles/icons.py": "ICONS = {}\n",
         "lagniappe/web/start/styles/styles.py": "STYLES = {}\n",
@@ -1717,6 +2267,13 @@ def _release_check_repository(tmp_path: Path) -> Path:
         path = repo / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+
+    _write_release_frontend_metadata(
+        repo,
+        build_id="base1234",
+        mode="production",
+        version="0.1.0",
+    )
 
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "Base")
@@ -1729,29 +2286,32 @@ def _write_release_candidate(
     *,
     mode: str = "production",
     build_id: str = "b1234567",
+    version: str = "0.2.0",
+    release_note: str | None = None,
 ):
+    release_note = release_note or (
+        f"# Version {version}\n\n- Added the release workflow.\n"
+    )
     updates = {
-        "package.json": '{"name": "lagniappe", "version": "0.2.0"}\n',
+        "package.json": f'{{"name": "lagniappe", "version": "{version}"}}\n',
         "package-lock.json": (
-            '{"name": "lagniappe", "version": "0.2.0", '
-            '"packages": {"": {"name": "lagniappe", "version": "0.2.0"}}}\n'
+            f'{{"name": "lagniappe", "version": "{version}", '
+            f'"packages": {{"": {{"name": "lagniappe", "version": "{version}"}}}}}}\n'
         ),
-        "documentation/releases/0.2.0.md": (
-            "# Version 0.2.0\n\n- Added the release workflow.\n"
-        ),
-        "lagniappe/web/static/build.json": (
-            f'{{"build_id": "{build_id}", "mode": "{mode}", '
-            f'"version": "0.2.0"}}\n'
-        ),
+        f"documentation/releases/{version}.md": release_note,
         "lagniappe/web/static/sw.js": f'const BUILD_ID = "{build_id}";\n',
-        "config/constants.py": (
-            f'SENTRY_DSN = "test"\nBUILD_ID = "{build_id}"\n'
-        ),
+        "config/constants.py": (f'SENTRY_DSN = "test"\nBUILD_ID = "{build_id}"\n'),
     }
     for relative, content in updates.items():
         path = repo / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+    _write_release_frontend_metadata(
+        repo,
+        build_id=build_id,
+        mode=mode,
+        version=version,
+    )
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "Prepare release")
 
@@ -1786,8 +2346,7 @@ def test_main_release_workflow_contract():
     assert "pr-clean" not in workflow_text
 
 
-# @features release
-# @dimensions delivery-tree
+# @pair release:delivery-tree
 def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     _write_release_candidate(repo)
@@ -1814,11 +2373,90 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     )
     assert result.returncode == 0
     assert "Release check passed against main" in result.stdout
+
+
+def _write_candidate_migration(repo: Path, *, introduced_in: str) -> None:
+    path = repo / "lagniappe/core/tools/database/migrations.py"
+    path.write_text(
+        "MIGRATION_CATALOG = (\n"
+        "    MigrationDefinition(\n"
+        "        sequence=1,\n"
+        "        id='BASE-001',\n"
+        "        introduced_in='0.1',\n"
+        "        label='Base migration',\n"
+        "        runner=run_base,\n"
+        "    ),\n"
+        "    MigrationDefinition(\n"
+        "        sequence=2,\n"
+        "        id='NEXT-001',\n"
+        f"        introduced_in={introduced_in!r},\n"
+        "        label='Next migration',\n"
+        "        runner=run_next,\n"
+        "    ),\n"
+        ")\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", str(path.relative_to(repo)))
+
+
+# @matrix migrations release : major-version release-note version-metadata
+def test_run_py_release_check_requires_major_version_for_new_migration(
+    tmp_path,
+    capsys,
+):
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(
+        repo,
+        release_note=(
+            "# Version 0.2.0\n\n"
+            "## Required post-upgrade maintenance\n\n"
+            "Apply updates after deployment.\n\n"
+            "- Added a migration.\n"
+        ),
+    )
+    _write_candidate_migration(repo, introduced_in="0.2")
+
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    output = capsys.readouterr().out
+    assert "require a major version increase over 0.1.0" in output
+    assert "NEXT-001" in output
+
+
+# @matrix migrations release : major-version release-note version-metadata
+def test_run_py_release_check_requires_matching_migration_release_metadata(
+    tmp_path,
+    capsys,
+):
+    release_note = (
+        "# Version 1.0.0\n\n"
+        "## Required post-upgrade maintenance\n\n"
+        "Apply updates and refresh cache after deployment.\n\n"
+        "- Added a migration.\n"
+    )
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(repo, version="1.0.0", release_note=release_note)
+    _write_candidate_migration(repo, introduced_in="0.2")
+
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    assert "must use introduced_in='1.0': NEXT-001" in capsys.readouterr().out
+
+    _write_candidate_migration(repo, introduced_in="1.0")
+    note_path = repo / "documentation/releases/1.0.0.md"
+    note_path.write_text(
+        "# Version 1.0.0\n\n- Added a migration.\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", str(note_path.relative_to(repo)))
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    assert "Required post-upgrade maintenance" in capsys.readouterr().out
+
+    note_path.write_text(release_note, encoding="utf-8")
+    _git(repo, "add", str(note_path.relative_to(repo)))
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 0
     assert "Release check passed against main" in capsys.readouterr().out
 
 
-# @features release
-# @dimensions delivery-tree build-mode
+# @matrix release : build-mode delivery-tree
 def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     _write_release_candidate(repo, mode="development")
@@ -1830,8 +2468,7 @@ def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
     assert "does not contain a newly generated BUILD_ID" not in output
 
 
-# @features release
-# @dimensions delivery-tree
+# @pair release:delivery-tree
 def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     (repo / "package.json").write_text(
@@ -1859,8 +2496,7 @@ def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     assert "must identify a production build" in output
 
 
-# @features version
-# @dimensions cli-routing
+# @pair version:cli-routing
 @pytest.mark.parametrize(
     ("settings_exist", "settings_version", "expected_version"),
     [
@@ -1895,8 +2531,7 @@ def test_run_py_version_show_uses_package_only_before_generated_settings_exist(
     ]
 
 
-# @features version
-# @dimensions cli-routing
+# @pair version:cli-routing
 def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(run, "RELEASES_DIR", tmp_path / "documentation" / "releases")
 
@@ -1912,8 +2547,7 @@ def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path
     assert "Added version note" in capsys.readouterr().out
 
 
-# @features version
-# @dimensions cli-routing
+# @pair version:cli-routing
 def test_run_py_version_set_updates_package_settings_and_release_file(
     monkeypatch, tmp_path, capsys
 ):

@@ -1,8 +1,7 @@
 """Node-backed checks for task-settings action-control lifecycle behavior."""
 
 
-# @features tasks
-# @dimensions action-control-lifecycle teardown
+# @matrix tasks : action-control-lifecycle teardown
 def test_task_settings_awaits_action_controls_and_cleans_up(run_node):
     run_node(
         r"""
@@ -162,8 +161,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features forms
-# @dimensions schema-ownership sibling-widgets
+# @matrix forms : schema-ownership sibling-widgets
 def test_form_response_metadata_stays_with_renderer_widget(run_node):
     run_node(
         r"""

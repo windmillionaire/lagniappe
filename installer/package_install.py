@@ -23,7 +23,10 @@ _SETUP_DEPENDENCIES = (
     ("certifi", "certifi", "trusted certificate authorities"),
     ("requests", "requests", "provider HTTP requests"),
     ("google.auth", "google-auth", "Google authentication"),
+    ("google.oauth2", "google-auth", "Google OAuth credentials"),
     ("google.api_core", "google-api-core", "Google API error handling"),
+    ("google.protobuf", "protobuf", "Google API message types"),
+    ("google.iam.v1", "google-cloud-iam", "Google IAM policy messages"),
     ("google.cloud.iam_admin_v1", "google-cloud-iam", "service-account setup"),
     (
         "google.cloud.resourcemanager_v3",
@@ -66,8 +69,7 @@ class _TrackedSpinnerContext:
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_install_if_missing_pauses_active_spinner_for_prompt
-# @features setup
-# @dimensions package-install spinner
+# @matrix setup : package-install spinner
 def track_spinner_factory(yaspin_factory):
     """Wrap a yaspin factory so package installs can pause active spinners."""
 
@@ -82,8 +84,7 @@ def track_spinner_factory(yaspin_factory):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_install_if_missing_pauses_active_spinner_for_prompt
-# @features setup
-# @dimensions package-install spinner
+# @matrix setup : package-install spinner
 @contextmanager
 def _pause_active_spinners():
     paused = []
@@ -104,8 +105,7 @@ def _pause_active_spinners():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
-# @features setup
-# @dimensions package-install
+# @pair setup:package-install
 def ensure_pip_is_available():
     """Checks if pip is available, tries to install it if not, and provides guidance."""
     try:
@@ -180,8 +180,7 @@ def _normalize_package_name(package_name):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_validates_versions_and_pip_check
-# @features setup
-# @dimensions package-install dependency-pins
+# @matrix setup : dependency-pins package-install
 def _requirement_version(requirement):
     match = re.match(
         r"^([a-zA-Z0-9_.-]+)(?:\[[^\]]+\])?==([^;\s]+)",
@@ -194,8 +193,7 @@ def _requirement_version(requirement):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
-# @features setup
-# @dimensions package-install dependency-pins
+# @matrix setup : dependency-pins package-install
 def _pinned_requirement(package_name):
     normalized_name = _normalize_package_name(package_name)
 
@@ -218,8 +216,7 @@ def _pinned_requirement(package_name):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_validates_versions_and_pip_check
-# @features setup
-# @dimensions package-install dependency-pins
+# @matrix setup : dependency-pins package-install
 def _dependency_status(import_name, package_name, *, check_import=True):
     """Return whether a distribution matches its pin and optionally imports."""
     requirement = _pinned_requirement(package_name)
@@ -249,8 +246,7 @@ def _dependency_status(import_name, package_name, *, check_import=True):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_validates_versions_and_pip_check
-# @features setup
-# @dimensions package-install dependency-pins
+# @matrix setup : dependency-pins package-install
 def _run_pip_check():
     result = subprocess.run(
         [sys.executable, "-m", "pip", "check"],
@@ -269,8 +265,7 @@ def _run_pip_check():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_validates_versions_and_pip_check
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_repairs_transitive_conflicts
-# @features setup
-# @dimensions package-install dependency-pins
+# @matrix setup : dependency-pins package-install
 def ensure_setup_dependencies():
     """Validate/install the default setup dependency set in one pip transaction."""
     pending = []
@@ -358,8 +353,7 @@ def ensure_setup_dependencies():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
-# @features setup
-# @dimensions package-install dependency-pins
+# @matrix setup : dependency-pins package-install
 def _install(package_name, import_name):
     requirement = _pinned_requirement(package_name)
     result = subprocess.run(
@@ -382,8 +376,7 @@ def _install(package_name, import_name):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
-# @features setup
-# @dimensions package-install
+# @pair setup:package-install
 def install_if_missing(import_name, explanation=None, package_name=None):
     """Test import and install if missing.
 

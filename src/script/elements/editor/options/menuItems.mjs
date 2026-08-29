@@ -4,8 +4,7 @@ import { setIcon } from "../../../shared/icons";
 /**
  * @testable true
  * @tests tests_js/test_033_editor_menu_items.py::test_editor_menu_item_serializes_current_active_state
- * @features editor
- * @dimensions menu-active-state dropdown-rerender
+ * @matrix editor : dropdown-rerender menu-active-state
  */
 class ToolbarMenuItem {
 	constructor(toolbar) {

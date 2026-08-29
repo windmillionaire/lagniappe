@@ -4,10 +4,12 @@ from config import constants
 from installer.package_install import install_if_missing
 
 
+PROJECT_OWNER_ROLE = "roles/owner"
+
+
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_iam_principal_member_classifies_google_identities
-# @features setup iam
-# @dimensions identity
+# @matrix iam setup : identity
 def principal_member(email):
     """Return the IAM member string for a Google user or service account."""
     principal_type = (
@@ -70,8 +72,7 @@ def _replace_bindings(policy, bindings):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_iam_reconciliation_is_idempotent_and_preserves_conditions_and_etag
-# @features setup iam
-# @dimensions idempotence conditions etag unrelated-members
+# @matrix iam setup : conditions etag idempotence unrelated-members
 def reconcile_member_roles(
     policy,
     member,
@@ -145,7 +146,7 @@ def reconcile_member_roles(
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_handoff_policy_helpers_remove_only_the_target_member
-# @pairs iam:policy-inspection iam:conditions iam:unrelated-members
+# @matrix iam : conditions policy-inspection unrelated-members
 def policy_member_roles(policy, member, *, include_conditions=True):
     """Return direct roles containing one member without changing the policy."""
     return {
@@ -157,8 +158,43 @@ def policy_member_roles(policy, member, *, include_conditions=True):
 
 
 # @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_permanent_owner_preflight_requires_direct_project_owner_binding
+# @matrix setup : delegated-install owner preflight project-iam
+def require_permanent_owner_binding(project_id, owner_email, *, client=None):
+    """Require the delegated site's permanent Owner to own the project directly."""
+    install_if_missing(
+        "google.cloud.resourcemanager_v3",
+        "Google Resource Manager API",
+        package_name="google-cloud-resource-manager",
+    )
+    if client is None:
+        from google.cloud import resourcemanager_v3
+
+        client = resourcemanager_v3.ProjectsClient()
+
+    policy = client.get_iam_policy(
+        request={
+            "resource": f"projects/{project_id}",
+            "options": {"requested_policy_version": 3},
+        },
+        timeout=30,
+    )
+    member = principal_member(str(owner_email or "").strip().casefold())
+    roles = policy_member_roles(policy, member, include_conditions=False)
+    if PROJECT_OWNER_ROLE in roles:
+        return True
+
+    raise RuntimeError(
+        f"Permanent site Owner {owner_email} must already have a direct "
+        f"{PROJECT_OWNER_ROLE} binding on project {project_id}. Enter the "
+        "Owner's exact Google account email, not a forwarding alias, and have "
+        "a project administrator grant that account Owner before retrying setup."
+    )
+
+
+# @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_handoff_policy_helpers_remove_only_the_target_member
-# @pairs iam:member-removal iam:conditions iam:unrelated-members iam:empty-bindings
+# @matrix iam : conditions empty-bindings member-removal unrelated-members
 def remove_member_bindings(policy, member):
     """Remove one direct member from every binding, including conditional ones."""
     changed = False
@@ -180,8 +216,7 @@ def remove_member_bindings(policy, member):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_operator_permission_preflight_reports_missing_boundaries
-# @features setup iam
-# @dimensions preflight installer deployer
+# @matrix iam setup : deployer installer preflight
 def inspect_operator_permissions(
     project_id,
     *,
@@ -258,8 +293,7 @@ def inspect_operator_permissions(
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_operator_permission_preflight_reports_missing_boundaries
-# @features setup iam
-# @dimensions preflight failure-reporting
+# @matrix iam setup : failure-reporting preflight
 def require_operator_permissions(
     project_id,
     *,
@@ -296,8 +330,7 @@ def require_operator_permissions(
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_installer_bucket_permission_preflight_uses_bucket_resource
-# @features setup storage iam
-# @dimensions preflight installer bucket-scope failure-reporting
+# @matrix iam setup storage : bucket-scope failure-reporting installer preflight
 def require_installer_bucket_permissions(bucket):
     """Require human installer permissions used to reconcile one bucket."""
     required = sorted(set(constants.INSTALLER_BUCKET_PERMISSIONS))

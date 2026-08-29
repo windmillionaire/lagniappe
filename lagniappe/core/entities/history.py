@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from .entity import Entity, EntityProperties
 from ..mixins import AssetMixin, SubmitterMixin
 from ..exceptions import ValidationError
+from ..definitions.identifiers import short_hash
 from ..properties import (
     common_entity,
     common_related,
@@ -11,7 +12,7 @@ from ..properties import (
     task_dates,
     task_related,
 )
-from ..tools import utility
+from ..tools.files.html import strip_tags
 
 
 # @testable true
@@ -19,8 +20,7 @@ from ..tools import utility
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_legacy_task_history_snapshot_text_defaults_to_none
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_fingerprint_ignores_later_form_versions
-# @features task-completion
-# @dimensions history snapshot name description submission schema-version linked-pages asset-copy immutable-fingerprint
+# @matrix task-completion : asset-copy description history immutable-fingerprint legacy linked-pages name schema-version snapshot submission
 class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     """Immutable task snapshot with a stable entity fingerprint.
 
@@ -48,7 +48,7 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
             return None
 
         urlsafe_key = self.urlsafe_key
-        return utility.short_hash(urlsafe_key) if urlsafe_key else None
+        return short_hash(urlsafe_key) if urlsafe_key else None
 
     @property
     def required(self):
@@ -90,8 +90,8 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
-    # @features task-completion, signature
-    # @dimensions history, asset-copy
+    # @matrix task-completion : asset-copy history
+    # @pair signature:asset-copy
     def copy_assets(self, task):
         for name in list(getattr(task, "assets", {}).keys()):
             asset = task.get_asset(name)
@@ -101,10 +101,9 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_clones_another_task_and_existing_history
     # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-    # @pairs task-completion:snapshot task-completion:asset-copy signature:asset-copy
-    # @pairs task-combine:source-snapshot task-combine:existing-history
-    # @pairs task-combine:metadata task-combine:schema-version
-    # @pairs task-combine:attachments task-combine:asset-copy
+    # @matrix task-combine : asset-copy attachments existing-history metadata schema-version source-snapshot
+    # @matrix task-completion : asset-copy snapshot
+    # @pair signature:asset-copy
     @classmethod
     def create(cls, task, overrides=None, *, source=None):
         overrides = dict(overrides or {})
@@ -159,8 +158,7 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
 
 # @testable true
 # @tests tests_unit/test_004_form_properties.py::test_form_save_records_schema_history_on_version_change
-# @features form
-# @dimensions schema-history
+# @pair form:schema-history
 class FormHistory(Entity):
     entity_kind = "form_history"
 
@@ -218,15 +216,8 @@ class FormHistory(Entity):
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_create_copies_document_asset
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_named_versions_order_and_delete_in_bounded_batches
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_named_version_rejects_invalid_name_or_content
-# @pair editor:history-list
-# @pair document-history:asset-copy
-# @pair document-history:named
-# @pair document-history:current-content
-# @pair document-history:asset-path
-# @pair document-history:legacy
-# @pair document-history:ordering
-# @pair document-history:batch-delete
-# @pair document-history:validation
+# @matrix document-history : asset-copy asset-path batch-delete current-content legacy named ordering validation
+# @matrix editor : history-list validation
 class DocumentHistory(AssetMixin, Entity):
     entity_kind = "document_history"
 
@@ -305,7 +296,7 @@ class DocumentHistory(AssetMixin, Entity):
         if not isinstance(value, str):
             raise ValidationError("Version name is required")
 
-        name = utility.strip_tags(value).strip()
+        name = strip_tags(value).strip()
         if not name:
             raise ValidationError("Version name is required")
         if len(name) > cls.MAX_NAME_LENGTH:
@@ -319,7 +310,7 @@ class DocumentHistory(AssetMixin, Entity):
         if not isinstance(value, str) or not value.strip():
             raise ValidationError("Document content is required")
 
-        text = utility.strip_tags(value)
+        text = strip_tags(value)
         markup = value.lower()
         meaningful_markup = any(
             tag in markup

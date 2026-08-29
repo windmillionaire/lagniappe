@@ -33,8 +33,7 @@ class FetchReason(Enum):
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_fetch_requires_registered_reason_for_nested_depth
-# @pair entities:explicit-fetch-depth
-# @pair permissions:registered-reason
+# @pairs entities:explicit-fetch-depth permissions:registered-reason
 @dataclass(frozen=True)
 class Fetch:
     """A caller-owned declaration of the entity graph it needs.

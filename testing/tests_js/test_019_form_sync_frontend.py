@@ -1,8 +1,7 @@
 """Node-backed checks for form rendering and administrative widgets."""
 
 
-# @features admin
-# @dimensions site-settings composite-widgets sections persistence
+# @matrix admin : composite-widgets persistence sections site-settings
 def test_site_settings_coordinates_section_widgets(run_node):
     run_node(
         r"""
@@ -34,6 +33,7 @@ class FakeSection {
 const names = [
   "maintenance",
   "administrators",
+  "installation-access",
   "deployment",
   "ai-models",
   "service-providers",
@@ -93,6 +93,7 @@ vm.runInContext(source, context);
   const expectedWidgets = [
     "SiteMaintenance",
     "SiteAdministrators",
+    "SiteInstallationAccess",
     "SiteDeployment",
     "SiteAiModels",
     "SiteServiceProviders",
@@ -140,8 +141,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features admin
-# @dimensions ai-settings model-options saved-values
+# @matrix admin : ai-settings model-options saved-values
 def test_site_settings_initializes_ai_selects_before_syncing_saved_values(run_node):
     run_node(
         r"""
@@ -200,8 +200,7 @@ if (!calls.includes("set:AI_MODEL:saved-primary") ||
     )
 
 
-# @features admin
-# @dimensions ai-settings model-selection submission
+# @matrix admin : ai-settings model-selection submission
 def test_site_settings_ai_submission_uses_visible_combobox_values(run_node):
     run_node(
         r"""
@@ -276,8 +275,7 @@ if (data.get("AI_IMAGE_MODEL") !== "saved-image" || data.get("AI_LOCATION") !== 
     )
 
 
-# @features forms form-schema
-# @dimensions visibility canonical-list legacy-object-rejected
+# @matrix form-schema forms : canonical-list legacy-object-rejected visibility
 def test_renderer_visibility_requires_canonical_condition_lists(run_node):
     run_node(
         r"""
@@ -360,8 +358,7 @@ renderer.elements.set(target.id, target);
     )
 
 
-# @features forms form-schema
-# @dimensions builder presentation-defaults immutable-schema
+# @matrix form-schema forms : builder immutable-schema presentation-defaults
 def test_builder_model_defaults_are_presentation_only(run_node):
     run_node(
         r"""
@@ -439,8 +436,7 @@ if (linkCall?.attributes?.label !== "Link" || linkCall?.attributes?.icon !== "ou
     )
 
 
-# @features admin database-migrations
-# @dimensions current pending running failed audit-error version-history repairs actionable-links cache-gate
+# @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repairs running version-history
 # @template home/site_settings.html::site_settings
 def test_site_settings_migration_status_uses_generic_release_states(run_node):
     run_node(
@@ -557,6 +553,21 @@ const completed = {
 
 settings._renderMigrationStatus({
   status: "current",
+  current_version: "0.3.0",
+  cache_refresh_allowed: true,
+  counts: { complete: 3, total: 3 },
+  migrations: [
+    { ...completed, source: "fresh-install" },
+    { ...completed, id: "MSG-001", source: "fresh-install" },
+    { ...completed, id: "AST-001", source: "fresh-install" },
+  ],
+});
+if (summary.textContent !== "Version 0.3.0. No site updates are required." || results.childElementCount) {
+  throw new Error(`Fresh-install baselines were exposed as updates: ${summary.textContent}`);
+}
+
+settings._renderMigrationStatus({
+  status: "current",
   current_version: "0.3",
   cache_refresh_allowed: true,
   counts: { complete: 1, total: 1 },
@@ -602,7 +613,7 @@ settings._renderMigrationStatus({
   counts: { complete: 1, pending: 1, failed: 0, interrupted: 0, blocked: 0 },
   migrations: [completed, pending],
 });
-if (title.textContent !== "Site updates are ready" || summary.textContent !== "Version 0.3. 1 pending, 1 previously completed.") {
+if (title.textContent !== "Site updates are ready" || summary.textContent !== "Version 0.3. 1 pending site update.") {
   throw new Error(`Unexpected pending state: ${title.textContent} / ${summary.textContent}`);
 }
 if (updateButton.disabled || !cacheButton.disabled || results.childElementCount !== 2) {

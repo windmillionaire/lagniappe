@@ -40,6 +40,7 @@ from testing.utility.test_entities import TestEntities
 CSV_DIR = Path(__file__).parent.parent / "files"
 
 
+# @pair ingress:size-limit
 @pytest.mark.unit
 def test_ingress_rejects_oversized_csv_before_read():
     upload = SimpleNamespace(
@@ -133,8 +134,7 @@ def set_ingress_csv_payload(ingress, csv_data):
     ingress.properties.rows._asset = csv_data["rows"]
 
 
-# @features ingress
-# @dimensions stage property
+# @matrix ingress : property stage
 def test_stage_returns_property(ingress_entity):
     """ingress.stage returns the Stage orchestrator; name matches Enum member name."""
     stage = ingress_entity.stage
@@ -144,8 +144,7 @@ def test_stage_returns_property(ingress_entity):
     assert ingress_entity.get_process("workflow")["current"] == "PROCESS_CSV"
 
 
-# @features ingress
-# @dimensions stage enum
+# @matrix ingress : enum stage
 def test_stage_set_enum(ingress_entity):
     """Setting stage via IngressStage enum updates db and Stage.name."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -154,8 +153,7 @@ def test_stage_set_enum(ingress_entity):
     assert ingress_entity.get_process("workflow")["current"] == "CHOOSE_TYPE"
 
 
-# @features ingress
-# @dimensions stage string
+# @matrix ingress : stage string
 def test_stage_set_string(ingress_entity):
     """Setting stage with uppercase string key."""
     ingress_entity.properties.stage.value = "CHOOSE_FORM"
@@ -164,16 +162,14 @@ def test_stage_set_string(ingress_entity):
     assert ingress_entity.get_process("workflow")["current"] == "CHOOSE_FORM"
 
 
-# @features ingress
-# @dimensions stage validation
+# @matrix ingress : stage validation
 def test_stage_set_invalid_raises(ingress_entity):
     """Invalid stage value raises."""
     with pytest.raises(ValueError, match="Invalid stage"):
         ingress_entity.properties.stage.value = 12345
 
 
-# @features ingress
-# @dimensions stage default
+# @matrix ingress : default stage
 def test_stage_default():
     """Unversioned ingress rows are rejected instead of guessed."""
     test_spec = {"hash": "ingress002", "name": "New Import", "kind": "ingress"}
@@ -185,8 +181,7 @@ def test_stage_default():
         _ = ingress.stage.name
 
 
-# @features ingress
-# @dimensions stage navigation back
+# @matrix ingress : back navigation stage
 def test_back_moves_to_prior_stage(ingress_entity):
     """Stage.back() moves to previous stage (returns None; check db)."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -198,8 +193,7 @@ def test_back_moves_to_prior_stage(ingress_entity):
     assert ingress_entity.stage.name == "PROCESS_CSV"
 
 
-# @features ingress
-# @dimensions stage navigation first-stage
+# @matrix ingress : first-stage navigation stage
 def test_back_at_first_stage_noop(ingress_entity):
     """Stage.back() at first stage returns None and leaves stage unchanged."""
     ingress_entity.properties.stage.value = IngressStage.PROCESS_CSV
@@ -210,8 +204,7 @@ def test_back_at_first_stage_noop(ingress_entity):
     assert ingress_entity.get_process("workflow")["current"] == "PROCESS_CSV"
 
 
-# @features ingress
-# @dimensions stage navigation finalize
+# @matrix ingress : finalize navigation stage
 def test_next_advances_after_finalize(ingress_entity):
     """Stage.next() finalizes current stage and advances (returns None; check db)."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -224,8 +217,7 @@ def test_next_advances_after_finalize(ingress_entity):
     assert ingress_entity.stage.name == "CHOOSE_PARENT"
 
 
-# @features ingress
-# @dimensions stage status
+# @matrix ingress : stage status
 def test_stage_status(ingress_entity):
     """properties.stage.status(stage) returns the ProcessProperty for that stage."""
     status = ingress_entity.properties.stage.status(IngressStage.PROCESS_CSV)
@@ -234,8 +226,7 @@ def test_stage_status(ingress_entity):
     assert status.section_id == "process_csv"
 
 
-# @features ingress
-# @dimensions choose-type update
+# @matrix ingress : choose-type update
 def test_choose_type_update_via_current_stage_property(ingress_entity):
     """Update current stage data through choose_type.update (Stage has no update)."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -246,8 +237,7 @@ def test_choose_type_update_via_current_stage_property(ingress_entity):
     assert ingress_entity.properties.choose_type.entity_type == "page"
 
 
-# @features ingress
-# @dimensions choose-type clear-downstream
+# @matrix ingress : choose-type clear-downstream
 @pytest.mark.unit
 def test_import_wizard_story_restarts_downstream_choices_when_entity_type_changes(
     ingress_entity,
@@ -283,8 +273,7 @@ def test_import_wizard_story_restarts_downstream_choices_when_entity_type_change
     assert ingress_entity.properties.completed.section == {}
 
 
-# @features ingress form
-# @dimensions choose-form schema-generation default-form
+# @matrix form ingress : choose-form default-form schema-generation
 @pytest.mark.unit
 def test_import_wizard_story_builds_or_selects_the_submission_form(
     sample_csv_data, monkeypatch
@@ -355,8 +344,7 @@ def test_import_wizard_story_builds_or_selects_the_submission_form(
     assert cleared == [True]
 
 
-# @features ingress project
-# @dimensions related-entities parent
+# @matrix ingress project : parent related-entities
 def test_related_entities_project():
     """Setting project establishes parent for project-only import target."""
     project = TestEntities.get("PROJECT", {"hash": "proj001", "name": "Test Project"})
@@ -369,8 +357,7 @@ def test_related_entities_project():
     assert ingress.form is None
 
 
-# @features ingress category form
-# @dimensions related-entities parent
+# @matrix category form ingress : parent related-entities
 def test_related_entities_category_and_form():
     """Setting category; form set explicitly (same outcome as parent=category)."""
     form = TestEntities.get("FORM", {"hash": "form002", "name": "Test Form"})
@@ -386,8 +373,7 @@ def test_related_entities_category_and_form():
     assert ingress.form == form
 
 
-# @features ingress project form task
-# @dimensions related-entities model
+# @matrix form ingress project task : model related-entities
 def test_related_entities_model_project_form():
     """Setting model and project (and form) matches model-as-parent wiring."""
     form = TestEntities.get("FORM", {"hash": "form003", "name": "Test Form"})
@@ -410,8 +396,7 @@ def test_related_entities_model_project_form():
     assert ingress.form == form
 
 
-# @features relations
-# @dimensions validation key-validation
+# @matrix relations : key-validation validation
 @pytest.mark.unit
 def test_related_entity_setter_rejects_values_without_key():
     ingress = make_raw_ingress("Invalid Relation", "page")
@@ -420,8 +405,7 @@ def test_related_entity_setter_rejects_values_without_key():
         ingress.category = SimpleNamespace()
 
 
-# @features ingress
-# @dimensions stage finalize process-complete
+# @matrix ingress : finalize process-complete stage
 def test_finalize_sets_choose_type_complete(ingress_entity):
     """Stage.finalize() runs finalize path on current stage ProcessProperty."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -432,8 +416,7 @@ def test_finalize_sets_choose_type_complete(ingress_entity):
     assert ingress_entity.properties.choose_type.complete is True
 
 
-# @features ingress
-# @dimensions process-state clear
+# @matrix ingress : clear process-state
 def test_stage_clear():
     """clear() on a ProcessProperty resets section-backed fields."""
     test_spec = {"hash": "ingress_clear", "name": "Import", "kind": "ingress"}
@@ -452,8 +435,7 @@ def test_stage_clear():
     assert ingress.properties.choose_type.complete is None
 
 
-# @features ingress
-# @dimensions stage error-handling
+# @matrix ingress : error-handling stage
 @pytest.mark.unit
 def test_import_wizard_story_reports_stage_errors_without_advancing(
     ingress_entity, monkeypatch
@@ -477,8 +459,7 @@ def test_import_wizard_story_reports_stage_errors_without_advancing(
     assert captured == []
 
 
-# @features ingress
-# @dimensions process-csv upload-counts rows asset-storage
+# @matrix ingress : asset-storage process-csv rows upload-counts
 @pytest.mark.unit
 def test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns(
     sample_csv_data,
@@ -516,8 +497,7 @@ def test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns(
     }
 
 
-# @features ingress
-# @dimensions choose-parent parent model form-reset
+# @matrix ingress : choose-parent form-reset model parent
 @pytest.mark.unit
 def test_import_wizard_story_reuses_or_creates_the_parent_before_form_mapping(
     monkeypatch,
@@ -615,8 +595,7 @@ def test_import_wizard_story_reuses_or_creates_the_parent_before_form_mapping(
     ]
 
 
-# @features ingress relations
-# @dimensions existing-parent model-load required-validation
+# @matrix ingress relations : existing-parent model-load required-validation
 @pytest.mark.unit
 def test_import_wizard_existing_model_parent_loads_project_for_required(monkeypatch):
     project = TestEntities.get(
@@ -660,8 +639,7 @@ def test_import_wizard_existing_model_parent_loads_project_for_required(monkeypa
     assert model.required == ["models", model.hash, project.hash]
 
 
-# @features requires
-# @dimensions validation unloaded-relation
+# @matrix requires : unloaded-relation validation
 @pytest.mark.unit
 def test_model_task_required_reports_unloaded_project_relation(monkeypatch):
     monkeypatch.setattr(
@@ -686,8 +664,7 @@ def test_model_task_required_reports_unloaded_project_relation(monkeypatch):
         model.properties.requires.update()
 
 
-# @features ingress
-# @dimensions assign-columns table-fields ignored-columns guessed-fields task-name multiple-columns
+# @matrix ingress : assign-columns guessed-fields ignored-columns multiple-columns table-fields task-name
 @pytest.mark.unit
 def test_import_wizard_story_maps_csv_columns_to_page_task_and_table_fields(
     get_schema,
@@ -777,8 +754,7 @@ def test_import_wizard_story_maps_csv_columns_to_page_task_and_table_fields(
     assert assign.field("row-emailef34")["description"] == "{ Email }"
 
 
-# @features ingress
-# @dimensions assign-columns stale-field
+# @matrix ingress : assign-columns stale-field
 @pytest.mark.unit
 def test_import_wizard_stale_form_field_mapping_is_ignored(get_schema):
     ingress = TestEntities.get(
@@ -813,8 +789,7 @@ def test_import_wizard_stale_form_field_mapping_is_ignored(get_schema):
     assert assign.field_map == {"name": ["col-name"]}
 
 
-# @features ingress link
-# @dimensions assign-columns fuzzy-match internal table-fields
+# @matrix ingress link : assign-columns fuzzy-match internal table-fields
 @pytest.mark.unit
 def test_import_wizard_internal_link_fields_offer_fuzzy_import(get_schema):
     ingress = TestEntities.get(
@@ -853,8 +828,7 @@ def test_import_wizard_internal_link_fields_offer_fuzzy_import(get_schema):
     assert verify.fuzzy_match("row_rel") is True
 
 
-# @features ingress
-# @dimensions verify-import page-lookup fuzzy-match
+# @matrix ingress : fuzzy-match page-lookup verify-import
 @pytest.mark.unit
 def test_task_import_story_chooses_page_lookup_fields_before_rows_are_imported(
     get_schema, monkeypatch
@@ -940,8 +914,7 @@ def test_task_import_story_chooses_page_lookup_fields_before_rows_are_imported(
     assert verify.fuzzy_match("input-textab12") is True
 
 
-# @features ingress
-# @dimensions import-pages row-results validation-errors asset-storage
+# @matrix ingress : asset-storage import-pages row-results validation-errors
 @pytest.mark.unit
 def test_importer_story_processes_page_rows_into_entities_and_results(monkeypatch):
     field = SimpleNamespace(
@@ -1010,8 +983,7 @@ def test_importer_story_processes_page_rows_into_entities_and_results(monkeypatc
     assert "entity" not in imported[1]
 
 
-# @features ingress
-# @dimensions import-pages list-normalization entity-name
+# @matrix ingress : entity-name import-pages list-normalization
 @pytest.mark.unit
 def test_importer_story_space_joins_entity_name_fallback(get_schema, monkeypatch):
     form = TestEntities.get("FORM", {"hash": "name_fallback_form", "name": "Form"})
@@ -1059,8 +1031,7 @@ def test_importer_story_space_joins_entity_name_fallback(get_schema, monkeypatch
     assert page.db["description"] == "General Contractor"
 
 
-# @features ingress
-# @dimensions task-import page-match completion-history due-date task-name multiple-columns
+# @matrix ingress : completion-history due-date multiple-columns page-match task-import task-name
 @pytest.mark.unit
 def test_importer_story_creates_tasks_for_matched_pages_and_records_history(
     monkeypatch,
@@ -1237,8 +1208,7 @@ def test_importer_story_creates_tasks_for_matched_pages_and_records_history(
     assert result == {}
 
 
-# @features ingress
-# @dimensions task-import row-task existing-model-task completion-history live-completion multiple-columns
+# @matrix ingress : completion-history existing-model-task live-completion multiple-columns row-task task-import
 @pytest.mark.unit
 def test_task_import_creates_distinct_tasks_per_row_with_same_row_completion_history(
     monkeypatch,
@@ -1429,8 +1399,7 @@ def test_task_import_creates_distinct_tasks_per_row_with_same_row_completion_his
     assert result == {}
 
 
-# @features ingress
-# @dimensions task-import completion-history name description
+# @matrix ingress : completion-history description name task-import
 @pytest.mark.unit
 def test_importer_records_older_completion_snapshot_text():
     form = SimpleNamespace(key="history-form")
@@ -1465,8 +1434,7 @@ def test_importer_records_older_completion_snapshot_text():
     assert imported == [(values, importing)]
 
 
-# @features ingress
-# @dimensions task-import page-match fuzzy-match
+# @matrix ingress : fuzzy-match page-match task-import
 @pytest.mark.unit
 def test_importer_task_page_lookup_uses_shared_find_page(monkeypatch):
     calls = []
@@ -1496,7 +1464,7 @@ def test_importer_task_page_lookup_uses_shared_find_page(monkeypatch):
             "errors": [],
         }
 
-    monkeypatch.setattr(file_ingress.files, "find_page", find_page)
+    monkeypatch.setattr(ingress_service.files, "find_page", find_page)
 
     importing = ingress_service.IngressMutationPlanner(entity)
     result = {}
@@ -1506,8 +1474,7 @@ def test_importer_task_page_lookup_uses_shared_find_page(monkeypatch):
     assert result == {"warnings": ["Weak match for Name: 'Target Page'"]}
 
 
-# @features ingress
-# @dimensions completed row-results
+# @matrix ingress : completed row-results
 @pytest.mark.unit
 def test_completed_ingress_shows_results():
     ingress = TestEntities.get(
@@ -1533,8 +1500,7 @@ def test_completed_ingress_shows_results():
     assert saved_assets == [(results, "results", "json", "private")]
 
 
-# @features ingress
-# @dimensions row-results asset-storage regression
+# @matrix ingress : asset-storage regression row-results
 @pytest.mark.unit
 def test_results_asset_loads_stored_json_without_recursing():
     ingress = make_raw_ingress("Stored Results", "page")
@@ -1553,8 +1519,7 @@ def test_results_asset_loads_stored_json_without_recursing():
     assert calls == ["results"]
 
 
-# @features ingress
-# @dimensions row-results delete
+# @matrix ingress : delete row-results
 @pytest.mark.unit
 def test_ingress_results_remove_deleted_imported_entities():
     ingress = make_raw_ingress("Remove Results", "page")
@@ -1581,8 +1546,7 @@ def test_ingress_results_remove_deleted_imported_entities():
     assert saved_assets == [(list(results), "results", "json", "private")]
 
 
-# @features ingress
-# @dimensions row-results delete reload
+# @matrix ingress : delete reload row-results
 @pytest.mark.unit
 def test_ingress_results_prune_missing_entities(monkeypatch):
     ingress = make_raw_ingress("Prune Results", "page")
@@ -1616,8 +1580,7 @@ def test_ingress_results_prune_missing_entities(monkeypatch):
     assert saved_assets == [(list(results), "results", "json", "private")]
 
 
-# @features ingress
-# @dimensions row-results delete bulk-delete
+# @matrix ingress : bulk-delete delete row-results
 @pytest.mark.unit
 def test_ingress_delete_imported_entities_deletes_pages_and_tasks(monkeypatch):
     ingress = make_raw_ingress("Bulk Delete Results", "page")

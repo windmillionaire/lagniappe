@@ -1,0 +1,357 @@
+"""Public-page discovery, document-image, and social metadata services."""
+
+from dataclasses import dataclass
+from urllib.parse import urlsplit
+from xml.etree import ElementTree
+
+from bs4 import BeautifulSoup
+
+from config.public_pages import normalize_public_page_settings
+from lagniappe import CONFIG
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions.manual import MANUAL_SECTIONS
+from lagniappe.core.entities import Entities
+from lagniappe.core.exceptions import capture
+from lagniappe.core.properties.page_public import normalize_public_settings
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import site as site_database
+from lagniappe.core.tools.email.notifications.links import absolute_url
+from lagniappe.core.tools.files.html import strip_tags
+from lagniappe.core.tools.mentions.content import sanitize_mentions
+
+
+SITEMAP_URL_LIMIT = 50_000
+PUBLIC_DIRECTORY_SCHEMA = 1
+PUBLIC_DIRECTORY_FALLBACK_ID = "public-pages"
+PUBLIC_DIRECTORY_FALLBACK_NAME = "Public Pages"
+
+
+class SitemapLimitError(RuntimeError):
+    """A single sitemap cannot safely represent all discoverable pages."""
+
+
+@dataclass(frozen=True)
+class DocumentImage:
+    """One page-owned image that is actually embedded in its document."""
+
+    name: str
+    url: str
+    alt: str
+    content_type: str
+    fingerprint: str | None
+    extension: str | None
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_public_page_runtime_settings_prefer_live_datastore_and_fail_closed
+# @matrix public-pages : config-fallback live-settings
+def runtime_settings(config=CONFIG):
+    """Read live site discovery settings, falling back to deployed config."""
+    fallback = {
+        "PUBLIC_PAGE_INDEXING": getattr(config, "PUBLIC_PAGE_INDEXING", False)
+    }
+    try:
+        stored = site_database.public_pages()
+        return normalize_public_page_settings(stored, current_settings=fallback)
+    except Exception as error:
+        capture(error, context={"operation": "public-page-settings-read"})
+        return normalize_public_page_settings(fallback)
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/site/public_pages.py::document_images
+# @reason URL equivalence is exercised through document-image extraction
+def _same_asset_url(source, asset_url):
+    source = urlsplit(str(source or ""))
+    target = urlsplit(str(asset_url or ""))
+    if not source.path or source.path != target.path:
+        return False
+    return not target.netloc or source.netloc == target.netloc
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_public_document_images_only_include_embedded_page_assets
+# @matrix public-pages : document-image privacy preview
+def document_images(page):
+    """Return unique page-owned document images in their document order."""
+    soup = BeautifulSoup(page.properties.document.html or "", "html.parser")
+    assets = {}
+    for name, definition in page.assets.items():
+        if not name.startswith("image_") or definition.get("type") != "image":
+            continue
+        asset = page.get_asset(name)
+        if asset:
+            assets[name] = asset
+
+    candidates = []
+    seen = set()
+    for node in soup.find_all("img"):
+        source = node.get("src")
+        match = next(
+            (
+                (name, asset)
+                for name, asset in assets.items()
+                if _same_asset_url(source, asset.url)
+            ),
+            None,
+        )
+        if not match or match[0] in seen:
+            continue
+        name, asset = match
+        seen.add(name)
+        candidates.append(
+            DocumentImage(
+                name=name,
+                url=asset.url,
+                alt=str(node.get("alt") or "").strip(),
+                content_type=asset.content_type,
+                fingerprint=asset.fingerprint,
+                extension=asset.extension,
+            )
+        )
+    return candidates
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_public_document_rewrites_only_embedded_page_images
+# @matrix public-pages : document-image public-rendering
+def public_document_html(page, image_url):
+    """Sanitize mentions and rewrite embedded private images to public URLs."""
+    soup = BeautifulSoup(
+        sanitize_mentions(page.properties.document.html or ""),
+        "html.parser",
+    )
+    candidates = document_images(page)
+    for node in soup.find_all("img"):
+        candidate = next(
+            (
+                item
+                for item in candidates
+                if _same_asset_url(node.get("src"), item.url)
+            ),
+            None,
+        )
+        if candidate:
+            node["src"] = image_url(candidate)
+    return str(soup), candidates
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_public_metadata_uses_safe_fallbacks_and_selected_document_image
+# @matrix public-pages : metadata privacy social-preview
+def metadata(page, *, canonical_url, site_image_url, public_image_url, indexing):
+    """Build privacy-safe canonical, robots, Open Graph, and Twitter metadata."""
+    settings = normalize_public_settings(page.public_settings)
+    document, candidates = public_document_html(page, public_image_url)
+    title = settings["title"] or page.name
+    description = settings["description"] or strip_tags(document)[:300].strip()
+    description = description or f"Public page: {title}"
+    selected = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.name == settings["preview_image_asset"]
+        ),
+        None,
+    )
+    image = public_image_url(selected) if selected else site_image_url
+    image_alt = (selected.alt if selected else "") or (
+        f"Preview for {title}" if selected else f"{CONFIG.APP_NAME} site image"
+    )
+    return {
+        "canonical_url": canonical_url,
+        "title": title,
+        "description": description,
+        "robots": (
+            "index, follow"
+            if indexing and settings["allow_indexing"]
+            else "noindex, follow"
+        ),
+        "site_name": CONFIG.APP_NAME,
+        "image": image,
+        "image_alt": image_alt,
+        "image_type": selected.content_type if selected else "image/png",
+        "image_width": None if selected else 512,
+        "image_height": None if selected else 512,
+        "twitter_card": "summary_large_image" if selected else "summary",
+        "document": document,
+    }
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/site/public_pages.py::manual_metadata
+# @covered-by lagniappe/core/tools/site/public_pages.py::discoverable_manual_urls
+# @reason canonical manual paths are exercised through metadata and sitemap URLs
+def _manual_path(section):
+    key = section["key"]
+    return "/manual/" if key == "overview" else f"/manual/{key}"
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_public_manual_metadata_and_urls_are_canonical
+# @matrix manual : canonical-url metadata search-discovery
+def manual_metadata(section, *, indexing, app_name=CONFIG.APP_NAME):
+    """Build public-safe search metadata for one full manual section."""
+    path = _manual_path(section)
+    name = section["name"]
+    return {
+        "path": path,
+        "canonical_url": absolute_url(path),
+        "title": f"{name} — {app_name} Manual",
+        "description": f"Read the {name} section of the {app_name} manual.",
+        "robots": "index, follow" if indexing else "noindex, follow",
+    }
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_public_manual_metadata_and_urls_are_canonical
+# @matrix manual sitemap : canonical-url public-url
+def discoverable_manual_urls():
+    """Return every canonical URL in the static public-manual catalog."""
+    return [absolute_url(_manual_path(section)) for section in MANUAL_SECTIONS]
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_manual_directory_group_preserves_authored_section_order
+# @matrix manual public-directory : authored-order public-url
+def manual_directory_group():
+    """Return the static manual as one directory group in authored order."""
+    return {
+        "id": "manual",
+        "name": "Manual",
+        "pages": [
+            {
+                "path": _manual_path(section),
+                "title": section["name"],
+                "description": None,
+            }
+            for section in MANUAL_SECTIONS
+        ],
+    }
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_robots_text_allows_public_surface_and_advertises_enabled_sitemap
+# @matrix public-pages robots : disabled enabled public-assets
+# @matrix manual robots : disabled enabled fragment
+def robots_text(indexing, *, sitemap_url, public_manual=False):
+    """Return crawler rules that block the app while allowing public surfaces."""
+    lines = [
+        "User-agent: *",
+        "Disallow: /",
+        "Allow: /public/",
+        "Allow: /pages/public/",
+        "Allow: /style.css",
+        "Allow: /script.js",
+        "Allow: /chunks/",
+        "Allow: /fonts/",
+        "Allow: /images/",
+        "Allow: /favicon.ico",
+    ]
+    if public_manual:
+        lines.extend(("Allow: /manual/", "Disallow: /manual/section/"))
+    if indexing:
+        lines.extend(("Allow: /sitemap.xml", f"Sitemap: {sitemap_url}"))
+    return "\n".join(lines) + "\n"
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_sitemap_xml_is_sorted_deduped_and_fails_closed_at_limit
+# @matrix public-pages sitemap : dedupe limit sorted xml
+def sitemap_xml(urls):
+    """Build one deterministic URL-only sitemap, failing rather than truncating."""
+    urls = sorted(set(urls))
+    if len(urls) > SITEMAP_URL_LIMIT:
+        raise SitemapLimitError(
+            f"Public sitemap contains more than {SITEMAP_URL_LIMIT} URLs."
+        )
+    root = ElementTree.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
+    for url in urls:
+        entry = ElementTree.SubElement(root, "url")
+        ElementTree.SubElement(entry, "loc").text = url
+    return ElementTree.tostring(root, encoding="unicode", xml_declaration=True)
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents
+# @tests tests_unit/test_026_site_admin.py::test_public_directory_snapshot_skips_page_query_when_discovery_is_off
+# @matrix public-pages public-directory : active category description disabled opt-out public-url query-avoidance sorting
+def public_directory_snapshot():
+    """Build the privacy-bounded catalog stored for anonymous directory reads."""
+    indexing = runtime_settings()["PUBLIC_PAGE_INDEXING"]
+    snapshot = {
+        "schema": PUBLIC_DIRECTORY_SCHEMA,
+        "site_indexing": indexing,
+        "groups": [],
+    }
+    if not indexing:
+        return snapshot
+
+    pages = Entities.fetch(
+        *database_get.discoverable_page_rows(),
+        request=Fetch.direct(),
+    )
+    groups = {}
+    for page in pages:
+        settings = normalize_public_settings(getattr(page, "public_settings", None))
+        if (
+            getattr(page, "entity_kind", None) != "page"
+            or not getattr(page, "active", False)
+            or not page.is_public
+            or not settings["allow_indexing"]
+        ):
+            continue
+        public_id = page.db.get("public_id")
+        if not public_id:
+            continue
+
+        selected_key = settings["directory_category"]
+        selected = next(
+            (
+                category
+                for category in page.categories
+                if selected_key and category.urlsafe_key == selected_key
+            ),
+            None,
+        )
+        group_id = (
+            f"category:{selected.urlsafe_key}"
+            if selected
+            else PUBLIC_DIRECTORY_FALLBACK_ID
+        )
+        group = groups.setdefault(
+            group_id,
+            {
+                "id": group_id,
+                "name": selected.name if selected else PUBLIC_DIRECTORY_FALLBACK_NAME,
+                "pages": [],
+            },
+        )
+        group["pages"].append(
+            {
+                "path": f"/pages/public/{public_id}",
+                "title": settings["title"] or page.name,
+                # Directory cards never derive an excerpt from document content.
+                "description": settings["description"],
+            }
+        )
+
+    for group in groups.values():
+        group["pages"].sort(key=lambda page: page["title"].casefold())
+    snapshot["groups"] = sorted(
+        groups.values(),
+        key=lambda group: group["name"].casefold(),
+    )
+    return snapshot
+
+
+# @testable true
+# @tests tests_unit/test_026_site_admin.py::test_discoverable_page_urls_use_cached_directory_snapshot
+# @matrix public-pages sitemap public-directory : shared-catalog public-url
+def discoverable_page_urls(snapshot):
+    """Return absolute page URLs from the shared public-directory catalog."""
+    return [
+        absolute_url(page["path"])
+        for group in snapshot["groups"]
+        for page in group["pages"]
+    ]

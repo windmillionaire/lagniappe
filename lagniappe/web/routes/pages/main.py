@@ -1,6 +1,8 @@
-from flask import abort, request
+from flask import Response, abort, g, request
 from flask_login import current_user
 
+from lagniappe.core import exceptions
+from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import (
     AI,
@@ -8,8 +10,14 @@ from lagniappe.core.definitions import (
     FileConsumerLimitError,
     enforce_file_consumer,
 )
-from lagniappe.core.tools import ai, database
-from lagniappe.core.tools.form_state import is_form_field, offline_replay_conflicts
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.site import public_pages as public_page_service
+from lagniappe.core.tools.auth.references import (
+    SubmittedReferenceResolver,
+    UNAVAILABLE_REFERENCE_ERROR,
+)
+from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
 from lagniappe.core.definitions import PageAttributes, Action, Fetch, Resource
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -27,8 +35,7 @@ from . import pages
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_file_and_photo_actions_are_forbidden
-# @features public-users
-# @dimensions own-page file-photo-gates
+# @matrix public-users : file-photo-gates own-page
 def _is_public_users_own_page(page):
     return bool(
         getattr(current_user, "is_public", False)
@@ -38,9 +45,7 @@ def _is_public_users_own_page(page):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_preloads_existing_groups
-# @pair user-settings:group-selector
-# @pair user-settings:preload
-# @pair user-settings:relation-loading
+# @matrix user-settings : group-selector preload relation-loading
 def _load_user_settings_groups(page):
     """Attach group relations needed by another user's settings selector."""
     is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
@@ -51,8 +56,7 @@ def _load_user_settings_groups(page):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
-# @features public-users
-# @dimensions attribute-preservation
+# @pair public-users:attribute-preservation
 def _preserve_public_user_page_attributes(page, page_data):
     if not getattr(current_user, "is_public", False):
         return
@@ -71,8 +75,7 @@ def _preserve_public_user_page_attributes(page, page_data):
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_is_forbidden_without_model_or_page_permission
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_sees_document_tab_only_when_content_exists
-# @features pages
-# @dimensions load tabs permission-gates readonly document-tab
+# @matrix pages : document-tab load permission-gates readonly tabs
 @pages.route("<key>", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def view(key, **kwargs):
@@ -83,7 +86,7 @@ def view(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @pairs ai:autofill ai:deferred ai:completion-refresh
+# @matrix ai : autofill completion-refresh deferred
 @pages.route("<key>/info/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def info(key, **kwargs):
@@ -121,8 +124,7 @@ def document_settings(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
-# @features tasks
-# @dimensions create basic
+# @matrix tasks : basic create
 @pages.route("<key>/tasks", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def tasks(key, **kwargs):
@@ -133,8 +135,7 @@ def tasks(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_sees_empty_files_tab_without_upload_affordances
-# @features files
-# @dimensions readonly empty-state permission-gates async-load
+# @matrix files : async-load empty-state permission-gates readonly
 @pages.route("<key>/files", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def files(key, **kwargs):
@@ -158,23 +159,54 @@ def _page_data(form, page=None, category=None):
     # nested fetch.
     if page and isinstance(page.model, Entities.USERS):
         entities.extend((page.model, page.user))
-    for e in ["category", "form", "model", "group", "reassign-page"]:
+    for e in ["model", "group", "reassign-page"]:
         entities.extend(form.getlist(e))
     loaded = {
         e.urlsafe_key: e for e in Entities.fetch(*entities, request=Fetch.direct())
     }
 
     attributes = [a.name for a in PageAttributes if form.get(a.name)]
+    category_keys = form.getlist("category")
+    form_key = form.get("form")
+    resolver = SubmittedReferenceResolver(
+        current_user,
+        *category_keys,
+        form_key,
+    )
+    current_categories = list(page.categories) if page else []
+    categories = resolver.many(
+        category_keys,
+        expected=Entities.CATEGORY,
+        action=Action.VIEW,
+        existing=current_categories,
+    )
+    selected_category_keys = {selected.key for selected in categories}
+    categories.extend(
+        current
+        for current in current_categories
+        if current.key not in selected_category_keys
+        and not current.allowed(Action.VIEW, user=current_user)
+    )
+    current_form = page.form if page else None
+    selected_form = resolver.one(
+        form_key,
+        expected=Entities.FORM,
+        action=Action.VIEW,
+        existing=current_form,
+        predicate=lambda candidate: candidate.form_type == "page",
+    )
+    if not form_key and current_form and not current_form.allowed(
+        Action.VIEW, user=current_user
+    ):
+        selected_form = current_form
 
     page_data = {
         "name": form.get("name"),
         "description": form.get("description"),
         "email": form.get("email"),
         "attributes": attributes,
-        "categories": [
-            loaded.get(k) for k in form.getlist("category") if loaded.get(k)
-        ],
-        "form": loaded.get(form.get("form")),
+        "categories": categories,
+        "form": selected_form,
         "model": loaded.get(category.urlsafe_key) if category else None,
         "groups": [loaded.get(k) for k in form.getlist("group") if loaded.get(k)],
     }
@@ -185,9 +217,7 @@ def _page_data(form, page=None, category=None):
     if "ai_access" in form:
         page_data["ai_access"] = form.get("ai_access")
     if "notification_email_mode" in form:
-        page_data["notification_email_mode"] = form.get(
-            "notification_email_mode"
-        )
+        page_data["notification_email_mode"] = form.get("notification_email_mode")
     if "allow_site_email" in form:
         page_data["allow_site_email"] = form.get("allow_site_email") == "true"
     for toggle in ("allow_messages_and_mentions", "allow_task_assignments"):
@@ -226,25 +256,23 @@ def _autofill_data(page, request, create=False):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
-# @features pages
-# @dimensions form-switch info-form
+# @matrix pages : form-switch info-form
 def _page_form_submission_response(page):
     return responses.form_submission(page)
 
 
 # @testable true
 # @scaffolding testing/resources/page.py::Page.submit_and_verify_submission
-# @pairs pages:submission pages:default-form pages:basic-inputs
-# @pairs pages:selection-fields pages:link-field
+# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_submission_rejects_hidden_internal_link_target
+# @matrix pages : basic-inputs default-form link-field selection-fields submission submitted-reference
 def _apply_page_submission(page, form):
-    page.form_submission(form)
+    page.form_submission(form, actor=current_user)
 
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_remove_category_from_page
-# @features pages
-# @dimensions category-add category-remove
+# @matrix pages : category-add category-remove
 def _apply_page_metadata_update(page, page_data, user=None):
     page.update(page_data)
     if page.user:
@@ -253,8 +281,7 @@ def _apply_page_metadata_update(page, page_data, user=None):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
-# @features user-settings
-# @dimensions submit-boundary attached-form categories restrictions
+# @matrix user-settings : attached-form categories restrictions submit-boundary
 def _apply_user_settings_update(page, page_data, user=None):
     if not page.user:
         return
@@ -296,9 +323,19 @@ def update(key, **kwargs):
 
     if request.method == "GET":
         if request.values.get("form"):
-            page.form = Entities.fetch_one(
-                request.values.get("form"), request=Fetch.direct()
-            )
+            try:
+                page.form = SubmittedReferenceResolver(
+                    current_user,
+                    request.values.get("form"),
+                ).one(
+                    request.values.get("form"),
+                    expected=Entities.FORM,
+                    action=Action.VIEW,
+                    predicate=lambda candidate: candidate.form_type == "page",
+                    required=True,
+                )
+            except exceptions.ValidationError:
+                abort(404)
         return _page_form_submission_response(page)
     elif not page.allowed(Action.EDIT):
         abort(403)
@@ -320,7 +357,10 @@ def update(key, **kwargs):
     old_attributes = [a.name for a in page.attributes if page.has(a.name)]
     old_image = page.image.path if page.image else None
 
-    page_data = _page_data(request.form, page=page)
+    try:
+        page_data = _page_data(request.form, page=page)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     _preserve_public_user_page_attributes(page, page_data)
 
     if role == "user-settings":
@@ -339,7 +379,10 @@ def update(key, **kwargs):
         require_ai_access(AI.CREATE)
         _apply_page_metadata_update(page, page_data, user=current_user)
         if page.form:
-            _apply_page_submission(page, request)
+            try:
+                _apply_page_submission(page, request)
+            except exceptions.ValidationError as error:
+                return responses.error(str(error))
         if role == "explain":
             try:
                 prompt = ai.form_autofill_prompt(**_autofill_data(page, request))
@@ -361,7 +404,10 @@ def update(key, **kwargs):
         )
     else:
         _apply_page_metadata_update(page, page_data, user=current_user)
-        _apply_page_submission(page, request)
+        try:
+            _apply_page_submission(page, request)
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
 
     page.save()
     if _is_offline_replay(request.form):
@@ -412,8 +458,7 @@ def _set_page_attribute(page, attribute, active):
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_page_attribute_toggle_updates_tabs_without_reload
 # @tests tests_e2e/005_pages/test_005f_page_image.py::test_empty_page_photo_prompt_can_disable_photo_without_reload
-# @features pages
-# @dimensions attributes-live-toggle photo-prompt photo-disable tabs no-reload
+# @matrix pages : attributes-live-toggle no-reload photo-disable photo-prompt tabs
 @pages.route("<key>/attributes/<attribute>", methods=["PUT"])
 @permission(Resource.PAGE, Action.EDIT)
 def set_attribute(key, attribute, **kwargs):
@@ -438,8 +483,7 @@ def set_attribute(key, attribute, **kwargs):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_updates_text_cell
-# @features category-index
-# @dimensions quick-edit editable-cell
+# @matrix category-index : editable-cell quick-edit
 @pages.route("<key>/patch", methods=["PATCH"])
 @permission(Resource.PAGE, Action.EDIT)
 def patch(key, **kwargs):
@@ -464,6 +508,14 @@ def patch(key, **kwargs):
         field = page.properties.submission.fields.get(schema_id)
         if not field or not field.editable:
             return responses.error("Field cannot be edited")
+        try:
+            page.validate_browser_submission_references(
+                {schema_id: value},
+                actor=current_user,
+                normalized=True,
+            )
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
         field = page.properties.submission.patch(schema_id, value)
         page.save_submission()
 
@@ -480,16 +532,19 @@ def patch(key, **kwargs):
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_from_category_index
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
-# @features pages
-# @dimensions create category-index mobile-tools
+# @matrix pages : category-index create mobile-tools
+# @pair deferred-jobs:hosted-e2e
 @pages.route("<key>/create", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def create(key, **kwargs):
     """Create a page within a category. Key is the category key, not a page key."""
     category = kwargs["entity"]
 
-    create_data = _page_data(request.form, category=category)
-    page = Entities.PAGE.create(create_data)
+    try:
+        create_data = _page_data(request.form, category=category)
+        page = Entities.PAGE.create(create_data)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     role = request.form.get("role")
 
     if role == "autofill-submit" and request.files.get("autofill-file"):
@@ -511,7 +566,10 @@ def create(key, **kwargs):
                 )
 
         if page.form:
-            _apply_page_submission(page, request)
+            try:
+                _apply_page_submission(page, request)
+            except exceptions.ValidationError as error:
+                return responses.error(str(error))
         page.save()
         deferred_response = deferred_autofill.start_deferred_autofill(
             page,
@@ -557,8 +615,7 @@ def create_direct(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002k_home_pages.py::test_create_page_from_home
-# @features home pages
-# @dimensions create category-select default-category
+# @matrix home pages : category-select create default-category
 @pages.route("create", methods=["POST"])
 @logged_in
 def create_from_home():
@@ -581,12 +638,20 @@ def create_from_home():
         if not category.allowed(Action.EDIT, current_user):
             return responses.error("Choose a category before creating this page.")
 
-    create_data = _page_data(request.form, category=category)
+    try:
+        create_data = _page_data(request.form, category=category)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     create_data["model"] = category
     create_data["categories"] = [
         c for c in create_data.get("categories", []) if c and c.key != category.key
     ]
     if not create_data.get("form") and category.form:
+        if (
+            category.form.form_type != "page"
+            or not category.form.allowed(Action.VIEW, user=current_user)
+        ):
+            return responses.error(UNAVAILABLE_REFERENCE_ERROR)
         create_data["form"] = category.form
 
     page = Entities.PAGE.create(create_data)
@@ -598,8 +663,8 @@ def create_from_home():
 # @testable true
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_delete_page_from_title_menu
-# @features pages
-# @dimensions delete title-menu parentless
+# @matrix pages : delete parentless title-menu
+# @pair entities:delete
 @pages.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.PAGE, Action.DELETE)
 def delete(key, **kwargs):
@@ -628,14 +693,39 @@ def delete(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
-# @features pages
-# @dimensions document-visibility public private
+# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
+# @matrix pages : document-visibility private public
+# @matrix public-pages : metadata preview
+# @pair public-directory:category
 @pages.route("<key>/visibility", methods=["PUT"])
 @permission(Resource.PAGE, Action.PUBLISH)
 def visibility(key, **kwargs):
     page = kwargs["entity"]
 
-    page.is_public = True if request.form["visibility"] == "public" else False
+    page.is_public = request.form.get("visibility") == "public"
+    if request.form.get("public-settings-present") == "true":
+        preview = request.form.get("preview-image-asset") or None
+        directory_category = request.form.get("directory-category") or None
+        valid_images = {
+            image.name for image in public_page_service.document_images(page)
+        }
+        if preview and preview not in valid_images:
+            return responses.error("Preview image must be used in this page's document.")
+        valid_categories = {category.urlsafe_key for category in page.categories}
+        if directory_category and directory_category not in valid_categories:
+            return responses.error(
+                "Directory category must be attached to this page."
+            )
+        try:
+            page.public_settings = {
+                "allow_indexing": request.form.get("allow-indexing") == "true",
+                "title": request.form.get("public-title"),
+                "description": request.form.get("public-description"),
+                "preview_image_asset": preview,
+                "directory_category": directory_category,
+            }
+        except ValidationError as error:
+            return responses.error(error)
     if page.is_public:
         page.public_id
     Entities.save(page)
@@ -647,12 +737,12 @@ def visibility(key, **kwargs):
 # @tests tests_unit/test_008_page_properties.py::test_page_public
 # @tests tests_unit/test_008_page_properties.py::test_page_to_cache_public_user
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
-# @features pages
-# @dimensions public-document
+# @matrix page : public public-user
+# @pair pages:public-document
 @pages.route("public/<public_id>", methods=["GET"])
 def public(public_id):
     public_pages = Entities.fetch(
-        *database.get.public_pages(public_id), request=Fetch.root()
+        *database_get.public_pages(public_id), request=Fetch.root()
     )
     page = next((page for page in public_pages if page.is_public), None)
 
@@ -663,17 +753,50 @@ def public(public_id):
 
 
 # @testable true
+# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
+# @matrix public-pages : document-image public-route revocation
+@pages.route("public/<public_id>/images/<asset_name>", methods=["GET", "HEAD"])
+def public_image(public_id, asset_name):
+    candidates = Entities.fetch(
+        *database_get.public_pages(public_id),
+        request=Fetch.root(),
+    )
+    page = next((candidate for candidate in candidates if candidate.is_public), None)
+    if not page:
+        abort(404)
+
+    asset_key = asset_name.split(".", 1)[0]
+    referenced = {
+        image.name: image for image in public_page_service.document_images(page)
+    }
+    if asset_key not in referenced:
+        abort(404)
+    asset = page.get_asset(asset_key)
+    if not asset:
+        abort(404)
+
+    g.NO_CACHE = True
+    if request.method == "HEAD":
+        response = Response("", mimetype=asset.content_type)
+        if asset.size is not None:
+            response.headers["Content-Length"] = str(asset.size)
+        return response
+    content = asset.get()
+    if content is None:
+        abort(404)
+    return Response(content, mimetype=asset.content_type)
+
+
+# @testable true
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_owner_can_open_page_permissions_panel
-# @features pages
-# @dimensions permissions-panel permission-gates
+# @matrix pages : permission-gates permissions-panel
 def _page_view_access_response(page):
     return responses.page_view_access(page)
 
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_owner_restricted_page_is_hidden_from_model_viewer
-# @features pages
-# @dimensions access-restrictions owner-restricted
+# @matrix pages : access-restrictions owner-restricted
 def _apply_owner_access_restriction(page, owner):
     if owner == "add":
         page.groups = None
@@ -684,8 +807,7 @@ def _apply_owner_access_restriction(page, owner):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
-# @features pages
-# @dimensions access-restrictions group-restricted
+# @matrix pages : access-restrictions group-restricted
 def _apply_group_access_restriction(page, group_action, group_key):
     group = Entities.fetch_one(group_key, request=Fetch.direct())
     if not group:

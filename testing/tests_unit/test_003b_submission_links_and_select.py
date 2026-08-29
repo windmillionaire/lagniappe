@@ -7,11 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
+from lagniappe.core.tools.http import OutboundResult, OutboundStatus
+
 pytestmark = pytest.mark.unit
 
 
-# @features radio
-# @dimensions ai-value, filter-value, import, column, fuzzy-match
+# @matrix radio : ai-value column filter-value fuzzy-match import
 def test_submission_radio(get_test_entities, get_schema, test_submission_values):
     """Test Radio field outputs."""
     for entity in get_test_entities():
@@ -19,8 +20,7 @@ def test_submission_radio(get_test_entities, get_schema, test_submission_values)
         test_submission_values(entity)
 
 
-# @features select
-# @dimensions ai-value, filter-value, import, column
+# @matrix select : ai-value column filter-value import
 def test_submission_select_single(
     get_test_entities, get_schema, test_submission_values
 ):
@@ -30,8 +30,7 @@ def test_submission_select_single(
         test_submission_values(entity)
 
 
-# @features select
-# @dimensions ai-value, filter-value, import, column, multiple, separator, fuzzy-match
+# @matrix select : ai-value column filter-value fuzzy-match import multiple separator
 def test_submission_select_multiple(
     get_test_entities, get_schema, test_submission_values
 ):
@@ -41,8 +40,7 @@ def test_submission_select_multiple(
         test_submission_values(entity)
 
 
-# @features link
-# @dimensions ai-value, filter-value, import, external
+# @matrix link : ai-value external filter-value import
 def test_submission_link_external(
     get_test_entities, get_schema, test_submission_values
 ):
@@ -56,8 +54,7 @@ def test_submission_link_external(
             test_submission_values(entity)
 
 
-# @features bookmark
-# @dimensions ai-value, filter-value
+# @matrix bookmark : ai-value filter-value
 def test_submission_bookmark(get_test_entities, get_schema, test_submission_values):
     """Test Bookmark field outputs with mocked metadata fetch."""
     with patch(
@@ -69,8 +66,7 @@ def test_submission_bookmark(get_test_entities, get_schema, test_submission_valu
             test_submission_values(entity)
 
 
-# @features bookmark
-# @dimensions replace-fields side-effects
+# @matrix bookmark : replace-fields side-effects
 def test_submission_bookmark_replace_flags_update_entity_fields(
     get_test_entities, get_schema, test_submission_values
 ):
@@ -80,7 +76,12 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
         "description": "Fetched bookmark description",
         "image": "https://images.example/bookmark.png",
     }
-    downloaded = {"success": True, "file": "image-content"}
+    downloaded = OutboundResult(
+        OutboundStatus.OK,
+        body=b"image-content",
+        media_type="image/png",
+        size=len(b"image-content"),
+    )
 
     with (
         patch(
@@ -88,7 +89,7 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
             return_value=metadata,
         ) as get_metadata,
         patch(
-            "lagniappe.core.properties.form_links.utility.download_image",
+            "lagniappe.core.properties.form_links.download_image",
             return_value=downloaded,
         ) as download_image,
     ):
@@ -106,9 +107,15 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
 
             assert entity.name == metadata["name"]
             assert entity.description == metadata["description"]
-            assert saved_assets == [
-                ("image-content", "bookmark-ab12", "image", "private")
-            ]
+            assert len(saved_assets) == 1
+            saved_image, saved_name, saved_type, visibility = saved_assets[0]
+            assert saved_image.getvalue() == b"image-content"
+            assert saved_image.content_type == "image/png"
+            assert (saved_name, saved_type, visibility) == (
+                "bookmark-ab12",
+                "image",
+                "private",
+            )
             get_metadata.assert_called_once_with(
                 {
                     "url": "https://bookmark.example.com",
@@ -121,8 +128,7 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
             download_image.assert_called_once_with(metadata["image"])
 
 
-# @features location
-# @dimensions ai-value, filter-value, import, column
+# @matrix location : ai-value column filter-value import
 def test_submission_location(get_test_entities, get_schema, test_submission_values):
     """Test Location field outputs with mocked place details."""
     # Use side_effect (not return_value) so each validation gets a fresh dict.

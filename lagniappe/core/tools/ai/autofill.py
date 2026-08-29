@@ -21,8 +21,7 @@ AUTOFILL_MAX_TOOL_ITERATIONS = 2
 
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @features ai
-# @dimensions structured-output submission
+# @matrix ai : structured-output submission
 def submission_response_schema():
     """Return the provider schema for one dynamic form submission object."""
     return {"type": "object"}
@@ -60,8 +59,7 @@ def _readable_autofill_files(entity, user):
 
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_prompt_data_keeps_attachment_context_entity_specific
-# @features ai files
-# @dimensions attached-files entity-specific
+# @matrix ai files : attached-files entity-specific
 def autofill_attached_files(entity, user):
     """Return readable projections for files attached directly to ``entity``."""
     return [file.to_ai(user) for file in _readable_autofill_files(entity, user)]
@@ -69,8 +67,7 @@ def autofill_attached_files(entity, user):
 
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_summary_dependencies_track_enabled_processing
-# @features ai files
-# @dimensions autofill summary-dependency pending failed complete
+# @matrix ai files : autofill complete failed pending summary-dependency
 def autofill_summary_dependencies(entity, user):
     """Classify enabled attached-file summaries before autofill generation."""
     states = {"complete": [], "pending": [], "failed": []}
@@ -91,8 +88,7 @@ def autofill_summary_dependencies(entity, user):
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_prompt_data_keeps_attachment_context_entity_specific
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
-# @features ai files pages tasks
-# @dimensions autofill shared-context attached-files entity-specific partial-submission
+# @matrix ai files pages tasks : attached-files autofill entity-specific partial-submission shared-context
 def autofill_prompt_data(
     entity,
     user,
@@ -164,8 +160,7 @@ def autofill_prompt_data(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
-# @features ai
-# @dimensions validation citations
+# @matrix ai : citations validation
 def validate_submission(submission):
     """Strip citation markers from textarea values in a submission."""
     textareas = [
@@ -185,8 +180,7 @@ def validate_submission(submission):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
-# @features ai
-# @dimensions error-context terminal-capture
+# @matrix ai : error-context terminal-capture
 def generate_autofilled_submission(prompt):
     """Generate and validate an autofilled form submission from a Prompt."""
     try:
@@ -201,8 +195,7 @@ def generate_autofilled_submission(prompt):
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
 # @tests tests_unit/test_015_ai_tools.py::test_autofill_accepts_summary_backed_json_without_tool_or_final_call
-# @features ai
-# @dimensions prompt-builders search tools file-context output-format
+# @matrix ai : file-context output-format prompt-builders search tools
 def form_autofill_prompt(**kwargs):
     """Build the AI prompt for form autofilling based on existing data"""
 

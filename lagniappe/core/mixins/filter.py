@@ -61,8 +61,7 @@ class FilterMixin:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_column_and_filter_contract_errors_are_explicit
-    # @features property
-    # @dimensions filter validation
+    # @matrix property : filter validation
     @property
     def field_type(self):
         if not hasattr(self, "_field_type"):

@@ -41,3 +41,4 @@ gha-creds-*.json
 
 # Local planning notes
 todo/
+/archives/

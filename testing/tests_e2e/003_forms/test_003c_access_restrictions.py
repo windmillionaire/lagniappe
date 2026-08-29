@@ -1,13 +1,3 @@
-"""
-Tests for form access restrictions from the form builder settings panel.
-
-Verified against:
-- lagniappe/web/templates/forms/builder.html
-- lagniappe/web/templates/forms/restrictions.html
-- lagniappe/web/routes/forms/main.py
-- src/script/views/builder/panels/formSettings.mjs
-"""
-
 import pytest
 from playwright.sync_api import expect
 
@@ -18,11 +8,9 @@ from testing.resources.form import Builder
 pytestmark = pytest.mark.e2e
 
 
-# @features forms
-# @dimensions access-restrictions owner-restricted
+# @matrix forms : access-restrictions owner-restricted
 # @template forms/restrictions.html::restrict_access
 def test_owner_can_restrict_form_to_site_owner(get_user, browser_failures):
-    """The owner locks a form down to owner-only access from the builder."""
     owner = get_user(Users.OWNER)
     form = Forms.test_owner_restricted_form.get(owner)
 
@@ -34,13 +22,11 @@ def test_owner_can_restrict_form_to_site_owner(get_user, browser_failures):
         expect(viewer.page).to_have_title("Error 403")
 
 
-# @features forms
-# @dimensions access-restrictions group-restricted
+# @matrix forms : access-restrictions group-restricted
 # @template forms/restrictions.html::restrict_access
 def test_group_restricted_form_opens_for_group_member_only(
     get_user, browser_failures
 ):
-    """A form restricted to a group remains usable for members and closed to others."""
     owner = get_user(Users.OWNER)
     form = Forms.test_group_restricted_form.get(owner)
     group = Groups.general_forms_view_only.get(owner)
@@ -58,10 +44,8 @@ def test_group_restricted_form_opens_for_group_member_only(
         expect(outsider.page).to_have_title("Error 403")
 
 
-# @features forms
-# @dimensions access-restrictions index-filter
+# @matrix forms : access-restrictions index-filter
 def test_form_index_lists_group_restricted_form_only_for_group_member(get_user):
-    """Restricted forms appear in the index only for users who can actually open them."""
     owner = get_user(Users.OWNER)
     form = Forms.test_index_restricted_form.get(owner)
     group = Groups.general_forms_view_only.get(owner)

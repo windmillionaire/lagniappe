@@ -3,7 +3,6 @@ from datetime import datetime, time, timedelta, timezone
 
 from flask import abort, g, render_template, request
 from flask_login import current_user
-from google.cloud.datastore import query as datastore_query
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import (
@@ -11,12 +10,12 @@ from lagniappe.core.definitions import (
     DEFERRED_JOB_HEARTBEAT_SECONDS,
     Resource,
 )
-from lagniappe.core.tools.database.core import DATA, KINDS
+from lagniappe.core.tools.database import analytics as analytics_database
 from lagniappe.core.tools.ai.observability import (
     aggregate_records,
     operation_diagnostic_payload,
 )
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
 
@@ -237,11 +236,8 @@ def _save_event(data):
     if path.startswith("/analytics"):
         return None
 
-    key = DATA.datastore.allocate_ids(DATA.datastore.key(KINDS.analytics.value), 1)[0]
-    event = DATA.datastore.entity(key=key)
-    event.update(
+    return analytics_database.create_event(
         {
-            "urlsafe_key": key.to_legacy_urlsafe().decode(),
             "created": datetime.now(timezone.utc),
             "action": data.get("action") or "view",
             "route_prefix": data.get("route_prefix") or _route_prefix(path),
@@ -261,8 +257,6 @@ def _save_event(data):
             "navigation_type": data.get("navigation_type") or "",
         }
     )
-    DATA.datastore.put(event)
-    return event
 
 
 # @testable false
@@ -291,13 +285,7 @@ def record_login(user, provider=None):
 # @covered-by lagniappe/web/routes/analytics/main.py::index
 # @reason analytics queries intentionally live with the analytics route
 def _events(period, prefix=None, limit=QUERY_LIMIT):
-    q = DATA.datastore.query(kind=KINDS.analytics.value)
-    start = _period_start(period)
-    if start:
-        q.add_filter(filter=datastore_query.PropertyFilter("created", ">=", start))
-    q.order = ["-created"]
-
-    events = list(q.fetch(limit=limit))
+    events = analytics_database.events(start=_period_start(period), limit=limit)
     if prefix:
         events = [event for event in events if event.get("route_prefix") == prefix]
     return events
@@ -307,12 +295,10 @@ def _events(period, prefix=None, limit=QUERY_LIMIT):
 # @covered-by lagniappe/web/routes/analytics/main.py::index
 # @reason AI summary queries are dashboard-owned period-window plumbing
 def _ai_records(period, limit=QUERY_LIMIT):
-    q = DATA.datastore.query(kind=KINDS.ai_observability.value)
-    start = _period_start(period)
-    if start:
-        q.add_filter(filter=datastore_query.PropertyFilter("created", ">=", start))
-    q.order = ["-created"]
-    return list(q.fetch(limit=limit))
+    return analytics_database.ai_observability_records(
+        start=_period_start(period),
+        limit=limit,
+    )
 
 
 # @testable false
@@ -382,48 +368,20 @@ def _clear_cutoff(retention):
 # @covered-by lagniappe/web/routes/analytics/main.py::clear_records
 # @reason key-only datastore cleanup is owned by the analytics retention route
 def _delete_events(retention, batch_size=DELETE_BATCH_SIZE):
-    cutoff = _clear_cutoff(retention)
-    deleted = 0
-
-    while True:
-        q = DATA.datastore.query(kind=KINDS.analytics.value)
-        if cutoff is not None:
-            q.add_filter(filter=datastore_query.PropertyFilter("created", "<", cutoff))
-            q.order = ["created"]
-        q.keys_only()
-
-        keys = [event.key for event in q.fetch(limit=batch_size)]
-        if not keys:
-            return deleted
-
-        DATA.datastore.delete_multi(keys)
-        deleted += len(keys)
-        if len(keys) < batch_size:
-            return deleted
+    return analytics_database.delete_events(
+        before=_clear_cutoff(retention),
+        batch_size=batch_size,
+    )
 
 
 # @testable false
 # @covered-by lagniappe/web/routes/analytics/main.py::clear_ai_records
 # @reason key-only AI cleanup is owned by its dataset-specific retention route
 def _delete_ai_records(retention, batch_size=DELETE_BATCH_SIZE):
-    cutoff = _clear_cutoff(retention)
-    deleted = 0
-
-    while True:
-        q = DATA.datastore.query(kind=KINDS.ai_observability.value)
-        if cutoff is not None:
-            q.add_filter(filter=datastore_query.PropertyFilter("created", "<", cutoff))
-            q.order = ["created"]
-        q.keys_only()
-
-        keys = [record.key for record in q.fetch(limit=batch_size)]
-        if not keys:
-            return deleted
-
-        DATA.datastore.delete_multi(keys)
-        deleted += len(keys)
-        if len(keys) < batch_size:
-            return deleted
+    return analytics_database.delete_ai_observability(
+        before=_clear_cutoff(retention),
+        batch_size=batch_size,
+    )
 
 
 # @testable false
@@ -477,12 +435,8 @@ def _dashboard(events):
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
-# @pair analytics:dashboard
-# @pair analytics:period-controls
-# @pair ai-observability:ai-only
-# @pair ai-observability:independent-flags
-# @pair analytics:page-tracking
-# @pair ai-observability:job-correlation
+# @matrix ai-observability : ai-only independent-flags job-correlation
+# @matrix analytics : dashboard page-tracking period-controls
 # @pair deferred-jobs:diagnostics
 @analytics.route("/", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
@@ -537,8 +491,7 @@ def index():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
-# @pair ai-observability:job-correlation
-# @pair deferred-jobs:diagnostics
+# @pairs ai-observability:job-correlation deferred-jobs:diagnostics
 @analytics.route("/ai/operations/<job_id>.json", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
 def operation_diagnostic(job_id):
@@ -555,8 +508,7 @@ def operation_diagnostic(job_id):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @features analytics
-# @dimensions dashboard accordion
+# @matrix analytics : accordion dashboard
 @analytics.route("/events/<prefix>", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
 def events(prefix):
@@ -575,8 +527,7 @@ def events(prefix):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @features analytics
-# @dimensions retention-clear owner-filter
+# @matrix analytics : owner-filter retention-clear
 @analytics.route("/clear/<retention>", methods=["DELETE"])
 @permission(Resource.SITE, Action.EDIT)
 def clear_records(retention):
@@ -617,8 +568,7 @@ def clear_ai_records(retention):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @features analytics
-# @dimensions page-load owner-filter
+# @matrix analytics : owner-filter page-load
 @analytics.route("/track", methods=["POST"])
 def track():
     if not enabled():

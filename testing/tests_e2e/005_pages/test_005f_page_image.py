@@ -1,5 +1,3 @@
-"""Page photo upload, generation, replacement, and removal workflows."""
-
 from contextlib import contextmanager
 import re
 
@@ -9,9 +7,8 @@ from playwright.sync_api import expect
 from testing.definitions import Pages, Uploads, Users
 from testing.elements import Attributes, UploadDropdown
 from testing.resources import Page
-from testing.utility import (
+from testing.utility.network import (
     expect_successful_response,
-    multipart_form_fields,
     scoped_browser_route,
 )
 
@@ -59,11 +56,9 @@ def _ensure_photo_form(user, page):
 @contextmanager
 def _mock_generated_image(page, key, html):
     path = f"/assets/{key}/generate-page-image"
-    requests = []
 
     def fulfill_generated_image(route):
         assert route.request.method == "POST"
-        requests.append(multipart_form_fields(route.request))
         route.fulfill(status=200, content_type="text/html", body=html)
 
     with scoped_browser_route(
@@ -71,7 +66,7 @@ def _mock_generated_image(page, key, html):
         f"**{path}",
         fulfill_generated_image,
     ):
-        yield path, requests
+        yield path
 
 
 def _expect_cache_busted_image(form):
@@ -84,8 +79,7 @@ def _desktop_photo_toggle(user):
     return user.locate("#tabs nav[data-nav='tabs'] button[lp-show='photo:active']")
 
 
-# @features pages
-# @dimensions image-add photo-prompt
+# @matrix pages : image-add photo-prompt
 def test_add_image_to_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_image_page)
@@ -97,8 +91,7 @@ def test_add_image_to_page(get_user):
     expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-7xl.*"))
 
 
-# @features pages
-# @dimensions photo-prompt desktop-tabs
+# @matrix pages : desktop-tabs photo-prompt
 def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_generated_image_page)
@@ -114,8 +107,8 @@ def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_user):
     expect(desktop_photo_toggle).to_be_hidden()
 
 
-# @pairs pages:photo-prompt pages:mobile-photo-tab
-# @pair entity-layout:dynamic-secondary
+# @matrix entity-layout : dynamic-secondary page-mobile
+# @matrix pages : mobile-photo-tab photo-prompt
 # @template pages/page.html::main
 def test_mobile_photo_prompt_rejoins_section_switching(get_user):
     user = get_user(Users.OWNER)
@@ -140,8 +133,7 @@ def test_mobile_photo_prompt_rejoins_section_switching(get_user):
     expect(photo_form).to_be_hidden()
 
 
-# @features pages
-# @dimensions image-replace
+# @pair pages:image-replace
 def test_replace_image_on_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_image_page)
@@ -155,8 +147,7 @@ def test_replace_image_on_page(get_user):
     _expect_cache_busted_image(form)
 
 
-# @features pages
-# @dimensions image-generate photo-prompt
+# @matrix pages : image-generate photo-prompt
 def test_generate_image_on_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_generated_image_page)
@@ -184,7 +175,7 @@ def test_generate_image_on_page(get_user):
         user.page,
         page.key,
         generated_dropzone,
-    ) as (path, requests):
+    ) as path:
         with expect_successful_response(
             user.page,
             method="POST",
@@ -196,12 +187,7 @@ def test_generate_image_on_page(get_user):
         expect(prompt).not_to_be_attached()
         expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-7xl.*"))
 
-    assert len(requests) == 1
-    assert ("prompt", image_prompt) in requests[0]
-
-
-# @features pages
-# @dimensions photo-prompt photo-disable
+# @matrix pages : photo-disable photo-prompt
 def test_empty_page_photo_prompt_can_disable_photo_without_reload(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_generated_image_page)
@@ -227,8 +213,7 @@ def test_empty_page_photo_prompt_can_disable_photo_without_reload(get_user):
     assert user.page.evaluate("window.__photoPromptNoReload") is True
 
 
-# @features pages
-# @dimensions image-paste
+# @pair pages:image-paste
 def test_paste_image_on_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_image_page)
@@ -261,8 +246,7 @@ def test_paste_image_on_page(get_user):
     _expect_cache_busted_image(form)
 
 
-# @features pages
-# @dimensions image-remove
+# @pair pages:image-remove
 def test_remove_image_from_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_image_page)

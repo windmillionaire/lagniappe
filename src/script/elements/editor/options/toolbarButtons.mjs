@@ -5,8 +5,7 @@ import { setIcon } from "../../../shared/icons";
  * @testable true
  * @tests tests_e2e/004_projects/test_004d_document.py::test_formatting_persists
  * @tests tests_e2e/004_projects/test_004d_document.py::test_task_list_persists
- * @features editor
- * @dimensions formatting task-list
+ * @matrix editor : formatting task-list
  */
 class ToolbarButton {
 	constructor(toolbar) {

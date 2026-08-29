@@ -10,7 +10,8 @@ from unittest.mock import patch
 import pytest
 
 from lagniappe.core.properties.form_links import Location
-from lagniappe.core.tools import location as loc
+from lagniappe.core.tools.http import OutboundResult, OutboundStatus
+from lagniappe.core.tools.services import places as loc
 
 
 class _FakeCredentials:
@@ -25,14 +26,16 @@ class _FakeCredentials:
         self.token = next(self.tokens)
 
 
-class _FakeResponse:
-    status_code = 200
-
-    def __init__(self, data):
-        self._data = data
-
-    def json(self):
-        return self._data
+def _outbound(data, *, status=OutboundStatus.OK, http_status=200):
+    body = json.dumps(data).encode()
+    return OutboundResult(
+        status=status,
+        body=body if status is OutboundStatus.OK else b"",
+        media_type="application/json",
+        http_status=http_status,
+        size=len(body),
+        final_url="https://places.googleapis.com/v1/redacted",
+    )
 
 
 def _location_field(existing=None):
@@ -43,38 +46,59 @@ def _location_field(existing=None):
     )
 
 
-# @features location
-# @dimensions suite-stripping
+# @matrix location : coordinates session-bias validation
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "not-json",
+        [],
+        {},
+        {"latitude": True, "longitude": 1},
+        {"latitude": "1", "longitude": 1},
+        {"latitude": float("nan"), "longitude": 1},
+        {"latitude": 91, "longitude": 1},
+        {"latitude": 1, "longitude": -181},
+    ],
+)
+def test_normalize_location_coordinates_rejects_malformed_values(value):
+    assert loc.normalize_location_coordinates(value) is None
+
+    assert loc.normalize_location_coordinates(
+        json.dumps({"latitude": 29, "longitude": -90, "ignored": "value"})
+    ) == {"latitude": 29.0, "longitude": -90.0}
+
+
+# @pair location:suite-stripping
 def test_simplify_address_for_search_comma_suite():
     """Comma-separated suite clause should be stripped for retry."""
     out = loc.simplify_address_for_search("123 Main St, Suite 400, City, ST")
     assert out == "123 Main St"
 
 
-# @features location
-# @dimensions suite-stripping
+# @pair location:suite-stripping
 def test_simplify_address_for_search_trailing_suite():
     out = loc.simplify_address_for_search("123 Main St Suite 4")
     assert out == "123 Main St"
 
 
-# @features location
-# @dimensions suite-stripping
+# @pair location:suite-stripping
 def test_simplify_address_for_search_no_change():
     assert loc.simplify_address_for_search("123 Main St") is None
 
 
-# @features location
-# @dimensions retry suite-stripping
+# @matrix location : retry suite-stripping
 def test_resolve_location_query_retries_after_simplify():
     """Second search uses simplified query when first returns empty."""
-    with patch.object(loc, "search_places", side_effect=[[], [{"id": "p1", "name": "Hit"}]]):
+    with patch.object(
+        loc, "search_places", side_effect=[[], [{"id": "p1", "name": "Hit"}]]
+    ):
         result = loc.resolve_location_query("123 Main St Suite 4")
     assert result == {"id": "p1", "name": "Hit"}
 
 
-# @features location
-# @dimensions first-hit
+# @pair location:first-hit
 def test_resolve_location_query_first_hit_wins():
     with patch.object(
         loc,
@@ -85,8 +109,7 @@ def test_resolve_location_query_first_hit_wins():
     assert result == {"id": "p1", "name": "First"}
 
 
-# @features location
-# @dimensions api-cache oauth
+# @matrix location : api-cache oauth
 @pytest.mark.unit
 def test_get_places_access_token_reuses_cached_token_until_refresh_window(monkeypatch):
     """OAuth credentials should refresh only when the cached token is near expiry."""
@@ -126,12 +149,11 @@ def test_get_places_access_token_reuses_cached_token_until_refresh_window(monkey
     ]
 
 
-# @features location
-# @dimensions api-request session-bias response-mapping
+# @matrix location : api-request response-mapping session-bias
 @pytest.mark.unit
 def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypatch):
     """Autocomplete should send a biased request and return compact suggestions."""
-    response = _FakeResponse(
+    response = _outbound(
         {
             "suggestions": [
                 {
@@ -158,8 +180,10 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
     )
 
     with (
-        patch.object(loc, "get_places_access_token", return_value="access-token") as token,
-        patch.object(loc.requests, "post", return_value=response) as post,
+        patch.object(
+            loc, "get_places_access_token", return_value="access-token"
+        ) as token,
+        patch.object(loc, "request_trusted_content", return_value=response) as request,
     ):
         results = loc.search_places("coffee")
 
@@ -168,13 +192,16 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
         {"id": "place-2", "name": "Test Market"},
     ]
     token.assert_called_once_with()
-    post.assert_called_once_with(
-        "https://places.googleapis.com/v1/places:autocomplete",
+    request.assert_called_once_with(
+        "POST",
+        "v1/places:autocomplete",
+        loc.PLACES_AUTOCOMPLETE_POLICY,
         headers={
             "Authorization": "Bearer access-token",
             "Content-Type": "application/json",
         },
-        json={
+        params=None,
+        json_body={
             "input": "coffee",
             "locationBias": {
                 "circle": {
@@ -186,11 +213,10 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
     )
 
 
-# @features location
-# @dimensions api-request address2 name-normalization
+# @matrix location : address2 api-request name-normalization
 @pytest.mark.unit
 def test_get_place_details_formats_address2_and_meaningful_name():
-    response = _FakeResponse(
+    response = _outbound(
         {
             "id": "place-1",
             "displayName": {"text": "Cafe Du Test"},
@@ -205,7 +231,7 @@ def test_get_place_details_formats_address2_and_meaningful_name():
 
     with (
         patch.object(loc, "get_places_access_token", return_value="access-token"),
-        patch.object(loc.requests, "get", return_value=response) as get,
+        patch.object(loc, "request_trusted_content", return_value=response) as request,
     ):
         result = loc.get_place_details("place-1")
 
@@ -215,18 +241,22 @@ def test_get_place_details_formats_address2_and_meaningful_name():
         "address": "123 Main St, New Orleans, LA 70112, USA",
         "address2": "Unit 400",
     }
-    get.assert_called_once()
-    assert get.call_args.kwargs["params"]["fields"] == (
+    request.assert_called_once()
+    assert request.call_args.args == (
+        "GET",
+        "v1/places/place-1",
+        loc.PLACES_DETAILS_POLICY,
+    )
+    assert request.call_args.kwargs["params"]["fields"] == (
         "id,displayName,formattedAddress,addressComponents,location,"
         "nationalPhoneNumber,websiteUri,regularOpeningHours"
     )
 
 
-# @features location
-# @dimensions name-normalization
+# @pair location:name-normalization
 @pytest.mark.unit
 def test_get_place_details_omits_street_address_display_name():
-    response = _FakeResponse(
+    response = _outbound(
         {
             "id": "place-1",
             "displayName": {"text": "123 Main St"},
@@ -240,7 +270,7 @@ def test_get_place_details_omits_street_address_display_name():
 
     with (
         patch.object(loc, "get_places_access_token", return_value="access-token"),
-        patch.object(loc.requests, "get", return_value=response),
+        patch.object(loc, "request_trusted_content", return_value=response),
     ):
         result = loc.get_place_details("place-1")
 
@@ -250,8 +280,93 @@ def test_get_place_details_omits_street_address_display_name():
     }
 
 
-# @features location
-# @dimensions column free-text
+# @matrix location : deadline degradation diagnostics provider-failure
+@pytest.mark.unit
+def test_places_provider_failures_capture_once_and_degrade(monkeypatch):
+    captured = []
+    monkeypatch.setattr(loc, "session", {"location": "not-json"})
+    monkeypatch.setattr(loc.exceptions, "capture", lambda error, context: captured.append((error, context)))
+
+    with (
+        patch.object(loc, "get_places_access_token", return_value="access-token"),
+        patch.object(
+            loc,
+            "request_trusted_content",
+            return_value=OutboundResult(OutboundStatus.TIMEOUT),
+        ) as request,
+    ):
+        assert loc.search_places("coffee") == []
+
+    assert request.call_args.args[2] is loc.PLACES_AUTOCOMPLETE_POLICY
+    assert loc.PLACES_AUTOCOMPLETE_POLICY.attempts == 1
+    assert loc.PLACES_AUTOCOMPLETE_POLICY.max_redirects == 0
+    assert len(captured) == 1
+    assert captured[0][1] == {"context": "search_places", "method": "POST"}
+
+    captured.clear()
+    with (
+        patch.object(loc, "get_places_access_token", return_value="access-token"),
+        patch.object(
+            loc,
+            "request_trusted_content",
+            return_value=_outbound(
+                {}, status=OutboundStatus.HTTP_ERROR, http_status=503
+            ),
+        ),
+    ):
+        assert loc.get_place_details("place-1") is None
+
+    assert len(captured) == 1
+    assert captured[0][1] == {
+        "context": "get_place_details",
+        "method": "GET",
+        "status": 503,
+    }
+
+
+# @matrix location : degradation diagnostics provider-contract
+@pytest.mark.unit
+def test_places_malformed_provider_payload_captures_once(monkeypatch):
+    captured = []
+    monkeypatch.setattr(loc, "session", {})
+    monkeypatch.setattr(loc.exceptions, "capture", lambda error, context: captured.append((error, context)))
+
+    with (
+        patch.object(loc, "get_places_access_token", return_value="access-token"),
+        patch.object(
+            loc,
+            "request_trusted_content",
+            return_value=_outbound({"suggestions": {"not": "a list"}}),
+        ),
+    ):
+        assert loc.search_places("coffee") == []
+
+    assert len(captured) == 1
+    assert captured[0][1] == {"context": "search_places", "method": "POST"}
+
+    captured.clear()
+    with (
+        patch.object(loc, "get_places_access_token", return_value="access-token"),
+        patch.object(
+            loc,
+            "request_trusted_content",
+            return_value=_outbound(
+                {
+                    "id": "place-1",
+                    "displayName": {"text": {"not": "text"}},
+                    "formattedAddress": "123 Main St",
+                    "addressComponents": [],
+                }
+            ),
+        ),
+    ):
+        assert loc.get_place_details("place-1") is None
+
+    assert len(captured) == 1
+    assert captured[0][1] == {"context": "get_place_details", "method": "GET"}
+
+
+# @matrix location : column free-text
 @pytest.mark.unit
 def test_location_address_only_value_and_column():
     field = _location_field()
@@ -260,14 +375,12 @@ def test_location_address_only_value_and_column():
     assert field.value.get("id") is None
     cv = field.column_value
     assert cv["url"] == (
-        "https://www.google.com/maps/search/"
-        "?api=1&query=123+Main+St+Suite+4"
+        "https://www.google.com/maps/search/?api=1&query=123+Main+St+Suite+4"
     )
     assert cv["title"] == "123 Main St Suite 4"
 
 
-# @features location
-# @dimensions address2 column filter-value ai-value
+# @matrix location : address2 ai-value column filter-value
 @pytest.mark.unit
 def test_location_place_value_preserves_address2():
     field = _location_field()
@@ -282,9 +395,7 @@ def test_location_place_value_preserves_address2():
         "address": "123 Main St, City",
         "address2": "Suite 400",
     }
-    assert (
-        field.column_value["title"] == "Mock Place, 123 Main St, Suite 400, City"
-    )
+    assert field.column_value["title"] == "Mock Place, 123 Main St, Suite 400, City"
     assert field.column_value["url"] == (
         "https://www.google.com/maps/search/"
         "?api=1&query=Mock+Place%2C+123+Main+St%2C+Suite+400%2C+City"
@@ -294,8 +405,7 @@ def test_location_place_value_preserves_address2():
     assert field.ai_value == "Mock Place, 123 Main St, Suite 400, City"
 
 
-# @features location
-# @dimensions address2 column free-text
+# @matrix location : address2 column free-text
 @pytest.mark.unit
 def test_location_free_text_value_preserves_address2():
     field = _location_field()
@@ -314,8 +424,7 @@ def test_location_free_text_value_preserves_address2():
     assert field.column_value["title"] == "123 Main St, Apt 5"
 
 
-# @features location
-# @dimensions address2 no-refetch
+# @matrix location : address2 no-refetch
 @pytest.mark.unit
 def test_location_same_id_updates_address2_without_refetch():
     field = _location_field(
@@ -343,8 +452,30 @@ def test_location_same_id_updates_address2_without_refetch():
     }
 
 
-# @features location
-# @dimensions fallback warnings
+# @matrix location : fallback free-text provider-failure warnings
+@pytest.mark.unit
+def test_location_place_detail_failure_falls_back_to_submitted_text():
+    field = _location_field()
+
+    with patch.object(loc, "get_place_details", return_value=None):
+        field.validate_submission(
+            {
+                "id": "unverified-place",
+                "name": "Cafe Du Test, New Orleans",
+                "address2": "Suite 4",
+            }
+        )
+
+    assert field.value == {
+        "address": "Cafe Du Test, New Orleans",
+        "name": "Cafe Du Test, New Orleans",
+        "address2": "Suite 4",
+    }
+    assert "id" not in field.value
+    assert field.warnings
+
+
+# @matrix location : fallback warnings
 @pytest.mark.unit
 def test_location_validate_ai_fallback():
     field = _location_field()
@@ -354,8 +485,7 @@ def test_location_validate_ai_fallback():
     assert field.warnings
 
 
-# @features location
-# @dimensions import fallback
+# @matrix location : fallback import
 @pytest.mark.unit
 def test_location_validate_import_fallback():
     field = _location_field()

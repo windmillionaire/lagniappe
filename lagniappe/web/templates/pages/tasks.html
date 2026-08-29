@@ -297,6 +297,7 @@
   {% set can_edit = (not task and page.allowed(Action.EDIT)) or (task and task.allowed(Action.EDIT)) %}
   {% set can_upload = can_edit and not current_user.is_public %}
   {% set assigned_to_preload = task.properties.assigned_to.column_value if task and task.assigned_to else none %}
+  {% set form_preload = task.properties.form.column_value if task and task.form else none %}
   <div class="flex flex-row flex-wrap gap-2 w-full empty:hidden {{ styles.task.actionIconContext }}"
        data-role="action-buttons">
     {% if Resource.PROJECTS.allowed(Action.RESTRICTED) %}
@@ -329,7 +330,7 @@
               data-creatable="true"
               data-form-type="task"
               data-title="Attach Form"
-              {% if task and task.form %}data-preload='{{ task.form.details|tojson }}'{% endif %}
+              {% if form_preload %}data-preload='{{ form_preload|tojson }}'{% endif %}
               class="{{ styles.select.button }}"></button>
     {% endif %}
     <button type="button"

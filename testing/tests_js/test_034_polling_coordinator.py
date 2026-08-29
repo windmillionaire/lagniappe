@@ -1,8 +1,7 @@
 """Node-backed checks for the shared adaptive polling scheduler."""
 
 
-# @features polling
-# @dimensions batching cadence lifecycle coalescing acknowledgement terminal-operation-order
+# @matrix polling : acknowledgement batching cadence coalescing lifecycle terminal-operation-order
 def test_polling_coordinator_batches_due_subscriptions_and_applies_results(run_node):
     run_node(
         r"""
@@ -184,9 +183,7 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
     )
 
 
-# @pair polling:cadence
-# @pair messaging:active-polling
-# @source src/script/shared/polling.mjs::PollingCoordinator
+# @pairs messaging:active-polling polling:cadence
 def test_polling_coordinator_temporarily_boosts_a_subscription(run_node):
     run_node(
         r"""
@@ -253,9 +250,7 @@ if (coordinator._interval(subscription, { status: "unchanged" }) < 15_000) {
     )
 
 
-# @pair polling:blur
-# @pair polling:visibility
-# @pair polling:cadence
+# @matrix polling : blur cadence visibility
 # @pair deferred-jobs:polling
 def test_polling_coordinator_limits_visible_blur_to_eligible_operations(run_node):
     run_node(
@@ -397,8 +392,7 @@ coordinator.subscribe(
     )
 
 
-# @pair polling:foreground
-# @pair polling:scheduled-initial
+# @matrix polling : foreground scheduled-initial
 # @pair notifications:cold-seed
 def test_polling_coordinator_schedules_modes_and_notification_seed(run_node):
     run_node(
@@ -502,9 +496,104 @@ if (timers.length !== 1 || timers[0].delay < 14_900) {
     )
 
 
-# @pair polling:reentrancy
-# @pair polling:requested-cycle
-# @pair polling:freshness
+# @matrix notifications : acknowledgement bounded-backoff cold-seed zero-subscriptions
+def test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+let now = 1_000;
+let timerId = 0;
+const timers = [];
+const cleared = new Set();
+const listeners = new Map();
+const calls = [];
+const deterministicMath = Object.create(Math);
+deterministicMath.random = () => 0.5;
+const context = {
+  console,
+  crypto: { randomUUID: () => "client-1" },
+  Date: { now: () => now },
+  ENDPOINTS: { poll: "/l/poll" },
+  Math: deterministicMath,
+  queueMicrotask,
+  sessionStorage: { getItem() { return null; }, setItem() {} },
+  captureError(error) { throw error; },
+  request: {
+    async post(_url, body) {
+      calls.push(body);
+      if (calls.length === 1) return { ok: false, status: 503 };
+      const warm = { generation: "warm", revision: 1, count: 0, miss: false };
+      context.window.__NOTIFICATION_STATE__ = warm;
+      listeners.get("notification-state")?.({ detail: warm });
+      return { ok: true, version: 1, results: [] };
+    },
+  },
+  window: {
+    __NOTIFICATION_STATE__: {
+      generation: null,
+      revision: null,
+      count: null,
+      miss: true,
+    },
+    addEventListener(name, listener) { listeners.set(name, listener); },
+    removeEventListener(name) { listeners.delete(name); },
+    clearTimeout(id) { cleared.add(id); },
+    setTimeout(callback, delay) {
+      timerId += 1;
+      timers.push({ id: timerId, callback, delay });
+      return timerId;
+    },
+  },
+};
+context.globalThis = context;
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/polling.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class PollingCoordinator", "class PollingCoordinator");
+source += "\nglobalThis.PollingCoordinator = PollingCoordinator;";
+vm.runInContext(source, context);
+
+const view = { elt: {}, hidden: false, online: true };
+const coordinator = new context.PollingCoordinator(view).init();
+(async () => {
+  await coordinator.trigger();
+  if (calls.length !== 1 || !calls[0].notification_state?.seed) {
+    throw new Error("Initial cold seed request was not sent");
+  }
+  if (!coordinator.notificationSeedPending || coordinator.notificationSeedDueAt !== 5_000) {
+    throw new Error(`Failed seed did not schedule 4s backoff: ${coordinator.notificationSeedDueAt}`);
+  }
+  const retryTimer = timers.at(-1);
+  if (retryTimer.delay !== 4_000 || cleared.has(retryTimer.id)) {
+    throw new Error(`Unexpected seed retry timer: ${JSON.stringify(retryTimer)}`);
+  }
+
+  now = coordinator.notificationSeedDueAt;
+  await coordinator.trigger();
+  if (calls.length !== 2 || !calls[1].notification_state?.seed) {
+    throw new Error("Cold seed was not retried after the backoff");
+  }
+  if (coordinator.notificationSeedPending || coordinator.notificationSeedErrorCount !== 0) {
+    throw new Error("Warm notification acknowledgement did not clear retry state");
+  }
+
+  now += 60_000;
+  await coordinator.trigger();
+  if (calls.length !== 2) {
+    throw new Error("Warm acknowledgement allowed another notification-only request");
+  }
+  coordinator.destroy();
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )
+
+
+# @matrix polling : freshness reentrancy requested-cycle
 def test_polling_coordinator_enqueues_reentrant_followup_without_waiting(run_node):
     run_node(
         r"""
@@ -651,8 +740,7 @@ coordinator.subscribe(
     )
 
 
-# @pairs polling:validation polling:diagnostics polling:presence
-# @pairs polling:protocol polling:revision polling:batching
+# @matrix polling : batching diagnostics presence protocol revision validation
 def test_polling_coordinator_captures_and_isolates_contract_failures(run_node):
     run_node(
         r"""
@@ -848,6 +936,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 let captured = 0;
+const calls = [];
 const results = [];
 const context = {
   console,
@@ -858,7 +947,12 @@ const context = {
   queueMicrotask,
   sessionStorage: { getItem() { return null; }, setItem() {} },
   captureError() { captured += 1; },
-  request: { async post() { return { ok: false, error: "Failed to fetch" }; } },
+  request: {
+    async post(url, body, options = {}) {
+      calls.push({ url, body, options });
+      return { ok: false, error: "Failed to fetch" };
+    },
+  },
   window: { clearTimeout() {}, setTimeout() { return 1; } },
 };
 context.globalThis = context;
@@ -879,9 +973,20 @@ coordinator.subscribe(
 
 (async () => {
   await coordinator.trigger();
+  await coordinator.closeDocuments(["one:document"]);
   if (captured !== 0) throw new Error("Transport failure was captured as a defect");
   if (results.length !== 1 || results[0].status !== "error") {
     throw new Error(`Transport failure did not schedule an error result: ${JSON.stringify(results)}`);
+  }
+  if (
+    calls.length !== 2 ||
+    calls.some(({ url, options }) =>
+      url !== "/l/poll" || options.replaceErrorPage !== false
+    ) ||
+    calls[0].options.keepalive === true ||
+    calls[1].options.keepalive !== true
+  ) {
+    throw new Error(`Polling requests were allowed to replace the page: ${JSON.stringify(calls)}`);
   }
 })().catch((error) => {
   console.error(error);

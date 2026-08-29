@@ -4,7 +4,8 @@ import smtplib
 
 import pytest
 
-from lagniappe.core.tools import auth_email, identity_platform
+from lagniappe.core.tools.email import smtp as auth_email
+from lagniappe.core.tools.services import identity_platform
 
 pytestmark = pytest.mark.unit
 
@@ -67,8 +68,7 @@ class RejectedSMTP(FakeSMTP):
         raise smtplib.SMTPAuthenticationError(535, b"Bad credentials")
 
 
-# @features login
-# @dimensions identity-platform token-verification issuer audience
+# @matrix login : audience identity-platform issuer token-verification
 def test_verify_identity_token_enforces_project_issuer_and_subject(monkeypatch):
     claims = {
         "aud": "project-1",
@@ -105,8 +105,7 @@ def test_verify_identity_token_enforces_project_issuer_and_subject(monkeypatch):
         )
 
 
-# @features login
-# @dimensions google-oauth token-verification audience email-verification
+# @matrix login : audience email-verification google-oauth token-verification
 def test_verify_google_credential_enforces_client_and_verified_email(monkeypatch):
     claims = {
         "sub": "google-user-1",
@@ -142,8 +141,7 @@ def test_verify_google_credential_enforces_client_and_verified_email(monkeypatch
         )
 
 
-# @features login
-# @dimensions identity-platform google-oauth token-exchange provider-error-code
+# @matrix login : google-oauth identity-platform provider-error-code token-exchange
 def test_exchange_google_credential_uses_identity_platform_idp_endpoint():
     session = FakeSession(
         [
@@ -205,8 +203,7 @@ def test_exchange_google_credential_uses_identity_platform_idp_endpoint():
     assert error.value.provider_code == "USER_DISABLED"
 
 
-# @features login
-# @dimensions identity-platform google-oauth provider-state
+# @matrix login : google-oauth identity-platform provider-state
 def test_google_provider_enabled_reads_live_provider_state():
     session = FakeSession(
         [
@@ -228,9 +225,7 @@ def test_google_provider_enabled_reads_live_provider_state():
     assert identity_platform.google_provider_enabled(**arguments) is False
 
     url, request = session.calls[0]
-    assert url.endswith(
-        "/projects/project%2Fone/defaultSupportedIdpConfigs/google.com"
-    )
+    assert url.endswith("/projects/project%2Fone/defaultSupportedIdpConfigs/google.com")
     assert request["headers"]["Authorization"] == "Bearer access-token"
     assert request["timeout"] == identity_platform.IDENTITY_REQUEST_TIMEOUT
 
@@ -245,8 +240,8 @@ def test_google_provider_enabled_reads_live_provider_state():
             session=unavailable_session,
         )
 
-# @features login
-# @dimensions identity-platform authentication-email action-codes
+
+# @matrix login : action-codes authentication-email identity-platform
 def test_generate_email_action_code_returns_provider_code_without_sending():
     session = FakeSession([FakeResponse({"oobCode": "reset-code"})])
 
@@ -273,8 +268,7 @@ def test_generate_email_action_code_returns_provider_code_without_sending():
     assert request["timeout"] == identity_platform.IDENTITY_REQUEST_TIMEOUT
 
 
-# @features login
-# @dimensions authentication-email smtp availability account-enumeration
+# @matrix login : account-enumeration authentication-email availability smtp
 def test_auth_email_connection_preflight_is_address_independent():
     config = {
         "provider": "smtp",
@@ -308,8 +302,7 @@ def test_auth_email_connection_preflight_is_address_independent():
         )
 
 
-# @features login
-# @dimensions authentication-email smtp tls
+# @matrix login : authentication-email smtp tls
 def test_send_auth_email_supports_generic_smtp_transports():
     FakeSMTP.instances.clear()
     tls_context = object()
@@ -364,8 +357,7 @@ def test_send_auth_email_supports_generic_smtp_transports():
     assert implicit_tls.started_tls is None
 
 
-# @features login
-# @dimensions authentication-email action-link templates
+# @matrix login : action-link authentication-email templates
 def test_auth_action_message_escapes_content_and_links():
     subject, text_body, html_body = auth_email.auth_action_message(
         "verifyEmail",
@@ -379,8 +371,7 @@ def test_auth_action_message_escapes_content_and_links():
     assert "a&amp;next=&quot;bad&quot;" in html_body
 
 
-# @features users
-# @dimensions identity-platform account-delete
+# @matrix users : account-delete identity-platform
 def test_delete_account_by_email_looks_up_and_deletes_identity_user():
     session = FakeSession(
         [

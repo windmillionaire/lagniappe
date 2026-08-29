@@ -14,7 +14,7 @@ tests and any source behavior they actually prove. The end state is:
 - focused tests that prove product, source, UI, route, or tooling behavior have
   accurate annotations;
 - source owners for the focused behavior are present, accurately tagged, and
-  linked back to the tests for every truthful `feature:dimension` pair;
+  linked back to the tests for every truthful behavior cell;
 - appropriate `@todo` items or unfinished stub tests have been added for real
   gaps; and
 - nearby source behavior touched by the change is either covered, intentionally
@@ -37,8 +37,8 @@ venv/bin/python run.py traceability --test testing/tests_unit/test_003_submissio
 
 The `--test` report shows:
 
-- focused test nodeids and parsed `@features`, `@dimensions`, `@pair`, `@template`, and
-  `@todo` tags;
+- focused test nodeids and parsed `@matrix`, `@pair`, `@source`, `@template`,
+  and `@todo` tags;
 - per-test `feature:dimension` mappings to source symbols that both reference
   the test and declare the same pair; and
 - annotated focused tests whose `feature:dimension` pairs are missing
@@ -68,8 +68,8 @@ observations.
 
 Use this path when the reverse report shows parsed test metadata.
 
-1. Compare the existing `@features`, `@dimensions`, `@pair`, `@template`, and `@todo`
-   tags with what the test actually proves.
+1. Compare the existing `@matrix`, `@pair`, `@source`, `@template`, and
+   `@todo` tags with what the test actually proves.
 2. Open every source symbol listed in the test's `feature:dimension` mappings.
    These are existing source-to-test links for the annotated pairs.
 3. If a pair has no mapped source symbol, use the test tags, assertions, nearby
@@ -78,10 +78,11 @@ Use this path when the reverse report shows parsed test metadata.
    itself.
 4. If the test tags are too broad, misleading, or only describe incidental code
    execution, narrow or remove them.
-5. If a behavior owner exists but does not reference this test, add the test
-   nodeid or a focused glob to that source symbol's `@tests` only when the test
-   really covers the source claim, and make sure the source declares the same
-   truthful `feature:dimension` pair.
+5. If a behavior owner exists but does not reference this test, declare one
+   direct edge: add the nodeid or focused glob to the source's `@tests`, or add
+   the source ID to the test's `@source`. Do so only when the test really
+   covers the source claim, and make sure the two sides realize at least one
+   truthful behavior cell.
 6. For each linked, newly linked, or corrected source symbol, run the workflow in
    `documentation/TESTING_SOURCE_REVIEW.md`.
 
@@ -135,17 +136,16 @@ Use this path when a new or focused test has no parsed metadata.
 6. Add the smallest truthful test block:
 
    ```python
-   # @features submission
-   # @dimensions readonly table-edit
+   # @matrix submission : readonly table-edit
    def test_submission_readonly_table_edit():
        ...
    ```
 
    Do not force the tags down to one feature or two dimensions when a
    parameterized loop genuinely asserts a broader cross-product. For example,
-   `@features text-input email-input number-input` with
-   `@dimensions ai-value filter-value` is appropriate if each generated
-   `feature:dimension` pair is actually tested.
+   `@matrix text-input email-input number-input : ai-value filter-value` is
+   appropriate if each generated behavior cell is actually tested. Add a
+   second matrix or exact pair when a sparse exception is also asserted.
 7. For E2E tests, add `@template path.html::macro` only when the test is meant
    to exercise the template skeleton as part of the UI contract. It is fine for
    template tags to be non-exhaustive when a smaller, precise pointer is more
@@ -154,9 +154,9 @@ Use this path when a new or focused test has no parsed metadata.
    test's helpers/resources, route names, selectors, imports, and `rg` to
    confirm or find the source behavior owner.
 9. Annotate source according to `documentation/TESTING_TRACEABILITY_TOOL.md`:
-   `@testable true` with this test in `@tests` when the symbol owns the
-   behavior, or `@testable false` with `@covered-by` when the symbol is a helper
-   covered through a better owner.
+   use `@testable true` and declare one `@tests`/`@source` edge when the symbol
+   owns the behavior, or `@testable false` with `@covered-by` when the symbol is
+   a helper covered through a better owner.
 10. Rerun the reverse report until every truthful test `feature:dimension` pair
     maps to at least one referenced source symbol with the same pair.
 11. Run the source-review workflow for each source symbol you linked or changed.
@@ -166,7 +166,7 @@ existing test mostly covers a behavior but exposes a real missing assertion, add
 a clear `@todo` to that test. If a separate future test is more appropriate for
 the test layer, add an `@pytest.mark.unfinished` stub in the unit, E2E, or
 tooling suite that matches the behavior and file naming pattern; keep matching
-`@features`, `@dimensions`, and `@todo` on the stub. Do not count a stub as real
+the matching `@matrix`/`@pair` and `@todo` on the stub. Do not count a stub as real
 coverage unless unfinished coverage is intentionally the clearest signal.
 
 ## Finish

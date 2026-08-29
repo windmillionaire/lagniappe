@@ -1,0 +1,41 @@
+{% from "manual/macros.html" import callout, subheading %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Installation Access") %}
+  <p class="text-sm text-base-dark">
+    This Owner-only section separates Lagniappe application identities from
+    Google Cloud IAM and outside provider accounts. It shows only non-secret
+    identity metadata already saved by setup.
+  </p>
+  {{ subheading("Handoff state") }}
+  <p class="text-sm text-base-dark">
+    “Application handoff configured” means the deployed settings name the
+    permanent Owner as deployer and no longer allow automatic installer
+    bootstrap. It does not by itself prove that every external permission was
+    removed. Use the project IAM link to confirm the historical installer is
+    absent there.
+  </p>
+  <p class="text-sm text-base-dark">
+    The installer normally runs <code>./setup.sh handoff</code> from the
+    installation working copy after the Owner has verified the application and
+    removed the temporary Lagniappe Administrator role. If the installer is
+    unavailable, the Owner may first recover a working copy from the downloaded
+    <code>lagniappe_settings.yaml</code>, authenticate gcloud and Application
+    Default Credentials as the permanent Owner, and run the same command.
+  </p>
+  {% call callout("warning") %}
+    Do not suspend or delete a temporary installer account while it is still
+    used to send authentication email or still has necessary account access to
+    billing, Redis Cloud, Cloudflare or DNS, Resend, or another provider.
+    Transfer or reconfigure those dependencies first. Also account for any
+    configuration backup or exported archive copied outside Lagniappe’s managed
+    Google Cloud buckets.
+  {% endcall %}
+  {{ subheading("Why there is no Remove IAM button") }}
+  <p class="text-sm text-base-dark">
+    The deployed application is intentionally not authorized to administer
+    human Google Cloud access. Run <code>./setup.sh handoff</code> from the
+    installation working copy; it verifies and transfers the managed access
+    before removing the installer’s direct project binding as its final cloud
+    change.
+  </p>
+{% endcall %}

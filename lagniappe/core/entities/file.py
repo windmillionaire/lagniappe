@@ -3,15 +3,14 @@ from flask import url_for
 from ..definitions import Action
 from ..mixins import AssetMixin
 from ..properties import file_assets, file_entity, file_options, file_related
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 from .entity import Entity
 
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_records_metadata_before_asset_save
 # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_lists_pages_that_reference_it
-# @features file
-# @dimensions upload attached-pages permissions asset-lifecycle
+# @matrix file : asset-lifecycle attached-pages permissions upload
 class File(AssetMixin, Entity):
     entity_kind = "file"
 
@@ -28,8 +27,7 @@ class File(AssetMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_file_reverse_task_links_drive_permissions_and_references
-    # @features file
-    # @dimensions attached-tasks reverse-links badges task-history
+    # @matrix file : attached-tasks badges reverse-links task-history
     @property
     def linked_tasks(self):
         tasks = []
@@ -51,8 +49,7 @@ class File(AssetMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_file_reverse_task_links_drive_permissions_and_references
-    # @features file
-    # @dimensions references
+    # @pair file:references
     @property
     def has_references(self):
         return bool(self.db.get("pages") or self.db.get("tasks"))
@@ -127,8 +124,7 @@ class File(AssetMixin, Entity):
     # @tests tests_unit/test_006_file_properties.py::test_file_description_form_field_populates_search_cache
     # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
     # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-    # @features file
-    # @dimensions description cache option-preservation deferred-dispatch
+    # @matrix file : cache deferred-dispatch description option-preservation
     def update(self, data):
         self.name = data.get("name") or data.get("display-name")
         self.summary = data.get("summary") or data.get("description")
@@ -150,8 +146,7 @@ class File(AssetMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-    # @features file deferred-jobs
-    # @dimensions post-save-dispatch summary-first deferred-dispatch
+    # @matrix deferred-jobs file : deferred-dispatch post-save-dispatch summary-first
     def dispatch_pending_processing(self):
         """Dispatch processing selected by the last update after persistence."""
         request = getattr(self, "_pending_file_processing", None)

@@ -2,7 +2,7 @@ from .entity import Entity
 from ..definitions import Action
 from ..mixins import AssetMixin
 from ..properties import activity
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 
 
 # @testable false
@@ -39,8 +39,7 @@ class Note(AssetMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_002j_notes.py::test_note_permissions_follow_visibility_scope_and_authorship
-    # @features notes permissions
-    # @dimensions private shared home page creator owner
+    # @matrix notes permissions : creator home owner page private shared
     def allowed(self, action, user=None):
         user = current_context_user(user)
         if not user or not user.is_authenticated:
@@ -67,8 +66,7 @@ class Note(AssetMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_002j_notes.py::test_note_create_persists_body_photo_visibility_and_scope
-    # @features notes
-    # @dimensions create body photo parent visibility scope
+    # @matrix notes : body create parent photo scope visibility
     @classmethod
     def create(cls, data):
         parent = data.get("parent") or data.get("user")

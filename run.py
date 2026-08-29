@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import ast
 import json
 from pathlib import Path
 import os
@@ -16,25 +17,17 @@ from runner.context import (
     format_command,
 )
 from runner.gcloud import activate_repository_gcloud
+from runner.frontend_build import GitFrontendBuildReader, inspect_frontend_build
+from runner.pytest_routing import (
+    PYTEST_CONFIG,
+    PYTEST_ROUTING_PLUGIN,
+    TRACEABILITY_RESULTS_PLUGIN,
+    PytestRoutingError,
+    normalize_pytest_invocation,
+)
 
 if len(sys.argv) > 1 and sys.argv[1] in {"browser-review", "test", "test-server"}:
     os.environ["FLASK_ENV"] = "testing"
-
-
-def includes_e2e_tests(test_args: list[str]) -> bool:
-    """Return whether normalized pytest arguments include the E2E suite."""
-    target_indexes = _positional_arg_indexes(test_args)
-    targets = [test_args[index] for index in sorted(target_indexes)]
-    normalized_targets = [
-        target.replace("\\", "/").split("::", 1)[0].rstrip("/")
-        for target in targets
-    ]
-    return not normalized_targets or any(
-        target == "testing/tests_e2e"
-        or target.startswith("testing/tests_e2e/")
-        or "/testing/tests_e2e/" in target
-        for target in normalized_targets
-    )
 
 
 # @testable false
@@ -51,73 +44,13 @@ def hosted_e2e_enabled() -> bool:
 
 
 # @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_configure_test_environment_prepares_frontend_only_for_e2e
-# @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
-# @features testing hosted-e2e
-# @dimensions cli-routing frontend-build
-def configure_test_environment(test_args: list[str]) -> None:
+# @tests tests_tooling/test_007_run_py_test_command.py::test_configure_test_environment_only_sets_import_environment
+# @matrix testing : environment
+def configure_test_environment(*, includes_e2e: bool) -> None:
     """Set test env vars before pytest imports the app package."""
     os.environ["FLASK_ENV"] = "testing"
-    if includes_e2e_tests(test_args) and not hosted_e2e_enabled():
-        from runner.testing import ensure_test_frontend_bundle
-
-        ensure_test_frontend_bundle()
 
 
-PYTEST_CONFIG = "testing/pytest.ini"
-TRACEABILITY_RESULTS_PLUGIN = "testing.utility.traceability_results"
-TEST_SUITE_ALIASES = {
-    "unit": ["testing/tests_unit/"],
-    "e2e": ["testing/tests_e2e/"],
-    "js": ["testing/tests_js/"],
-    "tooling": ["testing/tests_tooling/"],
-    "setup": [
-        "testing/tests_tooling/test_001a_setup_validation_config.py",
-        "testing/tests_tooling/test_001b_setup_providers.py",
-        "testing/tests_tooling/test_001c_setup_runtime_resources.py",
-        "testing/tests_tooling/test_001e_setup_orchestration.py",
-        "testing/tests_tooling/test_001f_setup_portability.py",
-        "testing/tests_tooling/test_001g_setup_release_readiness.py",
-    ],
-}
-SETUP_OPT_IN_TESTS = {
-    "setup_drift": ("testing/tests_tooling/test_001d_setup_drift.py",),
-    "setup_provider": (
-        "testing/tests_e2e/001_site/test_001g_setup_provider_contracts.py",
-    ),
-}
-PYTEST_OPTIONS_WITH_VALUES = {
-    "-c",
-    "-k",
-    "-m",
-    "-o",
-    "--basetemp",
-    "--confcutdir",
-    "--deselect",
-    "--ignore",
-    "--ignore-glob",
-    "--import-mode",
-    "--junit-prefix",
-    "--junit-xml",
-    "--junitxml",
-    "--lfnf",
-    "--log-cli-date-format",
-    "--log-cli-format",
-    "--log-cli-level",
-    "--log-date-format",
-    "--log-file",
-    "--log-file-date-format",
-    "--log-file-format",
-    "--log-file-level",
-    "--log-format",
-    "--log-level",
-    "--maxfail",
-    "--override-ini",
-    "--pastebin",
-    "--rootdir",
-    "--tb",
-    "--verbosity",
-}
 RELEASES_DIR = REPOSITORY_ROOT / "documentation/releases"
 REPORTING_PRIVACY_MARKDOWN_PATH = REPOSITORY_ROOT / "ERROR_REPORTING_PRIVACY.md"
 REPORTING_PRIVACY_TEMPLATE_PATH = (
@@ -131,93 +64,14 @@ RELEASE_LOCAL_PATHS = (
 RELEASE_BUILD_ID_PATH = "config/constants.py"
 RELEASE_BUILD_METADATA_PATH = "lagniappe/web/static/build.json"
 RELEASE_SERVICE_WORKER_PATH = "lagniappe/web/static/sw.js"
+RELEASE_MIGRATION_CATALOG_PATH = (
+    "lagniappe/core/tools/database/migrations.py"
+)
+RELEASE_MAINTENANCE_HEADING = "## Required post-upgrade maintenance"
 RELEASE_VERSION_PATTERN = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
 )
 RELEASE_BUILD_ID_PATTERN = re.compile(r"^b[0-9a-f]{7}$")
-
-
-def _strip_runner_args(test_args: list[str]) -> tuple[bool, list[str]]:
-    strict_relations = "--strict" in test_args
-    pytest_args = [arg for arg in test_args if arg not in {"--strict", "--"}]
-    return strict_relations, pytest_args
-
-
-def _positional_arg_indexes(args: list[str]) -> set[int]:
-    indexes = set()
-    skip_next = False
-    for index, arg in enumerate(args):
-        if skip_next:
-            skip_next = False
-            continue
-        if arg in PYTEST_OPTIONS_WITH_VALUES:
-            skip_next = True
-            continue
-        if arg.startswith("-"):
-            continue
-        indexes.add(index)
-    return indexes
-
-
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_test_args_adds_setup_opt_in_targets_without_filenames
-# @features testing setup
-# @dimensions cli-routing pytest-markers opt-in
-def _resolve_setup_opt_in_args(args: list[str]) -> tuple[list[str], list[str]]:
-    """Resolve setup opt-in markers to their otherwise uncollected test files."""
-    resolved_args = list(args)
-    selected_markers = set()
-
-    for index, arg in enumerate(resolved_args[:-1]):
-        if arg != "-m":
-            continue
-
-        marker_expression = resolved_args[index + 1]
-        if marker_expression == "provider":
-            marker_expression = "setup_drift or setup_provider"
-            resolved_args[index + 1] = marker_expression
-
-        marker_tokens = set(
-            re.findall(r"[A-Za-z_][A-Za-z0-9_]*", marker_expression)
-        )
-        selected_markers.update(marker_tokens.intersection(SETUP_OPT_IN_TESTS))
-
-    targets = []
-    for marker in SETUP_OPT_IN_TESTS:
-        if marker in selected_markers:
-            targets.extend(SETUP_OPT_IN_TESTS[marker])
-
-    return resolved_args, targets
-
-
-def normalize_test_args(test_args: list[str]) -> tuple[bool, list[str]]:
-    """Normalize runner-only flags and suite aliases for pytest."""
-    strict_relations, pytest_args = _strip_runner_args(test_args)
-    positional_indexes = _positional_arg_indexes(pytest_args)
-    setup_alias_requested = any(
-        pytest_args[index] == "setup" for index in positional_indexes
-    )
-    setup_opt_in_targets = []
-    if setup_alias_requested:
-        pytest_args, setup_opt_in_targets = _resolve_setup_opt_in_args(pytest_args)
-        positional_indexes = _positional_arg_indexes(pytest_args)
-
-    has_explicit_target = any(
-        pytest_args[index] not in TEST_SUITE_ALIASES for index in positional_indexes
-    )
-
-    normalized = []
-    for index, arg in enumerate(pytest_args):
-        if index in positional_indexes and arg in TEST_SUITE_ALIASES:
-            if has_explicit_target:
-                continue
-            normalized.extend(TEST_SUITE_ALIASES[arg])
-            if arg == "setup":
-                normalized.extend(setup_opt_in_targets)
-            continue
-        normalized.append(arg)
-
-    return strict_relations, normalized
 
 
 def pytest_command(pytest_args: list[str]) -> list[str]:
@@ -229,6 +83,8 @@ def pytest_command(pytest_args: list[str]) -> list[str]:
         PYTEST_CONFIG,
         "-p",
         TRACEABILITY_RESULTS_PLUGIN,
+        "-p",
+        PYTEST_ROUTING_PLUGIN,
         *pytest_args,
     ]
 
@@ -266,8 +122,8 @@ def _run_pytest_subprocess(command: list[str]) -> int:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_e2e_aligns_adc_before_pytest
 # @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
-# @features testing hosted-e2e
-# @dimensions cli-routing provider-auth
+# @matrix hosted-e2e testing : cli-routing
+# @pairs hosted-e2e:frontend-build testing:adc
 def run_tests(test_args: list[str]) -> int:
     """Run pytest through the repo wrapper.
 
@@ -282,17 +138,21 @@ def run_tests(test_args: list[str]) -> int:
         python run.py test --strict unit
         python run.py test -- -k "keyword"
     """
-    strict_relations, pytest_args = normalize_test_args(test_args)
-    if strict_relations or includes_e2e_tests(pytest_args):
+    try:
+        invocation = normalize_pytest_invocation(test_args, REPOSITORY_ROOT)
+    except PytestRoutingError as error:
+        print(f"Test argument error: {error}", file=sys.stderr)
+        return 4
+
+    if invocation.strict_relations or invocation.includes_e2e:
         os.environ["STRICT_RELATION_LOADS"] = "1"
 
-    configure_test_environment(pytest_args)
-    e2e_tests = includes_e2e_tests(pytest_args)
+    configure_test_environment(includes_e2e=invocation.includes_e2e)
     if not hosted_e2e_enabled():
         try:
             activate_repository_gcloud(
-                ensure_adc=e2e_tests,
-                allow_runtime_adc=e2e_tests,
+                ensure_adc=invocation.includes_e2e,
+                allow_runtime_adc=invocation.includes_e2e,
                 allow_adc_login=False,
             )
         except RuntimeError as error:
@@ -300,16 +160,85 @@ def run_tests(test_args: list[str]) -> int:
             return 1
     command_variable = "LAGNIAPPE_TEST_COMMAND"
     previous_command = os.environ.get(command_variable)
-    os.environ[command_variable] = json.dumps(
-        [sys.executable, str(REPOSITORY_ROOT / "run.py"), "test", *test_args]
-    )
+    full_command = [
+        sys.executable,
+        str(REPOSITORY_ROOT / "run.py"),
+        "test",
+        *test_args,
+    ]
+    os.environ[command_variable] = json.dumps(full_command)
+    authority = None
+    server_process = None
+    crossed_data_boundary = False
+    session_environment = {}
     try:
-        return _run_pytest_subprocess(pytest_command(pytest_args))
+        if invocation.includes_e2e and not hosted_e2e_enabled():
+            from runner.test_session import (
+                SESSION_MODE_ENV,
+                SESSION_NONCE_ENV,
+                acquire_test_session,
+            )
+            from runner.testing import (
+                cleanup_test_data,
+                ensure_test_frontend_bundle,
+                prepare_test_artifacts,
+                require_legacy_test_server_clear,
+                require_server_port_available,
+                run_test_server,
+            )
+
+            require_legacy_test_server_clear()
+            authority = acquire_test_session("local-e2e", full_command)
+            for name, value in (
+                (SESSION_NONCE_ENV, authority.nonce),
+                (SESSION_MODE_ENV, authority.mode),
+            ):
+                session_environment[name] = os.environ.get(name)
+                os.environ[name] = value
+
+            from config import SETTINGS
+
+            require_server_port_available(SETTINGS.test_config["BASE_URL"])
+            ensure_test_frontend_bundle(authority)
+            prepare_test_artifacts(authority)
+            # Treat cleanup as crossed before invoking it: partial provider
+            # deletion still requires the guarded final cleanup path.
+            crossed_data_boundary = True
+            cleanup_test_data(authority)
+            server_process = run_test_server(authority)
+            authority.update(phase="ready")
+
+        return _run_pytest_subprocess(pytest_command(list(invocation.pytest_args)))
+    except RuntimeError as error:
+        print(f"Test startup stopped: {error}")
+        return 1
     finally:
-        if previous_command is None:
-            os.environ.pop(command_variable, None)
-        else:
-            os.environ[command_variable] = previous_command
+        try:
+            if authority is not None:
+                from runner.testing import (
+                    cleanup_test_data,
+                    terminate_test_server_process,
+                )
+
+                try:
+                    if server_process is not None:
+                        terminate_test_server_process(server_process)
+                    if crossed_data_boundary:
+                        cleanup_test_data(authority)
+                    authority.complete()
+                except BaseException:
+                    authority.mark_recovery_required()
+                    raise
+        finally:
+            for name, previous in session_environment.items():
+                if previous is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = previous
+            if previous_command is None:
+                os.environ.pop(command_variable, None)
+            else:
+                os.environ[command_variable] = previous_command
 
 
 def run_test_server_command(command_args: list[str]) -> int:
@@ -330,6 +259,16 @@ def run_test_server_command(command_args: list[str]) -> int:
         action="store_true",
         help="Stop the background testing server and clean test data.",
     )
+    action.add_argument(
+        "--status",
+        action="store_true",
+        help="Show the recorded session, process, and health status.",
+    )
+    action.add_argument(
+        "--recover",
+        action="store_true",
+        help="Recover a stale session only after proving its owner exited.",
+    )
     parser.add_argument(
         "--load",
         action="append",
@@ -345,25 +284,28 @@ def run_test_server_command(command_args: list[str]) -> int:
     if args.load and not args.start:
         parser.error("--load can only be used with --start")
 
-    if not GCLOUD_CLI:
+    if not args.status and not GCLOUD_CLI:
         print("gcloud CLI not found")
         return 1
 
     from config import SETTINGS
     from runner.testing import (
+        recover_managed_test_server,
         start_managed_test_server,
+        test_server_status,
         teardown_managed_test_server,
     )
 
     try:
         if args.start:
-            pid = start_managed_test_server()
+            result = start_managed_test_server(args.load or ())
             print(
                 f"Test server started at "
-                f"{SETTINGS.test_config['BASE_URL']} (pid {pid})"
+                f"{SETTINGS.test_config['BASE_URL']} (pid {result['pid']}, "
+                f"keeper {result['keeper_pid']})"
             )
-            if args.load:
-                summary = test_server_seed.load_packs(args.load)
+            summary = result.get("seed_summary")
+            if summary:
                 report = test_server_seed.LOAD_REPORT
                 print(
                     "Loaded test-server seed pack(s): "
@@ -373,6 +315,16 @@ def run_test_server_command(command_args: list[str]) -> int:
                 for landing in summary["landings"]:
                     print(f"Seed landing: {landing['name']} - {landing['url']}")
                 print(f"Seed report written to {report}")
+            return 0
+
+        if args.status:
+            status = test_server_status()
+            print(json.dumps(status, indent=2, sort_keys=True))
+            return 0
+
+        if args.recover:
+            result = recover_managed_test_server()
+            print(result["detail"])
             return 0
 
         pid = teardown_managed_test_server()
@@ -389,8 +341,7 @@ def run_test_server_command(command_args: list[str]) -> int:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_auth_runs_interactive_human_adc_alignment
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_auth_reports_alignment_failure
-# @features auth
-# @dimensions adc runtime-identity interactive explicit-command
+# @matrix auth : adc explicit-command interactive runtime-identity
 def run_auth_command(command_args: list[str]) -> int:
     """Interactively align human ADC for local runtime impersonation."""
     parser = argparse.ArgumentParser(
@@ -490,8 +441,7 @@ def _update_reporting_privacy_version(version: str) -> tuple[Path, ...]:
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_show_uses_package_only_before_generated_settings_exist
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_note_appends_concise_release_entry
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_set_updates_package_settings_and_release_file
-# @features version
-# @dimensions cli-routing
+# @pair version:cli-routing
 def run_version_command(command_args: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="run.py version",
@@ -555,61 +505,6 @@ def run_upgrade_command(command_args: list[str]) -> int:
     from runner.upgrade import upgrade_all
 
     return upgrade_all()
-
-
-def run_backup_command(command_args: list[str]) -> int:
-    """Create or list complete production data recovery sets."""
-    parser = argparse.ArgumentParser(
-        prog="run.py backup",
-        description="Manage full Datastore and Cloud Storage recovery sets.",
-    )
-    subparsers = parser.add_subparsers(dest="action", required=True)
-    subparsers.add_parser("create", help="Create a complete recovery set.")
-    subparsers.add_parser("list", help="List completed recovery sets.")
-    args = parser.parse_args(command_args)
-
-    from runner.data_recovery import (
-        DataRecoveryError,
-        create_backup,
-        list_backups,
-    )
-
-    try:
-        if args.action == "create":
-            create_backup()
-        else:
-            list_backups()
-    except DataRecoveryError as error:
-        print(f"Backup command failed: {error}")
-        return 1
-    return 0
-
-
-def run_restore_command(command_args: list[str]) -> int:
-    """Restore one completed production data recovery set."""
-    parser = argparse.ArgumentParser(
-        prog="run.py restore",
-        description=(
-            "Replace production Datastore and Cloud Storage contents from "
-            "one completed recovery set."
-        ),
-    )
-    parser.add_argument("backup_id", metavar="BACKUP_ID")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Validate and describe the restore without changing data.",
-    )
-    args = parser.parse_args(command_args)
-
-    from runner.data_recovery import DataRecoveryError, restore_backup
-
-    try:
-        restored = restore_backup(args.backup_id, dry_run=args.dry_run)
-    except DataRecoveryError as error:
-        print(f"Restore failed: {error}")
-        return 1
-    return 0 if restored else 1
 
 
 def _run_release_git(
@@ -695,12 +590,175 @@ def _read_release_json(
     return value
 
 
+# @testable false
+# @covered-by run.py::release_readiness_issues
+# @reason optional Git-object reads are exercised through migration-aware release checks
+def _read_optional_git_text(
+    repo_root: Path,
+    object_spec: str,
+) -> str | None:
+    try:
+        return _run_release_git(repo_root, ["show", object_spec]).stdout
+    except RuntimeError:
+        return None
+
+
+# @testable false
+# @covered-by run.py::release_readiness_issues
+# @reason literal catalog extraction is exercised through release-check acceptance tests
+def _migration_catalog_metadata(content: str) -> dict[str, dict]:
+    """Extract immutable migration metadata without importing application code."""
+    tree = ast.parse(content)
+    catalog_node = None
+    for node in tree.body:
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        if any(
+            isinstance(target, ast.Name) and target.id == "MIGRATION_CATALOG"
+            for target in targets
+        ):
+            catalog_node = node.value
+            break
+    if not isinstance(catalog_node, (ast.Tuple, ast.List)):
+        raise ValueError("MIGRATION_CATALOG must be a literal tuple or list.")
+
+    catalog = {}
+    for entry in catalog_node.elts:
+        if not isinstance(entry, ast.Call):
+            raise ValueError("MIGRATION_CATALOG contains a non-call entry.")
+        call_name = (
+            entry.func.id
+            if isinstance(entry.func, ast.Name)
+            else entry.func.attr
+            if isinstance(entry.func, ast.Attribute)
+            else ""
+        )
+        if call_name != "MigrationDefinition":
+            raise ValueError(
+                "MIGRATION_CATALOG entries must use MigrationDefinition."
+            )
+        keywords = {keyword.arg: keyword.value for keyword in entry.keywords if keyword.arg}
+        try:
+            metadata = {
+                name: ast.literal_eval(keywords[name])
+                for name in ("sequence", "introduced_in", "label")
+            }
+        except (KeyError, ValueError, TypeError) as error:
+            raise ValueError(
+                "MigrationDefinition identity fields must be literal values."
+            ) from error
+        id_node = keywords.get("id")
+        try:
+            migration_id = ast.literal_eval(id_node)
+        except (ValueError, TypeError):
+            migration_id = id_node.id if isinstance(id_node, ast.Name) else None
+        if not isinstance(migration_id, str) or not migration_id:
+            raise ValueError(
+                "MigrationDefinition id must be a string or imported constant."
+            )
+        metadata["id"] = migration_id
+        if migration_id in catalog:
+            raise ValueError(f"Duplicate migration id: {migration_id}.")
+        catalog[migration_id] = metadata
+    return catalog
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_major_version_for_new_migration
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_matching_migration_release_metadata
+# @matrix release migrations : major-version release-note version-metadata
+def _migration_release_issues(
+    repo_root: Path,
+    merge_base: str,
+    candidate_version: str,
+    release_note: str | None,
+) -> list[str]:
+    """Return release-policy problems introduced by new catalog entries."""
+    issues = []
+    candidate_content = _read_optional_git_text(
+        repo_root,
+        f":{RELEASE_MIGRATION_CATALOG_PATH}",
+    )
+    base_content = _read_optional_git_text(
+        repo_root,
+        f"{merge_base}:{RELEASE_MIGRATION_CATALOG_PATH}",
+    )
+    if candidate_content is None and base_content is None:
+        return issues
+    if candidate_content is None:
+        return [f"{RELEASE_MIGRATION_CATALOG_PATH} was removed from the release."]
+
+    try:
+        candidate_catalog = _migration_catalog_metadata(candidate_content)
+        base_catalog = (
+            _migration_catalog_metadata(base_content)
+            if base_content is not None
+            else {}
+        )
+    except (SyntaxError, ValueError) as error:
+        return [f"Migration catalog could not be inspected: {error}"]
+
+    new_ids = sorted(set(candidate_catalog) - set(base_catalog))
+    if not new_ids:
+        return issues
+
+    candidate_match = RELEASE_VERSION_PATTERN.fullmatch(candidate_version)
+    base_package_content = _read_optional_git_text(
+        repo_root,
+        f"{merge_base}:package.json",
+    )
+    try:
+        base_version = json.loads(base_package_content or "{}").get("version")
+    except (AttributeError, json.JSONDecodeError):
+        base_version = None
+    base_match = (
+        RELEASE_VERSION_PATTERN.fullmatch(base_version)
+        if isinstance(base_version, str)
+        else None
+    )
+    if candidate_match is None or base_match is None:
+        issues.append(
+            "New migrations require stable candidate and base X.Y.Z versions."
+        )
+        return issues
+
+    candidate_parts = tuple(int(part) for part in candidate_match.groups())
+    base_parts = tuple(int(part) for part in base_match.groups())
+    if candidate_parts[0] <= base_parts[0]:
+        issues.append(
+            "New migration catalog entries require a major version increase "
+            f"over {base_version}: {', '.join(new_ids)}."
+        )
+
+    expected_release = f"{candidate_parts[0]}.{candidate_parts[1]}"
+    mismatched = [
+        migration_id
+        for migration_id in new_ids
+        if candidate_catalog[migration_id]["introduced_in"] != expected_release
+    ]
+    if mismatched:
+        issues.append(
+            "New migrations must use introduced_in="
+            f"{expected_release!r}: {', '.join(mismatched)}."
+        )
+
+    if release_note is None or RELEASE_MAINTENANCE_HEADING not in release_note:
+        issues.append(
+            "Migration-bearing releases must include the release-note heading "
+            f"{RELEASE_MAINTENANCE_HEADING!r}."
+        )
+    return issues
+
+
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_accepts_complete_release
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_development_build
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_incomplete_release
-# @features release
-# @dimensions delivery-tree build-mode
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_major_version_for_new_migration
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_matching_migration_release_metadata
+# @matrix release : build-mode delivery-tree
+# @matrix migrations release : major-version release-note version-metadata
 def release_readiness_issues(
     repo_root: Path,
     base_ref: str,
@@ -800,6 +858,14 @@ def release_readiness_issues(
             f"{RELEASE_BUILD_METADATA_PATH} must identify a production build."
         )
 
+    _frontend_validation, frontend_issues = inspect_frontend_build(
+        GitFrontendBuildReader(repo_root, index=True),
+        expected_mode="production",
+        expected_version=version,
+    )
+    issues.extend(f"Frontend build: {issue}" for issue in frontend_issues)
+
+    release_note = None
     if version:
         release_note_relative = f"documentation/releases/{version}.md"
         release_note = _read_release_text(
@@ -816,6 +882,14 @@ def release_readiness_issues(
                 issues.append(
                     f"{release_note_relative} has no release entries."
                 )
+        issues.extend(
+            _migration_release_issues(
+                repo_root,
+                merge_base,
+                version,
+                release_note,
+            )
+        )
 
     constants_content = (
         _read_release_text(repo_root, RELEASE_BUILD_ID_PATH, issues) or ""
@@ -923,10 +997,6 @@ if __name__ == "__main__":
         sys.exit(run_version_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "upgrade":
         sys.exit(run_upgrade_command(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "backup":
-        sys.exit(run_backup_command(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "restore":
-        sys.exit(run_restore_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "release-check":
         sys.exit(run_release_check_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "hosted-e2e":
@@ -939,7 +1009,6 @@ if __name__ == "__main__":
         "command",
         choices=[
             "auth",
-            "backup",
             "browser-review",
             "dev",
             "indexes",
@@ -948,7 +1017,6 @@ if __name__ == "__main__":
             "hosted-e2e",
             "mutation-contracts",
             "release-check",
-            "restore",
             "test",
             "test-server",
             "traceability",

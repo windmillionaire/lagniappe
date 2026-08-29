@@ -49,8 +49,7 @@ function displayText(location = {}) {
 /**
  * @testable true
  * @tests tests_js/test_026_location_urls.py::test_location_maps_url_uses_search_contract_and_place_id
- * @features location
- * @dimensions maps-url place-id encoding
+ * @matrix location : encoding maps-url place-id
  */
 function mapsUrl(location = {}) {
 	const query = displayText(location);

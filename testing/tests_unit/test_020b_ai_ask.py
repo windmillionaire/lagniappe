@@ -59,8 +59,7 @@ def _json_context(prompt, label):
     return json.loads(value)
 
 
-# @features ai-report
-# @dimensions ask prompt search tool-context answer-only structured-output provider-validation
+# @matrix ai-report : answer-only ask prompt provider-validation search structured-output tool-context
 @pytest.mark.unit
 def test_ask_prompt_prioritizes_answers_and_exposes_read_tools():
     user = _user()
@@ -110,8 +109,7 @@ def test_ask_prompt_prioritizes_answers_and_exposes_read_tools():
     assert "Create handles new work" in prompt.build()
 
 
-# @features ai-report
-# @dimensions ask revision feedback proposal context
+# @matrix ai-report : ask context feedback proposal revision
 @pytest.mark.unit
 def test_revise_ask_prompt_preserves_question_and_adds_review_context():
     user = _user("ask-revision-owner")
@@ -139,8 +137,7 @@ def test_revise_ask_prompt_preserves_question_and_adds_review_context():
     assert prompt.audit()["duplicate_headings"] == []
 
 
-# @features ai-report
-# @dimensions ask validation usable-answer
+# @matrix ai-report : ask usable-answer validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     ("updates", "message"),
@@ -163,8 +160,7 @@ def test_validate_ask_response_requires_a_usable_answer(updates, message):
         ask.validate_ask_response(response)
 
 
-# @features ai-report
-# @dimensions ask generate validate repair usable-answer
+# @matrix ai-report : ask generate repair usable-answer validate
 @pytest.mark.unit
 def test_generate_ask_report_repairs_unusable_answers(monkeypatch):
     user = _user("ask-repair-owner")
@@ -199,8 +195,7 @@ def test_generate_ask_report_repairs_unusable_answers(monkeypatch):
     assert _context(calls[1], "Validation Error").strip()
 
 
-# @features ai-report
-# @dimensions ask answer-only action-discard
+# @matrix ai-report : action-discard answer-only ask
 @pytest.mark.unit
 def test_generate_ask_report_discards_workspace_actions(monkeypatch):
     user = _user("ask-answer-only-owner")
@@ -234,8 +229,7 @@ def test_generate_ask_report_discards_workspace_actions(monkeypatch):
     assert len(calls) == 1
 
 
-# @features ai-report
-# @dimensions ask title-truncation
+# @matrix ai-report : ask title-truncation
 @pytest.mark.unit
 def test_ask_report_name_is_compact_and_marks_truncation():
     question = (

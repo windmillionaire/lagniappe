@@ -13,8 +13,7 @@ from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 # @testable true
 # @tests tests_tooling/test_004_network_waits.py::test_lagniappe_error_response_contract
-# @features e2e
-# @dimensions manual-http error-contract side-effect-free
+# @matrix e2e : error-contract manual-http side-effect-free
 def assert_lagniappe_error_response(response: Any, *, status: int) -> None:
     """Assert the common response envelope for a direct Lagniappe HTTP error."""
 
@@ -36,8 +35,7 @@ def assert_lagniappe_error_response(response: Any, *, status: int) -> None:
 
 # @testable true
 # @tests tests_tooling/test_004_network_waits.py::test_manual_mutation_headers_use_the_browser_origin
-# @features e2e
-# @dimensions manual-http csrf same-origin
+# @matrix e2e : csrf manual-http same-origin
 def manual_mutation_headers(page_url: str, csrf_token: str) -> dict[str, str]:
     """Return browser-equivalent same-origin headers for a direct mutation."""
 
@@ -58,8 +56,7 @@ def manual_mutation_headers(page_url: str, csrf_token: str) -> dict[str, str]:
 
 # @testable true
 # @tests tests_tooling/test_004_network_waits.py::test_semantically_equal_etags_allow_proxy_weakening
-# @features e2e
-# @dimensions manual-http etag proxy-normalization
+# @matrix e2e : etag manual-http proxy-normalization
 def assert_same_etag(actual: str | None, expected: str | None) -> None:
     """Assert equal opaque ETag values while allowing proxy-valid weakening."""
 
@@ -76,8 +73,7 @@ def assert_same_etag(actual: str | None, expected: str | None) -> None:
 
 # @testable true
 # @tests tests_tooling/test_004_network_waits.py::test_scoped_browser_route_always_removes_handler
-# @features e2e
-# @dimensions request-routing cleanup
+# @matrix e2e : cleanup request-routing
 @contextmanager
 def scoped_browser_route(
     target: Any,
@@ -95,8 +91,7 @@ def scoped_browser_route(
 
 # @testable true
 # @tests tests_tooling/test_004_network_waits.py::test_multipart_form_fields_preserves_values_and_filenames
-# @features e2e
-# @dimensions request-routing multipart
+# @matrix e2e : multipart request-routing
 def multipart_form_fields(request: Any) -> list[tuple[str, str]]:
     """Return ordered text values and filenames from a Playwright multipart request."""
 
@@ -134,8 +129,7 @@ def multipart_form_fields(request: Any) -> list[tuple[str, str]]:
 
 # @testable true
 # @tests tests_tooling/test_004_network_waits.py
-# @features e2e
-# @dimensions network-wait
+# @pair e2e:network-wait
 @contextmanager
 def expect_successful_response(
     page: Any,

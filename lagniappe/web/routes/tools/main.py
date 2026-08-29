@@ -18,7 +18,7 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web.auth import ai_access, require_ai_access
@@ -43,8 +43,7 @@ def _tool_label(tool):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
-# @features ai-report
-# @dimensions upload
+# @pair ai-report:upload
 def _uploaded_report_files():
     files = []
     for upload in request.files.getlist("tool-files"):
@@ -158,8 +157,7 @@ def create_organize_report_direct():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
-# @features ai-report
-# @dimensions create title-truncation
+# @matrix ai-report : create title-truncation
 def _create_report_name(instructions):
     text = " ".join((instructions or "").split())
     if not text:
@@ -237,9 +235,8 @@ def _start_tool_report(
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_uses_ask
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
-# @features ai-report
-# @dimensions create upload async explain-button text-only ask-fallback
-# @pairs ai-report:validation ai-report:http-boundary
+# @matrix ai-report : ask-fallback async create http-boundary text-only upload validation
+# @matrix ai-report : list stage-labels
 @tools.route("/organize", methods=["POST"])
 @ai_access(AI.CREATE)
 def create_organize_report():
@@ -282,8 +279,7 @@ def create_organize_report():
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @features ai-report
-# @dimensions ask explain-button tool-switcher async persistence
+# @matrix ai-report : ask async explain-button persistence tool-switcher
 @tools.route("/ask", methods=["POST"])
 @ai_access(AI.ASK)
 def create_ask_report():
@@ -303,8 +299,7 @@ def create_ask_report():
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
-# @features ai-report
-# @dimensions create explain-button tool-switcher async persistence
+# @matrix ai-report : async create explain-button persistence tool-switcher
 @tools.route("/create", methods=["POST"])
 @ai_access(AI.CREATE)
 def create_create_report():
@@ -350,8 +345,8 @@ def _get_report(key):
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_access_can_read_create_report_without_create_actions
-# @features ai-report
-# @dimensions detail skip-action ask answer-html links no-actions create revision execute report-view needs-review no-execute deferred-refresh pending
+# @matrix ai-report : detail live-submit needs-review no-execute organize revision schema-update skip-action
+# @matrix ai-report : structured-filter workspace-tools
 # @pair ai-access:report-read
 @tools.route("/reports/<key>", methods=["GET"])
 @ai_access(AI.ASK)
@@ -365,8 +360,7 @@ def report(key):
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
-# @features ai-report
-# @dimensions deterministic-run recovery retry detail repeat-run idempotent
+# @matrix ai-report : detail deterministic-run idempotent recovery repeat-run retry
 @tools.route("/reports/<key>/run", methods=["POST"])
 @ai_access(AI.CREATE)
 def run_report(key):
@@ -445,8 +439,7 @@ def run_report(key):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
-# @features ai-report
-# @dimensions deterministic-undo failed-prefix recovery undo
+# @matrix ai-report : deterministic-undo failed-prefix recovery undo
 @tools.route("/reports/<key>/undo", methods=["POST"])
 @ai_access(AI.CREATE)
 def undo_report(key):
@@ -478,8 +471,7 @@ def undo_report(key):
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
-# @features ai-report
-# @dimensions revision feedback async completed-state ready-state route-guard
+# @matrix ai-report : async completed-state feedback live-submit organize ready-state revision route-guard
 @tools.route("/reports/<key>/revise", methods=["POST"])
 @ai_access(AI.ASK)
 def revise_report(key):
@@ -538,8 +530,7 @@ def revise_report(key):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
-# @features ai-report
-# @dimensions skip-action dependencies
+# @matrix ai-report : dependencies skip-action
 @tools.route("/reports/<key>/actions/<int:action_index>/skip", methods=["POST"])
 @ai_access(AI.CREATE)
 def skip_report_action(key, action_index):
@@ -569,8 +560,7 @@ def skip_report_action(key, action_index):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
-# @features ai-report
-# @dimensions delete-modal file-cleanup
+# @matrix ai-report : delete-modal file-cleanup
 @tools.route("/reports/<key>", methods=["DELETE"])
 @ai_access(AI.ASK)
 def delete_report(key):

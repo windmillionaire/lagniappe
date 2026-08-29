@@ -37,8 +37,7 @@ export class Filters {
 	 * @testable true
 	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filters_tab_opens
 	 * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filters_form_opens
-	 * @features filters
-	 * @dimensions tab-open
+	 * @pair filters:tab-open
 	 */
 	async init() {
 		this._initFilters();
@@ -154,13 +153,16 @@ export class Filters {
 		});
 	}
 
+	get contract() {
+		return JSON.stringify({
+			version: 1,
+			conditions: this.definitions.map((definition) => JSON.parse(definition)),
+		});
+	}
+
 	get formData() {
 		const data = new FormData();
-		this.filters
-			.querySelectorAll("input[name='definition']")
-			.forEach((input) => {
-				data.append("definition", input.value);
-			});
+		data.append("contract", this.contract);
 		return data;
 	}
 
@@ -168,8 +170,7 @@ export class Filters {
 	 * @testable true
 	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_save
 	 * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filter_save_and_run
-	 * @features filters
-	 * @dimensions save
+	 * @pair filters:save
 	 */
 	async save() {
 		this._buttons.save.activate();
@@ -194,8 +195,7 @@ export class Filters {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filters_require_at_least_one_condition
-	 * @features filters
-	 * @dimensions empty-validation
+	 * @pair filters:empty-validation
 	 */
 	async run() {
 		if (this.definitions.length === 0) {
@@ -205,7 +205,9 @@ export class Filters {
 
 		this._buttons.run.activate();
 
-		const response = await request.get(this.endpoints.test, this.formData);
+		const response = await request.get(this.endpoints.test, {
+			contract: this.contract,
+		});
 		if (!this.view.successfulResponse(response, this.component)) return;
 
 		const results = await this.component.loadWidget("FilterResults");
@@ -360,8 +362,7 @@ export class Filters {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_reset
-	 * @features filters
-	 * @dimensions reset
+	 * @pair filters:reset
 	 */
 	reset() {
 		this._cleanup();
@@ -391,7 +392,6 @@ export class Filters {
  * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_save
  * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filters_empty_state
  * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filter_save_and_run
- * @features filters
- * @dimensions saved-filters save reload-persistence empty-state
+ * @matrix filters : empty-state reload-persistence save saved-filters
  */
 export class SavedFilters extends BaseList {}

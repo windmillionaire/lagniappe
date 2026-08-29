@@ -6,8 +6,7 @@ from .base_schema import SchemaProperty
 
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_textarea
-# @features textarea
-# @dimensions ai-value, filter-value, search-value, import
+# @matrix textarea : ai-value filter-value import search-value
 class Textarea(ColumnMixin, AIMixin, FilterMixin, SearchMixin, SchemaProperty):
     """Multi-line text field.
 

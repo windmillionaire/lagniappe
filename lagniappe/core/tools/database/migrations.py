@@ -13,6 +13,12 @@ from uuid import uuid4
 
 from google.api_core import exceptions as google_exceptions
 from google.cloud.datastore import Entity as DatastoreEntity
+from config.data_migrations import (
+    ASSET_GENERATION_MIGRATION_ID,
+    LEDGER_SCHEMA_VERSION,
+    migration_status_identifier,
+)
+from config.datastore import encode_urlsafe_key
 
 from lagniappe import CONFIG
 
@@ -27,10 +33,8 @@ from .migration_steps import (
 )
 
 
-LEDGER_SCHEMA_VERSION = 1
 MIGRATION_CHUNK_SIZE = 100
 MIGRATION_LEASE_SECONDS = 600
-MIGRATION_STATUS_PREFIX = "data-migration:"
 MIGRATION_CONTROL_ID = "data-migrations-control"
 MAX_RECORDED_ATTEMPTS = 5
 MAX_RECORDED_ERRORS = 25
@@ -77,7 +81,7 @@ def _form_record_reference(entity):
     if key is None:
         return None
     try:
-        identifier = key.to_legacy_urlsafe().decode()
+        identifier = encode_urlsafe_key(key)
     except (AttributeError, TypeError, ValueError):
         identifier = key if isinstance(key, str) else None
     if not identifier:
@@ -91,8 +95,8 @@ def _form_record_reference(entity):
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_registered_form_schema_migration_scans_forms_and_history
 # @tests tests_unit/test_018b_database_migrations.py::test_form_schema_migration_links_unreadable_row_failure_to_form
-# @pairs migrations:runner migrations:audit
-# @pairs form-schema:canonicalization form-schema:history-snapshot form-schema:malformed-data
+# @matrix form-schema : canonicalization history-snapshot malformed-data
+# @matrix migrations : audit runner
 def _run_form_schema_migration(context):
     result = _result("FSM-001", "Canonical form schemas")
 
@@ -193,6 +197,78 @@ def _run_messaging_notification_migration(context):
     return result
 
 
+# @testable true
+# @tests tests_unit/test_018b_database_migrations.py::test_asset_generation_migration_backfills_legacy_descriptors
+# @pairs disaster-recovery:asset-generation migrations:runner
+def _run_asset_generation_migration(context):
+    """Bind pre-v3 asset descriptors to their current immutable generations."""
+    result = _result("AST-001", "Asset generation metadata")
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/database/migrations.py::_run_asset_generation_migration
+    # @reason row transformation is exercised by the registered migration workflow
+    def transform(row):
+        changed = False
+        raw = row.get("assets")
+        if raw:
+            encoded = isinstance(raw, str)
+            definitions = json.loads(raw) if encoded else deepcopy(raw)
+            if not isinstance(definitions, dict):
+                raise MigrationDataError("asset metadata must be an object")
+            for definition in definitions.values():
+                if not isinstance(definition, dict) or not definition.get("path"):
+                    raise MigrationDataError("asset descriptor is incomplete")
+                if definition.get("generation"):
+                    continue
+                visibility = str(definition.get("visibility") or "private")
+                blob = DATA.bucket(visibility).blob(definition["path"])
+                blob.reload()
+                if not getattr(blob, "generation", None):
+                    raise MigrationDataError("asset generation metadata is unavailable")
+                definition["generation"] = str(blob.generation)
+                changed = True
+            if changed:
+                row["assets"] = (
+                    json.dumps(definitions, sort_keys=True, separators=(",", ":"))
+                    if encoded
+                    else definitions
+                )
+
+        if row.key.kind == KINDS.site.value and row.key.id_or_name == "image":
+            generations = dict(row.get("asset_generations") or {})
+            for name, path in row.items():
+                if (
+                    name in {"version", "asset_generations"}
+                    or not isinstance(path, str)
+                    or not path.casefold().endswith((".png", ".ico", ".jpg", ".jpeg", ".webp"))
+                    or generations.get(name)
+                ):
+                    continue
+                blob = DATA.public_bucket.blob(path)
+                blob.reload()
+                if not getattr(blob, "generation", None):
+                    raise MigrationDataError("site-image generation metadata is unavailable")
+                generations[name] = str(blob.generation)
+                changed = True
+            if generations != (row.get("asset_generations") or {}):
+                row["asset_generations"] = generations
+        return changed
+
+    for kind in dict.fromkeys(KINDS):
+        scan_kind(
+            result,
+            context,
+            kind,
+            lambda row: bool(row.get("assets"))
+            or (
+                row.key.kind == KINDS.site.value
+                and row.key.id_or_name == "image"
+            ),
+            transform,
+        )
+    return result
+
+
 MIGRATION_CATALOG = (
     MigrationDefinition(
         sequence=1,
@@ -208,6 +284,13 @@ MIGRATION_CATALOG = (
         introduced_in="0.1",
         label="Messaging notification aggregates",
         runner=_run_messaging_notification_migration,
+    ),
+    MigrationDefinition(
+        sequence=3,
+        id=ASSET_GENERATION_MIGRATION_ID,
+        introduced_in="1.0",
+        label="Asset generation metadata",
+        runner=_run_asset_generation_migration,
     ),
 )
 
@@ -284,7 +367,7 @@ def _entity_identifier(entity):
     if key is None:
         return "unknown"
     try:
-        return key.to_legacy_urlsafe().decode()
+        return encode_urlsafe_key(key)
     except (AttributeError, TypeError, ValueError):
         return str(key)
 
@@ -353,8 +436,7 @@ def _save_changed(result, changed, writer, reference=None):
 
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_scan_kind_is_copy_on_write_chunked_and_failure_isolated
-# @features database migrations
-# @dimensions raw-scan copy-on-write chunks failures inactive-rows heartbeat
+# @matrix database migrations : chunks copy-on-write failures heartbeat inactive-rows raw-scan
 def scan_kind(result, context, kind, predicate, transform, reference=None):
     """Apply one transform to matching raw rows and update ``result`` counts."""
 
@@ -435,7 +517,7 @@ def _parse_iso(value):
 # @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
 # @reason deterministic site key construction is exercised through ledger tests
 def _migration_key(datastore, migration_id):
-    return datastore.key("site", f"{MIGRATION_STATUS_PREFIX}{migration_id}")
+    return datastore.key(KINDS.site.value, migration_status_identifier(migration_id))
 
 
 # @testable false
@@ -443,7 +525,7 @@ def _migration_key(datastore, migration_id):
 # @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
 # @reason deterministic control key construction is exercised through lease tests
 def _control_key(datastore):
-    return datastore.key("site", MIGRATION_CONTROL_ID)
+    return datastore.key(KINDS.site.value, MIGRATION_CONTROL_ID)
 
 
 # @testable false
@@ -478,8 +560,7 @@ def _transaction_put(datastore, transaction, entity):
 
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_retries_transaction_contention
-# @features database-migrations setup
-# @dimensions transaction-contention retry
+# @matrix database-migrations setup : retry transaction-contention
 def _run_transaction(datastore, operation):
     """Retry a complete migration-ledger transaction after contention."""
     for attempt in range(len(MIGRATION_TRANSACTION_RETRY_DELAYS) + 1):
@@ -523,8 +604,7 @@ def _attempts(record):
 
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_catalog_rejects_identity_and_order_errors
-# @features admin database-migrations
-# @dimensions catalog identity order version runner
+# @matrix admin database-migrations : catalog identity order runner version
 def validate_catalog(catalog=MIGRATION_CATALOG):
     """Reject mutable or ambiguous migration catalog definitions."""
 
@@ -593,7 +673,6 @@ def _record_view(definition, record):
         "ledger_schema": LEDGER_SCHEMA_VERSION,
         "migration_id": definition.id,
         "sequence": definition.sequence,
-        "introduced_in": definition.introduced_in,
     }
     for field, expected_value in expected.items():
         if record.get(field) != expected_value:
@@ -700,7 +779,7 @@ def _load_views(datastore, catalog):
             for key in definition.legacy_audit_keys
         )
     )
-    legacy_keys = [datastore.key("site", key) for key in legacy_ids]
+    legacy_keys = [datastore.key(KINDS.site.value, key) for key in legacy_ids]
     records = _get_multi(datastore, [*status_keys, *legacy_keys, _control_key(datastore)])
     views = []
     for definition, key in zip(catalog, status_keys):
@@ -708,7 +787,9 @@ def _load_views(datastore, catalog):
         view = _record_view(definition, record)
         if not record:
             for legacy_id in definition.legacy_audit_keys:
-                legacy = records.get(datastore.key("site", legacy_id))
+                legacy = records.get(
+                    datastore.key(KINDS.site.value, legacy_id)
+                )
                 if not legacy:
                     continue
                 legacy_projection = _legacy_view(definition, legacy)
@@ -745,8 +826,7 @@ def _status_counts(views):
 # @tests tests_unit/test_018b_database_migrations.py::test_status_reads_completed_migrations_across_builds_and_blocks_after_failure
 # @tests tests_unit/test_018b_database_migrations.py::test_legacy_audit_projects_as_completed
 # @tests tests_unit/test_018b_database_migrations.py::test_migration_status_rejects_malformed_ledger
-# @features admin database-migrations
-# @dimensions catalog persistence build-history failure-order legacy-audit read-through invalid-storage audit identity sticky-completion
+# @matrix admin database-migrations : audit build-history catalog failure-order identity invalid-storage legacy-audit persistence read-through release-metadata sticky-completion
 def get_migration_status(
     *,
     datastore=None,
@@ -1041,8 +1121,8 @@ def _totals(results):
 # @tests tests_unit/test_018b_database_migrations.py::test_legacy_audit_projects_as_completed
 # @tests tests_unit/test_018b_database_migrations.py::test_no_registered_migrations_is_a_noop_success
 # @tests tests_unit/test_018b_database_migrations.py::test_attempt_history_retains_only_the_latest_five_runs
-# @features admin database-migrations
-# @dimensions ordered-run checkpoint failure resume lease lost-lease idempotence normalization catalog no-op concurrency interrupted-attempt stale-recovery bounded-history retries
+# @matrix admin database-migrations : bounded-history catalog checkpoint concurrency failure idempotence interrupted-attempt lease lost-lease no-op normalization ordered-run resume retries stale-recovery
+# @pair form-schema:history-snapshot
 def run_data_migrations(
     *,
     query_factory=None,
@@ -1121,8 +1201,7 @@ def run_data_migrations(
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_baselines_catalog_without_running_steps
 # @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_retries_transaction_contention
-# @features database-migrations setup
-# @dimensions fresh-install baseline idempotence
+# @matrix database-migrations setup : baseline fresh-install idempotence
 def initialize_fresh_install(
     fresh_install,
     *,

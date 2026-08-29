@@ -3,7 +3,8 @@
 from dataclasses import dataclass, field
 
 from ..definitions import Fetch, MutationEffectType, MutationOperation, Restriction
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import messaging as database_messaging
 from .base import MutationPlanBuilder
 
 
@@ -54,11 +55,7 @@ class DeleteCollector:
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_user_delete_can_preserve_page
     # @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
-    # @pairs entities:delete entities:preserve-page entities:user-unlink
-    # @pairs entities:category-fallback entities:search-cache users:delete
-    # @pairs users:preserve-page users:user-unlink users:category-fallback
-    # @pairs users:search-cache pages:delete pages:preserve-page
-    # @pairs pages:user-unlink pages:category-fallback pages:search-cache
+    # @matrix entities pages users : category-fallback delete preserve-page search-cache user-unlink
     def preserve_user_page(self, user, page):
         users_model = (
             page.model if isinstance(page.model, self.entities.USERS) else None
@@ -98,8 +95,7 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_entities_deletes_user_and_page_together
-    # @features entities
-    # @dimensions delete cascade user-page
+    # @matrix entities : cascade delete user-page
     def page(self, page, *, force=False):
         if force or not page.categories:
             self.page_notes(page)
@@ -123,7 +119,7 @@ class DeleteCollector:
         files = [
             entity
             for entity in self.entities.fetch(
-                *database.get.page_files(page.key),
+                *database_get.page_files(page.key),
                 request=Fetch.direct(),
             )
             if isinstance(entity, self.entities.FILE)
@@ -146,7 +142,7 @@ class DeleteCollector:
         tasks = [
             entity
             for entity in self.entities.fetch(
-                *database.get.page_tasks_with_history(page),
+                *database_get.page_tasks_with_history(page),
                 request=Fetch.direct(),
             )
             if isinstance(entity, (self.entities.TASK, self.entities.TASK_HISTORY))
@@ -172,8 +168,7 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_task_delete_updates_task_list_owners
-    # @features entities tasks
-    # @dimensions delete cascade list-owner-fingerprint
+    # @matrix entities tasks : cascade delete list-owner-fingerprint
     def task_owners(self, task):
         owners = getattr(task, "task_list_owners", None)
         if owners is None:
@@ -190,8 +185,7 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_002j_notes.py::test_note_delete_repairs_owners_and_parent_cascades
-    # @features notes mutations
-    # @dimensions delete owner-invalidation page-cascade user-cascade
+    # @matrix mutations notes : delete owner-invalidation page-cascade user-cascade
     def note(self, note):
         self.delete(note)
         owners = {owner.key: owner for owner in (note.parent, note.user) if owner}
@@ -203,7 +197,7 @@ class DeleteCollector:
     # @reason relation loading delegates each attached note to the tested note collector
     def page_notes(self, page):
         notes = self.entities.fetch(
-            *database.get.page_notes(page),
+            *database_get.page_notes(page),
             request=Fetch.direct(),
         )
         for note in notes:
@@ -215,7 +209,7 @@ class DeleteCollector:
     # @reason relation loading delegates each authored note to the tested note collector
     def user_notes(self, user):
         notes = self.entities.fetch(
-            *database.get.notes_by_user(user),
+            *database_get.notes_by_user(user),
             request=Fetch.direct(),
         )
         for note in notes:
@@ -223,14 +217,14 @@ class DeleteCollector:
                 self.note(note)
 
     # @testable true
-    # @tests tests_unit/test_027_messaging.py::test_user_delete_preserves_or_purges_message_history_by_survivor
-    # @pairs messaging:deleted-peer messaging:history-retention
+    # @tests tests_unit/test_027b_messaging_service.py::test_user_delete_preserves_or_purges_message_history_by_survivor
+    # @matrix messaging : deleted-peer history-retention
     def user_messages(self, user):
         if not user or user.key in self._message_users:
             return
         self._message_users.add(user.key)
         conversations = self.entities.fetch(
-            *database.get.message_conversation_keys(user),
+            *database_messaging.message_conversation_keys(user),
             request=Fetch.direct(),
         )
         for conversation in conversations:
@@ -238,8 +232,8 @@ class DeleteCollector:
                 self._message_conversations[conversation.key] = conversation
 
     # @testable true
-    # @tests tests_unit/test_027_messaging.py::test_user_delete_preserves_or_purges_message_history_by_survivor
-    # @pairs messaging:history-retention messaging:orphan-purge
+    # @tests tests_unit/test_027b_messaging_service.py::test_user_delete_preserves_or_purges_message_history_by_survivor
+    # @matrix messaging : history-retention orphan-purge
     def finalize_message_conversations(self):
         deleting_users = {
             entity.key
@@ -271,7 +265,7 @@ class DeleteCollector:
                 continue
 
             self.delete(conversation)
-            for message_key in database.get.message_keys(conversation):
+            for message_key in database_messaging.message_keys(conversation):
                 self.delete(self.entities.MESSAGE(message_key))
 
     # @testable infrastructure
@@ -286,7 +280,7 @@ class DeleteCollector:
     def model_forms(self, *models):
         forms = {model.form.key: model.form for model in models if model.form}
         model_keys = {model.key for model in models}
-        form_users = list(database.get.form_users(*forms.values()))
+        form_users = list(database_get.form_users(*forms.values()))
         used_by = {
             form_key: [
                 model.key for model in form_users if model.get("form") == form_key
@@ -301,12 +295,12 @@ class DeleteCollector:
 
     # @testable infrastructure
     def filters(self, entity):
-        for filter_key in database.get.filters(entity):
+        for filter_key in database_get.filters(entity):
             self.delete(self.entities.FILTER(filter_key))
 
     # @testable infrastructure
     def category_pages(self, category):
-        entities = database.get.pages(
+        entities = database_get.pages(
             category.key,
             limit=None,
             hashes=Restriction.UNRESTRICTED,
@@ -394,8 +388,7 @@ class ModelDeleteMutation(StandardDeleteMutation):
 class FormDeleteMutation(StandardDeleteMutation):
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_form_delete_updates_form_users
-    # @features entities forms
-    # @dimensions delete cascade forms list-owner-fingerprint
+    # @matrix entities forms : cascade delete forms list-owner-fingerprint
     def collect(self, entity, collector):
         collector.delete(entity)
         for owner in entity.used_by:
@@ -461,8 +454,7 @@ def _unique_entities(entities):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_delete_survivor_merge_combines_relation_removals
-# @features mutations
-# @dimensions delete plan property-mask mergeable-unlinks overlapping-roots
+# @matrix mutations : delete mergeable-unlinks overlapping-roots plan property-mask
 def _merge_survivors(survivors):
     grouped = {}
     for survivor in survivors:
@@ -523,8 +515,7 @@ def _merge_survivors(survivors):
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_delete_accepts_batch_and_dedupes
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_user_delete_can_preserve_page
 # @tests tests_unit/test_022_mutation_contracts.py::test_job_delete_removes_operation_projection_after_commit
-# @pairs mutations:delete mutations:batch mutations:dedupe
-# @pair mutations:preserve-user-pages
+# @matrix mutations : batch dedupe delete preserve-user-pages
 # @pair deferred-jobs:redis-projection
 def plan_delete(*entities, registry, preserve_user_pages=False):
     entities = tuple(entity for entity in entities if entity)
@@ -565,6 +556,11 @@ def plan_delete(*entities, registry, preserve_user_pages=False):
         )
     for entity in deleted:
         builder.delete(entity, reason="delete-cascade")
+        kind = getattr(entity, "entity_kind", None)
+        if kind == "page" and getattr(entity, "is_public", False):
+            builder.invalidate_public_discovery(reason="public-page-delete")
+        elif kind == "category":
+            builder.invalidate_public_discovery(reason="category-delete")
         if getattr(entity, "entity_kind", None) == "notification":
             entity._notification_count_delta = (
                 -1 if entity.notification_type == "ordinary" else 0

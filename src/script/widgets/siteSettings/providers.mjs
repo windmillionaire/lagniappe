@@ -4,8 +4,7 @@ import { SiteSetting } from "./base";
 /**
  * @testable true
  * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
- * @features admin
- * @dimensions service-providers external-links
+ * @matrix admin : external-links service-providers
  */
 export class SiteServiceProviders extends SiteSetting {
 	updated(response) {

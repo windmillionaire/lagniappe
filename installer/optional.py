@@ -30,8 +30,7 @@ def _operator_sentry_dsn(prompt):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_error_monitoring_supports_maintainer_or_operator_sentry
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_disabled_error_monitoring_offers_to_enable
-# @features setup
-# @dimensions optional settings-save privacy-consent sentry-destination rerun default-disabled
+# @matrix setup : default-disabled optional privacy-consent rerun sentry-destination settings-save
 def setup_error_monitoring():
     """
     Ask user for consent to enable error monitoring and crash reporting.
@@ -232,8 +231,7 @@ def setup_error_monitoring():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_monitoring_rejects_maintainer_sentry
-# @features setup
-# @dimensions development sentry-destination privacy
+# @matrix setup : development privacy sentry-destination
 def configure_development_error_monitoring():
     """Ensure development errors never use the maintainer Sentry project."""
     from config import SETTINGS
@@ -281,12 +279,12 @@ def configure_development_error_monitoring():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_ai_observability_is_an_explicit_preserved_setup_choice
-# @features setup ai-observability
-# @dimensions privacy-consent settings-save rerun
+# @matrix ai-observability setup : privacy-consent rerun settings-save
 def configure_ai_observability():
     """Set the optional owner-only AI generation summary flag."""
     from config import SETTINGS
 
+    f = FORMATTER.initialize()
     existing = SETTINGS.APP.get("AI_OBSERVABILITY")
     if existing is not None:
         existing_enabled = (
@@ -295,13 +293,15 @@ def configure_ai_observability():
             else str(existing).casefold() == "true"
         )
         state = "enabled" if existing_enabled else "disabled"
-        print(f"\nAI generation observability is currently {state}.")
-        preserve = input("Keep this AI observability choice? [Y/n]: ")
+        print(
+            f"\n{f.info(f'AI generation observability is currently {state}.')}"
+        )
+        preserve = input(f.info("Keep this AI observability choice? [Y/n]: "))
         if preserve.casefold() != "n":
-            print("Existing AI observability choice preserved.")
+            print(f.success("Existing AI observability choice preserved."))
             return existing_enabled
 
-    print("\nOptional AI Generation Observability")
+    print(f"\n{f.info('Optional AI Generation Observability')}")
     for paragraph in (
         "When enabled, Lagniappe stores owner-only operational summaries for "
         "text generations, including model, token totals, duration, retry and "
@@ -310,18 +310,18 @@ def configure_ai_observability():
         "arguments/results, file contents, and application identifiers.",
     ):
         print(wrap_text(paragraph))
-    enabled = (
-        input("Enable AI generation observability? [y/N]: ").casefold() == "y"
-    )
+    enabled = input(
+        f"\n{f.info('Enable AI generation observability? [y/N]: ')}"
+    ).casefold() == "y"
     SETTINGS.APP["AI_OBSERVABILITY"] = enabled
-    print(f"AI generation observability {'enabled' if enabled else 'disabled'}.")
+    state = "enabled" if enabled else "disabled"
+    print(f.success(f"AI generation observability {state}."))
     return enabled
 
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @features setup
-# @dimensions ai-model optional settings-save ai-observability
+# @matrix setup : ai-model ai-observability optional settings-save
 def change_ai_model():
     """
     Ask user for consent to change the AI model.

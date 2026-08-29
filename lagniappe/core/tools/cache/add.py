@@ -29,8 +29,7 @@ def _escape_pipe(text):
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_redis_details_store_parent_key_not_parent_blob
-# @features cache
-# @dimensions details parent-key redis-storage
+# @matrix cache : details parent-key redis-storage
 def _redis_details(entity):
     """Return entity details as Redis stores them, with parent represented by hash."""
     details = dict(entity.details)
@@ -42,8 +41,7 @@ def _redis_details(entity):
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_kind_search_score_prioritizes_high_level_entities
-# @features cache
-# @dimensions search-ranking kind-score
+# @matrix cache : kind-score search-ranking
 def _kind_search_score(kind):
     """Return the RediSearch document score for an entity kind."""
     return KIND_SEARCH_SCORES.get(kind, DEFAULT_SEARCH_SCORE)
@@ -58,7 +56,9 @@ def delete_entity_from_search(kind, entity):
     cache.delete(key)
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_017_cache_query.py::test_cache_update_writes_pointer_search_rows_and_parent_free_details
+# @matrix cache : details parent-key redis-storage
 def update(*entities, update=True):
     """Write entity data to the hash cache and update JSON indexes."""
     cacheable = [e for e in entities if getattr(e, "to_cache", None)]

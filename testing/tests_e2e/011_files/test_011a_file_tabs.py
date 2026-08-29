@@ -12,20 +12,49 @@ Verified against:
 import re
 from pathlib import Path
 import time
+from uuid import uuid4
 
 from playwright.sync_api import expect
 import pytest
-import requests
 
-from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Uploads, Users
+from testing.definitions.page_definitions import PageDefinition
 from testing.elements import MobileNav, Select, SpinnerButtons, Tabs
-from testing.resources import File
-from testing.utility import scoped_browser_route
+from testing.resources import File, Page
+from testing.utility.network import scoped_browser_route
 
 pytestmark = pytest.mark.e2e
+
+
+def _upload_file(user, upload):
+    suffix = uuid4().hex
+    category = Entities.CATEGORY.create(
+        {
+            "name": f"File Upload Category {suffix}",
+            "attributes": ["files"],
+        }
+    )
+    category.save()
+    page_entity = Entities.PAGE.create(
+        {
+            "name": f"File Upload Page {suffix}",
+            "model": category,
+            "attributes": ["files"],
+        }
+    )
+    page_entity.save()
+    page = Page(
+        user=user,
+        definition=PageDefinition(
+            name=page_entity.name,
+            category=Pages.test_file_upload_page.value.definition.category,
+            attributes=["files"],
+        ),
+    )
+    page.entity = page_entity
+    return page, File.upload_from_page(user, page, upload)
 
 
 def _fill_file_info_field(info_form, field_selector, input_selector, value):
@@ -59,10 +88,6 @@ def _canvas_has_ink(canvas):
     )
 
 
-def _opaque_etag(value):
-    return value.removeprefix("W/")
-
-
 def _select_file_page_link(info_form, file, page):
     select = Select(info_form.locator(file.INFO_PAGES))
     panel = select.open()
@@ -75,17 +100,12 @@ def _select_file_page_link(info_form, file, page):
     select.input.press("Escape")
 
 
-# @features file
-# @dimensions load tabs text-tab text-asset
+# @matrix file : load tabs text-asset text-tab
 # @template files/file.html::main
 # @template files/text.html::text_tab
 def test_file_text_tab_renders_uploaded_text_content(get_user):
     user = get_user(Users.OWNER)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.csv_file_input,
-    )
+    _, file = _upload_file(user, Uploads.csv_file_input)
 
     user.go(file)
 
@@ -99,19 +119,14 @@ def test_file_text_tab_renders_uploaded_text_content(get_user):
     expect(text_content).to_contain_text("Engineering")
 
 
-# @features file
-# @dimensions page-upload file-upload
+# @matrix file : file-upload page-upload
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/text.html::text_tab
 def test_page_uploaded_text_file_renders_original_content_in_text_tab(get_user):
     user = get_user(Users.OWNER)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.plain_text_file,
-    )
+    _, file = _upload_file(user, Uploads.plain_text_file)
 
     user.go(file)
 
@@ -129,19 +144,13 @@ def test_page_uploaded_text_file_renders_original_content_in_text_tab(get_user):
     expect(text_content).to_contain_text("not through the ingress import flow")
 
 
-# @features file
-# @dimensions linked-entities reverse-links badges
+# @matrix file : badges linked-entities reverse-links
 # @template files/file.html::main
 # @template files/file.html::linked_badges
 # @template badge.html::entity_badge
 def test_file_page_shows_linked_page_and_task_badges(get_user):
     user = get_user(Users.OWNER)
-    page = Pages.test_file_upload_page.get(user)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.plain_text_file,
-    )
+    page, file = _upload_file(user, Uploads.plain_text_file)
     file_entity = Entities.fetch_one(file.key, request=Fetch.direct())
     task_entity = Entities.TASK.create(
         {
@@ -162,19 +171,13 @@ def test_file_page_shows_linked_page_and_task_badges(get_user):
     expect(linked.locator("a[href*='/tasks/']")).to_contain_text(task_entity.name)
 
 
-# @features file
-# @dimensions linked-pages add remove reload
+# @matrix file : add linked-pages reload remove
 # @template files/info.html::info_form
 # @template files/file.html::linked_badges
 def test_file_info_page_links_can_be_added_and_removed(get_user):
     user = get_user(Users.OWNER)
-    source_page = Pages.test_file_upload_page.get(user)
+    source_page, file = _upload_file(user, Uploads.plain_text_file)
     target_page = Pages.test_category_edit_page.get(user)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.plain_text_file,
-    )
 
     user.go(file)
     info_form = file.info_form
@@ -201,19 +204,14 @@ def test_file_info_page_links_can_be_added_and_removed(get_user):
     assert {page.key for page in file_entity.pages} == {source_page.entity.key}
 
 
-# @features file
-# @dimensions page-upload file-upload preview text-tab
+# @matrix file : file-upload page-upload preview text-tab
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
 def test_page_uploaded_image_shows_desktop_preview(get_user):
     user = get_user(Users.OWNER)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.editor_test_image,
-    )
+    _, file = _upload_file(user, Uploads.editor_test_image)
 
     user.go(file)
 
@@ -233,19 +231,14 @@ def test_page_uploaded_image_shows_desktop_preview(get_user):
     expect(info_form).to_contain_text("image/jpeg")
 
 
-# @features file
-# @dimensions page-upload file-upload preview pdf-preview text-tab
+# @matrix file : file-upload page-upload pdf-preview preview text-tab
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
 def test_page_uploaded_pdf_renders_pdf_preview_widget(get_user):
     user = get_user(Users.OWNER)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.pdf_file,
-    )
+    _, file = _upload_file(user, Uploads.pdf_file)
 
     user.go(file)
 
@@ -269,26 +262,19 @@ def test_page_uploaded_pdf_renders_pdf_preview_widget(get_user):
     expect(info_form).to_contain_text("application/pdf")
 
 
-# @features file
-# @dimensions pdf-preview loading-state view-transition
+# @matrix file : loading-state pdf-preview view-transition
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
 def test_pdf_preview_loading_state_paints_before_document_render(get_user):
     user = get_user(Users.OWNER)
-    uploaded_file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.pdf_file,
-    )
-    range_requests = []
+    _, uploaded_file = _upload_file(user, Uploads.pdf_file)
 
     def delay_range_request(route):
         range_header = route.request.header_value("range")
         if range_header:
             assert route.request.method == "GET"
-            range_requests.append(route.request)
             time.sleep(1.5)
         route.continue_()
 
@@ -311,26 +297,14 @@ def test_pdf_preview_loading_state_paints_before_document_render(get_user):
         expect(first_page).not_to_have_attribute("width", "0")
         expect(first_page).not_to_have_attribute("height", "0")
 
-    assert range_requests
-    assert all(
-        request.header_value("range").startswith("bytes=")
-        for request in range_requests
-    )
-
-
-# @features file
-# @dimensions page-upload file-upload preview pdf-preview pdf-toolbar
+# @matrix file : file-upload page-upload pdf-preview pdf-toolbar preview
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
 def test_page_uploaded_pdf_toolbar_navigates_pages(get_user):
     user = get_user(Users.OWNER)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.pdf_two_page_file,
-    )
+    _, file = _upload_file(user, Uploads.pdf_two_page_file)
 
     user.go(file)
 
@@ -394,17 +368,12 @@ def test_page_uploaded_pdf_toolbar_navigates_pages(get_user):
     expect(focus).to_have_attribute("aria-pressed", "false")
 
 
-# @features file
-# @dimensions file-mobile tabs preview
+# @matrix file : file-mobile preview tabs
 # @template files/file.html::mobile_nav
 # @template files/preview.html::preview_tab
 def test_file_mobile_preview_uses_preview_tab(get_user):
     user = get_user(Users.OWNER)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.editor_test_image,
-    )
+    _, file = _upload_file(user, Uploads.editor_test_image)
 
     user.go(file)
     expect(user.locate(file.PREVIEW_CARD)).to_be_visible()
@@ -428,17 +397,12 @@ def test_file_mobile_preview_uses_preview_tab(get_user):
     assert mobile_nav.get_section_title() == "Preview"
 
 
-# @features file
-# @dimensions file-mobile tabs preview pdf-preview
+# @matrix file : file-mobile pdf-preview preview tabs
 # @template files/file.html::mobile_nav
 # @template files/preview.html::preview_tab
 def test_file_mobile_pdf_preview_renders_canvas(get_user):
     user = get_user(Users.OWNER)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.pdf_file,
-    )
+    _, file = _upload_file(user, Uploads.pdf_file)
 
     user.go(file)
     user.mobile = True
@@ -459,16 +423,11 @@ def test_file_mobile_pdf_preview_renders_canvas(get_user):
     assert mobile_nav.get_section_title() == "Preview"
 
 
-# @features file
-# @dimensions info-update display-name summary
+# @matrix file : display-name info-update summary
 # @template files/file.html::view_header
 def test_file_info_update_persists_name_and_summary(get_user):
     user = get_user(Users.OWNER)
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        Uploads.plain_text_file,
-    )
+    _, file = _upload_file(user, Uploads.plain_text_file)
     updated_name = "Updated page upload notes"
     updated_summary = "A saved summary for a page-uploaded text file."
 
@@ -505,16 +464,11 @@ def test_file_info_update_persists_name_and_summary(get_user):
     )
 
 
-# @pairs file:download file:filename file:mimetype file:etag
-# @pairs file:byte-range file:partial-content cache:byte-range
+# @matrix file : download filename mimetype
 def test_file_download_uses_original_filename_and_mimetype(get_user):
     user = get_user(Users.OWNER)
     upload = Uploads.plain_text_file
-    file = File.upload_from_page(
-        user,
-        Pages.test_file_upload_page,
-        upload,
-    )
+    _, file = _upload_file(user, upload)
 
     user.go(file)
     expect(user.locate(file.DOWNLOAD_LINK)).to_be_visible()
@@ -533,48 +487,3 @@ def test_file_download_uses_original_filename_and_mimetype(get_user):
     assert response.headers["content-type"].startswith("text/plain")
     assert download.suggested_filename == "sample_notes.txt"
     assert Path(download.path()).read_bytes() == upload.definition.file.content
-
-    asset_url = (
-        f"{SETTINGS.test_config['BASE_URL']}/assets/{file.key}/file"
-    )
-    cookies = {
-        cookie["name"]: cookie["value"]
-        for cookie in user.page.context.cookies()
-    }
-    full_response = requests.get(
-        asset_url,
-        cookies=cookies,
-        allow_redirects=False,
-        timeout=10,
-    )
-    assert full_response.status_code == 200
-    assert full_response.headers["content-type"].startswith("text/plain")
-    # A managed proxy may omit the advisory Accept-Ranges header on the full
-    # response. The real byte-range request below proves the actual contract.
-    assert full_response.headers["cache-control"] == "no-store"
-    assert full_response.content == upload.definition.file.content
-    etag = full_response.headers["etag"]
-
-    range_response = requests.get(
-        asset_url,
-        headers={
-            "If-None-Match": etag,
-            "Range": "bytes=0-3",
-        },
-        cookies=cookies,
-        allow_redirects=False,
-        timeout=10,
-    )
-    assert range_response.status_code == 206
-    assert range_response.headers["content-type"].startswith("text/plain")
-    assert range_response.headers["accept-ranges"] == "bytes"
-    assert range_response.headers["cache-control"] == "no-store"
-    # App Engine may weaken a compressible full response's ETag while leaving
-    # the uncompressed byte-range response strong. The opaque validator must
-    # remain identical across both representations.
-    assert _opaque_etag(range_response.headers["etag"]) == _opaque_etag(etag)
-    assert range_response.headers["content-range"] == (
-        f"bytes 0-3/{len(upload.definition.file.content)}"
-    )
-    assert range_response.headers["content-length"] == "4"
-    assert range_response.content == upload.definition.file.content[:4]

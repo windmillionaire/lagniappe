@@ -5,10 +5,15 @@ import { request } from "./request";
 import { withTransition } from "./utilities";
 
 /**
- * @testable infrastructure
+ * @testable true
+ * @tests tests_js/test_046_async_query_lifecycle.py::test_modal_owns_exact_node_and_rejects_late_attachment
+ * @matrix modal : exact-owner late-publication listener-teardown reuse
  */
 export class Modal {
 	constructor(view, trigger) {
+		this._destroyed = false;
+		this._listenersAttached = false;
+		this._modal = null;
 		this.trigger = trigger;
 		this.view = view;
 		this.keydown = this._keydown.bind(this);
@@ -17,20 +22,34 @@ export class Modal {
 	}
 
 	_attachListeners() {
+		if (this._destroyed || this._listenersAttached || !this.modal) return;
 		document.addEventListener("keydown", this.keydown);
 		document.addEventListener("click", this.click);
 		this.modal._lp_modal = this;
+		this._listenersAttached = true;
 	}
 
-	destroy() {
-		document.removeEventListener("keydown", this.keydown);
-		document.removeEventListener("click", this.click);
-		if (this.modal) this.modal.remove();
+	_detach() {
+		if (this._listenersAttached) {
+			document.removeEventListener("keydown", this.keydown);
+			document.removeEventListener("click", this.click);
+			this._listenersAttached = false;
+		}
+		const modal = this._modal;
+		if (modal?._lp_modal === this) delete modal._lp_modal;
+		modal?.remove();
+		this._modal = null;
 		if (this.trigger) this.trigger.disabled = false;
 	}
 
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this._detach();
+	}
+
 	get modal() {
-		return document.getElementById("modal");
+		return this._modal;
 	}
 
 	_keydown(event) {
@@ -85,18 +104,24 @@ export class Modal {
 	}
 
 	async remove() {
+		if (!this.modal) return;
 		await withTransition(
 			() => {
-				this.destroy();
+				this._detach();
 			},
 			{ label: "modal:remove" },
 		);
 	}
 
 	async load(route) {
+		if (this._destroyed || this.view?._destroyed) return null;
 		if (this.trigger) this.trigger.disabled = true;
 		try {
 			const modal = await request.get(route);
+			if (this._destroyed || this.view?._destroyed) {
+				if (this.trigger) this.trigger.disabled = false;
+				return null;
+			}
 			if (!modal.html) {
 				captureError(new Error("No modal HTML provided"), this.trigger, {
 					view: this.view?.dataset,
@@ -106,8 +131,9 @@ export class Modal {
 				if (this.trigger) this.trigger.disabled = false;
 				return null;
 			}
-			await this.attach(modal.html);
+			const attached = await this.attach(modal.html);
 			if (this.trigger) this.trigger.disabled = false;
+			return attached;
 		} catch (error) {
 			captureError(error, this.trigger, this.view?.dataset);
 			if (this.trigger) this.trigger.disabled = false;
@@ -115,17 +141,22 @@ export class Modal {
 	}
 
 	async attach(html, component) {
+		if (this._destroyed || this.view?._destroyed) return null;
 		try {
 			if (this.trigger) this.trigger.disabled = true;
 			const modal = html.querySelector("#modal") || html;
+			if (!modal) return null;
 			await withTransition(
 				() => {
+					if (this._destroyed || this.view?._destroyed) return;
+					this._detach();
+					this._modal = modal;
 					document.body.appendChild(modal);
 					this._attachListeners();
 				},
 				{ label: "modal:attach" },
 			);
-			return modal;
+			return this.modal;
 		} catch (error) {
 			captureError(error, component, this.view?.dataset);
 			return null;
@@ -144,8 +175,8 @@ export class Modal {
  * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
- * @pairs categories:delete projects:delete model-tasks:delete pages:delete
- * @pairs tasks:delete task-index:delete forms:delete users:delete users:options
+ * @matrix categories forms model-tasks pages projects task-index tasks : delete
+ * @matrix users : delete options
  * @pair messaging:clear-confirmation
  */
 export class DeleteModal extends Modal {
@@ -262,10 +293,23 @@ export class HelpModal extends Modal {
 }
 
 /**
- * @testable infrastructure
+ * @testable true
+ * @tests tests_js/test_046_async_query_lifecycle.py::test_modal_owns_exact_node_and_rejects_late_attachment
+ * @matrix modal : listener-teardown reuse
  */
 export class OfflineModal extends Modal {
+	constructor(view, trigger) {
+		super(view, trigger);
+		this._enabled = false;
+		this._triggerClick = () => {
+			void this.attach();
+		};
+	}
+
 	async attach() {
+		if (this._destroyed || this.view?._destroyed || this.modal) {
+			return this.modal;
+		}
 		const modal = document.createElement("div");
 		modal.id = "modal";
 		modal.className = STYLES.modal.wrapper;
@@ -297,7 +341,20 @@ export class OfflineModal extends Modal {
 	}
 
 	enable() {
-		if (!this.trigger) return;
-		this.trigger.addEventListener("click", this.attach.bind(this));
+		if (!this.trigger || this._destroyed || this._enabled) return;
+		this.trigger.addEventListener("click", this._triggerClick);
+		this._enabled = true;
+	}
+
+	disable() {
+		if (!this.trigger || !this._enabled) return;
+		this.trigger.removeEventListener("click", this._triggerClick);
+		this._enabled = false;
+	}
+
+	destroy() {
+		if (this._destroyed) return;
+		this.disable();
+		super.destroy();
 	}
 }

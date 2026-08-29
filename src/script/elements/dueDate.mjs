@@ -304,8 +304,7 @@ export class DueDate {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_due_date
-	 * @features tasks
-	 * @dimensions create due-date badge
+	 * @matrix tasks : badge create due-date
 	 */
 	_createDueDate() {
 		const dueDateGroup = primitives.div({

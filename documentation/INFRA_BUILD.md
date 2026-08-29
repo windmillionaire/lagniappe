@@ -1,346 +1,163 @@
-# Infrastructure Build System
+# Frontend Build
 
-The build system (`build/`) uses Rollup to bundle the frontend JavaScript and CSS from `src/` into production-ready assets in `lagniappe/web/static/`. Two custom Rollup plugins bridge the frontend and backend by generating shared style constants and processing the service worker.
+Rollup bundles authored JavaScript and CSS from `src/` into
+`lagniappe/web/static/`. The build also generates server-side style maps,
+service-worker metadata, and stable cache generations.
 
-## Output Structure
+`lagniappe/web/static/` is disposable generated output. Change `src/`,
+`build/`, or the style registries and run the appropriate build; do not edit
+generated bundles. The authored runtime-free `404.html` is the sole exception.
 
+For styles, icons, and linting, read
+[INFRA_BUILD_STYLES.md](INFRA_BUILD_STYLES.md).
+
+## Commands
+
+```bash
+npm run dev
+npm run build
 ```
+
+Development output is readable and tagged with mode `development`. Production
+output is minified, enforces startup budgets, records mode `production`, and
+may upload hidden JavaScript source maps when `SENTRY_AUTH_TOKEN` is present.
+Both modes emit a fresh build ID and bundle analysis under `reports/`.
+
+## Output
+
+```text
 lagniappe/web/static/
-  ├── 404.html               # Authored runtime-free catch-all page
-  ├── script.js              # Main app bundle (ESM)
-  ├── login.js               # Login bundle (ESM)
-  ├── sentry.js              # Conditional browser monitoring bundle (ESM)
-  ├── style.css              # Extracted + minified CSS
-  ├── sw.js                  # Service worker (from template)
-  ├── chunks/                # Code-split chunks
-  │     ├── shared.js        # Shared utilities (forced chunk)
-  │     └── [name].js        # Lazy-loaded view/widget/element chunks
+├── 404.html
+├── script.js
+├── login.js
+├── sentry.js
+├── style.css
+├── sw.js
+├── build.json
+├── fonts/
+└── chunks/
+    ├── shared.js
+    ├── views/
+    └── <feature>.js
 ```
 
-Chunk filenames remain stable on disk, while every generated inter-chunk import
-includes the current build ID (for example,
-`./chunks/shared.js?v=b824d23e`). The entrypoint and all of its static and
-dynamic chunks therefore use one cache generation during a service-worker
-update.
+Chunk filenames are stable. Generated imports carry `?v=<build-id>`, so an
+entry point and all of its static and dynamic imports use one cache generation.
+The service worker warms those exact URLs after an update.
 
-`lagniappe/web/static/` is generated build output even though parts of it are
-tracked. Do not edit static bundles directly. After source changes that need to
-ship generated assets, run `npm run dev` or `npm run build` in an intentional
-build-output pass.
+`build.json` is the build completion marker. It records the application
+version, build ID, build mode, a digest of all declared frontend sources, and
+the path, size, and digest of every published artifact. The inventory includes
+nested chunks, fonts, PDF.js assets, the service worker, and the generated
+Python style/icon registries. `config/constants.py` receives the same build ID
+for template URLs and ETags. Local application settings must not define
+`BUILD_ID`.
 
-The authored `lagniappe/web/static/404.html` page is an intentional exception to
-the generated-bundle rule. App Engine's final static handler serves it for paths
-outside the dynamic route allowlist, so those requests do not start the
-application runtime.
+The build wrapper removes the previous completion marker before Rollup starts.
+It publishes `BUILD_ID` and a new `build.json` only after every Rollup entry,
+optional Sentry upload, and output check succeeds, and only if the authored
+source digest is unchanged. A failed or interrupted build therefore leaves no
+apparently complete marker; the next managed build repairs it.
 
-### Release output
+## Entry points and chunks
 
-Development is committed directly to the active `next/<version>` branch.
-Development builds may update tracked generated files locally, and the branch's
-committed output may continue to describe the preceding release until the tree
-is frozen. `next/*` is not an installer channel.
+| Entry point | Output | Responsibility |
+| --- | --- | --- |
+| `src/script/main.mjs` | `script.js` and chunks | Private application and interactive public pages. |
+| `src/script/public.mjs` | `chunks/views/public.js` | Minimal native-share behavior for anonymous public documents. |
+| `src/script/login.mjs` | `login.js` | Identity Platform REST client and login forms. |
+| `src/script/sentry.mjs` | `sentry.js` | Conditional local browser monitoring SDK. |
 
-At release freeze, the maintainer runs one canonical `npm ci` and
-`npm run build`, commits the fresh output, and runs
-`venv/bin/python run.py release-check --base origin/main`. The complete
-`next/*` or `hotfix/*` branch is installer-tested before its release pull
-request is squash-merged into `main`. The main-only workflow requires the
-committed metadata to identify a production build; a later development build
-cannot pass the release gate.
+`src/script/viewRegistry.mjs` is the source of runtime view selection and
+stable named entries under `chunks/views/`. Rollup derives feature chunks from
+module boundaries. Editor, PDF, modal, combobox, offline, sync, notification,
+and similar code stay lazy until their owning surface requests them.
 
-Hosted E2E follows the same immutable-build boundary. After the canonical
-production output and candidate source are committed,
-`venv/bin/python run.py hosted-e2e create` validates the committed build
-metadata and deploys both hosted artifacts from an export of that exact commit.
-It never runs another build or replaces the reviewed random build ID. Hosted
-evidence is imported automatically after execution and may be committed
-afterward without changing the tested semantic source tree; the GitHub dispatch
-does that evidence-only follow-up commit itself after guarding the branch head.
-On a release pull request, the candidate run explicitly dispatches the same
-required workflow on that exact evidence-only child because GitHub suppresses
-ordinary workflow-token push triggers. The continuation validates the child
-against its exact parent and runs source/build/traceability gates without
-rebuilding assets or rerunning the hosted suites.
+The main startup path has four measured closures:
 
-When `SENTRY_AUTH_TOKEN` is configured, production JavaScript source maps are
-generated as hidden Rollup outputs, uploaded to Sentry, then deleted from
-`lagniappe/web/static/`. Without a token, JavaScript source maps and the upload
-plugins are disabled. CSS source maps are not generated.
+| Budget key | Measured closure | Limit (KiB) |
+| --- | --- | ---: |
+| `main` | Main entry alone | 32 |
+| `shell` | Main plus a shell view | 64 |
+| `core` | Main plus a Core view | 120 |
+| `builder` | Builder view | 224 |
 
-## Bundles
+`build/startupBudget.mjs` measures deduplicated minified static imports and
+fails when a closure exceeds its budget. It also prevents heavy interactive
+systems such as sync, edit reconciliation, modals, notifications, and combobox
+from entering every Core view's static closure.
 
-Three Rollup entry points produce independent bundles:
+## Production behavior
 
-### Login (`login.mjs` → `login.js`)
+`build/rollup.config.mjs` adds:
 
-The unauthenticated login page. Includes the focused Identity Platform REST
-client and the existing custom forms, but not a provider-owned Auth SDK. It remains
-separate from the main bundle so unauthenticated users do not download the full
-app. Its behavioral and trust-boundary contract is documented in
-[AUTHENTICATION.md](AUTHENTICATION.md).
+- esbuild minification with legal comments removed;
+- Tailwind processing and cssnano;
+- production build metadata and the startup budget;
+- a Rollup visualizer at `reports/bundle-stats.html`;
+- the content-addressed Material Symbols subset;
+- versioned chunk imports and service-worker precache entries; and
+- optional hidden Sentry source maps.
 
-### Sentry (`sentry.mjs` → `sentry.js`)
+When `SENTRY_AUTH_TOKEN` is configured, Rollup uploads hidden JavaScript source
+maps and removes them from static output. Without a token, source-map creation
+and upload plugins are disabled. CSS source maps are not emitted.
 
-The locally bundled browser SDK and shared event-sanitization configuration.
-Templates load it only when production error reporting is enabled. It reads the
-installation's configured `SENTRY_JS_DSN`, keeping browser events separate from
-the backend `SENTRY_DSN` without hardcoded browser loader keys.
+## Development behavior
 
-### Main and views (`main.mjs` → `script.js` + `chunks/`)
+`build/rollup.dev.config.mjs` keeps JavaScript readable, omits cssnano and
+Sentry upload, and writes `reports/bundle-stats-dev.html`. Its timestamp version
+is a frontend constant only; the configured application version is unchanged.
 
-The private application and public Manual share a small main boot entry.
-`src/script/viewRegistry.mjs` is the single source for runtime view selection
-and Rollup's stable named view entries under `chunks/views/`. Focused stable
-manual chunks separate connectivity, the shared
-shell/request/notification-state foundation, Core, Entity, and EntityIndex
-tiers. Templates preload only the
-tiers required by their current view: shell-only, Core, Entity, or Index.
-EntityIndex's dropdown styling remains lazy with the dropdown. This prevents a
-cold page from discovering interaction-critical dependencies only after DOM
-readiness without making shell or Builder closures inherit Core. Rollup
-automatically creates the remaining feature-level chunks from static and
-dynamic module boundaries.
-Editor, PDF, modal, combobox, offline, sync, the notification UI, and other
-feature chunks remain lazy until their owning surface requests them. The compact
-notification response-state helper stays in the request foundation. The
-vendored Material Symbols Rounded subset is declared by
-`src/style/fonts.css`, bundled into `style.css`, and emitted with the other
-self-hosted fonts under `lagniappe/web/static/fonts/`.
+Managed test startup validates the shared source/artifact manifest and records
+the accepted development state in `reports/test-frontend-bundle.json`. It
+preserves a coherent, current production build. Missing, corrupt, or stale
+output—including an old production build after source changes—is replaced by a
+development build. The source contract includes fonts and third-party license
+inputs as well as scripts, styles, and build configuration. The same
+interprocess lock guards build preflight and browser test sessions.
 
-## Production vs Development
+## Build plugins
 
-### Production (`rollup.config.mjs`)
+The custom plugins in `build/utility.mjs` enforce one artifact contract:
 
-Run via `npm run build`.
+- `versionChunkImports(buildId)` adds the build query to generated imports
+  without renaming files.
+- `updateServiceWorker(buildId)` injects the browser protocol, dynamic precache
+  URLs, and build ID into `sw.template.mjs`, then writes `sw.js` atomically.
+- `recordBuildArtifacts(...)` collects every Rollup output across all entry
+  configurations. The build wrapper validates that inventory and publishes the
+  completion marker last.
+- `emitMaterialSymbols()` emits the vendored glyph subset under a filename
+  derived from its digest.
+- `resolveMaterialSymbolsFont()` rewrites the stable authored font URL to that
+  generated asset.
+- `buildStyles()` validates the semantic style and icon registries and emits
+  their JavaScript and Python representations. See
+  [INFRA_BUILD_STYLES.md](INFRA_BUILD_STYLES.md).
 
-- **Minification**: esbuild with legal comments stripped
-- **CSS**: Tailwind CSS + cssnano minification
-- **Source maps**: With a nonblank `SENTRY_AUTH_TOKEN`, hidden JavaScript source
-  maps are generated for Sentry upload and deleted afterward; otherwise they
-  are disabled
-- **Sentry**: When the upload token is present, source maps are uploaded and the
-  release is tagged with `VERSION` from settings
-- **Chunk names**: Stable named view entries in `chunks/views/[name].js` and
-  automatic feature chunks in `chunks/[name].js`, with build-ID query strings
-  in generated imports; the service worker warms those exact versioned URLs
-  after update, and App Engine serves each versioned URL as long-lived immutable
-- **Bundle analysis**: Generates `reports/bundle-stats.html` treemap visualization
-- **Version**: `VERSION` is read from `config/files/lagniappe_settings.yaml`
-- **Build ID**: A short `BUILD_ID` is generated and written to
-  `config/constants.py` for cache busting
-- **Build metadata**: `lagniappe/web/static/build.json` records
-  `"mode": "production"` for the release gate
-- **Service worker precache**: Injects the current dynamic chunk URLs so
-  the service worker can warm them after an update, including nested
-  `chunks/views/` entries and their feature chunks
-- **Startup budget**: `build/startupBudget.mjs` measures deduplicated minified
-  static-import closures and fails above 16 KiB for main, 64 KiB for main plus
-  a shell view, 120 KiB for main plus a Core view, or 192 KiB for Builder. It
-  also rejects OfflineQueue, SyncManager, EditWatcher,
-  DeferredOperationManager, modal, notification, entity-menu, and combobox
-  modules from every Core view's static closure.
-- **Icon font**: Emits the official Material Symbols subset with a
-  content-derived filename
-- **Browser protocol**: Injects `config/browser_protocol.json` into the
-  standalone service-worker template
+Both Rollup configurations suppress dependency warnings for `eval` inside
+packages and the known `y-prosemirror` circular dependency. New warnings from
+application modules should remain visible.
 
-### Development (`rollup.dev.config.mjs`)
+## Release boundary
 
-Run via `npm run dev`.
-
-- **No minification**: Readable output for debugging
-- **CSS**: Tailwind CSS without cssnano
-- **No source maps**: Not needed with unminified output
-- **No Sentry**: No source map upload
-- **Chunk names**: Stable view entries (`chunks/views/[name].js`) plus automatic
-  feature chunks (`chunks/[name].js`), with the same build-ID query-string
-  contract as production
-- **Bundle analysis**: Generates `reports/bundle-stats-dev.html`
-- **Version replacement**: Timestamp-based (`new Date().toISOString()`) for dev-only frontend constants
-- **Build ID**: A short `BUILD_ID` is generated and written to
-  `config/constants.py` for cache busting
-- **Build metadata**: `lagniappe/web/static/build.json` records
-  `"mode": "development"` and cannot pass the release gate
-- **Test-server freshness**: E2E and managed test-server startup hashes the
-  authored build inputs plus generated outputs and runs this build only when
-  that state is stale or incomplete; the local state record lives at
-  `reports/test-frontend-bundle.json`. A completed production build is
-  preserved instead of being replaced with development assets. Development
-  preflight holds the same interprocess lock as the E2E session, so another
-  attempted test run cannot remove chunks while a live browser run uses them.
-
-## Custom Plugins (`utility.mjs`)
-
-### `buildStyles()`
-
-This plugin creates separate `"styles"` and `"icons"` virtual imports. It
-serves two purposes:
-
-**JavaScript side**: Rollup resolves `from "styles"` to the `STYLES` runtime
-tree parsed from `src/style/styles.yaml`, and `from "icons"` to the independent
-`ICONS` registry parsed from `src/style/icons.yaml`. Keeping the registries in
-separate modules lets interaction-critical icon helpers load without promoting
-the much larger style-class registry into the same static closure.
-
-**Python side**: During `generateBundle()`, writes the same data as Python
-dictionaries to `lagniappe/web/start/styles/icons.py` and `styles.py`. These
-auto-generated files are used by Jinja templates server-side.
-
-This ensures a single YAML source of truth for all style constants across both
-JavaScript and Python.
-
-Icon IDs use lower camel case. Each leaf is a structured Material Symbols
-record with a snake-case `glyph`, explicit `fill` value, and optional validated
-`weight` or `spin`.
-`src/style/icons.schema.json` is consumed by both the Node build and Python
-traceability path; the build rejects invalid IDs/values, and traceability
-rejects unknown consumers, unused definitions, or generated Python parity
-drift.
-
-Jinja's `render_icon()` and the frontend `createIcon()` / `setIcon()` helpers
-turn records into neutral `<span data-icon>` markup. The outer `.icon` span
-owns stable layout geometry, while its `.icon-glyph` child owns the rendered
-font size. Application code passes semantic IDs rather than glyph names or
-library classes. `icons.css` is the sole owner of `--icon-*` geometry:
-semantic optical exceptions use `data-icon`, while the `icon-xs` through
-`icon-2xl` modifiers provide intentional contextual scaling. Component CSS may
-position, stack, color, or hide an icon, but must not replace its box, glyph
-size, line height, or optical offsets. Icon-only controls consequently
-shrink-wrap the icon box and add only interaction styling.
-
-`src/style/pipeline.json` is the machine-readable contract for this path. It
-names both registries and virtual modules, generated Python targets, CSS entry
-and output, explicit Tailwind sources, and the transforms used by each Rollup
-mode. Both Rollup configurations consume the CSS output from this contract.
-
-Leaves in `styles.yaml` are typed records rather than bare strings:
-
-```yaml
-button:
-  submit:
-    classes: "..."
-    intent: primary form submission action
-    surfaces: [server, frontend]
-    hooks: []
-```
-
-An `alias` may replace `classes` when two semantic roles intentionally share a
-runtime value. The build rejects untyped leaves, unknown fields, invalid
-metadata, missing alias targets, and alias cycles. Normalization happens once;
-the virtual JavaScript style module and generated Python map receive that same
-string-valued runtime tree.
-
-### Style Traceability
-
-Run `venv/bin/python run.py traceability --styles` when tightening shared
-styles. The reporter scans source usage in `src/` and
-`lagniappe/web/templates/` against `src/style/styles.yaml`; it intentionally
-ignores generated static bundles and checks generated Python output only for
-runtime parity.
-
-The style graph reports:
-
-- shared style keys that are referenced with the same extra classes in both
-  Jinja and JavaScript;
-- repeated single-surface style extensions;
-- long or repeated raw class strings that are candidates for `styles.yaml`;
-- raw class strings that already match a YAML entry and can usually be replaced
-  by the shared key;
-- unused YAML entries, unknown style references, and duplicate YAML values.
-- authored stylesheet classifications and semantic selector ownership;
-- Tailwind candidate compilation, source reachability, and Python/JavaScript
-  runtime-map parity;
-- icon ID/value validation, consumer coverage, and generated Python parity;
-- template-contract and explicit `@style` test evidence.
-
-Normal runs write `reports/style-traceability.md` plus the versioned
-`reports/style-manifest.json`. Use `--json` for the shared traceability report
-envelope, or `--no-report --no-manifest` for a console-only pass. For
-candidate-review cautions, see [STYLE_CANDIDATES.md](STYLE_CANDIDATES.md).
-
-### Biome
-
-Biome owns formatting and linting for authored JavaScript, CSS, and JSON under
-`src/script/`, `src/style/`, and `build/`. The pinned configuration excludes
-generated frontend output under `lagniappe/web/static/`.
+Development occurs on `next/<version>` or `hotfix/<version>` branches. At
+release freeze, run one canonical dependency install and production build:
 
 ```bash
-npm run check
-npm run format
+npm ci
+npm run build
+venv/bin/python run.py release-check --base origin/main
 ```
 
-`npm run check` is non-mutating and checks formatting, lint rules, and import
-organization. `npm run format` writes formatting changes only. Biome is pinned
-in `package.json`; keep the lockfile in sync when upgrading it.
+Commit the generated output and test the complete candidate before merging its
+release pull request. The release gate verifies the exact Git index rather than
+the working tree: its source digest and every recorded artifact digest must
+match committed production metadata and the settings version. A development,
+partial, or stale build cannot pass.
 
-The CSS rules for descending specificity and `!important` are disabled
-repository-wide. The authored styles intentionally use both for state,
-responsive, and editor overrides, so those diagnostics do not distinguish
-defects from the cascade conventions used here.
-
-### Python lint
-
-Ruff owns the narrow Python correctness lint in `ruff.toml`; it is not used as
-a Python formatter. Run it from the project virtualenv:
-
-```bash
-venv/bin/python -m ruff check .
-```
-
-The selected rules cover import placement, invalid statement structure,
-syntax-level failures, and Pyflakes findings such as unused imports and
-undefined names. Python 3.12 is the lint target because it is the minimum
-supported runtime. Package `__init__.py` files intentionally receive
-exceptions for unused and late imports because they act as public facades or
-route-registration modules. Ruff is pinned in `requirements-dev.txt`.
-
-### `updateServiceWorker(buildId, version, mode)`
-
-Reads `src/script/sw.template.mjs`, replaces all `__BUILD_ID__` placeholders with
-the current build ID, injects the shared browser protocol plus the
-Rollup-generated versioned dynamic chunk URLs into their placeholders, and
-writes the result to `lagniappe/web/static/sw.js`. It also writes
-`lagniappe/web/static/build.json` with the build ID, application version, and
-explicit production/development mode. It runs during `writeBundle()` so the
-service worker and metadata always match the current build.
-
-### `versionChunkImports(buildId)`
-
-Rewrites Rollup-generated static imports, re-exports, and dynamic imports so
-internal chunk URLs carry `?v={buildId}`. It does not rename the emitted files.
-The plugin runs before production minification so source maps include the URL
-rewrite, and `updateServiceWorker()` derives its precache list from the same
-build ID.
-
-### `emitMaterialSymbols()`
-
-Reads the vendored official registry-derived subset from
-`src/fonts/material-symbols-rounded.woff2` and emits it using the first 12
-hex characters of its SHA-256 digest. The source request, axes, glyph list,
-upstream version, and full digest are recorded in the adjacent JSON metadata.
-After Rollup writes the current asset, the plugin removes older generated
-Material Symbols variants from the output font directory without touching
-other fonts.
-
-### `resolveMaterialSymbolsFont()`
-
-Rewrites the stable authored Material Symbols URL in `fonts.css` to the
-content-hashed emitted filename. This is required for a subset: adding a glyph
-must not let an installation reuse an older cached font that lacks it.
-
-## Warning Suppression
-
-Both configs suppress two known warnings:
-
-- **EVAL**: Suppressed for `node_modules` (third-party bundles may use eval internally)
-- **CIRCULAR_DEPENDENCY**: Suppressed for `y-prosemirror` (known circular dependency in the Yjs ProseMirror bindings)
-
-## Settings And Build Metadata
-
-Both configs read `config/files/lagniappe_settings.yaml` for `VERSION`; the
-production config also reads optional `SENTRY_AUTH_TOKEN`. A blank or missing
-token produces a normal production bundle without JavaScript source maps or
-Sentry upload plugins. Each frontend build writes a fresh `BUILD_ID` to
-`config/constants.py` and to `lagniappe/web/static/build.json`. The constant is
-tracked with the repo so upgraded installations receive the current
-cache-busting value; local app settings should not contain `BUILD_ID`.
+Hosted E2E exports an exact clean commit with production output, deploys that
+commit without rebuilding, and imports evidence for the same source tree. See
+[TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) and
+[INFRA_DEPLOYMENT.md](INFRA_DEPLOYMENT.md).

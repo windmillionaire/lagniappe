@@ -5,8 +5,9 @@ from flask_login import current_user
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, mentions
-from lagniappe.core.tools.form_state import validate_sync_payload
+from lagniappe.core.tools import cache
+from lagniappe.core.tools.mentions import service as mentions
+from lagniappe.core.tools.polling.forms import validate_sync_payload
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
 
@@ -29,11 +30,9 @@ def _document_seed(entity):
 
 # @testable true
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_sync_response_contract_is_browser_visible
 # @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_edits_document_without_ai_or_image_tools
-# @features sync
-# @dimensions document revision delta checkpoint persistence offline-replay
+# @matrix sync : checkpoint delta document offline-replay persistence revision
 @internal.route("/sync", methods=["POST"])
 @logged_in
 def sync():

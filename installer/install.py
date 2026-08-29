@@ -14,8 +14,7 @@ from installer.state import record_step
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_is_announced_before_dependency_or_provider_mutation
-# @features setup
-# @dimensions recovery failure-isolation
+# @matrix setup : failure-isolation recovery
 def _recovery_file_present(app_dir=None):
     """Detect the canonical recovery-file shape without importing config."""
     app_dir = Path(app_dir) if app_dir else REPOSITORY_ROOT
@@ -28,10 +27,9 @@ def _recovery_file_present(app_dir=None):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_characterization_starts_empty_and_reaches_all_boundaries
+# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_only_prints_manual_deployment_steps_when_declined
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
-# @pair setup:prerequisites
-# @pair setup:virtualenv
-# @pair setup:main-install
+# @matrix setup : explicit-project main-install manual-deploy prerequisites virtualenv
 def install():
     print("Welcome to Lagniappe Setup!")
     if _recovery_file_present():
@@ -89,6 +87,7 @@ def install():
         ("reconcile App Engine", gcloud.setup_app_engine),
         ("reconcile storage buckets", gcloud.configure_storage_buckets),
         ("reconcile task queue", gcloud.create_task_queue),
+        ("reconcile database data protection", gcloud.configure_data_protection),
         ("reconcile OCR processor", gcloud.create_ocr_processor),
         ("configure authentication email", auth_email.setup_auth_email),
         (
@@ -147,14 +146,24 @@ def install():
             "2. Run: "
             f"{format_command([GCLOUD_CLI, 'config', 'set', 'project', project])}"
         )
-        print(
-            "3. Run: "
-            f"{format_command([GCLOUD_CLI, 'app', 'deploy', File.INDEX_YAML.value])}"
-        )
-        print(
-            "4. Run: "
-            f"{format_command([GCLOUD_CLI, 'app', 'deploy', File.APP_YAML.value])}"
-        )
+        index_command = [
+            GCLOUD_CLI,
+            "app",
+            "deploy",
+            File.INDEX_YAML.value,
+            "--project",
+            project,
+        ]
+        app_command = [
+            GCLOUD_CLI,
+            "app",
+            "deploy",
+            File.APP_YAML.value,
+            "--project",
+            project,
+        ]
+        print(f"3. Run: {format_command(index_command)}")
+        print(f"4. Run: {format_command(app_command)}")
         print(f"After deployment, run: {setup_command('jobs')}")
         if ai_email_config:
             print(

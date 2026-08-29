@@ -52,7 +52,7 @@
     "check": "biome check src/script src/style build",
     "dev": "node build/run-rollup.mjs development",
     "format": "biome format --write src/script src/style build",
-    "watch": "chokidar './src/**/*.{css,js,mjs,yaml}' 'lagniappe/web/templates/*.html' 'lagniappe/web/templates/**/*.html' -c 'rollup --silent --config build/rollup.dev.config.mjs'"
+    "watch": "chokidar './src/**/*.{css,js,mjs,yaml}' 'lagniappe/web/templates/*.html' 'lagniappe/web/templates/**/*.html' -c 'node build/run-rollup.mjs development'"
   },
-  "version": "0.2.0"
+  "version": "1.0.0"
 }

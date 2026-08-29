@@ -1,3 +1,5 @@
+import re
+
 from playwright.sync_api import expect
 
 from .combobox import Select
@@ -161,6 +163,8 @@ class IngressWizard:
             Select(self.progress.locator("[data-option='page-form']")).select_by_name(
                 name
             )
+        destination = self.progress.locator("[data-role='index-to']")
+        expect(destination).to_have_attribute("data-page-form-id", re.compile(".+"))
         selected_form = self.progress.locator(
             "[data-option='page-form'] input[role='combobox']"
         )

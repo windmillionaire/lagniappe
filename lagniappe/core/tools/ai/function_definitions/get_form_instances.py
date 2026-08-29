@@ -4,7 +4,7 @@ from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from ..references import hash_reference
 
 
@@ -67,8 +67,7 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_form_instances_filters_permissions_status_and_truncates
-# @features ai form-schema
-# @dimensions form-instances permissions status truncation submission
+# @matrix ai form-schema : form-instances permissions status submission truncation
 def execute_get_form_instances(args, user):
     """Return viewable page/task instances attached to a form."""
     form_id = args.get("form_id")
@@ -104,7 +103,7 @@ def execute_get_form_instances(args, user):
     instances = [
         entity
         for entity in Entities.fetch(
-            *database.get.form_instance_users(form.key),
+            *database_get.form_instance_users(form.key),
             request=Fetch.direct(),
         )
         if _include_instance(entity, user, kinds, task_completed)

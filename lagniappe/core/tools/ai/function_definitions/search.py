@@ -23,8 +23,7 @@ ALLOWED_SEARCH_KINDS = tuple(sorted(SEARCH_KIND_ALIASES))
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_urls_and_result_scrubbing
-# @features ai
-# @dimensions search-url
+# @pair ai:search-url
 def entity_url(result):
     entity_ref = result.get("hash") or result["id"]
     if result["kind"] == "category":
@@ -43,8 +42,7 @@ def entity_url(result):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_urls_and_result_scrubbing
-# @features ai
-# @dimensions result-scrubbing parent-hydration
+# @matrix ai : parent-hydration result-scrubbing
 def format_search_result(result):
     formatted = dict(result)
     details = formatted.get("details")
@@ -123,8 +121,7 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
 # @covered-by lagniappe/core/tools/ai/function_definitions/search.py::format_search_result
-# @features ai
-# @dimensions search-filter search-limit
+# @matrix ai : search-filter search-limit
 def execute_search(args, user):
     query = args.get("query", "")
     restrictions = user.properties.restrictions.search
@@ -151,8 +148,7 @@ def execute_search(args, user):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
-# @features ai
-# @dimensions search-filter
+# @pair ai:search-filter
 def _search_kinds(value):
     if value is None:
         return None, []
@@ -181,8 +177,7 @@ def _search_kinds(value):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
-# @features ai
-# @dimensions search-limit
+# @pair ai:search-limit
 def _search_limit(value):
     try:
         limit = int(value)

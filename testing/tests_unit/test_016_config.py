@@ -49,8 +49,7 @@ def _disabled_ai_email_config():
     }
 
 
-# @features config
-# @dimensions build-id constants stale-settings ai-email public-projection secrets
+# @matrix config : ai-email build-id constants optional-providers public-projection secrets stale-settings
 def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
@@ -102,6 +101,8 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     assert module.CONFIG.AI_OBSERVABILITY is False
     assert module.CONFIG.GOOGLE_SIGNIN_ENABLED is True
     assert module.CONFIG.GOOGLE_CLIENT_ID == ""
+    assert module.CONFIG.CUSTOM_DOMAIN == ""
+    assert module.CONFIG.CLOUDFLARE_ACCOUNT_ID == ""
     assert module.CONFIG.REDIS_TLS is False
     assert module.CONFIG.REDIS_CA_CERT is None
     assert module.CONFIG.SOURCE_URL == "https://example.test/default-source"
@@ -175,7 +176,7 @@ def test_config_requires_hosted_build_id_to_match_built_source(monkeypatch):
         mismatch_spec.loader.exec_module(mismatch_module)
 
 
-# @pair config:observability-setting config:google-signin
+# @matrix config : google-signin observability-setting
 # @pair ai:observability
 def test_config_honors_ai_observability_setting(monkeypatch):
     app_settings = {
@@ -221,8 +222,66 @@ def test_config_honors_ai_observability_setting(monkeypatch):
     assert module.CONFIG.GOOGLE_SIGNIN_ENABLED is False
     assert module.CONFIG.GOOGLE_CLIENT_ID == ""
     assert module.CONFIG.ANALYTICS is False
+    assert module.CONFIG.SENTRY_TRACES_SAMPLE_RATE == 1.0
+    assert module.CONFIG.SENTRY_PROFILE_SESSION_SAMPLE_RATE == 1.0
     assert module.CONFIG.REDIS_TLS is True
     assert module.CONFIG.REDIS_CA_CERT == "config/files/redis_ca.pem"
+
+
+# @pairs config:error-reporting error-reporting:sampling
+def test_config_normalizes_and_validates_sentry_sample_rates(monkeypatch):
+    app_settings = {
+        "CONFIG_KIND": "lagniappe-settings",
+        "CONFIG_SCHEMA_VERSION": 3,
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
+            "runtime@project-1.iam.gserviceaccount.com"
+        ),
+        "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": (
+            "runtime@project-1.iam.gserviceaccount.com"
+        ),
+        "GOOGLE_CLOUD_PROJECT": "project-1",
+        "APP_ENGINE_LOCATION": "us-central",
+        "RESOURCE_REGION": "us-central1",
+        "GIBBERISH": "bucket-seed",
+        "VERSION": "1.0",
+        "SENTRY_TRACES_SAMPLE_RATE": "0.25",
+        "SENTRY_PROFILE_SESSION_SAMPLE_RATE": 0.5,
+    }
+    settings = types.SimpleNamespace(app_config=app_settings)
+    fake_config = types.SimpleNamespace(
+        Environment=FakeEnvironment,
+        SETTINGS=settings,
+        constants=types.SimpleNamespace(
+            BUILD_ID="tracked-build",
+            DEFAULT_SOURCE_URL="https://example.test/default-source",
+            DEFAULT_SENTRY_TRACES_SAMPLE_RATE=1.0,
+            DEFAULT_SENTRY_PROFILE_SESSION_SAMPLE_RATE=1.0,
+            UNSUPPORTED_SETTING_KEYS=frozenset(),
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "config", fake_config)
+    monkeypatch.setenv("FLASK_ENV", "production")
+
+    module_path = Path(__file__).resolve().parents[2] / "lagniappe" / "__init__.py"
+    spec = importlib.util.spec_from_file_location(
+        "_lagniappe_sentry_sampling_config_test",
+        module_path,
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module.CONFIG.SENTRY_TRACES_SAMPLE_RATE == 0.25
+    assert module.CONFIG.SENTRY_PROFILE_SESSION_SAMPLE_RATE == 0.5
+
+    invalid_values = (True, "invalid", float("nan"), float("inf"), -0.1, 1.1)
+    for name in (
+        "SENTRY_TRACES_SAMPLE_RATE",
+        "SENTRY_PROFILE_SESSION_SAMPLE_RATE",
+    ):
+        for value in invalid_values:
+            settings.app_config = {**app_settings, name: value}
+            with pytest.raises(RuntimeError, match=name):
+                module.Config()
 
 
 # @pair config:source-link
@@ -266,8 +325,7 @@ def test_config_honors_configured_source_url(monkeypatch):
     assert module.CONFIG.SOURCE_URL == "https://example.test/fork/tree/release"
 
 
-# @features config
-# @dimensions adc project-identity credential-cache
+# @matrix config : adc credential-cache project-identity
 def test_google_credentials_are_shared_and_project_bound(monkeypatch):
     import google.auth
     from lagniappe import Config
@@ -299,9 +357,8 @@ def test_google_credentials_are_shared_and_project_bound(monkeypatch):
         _ = mismatched.google_credentials
 
 
-# @pairs config:adc config:project-identity config:credential-cache
-# @pairs testing:adc testing:project-identity testing:credential-cache testing:runtime-impersonation
-# @pairs development:adc development:project-identity development:credential-cache development:runtime-impersonation
+# @matrix config : adc credential-cache project-identity
+# @matrix development testing : adc credential-cache project-identity runtime-impersonation
 @pytest.mark.parametrize("environment_name", ["development", "testing"])
 def test_local_google_credentials_impersonate_runtime_identity(
     monkeypatch,
@@ -383,8 +440,7 @@ def test_local_google_credentials_impersonate_runtime_identity(
     assert len(calls) == 1
 
 
-# @features config
-# @dimensions adc token-refresh
+# @matrix config : adc token-refresh
 def test_google_access_token_refreshes_adc_when_stale(monkeypatch):
     from lagniappe import Config
 
@@ -419,8 +475,7 @@ def test_google_access_token_refreshes_adc_when_stale(monkeypatch):
     assert isinstance(failure.value.__cause__, PermissionError)
 
 
-# @features testing hosted-e2e
-# @dimensions configuration prefix identity fail-closed deployment-binding
+# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix
 def test_hosted_e2e_overrides_require_exact_runtime_identity():
     from config.hosted_e2e import hosted_e2e_settings_overrides
     from lagniappe import Config
@@ -494,8 +549,7 @@ def test_hosted_e2e_overrides_require_exact_runtime_identity():
     assert config.hosted_e2e_server is False
 
 
-# @features testing hosted-e2e
-# @dimensions configuration identity fail-closed deployment-binding
+# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity
 def test_hosted_e2e_server_rejects_wrong_app_engine_version():
     from config.hosted_e2e import hosted_e2e_settings_overrides
     from lagniappe import Config
@@ -539,8 +593,7 @@ def test_hosted_e2e_server_rejects_wrong_app_engine_version():
     assert config.hosted_e2e_runner is False
 
 
-# @features testing hosted-e2e
-# @dimensions authentication soft-routing deletion-safety
+# @matrix hosted-e2e testing : authentication deletion-safety soft-routing
 def test_reserved_hosted_e2e_hostname_is_exact():
     from config.hosted_e2e import is_reserved_hosted_e2e_hostname
 
@@ -559,3 +612,13 @@ def test_reserved_hosted_e2e_hostname_is_exact():
     assert not is_reserved_hosted_e2e_hostname(
         "prefix-e2e-abcdef1234567890-dot-e2e-dot-project-1.appspot.com"
     )
+
+
+# @pair data-lifecycle:named-scratch-database
+def test_installer_database_id_validation():
+    from config.datastore import validate_database_id
+
+    assert validate_database_id("(default)") == "(default)"
+    assert validate_database_id("current-db") == "current-db"
+    with pytest.raises(ValueError):
+        validate_database_id("UPPERCASE")

@@ -7,7 +7,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="description" content="Private application, not for indexing">
+    <meta name="description"
+          content="{{ search_metadata.description if search_metadata else 'Private application, not for indexing' }}">
+    {% if search_metadata %}
+      <meta name="robots" content="{{ search_metadata.robots }}">
+      <link rel="canonical" href="{{ search_metadata.canonical_url }}">
+    {% endif %}
     <meta name="keywords" content="private, internal, non-indexed">
     <meta name="mode" content="{{ page_mode|default(default_page_mode) }}">
     <meta name="analytics" content="{{ CONFIG.ANALYTICS|yesno }}">

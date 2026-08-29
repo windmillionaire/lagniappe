@@ -26,8 +26,8 @@ class UserPermissions(UserPermissionsMixin, Permissions):
     # @tests tests_unit/test_009c_user_permissions_form.py::test_form_permissions
     # @tests tests_unit/test_009b_user_permissions.py::test_combine_groups
     # @tests tests_unit/test_009a_user.py::test_public_user_permissions_inherit_public_group_defaults_without_mutating_group
-    # @features permissions
-    # @dimensions form-data, no-groups, restricted, combine-groups
+    # @matrix permissions public-users : combine-groups form-data no-group-mutation no-groups own-page public-group-defaults restricted
+    # @pair permissions:public-group-defaults
     def create(self, form_data=None):
         self.entity.properties.restrictions.clear()
         self.entity.invalidate_cache = True

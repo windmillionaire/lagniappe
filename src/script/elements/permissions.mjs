@@ -90,8 +90,7 @@ const addSpecificPermission = (config, entry = {}) => {
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_preserves_unsaved_values_during_background_update
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_waits_for_authoritative_sections_before_initializing
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_ignores_validated_cached_response_after_initialization
- * @features user-groups
- * @dimensions permission-update general-permissions entity-permissions selection-render responsive-layout single-reconciliation unsaved-preservation background-update rebuild-serialization conditional-response initialization authoritative-sections
+ * @matrix user-groups : authoritative-sections background-update conditional-response entity-permissions general-permissions initialization permission-update rebuild-serialization responsive-layout selection-render single-reconciliation unsaved-preservation
  */
 export class PermissionsForm extends FormElement {
 	constructor(attributes) {

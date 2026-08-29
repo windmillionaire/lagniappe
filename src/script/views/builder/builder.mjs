@@ -1,6 +1,7 @@
 import { SearchBox } from "../../elements/combobox/search";
 import { EntityMenu } from "../../elements/entityMenu";
 import {
+	captureError,
 	connectivity,
 	DeleteModal,
 	generateElementId,
@@ -18,17 +19,16 @@ import { Header } from "./panels/header";
 import { ModelElement, ModelPanel } from "./panels/model";
 
 /**
- * @testable false
- * @covered-by src/script/views/builder/builder.mjs::FormBuilder.createFormElements
- * @covered-by src/script/views/builder/panels/components.mjs::ComponentsPanel.init
- * @covered-by src/script/views/builder/panels/components.mjs::ComponentsPanel._click
- * @covered-by src/script/views/builder/panels/header.mjs::Header.saveForm
- * @reason builder behavior is owned by concrete initialization and panel action methods
+ * @testable true
+ * @tests tests_js/test_046_async_query_lifecycle.py::test_builder_destroys_owned_search_modal_and_panels_during_startup
+ * @matrix forms : builder-lifecycle late-publication listener-teardown
  */
 class FormBuilder {
 	constructor(node) {
+		this._destroyed = false;
 		this.elt = node;
 		this.elements = new Map();
+		this._independentDocuments = new Set();
 		this.selectedElement = null;
 		this.schemaElt = document.querySelector('input[name="schema"]');
 		this.key = node.dataset.key;
@@ -36,6 +36,9 @@ class FormBuilder {
 		this.online = connectivity.online;
 		this.hidden = connectivity.hidden;
 		this.EntityMenu = new EntityMenu(this);
+		this.SearchBox = null;
+		this.offlineModal = null;
+		this._searchPromise = null;
 
 		this.components = new ComponentsPanel(this);
 		this.model = new ModelPanel(this);
@@ -48,41 +51,77 @@ class FormBuilder {
 	}
 
 	async init() {
+		if (this._destroyed) return this;
 		this.createFormElements();
 
 		this.model.init();
 		this.settings.init();
 		this.formSettings.init();
 
-		const offlineModal = new OfflineModal(this, this.offlineIndicator);
-		offlineModal.enable();
+		this.offlineModal = new OfflineModal(this, this.offlineIndicator);
+		this.offlineModal.enable();
 		this.offline(!this.online);
 
 		document.addEventListener("click", this.click);
 		this.elt._lp_view = this;
 
-		this._initSearch();
+		this._searchPromise = this._initSearch().catch((error) => {
+			captureError(error, this.elt, { context: "builder-search-startup" });
+			return null;
+		});
 		this.elt.setAttribute("initialized", "");
 		return this;
 	}
 
 	async _initSearch() {
 		const search = document.querySelector("[lp-search]");
-		if (search) {
-			const searchBox = new SearchBox(search);
-			await searchBox.init();
+		if (!search || this._destroyed) return null;
+
+		const searchBox = new SearchBox(search);
+		this.SearchBox = searchBox;
+		await searchBox.init();
+		if (this._destroyed || this.SearchBox !== searchBox) {
+			searchBox.destroy();
+			return null;
 		}
+		return searchBox;
 	}
 
 	/**
 	 * @testable true
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
-	 * @pairs forms:builder-lifecycle offline:builder-lifecycle
+	 * @tests tests_js/test_045_browser_persistence.py::test_builder_owns_independent_editor_lifecycle_flushes
+	 * @matrix editor html-field : teardown
+	 * @matrix forms offline : builder-lifecycle
 	 */
 	async sync({ hidden = document.hidden } = {}) {
+		const wasOnline = this.online;
 		this.hidden = hidden;
 		this.online = connectivity.online;
 		this.offline(!this.online);
+		if (this.online && (hidden || !wasOnline)) {
+			await this.flushIndependentDocuments({ keepalive: hidden });
+		}
+	}
+
+	registerIndependentDocument(document) {
+		this._independentDocuments.add(document);
+		return document;
+	}
+
+	unregisterIndependentDocument(document) {
+		this._independentDocuments.delete(document);
+	}
+
+	async flushIndependentDocuments(options = {}) {
+		const results = await Promise.allSettled(
+			[...this._independentDocuments].map((document) =>
+				Promise.resolve().then(() => document.flush(options)),
+			),
+		);
+		return results.every(
+			(result) => result.status === "fulfilled" && result.value === true,
+		);
 	}
 
 	/**
@@ -123,8 +162,7 @@ class FormBuilder {
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-	 * @features forms
-	 * @dimensions page-form task-form builder-defaults
+	 * @matrix forms : builder-defaults page-form task-form
 	 */
 	async createFormElements() {
 		const recentSchema = this.schemaElt.value;
@@ -175,32 +213,62 @@ class FormBuilder {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
-	 * @pairs forms:builder-copy forms:schema forms:navigation
-	 * @pairs entity-menu:builder-copy
+	 * @matrix forms : builder-copy navigation schema
+	 * @pair entity-menu:builder-copy
 	 */
 	async copyForm(button) {
-		if (!button?.dataset.route || button.disabled) return;
+		if (this._destroyed || !button?.dataset.route || button.disabled) return;
 
+		const hadFocus = document.activeElement === button;
+		let terminal = false;
 		button.disabled = true;
-		const response = await request.post(button.dataset.route, {
-			name: this.header.nameDisplay.textContent.trim(),
-			schema: this.schema,
-		});
-		if (response?.ok && response.url) {
-			window.location.assign(response.url);
-			return;
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+		this.header.clearMessage();
+		try {
+			const response = await request.post(button.dataset.route, {
+				name: this.header.nameDisplay.textContent.trim(),
+				schema: this.schema,
+			});
+			if (this._destroyed) return;
+			if (response?.ok === true && response.url) {
+				window.location.assign(response.url);
+				terminal = true;
+				return;
+			}
+			this.header.message(response?.error || "Could not copy this form.", {
+				persistent: true,
+			});
+		} catch (error) {
+			captureError(error, button, { context: "builder-copy-form" });
+			this.header.message("Could not copy this form. Try again.", {
+				persistent: true,
+			});
+		} finally {
+			if (!terminal && !this._destroyed && button.isConnected !== false) {
+				button.disabled = false;
+				button.setAttribute("aria-disabled", "false");
+				button.removeAttribute("aria-busy");
+				if (
+					hadFocus &&
+					(!document.activeElement ||
+						document.activeElement === document.body ||
+						document.activeElement === button)
+				) {
+					button.focus({ preventScroll: true });
+				}
+			}
 		}
-
-		button.disabled = false;
-		this.header.message(response?.error || "Could not copy this form.");
 	}
 
 	async _showDeleteModal(button) {
+		if (this._destroyed) return;
 		const modal = new DeleteModal(this, button);
 		await modal.init();
 	}
 
 	async _showHelpModal(button) {
+		if (this._destroyed) return;
 		const modal = new HelpModal(this, button);
 		await modal.init();
 	}
@@ -222,8 +290,7 @@ class FormBuilder {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_table_creation_defaults_columns_for_unsaved_preview
-	 * @features forms form-table
-	 * @dimensions builder-defaults unsaved-preview empty-columns
+	 * @matrix form-table forms : builder-defaults empty-columns unsaved-preview
 	 */
 	createElement(schema) {
 		schema.id = schema.id ?? generateElementId(schema.type);
@@ -260,14 +327,25 @@ class FormBuilder {
 	}
 
 	async showCondition(name, index = -1) {
-		if (this.conditions.loading) return;
+		if (this._destroyed || this.conditions.loading) return;
 		this.conditions.loading = true;
 		const element = this.selectedElement;
+		if (!element) {
+			this.conditions.loading = false;
+			return;
+		}
 
 		element.conditions ??= {};
 		let condition = element.conditions[name] ?? null;
+		let created = false;
 		if (!condition) {
 			condition = await loadCondition(this, name);
+			created = true;
+			if (this._destroyed || this.selectedElement !== element) {
+				condition?.destroy?.();
+				this.conditions.loading = false;
+				return;
+			}
 			element.conditions[name] = condition;
 		}
 
@@ -281,9 +359,18 @@ class FormBuilder {
 
 		condition.index = index;
 		await condition.init();
+		if (this._destroyed || this.selectedElement !== element) {
+			if (created) {
+				condition.destroy?.();
+				delete element.conditions[name];
+			}
+			this.conditions.loading = false;
+			return;
+		}
 
 		await withTransition(
 			() => {
+				if (this._destroyed || this.selectedElement !== element) return;
 				this.conditions.open(condition);
 			},
 			{ label: "builder:show-condition" },
@@ -309,8 +396,7 @@ class FormBuilder {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_delete_components
-	 * @features forms
-	 * @dimensions builder-delete-components
+	 * @pair forms:builder-delete-components
 	 */
 	removeElement() {
 		if (this.selectedElement.destroy) this.selectedElement.destroy();
@@ -322,8 +408,16 @@ class FormBuilder {
 	}
 
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.SearchBox?.destroy?.();
+		this.SearchBox = null;
+		this.offlineModal?.destroy?.();
+		this.offlineModal = null;
 		this.components.destroy();
 		this.model.destroy();
+		this.settings.destroy();
+		this.conditions.destroy();
 		this.header.destroy();
 		this.formSettings.destroy();
 		this.EntityMenu.destroy();
@@ -332,8 +426,10 @@ class FormBuilder {
 			if (element.destroy) element.destroy();
 		});
 		this.elements.clear();
+		this._independentDocuments.clear();
 
 		document.removeEventListener("click", this.click);
+		if (this.elt._lp_view === this) delete this.elt._lp_view;
 	}
 }
 

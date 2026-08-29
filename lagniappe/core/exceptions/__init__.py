@@ -30,8 +30,7 @@ class ValidationError(Exception):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
-# @features ai
-# @dimensions error-context
+# @pair ai:error-context
 class AIException(Exception):
     """Raised when AI generation fails or returns invalid output."""
 
@@ -110,9 +109,8 @@ def get_debug_context(error):
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_error_capture_can_wait_for_sentry_delivery
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_error_capture_sanitizes_context_without_duplicate_request
-# @pairs error-handling:sentry error-handling:terminal-delivery
-# @pairs deferred-jobs:sentry deferred-jobs:terminal-delivery
-# @pairs error-handling:privacy error-handling:request-context error-handling:redaction
+# @matrix deferred-jobs : sentry terminal-delivery
+# @matrix error-handling : privacy redaction request-context sentry terminal-delivery
 def capture(error, context=None, level="error", *, wait_for_delivery=False):
     """Capture an error, sending to Sentry in production or printing in dev."""
     if CONFIG.capture_errors:

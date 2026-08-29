@@ -96,8 +96,7 @@ def _cloudflare_request(method, path, api_token, *, params=None, json_data=None)
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_cloudflare_token_prompt_explains_dashboard_steps_and_scope
-# @features setup
-# @dimensions cloudflare-api interactive-input least-privilege
+# @matrix setup : cloudflare-api interactive-input least-privilege
 def get_cloudflare_api_token():
     """Prompt for a scoped token without echoing or persisting it."""
     print(
@@ -151,8 +150,7 @@ def get_cloudflare_api_token():
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dns_only_reconciliation
-# @features setup
-# @dimensions cloudflare-api zone-resolution
+# @matrix setup : cloudflare-api zone-resolution
 def get_cloudflare_zone(domain, api_token):
     """Resolve the longest provider-owned zone suffix for a hostname."""
     zones = []
@@ -212,8 +210,7 @@ def _valid_dmarc_policy(content):
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dmarc_reconciliation_creates_or_reuses_valid_policy
-# @features setup
-# @dimensions authentication-email cloudflare-dns dmarc idempotence
+# @matrix setup : authentication-email cloudflare-dns dmarc idempotence
 def ensure_cloudflare_dmarc_record(domain, zone, api_token):
     """Create a monitoring DMARC policy unless one already exists."""
     zone_id = str(zone.get("id") or "")
@@ -375,8 +372,7 @@ def _record_snapshot(record):
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dns_only_reconciliation
-# @features setup
-# @dimensions cloudflare-dns dns-only idempotence provider-records partial-failure
+# @matrix setup : cloudflare-dns dns-only idempotence partial-failure provider-records
 def reconcile_cloudflare_dns_records(
     domain,
     zone,

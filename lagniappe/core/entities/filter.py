@@ -7,8 +7,7 @@ from flask_login import current_user
 from ..definitions import Action, Fetch, FilterDefinition
 from ..entities import Entities
 from ..properties import filter
-from ..tools import cache
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 from .condition import Condition
 from .entity import Entity
 
@@ -22,6 +21,8 @@ class Filter(Entity):
         super().__init__(*args, **kwargs)
         self._conditions = None
         self._definitions = None
+        self._compiled_filters = {}
+        self._compiled_related = None
 
     @property
     def is_filter(self):
@@ -29,8 +30,7 @@ class Filter(Entity):
 
     # @testable true
     # @tests tests_unit/test_011_filters.py::test_filter_fingerprint_uses_loaded_parent_fingerprint
-    # @features filter
-    # @dimensions fingerprint parent
+    # @matrix filter : fingerprint parent
     @property
     def fingerprint(self):
         fingerprint = super().fingerprint
@@ -83,8 +83,7 @@ class Filter(Entity):
     # @testable true
     # @tests tests_unit/test_011_filters.py::test_filter_related_entities_allowed_checks_referenced_entities
     # @tests tests_unit/test_011_filters.py::test_filter_related_entities_allowed_checks_model_task_form_restrictions
-    # @features filter permissions
-    # @dimensions saved-filters related-entities model-task restricted-access
+    # @matrix filter permissions : model-task related-entities restricted-access saved-filters
     def related_entities_allowed(self, user=None):
         user = current_context_user(user)
         related = Entities.fetch(*self.related, request=Fetch.direct())
@@ -95,14 +94,16 @@ class Filter(Entity):
     # @tests tests_unit/test_011_filters.py::test_filter_conditions_boolean
     # @tests tests_unit/test_011_filters.py::test_filter_conditions_entity_valued
     # @tests tests_unit/test_011_filters.py::test_filter_conditions_multiple_types
-    # @features filter
-    # @dimensions conditions, string, boolean, entity-valued, mixed-types
+    # @matrix filter : boolean conditions entity-valued mixed-types string
     @property
     def conditions(self):
         if getattr(self, "_conditions", None):
             return self._conditions
 
-        entity_map = {e.hash: e for e in self.related}
+        if self._definitions is None:
+            self.compile()
+        related = self._compiled_related or self.related
+        entity_map = {e.hash: e for e in related}
         conditions = [Condition.create(d, entity_map) for d in self.definitions]
         self._conditions = [c for c in conditions if c]
 
@@ -110,32 +111,86 @@ class Filter(Entity):
 
     @property
     def definitions(self):
-        if getattr(self, "_definitions", None):
+        if self._definitions is not None:
             return self._definitions
 
-        stored_definitions = json.loads(self.db.get("definitions", "[]"))
-        self._definitions = [FilterDefinition.load(d) for d in stored_definitions]
+        self.compile()
         return self._definitions
 
     @definitions.setter
     def definitions(self, definitions):
-        self._definitions = definitions
-        self.db["definitions"] = json.dumps([d.description for d in definitions])
+        from ..tools.filters.contract import CompiledFilter
+
+        self._compiled_filters = {}
+        self._conditions = None
+        if isinstance(definitions, CompiledFilter):
+            self._definitions = list(definitions.definitions)
+            self._compiled_related = list(definitions.related)
+            self.db["definitions"] = json.dumps(definitions.contract)
+            return
+
+        # Retain the legacy setter for fixtures and trusted compatibility
+        # callers. Production creation compiles before reaching this boundary.
+        self._definitions = list(definitions)
+        self.db["definitions"] = json.dumps(
+            [definition.description for definition in definitions]
+        )
+
+    # @testable true
+    # @tests tests_unit/test_011c_filter_contract.py::test_saved_filter_compiles_legacy_data_per_viewer
+    # @matrix filters permissions : authorization legacy saved-filter validation
+    def compile(self, user=None):
+        """Validate saved data for the current viewer before it can be queried."""
+        from ..tools.filters.contract import compile_saved_filter
+
+        user = current_context_user(user)
+        user_key = getattr(user, "urlsafe_key", None) or id(user)
+        compiled = self._compiled_filters.get(user_key)
+        if compiled is None:
+            compiled = compile_saved_filter(
+                self.parent,
+                self.db.get("definitions", "[]"),
+                user,
+            )
+            self._compiled_filters[user_key] = compiled
+
+        # The entity can be compiled for more than one viewer in a long-lived
+        # context. Keep the display projections aligned with the requested
+        # viewer even when their compiled contract came from this local cache.
+        self._conditions = None
+        self._definitions = list(compiled.definitions)
+        self._compiled_related = list(compiled.related)
+        return compiled
 
     @classmethod
     def create(cls, entity, definitions, temporary=False):
+        from ..tools.filters.contract import (
+            CompiledFilter,
+            compile_filter_contract,
+            parse_filter_request,
+        )
+
         filter = cls(temporary=temporary, parent=entity.key)
         filter.kind = filter.entity_kind
         filter.creator = current_user
         filter.parent = entity
 
-        definitions = [FilterDefinition.load(d) for d in definitions]
+        if not isinstance(definitions, CompiledFilter):
+            legacy_values = [
+                json.dumps(
+                    definition.description
+                    if isinstance(definition, FilterDefinition)
+                    else definition
+                )
+                for definition in definitions
+            ]
+            contract = parse_filter_request(None, legacy_values)
+            definitions = compile_filter_contract(
+                entity,
+                contract,
+                current_context_user(),
+            )
         filter.definitions = definitions
-
-        conditions = [Condition(definition=d) for d in definitions]
-
-        hashes = {h for c in conditions for h in c.hashes}
-        entity_keys = [d["id"] for d in cache.get_details_by_hash(hashes).values()]
-        filter.related = Entities.fetch(*entity_keys, request=Fetch.direct())
+        filter.related = list(definitions.related)
 
         return filter

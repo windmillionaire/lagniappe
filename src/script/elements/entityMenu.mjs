@@ -9,7 +9,8 @@ import { Dropdown } from "./combobox/dropdown";
  * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_delete_page_from_title_menu
  * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
  * @tests tests_js/test_016_combobox_frontend.py::test_entity_title_menu_anchors_to_the_title_bottom_left
- * @pairs entity-menu:title-menu entity-menu:title-positioning entity-menu:state-linking entity-menu:builder-copy entity-menu:readiness
+ * @matrix entity-menu : builder-copy readiness state-linking title-menu title-positioning
+ * @matrix pages tasks : title-menu
  */
 export class EntityMenu {
 	constructor(view) {

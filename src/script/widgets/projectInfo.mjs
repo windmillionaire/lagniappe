@@ -47,8 +47,7 @@ class ProjectForm extends FormElement {
  * @testable true
  * @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_form
  * @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_reads_project_without_editing_controls
- * @features projects
- * @dimensions info-form metadata-sync readonly
+ * @matrix projects : info-form metadata-sync readonly
  */
 export class ProjectInfo extends ProjectForm {
 	constructor(attributes) {
@@ -78,8 +77,7 @@ export class ProjectInfo extends ProjectForm {
  * @testable true
  * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_form
  * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
- * @features projects
- * @dimensions manual-form ai-form
+ * @matrix projects : ai-form manual-form
  */
 export class CreateProject extends ProjectForm {
 	constructor(attributes) {

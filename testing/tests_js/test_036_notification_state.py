@@ -1,8 +1,7 @@
 """Node-backed checks for notification projection delivery."""
 
 
-# @features notifications
-# @dimensions badge redis-projection cold-seed response-header accessible-state
+# @matrix notifications : accessible-state badge cold-seed redis-projection response-header
 def test_notification_state_updates_badge_and_reports_cache_miss(run_node):
     run_node(
         r"""

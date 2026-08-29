@@ -26,8 +26,7 @@ const TOOL_DEFAULTS = {
  * @testable true
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
  * @tests tests_js/test_043_ai_email_frontend.py::test_ai_email_address_selection_and_copy_controls
- * @features ai-report
- * @dimensions upload-form multi-file instructions tool-switcher ask create explain-button email-address-selection clipboard-fallback status-reset absent-markup
+ * @matrix ai-report : absent-markup ask clipboard-fallback create email-address-selection explain-button instructions multi-file status-reset tool-switcher upload-form
  */
 export class CreateToolReport extends BaseUpload {
 	constructor(attributes) {

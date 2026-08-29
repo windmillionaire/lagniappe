@@ -19,10 +19,8 @@ from testing.resources.site import TaskIndex
 pytestmark = pytest.mark.e2e
 
 
-# @features table-controls
-# @dimensions mobile-controls columns
+# @matrix table-controls : columns mobile-controls
 def test_task_index_mobile_controls_open_with_task_columns(get_user):
-    """A phone user opens the task table controls and sees task columns."""
     user = get_user(Users.OWNER)
     Tasks.test_mobile_index_task.get(user)
     user.go(SitePages.TASK_INDEX)
@@ -39,10 +37,8 @@ def test_task_index_mobile_controls_open_with_task_columns(get_user):
     expect(controls.row("modified")).to_be_visible()
 
 
-# @features table-controls
-# @dimensions mobile-controls column-visibility
+# @matrix table-controls : column-visibility mobile-controls
 def test_task_index_mobile_visibility_toggle_hides_column(get_user):
-    """Mobile column controls hide a visible task column in the table."""
     user = get_user(Users.OWNER)
     Tasks.test_mobile_index_task.get(user)
     user.go(SitePages.TASK_INDEX)
@@ -58,10 +54,8 @@ def test_task_index_mobile_visibility_toggle_hides_column(get_user):
     expect(user.locate("#table td[data-column='modified']:visible")).to_have_count(0)
 
 
-# @features table-controls
-# @dimensions mobile-controls sorting
+# @matrix table-controls : mobile-controls sorting
 def test_task_index_mobile_filter_button_opens_sorting_panel(get_user):
-    """The mobile filter control opens the same sort choices as the desktop header."""
     user = get_user(Users.OWNER)
     Tasks.test_mobile_index_task.get(user)
     user.go(SitePages.TASK_INDEX)

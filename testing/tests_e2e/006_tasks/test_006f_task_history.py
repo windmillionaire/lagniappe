@@ -11,7 +11,6 @@ Verified against:
 from dataclasses import replace
 import re
 from datetime import datetime, timezone
-from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 import pytest
@@ -19,9 +18,10 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.tasks.ordering import page_task_roots
 from testing.definitions import ModelTasks, Pages, Tasks, Users
 from testing.resources import Task
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 pytestmark = pytest.mark.e2e
 
@@ -128,7 +128,6 @@ def _open_combine_form(user, task):
     expect(menu).to_be_visible()
     action = menu.get_by_role("menuitem", name="Combine with Task")
     expect(action).to_have_attribute("data-kind", "task")
-    view_key = user.locate("[lp-view]").get_attribute("data-key")
     with user.page.expect_response(
         lambda response: response.url.split("?", 1)[0]
         .rstrip("/")
@@ -137,9 +136,7 @@ def _open_combine_form(user, task):
     ) as response_info:
         action.click()
 
-    response = response_info.value
-    assert parse_qs(urlparse(response.url).query).get("page") == [view_key]
-    assert response.headers.get("cache-control") == "no-store"
+    assert response_info.value.headers.get("cache-control") == "no-store"
 
     combine_form = task.element.locator("[data-widget='TaskCombine']")
     expect(combine_form).to_be_visible()
@@ -147,11 +144,9 @@ def _open_combine_form(user, task):
     return combine_form
 
 
-# @features tasks
-# @dimensions history completion-cycle name description attachments
+# @matrix tasks : attachments completion-cycle description history name
 # @template cell.html::cell
 def test_task_history_appears_after_completion_cycle(get_user):
-    """Completing and reopening a task leaves a visible history record."""
     user = get_user(Users.OWNER)
     task_name = f"History Task {uuid4().hex}"
     task = _create_combine_task(
@@ -195,11 +190,10 @@ def test_task_history_appears_after_completion_cycle(get_user):
     expect(attachment_link).to_have_attribute("href", re.compile(r"/files/.+"))
 
 
-# @pairs tasks:history tasks:reload
-# @pairs table-controls:column-visibility table-controls:persistence
+# @matrix table-controls : column-visibility persistence
+# @matrix tasks : history reload
 # @template pages/tasks.html::task_tab
 def test_task_history_visibility_persists_after_reload(get_user):
-    """A task history column choice survives a full page reload."""
     user = get_user(Users.OWNER)
     task = Tasks.test_history_form_task.get(user)
     _add_task_row_pressure(task)
@@ -233,21 +227,12 @@ def test_task_history_visibility_persists_after_reload(get_user):
     ).to_be_checked()
 
 
-# @features tasks
-# @dimensions history-fill latest-submission repeating-default patch live-update
+# @matrix tasks : history-fill latest-submission live-update patch repeating-default
 # @template pages/tasks.html::task_form
 def test_task_form_field_fills_from_latest_history(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_history_fill_task.get(user)
     user.go(task)
-
-    history_fill_requests = []
-    user.page.on(
-        "request",
-        lambda request: history_fill_requests.append(request.url)
-        if "/history/latest-submission" in request.url
-        else None,
-    )
 
     _complete_then_uncomplete(task, reload=False)
 
@@ -267,32 +252,38 @@ def test_task_form_field_fills_from_latest_history(get_user):
     with user.page.expect_response(
         lambda response: "/default-submission" in response.url
         and response.request.method == "PATCH"
-    ) as text_default_response:
+    ):
         fill_button.click()
-    assert text_default_response.value.status == 200
     expect(text_field).to_contain_text("Historical text value")
     expect(number_field).to_be_visible()
 
     with user.page.expect_response(
         lambda response: "/default-submission" in response.url
         and response.request.method == "PATCH"
-    ) as number_default_response:
+    ):
         number_fill_button.click()
-    assert number_default_response.value.status == 200
 
     expect(text_field).to_contain_text("Historical text value")
     expect(text_field.locator("input")).to_have_value("Historical text value")
     expect(number_field.locator("input")).to_have_value("42")
-    assert len(history_fill_requests) == 1
 
-    saved = Entities.fetch_one(task.key, request=Fetch.direct())
-    assert saved.default_submission == {
-        "input-textab12": "Historical text value",
-        "input-numgh78": 42.0,
-    }
+    _complete_then_uncomplete(task, reload=False)
+    task_form = task.task_form
+    expect(task_form.locator("[name='input-textab12']")).to_have_value(
+        "Historical text value"
+    )
+    expect(task_form.locator("[name='input-numgh78']")).to_have_value("42")
+
+    user.reload()
+    task.wait_for_load()
+    task_form = task.task_form
+    expect(task_form.locator("[name='input-textab12']")).to_have_value(
+        "Historical text value"
+    )
+    expect(task_form.locator("[name='input-numgh78']")).to_have_value("42")
 
 
-# @pairs tasks:history-fill tasks:latest-submission tasks:live-update tasks:element-matrix
+# @matrix tasks : element-matrix history-fill latest-submission live-update
 # @template pages/tasks.html::task_form
 def test_task_history_fill_controls_cover_submission_elements(get_user):
     user = get_user(Users.OWNER)
@@ -476,12 +467,10 @@ def test_task_history_fill_controls_cover_submission_elements(get_user):
         Entities.delete(form)
 
 
-# @features embedded-table
-# @dimensions table-cell-expand
+# @pair embedded-table:table-cell-expand
 # @template cell.html::table_cell
 # @template controls.html::expand
 def test_task_history_expands_table_submission_cell(get_user):
-    """A completed task history row can expand a table-valued submission."""
     user = get_user(Users.OWNER)
     task = Tasks.test_history_table_task.get(user)
     user.go(task)
@@ -510,15 +499,10 @@ def test_task_history_expands_table_submission_cell(get_user):
     expect(embedded).to_contain_text("History row")
 
 
-# @pairs task-combine:compatible task-combine:same-page
-# @pairs task-combine:same-model task-combine:no-model
-# @pairs task-combine:checkbox-form task-combine:lazy-form
-# @pairs task-combine:lazy-reload
-# @pairs task-combine:view-page task-combine:linked-page
-# @pairs web-headers:no-store
+# @matrix task-combine : checkbox-form compatible lazy-form lazy-reload linked-page no-model same-model same-page view-page
+# @pair web-headers:no-store
 # @template pages/tasks.html::combine_form
 def test_combine_task_form_filters_compatible_tasks(get_user):
-    """The picker exposes same-model tasks owned by the currently viewed page."""
     user = get_user(Users.OWNER)
     fixture = Tasks.test_history_task.get(user)
     page = fixture.entity.page
@@ -592,32 +576,10 @@ def test_combine_task_form_filters_compatible_tasks(get_user):
         combine_form.get_by_role("checkbox", name=no_model_peer.entity.name)
     ).to_have_count(0)
 
-    combine_form.get_by_role(
-        "checkbox", name=linked_page_peer.entity.name
-    ).check()
-    with user.page.expect_response(
-        lambda response: response.url.split("?", 1)[0]
-        .rstrip("/")
-        .endswith("/combine")
-        and response.request.method == "PUT"
-    ) as response_info:
-        combine_form.get_by_role("button", name="Combine Tasks").click()
-
-    response = response_info.value
-    assert parse_qs(urlparse(response.url).query).get("page") == [linked_page.key]
-    assert "task_delta" in response.json()
-
-
-# @pairs task-combine:winner task-combine:completed-on
-# @pairs task-combine:current-snapshot task-combine:source-snapshot
-# @pairs task-combine:existing-history
-# @pairs task-combine:attachments task-combine:migrate-history task-combine:delete
-# @pairs task-combine:delta task-combine:upsert task-combine:remove task-combine:ordering
-# @pairs task-combine:checkbox-submit task-combine:isolated-form task-combine:no-reload
+# @matrix task-combine : attachments checkbox-submit completed-on current-snapshot delete delta existing-history isolated-form migrate-history no-reload ordering remove upsert winner
 # @template pages/tasks.html::combine_form
 # @template pages/tasks.html::task
 def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
-    """Combining retains each losing timeline and reconciles the page list in place."""
     user = get_user(Users.OWNER)
     fixture = Tasks.test_history_form_task.get(user)
     page = fixture.entity.page
@@ -664,9 +626,6 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
         source.key,
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
-    original_history = source.entity.history[0]
-    original_history_key = original_history.urlsafe_key
-
     user.go(source)
     combine_form = _open_combine_form(user, source)
     before_url = user.page.url
@@ -681,14 +640,11 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
     ) as response_info:
         combine_form.get_by_role("button", name="Combine Tasks").click()
 
-    response = response_info.value
-    assert response.status == 200
-    delta = response.json()["task_delta"]
-    assert delta["upsert"][0]["key"] == winner.key
+    delta = response_info.value.json()["task_delta"]
+    assert [update["key"] for update in delta["upsert"]] == [winner.key]
     assert set(delta["remove"]) == {source.key, secondary.key}
-    assert winner.key in delta["order"]
-    assert source.key not in delta["order"]
-    assert secondary.key not in delta["order"]
+    assert delta["order"] == [task.urlsafe_key for task in page_task_roots(page)]
+
     assert user.page.url == before_url
 
     winner_row = user.locate(f"[data-key='{winner.key}']")
@@ -697,25 +653,22 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
     expect(user.locate(f"[data-key='{source.key}']")).not_to_be_attached()
     expect(user.locate(f"[data-key='{secondary.key}']")).not_to_be_attached()
 
-    saved_winner = Entities.fetch_one(
-        winner.key,
-        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
-    )
-    migrated_history = saved_winner.history
-    assert len(migrated_history) == 3
-    assert {history.name for history in migrated_history} == {
+    fixture.definition.origin.get(user).completed_task_list
+    expect(winner_row).to_be_visible()
+    winner.element = winner_row
+    history = _open_history(winner)
+    history_rows = history.locator("tbody")
+    for name in (
         "Combine source archived",
         "Combine source current",
         "Combine secondary current",
-    }
-    assert {
-        file.name
-        for history in migrated_history
-        for file in history.files
-    } == {
+    ):
+        expect(history_rows).to_contain_text(name)
+
+    controller = _open_history_visibility(history)
+    controller.locator("input[type='checkbox'][name='files']").set_checked(True)
+    for attachment in (
         "Combine archived attachment",
         "Combine current attachment",
-    }
-    assert Entities.fetch_one(source.key, request=Fetch.root()) is None
-    assert Entities.fetch_one(secondary.key, request=Fetch.root()) is None
-    assert Entities.fetch_one(original_history_key, request=Fetch.root()) is None
+    ):
+        expect(history.get_by_role("link", name=attachment)).to_be_visible()

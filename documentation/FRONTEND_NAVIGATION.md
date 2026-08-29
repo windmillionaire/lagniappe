@@ -1,259 +1,129 @@
 # Frontend Navigation
 
-Reference for authoring templates that use the navigation system. The nav system controls which widgets are visible within components, manages toggle buttons, titles, and control buttons (help, close, delete, reset). For the canonical attribute inventory, see [TEMPLATES_ATTRIBUTES.md](TEMPLATES_ATTRIBUTES.md).
+This guide explains how templates compose views, components, widgets, nav, and
+tabs. The full attribute vocabulary is in
+[FRONTEND_TEMPLATES_ATTRIBUTES.md](FRONTEND_TEMPLATES_ATTRIBUTES.md); do not
+duplicate it here.
 
-## How It Works
+## Mental model
 
-A **view** (`lp-view`) contains **components** (`lp-component`). Each component can display one active **widget** (`data-widget`) at a time. Navigation is driven by `lp-show` attributes on buttons/elements — when clicked, the Core view parses the `componentId:widgetName` pair, activates that widget in that component, and reconciles the nav bar to reflect the new state.
+```text
+[lp-view]
+  -> [lp-component] with an id
+       -> optional [lp-nav]
+       -> one active [data-widget]
+```
 
-Widgets are lazily loaded on first activation. Once loaded they stay cached on
-the component. Activation and `prepareRender()` finish before the visual
-boundary; one synchronous `render()`/`reconcile()` commit then changes widget,
-component, and nav visibility together. The nav reads `data-*` attributes off
-the active widget's target element to determine what title, controls, and
-toggles to display.
-
-Conditional global nav controls leave the layout when hidden and publish
-`aria-hidden`/focus state with their visible state. Nav transitions never
-crossfade, and list rows do not receive independent transition snapshots that
-could outlive a collapsing widget.
-
-## View & Component Structure
+`lp-show="componentId:WidgetName"` selects a widget. `Core` activates it,
+finishes imports/loads/preparation, and commits component, widget, and nav state
+together.
 
 ```html
-<!-- Root view element -->
-<div lp-view data-kind="project" data-key="{{ key }}">
+<div lp-view data-kind="user">
+  <section id="tools" lp-component data-default="CreateUser">
+    <header lp-nav data-nav="tools">
+      <h2 data-role="title"></h2>
+      <div data-role="controls"></div>
+    </header>
 
-  <!-- A component: owns widgets and optionally a nav bar -->
-  <div id="tools" lp-component data-default="CreateUser" data-visible="false">
-    <!-- nav bar header -->
-    <div lp-nav data-nav="tools">...</div>
-
-    <!-- widgets live inside the component -->
-    <form data-widget="CreateUser" data-visible="false">...</form>
-    <form data-widget="EditUser" data-visible="false">...</form>
-  </div>
+    <form data-widget="CreateUser"
+          data-route="{{ url_for('users.create') }}"
+          data-destination="table:IndexRows"
+          data-title="Create a user"
+          lp-create>
+      ...
+    </form>
+  </section>
 </div>
 ```
 
-| Attribute | Element | Purpose |
-|---|---|---|
-| `lp-view` | root | Marks the view root. Core/Entity binds event listeners here. |
-| `lp-entity` | root | Use alongside `lp-view` for entity detail pages (enables tabs, mobile nav, collaboration). |
-| `lp-component` | div | Marks a component container. Must have an `id`. |
-| `id` | component | Used as the `componentId` in `lp-show="componentId:widgetName"`. |
-| `data-default` | component | The widget to activate when showing `"default"` or `"active"`. |
-| `data-visible` | component | `"true"` / `"false"` — whether the component is visible. |
-| `data-persistent` | component | `"true"` keeps the component visible even when deactivated. |
-| `data-key` | component | Entity key, used for delete operations and routing. |
-| `data-kind` | component | Kind identifier (e.g. `"project"`, `"user"`), used for theming. |
-| `data-tab` | component | `"true"` marks this component as a tab within an entity view. |
-| `data-title` | component | Fallback title when no widget-level title is set. |
-| `readonly` | component | Marks the component as read-only; propagates to widgets. |
+## Components and widgets
 
-## Widgets
+Every component needs a stable `id`. `data-default` names the widget selected
+by `default` or when no active widget exists. `data-persistent="true"` keeps a
+component or widget rendered when inactive. `data-tab="true"` marks a child
+component as an Entity tab.
 
-A widget target is any element inside a component with a `data-widget` attribute. The name must match a key in the widget loader's registry (or it gets a default no-op widget).
+A widget's `data-widget` must match `widgets/loader.mjs` or intentionally use
+the no-op default widget. Put request and presentation configuration on the
+widget:
 
-```html
-<form data-widget="CreateUser"
-      data-visible="false"
-      data-route="{{ url_for('users.create') }}"
-      data-destination="table:IndexRows"
-      data-title="Create a User"
-      data-close="tools"
-      data-help="create_user"
-      data-nav="true"
-      data-controls="true"
-      lp-create>
-  <button type="submit" class="..."></button>
-</form>
-```
+- `data-route` for GET/POST/PUT;
+- `data-destination` for create/deferred reconciliation;
+- `data-title` for the current nav heading;
+- `data-close`, `data-help`, and routed control targets;
+- `data-nav` / `data-controls` for nav visibility; and
+- `lp-load`, `lp-prefetch`, `lp-create`, `lp-update`, `lp-offline`, or
+  `lp-deferred` for the widget behavior it implements.
 
-### Widget Attributes
+## Navigation targets
 
-These `data-*` attributes on widget targets are read by the nav during reconciliation to configure the nav bar.
+`lp-show` uses `componentId:widgetName`.
 
-| Attribute | Purpose |
-|---|---|
-| `data-widget` | **Required.** Widget name — must match a loader registry key. |
-| `data-visible` | Initial visibility. Managed automatically after first activation. |
-| `data-title` | Title displayed in the nav bar when this widget is active. |
-| `data-nav` | `"true"` shows component toggle buttons in the nav; `"false"` hides them. |
-| `data-controls` | `"true"` shows the control buttons (help, close, delete, reset) when active. |
-| `data-close` | Value for the close button — format `"componentId:widgetName"` or just `"componentId"`. Navigates there on close. |
-| `data-help` | Help topic key. Populates the help button when this widget is active. |
-| `data-reset` | Reset target — format `"componentId:widgetName"`. Shows the reset button, navigating to that target on click. |
-| `data-route` | Server endpoint for this widget (used by load, update, create). |
-| `data-destination` | `"componentId:widgetName"` — where to navigate after a successful `lp-create` submission. |
-| `data-persistent` | `"true"` keeps the widget's target visible regardless of active state. |
-| `data-key` | Entity key specific to this widget. |
-| `data-kind` | Kind override for this widget. |
-| `lp-create` | Marks the form as a create action. |
-| `lp-update` | Marks the form as an update action. |
-| `lp-load` | Triggers a server fetch when this widget is first activated. |
+| Widget name | Meaning |
+| --- | --- |
+| Exact registry name | Activate that widget. |
+| `active` | Reopen the selected widget, falling back to the default. |
+| `default` | Activate `data-default`. |
+| `nav` | Activate a standalone selector nav. |
 
-## Nav Bar
+Add `data-toggle="true"` when selecting an already-visible target should hide
+it.
 
-Each component can have one nav bar. It consists of two parts: the **header** (inline with the component, marked with `lp-nav`) and the **toggle bar** (a `<nav>` element matched by `data-nav` name).
+## Nav header and toggle bar
 
-### Nav Header (`lp-nav`)
-
-```html
-<div lp-nav data-nav="tools" class="...">
-  <h2 data-role="title"></h2>
-  <div data-role="controls">
-    <!-- control buttons go here -->
-  </div>
-</div>
-```
-
-The `data-nav` value on the `lp-nav` element links it to a `<nav data-nav="...">` toggle bar with the same name. The title element (`data-role="title"`) is auto-populated from the active widget's `data-title`.
-
-### Toggle Bar
+An `[lp-nav][data-nav="tools"]` header pairs with
+`nav[data-nav="tools"]`. The active widget supplies the title, available
+toggles, and controls. A toggle bar can be persistent or standalone.
 
 ```html
 <nav data-nav="tools" data-persistent="true">
-  <button lp-show="tools:CreateUser">New User</button>
-  <button lp-show="user-groups:nav">User Groups</button>
+  <button lp-show="tools:CreateUser">New user</button>
+  <button lp-show="groups:nav">Groups</button>
 </nav>
 ```
 
-| Attribute | Element | Purpose |
-|---|---|---|
-| `data-nav` | `<nav>` | Links this toggle bar to a nav header with the same `data-nav` value. |
-| `data-persistent` | `<nav>` | `"true"` keeps the toggle bar visible even when the component isn't active. |
-| `data-standalone` | `<nav>` | `"true"` means the nav itself can be the component's active element (used for selector-style navs like user groups). |
-
-### Controls
-
-Control buttons use `lp-control="..."` values. They are placed inside
-`data-role="controls"` and their visibility is automatically managed based on
-the active widget's settings.
+Controls use documented `lp-control` values. Shared nav controls also carry a
+`data-controls` marker so `NavElement` knows which widget setting to copy.
 
 ```html
 <div data-role="controls">
-  <button lp-control="help" data-controls="help" lp-help="create_user" type="button">Help</button>
-  <button lp-control="close" data-controls="close" lp-close="tools:IndexRows" type="button">Close</button>
-  <button lp-control="delete" data-controls="delete" lp-delete type="button">Delete</button>
-  <button lp-control="reset" data-controls="show" lp-show="tools:CreateUser" type="button">Reset</button>
+  <button type="button" lp-control="help" data-controls="help"></button>
+  <button type="button" lp-control="close" data-controls="close"></button>
+  <button type="button" lp-control="delete" data-controls="delete" lp-delete></button>
 </div>
 ```
 
-`NavElement` usually sets the supporting attributes dynamically from the active
-widget's `data-help`, `data-close`, `data-reset`, and routed-control settings.
-Routed controls such as `form`, `task`, `history`, `filters`, and `reset` use
-the active widget's matching `data-*` value to populate `lp-show`. Delete
-controls get their key from the nearest `[lp-entity]` context. For shared nav controls,
-`DeleteModal` can use the active widget's nearest `[lp-entity]`.
+Title action menus use `templates/menus.html`. Hidden source items carry the
+same delegated `lp-show` or delete controls used elsewhere; `EntityMenu`
+renders the floating panel and forwards selection to those items.
 
-## Toggle Buttons (`lp-show`)
+## Entity tabs and mobile layout
 
-The primary navigation mechanism. Any element with `lp-show` triggers navigation on click.
-
-```html
-<!-- Show the CreateUser widget inside the tools component -->
-<button lp-show="tools:CreateUser">New User</button>
-
-<!-- Show the active widget (or default) in the info component -->
-<button lp-show="info:active">Info</button>
-
-<!-- Show the component with its default widget -->
-<button lp-show="tools:default">Settings</button>
-
-<!-- Activate standalone nav in user-groups -->
-<button lp-show="user-groups:nav">User Groups</button>
-```
-
-### Format: `componentId:widgetName`
-
-- **componentId** — the `id` of the target `lp-component` element.
-- **widgetName** — one of:
-  - A specific widget name (e.g. `CreateUser`, `BaseList`)
-  - `active` — re-show the currently active widget (or default if none)
-  - `default` — show the component's `data-default` widget
-  - `nav` — activate the component's standalone nav
-
-### Toggle Behavior
-
-Add `data-toggle="true"` to make a button toggle — clicking it again when that widget is already active will hide it.
+An Entity root carries `lp-entity`, `data-key`, `data-hash`, and `data-kind`.
+Its tab components use `data-tab="true"`; their toggles use ordinary `lp-show`.
+`Entity` persists the active tab by `data-hash` and moves secondary cards into
+the tab stack on mobile.
 
 ```html
-<button lp-show="tools:default" data-toggle="true">Settings</button>
-```
-
-## Sub-Toggles
-
-Widget toggles that appear inside the nav header (e.g. a "create" button that only shows when a specific component is active). These go inside a `data-role="subtoggles"` container.
-
-```html
-<div lp-nav data-nav="mobile">
-  <div data-role="subtoggles">
-    <span data-role="title"></span>
-    <button lp-show="model-tasks:CreateModelTask">
-      {{ render_icon("plus") }}
-    </button>
-  </div>
+<div lp-view lp-entity data-kind="project" data-key="..." data-hash="...">
+  <section id="tabs" lp-component>
+    <section id="info" lp-component data-tab="true" data-default="ProjectInfo">...</section>
+    <section id="document" lp-component data-tab="true" data-default="CollaborativeDocument">...</section>
+  </section>
 </div>
 ```
 
-Sub-toggle buttons are shown/hidden based on which component is currently active.
+Do not create a second mobile-only content tree. Entity moves the same
+components and reconciles their nav ownership.
 
-## Entity Views (Tabs + Mobile)
+## Authoring checklist
 
-Entity detail pages use `lp-entity` and organize content into tab components. The `Entity` class handles responsive layout — on mobile, a shared `mobileNav` replaces per-card nav bars, and tab components are stacked instead of side-by-side.
-
-```html
-<div lp-view lp-entity data-key="..." data-hash="..." data-kind="project">
-  <!-- Mobile nav: shared across tabs on small screens -->
-  <div lp-nav data-nav="mobile" data-visible="false">
-    <div data-role="subtoggles">...</div>
-    <nav>
-      <!-- tab toggle buttons -->
-      <button lp-show="info:active">Info</button>
-      <button lp-show="document:active">Document</button>
-    </nav>
-  </div>
-
-  <!-- Tab components -->
-  <div id="tabs" lp-component>
-    <div id="info" lp-component data-tab="true" data-default="ProjectInfo">...</div>
-    <div id="document" lp-component data-tab="true" data-default="CollaborativeDocument">...</div>
-  </div>
-
-  <!-- Secondary card (e.g. model tasks), moves into tabs on mobile -->
-  <div id="model-tasks" lp-component data-tab="true" data-persistent="true">...</div>
-</div>
-```
-
-Key points:
-- `data-tab="true"` on a component marks it as a tab. The active tab is persisted to `localStorage`.
-- `data-hash` on the view root is used as the localStorage key prefix.
-- On desktop, `#tabs` and secondary cards (like `#model-tasks`) sit side-by-side. On mobile, everything collapses into `#tabs` with a shared mobile nav.
-- The `_defaultTabId` in the Entity class determines which tab shows first (defaults to `"info"`).
-
-## Loader Buttons
-
-Toggle buttons inside a `<nav>` that have the `loader` class get automatic loading states — when clicked, the selected button is disabled and others are dimmed until the widget finishes loading.
-
-```html
-<nav data-nav="tools">
-  <button class="loader" lp-show="tools:CreateUser">New User</button>
-  <button class="loader" lp-show="tools:EditUser">Edit User</button>
-</nav>
-```
-
-## Quick Reference
-
-| I want to... | Do this |
-|---|---|
-| Add a toggle that shows a widget | `<button lp-show="componentId:WidgetName">` |
-| Make a toggle hide on re-click | Add `data-toggle="true"` to the button |
-| Set the title when a widget is active | `data-title="My Title"` on the widget target |
-| Show help/close/delete buttons | `data-controls="true"` on the widget, plus `data-help`, `data-close`, and key/delete context as needed |
-| Hide the nav toggles for a widget | `data-nav="false"` on the widget target |
-| Keep a widget visible always | `data-persistent="true"` on the widget target |
-| Create a nav that acts as a selector | `data-standalone="true"` on the `<nav>` element |
-| Add a new tab to an entity view | New `lp-component` with `data-tab="true"`, add a toggle button to the nav |
-| Navigate somewhere after form create | `data-destination="componentId:widgetName"` on the `lp-create` form |
-| Navigate somewhere on close | `data-close="componentId:widgetName"` on the widget target |
+- Use stable component IDs and registered widget names.
+- Put behavior opt-ins on the element that owns the behavior.
+- Keep routed controls aligned with actual component/widget targets.
+- Give create and deferred forms an explicit destination.
+- Use the macros and attributes already recognized by template-contract
+  tooling.
+- Run `venv/bin/python run.py template-contracts --changed --check` after
+  changing a tagged template contract.

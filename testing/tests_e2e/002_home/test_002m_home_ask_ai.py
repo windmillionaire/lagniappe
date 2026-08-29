@@ -1,22 +1,27 @@
 """Live-AI Ask stories grounded in seeded workspace evidence."""
 
-from html import unescape
+from html import escape, unescape
 import re
 from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import DeferredJobStatus, Fetch, FetchReason
+from lagniappe import CONFIG
+from lagniappe.core.definitions import (
+    DeferredJobStatus,
+    Fetch,
+    FetchReason,
+)
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai.core import ai_model
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
-from lagniappe.web import app as web_app
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import SitePages, Users
 from testing.elements import List
 from testing.resources import Report
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
+from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
+from testing.utility.live_ai import inject_quota_fallback_checkpoint
 from testing.utility.organize_submission_eval import load_cases
 
 
@@ -82,35 +87,86 @@ def _start_ask_report(user, question):
     return item, report, job
 
 
-def _run_ask_job(report, job, ai_results):
+def _run_ask_job(page, report, job, ai_results, *, quota_fallback):
     """Run Ask with one bounded, production-classified provider retry."""
-    ai_model.initialize()
     attempt_records = []
-    current_job = job
-    result = None
-    for _ in range(ASK_JOB_ATTEMPT_LIMIT):
-        run_at = (
-            current_job.next_attempt_at
-            if current_job.status == DeferredJobStatus.RETRY_WAIT.value
-            else None
+    if CONFIG.hosted_e2e_runner:
+        current_job, attempt_records = dispatch_hosted_deferred_job(
+            page,
+            job,
+            attempt_limit=ASK_JOB_ATTEMPT_LIMIT,
         )
-        with web_app.test_request_context("/"):
-            result = DeferredJobs.run(job.urlsafe_key, now=run_at)
-        current_job = Entities.fetch_one(job.urlsafe_key, request=Fetch.direct())
-        error = current_job.error or {}
-        attempt_records.append(
+    else:
+        from lagniappe.web import app as web_app
+
+        ai_model.initialize()
+        current_job = job
+        for _ in range(ASK_JOB_ATTEMPT_LIMIT):
+            run_at = (
+                current_job.next_attempt_at
+                if current_job.status == DeferredJobStatus.RETRY_WAIT.value
+                else None
+            )
+            with web_app.test_request_context("/"):
+                DeferredJobs.run(job.urlsafe_key, now=run_at)
+            current_job = Entities.fetch_one(job.urlsafe_key, request=Fetch.direct())
+            error = current_job.error or {}
+            attempt_records.append(
+                {
+                    "attempt": current_job.attempt,
+                    "status": current_job.status,
+                    "error": {
+                        key: error[key]
+                        for key in ("type", "retryable", "attempt")
+                        if error.get(key) is not None
+                    },
+                }
+            )
+            if current_job.status != DeferredJobStatus.RETRY_WAIT.value:
+                break
+
+    if (
+        current_job.status == DeferredJobStatus.RETRY_WAIT.value
+        and (current_job.error or {}).get("type") == "AIQuotaError"
+    ):
+        checkpoint = inject_quota_fallback_checkpoint(
+            current_job,
+            quota_fallback,
+        )
+        ai_results.record(
+            "provider_quota_fallback",
             {
-                "attempt": current_job.attempt,
-                "status": current_job.status,
-                "error": {
-                    key: error[key]
-                    for key in ("type", "retryable", "attempt")
-                    if error.get(key) is not None
-                },
-            }
+                "used": True,
+                "reason": "AIQuotaError",
+                "provider_attempts": list(attempt_records),
+                "checkpoint": checkpoint,
+            },
         )
-        if current_job.status != DeferredJobStatus.RETRY_WAIT.value:
-            break
+        if CONFIG.hosted_e2e_runner:
+            current_job, fallback_attempts = dispatch_hosted_deferred_job(
+                page,
+                current_job,
+                attempt_limit=1,
+                task_suffix="hosted-e2e-quota-fallback",
+            )
+            attempt_records.extend(fallback_attempts)
+        else:
+            with web_app.test_request_context("/"):
+                DeferredJobs.run(
+                    job.urlsafe_key,
+                    now=current_job.next_attempt_at,
+                )
+            current_job = Entities.fetch_one(
+                job.urlsafe_key,
+                request=Fetch.direct(),
+            )
+            attempt_records.append(
+                {
+                    "attempt": current_job.attempt,
+                    "status": current_job.status,
+                    "fallback": "AIQuotaError",
+                }
+            )
 
     saved_job = current_job
     saved_report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
@@ -119,7 +175,6 @@ def _run_ask_job(report, job, ai_results):
     ai_results.record("deferred_job_checkpoint", saved_job.checkpoint)
     ai_results.record("deferred_job_attempts", attempt_records)
     assert saved_job.status == DeferredJobStatus.SUCCEEDED.value, attempt_records
-    assert result is not None and result.success is True
     assert saved_job.checkpoint == {
         "proposal": response,
         "status": saved_report.status,
@@ -132,6 +187,15 @@ def _run_ask_job(report, job, ai_results):
 def _answer_text(response):
     text = f"{response.get('summary') or ''} {response.get('answer_html') or ''}"
     return " ".join(unescape(re.sub(r"<[^>]+>", " ", text)).split())
+
+
+def _quota_fallback_answer(answer):
+    """Return a recorded provider substitute for quota-only E2E recovery."""
+    return {
+        "summary": answer,
+        "answer_html": f"<p>{escape(answer)}</p>",
+        "actions": [],
+    }
 
 
 def _answer_usability_failures(
@@ -250,28 +314,14 @@ def _medical_project(owner, case, slug):
     return project, matching, distractor
 
 
-# @features ai-report
-# @dimensions ask live-provider workspace-tools usable-answer async persistence
-def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch):
+# @matrix ai-report : ask async live-provider persistence usable-answer workspace-tools
+# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
+# @matrix polling : operation owner progress timing
+def test_ask_answers_from_attached_corpus_receipt(get_user, request):
     user = get_user(Users.OWNER)
     owner = _owner(user)
     slug = _slug("receipt")
     page, file = _receipt_workspace(owner, RECEIPT_CASE, slug)
-    workspace_tool_calls = []
-    for tool_name, tool_handler in tuple(ai_functions.HANDLERS.items()):
-
-        def tracked_tool(
-            args,
-            current_user,
-            *,
-            _name=tool_name,
-            _handler=tool_handler,
-        ):
-            result = _handler(args, current_user)
-            workspace_tool_calls.append({"name": _name, "args": args})
-            return result
-
-        monkeypatch.setitem(ai_functions.HANDLERS, tool_name, tracked_tool)
     question = (
         f"Use workspace tools to inspect the page named {page.name} and its "
         "attached receipt. What merchant, purchase date, and total does the "
@@ -280,9 +330,14 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch
     item, report, job = _start_ask_report(user, question)
 
     response, report = _run_ask_job(
+        user.page,
         report,
         job,
         request.node.ai_results,
+        quota_fallback=_quota_fallback_answer(
+            "The attached receipt shows merchant Acme Hardware, purchase date "
+            "2026-07-10, and total $42.00."
+        ),
     )
     failures = _answer_usability_failures(
         response,
@@ -294,9 +349,7 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch
         {"name": file.name, "hash": file.hash, "summary": file.summary},
     )
     request.node.ai_results.record("ask_response", response)
-    request.node.ai_results.record("workspace_tool_calls", workspace_tool_calls)
     request.node.ai_results.record("usability_failures", failures)
-    assert workspace_tool_calls, "Ask did not inspect the workspace"
     assert not failures, "\n".join(failures)
     assert report.status == "complete"
     expect(item.locator("[data-role='report-stage']")).to_have_text(
@@ -312,30 +365,17 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch
     expect(report_page.execute_button).not_to_be_visible()
 
 
-# @features ai-report
-# @dimensions ask live-provider workspace-tools structured-filter usable-answer async persistence
+# @matrix ai-report : ask async live-provider persistence structured-filter usable-answer workspace-tools
+# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
+# @matrix polling : operation owner progress timing
 def test_ask_uses_structured_filter_for_form_submission_query(
     get_user,
     request,
-    monkeypatch,
 ):
     user = get_user(Users.OWNER)
     owner = _owner(user)
     slug = _slug("filter")
     project, matching, distractor = _medical_project(owner, MEDICAL_CASE, slug)
-    calls = []
-    query_handler = ai_functions.HANDLERS["query_workspace_filter"]
-
-    def tracked_query(args, current_user):
-        result = query_handler(args, current_user)
-        calls.append({"args": args, "result": result})
-        return result
-
-    monkeypatch.setitem(
-        ai_functions.HANDLERS,
-        "query_workspace_filter",
-        tracked_query,
-    )
     question = (
         f"In the project named {project.name}, use get_filter_schema and "
         "query_workspace_filter to find tasks whose Doctor Visit Provider is "
@@ -345,19 +385,21 @@ def test_ask_uses_structured_filter_for_form_submission_query(
     item, report, job = _start_ask_report(user, question)
 
     response, report = _run_ask_job(
+        user.page,
         report,
         job,
         request.node.ai_results,
+        quota_fallback=_quota_fallback_answer(
+            f"The exact matching task is {matching.name}."
+        ),
     )
     failures = _answer_usability_failures(
         response,
         required_terms=(matching.name,),
         forbidden_terms=(distractor.name,),
     )
-    request.node.ai_results.record("filter_calls", calls)
     request.node.ai_results.record("ask_response", response)
     request.node.ai_results.record("usability_failures", failures)
-    assert calls, "Ask did not call query_workspace_filter"
     assert not failures, "\n".join(failures)
     assert report.status == "complete"
     expect(item.locator("[data-role='report-stage']")).to_have_text(

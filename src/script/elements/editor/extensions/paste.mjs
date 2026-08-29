@@ -116,8 +116,7 @@ const unwrapElement = (element) => {
 
 // @testable true
 // @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
-// @features editor
-// @dimensions paste-html sanitization
+// @matrix editor : paste-html sanitization
 export const sanitizePastedHtml = (content) => {
 	if (!content || !HTML_FRAGMENT_PATTERN.test(content)) return "";
 
@@ -343,8 +342,7 @@ const isHorizontalRule = (line) =>
 // @testable true
 // @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_markdown_table_preserves_table_after_reload
 // @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_common_markdown_preserves_formatting
-// @features editor
-// @dimensions paste-markdown-table paste-markdown reload
+// @matrix editor : paste-markdown paste-markdown-table reload
 export const markdownToHtml = (content) => {
 	const lines = String(content || "")
 		.replaceAll("\r\n", "\n")
@@ -486,8 +484,7 @@ export const markdownToHtml = (content) => {
 // @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_markdown_table_preserves_table_after_reload
 // @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
 // @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_common_markdown_preserves_formatting
-// @features editor
-// @dimensions paste-markdown-table paste-markdown paste-html sanitization
+// @matrix editor : paste-html paste-markdown paste-markdown-table sanitization
 export const EditorPaste = Extension.create({
 	name: "editorPaste",
 

@@ -1,8 +1,7 @@
 """Node-backed checks for form-element module selection."""
 
 
-# @features forms
-# @dimensions invalid-schema
+# @pair forms:invalid-schema
 def test_unknown_form_element_reports_schema_type(run_node):
     run_node(
         r'''

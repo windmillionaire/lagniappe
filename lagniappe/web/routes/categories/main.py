@@ -4,20 +4,20 @@ from flask_login import current_user
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai, filters
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.definitions import (
     AI,
     Action,
     CategoryAttributes,
     DeferredJobSpec,
     DeferredJobType,
-    Fetch,
     MutationIntent,
     Resource,
 )
 from lagniappe.web.auth import permission, require_ai_access
 from lagniappe.web import responses
-from lagniappe.core.tools.utility import timed
+from lagniappe.core.tools.diagnostics import timed
 
 from . import categories
 
@@ -26,13 +26,7 @@ from . import categories
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_create_scoped_to_one_category
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
-# @features categories
-# @dimensions permission-gates index-filter create-control server-render first-batch
-# @pair categories:permission-gates
-# @pair categories:index-filter
-# @pair categories:create-control
-# @pair categories:server-render
-# @pair categories:first-batch
+# @matrix categories : create-control first-batch index-filter permission-gates server-render
 @categories.route("/<key>", methods=["GET"])
 @timed(profile=True)
 @permission(Resource.CATEGORY, Action.RESTRICTED)
@@ -49,8 +43,7 @@ def index(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
-# @features categories
-# @dimensions index-filter permission-gates
+# @matrix categories : index-filter permission-gates
 @categories.route("/<key>/rows", methods=["GET"])
 @permission(Resource.CATEGORY, Action.RESTRICTED)
 def rows(key, **kwargs):
@@ -74,15 +67,25 @@ def info(key, **kwargs):
 # @covered-by lagniappe/web/routes/categories/main.py::create
 # @covered-by lagniappe/web/routes/categories/main.py::update
 # @reason form parsing helper owned by category create/update routes
-def _category_data(form):
+def _category_data(form, category=None):
+    form_key = form.get("form")
+    current_form = category.form if category else None
+    selected_form = SubmittedReferenceResolver(current_user, form_key).one(
+        form_key,
+        expected=Entities.FORM,
+        action=Action.VIEW,
+        existing=current_form,
+        predicate=lambda candidate: candidate.form_type == "page",
+    )
+    if not form_key and current_form and not current_form.allowed(
+        Action.VIEW, user=current_user
+    ):
+        selected_form = current_form
+
     return {
         "name": form.get("name"),
         "description": form.get("description"),
-        "form": (
-            Entities.fetch_one(form.get("form"), request=Fetch.direct())
-            if form.get("form")
-            else None
-        ),
+        "form": selected_form,
         "attributes": [a.name for a in CategoryAttributes if form.get(a.name)],
     }
 
@@ -90,13 +93,16 @@ def _category_data(form):
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
-# @pairs categories:update categories:permission-gates
+# @matrix categories : permission-gates update
 @categories.route("<key>/update", methods=["PUT"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def update(key, **kwargs):
     category = kwargs["entity"]
 
-    category.update(_category_data(request.form))
+    try:
+        category.update(_category_data(request.form, category=category))
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     Entities.save(category)
 
     return responses.category_info(category)
@@ -130,8 +136,7 @@ def _generate_category(generated_data):
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_manual_mode
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_with_form
-# @features categories
-# @dimensions explain-button create-manual ai-create attach-form
+# @matrix categories : ai-create attach-form create-manual explain-button
 @categories.route("create", methods=["POST"])
 @permission(Resource.MODELS, Action.CREATE)
 def create():
@@ -159,7 +164,10 @@ def create():
             )
         )
     else:
-        category = Entities.CATEGORY().create(_category_data(request.form))
+        try:
+            category = Entities.CATEGORY().create(_category_data(request.form))
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
 
     category.save()
 
@@ -168,8 +176,7 @@ def create():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_delete_category
-# @features categories
-# @dimensions delete
+# @pair categories:delete
 @categories.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.MODELS, Action.DELETE)
 def delete(key, **kwargs):
@@ -200,8 +207,7 @@ def page_generation_data(category, form, form_data, user):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_explain_prompt_from_category_tools
-# @features pages
-# @dimensions generate ai-form explain-button
+# @matrix pages : ai-form explain-button generate
 @categories.route("<key>/generate-pages", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def create_pages(key, **kwargs):
@@ -209,7 +215,16 @@ def create_pages(key, **kwargs):
 
     category = kwargs["entity"]
     explain = request.form.get("role") == "explain"
-    form = Entities.fetch_one(request.form.get("form"), request=Fetch.direct())
+    form_key = request.form.get("form")
+    try:
+        form = SubmittedReferenceResolver(current_user, form_key).one(
+            form_key,
+            expected=Entities.FORM,
+            action=Action.VIEW,
+            predicate=lambda candidate: candidate.form_type == "page",
+        )
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     fields = request.form.to_dict(flat=True)
     operation_id = fields.pop("operation-id", None)
 

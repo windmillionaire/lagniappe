@@ -21,8 +21,7 @@ ASSIGNED_CONFIG = {
 
 # @testable true
 # @tests tests_unit/test_009c_user_permissions_form.py::test_form_permissions
-# @features permissions
-# @dimensions form-data, no-groups, restricted
+# @matrix permissions : form-data no-groups restricted
 class PermissionsMixin:
     """Base permission management shared by User, Group, and Public mixins.
 
@@ -87,8 +86,7 @@ class PermissionsMixin:
     # @tests tests_unit/test_009c_user_permissions_form.py::test_form_permissions
     # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
     # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
-    # @features permissions, user-groups
-    # @dimensions form-data, restricted, default-denial
+    # @matrix permissions user-groups : default-denial form-data restricted
     def create_permissions(self, form_data):
         """Build a {hash: Action.name} dict from form submission data."""
         form_data = form_data or {}
@@ -136,8 +134,7 @@ class UserPermissionsMixin(PermissionsMixin):
 
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_combine_groups
-    # @features permissions, user-groups
-    # @dimensions combine-groups, highest-permission, restricted
+    # @matrix permissions user-groups : combine-groups highest-permission restricted
     def combine_group_permissions(self):
         """Merge permissions from all groups (most permissive wins)."""
         permissions = {}
@@ -193,8 +190,7 @@ class PublicPermissionsMixin(PermissionsMixin):
 
     # @testable true
     # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
-    # @features public-groups permissions
-    # @dimensions permission-form default-denial
+    # @matrix permissions public-groups user-groups : default-denial form-data permission-form
     def permissions_form(self):
         """Build section config for the public permissions UI."""
         specific_permissions = self.get_specific_permissions()

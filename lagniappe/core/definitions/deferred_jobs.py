@@ -30,7 +30,6 @@ class DeferredJobType(Enum):
     REPORT_EXECUTION = "report-execution"
     AUTOFILL = "autofill"
     PAGE_GENERATION = "page-generation"
-    SITE_EXPORT = "site-export"
     FILE_EXTRACT = "file-extract"
     FILE_SUMMARIZE = "file-summarize"
 
@@ -109,9 +108,8 @@ class DeferredJobResult:
 
     @property
     # @testable true
-    # @tests tests_unit/test_023_deferred_jobs.py::test_runner_checkpoints_before_apply_and_resumes_without_prepare
-    # @features deferred-jobs
-    # @dimensions delivery-result
+    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_checkpoints_before_apply_and_resumes_without_prepare
+    # @pair deferred-jobs:delivery-result
     def success(self):
         return self.state in {
             DeferredJobRunState.COMPLETE,

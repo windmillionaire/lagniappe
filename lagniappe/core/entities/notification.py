@@ -1,6 +1,7 @@
 from .entity import Entity
-from ..properties import activity, messaging
-from ..tools import database
+from ..properties import activity, notification, notification_aggregate
+from lagniappe.core.tools.database import notifications as database_notifications
+from lagniappe.core.tools.database import utility as database_utility
 
 
 # @testable false
@@ -22,15 +23,17 @@ class Notification(Entity):
         properties.update(
             {
                 "parent": activity.AttachedParent,
-                "target": activity.Target,
+                "target": notification.Target,
                 "body": activity.Body,
-                "pending": activity.Pending,
-                "notification_type": messaging.NotificationType,
-                "ordinary_count": messaging.OrdinaryCount,
-                "unread_message_count": messaging.UnreadMessageCount,
-                "aggregate_revision": messaging.AggregateRevision,
-                "message_revision": messaging.MessageRevision,
-                "aggregate_generation": messaging.AggregateGeneration,
+                "pending": notification.Pending,
+                "notification_type": notification.NotificationType,
+                "event_type": notification.EventType,
+                "sender_name": notification.SenderName,
+                "ordinary_count": notification_aggregate.OrdinaryCount,
+                "unread_message_count": notification_aggregate.UnreadMessageCount,
+                "aggregate_revision": notification_aggregate.AggregateRevision,
+                "message_revision": notification_aggregate.MessageRevision,
+                "aggregate_generation": notification_aggregate.AggregateGeneration,
             }
         )
         return properties
@@ -44,25 +47,25 @@ class Notification(Entity):
     # @reason notification ownership and deletion are exercised through the route
     @classmethod
     def keys_for_parent(cls, parent):
-        return database.get.notification_keys(parent)
+        return database_notifications.notification_keys(parent)
 
     # @testable true
     # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
     # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
     # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
-    # @pairs activity:create activity:body activity:parent
-    # @pairs notifications:create notifications:body notifications:parent
-    # @pairs notifications:target notifications:pending
+    # @matrix activity : body create parent
+    # @matrix notifications : body create parent pending target
+    # @pair activity:notes-only
     @classmethod
     def create(cls, data):
         parent = data.get("parent")
         target = data.get("target")
 
         if data.get("identifier"):
-            key = database.create_named_key(
+            key = database_utility.create_named_key(
                 "notification", data["identifier"], parent=parent
             )
-            new_notification = cls(database.create_entity(key))
+            new_notification = cls(database_utility.create_entity(key))
         else:
             new_notification = cls(parent=parent)
         new_notification.kind = cls.entity_kind
@@ -71,9 +74,11 @@ class Notification(Entity):
         new_notification.body = data.get("body")
         new_notification.pending = data.get("pending", False)
         new_notification.notification_type = "ordinary"
-        if data.get("event_type"):
-            new_notification.db["event_type"] = str(data["event_type"])
-        if data.get("sender_name"):
-            new_notification.db["sender_name"] = str(data["sender_name"])
+        new_notification.event_type = (
+            str(data["event_type"]) if data.get("event_type") else None
+        )
+        new_notification.sender_name = (
+            str(data["sender_name"]) if data.get("sender_name") else None
+        )
 
         return new_notification

@@ -20,8 +20,7 @@ GENERIC_MESSAGE = "Generation failed. Please try again. "
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
-# @features ai
-# @dimensions validation schema
+# @matrix ai : schema validation
 def validate_schema(schema):
     validated_schema = []
     """Validate that each generated schema element has a type and id."""
@@ -59,8 +58,7 @@ def generate_schema(prompt):
 
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @features ai
-# @dimensions prompt-builders output-format thinking
+# @matrix ai : output-format prompt-builders thinking
 def form_generation_prompt(form_type, description=None):
     """Build the AI prompt for generating a page or task form schema.
 

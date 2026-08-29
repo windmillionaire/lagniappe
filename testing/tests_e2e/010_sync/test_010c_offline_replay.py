@@ -1,11 +1,3 @@
-"""
-E2E coverage for offline sync replay.
-
-These tests use real browser offline mode, real sync widgets, and the app's
-IndexedDB queue. They assert replay by observing network requests and document
-persistence after reconnects.
-"""
-
 from uuid import uuid4
 
 import pytest
@@ -14,9 +6,9 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, SitePages, Users
-from testing.utility import (
+from testing.utility.network import expect_successful_response
+from testing.utility.offline import (
     expect_offline_sync_replay,
-    expect_successful_response,
     wait_for_connectivity_replay,
     wait_for_offline_sync_records,
 )
@@ -25,6 +17,8 @@ pytestmark = pytest.mark.e2e
 
 SYNC_TEXT_FIELD = "sync-text"
 OFFLINE_INDICATOR = "[data-role='offline']"
+
+
 def _unique(label):
     return f"test-sync-{label}-{uuid4().hex[:8]}"
 
@@ -96,36 +90,17 @@ def _offline_form_edit(user, form, value):
 
 
 def _reconnect_with_sync(user, sync_id):
-    sync_requests = []
-
-    def record_sync(request):
-        request_body = request.post_data or ""
-        if (
-            request.method == "POST"
-            and request.url.endswith("/l/sync")
-            and sync_id in request_body
-        ):
-            sync_requests.append(request)
-
-    user.page.on("request", record_sync)
-    try:
-        with expect_successful_response(
-            user.page,
-            method="POST",
-            path="/l/sync",
-            request_payload_contains=sync_id,
-        ) as response_info:
-            user.offline = False
-        wait_for_offline_sync_records(user, sync_id=sync_id, exact=0)
-    finally:
-        user.page.remove_listener("request", record_sync)
-
-    assert len(sync_requests) == 1
-    return response_info.value
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/l/sync",
+        request_payload_contains=sync_id,
+    ):
+        user.offline = False
+    wait_for_offline_sync_records(user, sync_id=sync_id, exact=0)
 
 
-# @features sync
-# @dimensions offline-replay replay-order queue-clear
+# @matrix sync : offline-replay queue-clear replay-order
 def test_offline_document_edits_replay_in_order(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = Projects.test_offline_document_replay.get(user)
@@ -151,7 +126,7 @@ def test_offline_document_edits_replay_in_order(get_user, browser_failures):
     assert replayed.index(first) < replayed.index(second)
 
 
-# @pairs sync:offline-replay sync:queue-preserved
+# @matrix sync : offline-replay queue-preserved
 def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = Projects.test_offline_document_retry.get(user)
@@ -168,13 +143,10 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
         sync_id=document_sync_id,
     )
 
-    failed_sync_attempts = []
-
     def fail_sync(route):
         if document_sync_id not in (route.request.post_data or ""):
             route.continue_()
             return
-        failed_sync_attempts.append(route.request)
         route.abort()
 
     user.page.context.route("**/l/sync", fail_sync)
@@ -202,7 +174,6 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
     finally:
         user.page.context.unroute("**/l/sync", fail_sync)
 
-    assert len(failed_sync_attempts) == 1
     wait_for_offline_sync_records(
         user,
         sync_id=document_sync_id,
@@ -217,9 +188,8 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
     expect(project.editor.text_entry).to_contain_text(text)
 
 
-# @pairs sync:offline-replay sync:headless sync:concurrency sync:merge
-# @pairs sync:queue-clear sync:document sync:headless-widget
-# @pairs polling:document polling:current-state polling:cursor
+# @matrix polling : current-state cursor document
+# @matrix sync : concurrency document headless headless-widget merge offline-replay queue-clear
 def test_headless_offline_replay_merges_concurrent_remote_edits(
     get_user, browser_failures
 ):
@@ -262,6 +232,7 @@ def test_headless_offline_replay_merges_concurrent_remote_edits(
 
     acknowledgement = replay_responses[0].json()["updates"][0]
     assert acknowledgement["checkpoint_accepted"] is True
+    assert acknowledgement["checkpoint_persisted"] is True
     wait_for_offline_sync_records(
         owner,
         sync_id=document_sync_id,

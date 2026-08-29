@@ -7,8 +7,7 @@ from lagniappe.core.definitions import Fetch, Restriction
 from testing.utility.test_entities import TestEntities
 
 
-# @features user-index
-# @dimensions table columns
+# @matrix user-index : columns table
 @pytest.mark.unit
 def test_user_index(get_test_entities):
     """Test UserTable produces correct column structure for UI.
@@ -75,8 +74,7 @@ def test_user_index(get_test_entities):
         assert user.column("modified") is not None
 
 
-# @features user-index
-# @dimensions pagination restrictions groups public-group
+# @matrix user-index : groups pagination public-group restrictions
 @pytest.mark.unit
 def test_user_index_loads_users_groups_public_group_and_append_cursor():
     """UserIndex loads restricted users/groups and public-group state."""
@@ -125,13 +123,13 @@ def test_user_index_loads_users_groups_public_group_and_append_cursor():
 
     with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
         with patch(
-            "lagniappe.core.entities.index.database.get.users",
+            "lagniappe.core.entities.index.database_get.users",
             return_value=SimpleNamespace(
                 results=["usr-key-1", "usr-key-2"], next_cursor="next-users"
             ),
         ) as user_query:
             with patch(
-                "lagniappe.core.entities.index.database.get.groups",
+                "lagniappe.core.entities.index.database_get.groups",
                 return_value=["grp-key-1", "grp-key-2"],
             ) as group_query:
                 with patch(
@@ -184,8 +182,7 @@ def test_user_index_loads_users_groups_public_group_and_append_cursor():
     assert index.public_group is public_group
 
 
-# @features user-index
-# @dimensions regular-mode public-users mode
+# @matrix user-index : mode public-users regular-mode
 @pytest.mark.unit
 def test_user_index_regular_mode_excludes_public_users():
     """Default user index mode keeps public users out of the regular table."""
@@ -223,7 +220,7 @@ def test_user_index_regular_mode_excludes_public_users():
 
     with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
         with patch(
-            "lagniappe.core.entities.index.database.get.users",
+            "lagniappe.core.entities.index.database_get.users",
             return_value=SimpleNamespace(
                 results=["usr-key-3", "usr-key-4"], next_cursor="next-regular"
             ),
@@ -245,8 +242,7 @@ def test_user_index_regular_mode_excludes_public_users():
     assert index.append == "/users.rows&cursor=next-regular"
 
 
-# @features user-index public-users
-# @dimensions public-mode pagination mode
+# @matrix public-users user-index : mode pagination public-mode
 @pytest.mark.unit
 def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mode():
     """Public user index mode queries the public group and preserves mode in append."""
@@ -306,7 +302,7 @@ def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mo
                 return_value=public_group,
             ) as get_public_group:
                 with patch(
-                    "lagniappe.core.entities.index.database.get.users",
+                    "lagniappe.core.entities.index.database_get.users",
                     return_value=SimpleNamespace(
                         results=["usr-key-5", "usr-key-6", "usr-key-7"],
                         next_cursor="next-public",
@@ -334,8 +330,7 @@ def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mo
     assert index.append == "/users.rows&cursor=next-public&mode=public"
 
 
-# @features user-index public-users
-# @dimensions public-mode public-users disabled enabled
+# @matrix public-users user-index : disabled enabled public-mode public-users
 @pytest.mark.unit
 def test_user_index_public_mode_returns_empty_when_public_users_disabled():
     """Public user index mode is empty when public login is not enabled."""
@@ -352,7 +347,7 @@ def test_user_index_public_mode_returns_empty_when_public_users_disabled():
         return_value=False,
     ) as enabled:
         with patch(
-            "lagniappe.core.entities.index.database.get.users",
+            "lagniappe.core.entities.index.database_get.users",
         ) as user_query:
             index = UserIndex(mode="public", user=index_user)
             users = index.users

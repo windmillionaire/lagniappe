@@ -35,8 +35,8 @@ const submitLogout = async (route, { submitter = null, state = null } = {}) => {
  * @tests tests_e2e/001_site/test_001b_login.py::test_logout_clears_session_and_returns_login
  * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
  * @tests tests_js/test_009_request_csrf.py::test_logout_button_posts_without_hidden_form
- * @features login
- * @dimensions logout redirect button
+ * @matrix login : button logout redirect
+ * @pair user-settings:personal-page
  */
 export const initializeLogoutForms = (root = document) => {
 	if (initialized) return;

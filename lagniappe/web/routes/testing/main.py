@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 
 from flask import abort, jsonify, make_response, request
 from google.auth.transport import requests as google_requests
@@ -10,12 +11,12 @@ from google.oauth2 import id_token
 
 from config.hosted_e2e import is_reserved_hosted_e2e_hostname
 from lagniappe import CONFIG
-from lagniappe.core.tools.e2e_lease import (
+from lagniappe.core.tools.hosted_e2e.lease import (
     bind_e2e_deployment,
     consume_e2e_bootstrap_token,
     e2e_deployment_lease_active,
 )
-from lagniappe.core.tools.hosted_e2e_auth import (
+from lagniappe.core.tools.hosted_e2e.auth import (
     HOSTED_E2E_COOKIE,
     HOSTED_E2E_COOKIE_MAX_AGE,
     HostedE2EAuthenticationError,
@@ -60,8 +61,7 @@ def _bearer_token() -> str | None:
 
 
 # @testable infrastructure
-# @features hosted-e2e
-# @dimensions authentication internal-callback
+# @matrix hosted-e2e : authentication internal-callback
 def _valid_internal_process_request() -> bool:
     """Allow the app's own OIDC-authenticated task callbacks through the gate."""
     if request.method != "POST" or not request.path.startswith("/process/"):
@@ -91,8 +91,7 @@ def _valid_internal_process_request() -> bool:
 
 
 # @testable infrastructure
-# @features hosted-e2e
-# @dimensions authentication request-gate lease deployment-binding
+# @matrix hosted-e2e : authentication deployment-binding lease request-gate
 @testing.before_app_request
 def require_hosted_e2e_session():
     """Hide every dynamic/static Flask request without an active run cookie."""
@@ -125,14 +124,30 @@ def require_hosted_e2e_session():
     return None
 
 
-# @testable infrastructure
-# @features hosted-e2e
-# @dimensions readiness deployment-binding
+# @testable true
+# @tests tests_e2e/001_site/test_001a_environment.py::test_testing_health_identifies_the_exact_session
+# @matrix hosted-e2e : readiness server-identity
+# @matrix test-session : health-nonce readiness server-identity
 @testing.route("/health", methods=["GET"])
 def health():
     """Expose only non-secret identity needed to validate a fresh version."""
     if not CONFIG.hosted_e2e_server:
-        return _hidden()
+        if not CONFIG.testing:
+            return _hidden()
+        nonce = os.environ.get("LAGNIAPPE_TEST_SESSION_NONCE", "").strip()
+        mode = os.environ.get("LAGNIAPPE_TEST_SESSION_MODE", "").strip()
+        if not nonce or mode not in {"local-e2e", "managed-server"}:
+            return _hidden()
+        response = jsonify(
+            {
+                "ready": True,
+                "mode": mode,
+                "session_nonce": nonce,
+                "pid": os.getpid(),
+            }
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
     response = jsonify(
         {
             "ready": True,
@@ -148,8 +163,7 @@ def health():
 
 
 # @testable infrastructure
-# @features hosted-e2e
-# @dimensions authentication bootstrap replay cookie
+# @matrix hosted-e2e : authentication bootstrap cookie replay
 @testing.route("/session", methods=["POST"])
 def create_session():
     """Exchange one Google ID token for a run- and version-bound cookie."""

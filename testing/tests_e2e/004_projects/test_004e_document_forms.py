@@ -15,6 +15,7 @@ Related Files:
 """
 
 import re
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import expect
 
@@ -29,20 +30,72 @@ from testing.elements import (
     SpinnerButtons,
     Tabs,
 )
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 
-# @features editor
-# @dimensions color reload
+# @matrix editor link-preview : url-safety
+# @matrix outbound-http : privacy url-validation
+def test_editor_preview_rejects_private_targets_without_disrupting_popover(
+    get_user,
+    browser_failures,
+):
+    user = get_user(Users.OWNER)
+    project = user.go(Projects.test_editor_forms)
+    editor = project.editor
+    private_targets = [
+        (
+            "Metadata target",
+            "http://metadata.google.internal/computeMetadata/v1/instance/"
+            "service-accounts/default/token?marker=metadata-secret#credential",
+        ),
+        (
+            "Loopback target",
+            "http://127.0.0.1/private/loopback-secret?marker=query-secret#fragment",
+        ),
+    ]
+
+    for title, target in private_targets:
+        editor.text_entry.evaluate(
+            """(element, link) => {
+                const widget = element.closest('[data-widget]')._lp_widget;
+                widget.editor.commands.setContent(
+                    `<p><a href="${link.url}">${link.title}</a></p>`,
+                );
+            }""",
+            {"title": title, "url": target},
+        )
+        editor.wait_for_render()
+        link = editor.get_element("a")
+
+        with browser_failures.expect_http_error(
+            user,
+            status=422,
+            path="/l/preview",
+        ):
+            with user.page.expect_response(
+                lambda response: (
+                    urlsplit(response.url).path == "/l/preview"
+                    and parse_qs(urlsplit(response.url).query).get("url") == [target]
+                )
+            ) as response_info:
+                link.click()
+            response = response_info.value
+            assert response.status == 422
+            payload = response.json()
+
+        assert payload == {"error": "Preview URL is not allowed"}
+        assert "metadata-secret" not in repr(payload)
+        assert "loopback-secret" not in repr(payload)
+        popover = editor.link_popover
+        expect(popover).to_be_visible()
+        expect(popover.locator("[data-role='link-preview-title']")).to_have_text(title)
+        expect(popover.get_by_role("button", name="Edit", exact=True)).to_be_visible()
+        editor.text_entry.click()
+        expect(popover).not_to_be_visible()
+
+
+# @matrix editor : color reload
 def test_color_picker(get_user):
-    """
-    Test that color picker opens and colors can be selected.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Open color picker via menu
-        3. Select a color
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
@@ -62,17 +115,8 @@ def test_color_picker(get_user):
     expect(editor.get_element("span[style*='color']")).to_contain_text(text)
 
 
-# @features editor
-# @dimensions font-family reload
+# @matrix editor : font-family reload
 def test_font_family(get_user):
-    """
-    Test that font family picker opens and fonts can be selected.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Open font family picker via menu
-        3. Select a font
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
@@ -84,18 +128,15 @@ def test_font_family(get_user):
     editor.select_text()
 
     EditorFontFamilyOptions.MONO.click(editor)
-    # Verify action applied immediately
     expect(editor.get_element("span[style*='font-family']")).to_contain_text(text)
 
-    # Verify formatting persists after save/reload
     editor.blur()
     user.go(project)
     editor = project.editor
     expect(editor.get_element("span[style*='font-family']")).to_contain_text(text)
 
 
-# @features editor
-# @dimensions link reload external-link shortcut search unlink
+# @matrix editor : external-link link reload search shortcut unlink
 def test_external_link_persists_searches_and_unlinks(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -112,7 +153,6 @@ def test_external_link_persists_searches_and_unlinks(get_user):
     link_form.fill(test_url)
     link_form.submit()
 
-    # Verify action applied immediately
     expect(editor.get_element("a")).to_contain_text(test_text)
     expect(editor.get_element("a")).to_have_attribute("href", test_url)
     expect(editor.get_element("a")).to_have_attribute("target", "_blank")
@@ -144,8 +184,7 @@ def test_external_link_persists_searches_and_unlinks(get_user):
     expect(editor.text_entry).to_contain_text(search_text)
 
 
-# @features editor
-# @dimensions link delimiter
+# @matrix editor : delimiter link
 def test_space_exits_link_at_document_end(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -168,8 +207,7 @@ def test_space_exits_link_at_document_end(get_user):
     expect(editor.text_entry).to_have_text(f"{link_text} outside")
 
 
-# @features editor
-# @dimensions link form-dismissal selection
+# @matrix editor : form-dismissal link selection
 def test_link_form_dismissal_preserves_selection_interactions(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -196,8 +234,7 @@ def test_link_form_dismissal_preserves_selection_interactions(get_user):
     expect(link_form.form).not_to_be_visible()
 
 
-# @features editor
-# @dimensions link reload internal-link click-navigation shortcut popover readonly paste unlink
+# @matrix editor : click-navigation internal-link link paste popover readonly reload shortcut unlink
 def test_internal_links_normalize_paste_and_popover_navigation(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -336,8 +373,7 @@ def test_internal_links_normalize_paste_and_popover_navigation(get_user):
     expect(editor.text_entry).to_contain_text(click_text)
 
 
-# @features editor
-# @dimensions link kind-color
+# @style editor.container
 def test_links_colorize_properly(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -402,17 +438,8 @@ def test_links_colorize_properly(get_user):
     assert colors["external"] == colors["defaultExpected"]
 
 
-# @features editor
-# @dimensions youtube-embed
+# @pair editor:youtube-embed
 def test_add_youtube(get_user):
-    """
-    Test that YouTube form opens with URL input and can be filled.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Open YouTube form via menu
-        3. Fill a URL (without submitting)
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
@@ -428,61 +455,32 @@ def test_add_youtube(get_user):
     expect(player).to_be_attached()
 
 
-# @features editor
-# @dimensions image-generate-toggle
+# @pair editor:image-generate-toggle
 def test_add_image_generate_toggle(get_user):
-    """
-    Test that Image form opens and generate mode can be toggled.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Open image form via menu
-        3. Open generate form via menu
-        4. Verify generate textarea is visible
-        5. Cancel generate and verify textarea is hidden
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
     editor = project.editor
     form = EditorAddImage(editor).form
 
-    # Generate textarea should start hidden
     expect(form.locator(EditorAddImage.PROMPT)).to_be_hidden()
     expect(form.locator(EditorAddImage.DROPZONE)).to_be_visible()
 
-    # Open generate form
     UploadDropdown.GENERATE.select(form)
     expect(form.locator(EditorAddImage.PROMPT)).to_be_visible()
 
-    # Cancel should hide the generate textarea
     form.locator(EditorAddImage.GENERATE_CANCEL).click()
     expect(form.locator(EditorAddImage.PROMPT)).to_be_hidden()
 
 
-# @features editor
-# @dimensions image-upload image-selection
+# @matrix editor : image-selection image-upload
 def test_add_image(get_user):
-    """
-    Test image upload and setImage options appearing when image is selected.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Clear editor content
-        3. Open image form and upload an image
-        4. Verify image appears in editor
-        5. Click the image to select it
-        6. Verify setImage options appear
-        7. Click elsewhere to deselect
-        8. Verify setImage options disappear
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
     editor = project.editor
     editor.clear_text()
 
-    # Upload an image
     form = EditorAddImage(editor).form
     Uploads.editor_test_image.set(form)
     SpinnerButtons.UPLOAD.click(form)

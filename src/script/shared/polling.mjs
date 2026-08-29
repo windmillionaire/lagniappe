@@ -430,15 +430,11 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_schedules_modes_and_notification_seed
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_captures_and_isolates_contract_failures
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_temporarily_boosts_a_subscription
- * @features polling
- * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle freshness visible-blur deadline
- * @pairs polling:batching polling:cadence polling:lifecycle polling:coalescing polling:acknowledgement
- * @pairs polling:reentrancy polling:requested-cycle polling:freshness polling:foreground polling:scheduled-initial
- * @pair polling:terminal-operation-order
- * @pairs polling:protocol polling:validation polling:diagnostics polling:revision polling:presence
- * @pairs polling:blur polling:visibility deferred-jobs:polling
- * @pair notifications:cold-seed
- * @pair messaging:active-polling
+ * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement
+ * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_treats_failed_transport_as_retryable
+ * @matrix notifications : acknowledgement bounded-backoff cold-seed zero-subscriptions
+ * @matrix polling : acknowledgement batching blur cadence coalescing diagnostics foreground freshness lifecycle presence protocol reentrancy requested-cycle revision scheduled-initial terminal-operation-order transport-error validation visibility
+ * @pairs deferred-jobs:polling messaging:active-polling
  */
 export class PollingCoordinator {
 	constructor(view) {
@@ -455,11 +451,35 @@ export class PollingCoordinator {
 		this.destroyed = false;
 		this.blurredUntil = null;
 		this.notificationSeedPending = Boolean(window.__NOTIFICATION_STATE__?.miss);
+		this.notificationSeedDueAt = this.notificationSeedPending
+			? Date.now()
+			: Number.POSITIVE_INFINITY;
+		this.notificationSeedErrorCount = 0;
+		this.notificationSeedActive = false;
 		this._notificationState = (event) => {
-			if (!event?.detail?.miss) return;
+			if (!event?.detail?.miss) {
+				this.notificationSeedPending = false;
+				this.notificationSeedDueAt = Number.POSITIVE_INFINITY;
+				this.notificationSeedErrorCount = 0;
+				if (!this.activePoll) {
+					this._clearTimer();
+					this._schedule();
+				}
+				return;
+			}
+
+			const alreadyPending = this.notificationSeedPending;
 			this.notificationSeedPending = true;
+			if (this.notificationSeedActive) return;
+			if (!alreadyPending) {
+				this.notificationSeedErrorCount = 0;
+				this.notificationSeedDueAt = Date.now();
+			}
 			if (this.activePoll) this.followup = true;
-			else this._schedule(this.view.hidden ? null : 0);
+			else {
+				this._clearTimer();
+				this._schedule(this.view.hidden ? null : 0);
+			}
 		};
 	}
 
@@ -733,7 +753,10 @@ export class PollingCoordinator {
 					offset + MAX_SUBSCRIPTIONS_PER_REQUEST,
 				),
 			});
-			response = await request.post(ENDPOINTS.poll, body, { keepalive: true });
+			response = await request.post(ENDPOINTS.poll, body, {
+				keepalive: true,
+				replaceErrorPage: false,
+			});
 			if (response?.status === 422) {
 				this._captureContract(
 					new PollContractError(
@@ -798,6 +821,12 @@ export class PollingCoordinator {
 	_notificationRequest() {
 		const state = window.__NOTIFICATION_STATE__;
 		if (!state) return null;
+		if (
+			state.miss &&
+			(!this.notificationSeedPending || this.notificationSeedDueAt > Date.now())
+		) {
+			return null;
+		}
 		try {
 			return normalizedNotificationState(
 				state.miss
@@ -812,6 +841,16 @@ export class PollingCoordinator {
 			this._captureContract(error, "polling-request-contract");
 			return null;
 		}
+	}
+
+	_notificationSeedFailed() {
+		if (!this.notificationSeedPending) return;
+		this.notificationSeedErrorCount += 1;
+		const delay = Math.min(
+			2 ** this.notificationSeedErrorCount * 2_000,
+			60_000,
+		);
+		this.notificationSeedDueAt = Date.now() + jitter(delay);
 	}
 
 	_applyProtocolState(subscription, result) {
@@ -873,10 +912,13 @@ export class PollingCoordinator {
 	async _runPoll() {
 		let due = [];
 		const results = [];
+		let seededNotification = false;
 		try {
 			due = this._due();
 			const notificationOnly =
-				!this.view.hidden && this.notificationSeedPending;
+				!this.view.hidden &&
+				this.notificationSeedPending &&
+				this.notificationSeedDueAt <= Date.now();
 			if (!due.length && !notificationOnly) return [];
 			this.activeIds = new Set(due.map(({ descriptor }) => descriptor.id));
 			for (const { descriptor } of due) {
@@ -894,7 +936,7 @@ export class PollingCoordinator {
 					this.subscriptions.get(subscription.descriptor.id) === subscription &&
 					this._eligible(subscription),
 			);
-			if (!due.length && (this.view.hidden || !this.notificationSeedPending)) {
+			if (!due.length && (this.view.hidden || !notificationState?.seed)) {
 				return [];
 			}
 
@@ -909,8 +951,11 @@ export class PollingCoordinator {
 				closed_documents: [],
 				...(notificationState ? { notification_state: notificationState } : {}),
 			});
-			if (notificationState?.seed) this.notificationSeedPending = false;
-			this.inflight = request.post(ENDPOINTS.poll, body);
+			seededNotification = notificationState?.seed === true;
+			if (seededNotification) this.notificationSeedActive = true;
+			this.inflight = request.post(ENDPOINTS.poll, body, {
+				replaceErrorPage: false,
+			});
 			const response = await this.inflight;
 			if (!response?.ok) {
 				if (
@@ -1101,6 +1146,10 @@ export class PollingCoordinator {
 				});
 			}
 		} finally {
+			if (seededNotification) {
+				this.notificationSeedActive = false;
+				this._notificationSeedFailed();
+			}
 			this.inflight = null;
 			const now = Date.now();
 			for (const id of this.queuedIds) {
@@ -1125,9 +1174,12 @@ export class PollingCoordinator {
 					subscription.mode === "periodic" && this._eligible(subscription),
 			)
 			.map(({ dueAt }) => dueAt);
-		const notificationDue = !this.view.hidden && this.notificationSeedPending;
-		if (!notificationDue && !periodicDue.length) return;
-		const nextDue = notificationDue ? Date.now() : Math.min(...periodicDue);
+		const notificationDueAt =
+			!this.view.hidden && this.notificationSeedPending
+				? this.notificationSeedDueAt
+				: Number.POSITIVE_INFINITY;
+		if (!Number.isFinite(notificationDueAt) && !periodicDue.length) return;
+		const nextDue = Math.min(notificationDueAt, ...periodicDue);
 		if (
 			this.view.hidden &&
 			this.blurredUntil !== null &&

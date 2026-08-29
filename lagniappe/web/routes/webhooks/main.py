@@ -4,7 +4,7 @@ from flask import Response, request
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
-from lagniappe.core.tools.ai_email import (
+from lagniappe.core.tools.email.ai import (
     AIEmailWebhookError,
     parse_resend_event,
     process_resend_email,
@@ -15,8 +15,8 @@ from . import webhooks
 
 
 # @testable infrastructure
-# @covered-by lagniappe/core/tools/ai_email.py::verify_svix_signature
-# @covered-by lagniappe/core/tools/ai_email.py::process_resend_email
+# @covered-by lagniappe/core/tools/email/ai.py::verify_svix_signature
+# @covered-by lagniappe/core/tools/email/ai.py::process_resend_email
 @webhooks.post("/resend/ai-email")
 def resend_ai_email():
     """Verify and hand one Resend event to the durable report workflow."""

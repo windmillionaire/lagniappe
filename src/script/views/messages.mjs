@@ -12,11 +12,7 @@ const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_messages_page_uses_mobile_peer_selector_with_inline_reply
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
- * @pairs messaging:read-race messaging:clear-confirmation messaging:inline-reply
- * @pairs messaging:responsive-peer-selector messaging:reply-permission
- * @pairs messaging:selection-race messaging:preserve-selection
- * @pairs messaging:list-race messaging:unread-peer
- * @pairs messaging:polling-revision messaging:active-polling
+ * @matrix messaging : active-polling clear-confirmation inline-reply list-race polling-revision preserve-selection read-race reply-permission responsive-peer-selector selection-race unread-peer
  */
 export default class Messages extends Core {
 	_initPollingSubscription() {

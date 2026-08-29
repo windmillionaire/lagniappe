@@ -3,8 +3,7 @@ from ..exceptions import PropertyError
 
 # @testable true
 # @tests tests_unit/test_013f_process_property_complete_error.py::test_process_property_contract_errors_are_explicit
-# @features process-property
-# @dimensions initialization validation
+# @matrix process-property : initialization validation
 class ProcessProperty:
     """Property backed by a JSON process section in entity.db.
 
@@ -52,15 +51,13 @@ class ProcessProperty:
 
     # @testable true
     # @tests tests_unit/test_006b_ingress_entity.py::test_stage_clear
-    # @features ingress
-    # @dimensions process-state, clear
+    # @matrix ingress : clear process-state
     def clear(self):
         self.section = None
 
     # @testable true
     # @tests tests_unit/test_013f_process_property_complete_error.py::test_process_property_error_clears_complete
-    # @features process-property
-    # @dimensions error, complete-state
+    # @matrix process-property : complete-state error
     @property
     def error(self):
         return self.section.get("error")
@@ -72,8 +69,7 @@ class ProcessProperty:
 
     # @testable true
     # @tests tests_unit/test_013f_process_property_complete_error.py::test_process_property_complete_clears_error
-    # @features process-property
-    # @dimensions complete, error-state
+    # @matrix process-property : complete error-state
     @property
     def complete(self):
         return self.section.get("complete")

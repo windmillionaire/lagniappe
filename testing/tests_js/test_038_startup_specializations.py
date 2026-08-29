@@ -1,8 +1,7 @@
 """Node-backed checks for startup-sensitive view specialization."""
 
 
-# @pair startup:mobile-only-dropdown
-# @pair manual:responsive-navigation
+# @pairs manual:responsive-navigation startup:mobile-only-dropdown
 def test_manual_dropdown_loads_only_in_mobile_mode(run_node):
     run_node(
         r'''
@@ -80,8 +79,8 @@ const createRoot = () => {
     )
 
 
-# @pairs manual:command-copy manual:clipboard-fallback
-def test_manual_copy_command_falls_back_when_clipboard_is_unavailable(run_node):
+# @matrix manual admin : clipboard-fallback command-copy
+def test_command_copy_falls_back_when_clipboard_is_unavailable(run_node):
     run_node(
         r'''
 const fs = require("node:fs");
@@ -118,13 +117,14 @@ const context = {
 context.globalThis = context;
 vm.createContext(context);
 
-let source = fs.readFileSync("src/script/views/manual.mjs", "utf8");
+let source = fs.readFileSync("src/script/views/base/shell.mjs", "utf8");
 source = source.replace(
-  /^import [\s\S]*?(?=\/\*\*)/,
-  "const ShellView = class {};\n",
+  'import { connectivity } from "../../shared/connectivity";',
+  "",
 );
-source = source.replace("export default class Manual", "class Manual");
-source += "\nglobalThis.Manual = Manual;";
+source = source.replaceAll("export const ", "const ");
+source = source.replace("export default class ShellView", "class ShellView");
+source += "\nglobalThis.ShellView = ShellView;";
 vm.runInContext(source, context);
 
 const shell = {
@@ -138,11 +138,11 @@ const button = {
   setAttribute(name, value) { attributes.set(name, value); },
   textContent: "Copy",
 };
-const manual = Object.create(context.Manual.prototype);
-manual.copyResetTimers = new Map();
+const view = Object.create(context.ShellView.prototype);
+view.copyResetTimers = new Map();
 
 (async () => {
-  await manual.copyCommand(button);
+  await view.copyCommand(button);
   if (copied !== "copy" || textarea?.value !== "gcloud auth login") {
     throw new Error("Clipboard fallback did not copy the command");
   }
@@ -160,9 +160,7 @@ manual.copyResetTimers = new Map();
     )
 
 
-# @pair table-controls:eager-column-state
-# @pair table-controls:lazy-checkbox-panel
-# @pair table-controls:persistence
+# @matrix table-controls : eager-column-state lazy-checkbox-panel persistence
 def test_column_visibility_state_applies_before_lazy_panel(run_node):
     run_node(
         r'''
@@ -246,8 +244,7 @@ if (!styles[0].removed || toggleListener) {
     )
 
 
-# @pair pages:photo-lazy-activation
-# @pair pages:photo-visible-startup
+# @matrix pages : photo-lazy-activation photo-visible-startup
 def test_page_photo_initializes_only_when_selected_or_visible(run_node):
     run_node(
         r'''
@@ -321,8 +318,7 @@ const createPage = ({ active = null, visible = false } = {}) => {
     )
 
 
-# @pair ai-report:lazy-form-runtime
-# @pair ai-report:concurrent-form-init
+# @matrix ai-report : concurrent-form-init lazy-form-runtime
 def test_report_loads_base_form_only_for_present_forms_and_in_parallel(run_node):
     run_node(
         r'''

@@ -10,9 +10,9 @@ import pytest
 
 from config.ai_email import AI_EMAIL_LIMITS, normalize_ai_email_config
 from lagniappe.core.definitions import Action
-from lagniappe.core.tools import ai_email
+from lagniappe.core.tools.email import ai as ai_email
 from lagniappe.core.tools import ai as ai_tools
-from lagniappe.core.tools.ai_email import (
+from lagniappe.core.tools.email.ai import (
     AIEmailRejection,
     AIEmailWebhookError,
     InboundAttachment,
@@ -69,20 +69,21 @@ def _signed_headers(raw_body, *, event_id="event-1", timestamp=1_700_000_000):
     }
 
 
-# @features ai-email webhook
-# @dimensions webhook signature raw-body timestamp rotation
+# @matrix ai-email webhook : raw-body rotation signature timestamp webhook
 def test_svix_signature_verification_uses_raw_body_timestamp_and_any_v1_signature():
     raw_body = b'{"type":"email.received","data":{"email_id":"one"}}'
-    assert verify_svix_signature(
-        raw_body,
-        _signed_headers(raw_body),
-        "whsec_dGVzdC1zZWNyZXQ=",
-        now=1_700_000_200,
-    ) == "event-1"
+    assert (
+        verify_svix_signature(
+            raw_body,
+            _signed_headers(raw_body),
+            "whsec_dGVzdC1zZWNyZXQ=",
+            now=1_700_000_200,
+        )
+        == "event-1"
+    )
 
 
-# @features ai-email webhook
-# @dimensions webhook signature invalid stale raw-body timestamp rotation
+# @matrix ai-email webhook : invalid raw-body rotation signature stale timestamp webhook
 def test_svix_signature_verification_rejects_invalid_or_stale_requests():
     raw_body = b"{}"
     headers = _signed_headers(raw_body)
@@ -102,8 +103,7 @@ def test_svix_signature_verification_rejects_invalid_or_stale_requests():
         )
 
 
-# @features ai-email webhook
-# @dimensions webhook event-shape json malformed
+# @matrix ai-email webhook : event-shape json malformed webhook
 def test_parse_resend_event_rejects_malformed_shapes():
     assert parse_resend_event(b'{"type":"email.received","data":{}}') == {
         "type": "email.received",
@@ -125,8 +125,7 @@ class _HTTPResponse:
         return self.payload
 
 
-# @features ai-email provider-adapter
-# @dimensions provider-adapter authorization retrieval attachments outbound-email idempotency
+# @matrix ai-email provider-adapter : attachments authorization idempotency outbound-email provider-adapter retrieval
 def test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key():
     calls = []
 
@@ -144,20 +143,16 @@ def test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key
 
     assert calls[0][1].endswith("/emails/receiving/email-1")
     assert calls[1][1].endswith("/emails/receiving/email-1/attachments")
-    assert calls[2][1].endswith(
-        "/emails/receiving/email-1/attachments/attachment-1"
-    )
+    assert calls[2][1].endswith("/emails/receiving/email-1/attachments/attachment-1")
     assert all(
-        call[2]["headers"]["Authorization"] == "Bearer re_full"
-        for call in calls[:3]
+        call[2]["headers"]["Authorization"] == "Bearer re_full" for call in calls[:3]
     )
     assert calls[3][1].endswith("/emails")
     assert calls[3][2]["headers"]["Authorization"] == "Bearer re_send"
     assert calls[3][2]["headers"]["Idempotency-Key"] == "feedback/one"
 
 
-# @features ai-email provider-adapter attachments
-# @dimensions provider-adapter signed-url bounded-stream size
+# @matrix ai-email attachments provider-adapter : bounded-stream provider-adapter signed-url size
 def test_resend_attachment_download_is_bounded_and_does_not_return_signed_url():
     closed = []
 
@@ -201,8 +196,7 @@ def test_resend_attachment_download_is_bounded_and_does_not_return_signed_url():
     assert closed == [True, True]
 
 
-# @features ai-email sender-auth
-# @dimensions sender-auth authentication-results dmarc alignment telemetry
+# @matrix ai-email sender-auth : alignment authentication-results dmarc sender-auth telemetry
 def test_authentication_results_candidates_require_aligned_dmarc_pass():
     assert authentication_results_candidates(
         {
@@ -213,19 +207,21 @@ def test_authentication_results_candidates_require_aligned_dmarc_pass():
         },
         "example.com",
     ) == ("mx.resend.test",)
-    assert authentication_results_candidates(
-        {
-            "authentication-results": (
-                "mx.resend.test; dmarc=fail header.from=example.com; "
-                "spf=pass smtp.mailfrom=sender@example.com"
-            )
-        },
-        "example.com",
-    ) == ()
+    assert (
+        authentication_results_candidates(
+            {
+                "authentication-results": (
+                    "mx.resend.test; dmarc=fail header.from=example.com; "
+                    "spf=pass smtp.mailfrom=sender@example.com"
+                )
+            },
+            "example.com",
+        )
+        == ()
+    )
 
 
-# @features ai-email sender-auth
-# @dimensions sender-auth folding comments multiple-results telemetry
+# @matrix ai-email sender-auth : comments folding multiple-results sender-auth telemetry
 def test_authentication_results_candidates_handle_folding_comments_and_multiple_values():
     headers = {
         "Authentication-Results": [
@@ -241,8 +237,7 @@ def test_authentication_results_candidates_handle_folding_comments_and_multiple_
     )
 
 
-# @features ai-email normalization
-# @dimensions sender exact-local routing reply-marker html-fallback attachments
+# @matrix ai-email normalization : attachments exact-local html-fallback reply-marker routing sender
 def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
     message, tool = normalize_resend_message(
         {
@@ -293,8 +288,7 @@ def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
             parse_mailbox(malformed)
 
 
-# @features ai-email
-# @dimensions attachments content-disposition content-id inline
+# @matrix ai-email : attachments content-disposition content-id inline
 def test_inbound_attachment_disposition_overrides_content_id():
     attachment = InboundAttachment(
         "attachment-1",
@@ -322,8 +316,7 @@ def test_inbound_attachment_disposition_overrides_content_id():
     ).inline
 
 
-# @features ai-email
-# @dimensions attachments inline image-only signature quoted-content routing
+# @matrix ai-email : attachments image-only inline quoted-content routing signature
 def test_inline_attachment_selection_keeps_user_content_and_filters_signature_art(
     monkeypatch,
 ):
@@ -423,8 +416,7 @@ def test_inline_attachment_selection_keeps_user_content_and_filters_signature_ar
     assert [attachment.id for attachment in attachments] == ["photo-only"]
 
 
-# @features ai-email ai-report
-# @dimensions origin legacy-default inbound-manifest privacy
+# @matrix ai-email ai-report : inbound-manifest legacy-default origin privacy
 def test_email_report_shape_preserves_safe_inbound_display_fields():
     user = TestEntities.get("USER", {"name": "Owner", "owner": False})
     report = TestEntities.get(
@@ -453,8 +445,7 @@ def test_email_report_shape_preserves_safe_inbound_display_fields():
     assert legacy.origin == "web"
 
 
-# @features ai-email
-# @dimensions routing utility-model structured-output attachments privacy generation validation
+# @matrix ai-email : attachments generation privacy routing structured-output utility-model validation
 def test_ai_email_router_uses_utility_model_and_safe_metadata(monkeypatch):
     prompts = []
 
@@ -500,8 +491,7 @@ def test_ai_email_router_uses_utility_model_and_safe_metadata(monkeypatch):
     assert "download_url" not in built
 
 
-# @features ai-email
-# @dimensions routing validation attachment-contract
+# @matrix ai-email : attachment-contract routing validation
 def test_ai_email_router_normalizes_attachment_create_to_organize():
     assert ai_tools.validate_ai_email_route(
         {
@@ -518,8 +508,7 @@ def test_ai_email_router_normalizes_attachment_create_to_organize():
     }
 
 
-# @features ai-email
-# @dimensions routing inline attachment-only deterministic
+# @matrix ai-email : attachment-only deterministic inline routing
 def test_ai_email_router_routes_attachment_only_message_to_organize(monkeypatch):
     monkeypatch.setattr(
         ai_tools.ai_model,
@@ -549,8 +538,7 @@ def test_ai_email_router_routes_attachment_only_message_to_organize(monkeypatch)
     }
 
 
-# @features ai-email files
-# @dimensions temporary-view-ownership
+# @matrix ai-email files : temporary-view-ownership
 def test_email_report_file_is_viewable_only_by_submitter_or_owner():
     submitter = TestEntities.get(
         "USER", {"name": "Submitter", "email": "submitter@example.com", "owner": False}
@@ -564,8 +552,7 @@ def test_email_report_file_is_viewable_only_by_submitter_or_owner():
     assert not file.allowed(Action.VIEW, user=stranger)
 
 
-# @features ai-email
-# @dimensions acceptance terminal-link reply-to idempotency disabled-completion
+# @matrix ai-email : acceptance disabled-completion idempotency reply-to terminal-link
 def test_report_feedback_links_to_report_and_remains_available_after_disable(
     monkeypatch,
 ):
@@ -605,19 +592,15 @@ def test_report_feedback_links_to_report_and_remains_available_after_disable(
     payload, idempotency_key = sent[0]
     assert payload["to"] == ["Owner@example.com"]
     assert payload["reply_to"] == "ai@inbound.example.com"
-    assert (
-        "https://app.example.com/tools/reports/email-report-one"
-        in payload["text"]
-    )
+    assert "https://app.example.com/tools/reports/email-report-one" in payload["text"]
     assert REPLY_MARKER in payload["text"]
     assert payload["headers"]["Auto-Submitted"] == "auto-generated"
     assert idempotency_key.startswith("ai-email/success/")
 
 
-# @source lagniappe/core/tools/deferred_jobs.py::DeferredJobAdapter.external_delivery_required
-# @pairs ai-email:generic-delivery ai-email:terminal-delivery
+# @matrix ai-email : generic-delivery terminal-delivery
 def test_report_terminal_feedback_uses_generic_notification_delivery():
-    from lagniappe.core.tools.deferred_job_adapters import ReportAdapter
+    from lagniappe.core.tools.deferred_jobs.adapters.reports import ReportAdapter
 
     adapter = ReportAdapter()
     user = TestEntities.get("USER", {"name": "Owner", "owner": False})
@@ -642,10 +625,9 @@ def test_report_terminal_feedback_uses_generic_notification_delivery():
     assert not adapter.external_delivery_required(context(browser_report, {}))
 
 
-# @features ai-email webhook
-# @dimensions replay transient-release transaction lease privacy terminal-compaction
+# @matrix ai-email webhook : lease privacy replay terminal-compaction transaction transient-release
 def test_ai_email_event_claim_is_durable_and_replay_safe(monkeypatch):
-    from lagniappe.core.tools.database import utility
+    from lagniappe.core.tools.database import ai_email as email_database
 
     class Record(dict):
         def __init__(self, key=None, **_kwargs):
@@ -675,20 +657,22 @@ def test_ai_email_event_claim_is_durable_and_replay_safe(monkeypatch):
             self.rows[record.key] = record
 
     store = Store()
-    monkeypatch.setattr(utility, "Entity", Record)
-    monkeypatch.setattr(utility.DATA, "_datastore_client", store)
+    monkeypatch.setattr(email_database, "Entity", Record)
+    monkeypatch.setattr(email_database.DATA, "_datastore_client", store)
     digest = "a" * 64
     now = datetime.now(timezone.utc)
 
-    assert utility.claim_ai_email_event(digest, "lease-one", now)["claimed"]
-    active = utility.claim_ai_email_event(digest, "lease-two", now + timedelta(seconds=1))
+    assert email_database.claim_ai_email_event(digest, "lease-one", now)["claimed"]
+    active = email_database.claim_ai_email_event(
+        digest, "lease-two", now + timedelta(seconds=1)
+    )
     assert active == {"claimed": False, "reason": "active", "state": "processing"}
-    assert not utility.release_ai_email_event(digest, "wrong-lease", now)
-    assert utility.release_ai_email_event(digest, "lease-one", now)
-    resumed = utility.claim_ai_email_event(digest, "lease-two", now)
+    assert not email_database.release_ai_email_event(digest, "wrong-lease", now)
+    assert email_database.release_ai_email_event(digest, "lease-one", now)
+    resumed = email_database.claim_ai_email_event(digest, "lease-two", now)
     assert resumed["claimed"]
-    assert utility.finish_ai_email_event(digest, "lease-two", "accepted", now)
-    terminal = utility.claim_ai_email_event(digest, "lease-three", now)
+    assert email_database.finish_ai_email_event(digest, "lease-two", "accepted", now)
+    terminal = email_database.claim_ai_email_event(digest, "lease-three", now)
     assert terminal == {"claimed": False, "reason": "terminal", "state": "accepted"}
     only_row = next(iter(store.rows.values()))
     assert "lease_token" not in only_row
@@ -710,11 +694,11 @@ class _InboundClient:
         return []
 
 
-# @features ai-email webhook
-# @dimensions replay sender exact-match user-policy report-handoff
+# @matrix ai-email webhook : exact-match replay report-handoff sender user-policy
 def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch):
     from lagniappe.core.entities import Entities
-    from lagniappe.core.tools import database
+    from lagniappe.core.tools.database import ai_email as email_database
+    from lagniappe.core.tools.database import get as database_get
 
     user = TestEntities.get(
         "USER",
@@ -724,10 +708,18 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     user.is_public = False
     report = SimpleNamespace(urlsafe_key="report-one")
     states = []
-    monkeypatch.setattr(database, "claim_ai_email_event", lambda *_args: {"claimed": True})
-    monkeypatch.setattr(database, "finish_ai_email_event", lambda *args: states.append(args[2]))
-    monkeypatch.setattr(database, "release_ai_email_event", lambda *_args: None)
-    monkeypatch.setattr(database.get, "user", lambda email: "raw-user" if email == user.email else None)
+    monkeypatch.setattr(
+        email_database, "claim_ai_email_event", lambda *_args: {"claimed": True}
+    )
+    monkeypatch.setattr(
+        email_database,
+        "finish_ai_email_event",
+        lambda *args: states.append(args[2]),
+    )
+    monkeypatch.setattr(email_database, "release_ai_email_event", lambda *_args: None)
+    monkeypatch.setattr(
+        database_get, "user", lambda email: "raw-user" if email == user.email else None
+    )
     monkeypatch.setattr(
         Entities,
         "fetch_one",
@@ -756,12 +748,11 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     assert states == ["accepted"]
 
 
-# @features ai-email
-# @dimensions report-handoff routing idempotency privacy
+# @matrix ai-email : idempotency privacy report-handoff routing
 def test_create_shared_address_email_report_preserves_routing_input(monkeypatch):
     from lagniappe.core.entities import Entities
-    from lagniappe.core.tools import database
-    from lagniappe.core.tools.deferred_jobs import DeferredJobs
+    from lagniappe.core.tools.database import utility as database_utility
+    from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     user = SimpleNamespace(urlsafe_key="user-one")
     message = SimpleNamespace(
@@ -779,7 +770,9 @@ def test_create_shared_address_email_report_preserves_routing_input(monkeypatch)
     saved = []
     starts = []
 
-    monkeypatch.setattr(database, "create_named_key", lambda *_args: "report-key")
+    monkeypatch.setattr(
+        database_utility, "create_named_key", lambda *_args: "report-key"
+    )
     monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: None)
 
     def create_report(data, *, key):
@@ -818,15 +811,12 @@ def test_create_shared_address_email_report_preserves_routing_input(monkeypatch)
     assert starts[0].parameters["attachments"] == [attachment.job_record()]
 
 
-# @features ai-email deferred-jobs
-# @dimensions report-handoff idempotency acceptance
+# @matrix ai-email deferred-jobs : acceptance idempotency report-handoff
 def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatch):
     from lagniappe import CONFIG
-    from lagniappe.core.tools import deferred_job_adapters
+    from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
-    user = TestEntities.get(
-        "USER", {"name": "Owner", "owner": False}
-    )
+    user = TestEntities.get("USER", {"name": "Owner", "owner": False})
     user.email = "Owner@example.com"
     report = TestEntities.get(
         "REPORT",
@@ -842,10 +832,13 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     starts = []
     feedback = []
     monkeypatch.setattr(CONFIG, "AI_EMAIL_CONFIG", _config())
-    monkeypatch.setattr(deferred_job_adapters.Entities, "save", lambda *_args: None)
+    monkeypatch.setattr(email_adapters.Entities, "save", lambda *_args: None)
     monkeypatch.setattr(
-        "lagniappe.core.tools.deferred_jobs.DeferredJobs.start",
-        lambda spec: (starts.append(spec) or SimpleNamespace(urlsafe_key="child-job"), None),
+        "lagniappe.core.tools.deferred_jobs.service.DeferredJobs.start",
+        lambda spec: (
+            starts.append(spec) or SimpleNamespace(urlsafe_key="child-job"),
+            None,
+        ),
     )
     monkeypatch.setattr(
         ai_email,
@@ -871,7 +864,7 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
         ensure_active=lambda: None,
         checkpoint_stage=checkpoint_stage,
     )
-    checkpoint = deferred_job_adapters.EmailIngestAdapter().prepare(context)
+    checkpoint = email_adapters.EmailIngestAdapter().prepare(context)
     assert checkpoint == {
         "schema_version": 1,
         "stage": "acceptance_sent",
@@ -882,10 +875,9 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     assert feedback == [(report, "acceptance")]
 
 
-# @features ai-email deferred-jobs
-# @dimensions routing utility-model idempotency permissions
+# @matrix ai-email deferred-jobs : idempotency permissions routing utility-model
 def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
-    from lagniappe.core.tools import deferred_job_adapters
+    from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
     user = TestEntities.get("USER", {"name": "Owner", "owner": False})
     user.access = lambda _required: True
@@ -909,17 +901,19 @@ def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
     calls = []
     saved = []
     monkeypatch.setattr(
-        deferred_job_adapters.ai,
+        email_adapters.ai,
         "route_ai_email",
-        lambda *args: calls.append(args)
-        or {
-            "workflow": "organize",
-            "confidence": 0.96,
-            "reason": "The attachment should update a submission.",
-        },
+        lambda *args: (
+            calls.append(args)
+            or {
+                "workflow": "organize",
+                "confidence": 0.96,
+                "reason": "The attachment should update a submission.",
+            }
+        ),
     )
     monkeypatch.setattr(
-        deferred_job_adapters.Entities,
+        email_adapters.Entities,
         "save",
         lambda *entities: saved.append(entities),
     )
@@ -932,7 +926,7 @@ def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
             "size": 1200,
         }
     ]
-    adapter = deferred_job_adapters.EmailIngestAdapter()
+    adapter = email_adapters.EmailIngestAdapter()
 
     assert (
         adapter._route_shared_address(report, user, parameters, attachments)
@@ -951,10 +945,9 @@ def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
     assert len(saved) == 2
 
 
-# @features ai-email deferred-jobs feedback
-# @dimensions failure diagnostics privacy terminal-delivery
+# @matrix ai-email deferred-jobs feedback : diagnostics failure privacy terminal-delivery
 def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
-    from lagniappe.core.tools import deferred_job_adapters
+    from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
     user = TestEntities.get("USER", {"name": "Owner", "owner": False})
     report = TestEntities.get(
@@ -972,12 +965,12 @@ def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
     saved = []
     feedback = []
     monkeypatch.setattr(
-        deferred_job_adapters.Entities,
+        email_adapters.Entities,
         "fetch_one",
         lambda *_args, **_kwargs: report,
     )
     monkeypatch.setattr(
-        deferred_job_adapters.Entities,
+        email_adapters.Entities,
         "save",
         lambda *entities: saved.extend(entities),
     )
@@ -999,11 +992,9 @@ def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
         checkpoint={},
         input=lambda name: report if name == "report" else None,
     )
-    error = ai_email.AIEmailProviderError(
-        "Resend returned an invalid attachment URL."
-    )
+    error = ai_email.AIEmailProviderError("Resend returned an invalid attachment URL.")
 
-    adapter = deferred_job_adapters.EmailIngestAdapter()
+    adapter = email_adapters.EmailIngestAdapter()
     adapter.failure(context, error)
     expected = (
         "The email submission could not be prepared. "
@@ -1019,8 +1010,7 @@ def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
     assert context.parameters == {"_diagnostic_message": expected}
 
 
-# @features ai-email
-# @dimensions access attachment-contract body-contract rate-limit
+# @matrix ai-email : access attachment-contract body-contract rate-limit
 def test_submission_contract_keeps_create_and_organize_report_only(monkeypatch):
     monkeypatch.setattr(
         "lagniappe.core.tools.cache.rate_limit.check_limit",
@@ -1031,9 +1021,7 @@ def test_submission_contract_keeps_create_and_organize_report_only(monkeypatch):
         headers={},
         subject="Create this",
         text_body="Use the existing report workflow.",
-        attachments=(
-            InboundAttachment("file-1", "notes.txt", "text/plain", 10),
-        ),
+        attachments=(InboundAttachment("file-1", "notes.txt", "text/plain", 10),),
     )
     with pytest.raises(AIEmailRejection, match="Create email does not accept"):
         ai_email._preflight_submission(message, "create", user, _config())

@@ -3,7 +3,7 @@
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
-# @pairs template-formatting:date template-formatting:time
+# @matrix template-formatting : date time
 def format_datetime(value):
     if not value:
         return ""
@@ -15,8 +15,7 @@ def format_datetime(value):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
-# @features template-formatting
-# @dimensions date
+# @pair template-formatting:date
 def format_date(value):
     if not value:
         return ""
@@ -28,8 +27,7 @@ def format_date(value):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
-# @features template-formatting
-# @dimensions time
+# @pair template-formatting:time
 def format_time(value):
     if not value:
         return ""
@@ -41,8 +39,7 @@ def format_time(value):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
-# @features template-formatting
-# @dimensions phone
+# @pair template-formatting:phone
 def format_phone(value):
     if not value:
         return ""
@@ -59,8 +56,7 @@ def format_phone(value):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
-# @features template-formatting
-# @dimensions number
+# @pair template-formatting:number
 def format_number(value):
     if value is None or value == "":
         return ""

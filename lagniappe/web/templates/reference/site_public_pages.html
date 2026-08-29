@@ -1,0 +1,13 @@
+{% from "manual/macros.html" import callout %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Public Pages") %}
+  <p class="text-sm text-base-dark">
+    Public pages always have shareable links. Search discovery is an additional site-wide choice.
+  </p>
+  <p class="text-sm text-base-dark">
+    When discovery is enabled, eligible pages appear in the sitemap and may be indexed by search engines. A page can opt out in its Public settings.
+  </p>
+  {% call callout("warning") %}
+    Turning discovery off updates crawler instructions immediately, but search engines and third-party previews may take time to refresh cached results.
+  {% endcall %}
+{% endcall %}

@@ -45,8 +45,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
     # @testable true
     # @tests tests_unit/test_003_submission.py::test_submission_value
     # @tests tests_unit/test_003_submission.py::test_submission_save
-    # @features submission
-    # @dimensions db-value, save
+    # @matrix submission : db-value save
     @property
     def value(self):
         return super().value
@@ -63,8 +62,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
     # @tests tests_unit/test_004e_submission_behavior.py::test_missing_stored_checkbox_is_unset_and_omitted
     # @tests tests_unit/test_004e_submission_behavior.py::test_stored_explicit_checkbox_false_survives_load_save
     # @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
-    # @features submission
-    # @dimensions fields, cache, stale-db, empty-field, missing-field, unset, projection, stored-false, load-save, stored-null, normalization
+    # @matrix submission : cache column empty-field empty-value fields load-save missing-field normalization projection stale-db stored-false stored-null unset
     @property
     def fields(self):
         if getattr(self, "_fields", None):
@@ -91,8 +89,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_003_submission.py::test_submission_patch
-    # @features submission
-    # @dimensions patch
+    # @pair submission:patch
     def patch(self, field_id, value):
         field = self.fields[field_id]
         field.validate_submission(value)
@@ -100,8 +97,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_003_submission.py::test_submission_is_visible
-    # @features submission
-    # @dimensions visibility
+    # @pair submission:visibility
     def is_visible(self, field_id):
         visibility = self.fields[field_id].visibility
 
@@ -132,8 +128,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
     # @testable true
     # @tests tests_unit/test_003_submission.py::test_submission_is_visible
     # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @features submission, status
-    # @dimensions condition-matching
+    # @matrix status submission : condition-matching
     def condition_matches(self, condition, require_visible=True):
         """Return whether a schema condition matches the referenced field."""
         ref_id = condition.get("id")
@@ -163,16 +158,14 @@ class FormSubmission(SubmissionProperty, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_003_submission.py::test_submission_tables
-    # @features submission
-    # @dimensions tables
+    # @pair submission:tables
     @property
     def tables(self):
         return [t for t in self.fields.values() if isinstance(t, Table)]
 
     # @testable true
     # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
-    # @features submission
-    # @dimensions links, internal, row-submission
+    # @matrix submission : internal links row-submission
     @property
     def links(self):
         links = [

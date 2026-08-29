@@ -1,7 +1,7 @@
 """Node-backed checks for the task-form todo list element."""
 
 
-# @pairs form-todo:normalization form-todo:history-fill form-todo:checked-state
+# @matrix form-todo : checked-state history-fill normalization
 def test_todo_value_normalization_and_history_reset(run_node):
     run_node(
         r'''

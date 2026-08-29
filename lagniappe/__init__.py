@@ -1,3 +1,4 @@
+import math
 import os
 
 from config import SETTINGS, Environment, constants
@@ -23,18 +24,31 @@ def _env_flag(name, default=False):
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+# @testable false
+# @covered-by lagniappe/__init__.py::Config
+# @reason Sentry sampling normalization is exercised through runtime Config construction
+def _sample_rate(value, name):
+    if isinstance(value, bool):
+        raise RuntimeError(f"Invalid {name}: expected a number from 0.0 through 1.0")
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(
+            f"Invalid {name}: expected a number from 0.0 through 1.0"
+        ) from error
+    if not math.isfinite(normalized) or not 0.0 <= normalized <= 1.0:
+        raise RuntimeError(f"Invalid {name}: expected a number from 0.0 through 1.0")
+    return normalized
+
+
 # @testable true
 # @tests tests_unit/test_016_config.py::test_config_prefers_tracked_build_id_over_app_settings
 # @tests tests_unit/test_016_config.py::test_config_requires_hosted_build_id_to_match_built_source
 # @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
 # @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
-# @pair config:build-id
-# @pair config:constants
-# @pair config:stale-settings
-# @pair config:observability-setting
-# @pair config:google-signin
-# @pair config:source-link
-# @pair ai:observability
+# @tests tests_unit/test_016_config.py::test_config_normalizes_and_validates_sentry_sample_rates
+# @matrix config : ai-email build-id constants error-reporting google-signin observability-setting optional-providers public-projection secrets source-link stale-settings
+# @pairs ai:observability error-reporting:sampling
 class Config:
     """Application configuration."""
 
@@ -125,6 +139,26 @@ class Config:
         self.TASK_QUEUE_ENABLED = _env_flag("TASK_QUEUE_ENABLED", self.production)
         self.TEST_CURRENT_USER = None
         self.ANALYTICS = getattr(self, "ANALYTICS", False)
+        self.SENTRY_TRACES_SAMPLE_RATE = _sample_rate(
+            getattr(
+                self,
+                "SENTRY_TRACES_SAMPLE_RATE",
+                getattr(constants, "DEFAULT_SENTRY_TRACES_SAMPLE_RATE", 1.0),
+            ),
+            "SENTRY_TRACES_SAMPLE_RATE",
+        )
+        self.SENTRY_PROFILE_SESSION_SAMPLE_RATE = _sample_rate(
+            getattr(
+                self,
+                "SENTRY_PROFILE_SESSION_SAMPLE_RATE",
+                getattr(
+                    constants,
+                    "DEFAULT_SENTRY_PROFILE_SESSION_SAMPLE_RATE",
+                    1.0,
+                ),
+            ),
+            "SENTRY_PROFILE_SESSION_SAMPLE_RATE",
+        )
         self.GOOGLE_SIGNIN_ENABLED = getattr(
             self,
             "GOOGLE_SIGNIN_ENABLED",
@@ -140,6 +174,12 @@ class Config:
         ).strip().casefold()
         self.GOOGLE_CLIENT_ID = str(
             getattr(self, "GOOGLE_CLIENT_ID", "") or ""
+        ).strip()
+        self.CUSTOM_DOMAIN = str(
+            getattr(self, "CUSTOM_DOMAIN", "") or ""
+        ).strip()
+        self.CLOUDFLARE_ACCOUNT_ID = str(
+            getattr(self, "CLOUDFLARE_ACCOUNT_ID", "") or ""
         ).strip()
         self.AI_OBSERVABILITY = getattr(
             self,
@@ -208,8 +248,7 @@ class Config:
     @property
     # @testable true
     # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
-    # @features hosted-e2e
-    # @dimensions configuration role
+    # @matrix hosted-e2e : configuration role
     def hosted_e2e(self):
         """Return whether this is a validated Google-hosted test process."""
         return self.testing and bool(getattr(self, "HOSTED_E2E", False))
@@ -217,16 +256,14 @@ class Config:
     @property
     # @testable true
     # @tests tests_unit/test_016_config.py::test_hosted_e2e_server_rejects_wrong_app_engine_version
-    # @features hosted-e2e
-    # @dimensions configuration role
+    # @matrix hosted-e2e : configuration role
     def hosted_e2e_server(self):
         return self.hosted_e2e and getattr(self, "HOSTED_E2E_ROLE", None) == "server"
 
     @property
     # @testable true
     # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
-    # @features hosted-e2e
-    # @dimensions configuration role
+    # @matrix hosted-e2e : configuration role
     def hosted_e2e_runner(self):
         return self.hosted_e2e and getattr(self, "HOSTED_E2E_ROLE", None) == "runner"
 
@@ -245,9 +282,8 @@ class Config:
     # @testable true
     # @tests tests_unit/test_016_config.py::test_google_credentials_are_shared_and_project_bound
     # @tests tests_unit/test_016_config.py::test_local_google_credentials_impersonate_runtime_identity
-    # @pairs config:adc config:project-identity config:credential-cache
-    # @pairs testing:adc testing:project-identity testing:credential-cache testing:runtime-impersonation
-    # @pairs development:adc development:project-identity development:credential-cache development:runtime-impersonation
+    # @matrix config : adc credential-cache project-identity
+    # @matrix development testing : adc credential-cache project-identity runtime-impersonation
     @property
     def google_credentials(self):
         """Return one project- and runtime-bound credential for Google clients."""
@@ -308,8 +344,7 @@ class Config:
 
     # @testable true
     # @tests tests_unit/test_016_config.py::test_google_access_token_refreshes_adc_when_stale
-    # @features config
-    # @dimensions adc token-refresh
+    # @matrix config : adc token-refresh
     def google_access_token(self):
         """Return a fresh shared ADC token for direct Google REST operations."""
         from google.auth.transport.requests import Request

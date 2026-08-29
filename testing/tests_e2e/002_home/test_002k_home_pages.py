@@ -16,8 +16,7 @@ from testing.elements import FormElements, Link, List, Select, SpinnerButtons
 pytestmark = pytest.mark.e2e
 
 
-# @features home pages
-# @dimensions list load
+# @matrix home pages : list load
 # @template home/pages.html::list
 # @template home/pages.html::page
 def test_home_page_list_loads_recent_pages(get_user):
@@ -31,8 +30,7 @@ def test_home_page_list_loads_recent_pages(get_user):
     expect(page_item).to_be_visible()
 
 
-# @features home pages
-# @dimensions create category-select default-category
+# @matrix home pages : category-select create default-category
 # @template home/pages.html::create
 # @template home/pages.html::page
 def test_create_page_from_home(get_user):
@@ -59,8 +57,7 @@ def test_create_page_from_home(get_user):
     expect(user.page).to_have_title(re.compile(page_name))
 
 
-# @pair permissions:category-edit
-# @pair combobox:permission-filter
+# @pairs combobox:permission-filter permissions:category-edit
 # @template home/home.html::create
 # @template home/pages.html::create
 def test_home_page_create_visible_for_category_editor(get_user):

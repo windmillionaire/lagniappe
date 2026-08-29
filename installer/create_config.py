@@ -30,6 +30,12 @@ PROJECT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
 _ACTIVE_ADC_TRANSACTION = None
 ADC_QUOTA_TIMEOUT = 60
 ADC_PROJECT_PROPAGATION_DELAYS = (2, 4, 8, 15, 20)
+ADC_LOGIN_SCOPES = (
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/cloud-platform",
+)
+GOOGLE_CLOUD_TERMS_URL = "https://console.developers.google.com/terms/cloud"
 BOOTSTRAP_GOOGLE_CLOUD_APIS = {
     "cloudbilling.googleapis.com",
     "cloudresourcemanager.googleapis.com",
@@ -38,19 +44,23 @@ BOOTSTRAP_GOOGLE_CLOUD_APIS = {
 BOOTSTRAP_API_TIMEOUT = 300
 GOOGLE_AUTH_PERMISSION_GUIDANCE = (
     "On Google's permission screen, choose Select all if it appears, then "
-    "Continue or Allow. In practical terms, you are granting these permissions "
-    "to yourself: they let Google Cloud CLI and the setup code on this computer "
-    "act for you in your project, and do not give the Lagniappe maintainer "
-    "access. Every requested permission is needed to configure, verify, or "
-    "deploy your installation."
+    "Continue or Allow. This authorizes setup on this computer; it does not "
+    "give the Lagniappe maintainer access."
 )
 
 
 # @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_collects_owner_and_requires_google_before_confirmation
-# @pairs setup:delegated-install setup:existing-project setup:billing
-# @pairs admin:google-signin admin:bootstrap-email admin:preserved-empty
-def _configure_delegated_bootstrap(preflight, account, google_signin_enabled):
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_automatically_enables_google_and_installer_bootstrap
+# @matrix admin : bootstrap-email google-signin
+# @matrix setup : billing delegated-install existing-project project-iam
+def _configure_delegated_bootstrap(
+    preflight,
+    account,
+    *,
+    project_id=None,
+    project_client=None,
+    owner_checker=None,
+):
     """Validate and persist the temporary application Admin bootstrap window."""
     from config import SETTINGS
 
@@ -68,32 +78,62 @@ def _configure_delegated_bootstrap(preflight, account, google_signin_enabled):
             "Delegated installation requires an existing Google Cloud project "
             "whose billing is already linked by the business."
         )
-    if not google_signin_enabled:
+    if not project_id:
+        project_id = str(
+            (preflight["project"].get("details") or {}).get("projectId") or ""
+        ).strip()
+    if not project_id:
         raise RuntimeError(
-            "Delegated installation requires Google sign-in for the temporary "
-            "bootstrap Administrator."
+            "Delegated installation requires a positively identified existing "
+            "Google Cloud project."
         )
+    if owner_checker is None:
+        from installer.iam import require_permanent_owner_binding
 
+        owner_checker = require_permanent_owner_binding
+    owner_checker(project_id, owner_email, client=project_client)
+
+    SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = True
+    SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] = account
     print(
-        f"Delegated installation detected: the active installer ({account}) "
-        f"differs from the permanent Owner ({owner_email})."
+        "[OK] Delegated installer application access is ready "
+        f"({account}; Google sign-in and temporary Administrator enabled)."
     )
-    if "BOOTSTRAP_ADMIN_EMAIL" not in SETTINGS.APP:
-        bootstrap = input(
-            "Temporarily allow the installer to sign in as an application "
-            "Administrator? [Y/n]: "
-        ).strip().casefold()
-        SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] = (
-            "" if bootstrap in {"n", "no"} else account
-        )
     return True
 
 
 # @testable false
 # @covered-by installer/create_config.py::verify_application_config
 # @reason small typed-failure adapter exercised through configuration validation
-def _fail(message="Setup configuration failed."):
-    raise SetupError(message)
+def _fail(message="Setup configuration failed.", *, repair_action=None):
+    raise SetupError(message, repair_action=repair_action)
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
+# @matrix setup : error-guidance google-cloud-terms
+def _is_google_cloud_terms_error(detail):
+    """Recognize Google's account-level Cloud service-terms rejection."""
+    normalized = str(detail or "").casefold()
+    return any(
+        marker in normalized
+        for marker in (
+            "ureq_tos_not_accepted",
+            "tos_id=cloud",
+            "terms of service 'cloud' must be accepted",
+        )
+    )
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
+# @matrix setup : error-guidance google-cloud-terms identity
+def _google_cloud_terms_repair_action(account):
+    """Return safe first-use guidance for the exact selected Cloud identity."""
+    return (
+        f"Sign in as '{account}' at {GOOGLE_CLOUD_TERMS_URL}, accept the "
+        f"Google Cloud service terms, then rerun {setup_command()}."
+    )
 
 
 # @testable false
@@ -112,8 +152,7 @@ def _adc_credentials_path():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_authentication_is_kept_only_after_project_permission_confirmation
-# @features setup
-# @dimensions adc transactional-state permissions
+# @matrix setup : adc permissions transactional-state
 class _AdcCredentialTransaction:
     """Restore or remove ADC when setup cannot confirm the selected operator."""
 
@@ -170,8 +209,7 @@ class _AdcCredentialTransaction:
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_authentication_is_kept_only_after_project_permission_confirmation
-# @features setup
-# @dimensions adc transactional-state permissions
+# @matrix setup : adc permissions transactional-state
 @contextmanager
 def _adc_auth_transaction():
     global _ACTIVE_ADC_TRANSACTION
@@ -216,8 +254,7 @@ def _commit_adc_credentials():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @features setup
-# @dimensions gcloud-config
+# @pair setup:gcloud-config
 def _gcloud_debug_value(command):
     """Return a structured gcloud value without promoting errors to values."""
     result = run_gcloud_command(command, check=False)
@@ -258,14 +295,14 @@ def _display_gcloud_value(result):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @features setup
-# @dimensions gcloud-config
+# @pair setup:gcloud-config
 def _adc_login_command(account, project_id, *, force=False):
     command = [GCLOUD_CLI, "auth", "application-default", "login"]
     if account and not force:
         command.append(account)
     if project_id:
         command.append(f"--project={project_id}")
+    command.append(f"--scopes={','.join(ADC_LOGIN_SCOPES)}")
     return format_command(command)
 
 
@@ -286,6 +323,7 @@ def _run_adc_login(account, project_id=None, *, force=False):
         command.append(account)
     if project_id:
         command.append(f"--project={project_id}")
+    command.append(f"--scopes={','.join(ADC_LOGIN_SCOPES)}")
     return subprocess.run(command, check=False, timeout=GCLOUD_TIMEOUT)
 
 
@@ -330,8 +368,7 @@ def _get_current_account_email(credentials=None):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_identity_reports_principal_project_and_quota
-# @features setup
-# @dimensions gcloud-config adc
+# @matrix setup : adc gcloud-config
 def _adc_identity():
     """Return a secret-free structured view of Application Default Credentials."""
     from installer.utils import install_if_missing
@@ -368,76 +405,72 @@ def _adc_identity():
 
 
 # @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @features setup
-# @dimensions gcloud-config
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_account_selection_requires_an_explicit_authenticated_identity
+# @matrix setup : gcloud-config gcloud-token interactive-input
 def _get_gcloud_account(account):
-    from installer import FORMATTER
     from runner.gcloud import check_account_authentication
-    from installer.utils import install_if_missing
-
-    install_if_missing(
-        "google.auth", "Google authentication library", package_name="google-auth"
-    )
-    import google.auth
-
-    f = FORMATTER.initialize()
 
     if account:
         check_account_authentication(account)
         return account
 
-    configured_account = _gcloud_debug_value(["config", "get-value", "account"])
-    if configured_account["state"] == GCLOUD_VALUE_SUCCESS:
-        account = configured_account["value"]
-        check_account_authentication(account)
-        return account
-    if configured_account["state"] == GCLOUD_VALUE_ERROR:
-        print(
-            f.error(
-                "Could not determine the active gcloud CLI account: "
-                f"{configured_account['error']}"
-            )
-        )
-        _fail()
-
-    try:
-        run_gcloud_command(["auth", "list"])
-    except subprocess.CalledProcessError:
+    active_result = run_gcloud_command(
+        [
+            "auth",
+            "list",
+            "--filter=status:ACTIVE",
+            "--format=value(account)",
+        ],
+        check=False,
+    )
+    active_accounts = [
+        value.strip()
+        for value in str(active_result.stdout or "").splitlines()
+        if value.strip()
+    ]
+    if active_result.returncode != 0 or len(active_accounts) != 1:
         login_command = format_command([GCLOUD_CLI, "auth", "login"])
-        print(f.error(f"Not logged into gcloud. Run {login_command} first."))
-        _fail()
-    except google.auth.exceptions.DefaultCredentialsError:
-        adc_command = format_command(
-            [GCLOUD_CLI, "auth", "application-default", "login"]
+        raise RuntimeError(
+            "Setup could not identify exactly one active gcloud CLI account. Run "
+            f"{login_command}, then rerun setup."
         )
-        print(
-            f.error(
-                "Application Default Credentials (ADC) not found.\n"
-                f"Please run {adc_command} to set them up.\n"
-                "ADC is required for the script to create and manage Google Cloud resources."
-            )
-        )
-        _fail()
-    except Exception as e:
-        print(f.error(f"Authentication error: {e}"))
-        _fail()
 
-    account = input(
-        f.info("Enter the authenticated gcloud CLI account to use: ")
-    ).strip()
-    if not account:
-        print("Exiting installer.")
-        raise SetupCancelled("Setup cancelled during account selection.")
+    account = active_accounts[0]
+    print(f"\nThe active gcloud CLI account is: {account}")
+    while True:
+        answer = input("Use this account for the installation? [y/N]: ").strip()
+        if answer.casefold() in {"y", "yes"}:
+            break
+        if answer.casefold() in {"", "n", "no", "x", "exit"}:
+            login_command = format_command([GCLOUD_CLI, "auth", "login"])
+            print(
+                "Setup cancelled before project selection. Run "
+                f"{login_command}, choose the installation account, then "
+                "rerun setup."
+            )
+            raise SetupCancelled("Setup cancelled during account confirmation.")
+        print("Enter Y to confirm this account, or N to cancel.")
+
     check_account_authentication(account)
+    token_check = run_gcloud_command(
+        ["auth", "print-access-token", account],
+        check=False,
+        timeout=60,
+    )
+    if token_check.returncode != 0 or not str(token_check.stdout or "").strip():
+        login_command = format_command([GCLOUD_CLI, "auth", "login", account])
+        raise RuntimeError(
+            f"The gcloud CLI login for '{account}' could not be verified. Run "
+            f"{login_command}, then rerun setup."
+        )
+    print(f"[OK] Verified gcloud CLI installation account: {account}")
 
     return account
 
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
-# @features setup
-# @dimensions project-id interactive-input
+# @matrix setup : interactive-input project-id
 def _project_id_from_app_name(sanitized_app_name):
     base = re.sub(r"[^a-z0-9-]", "-", sanitized_app_name.lower()).strip("-")
     if not base or not base[0].isalpha():
@@ -455,8 +488,7 @@ def _randomized_project_id(sanitized_app_name):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_project_id_and_project_state_are_non_mutating
-# @features setup
-# @dimensions project-id
+# @pair setup:project-id
 def _project_state(project_id):
     result = run_gcloud_command(
         ["projects", "describe", project_id, "--format=json"],
@@ -499,8 +531,7 @@ def _project_state(project_id):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
-# @features setup
-# @dimensions project-id interactive-input
+# @matrix setup : interactive-input project-id
 def _confirm_project_candidate(project_id, state, formatter):
     if state["state"] == "unavailable":
         print(
@@ -526,8 +557,7 @@ def _confirm_project_candidate(project_id, state, formatter):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
-# @features setup
-# @dimensions project-id interactive-input
+# @matrix setup : interactive-input project-id
 def _get_gcloud_project(project_id, sanitized_app_name):
     from installer import FORMATTER
 
@@ -593,6 +623,223 @@ def _get_gcloud_project(project_id, sanitized_app_name):
 
 
 # @testable false
+# @covered-by installer/create_config.py::_list_owned_projects
+# @reason per-project policy parsing is exercised through delegated discovery
+def _has_direct_project_owner_binding(project_id, account):
+    result = run_gcloud_command(
+        [
+            "projects",
+            "get-iam-policy",
+            project_id,
+            "--format=json",
+            f"--account={account}",
+        ],
+        check=False,
+    )
+    if result.returncode != 0:
+        error = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(error or "project IAM policy lookup failed")
+    try:
+        policy = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError as error:
+        raise RuntimeError("project IAM policy lookup returned invalid JSON") from error
+    member = f"user:{str(account or '').strip().casefold()}"
+    return any(
+        str(binding.get("role") or "") == "roles/owner"
+        and not binding.get("condition")
+        and member
+        in {
+            str(value or "").strip().casefold()
+            for value in binding.get("members") or ()
+        }
+        for binding in policy.get("bindings") or ()
+        if isinstance(binding, dict)
+    )
+
+
+# @testable false
+# @covered-by installer/create_config.py::_list_owned_projects
+# @covered-by installer/create_config.py::_select_existing_gcloud_project
+# @reason project discovery normalization is exercised through both picker modes
+def _list_active_projects(account):
+    """Return normalized active projects visible to the selected account."""
+    result = run_gcloud_command(
+        [
+            "projects",
+            "list",
+            "--filter=lifecycleState=ACTIVE",
+            "--format=json",
+            f"--account={account}",
+        ],
+        check=False,
+    )
+    if result.returncode != 0:
+        error = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(
+            "Could not list Google Cloud projects accessible to "
+            f"'{account}': {error or 'gcloud projects list failed'}"
+        )
+    try:
+        discovered = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError as error:
+        raise RuntimeError(
+            "Google Cloud project discovery returned invalid JSON."
+        ) from error
+    if not isinstance(discovered, list):
+        raise RuntimeError("Google Cloud project discovery returned invalid data.")
+
+    projects = []
+    seen = set()
+    for project in discovered:
+        if not isinstance(project, dict):
+            continue
+        project_id = str(project.get("projectId") or "").strip()
+        if not PROJECT_ID_PATTERN.fullmatch(project_id) or project_id in seen:
+            continue
+        display_name = str(
+            project.get("displayName") or project.get("name") or project_id
+        ).strip()
+        if not display_name or display_name.startswith("projects/"):
+            display_name = project_id
+        projects.append(
+            {
+                "project_id": project_id,
+                "display_name": display_name,
+                "project_number": str(project.get("projectNumber") or "").strip(),
+            }
+        )
+        seen.add(project_id)
+
+    projects.sort(
+        key=lambda project: (
+            project["display_name"].casefold(),
+            project["project_id"],
+        )
+    )
+    return projects
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_project_picker_lists_only_direct_owner_projects
+# @matrix setup : delegated-install existing-project gcloud-config project-iam project-picker provider-discovery
+def _list_owned_projects(account):
+    """Return active projects directly owned by the selected gcloud account."""
+    projects = []
+    policy_errors = []
+    for project in _list_active_projects(account):
+        try:
+            owner = _has_direct_project_owner_binding(
+                project["project_id"], account
+            )
+        except RuntimeError as error:
+            policy_errors.append(f"{project['project_id']}: {error}")
+            continue
+        if owner:
+            projects.append(project)
+
+    if not projects:
+        if policy_errors:
+            raise RuntimeError(
+                "Could not determine which accessible Google Cloud projects "
+                f"are directly owned by '{account}': {policy_errors[0]}"
+            )
+        raise RuntimeError(
+            f"No active Google Cloud project gives '{account}' a direct, "
+            "unconditional Project Owner role. The permanent business Owner "
+            "must create the project, link billing, and grant this installer "
+            "Basic / Owner before setup can continue."
+        )
+    return projects
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_project_picker_lists_only_direct_owner_projects
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow
+# @matrix setup : delegated-install existing-project interactive-input ordinary-install project-iam project-picker provider-discovery
+def _select_existing_gcloud_project(account, *, direct_owner_required=True):
+    """Let the operator select an active project visible to their account."""
+    if direct_owner_required:
+        projects = _list_owned_projects(account)
+        heading = f"Active Google Cloud projects owned directly by {account}:"
+    else:
+        projects = _list_active_projects(account)
+        if not projects:
+            raise RuntimeError(
+                f"No active Google Cloud projects are accessible to '{account}'. "
+                "Grant this account access to the intended project, or rerun "
+                "setup and choose the new-project path."
+            )
+        heading = f"Active Google Cloud projects accessible to {account}:"
+
+    print(f"\n{heading}")
+    for index, project in enumerate(projects, start=1):
+        print(
+            f"  {index}. {project['display_name']} "
+            f"({project['project_id']})"
+        )
+
+    while True:
+        default = " [1]" if len(projects) == 1 else ""
+        entered = input(
+            "Select the project for this installation by number"
+            f"{default}, or X to cancel: "
+        ).strip()
+        if not entered and len(projects) == 1:
+            entered = "1"
+        if entered.casefold() in {"x", "exit"}:
+            raise SetupCancelled("Setup cancelled during project selection.")
+        if entered.isdigit() and 1 <= int(entered) <= len(projects):
+            selected = projects[int(entered) - 1]
+            state = _project_state(selected["project_id"])
+            if state["state"] != "available":
+                raise RuntimeError(
+                    f"Selected project '{selected['project_id']}' could not be "
+                    "reverified as accessible to the active gcloud account."
+                )
+            print(
+                f"Selected existing project '{selected['display_name']}' "
+                f"({selected['project_id']})."
+            )
+            return selected["display_name"], selected["project_id"]
+        print("Enter one of the project numbers shown above, or X to cancel.")
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow
+# @matrix setup : delegated-install interactive-input ordinary-install project-picker
+def _select_initial_target(account):
+    """Choose the delegated picker or ordinary installation naming flow."""
+    while True:
+        answer = input(
+            "Are you installing Lagniappe for a different permanent Owner? "
+            "[y/N]: "
+        ).strip().casefold()
+        if answer in {"y", "yes"}:
+            return _select_existing_gcloud_project(
+                account, direct_owner_required=True
+            )
+        if answer in {"", "n", "no"}:
+            break
+        print("Enter Y for a delegated installation, or N for your own installation.")
+
+    while True:
+        answer = input(
+            "Has the Google Cloud project for this installation already been "
+            "created? [y/N]: "
+        ).strip().casefold()
+        if answer in {"y", "yes"}:
+            return _select_existing_gcloud_project(
+                account, direct_owner_required=False
+            )
+        if answer in {"", "n", "no"}:
+            app_name = _get_app_name()
+            sanitized_app_name = _gcloud_configuration_name(app_name)
+            project_id = _get_gcloud_project("", sanitized_app_name)
+            return app_name, project_id
+        print("Enter Y to select an existing project, or N to create one.")
+
+
+# @testable false
 # @covered-by installer/create_config.py::set_application_defaults
 # @reason deterministic name normalization exercised through config-file creation
 def _gcloud_configuration_name(name):
@@ -609,8 +856,7 @@ def _gcloud_configuration_name(name):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_project_id_and_project_state_are_non_mutating
-# @features setup
-# @dimensions project-id
+# @pair setup:project-id
 def validate_project_id(project_id):
     """Validate the provider's project-ID syntax without mutating state."""
     if not PROJECT_ID_PATTERN.fullmatch(str(project_id or "")):
@@ -629,8 +875,7 @@ def validate_project_id(project_id):
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_new_project_forces_transactional_adc_refresh
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_refreshes_adc_login_after_quota_failure
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_exits_when_adc_login_refresh_fails
-# @features setup
-# @dimensions gcloud-config
+# @matrix setup : adc gcloud-config new-project transactional-state
 def _set_adc_quota_project(project_id, sp):
     from installer import FORMATTER
     from config import SETTINGS
@@ -674,7 +919,10 @@ def _set_adc_quota_project(project_id, sp):
                 "Setup could not refresh Application Default Credentials automatically."
             )
             sp.fail(f.fail_glyph)
-            _fail()
+            _fail(
+                "ADC authentication did not complete.",
+                repair_action=_google_cloud_terms_repair_action(account),
+            )
         adc_refreshed = True
 
     new_project_refresh = False
@@ -736,8 +984,6 @@ def _set_adc_quota_project(project_id, sp):
             sp.fail(f.fail_glyph)
             _fail()
 
-        if detail:
-            sp.write(f.warning(f"ADC quota command returned: {detail}"))
         refresh_adc(
             "ADC is separate from the active gcloud CLI login and could not "
             "use the selected quota project."
@@ -750,11 +996,18 @@ def _set_adc_quota_project(project_id, sp):
             timeout=ADC_QUOTA_TIMEOUT,
         )
         if quota_project_result.returncode != 0:
+            detail = (
+                quota_project_result.stderr
+                or quota_project_result.stdout
+                or ""
+            ).strip()
             sp.write(
                 f.error(
                     "ADC login completed, but setup still could not set the ADC quota project."
                 )
             )
+            if detail:
+                sp.write(f.warning(f"Google Cloud returned: {detail.splitlines()[0]}"))
             sp.write(
                 "Verify the selected account can access the project, then run setup again."
             )
@@ -813,8 +1066,7 @@ def _set_adc_quota_project(project_id, sp):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_principal_mismatch_requires_explicit_reauthentication
-# @features setup
-# @dimensions gcloud-config adc identity
+# @matrix setup : adc gcloud-config identity
 def _ensure_adc_principal(account, project_id=None):
     """Authenticate ADC explicitly when it is not the selected CLI principal."""
     from installer import FORMATTER
@@ -848,7 +1100,10 @@ def _ensure_adc_principal(account, project_id=None):
     result = _run_adc_login(account, project_id)
     if result.returncode != 0:
         print(f.error("ADC authentication did not complete."))
-        _fail()
+        _fail(
+            "ADC authentication did not complete.",
+            repair_action=_google_cloud_terms_repair_action(account),
+        )
 
     identity = _adc_identity()
     if (
@@ -866,8 +1121,7 @@ def _ensure_adc_principal(account, project_id=None):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_selects_billing_and_reports_required_apis
-# @features setup
-# @dimensions preflight billing provider-apis
+# @matrix setup : billing preflight provider-apis
 def _load_gcloud_json(command, description):
     result = run_gcloud_command(command, check=False)
     if result.returncode != 0:
@@ -882,8 +1136,7 @@ def _load_gcloud_json(command, description):
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_billing_selection_defers_to_project_console_when_cli_returns_no_open_account
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_selects_billing_and_reports_required_apis
-# @features setup
-# @dimensions billing interactive-input gcloud-config
+# @matrix setup : billing gcloud-config interactive-input
 def _select_billing_account(accounts):
     from installer import FORMATTER
 
@@ -929,8 +1182,7 @@ def _select_billing_account(accounts):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_project_billing_authorization_uses_existing_account_and_project_console
-# @features setup
-# @dimensions billing interactive-input browser
+# @matrix setup : billing browser interactive-input
 def _authorize_project_billing(project_id):
     """Open the target's billing page and verify its existing-account link."""
     from installer import FORMATTER
@@ -983,8 +1235,7 @@ def _authorize_project_billing(project_id):
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_selects_billing_and_reports_required_apis
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_defers_billing_discovery_until_new_project_exists
-# @features setup
-# @dimensions preflight billing provider-apis project-create
+# @matrix setup : billing preflight project-create provider-apis
 def _target_preflight(project_id):
     """Run read-only target, billing, and Service Usage checks."""
     from config import constants
@@ -1051,11 +1302,11 @@ def _target_preflight(project_id):
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_creates_and_bills_confirmed_project
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_authorizes_billing_after_project_creation_when_cli_list_is_empty
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_rediscovers_and_links_existing_billing_account
-# @features setup
-# @dimensions preflight project-create billing browser provider-apis
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
+# @matrix setup : billing browser preflight project-create provider-apis
 def _apply_target_preflight(project_id, preflight, project_ready=None):
     """Apply the already-confirmed project creation and billing mutations."""
-    from config import constants
+    from config import SETTINGS, constants
     from installer import FORMATTER
 
     f = FORMATTER.initialize()
@@ -1097,6 +1348,13 @@ def _apply_target_preflight(project_id, preflight, project_ready=None):
         )
         if result.returncode != 0:
             error = (result.stderr or result.stdout or "").strip()
+            if _is_google_cloud_terms_error(error):
+                account = SETTINGS.GCLOUD_CONFIG.get("ACCOUNT") or "the installer"
+                raise SetupError(
+                    "Google Cloud service terms have not been accepted for "
+                    f"'{account}'.",
+                    repair_action=_google_cloud_terms_repair_action(account),
+                )
             raise RuntimeError(
                 f"Could not prepare Google Cloud project APIs: "
                 f"{error or 'gcloud command failed'}"
@@ -1189,6 +1447,7 @@ def _require_operator_permissions(
     *,
     billing_account=None,
     require_billing_link=False,
+    client=None,
 ):
     from installer.iam import require_operator_permissions
 
@@ -1196,13 +1455,64 @@ def _require_operator_permissions(
         project_id,
         billing_account=billing_account,
         require_billing_link=require_billing_link,
+        client=client,
     )
 
 
 # @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_project_client_uses_selected_cli_account_without_adc
+# @matrix setup : adc gcloud-token identity
+def _gcloud_project_client(account):
+    """Create a Resource Manager client from the already-authenticated CLI login."""
+    result = run_gcloud_command(
+        ["auth", "print-access-token", account],
+        check=False,
+        timeout=60,
+    )
+    token = str(result.stdout or "").strip()
+    if result.returncode != 0 or not token:
+        raise RuntimeError(
+            f"The gcloud CLI login for installer '{account}' is unavailable. "
+            f"Run {setup_command('auth')}, then retry setup."
+        )
+
+    from installer.utils import install_if_missing
+
+    install_if_missing(
+        "google.cloud.resourcemanager_v3",
+        "Google Resource Manager API",
+        package_name="google-cloud-resource-manager",
+    )
+    from google.cloud import resourcemanager_v3
+    from google.oauth2.credentials import Credentials
+
+    return resourcemanager_v3.ProjectsClient(credentials=Credentials(token=token))
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_existing_project_checks_cli_installer_permissions_before_adc_authentication
+# @matrix setup : adc gcloud-token operator-permissions preflight
+def _preflight_operator_authority(account, project_id, *, client=None):
+    """Verify the selected CLI installer before opening or changing ADC."""
+    client = client or _gcloud_project_client(account)
+    try:
+        _require_operator_permissions(project_id, client=client)
+    except Exception as error:
+        raise RuntimeError(
+            f"The gcloud CLI installer '{account}' is signed in, but setup "
+            f"could not verify its required access to project '{project_id}' "
+            "before ADC authentication. Application Default Credentials were "
+            f"not changed. {error}"
+        ) from error
+    print(
+        f"[OK] gcloud CLI installer access is ready ({account}, {project_id})"
+    )
+    return client
+
+
+# @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_authentication_is_kept_only_after_project_permission_confirmation
-# @features setup
-# @dimensions adc transactional-state permissions
+# @matrix setup : adc permissions transactional-state
 def _confirm_operator_permissions(
     project_id,
     *,
@@ -1266,8 +1576,7 @@ def _display_install_identity_summary(preflight, adc_identity):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_build_app_settings_refreshes_agent_access_defaults
-# @features setup
-# @dimensions config-files agent-access ai-defaults source-link
+# @matrix setup : agent-access ai-defaults config-files source-link
 def _build_app_settings():
     from config import SETTINGS, constants
 
@@ -1347,8 +1656,19 @@ def _build_app_settings():
         "CAPTURE_ERRORS": SETTINGS.APP.get(
             "CAPTURE_ERRORS", constants.DEFAULT_ERROR_MONITORING_ENABLED
         ),
+        "SENTRY_TRACES_SAMPLE_RATE": SETTINGS.APP.get(
+            "SENTRY_TRACES_SAMPLE_RATE",
+            constants.DEFAULT_SENTRY_TRACES_SAMPLE_RATE,
+        ),
+        "SENTRY_PROFILE_SESSION_SAMPLE_RATE": SETTINGS.APP.get(
+            "SENTRY_PROFILE_SESSION_SAMPLE_RATE",
+            constants.DEFAULT_SENTRY_PROFILE_SESSION_SAMPLE_RATE,
+        ),
         "PUBLIC_MANUAL": SETTINGS.APP.get(
             "PUBLIC_MANUAL", constants.DEFAULT_PUBLIC_MANUAL
+        ),
+        "PUBLIC_PAGE_INDEXING": SETTINGS.APP.get(
+            "PUBLIC_PAGE_INDEXING", constants.DEFAULT_PUBLIC_PAGE_INDEXING
         ),
         "SOURCE_URL": SETTINGS.APP.get(
             "SOURCE_URL", constants.DEFAULT_SOURCE_URL
@@ -1362,9 +1682,9 @@ def _build_app_settings():
     SETTINGS.APP.update(default_settings)
 
 
-# @testable false
-# @covered-by installer/create_config.py::_set_default_config
-# @reason config-file build step owned by the default config creation flow
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_app_engine_pdfjs_wasm_handlers_precede_general_js
+# @matrix deploy : app-yaml pdf-preview static-assets
 def _build_deploy_yaml():
     from config import constants, SETTINGS
 
@@ -1439,8 +1759,7 @@ def _build_manifest():
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_deep_copies_templates
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_generates_fresh_settings
-# @features setup
-# @dimensions config-files
+# @pair setup:config-files
 def _set_default_config():
     from config import SETTINGS
 
@@ -1456,8 +1775,7 @@ def _set_default_config():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_update_config_sets_application_version_from_package
-# @features setup
-# @dimensions config-files config-version
+# @matrix setup : config-files config-version
 def update_config():
     """Refresh generated config defaults and return the active package version."""
     from config import SETTINGS, constants
@@ -1477,8 +1795,7 @@ def update_config():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_app_name_validation_rejects_control_characters_and_long_names
-# @features setup
-# @dimensions validation app-name
+# @matrix setup : app-name validation
 def _validate_app_name(value):
     value = str(value or "").strip()
     return bool(value) and len(value) <= 80 and all(
@@ -1500,8 +1817,7 @@ def _get_app_name(value):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_cli_identity_snapshot_fails_closed_on_unset_or_error
-# @features setup
-# @dimensions gcloud-config identity
+# @matrix setup : gcloud-config identity
 def _active_cli_identity():
     values = {
         "configuration": _gcloud_debug_value(
@@ -1533,9 +1849,9 @@ def _active_cli_identity():
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_refreshes_adc_login_after_quota_failure
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_exits_when_adc_login_refresh_fails
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_persists_prompted_name_before_cloud_change
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_existing_project_prepares_bootstrap_apis_before_adc
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_write
-# @features setup
-# @dimensions config-files interactive-input gcloud-config recovery
+# @matrix setup : adc config-files existing-project gcloud-config interactive-input preconfirmation provider-apis recovery
 def set_application_defaults():
     with _adc_auth_transaction():
         return _set_application_defaults()
@@ -1584,23 +1900,26 @@ def _set_application_defaults():
         else SETTINGS.GCLOUD_CONFIG.get("PROJECT", "")
     )
 
-    if not _validate_app_name(app_name):
-        app_name = _get_app_name()
-        SETTINGS.APP["APP_NAME"] = app_name
+    SETTINGS.GCLOUD_CONFIG["ACCOUNT"] = _get_gcloud_account(account)
+    account = SETTINGS.GCLOUD_CONFIG["ACCOUNT"]
+
+    if not recovery_mode and not _validate_app_name(app_name) and not project_id:
+        app_name, selected_project = _select_initial_target(account)
     else:
-        SETTINGS.APP["APP_NAME"] = app_name
+        if not _validate_app_name(app_name):
+            app_name = _get_app_name()
+        sanitized_app_name = _gcloud_configuration_name(app_name)
+        selected_project = _get_gcloud_project(project_id, sanitized_app_name)
+
     if not _validate_app_name(app_name):
         print(f.error("A name is required for your Lagniappe installation."))
         _fail()
+    SETTINGS.APP["APP_NAME"] = app_name
 
     sanitized_app_name = _gcloud_configuration_name(app_name)
     if gcloud_name != sanitized_app_name:
         SETTINGS.GCLOUD_CONFIG["NAME"] = sanitized_app_name
 
-    SETTINGS.GCLOUD_CONFIG["ACCOUNT"] = _get_gcloud_account(account)
-    selected_project = _get_gcloud_project(
-        project_id, sanitized_app_name
-    )
     if recovery_mode and selected_project != project_id:
         raise RuntimeError(
             "Recovery cannot retarget the saved installation to another project."
@@ -1648,22 +1967,45 @@ def _set_application_defaults():
             "cross-check Cloud Storage ownership."
         )
     SETTINGS.GCLOUD_CONFIG["BILLING_ACCOUNT"] = preflight["billing_account"]
+    project_client = None
+    if preflight["project"]["state"] == "available":
+        project_client = _preflight_operator_authority(account, project_id)
     if not recovery_mode:
         from installer.admin import collect_owner_and_signin_choice
 
-        google_signin_enabled = collect_owner_and_signin_choice()
-        _configure_delegated_bootstrap(preflight, account, google_signin_enabled)
-    if preflight["project"]["state"] == "available":
+        collect_owner_and_signin_choice(account)
+        _configure_delegated_bootstrap(
+            preflight,
+            account,
+            project_id=project_id,
+            project_client=project_client,
+        )
+    defer_adc_for_api_preparation = (
+        not recovery_mode
+        and preflight["project"]["state"] == "available"
+        and bool(
+            BOOTSTRAP_GOOGLE_CLOUD_APIS - set(preflight["enabled_apis"])
+        )
+    )
+    if (
+        preflight["project"]["state"] == "available"
+        and not defer_adc_for_api_preparation
+    ):
         adc_identity = _ensure_adc_principal(account, project_id)
     else:
         adc_identity = {"state": "pending"}
-        if _ACTIVE_ADC_TRANSACTION is not None:
+        if (
+            _ACTIVE_ADC_TRANSACTION is not None
+            and preflight["project"]["state"] != "available"
+        ):
             _ACTIVE_ADC_TRANSACTION.refresh_required = True
 
     # @testable false
     # @covered-by installer/create_config.py::set_application_defaults
     # @reason spinner closure for the parent install preflight sequence
     def align_target_adc():
+        if defer_adc_for_api_preparation:
+            _ensure_adc_principal(account, project_id)
         with f.yaspin(text=f.success("Verifying Google Cloud credentials")) as sp:
             identity = _set_adc_quota_project(project_id, sp)
             sp.ok(f.ok_glyph)
@@ -1679,7 +2021,10 @@ def _set_application_defaults():
             sp.ok(f.ok_glyph)
         return identity
 
-    if preflight["project"]["state"] == "available":
+    if (
+        preflight["project"]["state"] == "available"
+        and not defer_adc_for_api_preparation
+    ):
         adc_identity = align_target_adc()
 
     if recovery_mode:
@@ -1708,7 +2053,10 @@ def _set_application_defaults():
         preflight,
         project_ready=(
             align_target_adc
-            if preflight["project"]["state"] in ("absent", "unverified")
+            if (
+                preflight["project"]["state"] in ("absent", "unverified")
+                or defer_adc_for_api_preparation
+            )
             else None
         ),
     )
@@ -1728,8 +2076,7 @@ def _set_application_defaults():
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_requires_google_client_only_when_enabled
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_rejects_keyless_identity_mismatch
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_reports_invalid_redis_tls
-# @features setup
-# @dimensions config-files validation redis-tls keyless-config project-identity google-oauth optional
+# @matrix setup : config-files google-oauth keyless-config optional project-identity redis-tls validation
 def verify_application_config(upgrade=False):
     from installer import FORMATTER
 

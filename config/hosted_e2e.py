@@ -49,8 +49,7 @@ def _required(environ: dict[str, str], name: str) -> str:
 
 # @testable true
 # @tests tests_unit/test_016_config.py::test_reserved_hosted_e2e_hostname_is_exact
-# @features testing hosted-e2e
-# @dimensions authentication soft-routing deletion-safety
+# @matrix hosted-e2e testing : authentication deletion-safety soft-routing
 def is_reserved_hosted_e2e_hostname(hostname: str) -> bool:
     """Return whether an App Engine hostname is reserved for ephemeral E2E."""
     normalized = str(hostname or "").strip().rstrip(".").casefold()
@@ -60,8 +59,7 @@ def is_reserved_hosted_e2e_hostname(hostname: str) -> bool:
 # @testable true
 # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
 # @tests tests_unit/test_016_config.py::test_hosted_e2e_server_rejects_wrong_app_engine_version
-# @features testing hosted-e2e
-# @dimensions configuration prefix identity fail-closed deployment-binding
+# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix
 def hosted_e2e_settings_overrides(
     app_settings: dict[str, object],
     *,

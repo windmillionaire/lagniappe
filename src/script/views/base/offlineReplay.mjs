@@ -5,10 +5,7 @@
  *
  * @testable true
  * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
- * @features offline polling
- * @dimensions background-replay nonblocking
- * @pair offline:background-replay
- * @pair polling:nonblocking
+ * @pairs offline:background-replay polling:nonblocking
  */
 export const replayOfflineQueue = async (view, existingQueue = null) => {
 	try {

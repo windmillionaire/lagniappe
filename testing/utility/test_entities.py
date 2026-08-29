@@ -20,7 +20,7 @@ import json
 from lagniappe import CONFIG
 from lagniappe.core.definitions.asset import AssetVisibility, LARGE_ASSET_BYTES
 from lagniappe.core.definitions.permissions import Action, Resource
-from lagniappe.core.tools import utility
+from lagniappe.core.tools.files.html import strip_tags
 from smartypants import smartypants
 
 __test__ = False
@@ -221,7 +221,7 @@ class MockAsset:
         if raw is None:
             return None
         if self._type == "html":
-            return utility.strip_tags(raw).strip()
+            return strip_tags(raw).strip()
         if self._type == "text":
             return raw.strip()
         return None

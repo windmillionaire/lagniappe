@@ -18,8 +18,7 @@ REDIS_CLOUD_CONSOLE_URL = "https://cloud.redis.io/"
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_connection_uses_shared_tls_settings_and_exits_on_failure
-# @features setup
-# @dimensions redis-connection redis-tls
+# @matrix setup : redis-connection redis-tls
 def test_redis_connection(settings=None, *, exit_on_failure=True):
     """Test Redis connection."""
     from config import SETTINGS
@@ -71,9 +70,9 @@ def test_redis_connection(settings=None, *, exit_on_failure=True):
                     close()
 
 
-# @testable false
-# @covered-by installer/redis.py::setup_redis
-# @reason console-only Redis Cloud configuration instructions
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_eviction_policy_instructions_require_confirmation
+# @matrix setup : interactive-input operator-guidance redis
 def eviction_policy_instructions():
     """Print eviction policy instructions."""
     from installer import FORMATTER
@@ -92,12 +91,29 @@ def eviction_policy_instructions():
     print(
         f.info(
             wrap_text(
-                "This can be set in your Redis Cloud dashboard under "
-                "Configuration → Durability → Data eviction policy"
+                "On the same Redis Cloud database details page, find "
+                "Performance & Availability → Data eviction policy and "
+                "select volatile-ttl."
             )
         )
     )
-    print(f.info("You will need to click 'Edit', make the change, and click 'Save'"))
+    print(
+        f.info(
+            wrap_text(
+                "The selection is only pending until you click 'Review "
+                "changes', review the confirmation modal, and click 'Confirm' "
+                "or 'Confirm & pay' to save it."
+            )
+        )
+    )
+    print(
+        f.info(
+            wrap_text(
+                "Wait for the pending-change indicator to clear, then verify "
+                "the displayed Data eviction policy is still volatile-ttl."
+            )
+        )
+    )
     print(
         f.info(
             wrap_text(
@@ -107,17 +123,21 @@ def eviction_policy_instructions():
         )
     )
     input(
-        f"\n{f.warning('Press Enter after configuring the eviction policy to continue...')}"
+        f"\n{f.warning('Press Enter only after Redis Cloud confirms the eviction policy...')}"
     )
 
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cloud_instructions_open_console_and_locate_credentials
-# @features setup
-# @dimensions redis browser operator-guidance
+# @matrix setup : browser operator-guidance plan-selection provider-region redis redis-tls
 def redis_cloud_instructions():
-    """Open Redis Cloud and explain how to copy its Redis CLI command."""
+    """Open Redis Cloud and guide database placement and credential copying."""
+    from config import SETTINGS, constants
+
     f = FORMATTER.initialize()
+    resource_region = str(
+        SETTINGS.APP.get("RESOURCE_REGION") or constants.DEFAULT_RESOURCE_REGION
+    ).strip()
 
     print(f"\n{f.info('Configure Redis Cloud')}")
     print(
@@ -135,31 +155,49 @@ def redis_cloud_instructions():
     print(wrap_text("\n1. Sign in to Redis Cloud or create an account."))
     print(
         wrap_text(
-            "2. In Redis Cloud, open Databases and create a database or "
-            "select an existing one."
+            "2. Open Databases and create a database. For a disposable "
+            "trial/test installation, select 'Try 30 MB for free'; it is "
+            "sufficient for the rehearsal, but Lagniappe's configurable "
+            "database TLS option is unavailable on the free plan."
         )
     )
     print(
         wrap_text(
-            "3. On the database details page, find Access and click the blue "
-            "Connect button."
+            "3. For production, or to configure Redis TLS during setup, "
+            "select a paid Essentials or Pro plan instead."
         )
     )
     print(
         wrap_text(
-            "4. In the connection panel, expand Redis CLI and keep Internet "
+            "4. Under 'Select cloud provider & region', choose Cloud vendor "
+            f"'Google Cloud' and Region '{resource_region}' to match "
+            "Lagniappe's regional Google Cloud resources. An existing "
+            "database is suitable only when it has that same placement."
+        )
+    )
+    print(
+        wrap_text(
+            "5. Create the database, then find Access on that same database "
+            "details page and click the blue Connect button."
+        )
+    )
+    print(
+        wrap_text(
+            "6. In the connection panel, expand Redis CLI and keep Internet "
             "(public endpoint) as the connection method."
         )
     )
     print(
         wrap_text(
-            "5. Click the blue Copy button beneath the redis-cli command."
+            "7. Click the blue Copy button beneath the redis-cli command."
         )
     )
     print(
         wrap_text(
-            "6. Return to setup and paste the complete copied command when "
-            "prompted; you do not need to run it."
+            "8. Return to setup and paste the complete copied command when "
+            "prompted; you do not need to run it. Keep the database details "
+            "page open because setup will next guide the required eviction "
+            "policy there."
         )
     )
 
@@ -167,8 +205,7 @@ def redis_cloud_instructions():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_extracts_connection_details
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_rejects_invalid_commands
-# @features setup
-# @dimensions redis credential-parsing validation
+# @matrix setup : credential-parsing redis validation
 def _parse_redis_cli_command(value):
     """Extract host, port, and password from pasted Redis connection input."""
     try:
@@ -245,8 +282,7 @@ def _parse_redis_cli_command(value):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_rejects_invalid_commands
-# @features setup
-# @dimensions redis credential-parsing validation
+# @matrix setup : credential-parsing redis validation
 def _is_redis_cli_command(value):
     try:
         _parse_redis_cli_command(value)
@@ -257,8 +293,7 @@ def _is_redis_cli_command(value):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_uses_visible_standard_input
-# @features setup
-# @dimensions redis interactive-input cancellation credential-parsing
+# @matrix setup : cancellation credential-parsing interactive-input redis
 @validate_input(
     "Paste copied Redis CLI command",
     validation_fn=_is_redis_cli_command,
@@ -285,8 +320,7 @@ def _managed_redis_ca_path():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_tls_enablement_uses_managed_ca
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_tls_enablement_requires_managed_ca
-# @features setup
-# @dimensions redis-tls settings-save certificate-validation failure-isolation missing-file operator-guidance
+# @matrix setup : certificate-validation failure-isolation missing-file operator-guidance redis-tls settings-save
 def _enable_redis_tls():
     """Guide the operator through verified server-side Redis TLS enablement."""
     from config import SETTINGS, constants
@@ -298,8 +332,8 @@ def _enable_redis_tls():
     print(
         wrap_text(
             "Redis database TLS is available on paid Redis Cloud "
-            "Essentials/Flex and Pro plans. It is not available on Free "
-            "Essentials plans."
+            "Essentials/Flex and Pro plans. It is not available on the free "
+            "30 MB Essentials plan."
         )
     )
     print(
@@ -397,8 +431,7 @@ def _enable_redis_tls():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_tls_disablement_is_transactional
-# @features setup
-# @dimensions redis-tls rollback settings-save failure-isolation
+# @matrix setup : failure-isolation redis-tls rollback settings-save
 def _disable_redis_tls():
     """Guide the operator through a tested Redis TLS rollback."""
     from config import SETTINGS
@@ -461,8 +494,7 @@ def _disable_redis_tls():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @features setup
-# @dimensions redis-tls optional settings-save
+# @matrix setup : optional redis-tls settings-save
 def _offer_redis_tls_for_fresh_install():
     """Offer Redis TLS while the initial Redis connection is being configured."""
     f = FORMATTER.initialize()
@@ -471,8 +503,8 @@ def _offer_redis_tls_for_fresh_install():
     print(
         wrap_text(
             "Paid Redis Cloud plans can encrypt application-to-database traffic "
-            "with TLS; Free Essentials plans cannot enable this database "
-            "setting."
+            "with TLS; the free 30 MB Essentials plan cannot enable this "
+            "database setting."
         )
     )
     consent = input(f.info("Configure Redis TLS now? [y/N]: "))
@@ -491,8 +523,7 @@ def _offer_redis_tls_for_fresh_install():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_redis_clears_failed_credentials_and_retries
-# @features setup
-# @dimensions redis settings-save retry rollback failure-isolation
+# @matrix setup : failure-isolation redis retry rollback settings-save
 def setup_redis():
     """Configure Redis connection details."""
     from config import SETTINGS

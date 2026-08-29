@@ -1,15 +1,15 @@
-"""Unit tests for complex date utility functions in core/tools/dates.py."""
+"""Unit tests for complex date utility functions in core/tools/tasks/scheduling.py."""
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from lagniappe.core.tools import dates
+from lagniappe.core.tools import dates as generic_dates
+from lagniappe.core.tools.tasks import scheduling as dates
 
 
-# @features dates
-# @dimensions ordinal-weekday
+# @pair dates:ordinal-weekday
 @pytest.mark.unit
 def test_find_ordinal_weekday_in_month():
     """Test finding nth weekday or last weekday in a month."""
@@ -33,8 +33,7 @@ def test_find_ordinal_weekday_in_month():
     assert dates.find_ordinal_weekday_in_month(month_start, 5, 1) is None
 
 
-# @features dates
-# @dimensions monthly-occurrence
+# @pair dates:monthly-occurrence
 @pytest.mark.unit
 def test_calculate_next_monthly_occurrence():
     """Test monthly occurrence calculation with various modes."""
@@ -85,8 +84,7 @@ def test_calculate_next_monthly_occurrence():
     )
 
 
-# @features dates
-# @dimensions yearly-occurrence
+# @pair dates:yearly-occurrence
 @pytest.mark.unit
 def test_calculate_next_yearly_occurrence():
     """Test yearly occurrence calculation."""
@@ -95,7 +93,7 @@ def test_calculate_next_yearly_occurrence():
     tz = ZoneInfo("UTC")
     due_date = datetime(2025, 6, 18, tzinfo=tz)
 
-    with patch("lagniappe.core.tools.dates.user_timezone", return_value=tz):
+    with patch("lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz):
         # August 15, 2025
         sched = {"type": "specific_day", "month": 8, "day": 15}
         assert dates.calculate_next_yearly_occurrence(due_date, sched) == datetime(
@@ -116,8 +114,7 @@ def test_calculate_next_yearly_occurrence():
         )
 
 
-# @features dates
-# @dimensions postponement
+# @pair dates:postponement
 @pytest.mark.unit
 def test_calculate_postponed_due_date():
     """Test postponement calculation relative to mocked today."""
@@ -127,8 +124,8 @@ def test_calculate_postponed_due_date():
     # Wednesday June 18, 2025
     mock_now = datetime(2025, 6, 18, 10, 0, 0, tzinfo=tz)
 
-    with patch("lagniappe.core.tools.dates.user_timezone", return_value=tz):
-        with patch("lagniappe.core.tools.dates.datetime") as mock_datetime:
+    with patch("lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz):
+        with patch("lagniappe.core.tools.tasks.scheduling.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
             # Mock strptime/timedelta/etc if needed, but dates.py uses them from the original datetime module
             # Let's ensure mock_datetime has the same attributes as the real datetime class
@@ -185,13 +182,12 @@ def test_calculate_postponed_due_date():
                 ) == mock_now + dates.timedelta(days=5 + offset)
 
 
-# @features template-formatting
-# @dimensions date input-value blank-value string-passthrough
+# @matrix template-formatting : blank-value date input-value string-passthrough
 @pytest.mark.unit
 def test_format_date_as_input_string():
-    assert dates.format_date_as_input_string(None) == ""
-    assert dates.format_date_as_input_string("") == ""
-    assert dates.format_date_as_input_string("2026-07-13") == "2026-07-13"
-    assert dates.format_date_as_input_string(datetime(2026, 7, 13, 18, 30)) == (
+    assert generic_dates.format_date_as_input_string(None) == ""
+    assert generic_dates.format_date_as_input_string("") == ""
+    assert generic_dates.format_date_as_input_string("2026-07-13") == "2026-07-13"
+    assert generic_dates.format_date_as_input_string(datetime(2026, 7, 13, 18, 30)) == (
         "2026-07-13"
     )

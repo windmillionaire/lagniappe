@@ -16,8 +16,7 @@ function isRecord(value) {
 /**
  * @testable true
  * @tests tests_js/test_021_browser_protocol.py::test_connectivity_messages_are_versioned_and_validated
- * @features browser-protocol
- * @dimensions connectivity validation
+ * @matrix browser-protocol : connectivity validation
  */
 export function validateConnectivityState(state) {
 	if (!isRecord(state)) return false;
@@ -33,8 +32,7 @@ export function validateConnectivityState(state) {
  * @testable true
  * @tests tests_js/test_021_browser_protocol.py::test_browser_protocol_contains_only_connectivity_messages
  * @tests tests_js/test_021_browser_protocol.py::test_connectivity_messages_are_versioned_and_validated
- * @features browser-protocol
- * @dimensions connectivity-only connectivity producer version envelope
+ * @matrix browser-protocol : connectivity connectivity-only envelope producer version
  */
 export function connectivityMessage(state) {
 	if (!validateConnectivityState(state)) {

@@ -9,17 +9,18 @@ from ..properties import (
     common_related,
     form_submission,
     page_assets,
+    page_public,
     page_related,
 )
-from ..tools import database, utility
-from ..tools.user_context import current_context_user
+from lagniappe.core.tools.database import get as database_get
+from ..tools.auth.context import current_context_user
+from ..tools.tasks.ordering import sort_tasks
 from .entity import Entity
 
 
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_to_cache_public_user
-# @features page, cache
-# @dimensions public-user
+# @matrix cache page : public-user
 class Page(AssetMixin, SubmitterMixin, Entity):
     entity_kind = "page"
 
@@ -36,6 +37,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             "assets",
             "schema_version",
             "deferred_job",
+            "public_settings",
         }
         return frozenset(exclude)
 
@@ -68,8 +70,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_user_page_permissions_follow_users_only_or_attached_categories
     # @tests tests_unit/test_009f_page_view_access.py::test_user_page_uses_users_permissions_not_models_permissions
-    # @features permissions users
-    # @dimensions user-page models-scope users-scope
+    # @matrix page permissions users : models-scope user-page users-scope
     @property
     def required(self):
         required = []
@@ -98,8 +99,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_008_page_properties.py::test_page_details
     # @tests tests_unit/test_008_page_properties.py::test_page_attributes
-    # @features page
-    # @dimensions details, parent, kind, inheritance
+    # @matrix page : details inheritance kind parent
     def _get_properties(self):
         properties = super()._get_properties()
         properties.update(
@@ -114,8 +114,9 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 "document": common_assets.Document,
                 "attributes": common_entity.Attributes,
                 "image": page_assets.Image,
-                "is_public": common_entity.IsPublic,
+                "is_public": page_public.PageIsPublic,
                 "public_id": common_entity.PublicID,
+                "public_settings": page_public.PublicSettings,
                 "submission": form_submission.FormSubmission,
                 "deferred_job": common_entity.DeferredJobReference,
                 "restricted_to": common_entity.RestrictedTo,
@@ -125,13 +126,11 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_tasks_filtered_by_task_allowed
-    # @features page, task, permissions
-    # @dimensions task-visibility, restricted-access
+    # @matrix page permissions task : restricted-access task-visibility
     def _load_tasks(self):
-        results = database.get.page_tasks(self)
+        results = database_get.page_tasks(self)
         entities = {
-            e.key: e
-            for e in Entities.fetch(*results, self, request=Fetch.direct())
+            e.key: e for e in Entities.fetch(*results, self, request=Fetch.direct())
         }
 
         tasks = [
@@ -142,7 +141,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
         self._completed = [t for t in tasks if t.completed]
         self._completed.sort(key=lambda x: x.modified, reverse=True)
-        self._tasks = utility.sort_tasks([t for t in tasks if not t.completed])
+        self._tasks = sort_tasks([t for t in tasks if not t.completed])
 
     @property
     def tasks(self):
@@ -161,21 +160,18 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
     # @tests tests_unit/test_009b_user_permissions.py::test_privileged_user_rows_are_owner_managed
-    # @pairs page:restricted-access page:group-match
-    # @pairs admin:privileged-account admin:page owner:owner-only
+    # @tests tests_unit/test_009f_page_view_access.py::test_page_view_does_not_require_loaded_owner
+    # @matrix admin : page privileged-account
+    # @matrix page : group-match restricted-access view-owner-short-circuit
+    # @pair owner:owner-only
     def allowed(self, action, user=None):
         user = current_context_user(user)
         if self.restricted_access(user):
             return False
-        target_user = self.user
-        if (
-            target_user
-            and target_user.is_admin
-            and user
-            and not user.is_owner
-            and action.value > Action.VIEW.value
-        ):
-            return False
+        if action.value > Action.VIEW.value:
+            target_user = self.user
+            if target_user and target_user.is_admin and user and not user.is_owner:
+                return False
         return super().allowed(action, user=user)
 
     # @testable true
@@ -183,8 +179,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_009f_page_view_access.py::test_page_view_access_returns_attached_groups
     # @tests tests_unit/test_009f_page_view_access.py::test_page_view_access_from_group_views
     # @tests tests_unit/test_009f_page_view_access.py::test_user_page_uses_users_permissions_not_models_permissions
-    # @features page
-    # @dimensions view-access, owner, attached-groups, group-views, db-load, user-page
+    # @matrix page permissions users : attached-groups db-load group-views owner user-page view-access
     @property
     def view_access(self):
         if "owner" in self.properties.restricted_to.stored:
@@ -193,7 +188,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             return self.groups
         else:
             return Entities.fetch(
-                *database.get.group_view_access(self.required),
+                *database_get.group_view_access(self.required),
                 request=Fetch.direct(),
             )
 
@@ -208,8 +203,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_008_page_properties.py::test_page_update_tracks_old_and_current_category_owners_for_save
-    # @features page, category
-    # @dimensions save-relations
+    # @matrix category page : save-relations
     @property
     def page_list_owners(self):
         owners = [self.user, self.model, *self.categories]
@@ -228,8 +222,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_008_page_properties.py::test_page_update_tracks_old_and_current_category_owners_for_save
     # @tests tests_unit/test_008_page_properties.py::test_page_update_keeps_current_user_before_page_without_dependency_cycle
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_select_includes_form_from_created_page
-    # @features page, category, filters
-    # @dimensions form-registration, related-forms, save-relations
+    # @matrix category filters page : form-registration related-forms save-relations
     def update(self, data):
         previous_owners = self.page_list_owners
 
@@ -280,8 +273,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_008_page_properties.py::test_page_update_defaults_empty_category_state_to_uncategorized
-    # @features page
-    # @dimensions default-category
+    # @pair page:default-category
     def _ensure_category(self):
         if not self.model and not self.categories:
             self.model = Entities.CATEGORY.get_uncategorized_pages()
@@ -290,13 +282,9 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_009a_user.py::test_page_update_user_authorization_rules
     # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
     # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
-    # @pairs user-settings:email-edit user-settings:ai-access user-settings:owner-own-page
-    # @pairs user-settings:owner-other-page user-settings:page-preservation
-    # @pairs user-settings:page-reassign user-settings:page-remove
-    # @pairs notification-email:preference notification-email:user-only
-    # @pair public-users:email-consent
-    # @pair cache:invalidation-acknowledgement
-    # @pair permissions:permission-recalc
+    # @matrix notification-email : preference user-only
+    # @matrix user-settings : ai-access email-edit owner-other-page owner-own-page page-preservation page-reassign page-remove
+    # @pairs cache:invalidation-acknowledgement permissions:permission-recalc public-users:email-consent
     def update_user(self, data, user=None):
         user = current_context_user(user)
         target_user = self.user
@@ -372,10 +360,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         }
         if inbound_toggles:
             if not (
-                is_owner_viewer
-                and is_own_page
-                and target_user
-                and target_user.is_owner
+                is_owner_viewer and is_own_page and target_user and target_user.is_owner
             ):
                 raise PermissionError(
                     "Only the owner can change their inbound collaboration settings."
@@ -418,8 +403,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_user_page_default_form_submission_keeps_email_on_user
-    # @features user-settings
-    # @dimensions default-form email-canonical submission-preservation
+    # @matrix user-settings : default-form email-canonical submission-preservation
     def save_submission(self):
         super().save_submission()
         self._sync_default_user_form_email()

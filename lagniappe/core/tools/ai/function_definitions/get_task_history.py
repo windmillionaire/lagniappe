@@ -45,8 +45,7 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_task_history_returns_dates_submissions_and_files
-# @features ai tasks
-# @dimensions task-history tool-context files
+# @matrix ai tasks : files task-history tool-context
 def execute_get_task_history(args, user):
     task_id = args.get("task_id") or args.get("id")
     if not task_id:

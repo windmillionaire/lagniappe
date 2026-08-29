@@ -2,9 +2,12 @@ from urllib.parse import urlencode, urlparse
 
 from ..definitions import Fetch, FieldType, FilterOptions, Ordering
 from ..entities import Entities
-from ..exceptions import ValidationError, capture
+from ..exceptions import ValidationError
 from ..mixins import AIMixin, ColumnMixin, FilterMixin
-from ..tools import external, files, location, utility
+from ..tools.files.downloads import download_image, downloaded_image_file
+from ..tools.files.find_page import find_page
+from ..tools.links import metadata as external
+from ..tools.services import places as location
 from .base_schema import SchemaProperty
 
 MAPS_SEARCH_URL = "https://www.google.com/maps/search/"
@@ -61,8 +64,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_external_link_column
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_internal_link_column
     # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_internal_link_missing_target_clears_value
-    # @features link
-    # @dimensions row-submission, external, internal, entity-resolution, metadata, stale-target
+    # @matrix link submission : entity-resolution external internal metadata row-submission stale-target
     @property
     def value(self):
         return super().value
@@ -114,8 +116,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_exact_match
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_fuzzy_match_warning
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_no_match_records_error
-    # @features link
-    # @dimensions import, external, internal, fuzzy-match, no-match
+    # @matrix link submission : entity-resolution external fuzzy-match import internal no-match weak-match
     def validate_import(self, value):
         try:
             if self["location"] == "in":
@@ -137,7 +138,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
             self.value = None
             return False
 
-        match = files.find_page(value, fuzzy=self.fuzzy_match, error_label=self.label)
+        match = find_page(value, fuzzy=self.fuzzy_match, error_label=self.label)
         self.warnings.extend(match["warnings"])
         if match["id"]:
             self.value = match["id"]
@@ -150,8 +151,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @testable true
     # @tests tests_unit/test_004d_submitter.py::test_ai_submission_internal_link_plaintext_resolves
     # @tests tests_unit/test_004d_submitter.py::test_ai_submission_internal_link_falls_back_to_value_setter
-    # @features submission link
-    # @dimensions ai-value internal entity-resolution fallback
+    # @matrix link submission : ai-value entity-resolution fallback internal
     def validate_ai(self, value):
         try:
             if self["location"] == "in":
@@ -188,8 +188,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # AI Attributes
     # @testable true
     # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_link_external
-    # @features link
-    # @dimensions ai-value
+    # @pair link:ai-value
     @property
     def ai_value(self):
         return self.value
@@ -200,8 +199,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
 
     # @testable true
     # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_link_external
-    # @features link
-    # @dimensions filter-value
+    # @pair link:filter-value
     @property
     def filter_value(self):
         if not self.value:
@@ -252,8 +250,7 @@ class Bookmark(Link):
     # Property Attributes
     # @testable true
     # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_bookmark
-    # @features bookmark
-    # @dimensions ai-value, filter-value
+    # @matrix bookmark : ai-value filter-value
     @property
     def value(self):
         return super().value or {}
@@ -272,8 +269,7 @@ class Bookmark(Link):
     # Submission Attributes
     # @testable true
     # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_bookmark_replace_flags_update_entity_fields
-    # @features bookmark
-    # @dimensions replace-fields, side-effects
+    # @matrix bookmark : replace-fields side-effects
     def validate_submission(self, value=None):
         if value is None:
             self._value = value
@@ -290,15 +286,10 @@ class Bookmark(Link):
 
         metadata = external.get_bookmark_metadata(value)
         if value.get("replace-image") and metadata.get("image"):
-            try:
-                image = utility.download_image(metadata["image"])
-                if image["success"]:
-                    self.entity.save_asset(image["file"], self.id, "image")
-            except Exception as e:
-                self.warnings.append(f"Error downloading image: {e}")
-                capture(
-                    e, {"function": "utility.download_image", "url": metadata["image"]}
-                )
+            result = download_image(metadata["image"])
+            image = downloaded_image_file(result)
+            if image is not None:
+                self.entity.save_asset(image, self.id, "image")
 
         if value.get("replace-name"):
             self.entity.name = metadata.get("name")
@@ -423,8 +414,8 @@ class Location(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @tests tests_unit/test_003d_submission_location.py::test_location_place_value_preserves_address2
     # @tests tests_unit/test_003d_submission_location.py::test_location_free_text_value_preserves_address2
     # @tests tests_unit/test_003d_submission_location.py::test_location_same_id_updates_address2_without_refetch
-    # @features location
-    # @dimensions address2, free-text, no-refetch
+    # @tests tests_unit/test_003d_submission_location.py::test_location_place_detail_failure_falls_back_to_submitted_text
+    # @matrix location : address2 fallback free-text no-refetch provider-failure warnings
     @property
     def value(self):
         return super().value
@@ -455,6 +446,19 @@ class Location(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
         else:
             place = self._normalize_place(location.get_place_details(google_id))
 
+        if not place:
+            fallback = self._clean_text(value.get("address") or value.get("name"))
+            if fallback:
+                place = {"address": fallback, "name": fallback}
+                self.warnings.append(
+                    "Place details were unavailable; stored the submitted location "
+                    "as text."
+                )
+            else:
+                self.warnings.append(
+                    "Place details were unavailable and no location text was supplied."
+                )
+
         if place and address2:
             place["address2"] = address2
 
@@ -469,8 +473,7 @@ class Location(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # Ingress Attributes
     # @testable true
     # @tests tests_unit/test_003d_submission_location.py::test_location_validate_ai_fallback
-    # @features location
-    # @dimensions fallback, warnings
+    # @matrix location : fallback warnings
     def validate_ai(self, value):
         """Validate AI-submitted location (string or dict)."""
         place = (
@@ -497,8 +500,7 @@ class Location(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @testable true
     # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_location
     # @tests tests_unit/test_003d_submission_location.py::test_location_validate_import_fallback
-    # @features location
-    # @dimensions import, fallback
+    # @matrix location : fallback import
     def validate_import(self, value):
         try:
             if value is None or (isinstance(value, str) and not value.strip()):
@@ -525,8 +527,7 @@ class Location(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @tests tests_unit/test_003d_submission_location.py::test_location_address_only_value_and_column
     # @tests tests_unit/test_003d_submission_location.py::test_location_place_value_preserves_address2
     # @tests tests_unit/test_003d_submission_location.py::test_location_free_text_value_preserves_address2
-    # @features location
-    # @dimensions column
+    # @pair location:column
     @property
     def column_value(self):
         if not self.value:
@@ -553,8 +554,7 @@ class Location(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @testable true
     # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_location
     # @tests tests_unit/test_003d_submission_location.py::test_location_place_value_preserves_address2
-    # @features location
-    # @dimensions filter-value
+    # @pair location:filter-value
     @property
     def filter_value(self):
         if not self.value:
@@ -565,8 +565,7 @@ class Location(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @testable true
     # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_location
     # @tests tests_unit/test_003d_submission_location.py::test_location_place_value_preserves_address2
-    # @features location
-    # @dimensions ai-value
+    # @pair location:ai-value
     @property
     def ai_value(self):
         if not self.value:

@@ -10,8 +10,7 @@ import { withTransition } from "../../shared/utilities";
  * @tests tests_js/test_015_core_submit_frontend.py::test_submit_does_not_show_upload_error_after_stale_prepare
  * @tests tests_js/test_015_core_submit_frontend.py::test_submit_stops_before_appending_when_form_data_is_missing
  * @tests tests_js/test_015_core_submit_frontend.py::test_submit_uses_explicit_action_route_over_active_widget_route
- * @features submit
- * @dimensions stale-widget direct-upload-navigation direct-upload-error missing-form-data route-override active-widget
+ * @matrix submit : active-widget direct-upload-error direct-upload-navigation missing-form-data route-override stale-widget
  */
 export class SubmissionManager {
 	constructor(view) {
@@ -215,8 +214,9 @@ export class SubmissionManager {
 	 * @testable true
 	 * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 	 * @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_submit_marks_form_successful
-	 * @features pages
-	 * @dimensions deferred-submit
+	 * @tests tests_js/test_015_core_submit_frontend.py::test_deferred_background_create_does_not_decorate_source_form
+	 * @matrix deferred-jobs submit : background deferred-create destination-row
+	 * @pairs deferred-jobs:hosted-e2e pages:deferred-submit
 	 */
 	async _deferredCreated(response, component) {
 		const [operations, notifications] = await Promise.all([
@@ -255,10 +255,9 @@ export class SubmissionManager {
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 	 * @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
-	 * @pairs pages:autofill pages:deferred tasks:autofill tasks:deferred
-	 * @pairs notifications:autofill notifications:deferred
-	 * @pairs deferred-jobs:refresh deferred-jobs:form-schema
-	 * @pairs pages:refresh pages:form-schema
+	 * @matrix deferred-jobs : form-schema refresh
+	 * @matrix notifications tasks : autofill deferred
+	 * @matrix pages : autofill deferred form-schema refresh
 	 */
 	async _deferredUpdated(response, component) {
 		if (response.locked) {

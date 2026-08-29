@@ -1,12 +1,3 @@
-"""
-Tests for user settings and preferences.
-
-Tests user page, profile updates, and application settings.
-Verified against:
-- lagniappe/templates/pages/page.html (user page variant)
-- src/script/views/page.mjs
-"""
-
 import json
 import re
 from pathlib import Path
@@ -23,7 +14,9 @@ from config import SETTINGS, recovery
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI, Action, Fetch, General, Levels, Site
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import site as site_database
+from lagniappe.core.tools.email.notifications.links import absolute_url
 from testing.definitions import Categories, Groups, SitePages, Submissions, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import HomePage, Page
@@ -43,7 +36,6 @@ pytestmark = pytest.mark.e2e
 
 
 def _open_user_settings(user, user_page):
-    """Open the user settings subpanel from the page Info tab."""
     toggle = user.locate(user_page.USER_SETTINGS_TOGGLE).first
     expect(toggle).to_be_visible()
     toggle.click()
@@ -257,9 +249,7 @@ def _select_deployment_option(user, form, field_name, option_name):
 
 
 def _select_ai_option(user, form, field_name, option_value):
-    select = form.locator(
-        f"[data-role='ai-select']:has(select[name='{field_name}'])"
-    )
+    select = form.locator(f"[data-role='ai-select']:has(select[name='{field_name}'])")
     option_name = select.locator(
         f"select option[value='{option_value}']"
     ).text_content()
@@ -339,13 +329,31 @@ def _session_page_key(user):
     return serializer.loads(cookie["value"])[CONFIG.LOGIN_USER_PAGE_KEY]
 
 
-# @pairs user-settings:personal-page user-settings:readonly-email
-# @pairs user-settings:sign-out user-settings:group-selector-hidden
-# @pair user-settings:field-order
-# @pairs notification-email:user-setting notification-email:default-daily
+def _acknowledge_user_cache_invalidation(user, destination=None):
+    """Consume a permission mutation through the browser-owned protocol."""
+    assert Entities.USER.load(user.email).invalidate_cache is True
+    destination = destination or SitePages.HOME.get(user).url
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: (
+            response.url.endswith("/l/validate-user")
+            and response.request.method == "POST"
+        ),
+    ) as validation_info:
+        response = user.navigate(destination)
+
+    validation = validation_info.value
+    assert validation.status == 200
+    assert validation.json()["cacheCleared"] is True
+    user.entity = Entities.USER.load(user.email)
+    assert user.entity.invalidate_cache is False
+    return response
+
+
+# @matrix notification-email : default-daily user-setting
+# @matrix user-settings : field-order group-selector-hidden personal-page readonly-email sign-out
 # @template pages/info.html::user_settings
 def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
-    """A signed-in user can open settings from their personal page."""
     owner = get_user(Users.OWNER)
     user = get_user(Users.create_user, creator=owner)
     user.go(SitePages.HOME)
@@ -375,9 +383,7 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     )
     expect(notification_options).to_have_count(3)
     expect(
-        settings_panel.locator(
-            "input[name='notification_email_mode'][value='DAILY']"
-        )
+        settings_panel.locator("input[name='notification_email_mode'][value='DAILY']")
     ).to_be_checked()
     expect(
         settings_panel.locator("fieldset[data-role='notification-email']")
@@ -420,9 +426,7 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     )
 
 
-# @pairs user-settings:owner-own-page user-settings:readonly-email
-# @pairs user-settings:sign-out user-settings:group-selector-hidden
-# @pair user-settings:field-order
+# @matrix user-settings : field-order group-selector-hidden owner-own-page readonly-email sign-out
 # @pair notification-email:default-daily
 # @template pages/info.html::user_settings
 def test_owner_settings_hides_group_selector_on_own_page(get_user):
@@ -450,9 +454,7 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
         settings_panel.locator("input[name='notification_email_mode']")
     ).to_have_count(3)
     expect(
-        settings_panel.locator(
-            "input[name='notification_email_mode'][value='DAILY']"
-        )
+        settings_panel.locator("input[name='notification_email_mode'][value='DAILY']")
     ).to_be_checked()
     assert _user_settings_field_order(settings_panel) == [
         "name",
@@ -468,10 +470,8 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(controls.locator(Buttons.LP_CLOSE)).to_be_visible()
 
 
-# @pairs public-users:own-page public-users:file-photo-gates
-# @pair user-settings:field-order
-# @pair notification-email:public-user
-# @pair public-users:email-consent
+# @matrix public-users : email-consent file-photo-gates own-page
+# @pairs notification-email:public-user user-settings:field-order
 # @template pages/page.html::main
 # @template pages/info.html::user_settings
 def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user):
@@ -523,8 +523,7 @@ def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user)
     assert Entities.USER.load(scenario.entity.email).allow_site_email is True
 
 
-# @features sync
-# @dimensions document
+# @pair sync:document
 # @template pages/document.html::document_tab
 def test_public_user_edits_document_without_ai_or_image_tools(limited_public_user):
     scenario = limited_public_user
@@ -556,8 +555,7 @@ def test_public_user_edits_document_without_ai_or_image_tools(limited_public_use
     user.page.keyboard.press("Escape")
 
 
-# @features tasks
-# @dimensions create
+# @pair tasks:create
 # @template pages/tasks.html::action_buttons
 def test_public_user_creates_task_with_reduced_schedule_options(limited_public_user):
     scenario = limited_public_user
@@ -609,8 +607,7 @@ def _assert_routes_forbidden(user, routes, browser_failures):
         assert result["status"] == 403, f"{method} {path}: {result}"
 
 
-# @features public-users
-# @dimensions metered-actions restriction-gate
+# @matrix public-users : metered-actions restriction-gate
 def test_public_user_ai_actions_are_forbidden(limited_public_user, browser_failures):
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
@@ -660,7 +657,7 @@ def test_public_user_ai_actions_are_forbidden(limited_public_user, browser_failu
     )
 
 
-# @pairs ai:batch-summary ai:access-gate ai:provider-boundary
+# @matrix ai : access-gate batch-summary provider-boundary
 def test_page_editor_without_ai_create_is_rejected_before_batch_summary(
     get_user,
     browser_failures,
@@ -697,8 +694,7 @@ def test_page_editor_without_ai_create_is_rejected_before_batch_summary(
     assert result == 403
 
 
-# @features public-users
-# @dimensions file-photo-gates restriction-gate
+# @matrix public-users : file-photo-gates restriction-gate
 def test_public_user_file_and_photo_actions_are_forbidden(
     limited_public_user, browser_failures
 ):
@@ -723,8 +719,7 @@ def test_public_user_file_and_photo_actions_are_forbidden(
     )
 
 
-# @features public-users
-# @dimensions attribute-preservation ai-schedule-guard restriction-gate
+# @matrix public-users : ai-schedule-guard attribute-preservation restriction-gate
 def test_public_user_restricted_schedules_are_forbidden(
     limited_public_user, browser_failures
 ):
@@ -792,14 +787,8 @@ def test_public_user_restricted_schedules_are_forbidden(
     )
 
 
-# @pair user-settings:owner-other-page
-# @pair user-settings:editable-email
-# @pair user-settings:group-selector
-# @pair user-settings:edit-groups
-# @pair user-settings:ai-access
-# @pair user-settings:field-order
-# @pair cache:invalidation-acknowledgement
-# @pair notification-email:user-only
+# @matrix user-settings : ai-access edit-groups editable-email field-order group-selector owner-other-page
+# @pairs cache:invalidation-acknowledgement notification-email:user-only
 # @template pages/info.html::user_settings
 def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     owner = get_user(Users.OWNER)
@@ -900,12 +889,9 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     expect(created_user.page).to_have_title("Home")
 
 
-# @pair user-settings:group-selector
-# @pair user-settings:preload
-# @pair user-settings:relation-loading
+# @matrix user-settings : group-selector preload relation-loading
 # @template pages/info.html::user_settings
 def test_user_settings_preloads_existing_groups(get_user):
-    """The group selector shows every group already assigned to the user."""
     owner = get_user(Users.OWNER)
     created_user = get_user(Users.user_settings_group_preload, creator=owner)
     first_group = Groups.general_users_view_only.get(owner)
@@ -932,9 +918,7 @@ def test_user_settings_preloads_existing_groups(get_user):
     expect(selected_options).to_have_count(len(expected_group_ids))
     for group_id in expected_group_ids:
         expect(
-            groups.locator(
-                f"select[name='group'] option[value='{group_id}']:checked"
-            )
+            groups.locator(f"select[name='group'] option[value='{group_id}']:checked")
         ).to_have_count(1)
     for group_name in (
         first_group.definition.name,
@@ -945,11 +929,8 @@ def test_user_settings_preloads_existing_groups(get_user):
         )
 
 
-# @pair user-settings:owner-other-page
-# @pair user-settings:page-reassign
-# @pair user-settings:page-remove
-# @pair cache:invalidation-acknowledgement
-# @pair auth:canonical-page
+# @matrix user-settings : owner-other-page page-reassign page-remove
+# @pairs auth:canonical-page cache:invalidation-acknowledgement
 # @template pages/info.html::user_settings
 def test_owner_can_reassign_and_remove_user_from_page(get_user):
     owner = get_user(Users.OWNER)
@@ -1024,8 +1005,7 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
     assert _session_page_key(created_user) == replacement_page.urlsafe_key
 
 
-# @pairs user-settings:submit-boundary user-settings:attached-form
-# @pairs user-settings:categories user-settings:restrictions
+# @matrix user-settings : attached-form categories restrictions submit-boundary
 # @pair cache:invalidation-acknowledgement
 def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     owner = get_user(Users.OWNER)
@@ -1156,46 +1136,55 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     user_page.submit_and_verify_submission(updated_submission)
 
 
-# @features admin
-# @dimensions site-settings admin-only route page-load
+# @matrix admin : admin-only page-load route site-settings
+# @pair cache:invalidation-acknowledgement
 # @template home/admin.html::main
 def test_site_settings_requires_administrator(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    user = get_user(Users.create_user, creator=owner)
+    suffix = uuid4().hex
+    user = get_user(
+        UserDefinition(
+            name=f"Temporary Administrator {suffix[:8]}",
+            email=f"temporary-administrator-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
 
-    # Owner: admin settings page is available.
     admin = owner.go(SitePages.ADMIN)
     expect(owner.locate(admin.SITE_SETTINGS_FORM)).to_be_visible()
 
-    # Non-owner: direct route is forbidden.
     admin_url = f"{SETTINGS.test_config['BASE_URL'].rstrip('/')}/admin"
     with browser_failures.expect_http_error(user, status=403, path=admin_url):
-        response = user.page.goto(
-            admin_url,
-            wait_until="domcontentloaded",
-        )
-    assert response.status == 403
+        user.navigate(admin_url)
+    expect(user.locate(admin.SITE_SETTINGS_FORM)).to_have_count(0)
 
     user.entity.is_admin = True
     user.entity.save()
     try:
-        response = user.page.goto(admin_url, wait_until="domcontentloaded")
-        assert response.status == 200
-        expect(user.locate("[data-widget='SiteSettings']")).to_be_visible()
+        _acknowledge_user_cache_invalidation(user)
+        admin = user.go(SitePages.ADMIN)
+        expect(user.locate(admin.SITE_SETTINGS_FORM)).to_be_visible()
     finally:
+        user.entity = Entities.USER.load(user.email)
         user.entity.is_admin = False
         user.entity.save()
+        _acknowledge_user_cache_invalidation(user)
 
 
-# @pairs admin:roster admin:managed-user-search admin:promotion admin:demotion
-# @pairs admin:read-only admin:privileged-account admin:responsive admin:failure-state
-# @pairs admin:managed-users admin:account-preservation admin:owner-only
-# @pairs owner:role-controls owner:awaiting-first-sign-in owner:owner-only
-# @pair cache:cache-invalidation
+# @matrix admin : account-preservation confirmation-modal demotion failure-state managed-user-search managed-users owner-only privileged-account promotion read-only responsive roster
+# @matrix cache : cache-invalidation invalidation-acknowledgement
+# @matrix owner : awaiting-first-sign-in owner-only role-controls
 # @template home/site_settings.html::site_settings
 def test_site_administrator_roster_and_owner_controls(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    managed = get_user(Users.create_user, creator=owner)
+    suffix = uuid4().hex
+    managed = get_user(
+        UserDefinition(
+            name=f"Administrator Roster User {suffix[:8]}",
+            email=f"administrator-roster-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
     _, settings_panel = _open_owner_site_settings(owner)
     section = _open_site_settings_section(settings_panel, "administrators")
     form = section.locator("[data-role='administrator-form']")
@@ -1224,41 +1213,38 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
         managed.entity.page.urlsafe_key
     )
     with owner.page.expect_response(
-        lambda response: response.url.endswith("/l/site-administrators")
-        and response.request.method == "POST"
+        lambda response: (
+            response.url.endswith("/l/site-administrators")
+            and response.request.method == "POST"
+        )
     ) as promotion:
         submit.click()
     assert promotion.value.status == 200
     expect(roster).to_contain_text(managed.email)
-    promoted = Entities.USER(database.get.user(managed.email))
+    promoted = Entities.USER(database_get.user(managed.email))
     assert promoted.is_admin
     assert promoted.invalidate_cache
     assert not promoted.is_owner
 
     admin_url = f"{SETTINGS.test_config['BASE_URL'].rstrip('/')}/admin"
-    response = managed.page.goto(admin_url, wait_until="domcontentloaded")
+    managed.entity = promoted
+    response = _acknowledge_user_cache_invalidation(managed, admin_url)
     assert response.status == 200
     expect(managed.locate("button[data-role='configuration']")).to_have_count(0)
     admin_section = _open_site_settings_section(
         managed.locate("[data-widget='SiteSettings']"), "administrators"
     )
-    expect(
-        admin_section.locator("[data-role='administrator-form']")
-    ).to_have_attribute("data-visible", "false")
-    expect(
-        admin_section.locator("[data-role='demote-administrator']")
-    ).to_have_count(0)
+    expect(admin_section.locator("[data-role='administrator-form']")).to_have_attribute(
+        "data-visible", "false"
+    )
+    expect(admin_section.locator("[data-role='demote-administrator']")).to_have_count(0)
 
     protected_path = f"/users/{owner.entity.urlsafe_key}/delete"
-    with browser_failures.expect_http_error(
-        managed, status=403, path=protected_path
-    ):
+    with browser_failures.expect_http_error(managed, status=403, path=protected_path):
         protected_delete = _fetch_status(managed, protected_path, "DELETE")
     assert protected_delete["status"] == 403
     self_demote_path = f"/l/site-administrators/{managed.entity.urlsafe_key}"
-    with browser_failures.expect_http_error(
-        managed, status=403, path=self_demote_path
-    ):
+    with browser_failures.expect_http_error(managed, status=403, path=self_demote_path):
         self_demote = _fetch_status(managed, self_demote_path, "DELETE")
     assert self_demote["status"] == 403
 
@@ -1266,32 +1252,61 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
         f"[data-role='administrator']:has(button[data-key='{managed.entity.urlsafe_key}'])"
     )
     expect(administrator_row).to_have_class(re.compile(r".*\bsm:flex-row\b.*"))
-    owner.page.once("dialog", lambda dialog: dialog.accept())
+    demote_button = administrator_row.locator(
+        "[data-role='demote-administrator']"
+    )
+    demote_button.click()
+    modal = owner.locate("#modal")
+    expect(modal).to_be_visible()
+    expect(
+        modal.get_by_role("heading", name="Remove Administrator", exact=True)
+    ).to_be_visible()
+    expect(modal).to_contain_text(
+        f"Remove Administrator access from {managed.entity.name}?"
+    )
+    expect(modal).to_contain_text("Their account and content will be kept.")
+    modal.get_by_role("button", name="Cancel").click()
+    expect(modal).not_to_be_attached()
+    expect(administrator_row).to_contain_text(managed.email)
+    assert Entities.USER(database_get.user(managed.email)).is_admin
+
+    demote_button.click()
+    modal = owner.locate("#modal")
+    expect(modal).to_be_visible()
     with owner.page.expect_response(
-        lambda response: response.url.endswith(
-            f"/l/site-administrators/{managed.entity.urlsafe_key}"
+        lambda response: (
+            response.url.endswith(
+                f"/l/site-administrators/{managed.entity.urlsafe_key}"
+            )
+            and response.request.method == "DELETE"
         )
-        and response.request.method == "DELETE"
     ) as demotion:
-        administrator_row.locator("[data-role='demote-administrator']").click()
+        modal.get_by_role("button", name="Remove Administrator").click()
     assert demotion.value.status == 200
+    expect(modal).not_to_be_attached()
     expect(roster).not_to_contain_text(managed.email)
-    demoted = Entities.USER(database.get.user(managed.email))
+    demoted = Entities.USER(database_get.user(managed.email))
     assert not demoted.is_admin
     assert demoted.invalidate_cache
+    managed.entity = demoted
 
     with browser_failures.expect_http_error(managed, status=403, path=admin_url):
-        response = managed.page.goto(admin_url, wait_until="domcontentloaded")
+        response = _acknowledge_user_cache_invalidation(managed, admin_url)
     assert response.status == 403
 
 
-# @pairs admin:site-settings export:admin-only owner:sensitive-configuration
-# @pairs owner:recovery-export owner:route-gate owner:configuration
-def test_additional_admin_cannot_access_owner_configuration(
-    get_user, browser_failures
-):
+# @matrix owner : configuration recovery-export route-gate sensitive-configuration
+# @pair admin:site-settings
+def test_additional_admin_cannot_access_owner_configuration(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    administrator = get_user(Users.create_user, creator=owner)
+    suffix = uuid4().hex
+    administrator = get_user(
+        UserDefinition(
+            name=f"Restricted Administrator {suffix[:8]}",
+            email=f"restricted-administrator-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
     owner.go(SitePages.HOME)
     administrator.go(SitePages.HOME)
     promotion = _fetch_status(
@@ -1303,31 +1318,37 @@ def test_additional_admin_cannot_access_owner_configuration(
     assert promotion["status"] == 200
 
     try:
-        persisted_administrator = Entities.USER(
-            database.get.user(administrator.email)
-        )
+        persisted_administrator = Entities.USER(database_get.user(administrator.email))
         assert persisted_administrator.is_admin
+        administrator.entity = persisted_administrator
+        _acknowledge_user_cache_invalidation(administrator)
         admin = administrator.go(SitePages.ADMIN)
         settings_panel = administrator.locate(admin.SITE_SETTINGS_FORM)
         expect(settings_panel).to_be_visible()
-        expect(settings_panel.locator("button[data-role='configuration']")).to_have_count(
-            0
-        )
+        expect(
+            settings_panel.locator("button[data-role='configuration']")
+        ).to_have_count(0)
 
         site_settings = _fetch_status(administrator, "/l/site-settings", "GET")
         assert site_settings["status"] == 200
         assert site_settings["data"]["can_manage_administrators"] is False
         assert site_settings["data"]["can_view_sensitive_configuration"] is False
-        assert _fetch_status(administrator, "/l/site-export", "GET")["status"] == 200
-        assert _fetch_status(
-            administrator, "/reference/environment-variables", "GET"
-        )["status"] == 200
+        assert "installation_access" not in site_settings["data"]
+        expect(
+            settings_panel.locator(
+                "[data-role='site-settings-section'][data-section='installation-access']"
+            )
+        ).to_have_count(0)
+        assert (
+            _fetch_status(administrator, "/reference/environment-variables", "GET")[
+                "status"
+            ]
+            == 200
+        )
         with browser_failures.expect_http_error(
             administrator, status=403, path="/l/site-configuration"
         ):
-            configuration = _fetch_status(
-                administrator, "/l/site-configuration", "GET"
-            )
+            configuration = _fetch_status(administrator, "/l/site-configuration", "GET")
         assert configuration["status"] == 403
         with browser_failures.expect_http_error(
             administrator, status=403, path="/reference/download-settings"
@@ -1343,13 +1364,129 @@ def test_additional_admin_cannot_access_owner_configuration(
             "DELETE",
         )
         assert demotion["status"] == 200
+        administrator.entity = Entities.USER.load(administrator.email)
+        assert not administrator.entity.is_admin
+        _acknowledge_user_cache_invalidation(administrator)
 
 
-# @features admin
-# @dimensions site-settings sections configuration-modal environment-variables service-providers external-links
-# @pairs admin:configuration-display admin:recovery-export admin:secrets admin:web-headers
-# @pairs admin:site-settings admin:sections admin:configuration-modal
-# @pairs admin:environment-variables admin:service-providers admin:external-links
+# @matrix owner : authentication-email delegated-handoff identity-metadata provider-cleanup
+# @template home/site_settings.html::site_settings
+def test_owner_installation_access_distinguishes_handoff_from_provider_cleanup(
+    get_user,
+):
+    owner = get_user(Users.OWNER)
+    owner_email = str(getattr(CONFIG, "ADMIN_EMAIL", "") or "").strip().casefold()
+    installer_email = str(
+        getattr(CONFIG, "INSTALLER_EMAIL", "") or ""
+    ).strip().casefold()
+    deployer_email = str(
+        getattr(CONFIG, "DEPLOYER_EMAIL", "") or ""
+    ).strip().casefold()
+    bootstrap_email = str(
+        getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or ""
+    ).strip().casefold()
+    delegated = bool(
+        owner_email and installer_email and owner_email != installer_email
+    )
+    _, settings_panel = _open_owner_site_settings(owner)
+    response = _fetch_status(owner, "/l/site-settings", "GET")["data"]
+    section = _site_settings_section(settings_panel, "installation-access")
+    if not delegated:
+        expect(section).to_have_count(0)
+        assert "installation_access" not in response
+        return
+
+    expect(section).to_have_count(1)
+    access = _open_site_settings_section(settings_panel, "installation-access")
+    target = access.locator(
+        "[data-role='section-body'][data-widget='SiteInstallationAccess']"
+    )
+    application_complete = bool(
+        deployer_email == owner_email and not bootstrap_email
+    )
+    state = "application-complete" if application_complete else "pending"
+    title = (
+        "Application handoff configured"
+        if application_complete
+        else "Delegated handoff pending"
+    )
+    project_id = str(getattr(CONFIG, "GOOGLE_CLOUD_PROJECT", "") or "").strip()
+    runtime_email = str(
+        getattr(CONFIG, "RUNTIME_SERVICE_ACCOUNT_EMAIL", "") or ""
+    ).strip().casefold()
+    auth_email = getattr(CONFIG, "AUTH_EMAIL_CONFIG", None) or {}
+    if not isinstance(auth_email, dict):
+        auth_email = {}
+    auth_service = str(auth_email.get("service") or "").strip()
+    auth_sender = str(auth_email.get("senderEmail") or "").strip().casefold()
+    auth_login = str(auth_email.get("username") or "").strip().casefold()
+    installer_controls_email = bool(
+        installer_email and installer_email in {auth_sender, auth_login}
+    )
+
+    expect(target).to_have_attribute("data-state", state)
+    expect(access.locator("[data-role='status-title']")).to_have_text(
+        title
+    )
+    expect(access.locator("[data-field='owner']")).to_have_text(owner_email)
+    expect(access.locator("[data-field='installer']")).to_have_text(
+        installer_email
+    )
+    expect(access.locator("[data-field='deployer']")).to_have_text(
+        deployer_email or "None"
+    )
+    expect(access.locator("[data-field='bootstrap']")).to_have_text(
+        bootstrap_email or "None"
+    )
+    expect(access.locator("[data-field='runtime']")).to_have_text(
+        runtime_email or "None"
+    )
+    expect(access.locator("[data-field='email-service']")).to_have_text(
+        auth_service or "None"
+    )
+    expect(access.locator("[data-field='email-sender']")).to_have_text(
+        auth_sender or "None"
+    )
+    expect(access.locator("[data-field='email-login']")).to_have_text(
+        auth_login or "None"
+    )
+    handoff = access.locator("[data-role='handoff-instructions']")
+    if state == "pending":
+        expect(handoff).to_be_visible()
+        expect(handoff).to_contain_text("the installer normally runs")
+        expect(handoff.locator("code")).to_have_text("./setup.sh handoff")
+    else:
+        expect(handoff).to_be_hidden()
+    expect(access.locator("code[data-field]")).to_have_count(8)
+    email_warning = access.locator("[data-role='installer-email-warning']")
+    if installer_controls_email:
+        expect(email_warning).to_be_visible()
+    else:
+        expect(email_warning).to_be_hidden()
+    expect(access.locator("[data-role='project-iam-link']")).to_have_attribute(
+        "href",
+        f"https://console.cloud.google.com/iam-admin/iam?project={project_id}",
+    )
+
+    payload = response["installation_access"]
+    assert payload["state"] == state
+    assert payload["application_handoff_complete"] is application_complete
+    assert payload["owner_email"] == owner_email
+    assert payload["installer_email"] == installer_email
+    assert payload["deployer_email"] == deployer_email
+    assert payload["bootstrap_admin_email"] == bootstrap_email
+    assert payload["runtime_service_account"] == runtime_email
+    assert payload["authentication_email"] == {
+        "configured": bool(auth_email),
+        "service": auth_service,
+        "sender_email": auth_sender,
+        "login": auth_login,
+        "uses_installer": installer_controls_email,
+    }
+    assert "password" not in json.dumps(payload).casefold()
+
+
+# @matrix admin : configuration-display configuration-modal environment-variables external-links recovery-export secrets sections service-providers site-settings web-headers
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
 def test_site_settings_sections_expand_help_and_configuration(get_user):
@@ -1357,12 +1494,16 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     _, settings_panel = _open_owner_site_settings(owner)
 
     maintenance = _site_settings_section(settings_panel, "maintenance")
+    installation_access = _site_settings_section(
+        settings_panel, "installation-access"
+    )
     deployment = _site_settings_section(settings_panel, "deployment")
     ai_models = _site_settings_section(settings_panel, "ai-models")
     providers = _site_settings_section(settings_panel, "service-providers")
     site_image = _site_settings_section(settings_panel, "site-image")
 
     expect(maintenance).to_have_attribute("data-open", "true")
+    expect(installation_access).to_have_attribute("data-open", "false")
     expect(deployment).to_have_attribute("data-open", "false")
     expect(ai_models).to_have_attribute("data-open", "false")
     expect(providers).to_have_attribute("data-open", "false")
@@ -1371,6 +1512,13 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
         owner,
         maintenance.locator("button[lp-help='site_maintenance']"),
         "Refresh Cache",
+    )
+
+    _open_site_settings_section(settings_panel, "installation-access")
+    _open_help_and_expect(
+        owner,
+        installation_access.locator("button[lp-help='site_installation_access']"),
+        "Why there is no Remove IAM button",
     )
 
     _open_site_settings_section(settings_panel, "deployment")
@@ -1433,20 +1581,19 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     assert response.headers["content-type"].startswith("application/yaml")
     assert downloaded["CONFIG_KIND"] == recovery.CONFIG_KIND
     assert downloaded["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
-    live_deployment = database.get.site_deployment()
+    live_deployment = site_database.deployment()
     if live_deployment:
         assert (
             downloaded["DEPLOY_MAX_INSTANCES"]
             == dict(live_deployment)["DEPLOY_MAX_INSTANCES"]
         )
-    live_ai = database.get.site_ai()
+    live_ai = site_database.ai()
     if live_ai:
         assert downloaded["AI_MODEL"] == dict(live_ai)["AI_MODEL"]
     modal.close()
 
 
-# @features admin
-# @dimensions deployment-settings metadata scaling-controls validation
+# @matrix admin : deployment-settings metadata scaling-controls validation
 # @template home/site_settings.html::site_settings
 def test_site_settings_deployment_form_saves_and_updates_summary(
     get_user,
@@ -1514,8 +1661,7 @@ def test_site_settings_deployment_form_saves_and_updates_summary(
     assert "Worker count" in rejected["text"]
 
 
-# @features admin
-# @dimensions ai-settings metadata validation model-selection saved-values
+# @matrix admin : ai-settings metadata model-selection saved-values validation
 # @template home/site_settings.html::site_settings
 def test_site_settings_ai_form_saves_current_models_through_route(
     get_user,
@@ -1558,7 +1704,7 @@ def test_site_settings_ai_form_saves_current_models_through_route(
     expect(form.locator("button[type='submit']")).to_contain_text(
         "AI Model Settings Saved"
     )
-    saved = dict(database.get.site_ai())
+    saved = dict(site_database.ai())
     assert {name: saved[name] for name in expected} == expected
 
     owner.page.reload(wait_until="domcontentloaded")
@@ -1586,7 +1732,90 @@ def test_site_settings_ai_form_saves_current_models_through_route(
     assert "global" in rejected["text"]
 
 
-# @pairs admin:site-update admin:success cache:current
+# @matrix admin public-pages : live-settings sitemap-invalidation validation
+# @matrix public-pages sitemap : disabled enabled redis-cache
+# @matrix robots : disabled enabled
+# @template home/site_settings.html::site_settings
+def test_site_settings_public_page_indexing_saves_live_setting(
+    get_user,
+    browser_failures,
+):
+    owner = get_user(Users.OWNER)
+    _, settings_panel = _open_owner_site_settings(owner)
+    section = _open_site_settings_section(settings_panel, "public-pages")
+    form = section.locator("[data-role='public-page-settings']")
+    field = form.locator("[name='PUBLIC_PAGE_INDEXING']")
+    stored = site_database.public_pages()
+    original = (
+        bool(stored.get("PUBLIC_PAGE_INDEXING"))
+        if stored
+        else bool(getattr(CONFIG, "PUBLIC_PAGE_INDEXING", False))
+    )
+    loaded = _fetch_status(owner, "/l/site-settings/public-pages", "GET")
+    assert loaded["status"] == 200
+    assert loaded["data"]["public_pages"]["PUBLIC_PAGE_INDEXING"] is original
+
+    def save(enabled):
+        field.set_checked(enabled)
+        with owner.page.expect_response(
+            "**/l/site-settings/public-pages"
+        ) as response_info:
+            form.locator("button[type='submit']").click()
+        response = response_info.value
+        assert response.status == 200
+        assert response.json()["public_pages"]["PUBLIC_PAGE_INDEXING"] is enabled
+        expect(section.locator("[data-role='section-summary']")).to_have_text(
+            f"Search discovery is {'on' if enabled else 'off'}"
+        )
+
+    try:
+        save(True)
+        assert site_database.public_pages()["PUBLIC_PAGE_INDEXING"] is True
+        origin = owner.page.evaluate("location.origin")
+
+        robots = owner.page.context.request.get(f"{origin}/robots.txt")
+        assert robots.status == 200
+        assert "Allow: /pages/public/" in robots.text()
+        assert f"Sitemap: {absolute_url('/sitemap.xml')}" in robots.text()
+
+        first_sitemap = owner.page.context.request.get(
+            f"{origin}/sitemap.xml"
+        )
+        second_sitemap = owner.page.context.request.get(
+            f"{origin}/sitemap.xml"
+        )
+        assert first_sitemap.status == second_sitemap.status == 200
+        assert first_sitemap.text() == second_sitemap.text()
+        assert "<urlset" in first_sitemap.text()
+
+        with browser_failures.expect_http_error(
+            owner,
+            status=422,
+            path="/l/site-settings/public-pages",
+        ):
+            rejected = _fetch_status(
+                owner,
+                "/l/site-settings/public-pages",
+                data={"PUBLIC_PAGE_INDEXING": "sometimes"},
+            )
+        assert rejected["status"] == 422
+
+        save(False)
+        disabled_robots = owner.page.context.request.get(
+            f"{origin}/robots.txt"
+        )
+        assert "Sitemap:" not in disabled_robots.text()
+        disabled_sitemap = owner.page.context.request.get(
+            f"{origin}/sitemap.xml"
+        )
+        assert disabled_sitemap.status == 404
+    finally:
+        if field.is_checked() is not original:
+            save(original)
+
+
+# @matrix admin : site-update success
+# @pair cache:current
 # @template home/site_settings.html::site_settings
 def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     owner = get_user(Users.OWNER)
@@ -1605,8 +1834,7 @@ def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     expect(cache_button).to_contain_text("Cache Refreshed")
 
 
-# @features admin
-# @dimensions site-image-upload generated-images public-preview metadata lazy-initialization
+# @matrix admin : generated-images lazy-initialization metadata public-preview site-image-upload
 # @template home/site_settings.html::site_settings
 def test_site_settings_image_upload_generates_and_persists_site_images(get_user):
     owner = get_user(Users.OWNER)

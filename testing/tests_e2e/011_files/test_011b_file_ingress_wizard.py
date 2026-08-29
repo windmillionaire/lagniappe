@@ -16,7 +16,7 @@ import pytest
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from testing.definitions import Categories, Forms, SitePages, Uploads, Users
 from testing.elements import IngressWizard, SpinnerButtons
 from testing.resources import File
@@ -80,7 +80,7 @@ def _create_task_target_pages(user):
     existing_names = {
         page.name
         for page in Entities.fetch(
-            *database.get.pages(category.key, limit=None).results,
+            *database_get.pages(category.key, limit=None).results,
             request=Fetch.direct(),
         )
     }
@@ -101,8 +101,7 @@ def _create_task_target_pages(user):
     return category
 
 
-# @features ingress
-# @dimensions stage-wizard process-csv upload-counts
+# @matrix ingress : process-csv stage-wizard upload-counts
 # @template home/ingress.html::upload_ingress_file
 # @template files/ingress.html::ingress
 # @template files/status.html::column_values
@@ -120,8 +119,7 @@ def test_import_wizard_opens_with_processed_csv_status(get_user):
     expect(wizard.stage_button("CHOOSE_TYPE")).to_contain_text("Select Entity Type")
 
 
-# @features ingress
-# @dimensions stage-wizard choose-type choose-parent choose-form assign-columns verify-import
+# @matrix ingress : assign-columns choose-form choose-parent choose-type stage-wizard verify-import
 # @template files/status.html::row_type_choices
 # @template files/status/parent.html::category_choice
 # @template files/status/form.html::form_choice
@@ -138,8 +136,7 @@ def test_import_wizard_advances_through_page_import_stages(get_user):
     expect(wizard.progress).to_contain_text("{ description }")
 
 
-# @features ingress
-# @dimensions stage-wizard choose-type choose-parent choose-form assign-columns verify-import task-name
+# @matrix ingress : assign-columns choose-form choose-parent choose-type stage-wizard task-name verify-import
 # @template files/status.html::row_type_choices
 # @template files/status/parent.html::project_choice
 # @template files/status/form.html::form_choice
@@ -179,8 +176,7 @@ def test_import_wizard_advances_through_task_import_stages(get_user):
     expect(wizard.progress).to_contain_text("{ name }")
 
 
-# @features ingress
-# @dimensions stage-wizard set-stage error-handling
+# @matrix ingress : error-handling set-stage stage-wizard
 # @template files/status/parent.html::category_choice
 def test_import_wizard_stage_navigation_reconciles_downstream_status(get_user):
     user = get_user(Users.OWNER)
@@ -201,8 +197,7 @@ def test_import_wizard_stage_navigation_reconciles_downstream_status(get_user):
     wizard.continue_stage("CHOOSE_PARENT", "Choose or Create a Project")
 
 
-# @features ingress
-# @dimensions import-results completed
+# @matrix ingress : completed import-results
 # @template files/status/results.html::importing
 # @template files/status/results.html::completed
 def test_import_wizard_importing_stage_streams_results_and_completes(get_user):
@@ -217,7 +212,7 @@ def test_import_wizard_importing_stage_streams_results_and_completes(get_user):
     expect(results).to_contain_text("Beta Follow Up")
 
 
-# @pairs ingress:non-csv ingress:validation
+# @matrix ingress : non-csv validation
 # @pair request-errors:plain-validation
 def test_import_wizard_rejects_non_csv_upload(get_user, browser_failures):
     user = get_user(Users.OWNER)
@@ -238,8 +233,7 @@ def test_import_wizard_rejects_non_csv_upload(get_user, browser_failures):
         )
 
 
-# @features ingress
-# @dimensions error-handling persistence reopen
+# @matrix ingress : error-handling persistence reopen
 def test_import_wizard_error_state_persists_after_reopen(get_user):
     user = get_user(Users.OWNER)
     file, wizard = _upload_ingress_file(user, Uploads.ingress_pages_error_csv)
@@ -264,8 +258,7 @@ def test_import_wizard_error_state_persists_after_reopen(get_user):
     )
 
 
-# @features ingress
-# @dimensions existing-parent existing-form
+# @matrix ingress : existing-form existing-parent
 def test_import_wizard_selects_existing_parent_and_form(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_empty_category.get(user)
@@ -290,8 +283,7 @@ def test_import_wizard_selects_existing_parent_and_form(get_user):
     expect(wizard.progress).to_contain_text(form.definition.name)
 
 
-# @features ingress
-# @dimensions ignored-columns verify-import
+# @matrix ingress : ignored-columns verify-import
 def test_import_wizard_ignored_columns_are_not_imported(get_user):
     user = get_user(Users.OWNER)
     _, wizard = _advance_page_import_to_assign(user, Uploads.ingress_pages_ignored_csv)
@@ -307,8 +299,7 @@ def test_import_wizard_ignored_columns_are_not_imported(get_user):
     expect(wizard.progress).not_to_contain_text("{ status }")
 
 
-# @features ingress
-# @dimensions task-import page-form-lookup
+# @matrix ingress : page-form-lookup task-import
 def test_import_wizard_task_page_form_lookup_updates_index_fields(get_user):
     user = get_user(Users.OWNER)
     page_form = Forms.test_create_category_with_form.get(user)

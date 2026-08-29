@@ -28,8 +28,7 @@ def _load_recovery_module(monkeypatch):
     return importlib.import_module("config.recovery")
 
 
-# @features config setup
-# @dimensions permissions transactional-state utf8
+# @matrix config setup : permissions transactional-state utf8
 def test_atomic_config_write_preserves_valid_file_and_restricts_secrets(
     monkeypatch,
     tmp_path,
@@ -71,8 +70,7 @@ def test_atomic_config_write_preserves_valid_file_and_restricts_secrets(
         assert target.stat().st_mode & 0o777 == 0o600
 
 
-# @features config setup deploy
-# @dimensions generation source-marker completeness
+# @matrix config deploy setup : completeness generation source-marker
 def test_generation_manifest_tracks_constants_and_required_outputs(
     monkeypatch,
     tmp_path,
@@ -170,8 +168,7 @@ def test_gcloudignore_uploads_only_canonical_runtime_config():
         assert f"!/config/files/{local_only}" not in ignore
 
 
-# @features config setup
-# @dimensions app-engine-location resource-region compatibility
+# @matrix config setup : app-engine-location compatibility resource-region
 def test_google_location_aliases_keep_app_engine_and_regional_resources_distinct():
     from config.locations import (
         normalize_app_engine_location,
@@ -198,8 +195,7 @@ def test_dependency_upgrade_tracks_all_requirement_files():
     ]
 
 
-# @features dependencies
-# @dimensions upgrade-requirements
+# @pair dependencies:upgrade-requirements
 def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
     monkeypatch,
     tmp_path,
@@ -268,8 +264,7 @@ def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
     assert dev_requirements.read_text(encoding="utf-8") == "ruff==0.15.22\n"
 
 
-# @features dependencies
-# @dimensions upgrade-report
+# @pair dependencies:upgrade-report
 def test_dependency_upgrade_report_includes_setup_pins(capsys):
     from runner import upgrade
 
@@ -294,8 +289,7 @@ def test_dependency_upgrade_report_includes_setup_pins(capsys):
     assert str(report_path) in output
 
 
-# @features dependencies
-# @dimensions node-version upgrade pinning
+# @matrix dependencies : node-version pinning upgrade
 def test_dependency_upgrade_updates_node_version_pin(monkeypatch, tmp_path):
     from runner import upgrade
 
@@ -327,8 +321,7 @@ def test_dependency_upgrade_updates_node_version_pin(monkeypatch, tmp_path):
     )
 
 
-# @features config
-# @dimensions config-files parsing
+# @matrix config : config-files parsing
 def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_path):
     app_dir = tmp_path / "demo-app"
     config_files_dir = app_dir / "config" / "files"
@@ -463,8 +456,7 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
         restore_config_modules()
 
 
-# @pair frontend-build:chunk-versioning
-# @pair cache:bundle-consistency
+# @pairs cache:bundle-consistency frontend-build:chunk-versioning
 def test_app_engine_chunk_handler_uses_immutable_cache_before_general_js():
     constants_path = Path(__file__).resolve().parents[2] / "config" / "constants.py"
     spec = importlib.util.spec_from_file_location(
@@ -498,8 +490,7 @@ def test_app_engine_chunk_handler_uses_immutable_cache_before_general_js():
     assert "expiration" not in chunk_handler
 
 
-# @features deploy
-# @dimensions static-assets pdf-preview app-yaml
+# @matrix deploy : app-yaml pdf-preview static-assets
 def test_app_engine_pdfjs_wasm_handlers_precede_general_js():
     constants_path = Path(__file__).resolve().parents[2] / "config" / "constants.py"
     spec = importlib.util.spec_from_file_location(
@@ -652,8 +643,7 @@ def test_app_engine_dynamic_handler_allowlist_covers_registered_routes():
     assert "That page was not found on this server." in static_404_page.read_text()
 
 
-# @features deploy
-# @dimensions deploy-surface imports requirements gcloudignore
+# @matrix deploy : deploy-surface gcloudignore imports requirements
 def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirements(
     monkeypatch, tmp_path
 ):
@@ -674,6 +664,7 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
                 "import json",
                 "import requests",
                 "from flask import Flask",
+                "from google.cloud import firestore_admin_v1",
                 "from installer.deployment import normalize_deployment_settings",
                 "from runner.context import REPOSITORY_ROOT",
             ]
@@ -688,7 +679,9 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
     (app_dir / ".gcloudignore").write_text(
         "installer/\nrunner/\ntesting/\n.gcloudignore\n"
     )
-    (app_dir / "requirements.txt").write_text("flask==3.1.3\n")
+    (app_dir / "requirements.txt").write_text(
+        "flask==3.1.3\ngoogle-cloud-firestore==2.28.0\n"
+    )
     (app_dir / "package.json").write_text(json.dumps({"version": "1.0"}))
     (app_dir / "index.yaml").write_text("indexes: []\n")
     (app_dir / "lagniappe.yaml").write_text("runtime: python314\n")
@@ -723,6 +716,7 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
         assert any("excluded by .gcloudignore" in issue for issue in issues)
         assert any("imports 'requests'" in issue for issue in issues)
         assert not any("imports 'flask'" in issue for issue in issues)
+        assert not any("firestore_admin_v1" in issue for issue in issues)
 
         with pytest.raises(RuntimeError, match="Runtime deploy surface check failed"):
             verify_runtime_deploy_surface(app_dir)
@@ -746,20 +740,15 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
         if original_runner_deploy is not None:
             sys.modules["runner.deploy"] = original_runner_deploy
 
-# @features deploy
-# @dimensions deploy-surface imports gcloudignore package-boundary
+# @matrix deploy : deploy-surface gcloudignore imports package-boundary
 def test_runtime_upload_boundary_has_no_local_orchestration_imports():
     from runner.deploy import runtime_deploy_surface_issues
 
-    excluded_import_issues = [
-        issue
-        for issue in runtime_deploy_surface_issues(runner_context.REPOSITORY_ROOT)
-        if "excluded by .gcloudignore" in issue
-    ]
-    assert excluded_import_issues == []
+    assert runtime_deploy_surface_issues(runner_context.REPOSITORY_ROOT) == []
 
 
-# @pairs config:recovery-export config:current-schema config:messaging-removal
+# @matrix config : current-schema messaging-removal recovery-export
+# @pair public-pages:recovery-export
 def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch):
     recovery = _load_recovery_module(monkeypatch)
 
@@ -794,6 +783,11 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch
             "AI_LOCATION": "global",
             "version": 4,
         },
+        public_page_settings={
+            "PUBLIC_PAGE_INDEXING": True,
+            "version": 2,
+            "IGNORED_PUBLIC": "not-owned",
+        },
     )
 
     assert snapshot["APP_NAME"] == "Custom Name"
@@ -802,6 +796,7 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch
     assert snapshot["DEPLOY_MAX_INSTANCES"] == "3"
     assert snapshot["AI_MODEL"] == "live-model"
     assert snapshot["AI_LOCATION"] == "global"
+    assert snapshot["PUBLIC_PAGE_INDEXING"] is True
     assert snapshot["CONFIG_KIND"] == recovery.CONFIG_KIND
     assert snapshot["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
     assert snapshot["GOOGLE_SIGNIN_ENABLED"] is True
@@ -810,11 +805,28 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch
     assert "FIREBASE_CONFIG" not in snapshot
     assert "version" not in snapshot
     assert "IGNORED" not in snapshot
+    assert "IGNORED_PUBLIC" not in snapshot
     assert persisted["DEPLOY_MAX_INSTANCES"] == "1"
 
 
-# @features config
-# @dimensions recovery-display secrets
+# @matrix config : public-page-indexing validation
+def test_public_page_settings_normalize_boolean_values():
+    from config.public_pages import (
+        ConfigPublicPageSettingsError,
+        normalize_public_page_settings,
+    )
+
+    assert normalize_public_page_settings(
+        {"PUBLIC_PAGE_INDEXING": "true"}
+    ) == {"PUBLIC_PAGE_INDEXING": True}
+    assert normalize_public_page_settings(
+        {"PUBLIC_PAGE_INDEXING": "off"}
+    ) == {"PUBLIC_PAGE_INDEXING": False}
+    with pytest.raises(ConfigPublicPageSettingsError):
+        normalize_public_page_settings({"PUBLIC_PAGE_INDEXING": "sometimes"})
+
+
+# @matrix config : recovery-display secrets
 def test_recovery_display_redacts_nested_and_flat_secrets_without_mutation():
     from config import recovery
 
@@ -898,7 +910,7 @@ def _valid_recovery_document():
     }
 
 
-# @pairs config:recovery-validation config:project-identity config:project-number
+# @matrix config : project-identity project-number recovery-validation
 def test_recovery_document_cross_checks_all_persisted_project_identities():
     from config import recovery
 
@@ -949,7 +961,7 @@ def test_recovery_document_cross_checks_all_persisted_project_identities():
     assert recovery.validate_recovery_document(numeric_ocr_parent)
 
 
-# @pairs config:recovery-validation config:schema-upgrade config:messaging-removal
+# @matrix config : messaging-removal recovery-validation schema-upgrade
 def test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config(monkeypatch):
     recovery = _load_recovery_module(monkeypatch)
 
@@ -962,8 +974,7 @@ def test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config(monkeyp
     assert "FIREBASE_CONFIG" not in recovered
 
 
-# @features config
-# @dimensions recovery-validation current-schema required-settings
+# @matrix config : current-schema recovery-validation required-settings
 @pytest.mark.parametrize(
     ("setting", "message"),
     [
@@ -989,8 +1000,7 @@ def test_recovery_requires_complete_current_configuration(setting, message):
         recovery.validate_recovery_document(document)
 
 
-# @features config
-# @dimensions recovery-validation authentication-email secrets
+# @matrix config : authentication-email recovery-validation secrets
 def test_recovery_validates_and_normalizes_auth_email_smtp():
     from config import recovery
 
@@ -1016,8 +1026,6 @@ def test_recovery_validates_and_normalizes_auth_email_smtp():
         recovery.validate_recovery_document(snapshot)
 
 
-# @features ai-email config
-# @dimensions recovery-validation recovery-display secrets optional-setting
 # @pair config:ai-email
 def test_recovery_accepts_and_redacts_optional_ai_email_config():
     from config import recovery
@@ -1056,8 +1064,7 @@ def test_recovery_accepts_and_redacts_optional_ai_email_config():
     assert displayed["AI_EMAIL_CONFIG"]["resend"]["sendingApiKey"] == "[REDACTED]"
 
 
-# @features config
-# @dimensions recovery-validation project-identity
+# @matrix config : project-identity recovery-validation
 def test_recovery_rejects_current_configuration_identity_mismatch():
     from config import recovery
 
@@ -1116,8 +1123,7 @@ def test_recovery_rejects_current_configuration_identity_mismatch():
             recovery.validate_recovery_document(document)
 
 
-# @features config
-# @dimensions recovery-export recovery-restore redis-tls certificate-validation
+# @matrix config : certificate-validation recovery-export recovery-restore redis-tls
 def test_recovery_redis_ca_round_trips_through_one_file(monkeypatch, tmp_path):
     from config import recovery
 
@@ -1165,8 +1171,7 @@ def test_recovery_redis_ca_round_trips_through_one_file(monkeypatch, tmp_path):
     assert validated[1].parent == target.parent
 
 
-# @features config
-# @dimensions redis-connection redis-tls settings certificate-validation
+# @matrix config : certificate-validation redis-connection redis-tls settings
 def test_redis_client_kwargs_support_verified_tls(monkeypatch, tmp_path):
     from config import redis as redis_config
 
@@ -1221,8 +1226,7 @@ def test_redis_client_kwargs_support_verified_tls(monkeypatch, tmp_path):
     assert validated == [{"cafile": str(ca_bundle)}]
 
 
-# @features config
-# @dimensions redis-tls certificate-validation failure
+# @matrix config : certificate-validation failure redis-tls
 def test_redis_tls_requires_a_valid_ca_bundle(monkeypatch, tmp_path):
     from config import redis as redis_config
 
@@ -1252,8 +1256,7 @@ def test_redis_tls_requires_a_valid_ca_bundle(monkeypatch, tmp_path):
         redis_config.redis_client_kwargs(settings, app_dir=tmp_path)
 
 
-# @features deploy
-# @dimensions version package-lock transactional-state utf8
+# @matrix deploy : package-lock transactional-state utf8 version
 def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path):
     app_dir = tmp_path / "demo-app"
     config_files_dir = app_dir / "config" / "files"
@@ -1326,9 +1329,12 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
     assert "\\u2764" not in lock_text
 
 
-# @features deploy
-# @dimensions version build app-yaml index-yaml
-def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_path):
+# @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
+def test_deploy_modes_separate_dev_build_from_setup_publish(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
     app_dir = tmp_path / "demo-app"
     config_files_dir = app_dir / "config" / "files"
     config_source_dir = app_dir / "config"
@@ -1375,11 +1381,13 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
         from runner.deploy import deploy as deploy_app
 
         deploy_module = importlib.import_module("runner.deploy")
+        SETTINGS.APP["GOOGLE_CLOUD_PROJECT"] = "demo-project"
         SETTINGS.save()
 
         commands = []
         preflight_snapshots = []
         build_versions = []
+        frontend_verifications = []
 
         def fake_preflight(app_dir=None):
             preflight_snapshots.append(
@@ -1393,6 +1401,11 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
 
         monkeypatch.setattr(
             deploy_module, "verify_runtime_deploy_surface", fake_preflight
+        )
+        monkeypatch.setattr(
+            deploy_module,
+            "verify_frontend_build",
+            lambda **kwargs: frontend_verifications.append(kwargs) or True,
         )
 
         def fake_run_command(command, **kwargs):
@@ -1410,7 +1423,10 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
             build_assets=False,
             deploy_indexes=True,
             quiet=True,
+            capture_output=True,
+            announce_progress=False,
         )
+        assert capsys.readouterr().out == "Deployment complete!\n"
         assert preflight_snapshots == [
             {"version": "1.23", "chunk_exists": True, "commands": []}
         ]
@@ -1429,8 +1445,10 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
                     "deploy",
                     str(app_dir / "index.yaml"),
                     "--quiet",
+                    "--project",
+                    "demo-project",
                 ],
-                {"check": False, "capture_output": False},
+                {"check": False, "capture_output": True},
             ),
             (
                 [
@@ -1439,14 +1457,24 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
                     "--quiet",
+                    "--project",
+                    "demo-project",
                 ],
-                {"check": False, "capture_output": False},
+                {"check": False, "capture_output": True},
             ),
         ]
         assert build_versions == []
+        assert frontend_verifications == [
+            {
+                "app_dir": app_dir,
+                "expected_mode": "production",
+                "expected_version": "1.23",
+            }
+        ]
 
         commands.clear()
         preflight_snapshots.clear()
+        frontend_verifications.clear()
 
         assert deploy_app()
         assert preflight_snapshots == [
@@ -1455,7 +1483,14 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
         assert SETTINGS.NODE["version"] == "1.23"
         assert SETTINGS.APP["VERSION"] == "1.23"
         assert build_versions == ["1.23"]
-        assert not chunks_dir.exists()
+        assert chunks_dir.exists()
+        assert frontend_verifications == [
+            {
+                "app_dir": app_dir,
+                "expected_mode": "production",
+                "expected_version": "1.23",
+            }
+        ]
         assert commands == [
             (
                 [deploy_module.NPM_CLI, "run", "build"],
@@ -1467,10 +1502,40 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
                     "app",
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
+                    "--project",
+                    "demo-project",
                 ],
                 {"check": False, "capture_output": False},
             ),
         ]
+
+        def failed_deploy(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                stdout="",
+                stderr="provider permission denied",
+            )
+
+        monkeypatch.setattr(deploy_module, "run_command", failed_deploy)
+        with pytest.raises(RuntimeError, match="provider permission denied"):
+            deploy_app(
+                build_assets=False,
+                capture_output=True,
+                announce_progress=False,
+            )
+
+        commands.clear()
+        monkeypatch.setattr(
+            deploy_module,
+            "verify_frontend_build",
+            lambda **_kwargs: (_ for _ in ()).throw(
+                RuntimeError("Frontend build is incomplete or stale")
+            ),
+        )
+        with pytest.raises(RuntimeError, match="Frontend build is incomplete"):
+            deploy_app(build_assets=False)
+        assert commands == []
     finally:
         for name in [
             name

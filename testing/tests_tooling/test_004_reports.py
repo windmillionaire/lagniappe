@@ -6,7 +6,11 @@ import types
 
 import pytest
 
-from testing.utility import browser_review, error_tracking, test_reporting
+from testing.utility import (
+    browser_review,
+    error_tracking,
+    test_reporting,
+)
 from testing.utility.artifacts import (
     BROWSER_REVIEWS_DIR,
     TEST_FAILURES_DIR,
@@ -107,6 +111,7 @@ def test_browser_review_html_includes_diagnostics_only_when_present(tmp_path):
     assert "failed to load module" in html
 
 
+# @matrix browser-review : attachment failure-cleanup
 @pytest.mark.parametrize(
     ("keep_failed", "exists_after_failure"),
     [(False, False), (True, True)],
@@ -136,8 +141,17 @@ def test_browser_review_capture_cleans_failed_folder(
 
     fake_sync_api = types.ModuleType("playwright.sync_api")
     fake_sync_api.sync_playwright = lambda: FakePlaywrightContext()
+    attachments = []
+    fake_testing = types.ModuleType("runner.testing")
+    fake_testing.attach_browser_review = (
+        lambda command: attachments.append(("attach", command)) or "attachment-1"
+    )
+    fake_testing.detach_browser_review = (
+        lambda attachment_id: attachments.append(("detach", attachment_id))
+    )
 
     monkeypatch.setitem(sys.modules, "playwright.sync_api", fake_sync_api)
+    monkeypatch.setitem(sys.modules, "runner.testing", fake_testing)
     monkeypatch.setattr(browser_review, "create_review_dir", fake_create_review_dir)
 
     args = types.SimpleNamespace(
@@ -157,3 +171,4 @@ def test_browser_review_capture_cleans_failed_folder(
         browser_review.capture_review(args)
 
     assert review_dir.exists() is exists_after_failure
+    assert [event[0] for event in attachments] == ["attach", "detach"]

@@ -3,8 +3,7 @@ import { COLOR_MENU } from "../../../config/editor";
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_color_picker
- * @features editor
- * @dimensions color reload
+ * @matrix editor : color reload
  */
 class ColorPicker {
 	constructor(toolbar) {

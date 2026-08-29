@@ -1,38 +1,40 @@
 import { STYLES } from "styles";
-import { debounce, ENDPOINTS, request } from "../../shared";
-import { Combobox } from "./combobox";
+import { ENDPOINTS, request } from "../../shared";
+import { RemoteQueryCombobox } from "./remote";
 import { Results } from "./results";
 
 /**
  * @testable true
  * @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
- * @features search
- * @dimensions navbar-submit page-navigation
+ * @tests tests_js/test_046_async_query_lifecycle.py::test_search_threshold_settles_stale_work_and_restores_recent_results
+ * @matrix search : recent-results stale-publication threshold
+ * @pair search:page-navigation
  */
-export class SearchBox extends Combobox {
+export class SearchBox extends RemoteQueryCombobox {
 	constructor(element) {
 		super(element);
 		this.index = "search";
 		this.results = new Results(this.index);
-		this.input = this._input.bind(this);
 		this.placement = "bottom-end";
 		this.endpoints = ENDPOINTS.search;
 	}
 
 	init() {
 		this.styles.panel = `${STYLES.dropdown.panel} right-0 w-64 sm:w-96 mt-2`;
-		this.element.addEventListener("input", debounce(this.input, 200));
-
 		super.init();
+		this.updatePanel(this.results.create());
 	}
 
 	_input(event) {
 		const query = event.target.value.trim();
 		if (query.length > 1) {
-			this._search(query);
+			return this._search(query);
 		} else if (query.length === 0) {
+			this.settleQueryInput();
 			this.updatePanel(this.results.create());
+			return this.showPanel();
 		}
+		this.settleQueryInput({ clear: true });
 	}
 
 	elementClick(event) {
@@ -40,23 +42,29 @@ export class SearchBox extends Combobox {
 		this.showPanel();
 	}
 
-	async _search(query) {
+	_search(query) {
 		const params = new URLSearchParams();
 		params.set("q", query);
-		const response = await request.get(this.endpoints.bar, params);
-		if (response?.ok) {
-			const html = response?.results || null;
-			this.updatePanel(html);
-		}
-		this.showPanel();
+		return this.runQuery(
+			query,
+			(token) =>
+				request.get(this.endpoints.bar, params, { signal: token.signal }),
+			(response) => {
+				if (response?.ok) {
+					this.updatePanel(response.results || null);
+				} else {
+					this.clearQueryResults();
+				}
+				return this.showPanel();
+			},
+		);
 	}
 
 	/**
 	 * @testable true
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_result_links_correct
-	 * @features search
-	 * @dimensions result-navigation result-links
+	 * @matrix search : result-links result-navigation
 	 * @template nav.html::search_results
 	 */
 	selectOption(option) {
@@ -65,6 +73,11 @@ export class SearchBox extends Combobox {
 		window.location.href = option.dataset.url;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
+	 * @pair search:navbar-submit
+	 */
 	elementKeydown(event) {
 		super.elementKeydown(event);
 		if (event.defaultPrevented) return;

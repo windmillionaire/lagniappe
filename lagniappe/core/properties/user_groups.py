@@ -3,14 +3,13 @@ from ..mixins import (
     GroupPermissionsMixin,
     PublicPermissionsMixin,
 )
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 from .common_entity import Permissions
 
 
 # @testable true
 # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
-# @features user-groups, permissions
-# @dimensions views, form-data, restricted
+# @matrix permissions user-groups : form-data restricted views
 def get_view_hashes(permissions):
     return [
         hash
@@ -35,8 +34,8 @@ class GroupPermissions(GroupPermissionsMixin, Permissions):
     # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
     # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_owner_only_and_unauthenticated_defaults
     # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
-    # @features user-groups, permissions
-    # @dimensions form-data, restricted, views, default-denial
+    # @matrix permissions user-groups : default-denial form-data restricted unauthenticated views
+    # @pair user-groups:owner-only
     def create(self, form_data=None, user=None):
         user = current_context_user(user)
         if not user or not user.is_authenticated:
@@ -70,13 +69,11 @@ class PublicPermissions(PublicPermissionsMixin, Permissions):
 
     # @testable true
     # @tests tests_unit/test_009e_user_groups.py::test_public_group_get_create_and_enabled_state
-    # @features public-groups
-    # @dimensions enabled, permissions
+    # @matrix public-groups : enabled permissions
     @property
     def enabled(self):
         return (
-            self.entity.active
-            and self.value.get(Site.PUBLIC.value) == Levels.TRUE.name
+            self.entity.active and self.value.get(Site.PUBLIC.value) == Levels.TRUE.name
         )
 
     @staticmethod
@@ -98,8 +95,8 @@ class PublicPermissions(PublicPermissionsMixin, Permissions):
     # @tests tests_unit/test_009e_user_groups.py::test_public_permissions_default_forms_view_is_stored
     # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_owner_only_and_unauthenticated_defaults
     # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
-    # @features public-groups, permissions
-    # @dimensions public, active, permissions
+    # @matrix permissions public-groups user-groups : active default-forms-view explicit-none permissions public storage unauthenticated
+    # @pairs permissions:owner-only public-groups:default-forms-view
     def create(self, form_data=None, user=None):
         user = current_context_user(user)
         if not user or not user.is_authenticated:

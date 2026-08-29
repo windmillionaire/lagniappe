@@ -72,8 +72,7 @@ const button = (attributes) => {
 /**
  * @testable true
  * @tests tests_js/test_018_style_pipeline.py::test_active_action_buttons_preserve_full_width_icon_slots
- * @features ui-action
- * @dimensions loading-state fixed-layout
+ * @matrix ui-action : fixed-layout loading-state
  */
 const active = (attributes) => {
 	const buttonElt = attributes.existingButton || button(attributes);

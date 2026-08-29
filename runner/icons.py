@@ -26,6 +26,7 @@ FONT_URL_RE = re.compile(r"src:\s*url\((https://fonts\.gstatic\.com/[^)]+)\)")
 
 # @testable true
 # @tests tests_tooling/test_icons.py::test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs
+# @pair icons:subset-request
 def _registry_glyphs(value):
     if not isinstance(value, dict) or not value:
         raise TypeError("icon registry nodes must be non-empty mappings")
@@ -39,6 +40,7 @@ def _registry_glyphs(value):
 
 # @testable true
 # @tests tests_tooling/test_icons.py::test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs
+# @pair icons:subset-request
 def subset_request(icons_path=ICONS_PATH):
     registry = yaml.safe_load(Path(icons_path).read_text(encoding="utf-8")) or {}
     icon_names = sorted(set(_registry_glyphs(registry)))
@@ -63,6 +65,7 @@ def _download(url):
 
 # @testable true
 # @tests tests_tooling/test_icons.py::test_update_icons_writes_official_subset_metadata_and_rebuilds
+# @pair icons:subset-update
 def _font_url(css):
     match = FONT_URL_RE.search(css)
     if not match:
@@ -74,6 +77,7 @@ def _font_url(css):
 
 # @testable true
 # @tests tests_tooling/test_icons.py::test_update_icons_writes_official_subset_metadata_and_rebuilds
+# @pair icons:subset-update
 def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path):
     if not font.startswith(b"wOF2"):
         raise ValueError("Google Fonts response is not a WOFF2 font")
@@ -104,6 +108,7 @@ def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path)
 
 # @testable true
 # @tests tests_tooling/test_icons.py::test_update_icons_writes_official_subset_metadata_and_rebuilds
+# @pair icons:subset-update
 def update_icons(
     *,
     rebuild=True,

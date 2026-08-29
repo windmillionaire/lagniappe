@@ -1,8 +1,7 @@
 import { buttons } from "../elements/buttons.mjs";
 import { FacetsBox, SelectBox } from "../elements/combobox";
-import { formatting } from "../elements/formatting";
 import { primitives } from "../elements/primitives";
-import { Modal, request, withTransition } from "../shared";
+import { captureError, Modal, request, withTransition } from "../shared";
 
 /**
  * @testable infrastructure
@@ -10,6 +9,8 @@ import { Modal, request, withTransition } from "../shared";
 export class ImportData {
 	constructor(attributes) {
 		Object.assign(this, attributes);
+		this._destroyed = false;
+		this._stageActionPromise = null;
 		this.stageElt = this.target.querySelector("[data-role='stage']");
 		this.progressElt = this.target.querySelector("[data-role='progress']");
 		this.stage = this.target.dataset.stage;
@@ -34,9 +35,14 @@ export class ImportData {
 	}
 
 	init() {
-		request.get(this.endpoints.get(this.key)).then((resp) => {
-			this._setStage(resp);
-		});
+		request
+			.get(this.endpoints.get(this.key))
+			.then((resp) => {
+				if (!this._destroyed) this._setStage(resp);
+			})
+			.catch((error) => {
+				captureError(error, this.target, { context: "ingress-initial-stage" });
+			});
 
 		this.target.addEventListener("click", this._click);
 		this.progressElt.addEventListener("change", this._change);
@@ -44,15 +50,22 @@ export class ImportData {
 	}
 
 	async _click(e) {
+		if (this._destroyed) return;
 		const button = e.target.closest("button");
 		if (!button) return;
 
 		if (button.dataset.role === "next") {
-			formatting.working(button, "Processing...");
-			await this._next();
+			await this._runStageAction(button, {
+				pendingText: "Processing...",
+				fallback: "Could not continue. Try again.",
+				operation: () => this._next(),
+			});
 		} else if (button.dataset.role === "import") {
-			formatting.working(button, "Starting Import...");
-			this._startImport();
+			await this._runStageAction(button, {
+				pendingText: "Starting Import...",
+				fallback: "Import could not be started. Please try again.",
+				operation: () => this._startImport(),
+			});
 		} else if (button.dataset.role === "set-stage") {
 			const stage = button.dataset.stage;
 			this._setStage(
@@ -61,16 +74,107 @@ export class ImportData {
 		} else if (button.dataset.role === "delete-imported") {
 			await this._deleteImported(button);
 		} else if (button.dataset.role === "stop" && this.actions.has("stop")) {
-			this.stopButton.activate("Stopping...", "delete");
-			this._setImportStopped();
-			this._setStage(await request.post(this.endpoints.stop(this.key)));
+			await this._runStageAction(button, {
+				pendingText: "Stopping...",
+				pendingKind: "delete",
+				fallback: "Import could not be stopped. Please try again.",
+				pausePolling: true,
+				operation: () => request.post(this.endpoints.stop(this.key)),
+			});
 		} else if (button.dataset.role === "stop" && this.actions.has("restart")) {
-			this.stopButton.activate("Restarting...", "project");
-			this.stopped = false;
-			this.importRequestStarted = false;
-			this._startImport();
-			button.dataset.stopped = "false";
+			await this._runStageAction(button, {
+				pendingText: "Restarting...",
+				pendingKind: "project",
+				fallback: "Import could not be restarted. Please try again.",
+				operation: () => this._startImport(),
+			});
 		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_stage_action_failure_restores_button_and_polling_for_retry
+	 * @matrix ingress ui-action : polling-recovery retryable-action single-flight stage-action
+	 */
+	_runStageAction(
+		button,
+		{
+			pendingText,
+			pendingKind = null,
+			fallback,
+			operation,
+			pausePolling = false,
+		},
+	) {
+		if (this._stageActionPromise) return this._stageActionPromise;
+		if (this._destroyed || !button) return Promise.resolve(false);
+
+		const originalText = button.textContent.trim();
+		const originalKind = button.dataset.kind;
+		const hadFocus = document.activeElement === button;
+		const wasPolling = this.importRequestStarted;
+		const action = buttons.active({
+			existingButton: button,
+			defaultText: originalText,
+			completedText: originalText,
+		});
+		this._clearError();
+		action.activate(pendingText, pendingKind);
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+		if (pausePolling) this._setImportStopped();
+
+		let committed = false;
+		const pending = (async () => {
+			try {
+				const response = await operation();
+				if (this._destroyed) return false;
+				if (response?.ok !== true) {
+					this._showError(response?.error || fallback);
+					return false;
+				}
+				committed = response.stage
+					? this._setStage(response)
+					: await this._refreshProgress();
+				if (!committed && !this._destroyed) this._showError(fallback);
+				return committed;
+			} catch (error) {
+				captureError(error, button, { context: "ingress-stage-action" });
+				if (!this._destroyed) this._showError(fallback);
+				return false;
+			} finally {
+				if (!committed && pausePolling && wasPolling && !this._destroyed) {
+					Promise.resolve()
+						.then(() => this._startImportPolling())
+						.catch((error) => {
+							captureError(error, this.target, {
+								context: "ingress-polling-recovery",
+							});
+						});
+				}
+				if (!committed && !this._destroyed && button.isConnected !== false) {
+					action.deactivate(originalText, originalKind);
+					button.setAttribute("aria-disabled", "false");
+					button.removeAttribute("aria-busy");
+					if (
+						hadFocus &&
+						(!document.activeElement ||
+							document.activeElement === document.body ||
+							document.activeElement === button)
+					) {
+						button.focus({ preventScroll: true });
+					}
+				}
+			}
+		})();
+		this._stageActionPromise = pending;
+		const clearPending = () => {
+			if (this._stageActionPromise === pending) {
+				this._stageActionPromise = null;
+			}
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
 	}
 
 	/**
@@ -78,8 +182,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_next_waits_for_pending_stage_update
-	 * @features ingress
-	 * @dimensions choose-type stage-update serialization
+	 * @matrix ingress : choose-type serialization stage-update
 	 */
 	async _change(e) {
 		const form = e.target.closest("form");
@@ -106,10 +209,10 @@ export class ImportData {
 	 * @testable true
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-	 * @features ingress
-	 * @dimensions stage-wizard
+	 * @pair ingress:stage-wizard
 	 */
 	_setStage(resp) {
+		if (this._destroyed || !resp) return false;
 		const {
 			stage,
 			error,
@@ -202,6 +305,9 @@ export class ImportData {
 	_showError(message) {
 		this._clearError();
 		this.error = primitives.error(message);
+		this.error.setAttribute("role", "status");
+		this.error.setAttribute("aria-live", "polite");
+		this.error.setAttribute("aria-atomic", "true");
 		this.error.dataset.visible = "true";
 		this.progressElt.prepend(this.error);
 	}
@@ -227,8 +333,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_ignored_columns_are_not_imported
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_task_page_form_lookup_updates_index_fields
-	 * @features ingress
-	 * @dimensions verify-import page-form-lookup
+	 * @matrix ingress : page-form-lookup verify-import
 	 */
 	_setVerifyImport() {
 		const target = this.stageSettings.target;
@@ -304,8 +409,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_selects_existing_parent_and_form
-	 * @features ingress
-	 * @dimensions choose-form existing-form
+	 * @matrix ingress : choose-form existing-form
 	 */
 	_setChooseForm() {
 		const formElt = this.stageSettings.target;
@@ -321,8 +425,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_selects_existing_parent_and_form
-	 * @features ingress
-	 * @dimensions choose-parent existing-parent
+	 * @matrix ingress : choose-parent existing-parent
 	 */
 	_setChooseParent() {
 		const parentElt = this.stageSettings.target;
@@ -362,8 +465,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_ignored_columns_are_not_imported
-	 * @features ingress
-	 * @dimensions assign-columns ignored-columns
+	 * @matrix ingress : assign-columns ignored-columns
 	 */
 	_setAssignColumns() {
 		const target = this.stageSettings.target;
@@ -403,16 +505,17 @@ export class ImportData {
 	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_next_waits_for_pending_stage_update
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-	 * @features ingress
-	 * @dimensions next-action stage-update serialization
+	 * @matrix ingress : next-action serialization stage-update
+	 * @pair ingress:verify-import
 	 */
 	async _next() {
 		await this._stageUpdate;
+		if (this._destroyed) return null;
 		const form = this.stageSettings.target;
 		const updates = form ? new FormData(form) : new FormData();
 		updates.append("stage", this.stage);
 
-		this._setStage(await request.put(this.endpoints.next(this.key), updates));
+		return request.put(this.endpoints.next(this.key), updates);
 	}
 
 	_setImportControls() {
@@ -428,12 +531,14 @@ export class ImportData {
 	}
 
 	async _refreshProgress() {
+		if (this._destroyed) return false;
 		const response = await request.get(this.endpoints.get(this.key));
-		if (!response?.ok) return false;
+		if (this._destroyed || response?.ok !== true) return false;
 		return this._setStage(response);
 	}
 
 	_startImportPolling() {
+		if (this._destroyed) return;
 		this.importRequestStarted = true;
 		return this.syncPollingSubscription();
 	}
@@ -460,12 +565,10 @@ export class ImportData {
 	 *
 	 * @testable true
 	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_polling_tracks_widget_visibility
-	 * @features ingress polling
-	 * @dimensions active-widget visibility subscription-lifecycle catch-up
-	 * @pairs ingress:active-widget ingress:visibility ingress:subscription-lifecycle ingress:catch-up
-	 * @pairs polling:active-widget polling:visibility polling:subscription-lifecycle polling:catch-up
+	 * @matrix ingress polling : active-widget catch-up subscription-lifecycle visibility
 	 */
 	async syncPollingSubscription() {
+		if (this._destroyed) return;
 		if (!this.importRequestStarted || !this._pollingVisible()) {
 			this._stopImportPolling();
 			return;
@@ -528,29 +631,15 @@ export class ImportData {
 	}
 
 	_startImport() {
-		this._setImportControls();
-		this.importRequestStarted = true;
-		this.stopButton?.deactivate("Stop Import", "delete");
-
-		this._startImportPolling();
-
-		request.post(this.endpoints.import(this.key), {}).then((resp) => {
-			if (!resp.ok) {
-				this._setImportStopped();
-				this._showError(
-					resp.error || "Import could not be started. Please try again.",
-				);
-				return;
-			}
-			if (resp.stage) {
-				this._setStage(resp);
-			} else {
-				this._refreshProgress();
-			}
-		});
+		return request.post(this.endpoints.import(this.key), {});
 	}
 
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.target.removeEventListener("click", this._click);
+		this.progressElt.removeEventListener("change", this._change);
+		this.progressElt.removeEventListener("input", this._updateVisibility);
 		this._destroyStage();
 		this._stopImportPolling();
 	}

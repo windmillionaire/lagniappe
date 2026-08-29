@@ -48,6 +48,8 @@ class SpinnerRecorder:
     messages: list[str] = field(default_factory=list)
     oks: list[str] = field(default_factory=list)
     fails: list[str] = field(default_factory=list)
+    starts: int = 0
+    stops: int = 0
 
     def write(self, message):
         self.messages.append(message)
@@ -57,6 +59,12 @@ class SpinnerRecorder:
 
     def fail(self, mark):
         self.fails.append(mark)
+
+    def start(self):
+        self.starts += 1
+
+    def stop(self):
+        self.stops += 1
 
 
 def spinner_factory(spinner=None):

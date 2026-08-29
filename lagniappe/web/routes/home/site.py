@@ -1,25 +1,32 @@
 import json
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import abort, request, session, g
+from flask import abort, render_template, request, session, g
 from flask_login import current_user
 from flask_wtf.csrf import generate_csrf
 
 from config import SETTINGS
 from config.ai_settings import normalize_ai_settings
 from config.deployment import normalize_deployment_settings
+from config.public_pages import normalize_public_page_settings
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, collaboration, database, site_image
-from lagniappe.core.tools.ai_settings import runtime_ai_settings
+from lagniappe.core.tools import cache, collaboration
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.site import images as site_image
+from lagniappe.core.tools.site import public_pages as public_page_service
+from lagniappe.core.tools.services import places
+from lagniappe.core.tools.ai.settings import runtime_ai_settings
+from lagniappe.core.tools.database import site as site_database
 from lagniappe.core.tools.database import migrations as database_migrations
-from lagniappe.core.tools.site_admin import (
+from lagniappe.core.tools.site.admin import (
     load_ai_settings_payload,
     load_deployment_settings,
-    rebuild_application_cache,
     run_site_updates,
 )
+from lagniappe.core.tools.site.cache_rebuild import rebuild_application_cache
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web.auth import (
@@ -43,16 +50,17 @@ def _site_image_response(paths):
         if (v.startswith("http://") or v.startswith("https://") or v.startswith("/"))
         else f"/images/{v}"
         for k, v in paths.items()
-        if k != "version"
+        if k not in {"version", "asset_generations"}
     }
 
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
-# @pairs admin:roster owner:awaiting-first-sign-in admin:managed-users owner:role-controls
+# @matrix admin : managed-users roster
+# @matrix owner : awaiting-first-sign-in role-controls
 def _administrator_payload():
     """Return the canonical Owner, additional Admins, and promotion choices."""
-    rows = database.get.users(limit=None).results
+    rows = database_get.users(limit=None).results
     users = [
         user
         for user in Entities.fetch(*rows, request=Fetch.direct())
@@ -85,28 +93,93 @@ def _administrator_payload():
         }
 
     additional = sorted(
-        (
-            role_entry(user)
-            for user in users
-            if user is not owner and user.is_admin
-        ),
+        (role_entry(user) for user in users if user is not owner and user.is_admin),
         key=lambda entry: (
             str(entry["name"] or "").casefold(),
             str(entry["email"] or "").casefold(),
         ),
     )
     candidates = sorted(
-        (
-            role_entry(user)
-            for user in users
-            if user is not owner and not user.is_admin
-        ),
+        (role_entry(user) for user in users if user is not owner and not user.is_admin),
         key=lambda entry: (
             str(entry["name"] or "").casefold(),
             str(entry["email"] or "").casefold(),
         ),
     )
     return [role_entry(owner, primary_owner=True), *additional], candidates
+
+
+# @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
+# @matrix owner : authentication-email delegated-handoff identity-metadata provider-cleanup
+def _installation_access_payload():
+    """Return an Owner-safe view of saved operator and provider identities."""
+    owner_email = str(getattr(CONFIG, "ADMIN_EMAIL", "") or "").strip().casefold()
+    installer_email = str(
+        getattr(CONFIG, "INSTALLER_EMAIL", "") or ""
+    ).strip().casefold()
+    deployer_email = str(
+        getattr(CONFIG, "DEPLOYER_EMAIL", "") or ""
+    ).strip().casefold()
+    bootstrap_email = str(
+        getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or ""
+    ).strip().casefold()
+    delegated = bool(
+        owner_email and installer_email and owner_email != installer_email
+    )
+    application_handoff_complete = bool(
+        delegated and deployer_email == owner_email and not bootstrap_email
+    )
+
+    if application_handoff_complete:
+        state = "application-complete"
+        summary = "Owner is the saved deployer; installer bootstrap is closed"
+    elif delegated:
+        state = "pending"
+        summary = "Delegated handoff is still pending"
+    else:
+        state = "owner-managed"
+        summary = "Owner-managed installation"
+
+    auth_email = getattr(CONFIG, "AUTH_EMAIL_CONFIG", None) or {}
+    if not isinstance(auth_email, dict):
+        auth_email = {}
+    auth_service = str(auth_email.get("service") or "").strip()
+    auth_sender = str(auth_email.get("senderEmail") or "").strip().casefold()
+    auth_login = str(auth_email.get("username") or "").strip().casefold()
+    installer_controls_auth_email = bool(
+        installer_email
+        and installer_email in {auth_sender, auth_login}
+    )
+
+    project_id = str(
+        getattr(CONFIG, "GOOGLE_CLOUD_PROJECT", "") or ""
+    ).strip()
+    return {
+        "state": state,
+        "summary": summary,
+        "delegated": delegated,
+        "application_handoff_complete": application_handoff_complete,
+        "project_id": project_id,
+        "project_iam_url": (
+            "https://console.cloud.google.com/iam-admin/iam"
+            f"?project={project_id}"
+        ),
+        "owner_email": owner_email,
+        "installer_email": installer_email,
+        "deployer_email": deployer_email,
+        "bootstrap_admin_email": bootstrap_email,
+        "runtime_service_account": str(
+            getattr(CONFIG, "RUNTIME_SERVICE_ACCOUNT_EMAIL", "") or ""
+        ).strip().casefold(),
+        "authentication_email": {
+            "configured": bool(auth_email),
+            "service": auth_service,
+            "sender_email": auth_sender,
+            "login": auth_login,
+            "uses_installer": installer_controls_auth_email,
+        },
+    }
 
 
 # @testable false
@@ -129,6 +202,7 @@ def _role_target(identifier):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
+# @pair entities:delete
 @internal.route("/delete/<key>", methods=["GET"])
 @permission(requested=Action.DELETE)
 def delete(key, **kwargs):
@@ -144,8 +218,7 @@ def delete(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
-# @features offline
-# @dimensions indicator
+# @pair offline:indicator
 @home.route("/offline", methods=["GET"])
 def offline():
     g.NO_CACHE = True
@@ -155,7 +228,7 @@ def offline():
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
-# @pairs cache:redis-connection cache:current
+# @matrix cache : current redis-connection
 @internal.route("/rebuild-cache", methods=["POST"])
 @permission(Resource.SITE)
 def rebuild_cache():
@@ -170,7 +243,7 @@ def rebuild_cache():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
-# @pairs admin:site-update admin:success
+# @matrix admin : site-update success
 @internal.route("/site-update", methods=["POST"])
 @permission(Resource.SITE)
 def site_update():
@@ -186,12 +259,11 @@ def site_update():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
-# @features admin
-# @dimensions site-settings admin-only public-preview metadata
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
+# @matrix admin owner : admin-only identity-metadata public-preview site-settings
 @internal.route("/site-settings", methods=["GET"])
-@permission(Resource.SITE)
+@permission(Resource.SITE, no_store=True)
 def site_settings():
-    g.NO_CACHE = True
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
     google_console_url = "https://console.cloud.google.com"
 
@@ -280,7 +352,7 @@ def site_settings():
             }
         )
 
-    entity = database.get.site_image()
+    entity = site_database.image()
     if entity:
         site_image_response = _site_image_response(dict(entity))
     else:
@@ -289,25 +361,28 @@ def site_settings():
     ai_settings, ai_model_options = load_ai_settings_payload(config=CONFIG)
 
     administrators, administrator_candidates = _administrator_payload()
-    return responses.json_response(
-        {
-            "ai_settings": ai_settings,
-            "ai_model_options": ai_model_options,
-            "deployment": load_deployment_settings(config=CONFIG),
-            "site_image": site_image_response,
-            "service_providers": links,
-            "migration_status": database_migrations.get_migration_status(),
-            "administrators": administrators,
-            "administrator_candidates": administrator_candidates,
-            "can_manage_administrators": current_user.is_owner,
-            "can_view_sensitive_configuration": current_user.is_owner,
-        }
-    )
+    payload = {
+        "ai_settings": ai_settings,
+        "ai_model_options": ai_model_options,
+        "deployment": load_deployment_settings(config=CONFIG),
+        "site_image": site_image_response,
+        "service_providers": links,
+        "migration_status": database_migrations.get_migration_status(),
+        "administrators": administrators,
+        "administrator_candidates": administrator_candidates,
+        "can_manage_administrators": current_user.is_owner,
+        "can_view_sensitive_configuration": current_user.is_owner,
+    }
+    if current_user.is_owner:
+        installation_access = _installation_access_payload()
+        if installation_access["delegated"]:
+            payload["installation_access"] = installation_access
+    return responses.json_response(payload)
 
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
-# @pairs admin:promotion owner:owner-only cache:cache-invalidation
+# @pairs admin:promotion cache:cache-invalidation cache:invalidation-acknowledgement owner:owner-only
 @internal.route("/site-administrators", methods=["POST"])
 @owner_only
 def promote_site_administrator():
@@ -332,12 +407,17 @@ def promote_site_administrator():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
-# @pairs admin:demotion owner:owner-only cache:cache-invalidation
-# @pair admin:account-preservation
-@internal.route("/site-administrators/<key>", methods=["DELETE"])
+# @matrix admin : account-preservation confirmation-modal demotion
+# @pairs cache:cache-invalidation cache:invalidation-acknowledgement owner:owner-only
+@internal.route("/site-administrators/<key>", methods=["GET", "DELETE"])
 @owner_only
 def demote_site_administrator(key):
     target = _role_target(key)
+    if request.method == "GET":
+        return render_template(
+            "delete/site_administrator.html",
+            administrator=target,
+        )
     if target.is_admin:
         target.is_admin = False
         target.save()
@@ -354,8 +434,7 @@ def demote_site_administrator(key):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
-# @features admin
-# @dimensions deployment-settings metadata validation
+# @matrix admin : deployment-settings metadata validation
 @internal.route("/set-deployment-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_deployment_settings():
@@ -366,14 +445,13 @@ def set_deployment_settings():
     except DeploymentSettingsError as e:
         return responses.error(str(e))
 
-    database.save_site_deployment(deployment)
+    site_database.save_deployment(deployment)
     return responses.json_response({"deployment": deployment})
 
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
-# @features admin
-# @dimensions ai-settings validation
+# @matrix admin : ai-settings validation
 @internal.route("/set-ai-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_ai_settings():
@@ -390,7 +468,7 @@ def set_ai_settings():
     except AISettingsError as e:
         return responses.error(str(e))
 
-    database.save_site_ai(ai_settings)
+    site_database.save_ai(ai_settings)
     return responses.json_response(
         {
             "ai_settings": ai_settings,
@@ -400,9 +478,34 @@ def set_ai_settings():
 
 
 # @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
+# @matrix admin public-pages : live-settings sitemap-invalidation validation
+@internal.route("/site-settings/public-pages", methods=["GET", "POST"])
+@permission(Resource.SITE, no_store=True)
+def set_public_page_settings():
+    current = public_page_service.runtime_settings(config=CONFIG)
+    if request.method == "GET":
+        return responses.json_response({"public_pages": current})
+
+    data = request.form if request.form else request.get_json(silent=True) or {}
+    try:
+        settings = normalize_public_page_settings(
+            data,
+            current_settings=current,
+        )
+    except ValueError as error:
+        return responses.error(str(error))
+
+    site_database.save_public_pages(settings)
+    cache.invalidate_public_discovery()
+    return responses.json_response({"public_pages": settings})
+
+
+# @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
-# @pairs owner:sensitive-configuration owner:configuration
+# @matrix owner : configuration sensitive-configuration
+# @pair admin:site-settings
 @internal.route("/site-configuration", methods=["GET"])
 @owner_only
 def site_configuration():
@@ -412,8 +515,7 @@ def site_configuration():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @features admin
-# @dimensions site-image-upload generated-images public-preview metadata
+# @matrix admin : generated-images metadata public-preview site-image-upload
 @internal.route("/set-site-image", methods=["POST"])
 @permission(Resource.SITE)
 def set_site_image():
@@ -448,8 +550,8 @@ def set_site_image_direct():
 # @tests tests_e2e/001_site/test_001a_environment.py::test_ping_notification_state_is_redis_only_and_optional
 # @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
 # @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
-# @pairs notifications:ping notifications:redis-projection
-# @pair web-headers:notification-state
+# @matrix notifications : ping redis-projection
+# @pairs offline:server-health server:initialization web-headers:notification-state
 @internal.route("/ping")
 def ping():
     g.NO_CACHE = True
@@ -466,8 +568,7 @@ def ping():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_privacy_policy_is_public
-# @features privacy public-pages
-# @dimensions anonymous-access document-load
+# @matrix privacy public-pages : anonymous-access document-load
 @home.route("/privacy-policy", methods=["GET"])
 def privacy_policy():
     return responses.privacy_policy()
@@ -475,8 +576,7 @@ def privacy_policy():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_reporting_privacy_notice_is_public
-# @features privacy public-pages error-reporting
-# @dimensions anonymous-access document-load maintainer-destination
+# @matrix error-reporting privacy public-pages : anonymous-access document-load maintainer-destination
 @home.route("/reporting_privacy", methods=["GET"])
 def reporting_privacy():
     return responses.reporting_privacy()
@@ -484,6 +584,7 @@ def reporting_privacy():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
+# @pair login:remember-cookie
 @internal.route("/token")
 def refresh_token():
     g.NO_CACHE = True
@@ -492,8 +593,7 @@ def refresh_token():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
-# @features login
-# @dimensions page-load form-state
+# @matrix login : form-state page-load
 @internal.route("/identity-config")
 def identity_config():
     g.NO_CACHE = True
@@ -502,18 +602,44 @@ def identity_config():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
+# @tests tests_e2e/001_site/test_001a_environment.py::test_update_session_rejects_invalid_timezone_and_location_atomically
+# @matrix location session timezone : atomic-update coordinates validation
+# @pair login:remember-cookie
 @internal.route("/update-session", methods=["POST"])
 @logged_in
 def update_session():
-    if request.json.get("timezone"):
-        tz = request.json.get("timezone")
-        session["timezone"] = tz
-        if current_user.db.get("timezone") != tz:
-            current_user.db["timezone"] = tz
-            current_user.save()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return responses.error("Invalid session update.")
 
-    if request.json.get("location"):
-        session["location"] = json.dumps(request.json.get("location"))
+    timezone = None
+    if "timezone" in data:
+        timezone = data["timezone"].strip() if isinstance(data["timezone"], str) else ""
+        try:
+            if not timezone:
+                raise ValueError("timezone is empty")
+            ZoneInfo(timezone)
+        except (ValueError, ZoneInfoNotFoundError):
+            return responses.error("Invalid session update.")
+
+    location = None
+    if "location" in data:
+        location = places.normalize_location_coordinates(data["location"])
+        if location is None:
+            return responses.error("Invalid session update.")
+
+    save_user = False
+    if timezone is not None:
+        session["timezone"] = timezone
+        if current_user.db.get("timezone") != timezone:
+            current_user.db["timezone"] = timezone
+            save_user = True
+
+    if location is not None:
+        session["location"] = json.dumps(location, separators=(",", ":"))
+
+    if save_user:
+        current_user.save()
 
     return responses.json_response({"userHash": current_user.hash})
 
@@ -527,8 +653,8 @@ def update_session():
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_access_can_read_create_report_without_create_actions
-# @features cache
-# @dimensions invalidation-acknowledgement
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
+# @pair cache:invalidation-acknowledgement
 @internal.route("/validate-user", methods=["POST"])
 @logged_in
 def validate_user():

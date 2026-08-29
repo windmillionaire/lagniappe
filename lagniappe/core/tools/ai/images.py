@@ -24,8 +24,7 @@ Respond with ONLY the ratio (e.g. "3:4"). Nothing else.
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_image_prompting_and_aspect_ratio_selection
-# @features ai
-# @dimensions image-prompt aspect-ratio fallback
+# @matrix ai : aspect-ratio fallback image-prompt
 def _choose_aspect_ratio(prompt):
     """Ask the text model to recommend an aspect ratio from the image context."""
     ratio_prompt = Prompt(type="image aspect ratio")
@@ -52,8 +51,7 @@ def _choose_aspect_ratio(prompt):
 # @testable true
 # @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
 # @tests tests_unit/test_015_ai_tools.py::test_generate_ai_image_returns_clean_provider_message
-# @features pages ai
-# @dimensions image-generate
+# @matrix ai pages : image-generate
 def generate_ai_image(prompt):
     """Generate an image from a Prompt and return a BytesIO buffer."""
     try:
@@ -67,8 +65,7 @@ def generate_ai_image(prompt):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_image_prompting_and_aspect_ratio_selection
-# @features ai
-# @dimensions image-prompt
+# @pair ai:image-prompt
 def page_image_generation_prompt(**kwargs):
     """Build the AI prompt for generating an image from page context.
 

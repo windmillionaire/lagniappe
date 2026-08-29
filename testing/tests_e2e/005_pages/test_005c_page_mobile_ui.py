@@ -1,20 +1,10 @@
-"""
-Tests for page mobile navigation and mobile-only actions.
-
-Verified against:
-- lagniappe/web/templates/pages/page.html
-- lagniappe/web/templates/pages/tasks.html
-- src/script/views/page.mjs
-- src/script/views/base/entity.mjs
-"""
-
 import pytest
 from playwright.sync_api import expect
 
 from testing.definitions import Pages, Users
 from testing.elements import FormElements, MobileNav, Tabs
 from testing.resources import Page
-from testing.utility import scoped_browser_route
+from testing.utility.network import scoped_browser_route
 
 pytestmark = pytest.mark.e2e
 
@@ -26,7 +16,6 @@ def _empty_main_script(route):
 # @template pages/page.html::main
 # @style entity.tabIcon
 def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
-    """Desktop tab icons never paint while a phone layout is unresolved."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     page.user = user
@@ -44,10 +33,8 @@ def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
     expect(user.locate(page.MOBILE_NAV)).to_be_hidden()
 
 
-# @features entity-layout
-# @dimensions page-mobile nav visibility
+# @matrix entity-layout : nav page-mobile visibility
 def test_page_mobile_nav_replaces_desktop_tabs(get_user):
-    """The page switches from desktop tabs to mobile section navigation."""
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_page_loads)
 
@@ -63,10 +50,8 @@ def test_page_mobile_nav_replaces_desktop_tabs(get_user):
     assert mobile_nav.get_section_title() == "Info"
 
 
-# @features entity-layout
-# @dimensions page-mobile flipper
+# @matrix entity-layout : flipper page-mobile
 def test_page_mobile_flipper_reveals_sections(get_user):
-    """The mobile flipper exposes the page sections a user can visit."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)
@@ -83,10 +68,8 @@ def test_page_mobile_flipper_reveals_sections(get_user):
     expect(user.locate(Tabs.FILES_TOGGLE_MOBILE)).to_be_visible()
 
 
-# @features entity-layout
-# @dimensions page-mobile section-switch
+# @matrix entity-layout : page-mobile section-switch
 def test_page_mobile_section_switching_updates_visible_panel_and_title(get_user):
-    """A phone user moves between document, tasks, files, and info."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)
@@ -109,29 +92,21 @@ def test_page_mobile_section_switching_updates_visible_panel_and_title(get_user)
     assert mobile_nav.get_section_title() == "Info"
 
 
-# @features entity-layout
-# @dimensions page-mobile task-create
+# @matrix entity-layout : page-mobile task-create
 def test_page_mobile_create_task_opens_from_tasks_section(get_user):
-    """The mobile page header keeps the new-task action close to the Tasks section."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)
 
     page.mobile_nav.select_section("tasks:active")
 
-    # create_button = user.locate(Page.MOBILE_CREATE_TASK_BUTTON)
-    # expect(create_button).to_be_visible()
-    # create_button.click()
-
     create_form = user.locate(Page.CREATE_TASK_FORM)
     expect(create_form).to_be_visible()
     expect(create_form.locator(FormElements.NAME)).to_be_visible()
 
 
-# @features entity-layout
-# @dimensions page-mobile reload persistence
+# @matrix entity-layout : page-mobile persistence reload
 def test_page_mobile_selection_persists_after_reload(get_user):
-    """The page restores the last mobile section after a full reload."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)

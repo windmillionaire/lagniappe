@@ -1,18 +1,17 @@
-import { debounce, ENDPOINTS, request } from "../../shared";
-import { Combobox } from "./combobox";
+import { ENDPOINTS, request } from "../../shared";
+import { RemoteQueryCombobox } from "./remote";
 import { Results } from "./results";
 import { Submitter } from "./submitter";
 
 /**
  * @testable infrastructure
  */
-export class FacetsBox extends Submitter(Combobox) {
+export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_create_visible_for_category_editor
 	 * @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
-	 * @features combobox
-	 * @dimensions permission-filter
+	 * @pair combobox:permission-filter
 	 */
 	constructor(element, args = {}) {
 		super(element);
@@ -37,19 +36,15 @@ export class FacetsBox extends Submitter(Combobox) {
 			index = `${this.index}-no-models`;
 		}
 		this.results = new Results(index);
-		this._searchSequence = 0;
-
-		this._input = this._input.bind(this);
-	}
-
-	init() {
-		this.element.addEventListener("input", debounce(this._input, 200));
-
-		super.init();
 	}
 
 	_input(event) {
-		this._search(event.target.value.trim());
+		const query = event.target.value.trim();
+		if (query) return this._search(query);
+
+		this.settleQueryInput();
+		this.updatePanel(this.results.create());
+		return this.showPanel();
 	}
 
 	elementClick(event) {
@@ -59,11 +54,11 @@ export class FacetsBox extends Submitter(Combobox) {
 
 	selectOption(option) {
 		if (option.dataset.command === "create") {
-			this._createOption(option);
-			return;
+			return this._createOption(option);
 		}
 		if (!option.dataset.id) return;
 
+		this.invalidateQuery();
 		super.selectOption(option);
 		this.results.save(option);
 	}
@@ -72,8 +67,7 @@ export class FacetsBox extends Submitter(Combobox) {
 		return this.options.filter((o) => this.values.has(o.id));
 	}
 
-	async _search(query) {
-		const searchSequence = ++this._searchSequence;
+	_search(query) {
 		const selectedHashes = this.options
 			.filter((o) => this.values.has(o.id))
 			.map((o) => o.hash);
@@ -90,49 +84,60 @@ export class FacetsBox extends Submitter(Combobox) {
 			params.append("preload", hash);
 		});
 
-		const response = await request.get(this.endpoint, params);
-		if (
-			searchSequence !== this._searchSequence ||
-			query !== this.element.value.trim()
-		) {
-			return;
-		}
-		if (response.ok) {
-			const html = response.results || null;
-			this.updatePanel(html);
-		}
-		this.showPanel();
+		return this.runQuery(
+			query,
+			(token) => request.get(this.endpoint, params, { signal: token.signal }),
+			(response) => {
+				if (response?.ok) {
+					this.updatePanel(response.results || null);
+				} else {
+					this.clearQueryResults();
+				}
+				return this.showPanel();
+			},
+		);
 	}
 
-	async _createOption(option) {
-		this._searchSequence++;
+	_createOption(option) {
 		const selectedOptions = this.selectedOptions;
+		const query = this.element.value.trim();
+		this.hidePanel();
 		const data = new FormData();
-		data.set("name", option.dataset.name || this.element.value.trim());
+		data.set("name", option.dataset.name || query);
 		Object.entries(this.indexArgs).forEach(([key, value]) => {
 			data.set(key, value);
 		});
 
-		const response = await request.post(`${this.endpoint}/create`, data);
-		if (!response.ok) return;
+		const key = `create:${query}`;
+		return this.runQuery(
+			key,
+			() => request.post(`${this.endpoint}/create`, data),
+			(response) => {
+				if (!response?.ok) return;
 
-		let html = response.results || null;
-		if (this.multiple && response.option) {
-			html = this.results.create(
-				[...selectedOptions, response.option].filter(
-					(item, index, items) =>
-						item?.id && items.findIndex((i) => i?.id === item.id) === index,
-				),
-			);
-		}
+				let html = response.results || null;
+				if (this.multiple && response.option) {
+					html = this.results.create(
+						[...selectedOptions, response.option].filter(
+							(item, index, items) =>
+								item?.id && items.findIndex((i) => i?.id === item.id) === index,
+						),
+					);
+				}
 
-		this.updatePanel(html);
-		const created = [
-			...(this.panel?.querySelectorAll("[role='option'][data-id]") || []),
-		].find((item) => item.dataset.id === response.option?.id);
-		if (!created) return;
+				this.updatePanel(html);
+				const created = [
+					...(this.panel?.querySelectorAll("[role='option'][data-id]") || []),
+				].find((item) => item.dataset.id === response.option?.id);
+				if (!created) return;
 
-		super.selectOption(created);
-		this.results.save(created);
+				super.selectOption(created);
+				this.results.save(created);
+			},
+			{
+				cancelTransport: false,
+				getCurrentKey: () => `create:${this.element.value.trim()}`,
+			},
+		);
 	}
 }

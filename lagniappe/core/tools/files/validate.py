@@ -5,14 +5,13 @@ import io
 import re
 
 from ... import exceptions
-from ..utility import short_hash, short_uuid
+from ...definitions.identifiers import short_hash, short_uuid
 
 
 # @testable true
 # @tests tests_unit/test_006a_ingress_csv.py::test_categorical_detection
 # @tests tests_unit/test_006a_ingress_csv.py::test_string_fallback
-# @features ingress-csv
-# @dimensions type-inference categorical fallback
+# @matrix ingress-csv : categorical fallback type-inference
 def infer_column_types(rows, columns):
     """Infer column types (string, number, date, etc.) by sampling row values.
 
@@ -40,8 +39,7 @@ def infer_column_types(rows, columns):
 
     # @testable true
     # @tests tests_unit/test_006a_ingress_csv.py::test_phone_detection
-    # @features ingress-csv
-    # @dimensions type-inference phone
+    # @matrix ingress-csv : phone type-inference
     def is_phone_number(s: str) -> bool:
         digits = "".join(c for c in s if c.isdigit())
         return 10 <= len(digits) <= 15
@@ -49,43 +47,37 @@ def infer_column_types(rows, columns):
     # @testable true
     # @tests tests_unit/test_006a_ingress_csv.py::test_url_detection
     # @tests tests_unit/test_006a_ingress_csv.py::test_url_detection_rejects_long_unsupported_path_within_deadline
-    # @features ingress-csv
-    # @dimensions type-inference url
+    # @matrix ingress-csv : type-inference url
     def is_url(s: str) -> bool:
         return bool(url_pattern.match(s.lower().strip()))
 
     # @testable true
     # @tests tests_unit/test_006a_ingress_csv.py::test_email_detection
-    # @features ingress-csv
-    # @dimensions type-inference email
+    # @matrix ingress-csv : email type-inference
     def is_email(s: str) -> bool:
         return bool(email_pattern.match(s.lower().strip()))
 
     # @testable true
     # @tests tests_unit/test_006a_ingress_csv.py::test_multi_categorical_detection
-    # @features ingress-csv
-    # @dimensions type-inference multi-categorical
+    # @matrix ingress-csv : multi-categorical type-inference
     def has_multiple_values(s: str) -> bool:
         return bool(multiple_value_pattern.search(s))
 
     # @testable true
     # @tests tests_unit/test_006a_ingress_csv.py::test_number_detection
-    # @features ingress-csv
-    # @dimensions type-inference number
+    # @matrix ingress-csv : number type-inference
     def is_numeric(s: str) -> bool:
         return str(s).replace(".", "").replace("-", "").isdigit()
 
     # @testable true
     # @tests tests_unit/test_006a_ingress_csv.py::test_date_detection
-    # @features ingress-csv
-    # @dimensions type-inference date
+    # @matrix ingress-csv : date type-inference
     def is_date(s: str) -> bool:
         return any(pattern.match(str(s)) for pattern in date_patterns)
 
     # @testable true
     # @tests tests_unit/test_006a_ingress_csv.py::test_boolean_detection
-    # @features ingress-csv
-    # @dimensions type-inference boolean
+    # @matrix ingress-csv : boolean type-inference
     def is_boolean(s: str) -> bool:
         return str(s).lower() in boolean_values
 
@@ -203,8 +195,7 @@ def extract_options(rows, column):
 # @tests tests_unit/test_006a_ingress_csv.py::test_header_only_raises
 # @tests tests_unit/test_006a_ingress_csv.py::test_no_header_raises
 # @tests tests_unit/test_006a_ingress_csv.py::test_rows_keyed_by_column_id
-# @features ingress-csv
-# @dimensions delimiter empty-rows validation column-ids
+# @matrix ingress-csv : column-ids delimiter empty-rows validation
 def process_csv(text):
     """Parse CSV text into structured rows, columns, and inferred types.
 
@@ -278,8 +269,7 @@ def create_options(values, column_schema):
 
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_builds_or_selects_the_submission_form
-# @features ingress form
-# @dimensions choose-form schema-generation default-form
+# @matrix form ingress : choose-form default-form schema-generation
 def create_schema(columns, rows):
     """Generate a form schema from inferred column types and row data.
 

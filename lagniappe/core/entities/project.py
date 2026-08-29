@@ -9,8 +9,7 @@ from .index import TaskIndex
 
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_description_and_attributes
-# @features project
-# @dimensions update
+# @pair project:update
 class Project(Entity, AssetMixin):
     entity_kind = "project"
 
@@ -78,8 +77,7 @@ class Project(Entity, AssetMixin):
 
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_description_and_attributes
-    # @features project
-    # @dimensions update identity attributes description
+    # @matrix project : attributes description identity update
     def update(self, data):
         self.name = data["name"]
         self.description = data.get("description")

@@ -3,8 +3,7 @@ import { ICONS } from "icons";
 /**
  * @testable true
  * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
- * @features frontend-icons
- * @dimensions registry lookup nested-ids
+ * @matrix frontend-icons : lookup nested-ids registry
  */
 export const iconDefinition = (name) => {
 	let definition = ICONS;
@@ -18,8 +17,7 @@ export const iconDefinition = (name) => {
 /**
  * @testable true
  * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
- * @features frontend-icons
- * @dimensions semantic-markup fill weight animation accessibility
+ * @matrix frontend-icons : accessibility animation fill semantic-markup weight
  */
 export const setIcon = (element, name, classes = "") => {
 	const definition = iconDefinition(name);
@@ -52,8 +50,7 @@ export const setIcon = (element, name, classes = "") => {
 /**
  * @testable true
  * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
- * @features frontend-icons
- * @dimensions semantic-markup element-creation
+ * @matrix frontend-icons : element-creation semantic-markup
  */
 export const createIcon = (name, classes = "") => {
 	return setIcon(document.createElement("span"), name, classes);

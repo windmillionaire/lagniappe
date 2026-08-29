@@ -62,8 +62,7 @@ class ColumnMixin:
 
     # @testable true
     # @tests tests_unit/test_008_page_properties.py::test_column_editable_does_not_load_page_tasks
-    # @features page
-    # @dimensions table-editability task-load
+    # @matrix page : table-editability task-load
     @property
     def editable(self):
         return (
@@ -78,8 +77,7 @@ class ColumnMixin:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_column_and_filter_contract_errors_are_explicit
-    # @features property
-    # @dimensions column validation
+    # @matrix property : column validation
     @property
     def ordering(self):
         ordering = getattr(self, "_ordering", False)

@@ -1,5 +1,6 @@
 import { STYLES } from "styles";
 import { setIcon } from "../../shared/icons";
+import { localStore } from "../../shared/storage";
 import { formatting } from "../formatting";
 
 const SEARCH_ENTITY_PATTERN = /&(#(?:x[0-9a-f]+|\d+)|amp|apos|gt|lt|quot);/gi;
@@ -173,7 +174,11 @@ export class Results {
 	}
 
 	get options() {
-		return JSON.parse(localStorage.getItem(`recent-${this.index}`) || "[]");
+		const key = `recent-${this.index}`;
+		const recent = localStore.getJSON(key, []);
+		if (Array.isArray(recent)) return recent;
+		localStore.remove(key);
+		return [];
 	}
 
 	add(option) {
@@ -194,10 +199,7 @@ export class Results {
 			filtered.unshift(details);
 		}
 		if (Array.isArray(filtered)) {
-			localStorage.setItem(
-				`recent-${this.index}`,
-				JSON.stringify(filtered.slice(0, 10)),
-			);
+			localStore.setJSON(`recent-${this.index}`, filtered.slice(0, 10));
 		}
 	}
 
@@ -211,10 +213,8 @@ export class Results {
 	 * @testable true
 	 * @tests tests_js/test_023_entity_name_formatting.py::test_recent_combobox_results_reuse_shared_parent_name_formatting
 	 * @tests tests_js/test_023_entity_name_formatting.py::test_recent_search_snippets_allow_only_highlight_markup
-	 * @pair combobox:parent-separator
-	 * @pair combobox:recent-results
-	 * @pair entity-name:recent-results
-	 * @pair search:snippet-safety
+	 * @matrix combobox : parent-separator recent-results
+	 * @pairs entity-name:recent-results search:snippet-safety
 	 */
 	create(items = []) {
 		let options = items;

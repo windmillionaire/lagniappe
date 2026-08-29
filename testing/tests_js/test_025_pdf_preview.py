@@ -47,8 +47,7 @@ const PDFPreview = context.PDFPreview;
     run_node(script)
 
 
-# @features file
-# @dimensions pdf-preview loading-state view-transition
+# @matrix file : loading-state pdf-preview view-transition
 def test_pdf_preview_loading_does_not_block_widget_reconciliation(run_node):
     run_pdf_preview_check(
         run_node,
@@ -78,8 +77,7 @@ if (status !== "Loading preview") {
     )
 
 
-# @features file
-# @dimensions pdf-preview revisit view-transition
+# @matrix file : pdf-preview revisit view-transition
 def test_pdf_preview_revisit_does_not_await_pending_rasterization(run_node):
     run_pdf_preview_check(
         run_node,

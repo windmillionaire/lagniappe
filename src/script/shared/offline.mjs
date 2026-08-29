@@ -6,18 +6,13 @@ const MUTATION_STORE = "mutations";
 /**
  * @testable true
  * @tests tests_js/test_028_form_state_split.py::test_offline_database_upgrade_discards_legacy_activity_records
- * @features offline
- * @dimensions database-upgrade legacy-record-discard mutation-store
+ * @matrix offline : database-upgrade legacy-record-discard mutation-store
  */
 function openDB() {
 	return new Promise((resolve, reject) => {
 		const request = indexedDB.open(DB_NAME, DB_VERSION);
 		request.onerror = () => reject(request.error);
-		request.onsuccess = () => {
-			const db = request.result;
-			db.onversionchange = () => db.close();
-			resolve(db);
-		};
+		request.onsuccess = () => resolve(request.result);
 		request.onupgradeneeded = (event) => {
 			const db = event.target.result;
 			if (event.oldVersion < 2) {
@@ -45,26 +40,118 @@ function openDB() {
 }
 
 /**
- * @testable false
- * @covered-by src/script/shared/offline.mjs::updateSyncRecord
- * @covered-by src/script/shared/offline.mjs::getAllOfflineRecords
- * @reason transaction wrapper is exercised through the offline record API
+ * @testable true
+ * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_operations_resolve_only_after_transaction_commit
+ * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_abort_and_errors_reject_once_and_close_the_database
+ * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_executor_failures_abort_and_preserve_the_original_error
+ * @matrix offline sync : connection-lifecycle error-ownership executor-error multi-delete readonly-result transaction-abort transaction-commit
  */
 function withTransaction(storeNames, mode, executor) {
 	return openDB().then(
 		(db) =>
 			new Promise((resolve, reject) => {
-				const tx = db.transaction(storeNames, mode);
-				tx.oncomplete = () => db.close();
-				tx.onerror = () => {
+				let tx = null;
+				let operationComplete = false;
+				let transactionComplete = false;
+				let operationResult;
+				let firstError = null;
+				let settled = false;
+				let databaseClosed = false;
+
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason connection closure is private transaction settlement plumbing
+				 */
+				const closeDatabase = () => {
+					if (databaseClosed) return;
+					databaseClosed = true;
+					db.onclose = null;
 					db.close();
-					reject(tx.error);
 				};
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason first-error retention is private transaction settlement plumbing
+				 */
+				const rememberError = (error) => {
+					firstError ||=
+						error || tx?.error || new Error("IndexedDB transaction failed");
+					return firstError;
+				};
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason rejection ownership is private transaction settlement plumbing
+				 */
+				const rejectOnce = (error) => {
+					if (settled) return;
+					settled = true;
+					closeDatabase();
+					reject(rememberError(error));
+				};
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason commit gating is private transaction settlement plumbing
+				 */
+				const resolveAfterCommit = () => {
+					if (settled || !operationComplete || !transactionComplete) return;
+					settled = true;
+					closeDatabase();
+					resolve(operationResult);
+				};
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason executor abort handling is private transaction settlement plumbing
+				 */
+				const abortWithError = (error) => {
+					rememberError(error);
+					try {
+						tx?.abort();
+					} catch {
+						// A transaction that already completed cannot be aborted. The
+						// original executor error remains the useful failure.
+					}
+					rejectOnce(firstError);
+				};
+
+				db.onversionchange = closeDatabase;
+				db.onclose = () => {
+					rejectOnce(new Error("IndexedDB database closed unexpectedly"));
+				};
+
 				try {
-					executor(tx, resolve, reject);
+					tx = db.transaction(storeNames, mode);
 				} catch (e) {
-					reject(e);
+					rejectOnce(e);
+					return;
 				}
+
+				tx.oncomplete = () => {
+					transactionComplete = true;
+					resolveAfterCommit();
+				};
+				tx.onerror = (event) => {
+					rejectOnce(event.target?.error || tx.error);
+				};
+				tx.onabort = () => {
+					rejectOnce(tx.error || new Error("IndexedDB transaction aborted"));
+				};
+
+				let operation;
+				try {
+					operation = executor(tx);
+				} catch (e) {
+					abortWithError(e);
+					return;
+				}
+				Promise.resolve(operation).then((result) => {
+					operationResult = result;
+					operationComplete = true;
+					resolveAfterCommit();
+				}, abortWithError);
 			}),
 	);
 }
@@ -86,36 +173,25 @@ function promisify(request) {
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
- * @features sync
- * @dimensions offline-replay replay-order queue-preserved
+ * @matrix sync : offline-replay queue-preserved replay-order
  */
 export function updateSyncRecord(record) {
 	const timestamp = Date.now();
-	return withTransaction(
-		SYNC_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			const store = tx.objectStore(SYNC_STORE);
-			try {
-				const existing = await promisify(store.get(record.sync_id));
-				const merged = existing
-					? {
-							...existing,
-							...record,
-							save: existing.save || record.save,
-							timestamp,
-						}
-					: { ...record, timestamp };
-				if (existing && !Object.hasOwn(record, "html")) delete merged.html;
-				if (existing && !Object.hasOwn(record, "mentions"))
-					delete merged.mentions;
-				await promisify(store.put(merged));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
+		const store = tx.objectStore(SYNC_STORE);
+		const existing = await promisify(store.get(record.sync_id));
+		const merged = existing
+			? {
+					...existing,
+					...record,
+					save: existing.save || record.save,
+					timestamp,
+				}
+			: { ...record, timestamp };
+		if (existing && !Object.hasOwn(record, "html")) delete merged.html;
+		if (existing && !Object.hasOwn(record, "mentions")) delete merged.mentions;
+		await promisify(store.put(merged));
+	});
 }
 
 /**
@@ -124,41 +200,28 @@ export function updateSyncRecord(record) {
  * @reason single-record lookup is owned by the widget state sync path
  */
 export function getSyncRecord(sync_id) {
-	return withTransaction(
-		[SYNC_STORE],
-		"readonly",
-		async (tx, resolve, reject) => {
-			try {
-				const record = await promisify(tx.objectStore(SYNC_STORE).get(sync_id));
-				resolve(record ?? null);
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction([SYNC_STORE], "readonly", async (tx) => {
+		const record = await promisify(tx.objectStore(SYNC_STORE).get(sync_id));
+		return record ?? null;
+	});
 }
 
 /**
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
- * @features sync
- * @dimensions offline-replay replay-order queue-preserved
+ * @matrix sync : offline-replay queue-preserved replay-order
  */
 export function getAllOfflineRecords() {
 	return withTransaction(
 		[SYNC_STORE, MUTATION_STORE],
 		"readonly",
-		async (tx, resolve, reject) => {
-			try {
-				const sync = await promisify(tx.objectStore(SYNC_STORE).getAll());
-				const mutations = await promisify(
-					tx.objectStore(MUTATION_STORE).getAll(),
-				);
-				resolve({ sync, mutations });
-			} catch (e) {
-				reject(e);
-			}
+		async (tx) => {
+			const sync = await promisify(tx.objectStore(SYNC_STORE).getAll());
+			const mutations = await promisify(
+				tx.objectStore(MUTATION_STORE).getAll(),
+			);
+			return { sync, mutations };
 		},
 	);
 }
@@ -169,62 +232,34 @@ export function getAllOfflineRecords() {
  * @reason single-record deletion is owned by successful state reconciliation
  */
 export function deleteSyncRecord(sync_id) {
-	return withTransaction(
-		SYNC_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			try {
-				await promisify(tx.objectStore(SYNC_STORE).delete(sync_id));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
+		await promisify(tx.objectStore(SYNC_STORE).delete(sync_id));
+	});
 }
 
 /**
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
- * @features sync
- * @dimensions offline-replay queue-clear
+ * @matrix sync : offline-replay queue-clear
  */
 export function deleteSyncRecords(sync_ids) {
 	if (!sync_ids?.length) return Promise.resolve();
-	return withTransaction(
-		SYNC_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			try {
-				const store = tx.objectStore(SYNC_STORE);
-				await Promise.all(sync_ids.map((id) => promisify(store.delete(id))));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
+		const store = tx.objectStore(SYNC_STORE);
+		await Promise.all(sync_ids.map((id) => promisify(store.delete(id))));
+	});
 }
 
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_create_mutations_persist_after_reload
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
- * @pairs offline:queue-create offline:queue-submit offline:reload
+ * @matrix offline : queue-create queue-submit reload
  */
 export function setOfflineMutation(record) {
-	return withTransaction(
-		MUTATION_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			try {
-				await promisify(tx.objectStore(MUTATION_STORE).put(record));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(MUTATION_STORE, "readwrite", async (tx) => {
+		await promisify(tx.objectStore(MUTATION_STORE).put(record));
+	});
 }
 
 /**
@@ -232,45 +267,24 @@ export function setOfflineMutation(record) {
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutations_replay_when_online
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
- * @features offline
- * @dimensions durable-queue server-first replay queue-submit
+ * @matrix offline : durable-queue queue-submit replay server-first
  */
 export function getOfflineMutations() {
-	return withTransaction(
-		MUTATION_STORE,
-		"readonly",
-		async (tx, resolve, reject) => {
-			try {
-				const records = await promisify(
-					tx.objectStore(MUTATION_STORE).getAll(),
-				);
-				resolve(records);
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(MUTATION_STORE, "readonly", async (tx) => {
+		return await promisify(tx.objectStore(MUTATION_STORE).getAll());
+	});
 }
 
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutations_replay_when_online
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
- * @pairs offline:replay offline:queue-clear offline:notification
+ * @matrix offline : notification queue-clear replay
  */
 export function deleteOfflineMutations(ids) {
 	if (!ids?.length) return Promise.resolve();
-	return withTransaction(
-		MUTATION_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			try {
-				const store = tx.objectStore(MUTATION_STORE);
-				await Promise.all(ids.map((id) => promisify(store.delete(id))));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(MUTATION_STORE, "readwrite", async (tx) => {
+		const store = tx.objectStore(MUTATION_STORE);
+		await Promise.all(ids.map((id) => promisify(store.delete(id))));
+	});
 }

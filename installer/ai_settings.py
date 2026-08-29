@@ -1,7 +1,6 @@
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_ai_settings_applies_saved_app_config
-# @features setup
-# @dimensions ai-settings datastore
+# @matrix setup : ai-settings datastore
 def get_ai_settings():
     from installer.utils import ensure_datastore_dependency
     from installer.image import DATASTORE_TIMEOUT, get_datastore_client

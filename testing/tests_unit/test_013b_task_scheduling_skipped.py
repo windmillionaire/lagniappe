@@ -1,8 +1,7 @@
 import pytest
 
 
-# @features task-scheduling
-# @dimensions skipped recurring periodic
+# @matrix task-scheduling : periodic recurring skipped
 @pytest.mark.unit
 def test_skipped_recurring(get_test_entities):
     """Test skipped calculation for recurring/periodic schedules.
@@ -20,8 +19,12 @@ def test_skipped_recurring(get_test_entities):
     # Use a fixed "today" for consistent testing
     mock_today = datetime(2025, 6, 15, 0, 0, 0, tzinfo=tz)
 
-    with patch("lagniappe.core.tools.dates.user_today", return_value=mock_today):
-        with patch("lagniappe.core.tools.dates.user_timezone", return_value=tz):
+    with patch(
+        "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
+    ):
+        with patch(
+            "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
+        ):
             for task in get_test_entities():
                 schedule_data = task.test_spec.get("schedule", {})
                 days_ago = task.test_spec.get("days_ago", 0)
@@ -46,8 +49,7 @@ def test_skipped_recurring(get_test_entities):
                 )
 
 
-# @features task-scheduling
-# @dimensions skipped scheduled
+# @matrix task-scheduling : scheduled skipped
 @pytest.mark.unit
 def test_skipped_scheduled(get_test_entities):
     """Test skipped calculation for scheduled schedules.
@@ -70,8 +72,12 @@ def test_skipped_scheduled(get_test_entities):
     # Use a fixed "today" for consistent testing - pick a Wednesday
     mock_today = datetime(2025, 6, 18, 0, 0, 0, tzinfo=tz)  # Wednesday
 
-    with patch("lagniappe.core.tools.dates.user_today", return_value=mock_today):
-        with patch("lagniappe.core.tools.dates.user_timezone", return_value=tz):
+    with patch(
+        "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
+    ):
+        with patch(
+            "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
+        ):
             for task in get_test_entities():
                 schedule_data = task.test_spec.get("schedule", {})
                 expected = task.test_spec.get("expected", {})

@@ -5,8 +5,7 @@ import { EmbeddedTableVisibility, ExpandedTableCell } from "../embeddedTable";
  * @testable true
  * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_results_expands_table_submission_cell
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell
- * @features embedded-table
- * @dimensions table-cell-expand visibility
+ * @matrix embedded-table : table-cell-expand visibility
  */
 export class EmbeddedTable {
 	constructor(attributes) {

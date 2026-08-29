@@ -6,7 +6,8 @@ from enum import Enum
 
 from lagniappe import CONFIG
 
-from ...definitions import DefaultEnum, Restriction
+from ...definitions.default import DefaultEnum
+from ...restrictions import Restriction
 
 SEARCH_SCORE_FIELD = "search_score"
 
@@ -24,6 +25,9 @@ class Keys(Enum):
     NOTIFICATION_EPOCH = f"{CONFIG.PREFIX}NOTIFICATIONS:EPOCH:{{}}"
     OPERATION = f"{CONFIG.PREFIX}OPERATIONS:{{}}"
     OWNER_PROJECTION = f"{CONFIG.PREFIX}OWNER_PROJECTION"
+    PUBLIC_DIRECTORY = f"{CONFIG.PREFIX}PUBLIC:DIRECTORY"
+    PUBLIC_DISCOVERY_EPOCH = f"{CONFIG.PREFIX}PUBLIC:DISCOVERY:EPOCH"
+    SITEMAP = f"{CONFIG.PREFIX}PUBLIC:SITEMAP"
 
     # @testable infrastructure
     def key(self, entity):

@@ -7,8 +7,7 @@ from .base_property import Property
 # @tests tests_unit/test_002_entity_general_properties.py::test_db_property_blanks_pop_but_explicit_false_persists
 # @tests tests_unit/test_002_entity_general_properties.py::test_db_property_custom_blank_values_can_keep_empty_lists
 # @tests tests_unit/test_002_entity_general_properties.py::test_db_property_write_refreshes_entity_details_and_cache
-# @features db-property
-# @dimensions missing-key explicit-false blank-values custom-blank-values cache-invalidation
+# @matrix db-property : blank-values cache-invalidation custom-blank-values explicit-false missing-key
 class DBProperty(Property):
     """Property that persists its value in entity.db.
 

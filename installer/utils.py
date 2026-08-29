@@ -54,8 +54,7 @@ def print_summary():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_input_retries_allows_empty_and_exits
-# @features setup
-# @dimensions interactive-input
+# @pair setup:interactive-input
 def validate_input(
     prompt,
     validation_fn=None,
@@ -109,8 +108,7 @@ def validate_input(
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @features setup
-# @dimensions gcloud-command
+# @pair setup:gcloud-command
 def check_gcloud_cli():
     if not GCLOUD_CLI:
         print(
@@ -123,8 +121,7 @@ def check_gcloud_cli():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @features setup
-# @dimensions gcloud-command
+# @pair setup:gcloud-command
 def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
     """Run a shell command and return the result."""
     try:
@@ -138,9 +135,6 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
         )
         return result
     except subprocess.CalledProcessError as e:
-        print(f"Error running command: {' '.join(command)}")
-        if e.stderr:
-            print(f"Error: {e.stderr}")
         if check:
             raise classify_provider_error(
                 e,
@@ -159,22 +153,52 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @features setup
-# @dimensions deploy gcloud-command
-def deploy_to_app_engine(*, print_final_summary=True):
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_legacy_upgrade_warning_can_cancel_before_provider_deploy
+# @matrix setup : deploy failure gcloud-command progress
+# @pairs migrations:deploy setup:legacy-upgrade setup:major-version
+def deploy_to_app_engine(
+    *,
+    print_final_summary=True,
+    upgrade_notice_handled=False,
+):
     from config import SETTINGS
+    from installer import FORMATTER
+    from installer.upgrade_notice import (
+        confirm_legacy_upgrade_deployment,
+        legacy_upgrade_deploy_notice_required,
+        print_post_upgrade_maintenance_steps,
+    )
     from runner.deploy import deploy
 
-    print(
-        "Deploying the App Engine indexes and application may take up to "
-        "10 minutes. Deployment progress will appear below."
+    f = FORMATTER.initialize()
+    legacy_upgrade_notice = (
+        not upgrade_notice_handled
+        and legacy_upgrade_deploy_notice_required(SETTINGS)
     )
-    deploy(
-        build_assets=False,
-        deploy_indexes=True,
-        quiet=True,
-        announce_completion=False,
+    if legacy_upgrade_notice:
+        target_version = str(
+            SETTINGS.APP.get("VERSION") or SETTINGS.NODE.get("version") or ""
+        ).strip()
+        confirm_legacy_upgrade_deployment(f, target_version)
+
+    progress = f.success(
+        "Deploy App Engine indexes and application "
+        "(may take up to 10 minutes)"
     )
+    with f.yaspin(text=progress) as spinner:
+        try:
+            deploy(
+                build_assets=False,
+                deploy_indexes=True,
+                quiet=True,
+                capture_output=True,
+                announce_progress=False,
+                announce_completion=False,
+            )
+        except Exception:
+            spinner.fail(f.fail_glyph)
+            raise
+        spinner.ok(f.ok_glyph)
 
     custom_domain = str(SETTINGS.APP.get("CUSTOM_DOMAIN") or "").strip()
     if custom_domain:
@@ -187,3 +211,5 @@ def deploy_to_app_engine(*, print_final_summary=True):
     if print_final_summary:
         print("Deployment complete!")
         print_summary()
+    if legacy_upgrade_notice:
+        print_post_upgrade_maintenance_steps(f)

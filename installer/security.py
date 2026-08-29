@@ -5,8 +5,7 @@ from .verify import prepare_existing_installation
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_security_cli_configures_and_optionally_deploys_redis_tls
-# @features setup
-# @dimensions redis-tls cli deploy
+# @matrix setup : cli deploy redis-tls
 def configure_security():
     """Configure optional Redis transport security for an installation."""
     prepare_existing_installation()

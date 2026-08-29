@@ -6,7 +6,13 @@
       data-visible="false"
       data-route='{{ url_for("internal.get", kind="starred") }}'
       class="{{ styles.home.card.list }}">
-    {% for s in starred.list %}{{ starred_entity(s) }}{% endfor %}
+    {% for item in starred.items %}
+      {% if item.entity %}
+        {{ starred_entity(item.entity) }}
+      {% else %}
+        {{ unavailable_starred_item(item) }}
+      {% endif %}
+    {% endfor %}
     {% if starred.cursor or starred.back %}
       <div class="{{ styles.home.pagination.container }}">
         {% if starred.back %}
@@ -26,6 +32,17 @@
       </div>
     {% endif %}
   </ul>
+{% endmacro %}
+
+{% macro unavailable_starred_item(item) %}
+  <li data-key="{{ item.key }}"
+      data-role="unavailable-starred-item"
+      data-state="{{ item.state }}">
+    <div class="{{ styles.home.card.item }}">
+      <div>{{ item.message }}</div>
+      {{ controls.star(True) }}
+    </div>
+  </li>
 {% endmacro %}
 
 {% macro starred_entity(entity) %}

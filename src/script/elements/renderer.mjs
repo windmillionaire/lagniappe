@@ -94,8 +94,7 @@ export class Renderer {
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
-	 * @features tasks
-	 * @dimensions history-fill latest-submission element-matrix
+	 * @matrix tasks : element-matrix history-fill latest-submission
 	 */
 	addHistoryFillButtons(submission, onFill = null) {
 		if (!this.historyFillEnabled || !submission) return;
@@ -129,8 +128,7 @@ export class Renderer {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_019_form_sync_frontend.py::test_renderer_visibility_requires_canonical_condition_lists
-	 * @features forms form-schema
-	 * @dimensions visibility canonical-list legacy-object-rejected
+	 * @matrix form-schema forms : canonical-list legacy-object-rejected visibility
 	 */
 	async _initVisibilityTriggers() {
 		this.visibilityTriggers = new Map();

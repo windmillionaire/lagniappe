@@ -1,5 +1,3 @@
-"""E2E coverage for offline PageInfo submissions and replay."""
-
 from dataclasses import replace
 import re
 from uuid import uuid4
@@ -12,7 +10,8 @@ from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Users
 from testing.elements import Tabs
 from testing.resources import Page
-from testing.utility import expect_successful_response, wait_for_offline_mutations
+from testing.utility.network import expect_successful_response
+from testing.utility.offline import wait_for_offline_mutations
 
 
 pytestmark = pytest.mark.e2e
@@ -37,8 +36,8 @@ def _fill_form_element(form, selector, value):
     field_input.fill(value)
 
 
-# @pairs offline:queue-submit offline:replay offline:notification offline:durable-queue
-# @pairs offline:dropdown-refresh offline:target-link pages:lp-offline
+# @matrix offline : dropdown-refresh durable-queue notification queue-submit replay target-link
+# @pair pages:lp-offline
 # @template pages/info.html::info_form
 # @template pages/document.html::document_settings
 # @template notifications.html::list
@@ -104,9 +103,8 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_fail
     expect(option).not_to_be_attached()
 
 
-# @pairs offline:queue-submit offline:reload offline:replay-reconciliation
-# @pairs pages:lp-offline edited-entity-notice:replayed-response
-# @pairs polling:freshness
+# @matrix offline : queue-submit reload replay-reconciliation
+# @pairs edited-entity-notice:replayed-response pages:lp-offline polling:freshness
 # @template pages/info.html::info_form
 def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
     owner = get_user(Users.OWNER)
@@ -177,7 +175,7 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
     )
 
 
-# @pairs forms:submission-choice forms:queued-conflict
+# @matrix forms : queued-conflict submission-choice
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
 def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_failures):

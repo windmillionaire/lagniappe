@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lagniappe.app/schema/portable-v1.json",
+  "title": "Lagniappe portable archive v1",
+  "type": "object",
+  "required": ["format", "schema_version", "archive_id", "source_backup_id", "source_application_version", "export_consistency", "created_at", "asset_collection", "warnings", "feature_flags", "shards", "type_counts", "assets"],
+  "properties": {
+    "format": {"const": "lagniappe-portable"},
+    "schema_version": {"const": 1},
+    "archive_id": {"type": "string", "pattern": "^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$"},
+    "source_backup_id": {"type": "string", "pattern": "^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$"},
+    "source_application_version": {"type": "string", "minLength": 1},
+    "export_consistency": {"const": "eventually-consistent"},
+    "created_at": {"type": "string", "minLength": 1},
+    "asset_collection": {"type": "object"},
+    "feature_flags": {"type": "object"},
+    "shards": {"type": "array", "items": {"$ref": "#/$defs/shard"}},
+    "type_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "assets": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "portableIdentity": {
+      "type": "object",
+      "required": ["type", "id"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{5,127}$"},
+        "namespace": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "reference": {
+      "type": "object",
+      "required": ["$ref"],
+      "properties": {
+        "$ref": {"$ref": "#/$defs/portableIdentity"}
+      },
+      "additionalProperties": false
+    },
+    "childKey": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["id"],
+          "properties": {"id": {"type": "integer", "minimum": 1}},
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {"name": {"type": "string", "minLength": 1}},
+          "additionalProperties": false
+        }
+      ]
+    },
+    "child": {
+      "type": "object",
+      "required": ["key", "exclude_from_indexes", "properties"],
+      "properties": {
+        "key": {"$ref": "#/$defs/childKey"},
+        "exclude_from_indexes": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "properties": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "entity": {
+      "type": "object",
+      "required": ["identity", "exclude_from_indexes", "properties"],
+      "properties": {
+        "identity": {
+          "type": "object",
+          "required": ["type", "id", "namespace", "kind_role", "ancestors"],
+          "properties": {
+            "type": {"type": "string", "minLength": 1},
+            "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{5,127}$"},
+            "namespace": {"type": "string"},
+            "kind_role": {"type": "string", "minLength": 1},
+            "ancestors": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/reference"}
+            },
+            "reserved_role": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        },
+        "exclude_from_indexes": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "properties": {"type": "object"},
+        "children": {
+          "type": "object",
+          "properties": {
+            "task_history": {"type": "array", "items": {"$ref": "#/$defs/child"}},
+            "document_history": {"type": "array", "items": {"$ref": "#/$defs/child"}},
+            "message": {"type": "array", "items": {"$ref": "#/$defs/child"}}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "shard": {
+      "type": "object",
+      "required": ["type", "path", "count", "bytes", "sha256"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "path": {"type": "string"},
+        "count": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "bytes": {"type": "integer", "minimum": 2, "maximum": 8388608},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -14,8 +14,8 @@ import { Toolbar } from "./toolbar";
  * @tests tests_e2e/004_projects/test_004d_document.py::test_editor_loads_and_saves_text
  * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
  * @tests tests_e2e/004_projects/test_004d_document.py::test_formatting_persists
- * @features editor
- * @dimensions text-save reload
+ * @matrix editor : reload text-save
+ * @pair sync:save-guard
  */
 export class CollaborativeDocument {
 	constructor(attributes) {
@@ -40,9 +40,7 @@ export class CollaborativeDocument {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_renders_before_initial_state
-	 * @pair sync:editor-readiness
-	 * @pair sync:loader-free
-	 * @pair sync:state-only
+	 * @matrix sync : editor-readiness loader-free state-only
 	 */
 	init() {
 		this._initContainer();
@@ -175,10 +173,8 @@ export class CollaborativeDocument {
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
 	 * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
-	 * @features sync editor
-	 * @dimensions initialization empty-content save-guard parent-modified
-	 * @pairs sync:initialization sync:empty-content sync:save-guard sync:parent-modified
-	 * @pairs editor:initialization editor:empty-content editor:save-guard
+	 * @matrix editor : empty-content initialization save-guard
+	 * @matrix sync : empty-content initialization parent-modified save-guard
 	 */
 	_commitInitialBaseline() {
 		this.snapshot = this._packageState();
@@ -192,9 +188,7 @@ export class CollaborativeDocument {
 	 *
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
-	 * @features sync editor
-	 * @dimensions checkpoint dirty-state concurrent-edit
-	 * @pairs sync:checkpoint sync:dirty-state sync:concurrent-edit
+	 * @matrix sync : checkpoint concurrent-edit dirty-state
 	 */
 	commitSavedBaseline(snapshot, mentions = []) {
 		this.snapshot = snapshot;
@@ -230,11 +224,10 @@ export class CollaborativeDocument {
 
 	/**
 	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
 	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_sync_response_contract_is_browser_visible
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
-	 * @features sync
-	 * @dimensions document collaboration response-contract offline-replay replay-order
+	 * @matrix sync : collaboration document offline-replay replay-order response-contract
 	 */
 	get syncData() {
 		if (!this.initialized || this.updateQueue.length === 0) return null;
@@ -249,9 +242,7 @@ export class CollaborativeDocument {
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
 	 * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
-	 * @features sync
-	 * @dimensions empty-content save-guard parent-modified intentional-clear
-	 * @pairs sync:empty-content sync:save-guard sync:parent-modified sync:intentional-clear
+	 * @matrix sync : empty-content intentional-clear parent-modified save-guard
 	 */
 	get saveData() {
 		if (!this.initialized || !this._dirty) return null;
@@ -283,8 +274,7 @@ export class CollaborativeDocument {
 	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
-	 * @features sync
-	 * @dimensions document collaboration presence lifecycle offline-replay replay-order concurrency merge
+	 * @matrix sync : collaboration concurrency document lifecycle merge offline-replay presence replay-order
 	 */
 	async sync() {
 		this.pendingMentions ||= new Map();

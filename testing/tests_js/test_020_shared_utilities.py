@@ -112,7 +112,7 @@ source = source.replace(
 );
 source = source.replaceAll("export const ", "const ");
 source = source.replaceAll("export function ", "function ");
-source += "\\nglobalThis.waitForAttribute = waitForAttribute; globalThis.areEqual = areEqual;";
+source += "\\nglobalThis.waitForAttribute = waitForAttribute; globalThis.areEqual = areEqual; globalThis.debounce = debounce;";
 vm.runInContext(source, context);
 
 (async () => {{
@@ -125,7 +125,24 @@ vm.runInContext(source, context);
     run_node(script)
 
 
-# @pairs frontend-utilities:mutation-observer frontend-utilities:cleanup
+# @pair async-query:debounce-teardown
+def test_debounce_cancel_prevents_delayed_callback(run_node):
+    run_utility_check(
+        run_node,
+        """
+let calls = 0;
+const delayed = context.debounce(() => { calls += 1; }, 5);
+delayed();
+delayed.cancel();
+await new Promise((resolve) => setTimeout(resolve, 15));
+if (calls !== 0) {
+  throw new Error("Cancelled debounce callback still ran");
+}
+""",
+    )
+
+
+# @matrix frontend-utilities : cleanup mutation-observer
 def test_wait_for_attribute_resolves_and_cleans_up_observers(run_node):
     run_utility_check(
         run_node,
@@ -155,13 +172,19 @@ if (!observers[1].disconnected) throw new Error("timed-out observer leaked");
     )
 
 
-# @pairs frontend-utilities:deep-equality frontend-utilities:array-order
+# @matrix frontend-utilities : array-order deep-equality
 def test_are_equal_normalizes_object_keys_but_preserves_array_order(run_node):
     run_utility_check(
         run_node,
         """
 if (!context.areEqual({ b: 2, nested: { y: 2, x: 1 } }, { nested: { x: 1, y: 2 }, b: 2 })) {
   throw new Error("equivalent object key orders compared unequal");
+}
+if (!context.areEqual(
+  { values: [{ b: 2, a: 1 }, { nested: { y: 2, x: 1 } }] },
+  { values: [{ a: 1, b: 2 }, { nested: { x: 1, y: 2 } }] },
+)) {
+  throw new Error("equivalent objects nested in arrays compared unequal");
 }
 if (context.areEqual({ values: [1, 2] }, { values: [2, 1] })) {
   throw new Error("array order was incorrectly normalized");
@@ -170,8 +193,59 @@ if (context.areEqual({ values: [1, 2] }, { values: [2, 1] })) {
     )
 
 
+# @matrix browser-storage : availability json
+def test_safe_storage_adapters_handle_browser_failures_and_json(run_node):
+    run_node(
+        """
+import assert from "node:assert/strict";
+import { localStore, sessionStore } from "./src/script/shared/storage.mjs";
+
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  get() { throw new Error("blocked"); },
+});
+assert.equal(localStore.get("missing", "fallback"), "fallback");
+assert.equal(localStore.set("key", "value"), false);
+assert.equal(localStore.remove("key"), false);
+
+const values = new Map();
+const storage = {
+  getItem(key) { return values.get(key) ?? null; },
+  setItem(key, value) { values.set(key, String(value)); },
+  removeItem(key) { values.delete(key); },
+};
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  value: storage,
+});
+Object.defineProperty(globalThis, "sessionStorage", {
+  configurable: true,
+  value: storage,
+});
+
+assert.equal(localStore.set("plain", "value"), true);
+assert.equal(localStore.get("plain", "fallback"), "value");
+assert.equal(localStore.remove("plain"), true);
+assert.equal(localStore.get("plain", "fallback"), "fallback");
+
+values.set("broken", "{not-json");
+assert.deepEqual(localStore.getJSON("broken", []), []);
+assert.equal(values.has("broken"), false);
+assert.equal(sessionStore.setJSON("state", { active: true }), true);
+assert.deepEqual(sessionStore.getJSON("state"), { active: true });
+
+const circular = {};
+circular.self = circular;
+assert.equal(localStore.setJSON("circular", circular), false);
+storage.setItem = () => { throw new Error("quota"); };
+assert.equal(sessionStore.setJSON("quota", { active: true }), false);
+""",
+        module=True,
+    )
+
+
+# @matrix timezone : page-load session-update
 # @pair location:permission-deferral
-# @pairs timezone:page-load timezone:session-update
 def test_user_data_sync_posts_timezone_without_requesting_location(run_node):
     run_user_check(
         run_node,
@@ -203,8 +277,8 @@ if (
     )
 
 
-# @pairs location:geolocation location:on-demand location:session-update
-# @pairs location:deduplication timezone:serialized-update
+# @matrix location : deduplication geolocation on-demand session-update
+# @pair timezone:serialized-update
 def test_user_location_sync_starts_on_demand_and_deduplicates(run_node):
     run_user_check(
         run_node,
@@ -237,7 +311,7 @@ if (
     )
 
 
-# @pairs location:session-update location:retry
+# @matrix location : retry session-update
 def test_user_location_sync_retries_failed_session_update(run_node):
     run_user_check(
         run_node,

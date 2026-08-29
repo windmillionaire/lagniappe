@@ -1,8 +1,7 @@
 """Node-backed checks for targeted Home foreground reconciliation."""
 
 
-# @features home polling
-# @dimensions foreground mounted-scope targeted-refresh lazy-widget
+# @matrix home polling : foreground lazy-widget mounted-scope targeted-refresh
 def test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner(run_node):
     run_node(
         r"""

@@ -10,8 +10,7 @@ import { primitives } from "../../primitives";
  * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_replaces_selection_and_posts_selected_text
  * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_explain_includes_selected_text_context
  * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_provider_error_surfaces_in_form
- * @features editor ai
- * @dimensions generate-text insert-mode selected-text replace-selection explain error
+ * @matrix ai editor : error explain generate-text insert-mode replace-selection selected-text
  */
 class GenerateText {
 	constructor(toolbar) {

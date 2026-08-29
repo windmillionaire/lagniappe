@@ -8,11 +8,8 @@ const ISOLATED_TASK_ACTIONS = new Set(["TaskMove", "TaskCombine"]);
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
- * @pairs tasks:update-state tasks:refresh tasks:readonly
- * @pairs tasks:create tasks:while-open tasks:list-state
- * @pairs task-combine:isolated-form task-combine:lazy-reload
- * @pairs task-combine:view-page task-combine:linked-page
- * @pairs task-combine:delta task-combine:no-reload
+ * @matrix task-combine : delta isolated-form lazy-reload linked-page no-reload view-page
+ * @matrix tasks : create list-state readonly refresh update-state while-open
  */
 export class Task extends ViewComponent {
 	async activate(show) {

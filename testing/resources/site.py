@@ -109,10 +109,6 @@ class AdminPage(SiteResource):
     _sync = True
 
     SITE_SETTINGS_FORM = "[data-widget='SiteSettings']"
-    SITE_EXPORT_FORM = "[data-widget='SiteExport']"
-    SITE_EXPORT_TOGGLE = "#tabs button[lp-show='exports:active']"
-    SITE_EXPORT_START = "[data-role='start-export']"
-    SITE_EXPORT_ITEM = "[data-role='site-export-item']"
     SITE_IMPORT_TOGGLE = "#tabs button[lp-show='ingress:active']"
     IMPORT_UPLOAD_TOGGLE = "#tabs button[lp-show='ingress:IngressFileUpload']"
     IMPORT_LIST = "#ingress ul[data-widget='IngressList']"

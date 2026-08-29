@@ -1,14 +1,14 @@
 from ..definitions import FieldType, FilterOptions, MutationIntent
+from ..definitions.identifiers import short_uuid
 from ..mixins import AIMixin, CacheMixin, FilterMixin
-from ..tools import utility
 from .base_property import Property, UNSET
 
 
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_document
+# @tests tests_unit/test_005_project_properties.py::test_project_document_state_uses_markup_when_no_ydoc
 # @tests tests_unit/test_008_page_properties.py::test_page_document
-# @features project, page
-# @dimensions document
+# @matrix page project : document document-state markup-fallback
 class Document(CacheMixin, FilterMixin, AIMixin, Property):
     """Collaborative rich-text document (HTML + YDoc).
 
@@ -84,10 +84,9 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property):
 
     # @testable true
     # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
-    # @features editor
-    # @dimensions image-upload
+    # @pair editor:image-upload
     def add_image(self, image, visibility="private"):
-        name = f"image_{utility.short_uuid()}"
+        name = f"image_{short_uuid()}"
         asset = self.entity.save_asset(image, name, "image", visibility=visibility)
         return asset.url
 
@@ -95,8 +94,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property):
     # @tests tests_e2e/004_projects/test_004d_document.py::test_editor_loads_and_saves_text
     # @tests tests_e2e/004_projects/test_004d_document.py::test_task_list_persists
     # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
-    # @features editor
-    # @dimensions text-save reload task-list history-list
+    # @matrix editor : history-list reload task-list text-save
     def save(self, **kwargs):
         self._html = kwargs.get("html")
         self._ydoc = kwargs.get("ydoc")
@@ -133,8 +131,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_document
     # @tests tests_unit/test_008_page_properties.py::test_page_document
-    # @features project, page
-    # @dimensions cache
+    # @matrix page project : cache
     @property
     def cache_value(self):
         return self.ai_value
@@ -147,8 +144,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_document
     # @tests tests_unit/test_008_page_properties.py::test_page_document
-    # @features project, page
-    # @dimensions ai-value
+    # @matrix page project : ai-value
     @property
     def ai_value(self):
         asset = self.entity.get_asset(self.id)
@@ -165,8 +161,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_document
     # @tests tests_unit/test_008_page_properties.py::test_page_document
-    # @features project, page
-    # @dimensions filter-value
+    # @matrix page project : filter-value
     @property
     def filter_value(self):
         return True if self.entity.get_asset(self.id) else False

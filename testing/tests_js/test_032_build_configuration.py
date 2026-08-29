@@ -1,8 +1,7 @@
 """Node-backed checks for pure frontend build configuration helpers."""
 
 
-# @features build
-# @dimensions sentry source-maps optional-credentials
+# @matrix build : optional-credentials sentry source-maps
 def test_sentry_build_requires_nonblank_upload_token(run_node):
     run_node(
         """
@@ -51,7 +50,12 @@ assert.deepEqual(Object.keys(VIEW_ENTRIES).sort(), [
   "page", "project", "report", "results", "user",
 ]);
 assert.equal(VIEW_REGISTRY.category.entry, VIEW_REGISTRY.form.entry);
-assert.equal(STARTUP_BUDGETS.core, 120 * 1024);
+const documentedBudgets = Object.fromEntries(
+  [...readFileSync("documentation/INFRA_BUILD.md", "utf8").matchAll(
+    /^\| `([a-z]+)` \| [^|]+ \| ([0-9]+) \|$/gm,
+  )].map(([, key, kib]) => [key, Number(kib) * 1024]),
+);
+assert.deepEqual(documentedBudgets, STARTUP_BUDGETS);
 
 for (const configPath of [
   "build/rollup.config.mjs",
@@ -59,6 +63,7 @@ for (const configPath of [
 ]) {
   const source = readFileSync(configPath, "utf8");
   assert.match(source, /VIEW_ENTRIES/);
+  assert.match(source, /public: "\.\/src\/script\/public\.mjs"/);
   assert.match(source, /chunks\/views\/\[name\]\.js/);
   assert.match(source, /manualChunks: interactionFoundationChunk/);
   assert.match(source, /onlyExplicitManualChunks: true/);
@@ -108,8 +113,7 @@ assert.throws(
     )
 
 
-# @pair frontend-build:modulepreload
-# @pair frontend-build:view-registry
+# @matrix frontend-build : modulepreload view-registry
 def test_templates_preload_registered_view_and_interaction_foundations(run_node):
     run_node(
         r'''
@@ -165,9 +169,7 @@ for (const template of templates) {
     )
 
 
-# @pair frontend-build:modulepreload
-# @pair frontend-build:interaction-foundation
-# @pair frontend-build:chunking
+# @matrix frontend-build : chunking interaction-foundation modulepreload
 def test_interaction_preloads_have_stable_manual_chunks(run_node):
     run_node(
         r'''

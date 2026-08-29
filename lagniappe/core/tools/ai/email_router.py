@@ -30,8 +30,7 @@ def _routable_workflows(eligible_workflows, attachments):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_router_uses_utility_model_and_safe_metadata
-# @features ai-email
-# @dimensions routing utility-model structured-output attachments privacy
+# @matrix ai-email : attachments privacy routing structured-output utility-model
 def ai_email_routing_prompt(subject, body, attachments, eligible_workflows):
     """Build a small structured classifier prompt without attachment contents."""
     eligible = _routable_workflows(eligible_workflows, attachments)
@@ -105,8 +104,7 @@ attachments and `organize` requires at least one attachment.
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_router_normalizes_attachment_create_to_organize
-# @features ai-email
-# @dimensions routing validation attachment-contract
+# @matrix ai-email : attachment-contract routing validation
 def validate_ai_email_route(result, *, attachments, eligible_workflows):
     """Validate and enforce transport invariants on a routing result."""
     if not isinstance(result, dict):
@@ -152,8 +150,7 @@ def validate_ai_email_route(result, *, attachments, eligible_workflows):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_router_uses_utility_model_and_safe_metadata
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_router_routes_attachment_only_message_to_organize
-# @features ai-email
-# @dimensions routing generation validation inline attachment-only deterministic
+# @matrix ai-email : attachment-only deterministic generation inline routing validation
 def route_ai_email(subject, body, attachments, eligible_workflows):
     """Classify one shared-address email with the configured utility model."""
     eligible = tuple(eligible_workflows or ())

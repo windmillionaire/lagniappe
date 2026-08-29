@@ -1,8 +1,7 @@
 """Node-backed checks for AI email address selection and copy behavior."""
 
 
-# @features ai-report
-# @dimensions email-address-selection clipboard-fallback status-reset absent-markup
+# @matrix ai-report : absent-markup clipboard-fallback email-address-selection status-reset
 def test_ai_email_address_selection_and_copy_controls(run_node):
     run_node(
         r"""

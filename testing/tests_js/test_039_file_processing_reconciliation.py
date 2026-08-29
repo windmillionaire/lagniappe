@@ -1,7 +1,7 @@
 """Node-backed coverage for file-processing reconciliation state."""
 
 
-# @pairs file:extract file:reload file:text-tab file:authoritative-remount
+# @matrix file : authoritative-remount extract reload text-tab
 def test_file_info_extract_completion_requests_one_reload_notice(run_node):
     run_node(
         r'''
@@ -92,8 +92,7 @@ const response = {
     )
 
 
-# @features file
-# @dimensions extract reload text-tab authoritative-remount
+# @matrix file : authoritative-remount extract reload text-tab
 def test_file_view_shows_extract_reload_only_for_matching_unmounted_text(run_node):
     run_node(
         r'''

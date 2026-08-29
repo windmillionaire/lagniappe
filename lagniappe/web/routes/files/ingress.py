@@ -10,7 +10,7 @@ from lagniappe.core.definitions import (
     Resource,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import task_queue
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ingress import IngressService
 from lagniappe.web.auth import permission
 from lagniappe.web import responses
@@ -25,8 +25,7 @@ from . import files
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_opens_with_processed_csv_status
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_error_state_persists_after_reopen
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
-# @features ingress
-# @dimensions file-input drag-drop upload-counts process-csv stage-wizard reopen non-csv validation
+# @matrix ingress : drag-drop file-input non-csv process-csv reopen stage-wizard upload-counts validation
 @files.route("/ingress", methods=["GET", "POST"])
 @permission(Resource.SITE)
 def ingress(**kwargs):
@@ -75,8 +74,7 @@ def ingress_direct(**kwargs):
 # @testable true
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_stage_navigation_reconciles_downstream_status
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_error_state_persists_after_reopen
-# @features ingress
-# @dimensions stage-wizard set-stage error-handling persistence
+# @matrix ingress : error-handling persistence set-stage stage-wizard
 @files.route("/ingress/<key>/stage", methods=["PUT", "GET"])
 @permission(Resource.SITE)
 def ingress_stage(key, **kwargs):
@@ -98,8 +96,7 @@ def ingress_stage(key, **kwargs):
 # @testable true
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-# @features ingress
-# @dimensions stage-wizard
+# @pair ingress:stage-wizard
 @files.route("/ingress/<key>/update", methods=["PATCH"])
 @permission(Resource.SITE)
 def ingress_update(key, **kwargs):
@@ -115,8 +112,7 @@ def ingress_update(key, **kwargs):
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 # @tests tests_unit/test_006b_ingress_entity.py::test_next_advances_after_finalize
-# @features ingress
-# @dimensions stage-wizard
+# @matrix ingress : finalize stage-wizard
 @files.route("/ingress/<key>/next", methods=["PUT"])
 @permission(Resource.SITE)
 def ingress_next(key, **kwargs):
@@ -133,8 +129,8 @@ def ingress_next(key, **kwargs):
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_importing_stage_streams_results_and_completes
 # @tests tests_unit/test_006b_ingress_entity.py::test_importer_story_processes_page_rows_into_entities_and_results
-# @features ingress
-# @dimensions stage-wizard verify-import import-results completed
+# @matrix ingress : completed import-results stage-wizard verify-import
+# @pair ingress:row-results
 @files.route("/ingress/<key>/import", methods=["POST"])
 @permission(Resource.SITE)
 def ingress_import(key, **kwargs):
@@ -142,14 +138,10 @@ def ingress_import(key, **kwargs):
     service = IngressService(file)
     already_active = False
     try:
-        already_active = (
-            service.stage.name == "IMPORTING"
-            and service.run_status
-            in {
-                IngressRunStatus.QUEUED.value,
-                IngressRunStatus.RUNNING.value,
-            }
-        )
+        already_active = service.stage.name == "IMPORTING" and service.run_status in {
+            IngressRunStatus.QUEUED.value,
+            IngressRunStatus.RUNNING.value,
+        }
         service.start(
             {
                 "timezone": session.get("timezone", "UTC"),
@@ -188,9 +180,7 @@ def ingress_import(key, **kwargs):
             )[:32],
         )
     except Exception as e:
-        service.mark_dispatch_failed(
-            "Import could not be started. Please try again."
-        )
+        service.mark_dispatch_failed("Import could not be started. Please try again.")
         exceptions.capture(
             e,
             context={
@@ -207,8 +197,7 @@ def ingress_import(key, **kwargs):
 # @testable false
 # @manual true
 # @reason production remote import stop/restart depends on asynchronous importing state
-# @features ingress
-# @dimensions stop restart
+# @matrix ingress : restart stop
 @files.route("/ingress/<key>/stop", methods=["POST"])
 @permission(Resource.SITE)
 def ingress_stop(key, **kwargs):
@@ -224,8 +213,7 @@ def ingress_stop(key, **kwargs):
 # @testable false
 # @covered-by lagniappe/core/entities/ingress.py::Ingress.delete_imported_entities
 # @reason route delegates bulk deletion to the core ingress entity and returns the standard progress payload
-# @features ingress
-# @dimensions bulk-delete row-results
+# @matrix ingress : bulk-delete row-results
 @files.route("/ingress/<key>/delete-imported", methods=["GET", "DELETE"])
 @permission(Resource.SITE)
 def ingress_delete_imported(key, **kwargs):
@@ -244,8 +232,8 @@ def ingress_delete_imported(key, **kwargs):
 # @testable true
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_task_page_form_lookup_updates_index_fields
 # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_builds_or_selects_the_submission_form
-# @features ingress
-# @dimensions task-import page-form-lookup
+# @matrix ingress : page-form-lookup task-import
+# @pair ingress:default-form
 @files.route("/ingress/<key>/get-page-form", methods=["GET"])
 @permission(Resource.SITE)
 def ingress_get_page_form(key, **kwargs):

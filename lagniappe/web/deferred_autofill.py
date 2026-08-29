@@ -4,11 +4,11 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     FileConsumerLimitError,
 )
-from lagniappe.core.tools.autofill_jobs import start_autofill_job
+from lagniappe.core.tools.deferred_jobs.autofill import start_autofill_job
 from lagniappe.core.tools.database.assets import DirectUploadError
-from lagniappe.core.tools.deferred_jobs import (
+from lagniappe.core.tools.deferred_jobs.errors import DeferredJobLockedError
+from lagniappe.core.tools.deferred_jobs.locks import (
     AUTOFILL_FORM_LOCK_SCOPE,
-    DeferredJobLockedError,
     deferred_job_lock_descriptor,
 )
 from lagniappe.web import direct_uploads, responses
@@ -24,7 +24,7 @@ def active_lock(entity):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @pairs deferred-jobs:form-lock deferred-jobs:conflict
+# @matrix deferred-jobs : conflict form-lock
 def locked_response(entity, form=None):
     """Return a structured conflict response when autofill owns the form."""
     del form
@@ -45,9 +45,8 @@ def locked_response(entity, form=None):
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @pairs ai:autofill ai:deferred
-# @pairs pages:autofill pages:deferred tasks:autofill tasks:deferred
-# @pairs notifications:autofill notifications:deferred
+# @matrix ai notifications pages tasks : autofill deferred
+# @pair deferred-jobs:hosted-e2e
 def start_deferred_autofill(
     entity,
     user,

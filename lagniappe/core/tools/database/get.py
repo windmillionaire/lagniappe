@@ -3,16 +3,16 @@
 from datetime import datetime, timedelta, timezone
 
 from google.cloud.datastore import Entity, Key
-from google.protobuf.message import DecodeError
 
-from ...definitions import Restriction
+from ...restrictions import Restriction
 from .core import DATA, KINDS
 from .filter import Filter, Query, Results
+from config.datastore import decode_urlsafe_key, encode_urlsafe_key
 
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_empty_results_has_no_items_or_cursor
-# @pairs database:restricted-results database:empty-page
+# @matrix database : empty-page restricted-results
 def _empty_results():
     return Results([], None)
 
@@ -25,14 +25,16 @@ def urlsafe_key(identifier):
     """Convert an identifier to its URL-safe base64 key string."""
     key = datastore_key(identifier)
     if key:
-        return key.to_legacy_urlsafe().decode()
+        return encode_urlsafe_key(key)
 
     return None
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_datastore_key_decodes_without_runtime_rebinding
+# @pair database:named-key-encoding
 def datastore_key(identifier):
-    """Resolve an identifier (key, entity, or URL-safe string) to a Datastore Key."""
+    """Resolve a live key, keyed entity, or urlsafe string without rebinding."""
     if identifier is None:
         return None
     elif isinstance(identifier, Key):
@@ -41,8 +43,8 @@ def datastore_key(identifier):
         return identifier.key
     elif isinstance(identifier, str):
         try:
-            return Key.from_legacy_urlsafe(identifier)
-        except (ValueError, DecodeError):
+            return decode_urlsafe_key(identifier)
+        except (ValueError, UnicodeError):
             return None
     return None
 
@@ -51,9 +53,9 @@ def datastore_key(identifier):
 def is_urlsafe_key(identifier):
     """Return True if the identifier is a valid URL-safe Datastore key."""
     try:
-        Key.from_legacy_urlsafe(identifier)
+        decode_urlsafe_key(identifier)
         return True
-    except (ValueError, DecodeError):
+    except (ValueError, UnicodeError):
         return False
 
 
@@ -135,8 +137,9 @@ def users(start_cursor=None, hashes=Restriction.UNRESTRICTED, group=None, limit=
     return q.fetch()
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_groups_with_denied_hashes_does_not_query_datastore
+# @matrix database permissions : deny-all group-query
 def groups(hashes=Restriction.UNRESTRICTED):
     """Fetch all group models, optionally restricted to the given hashes."""
     return (
@@ -239,79 +242,6 @@ def category_by_name(name):
     )
 
 
-# --- Site ---
-
-
-# @testable false
-# @reason site config persistence is owned by route/E2E workflows
-def site(key):
-    """Fetch a site config entity by key, creating it if missing."""
-    site = DATA.datastore.get(key)
-    if site:
-        return site
-
-    site = DATA.datastore.entity(key=key)
-    DATA.datastore.put(site)
-
-    return site
-
-
-# @testable infrastructure
-def site_key(identifier):
-    """Build a Datastore key for a site config entry."""
-    return DATA.datastore.key(KINDS.site.value, identifier)
-
-
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @features admin
-# @dimensions metadata public-preview
-def site_image():
-    """Fetch the stored site image metadata entity."""
-    image_key = DATA.datastore.key("site", "image")
-    return DATA.datastore.get(image_key)
-
-
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
-# @features admin
-# @dimensions deployment-settings metadata
-def site_deployment():
-    """Fetch the stored deployment settings metadata entity."""
-    deployment_key = DATA.datastore.key("site", "deployment")
-    return DATA.datastore.get(deployment_key)
-
-
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
-# @features admin
-# @dimensions ai-settings metadata
-def site_ai():
-    """Fetch the stored AI model settings metadata entity."""
-    ai_key = DATA.datastore.key("site", "ai")
-    return DATA.datastore.get(ai_key)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::site_export
-# @reason public database API forwards to the metadata helper
-def site_export(export_id):
-    """Fetch a site export metadata record by export id."""
-    from .assets import site_export as _site_export
-
-    return _site_export(export_id)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::site_exports
-# @reason public database API forwards to the metadata helper
-def site_exports(limit=10):
-    """Fetch recent site export metadata records."""
-    from .assets import site_exports as _site_exports
-
-    return _site_exports(limit=limit)
-
-
 # @testable false
 # @reason maintenance iterator is persistence-owned and covered by maintenance/E2E workflows
 def all_models():
@@ -383,6 +313,17 @@ def public_pages(public_id):
     return (
         Query(KINDS.instances)
         .filter(Filter().eq("type", "page").eq("public_id", public_id))
+        .fetch_all()
+    )
+
+
+# @testable false
+# @reason sitemap query recipe is persistence-owned and covered by public-route tests
+def discoverable_page_rows():
+    """Fetch candidate public rows; callers enforce active/type/page settings."""
+    return (
+        Query(KINDS.instances)
+        .filter(Filter().eq("public", True))
         .fetch_all()
     )
 
@@ -481,8 +422,7 @@ _TASK_DUE_MIN = datetime(1, 1, 1, tzinfo=timezone.utc)
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_task_query_filter_uses_completed_status_not_active_status
 # @tests tests_unit/test_010_task_index.py::test_task_query_filter_includes_assignee_visibility_branch
-# @features task-index
-# @dimensions query-filter completed active assignee-visibility
+# @matrix task-index : active assignee-visibility completed query-filter
 def _tasks_filter(
     project=None,
     model=None,
@@ -647,8 +587,7 @@ def user_task_count(page):
 
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_due_tasks_does_not_add_requires_filter_for_unrestricted
-# @features home task-index
-# @dimensions due-tasks restrictions unrestricted
+# @matrix home task-index : due-tasks restrictions unrestricted
 def due_tasks(hashes=Restriction.UNRESTRICTED, assigned_to=None):
     """Fetch incomplete active tasks due within the next seven days."""
     if Restriction.is_denied(hashes) and assigned_to is None:
@@ -771,8 +710,7 @@ def form_instance_users(form_key):
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_activity_query_filters_requested_types
-# @features activity
-# @dimensions query ancestor type-order
+# @matrix activity : ancestor query type-order
 def activity(parent, types=("note", "notification")):
     """Fetch activity items belonging to ``parent``."""
     parent_key = datastore_key(parent)
@@ -796,73 +734,20 @@ def activity(parent, types=("note", "notification")):
 
 
 # @testable true
-# @tests tests_unit/test_025_notification_state.py::test_cold_seed_runs_one_keys_only_query_and_is_race_safe
-# @tests tests_unit/test_002j_notes.py::test_notification_keys_query_returns_only_ancestor_keys
-# @pairs notifications:cold-seed notifications:keys-only
-def notification_keys(parent):
-    """Fetch only notification keys in one ancestor query."""
-    parent_key = datastore_key(parent)
-    if not parent_key:
-        return []
-    records = (
-        Query(KINDS.activity)
-        .ancestor(parent_key)
-        .filter(
-            Filter()
-            .eq("type", "notification")
-            .eq("notification_type", "ordinary")
-        )
-        .keys_only()
-        .fetch_all()
-    )
-    return [record.key for record in records]
-
-
-# @testable true
-# @tests tests_unit/test_002j_notes.py::test_notification_page_is_bounded_and_excludes_aggregate_rows
-# @pairs notifications:bounded-page notifications:ordinary-discriminator notifications:cursor
-def notifications_page(parent, start_cursor=None, limit=25):
-    """Fetch one bounded page of ordinary notifications, newest first."""
-    parent_key = datastore_key(parent)
-    if not parent_key:
-        return _empty_results()
-    return (
-        Query(KINDS.activity)
-        .ancestor(parent_key)
-        .filter(
-            Filter()
-            .eq("type", "notification")
-            .eq("notification_type", "ordinary")
-        )
-        .order("-created")
-        .limit(limit)
-        .cursor(start_cursor)
-        .fetch()
-    )
-
-
-# @testable true
 # @tests tests_unit/test_002j_notes.py::test_home_notes_return_only_visible_notes
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_note_visibility_across_users
-# @features notes permissions
-# @dimensions home shared private owner ordering
+# @matrix activity notes permissions : home ordering owner private shared
 def home_notes(user):
     """Fetch Home-scope notes visible to ``user``."""
     note_filter = Filter().eq("type", "note").eq("scope", "home")
-    notes = (
-        Query(KINDS.activity)
-        .filter(note_filter)
-        .order("-created")
-        .fetch_all()
-    )
+    notes = Query(KINDS.activity).filter(note_filter).order("-created").fetch_all()
 
     if not (getattr(user, "is_admin", False) or getattr(user, "is_owner", False)):
         user_key = datastore_key(user)
         notes = [
             note
             for note in notes
-            if note.get("visibility") == "everyone"
-            or note.get("user") == user_key
+            if note.get("visibility") == "everyone" or note.get("user") == user_key
         ]
 
     return notes
@@ -902,45 +787,7 @@ def notes_by_user(user):
 
 # @testable true
 # @tests tests_unit/test_002i_home_properties.py::test_home_note_ingress_and_tool_lists_load_database_entities
-# @features home ai-report
-# @dimensions query list
+# @matrix ai-report home : list query
 def ai_reports(user_key):
     """Fetch AI report activity records belonging to a user."""
     return activity(user_key, types=("report",))
-
-
-# --- Messaging ---
-
-
-# @testable false
-# @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.user_messages
-# @reason user-deletion lookup is exercised through the delete mutation plan
-def message_conversation_keys(participant):
-    """Fetch conversation keys containing ``participant``."""
-    participant_key = datastore_key(participant)
-    if not participant_key:
-        return []
-    records = (
-        Query(KINDS.message_conversations)
-        .filter(Filter().eq("participants", participant_key))
-        .keys_only()
-        .fetch_all()
-    )
-    return [record.key for record in records]
-
-
-# @testable false
-# @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.finalize_message_conversations
-# @reason orphan purging is exercised through the delete mutation plan
-def message_keys(conversation):
-    """Fetch all message keys in one conversation ancestor group."""
-    conversation_key = datastore_key(conversation)
-    if not conversation_key:
-        return []
-    records = (
-        Query(KINDS.messages)
-        .ancestor(conversation_key)
-        .keys_only()
-        .fetch_all()
-    )
-    return [record.key for record in records]

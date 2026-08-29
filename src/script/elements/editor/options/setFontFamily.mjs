@@ -3,8 +3,7 @@ import { FONT_MENU } from "../../../config/editor";
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_font_family
- * @features editor
- * @dimensions font-family reload
+ * @matrix editor : font-family reload
  */
 class FontFamilyPicker {
 	constructor(toolbar) {

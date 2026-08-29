@@ -7,8 +7,8 @@ import { TableElement } from "./table";
 /**
  * @testable true
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
- * @pairs tasks:history
- * @pairs table-controls:column-visibility table-controls:persistence
+ * @matrix table-controls : column-visibility persistence
+ * @pair tasks:history
  */
 export class EmbeddedTableVisibility {
 	constructor(tableElt, storageKey = null) {

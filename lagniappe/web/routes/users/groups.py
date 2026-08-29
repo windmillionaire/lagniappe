@@ -2,7 +2,7 @@ from flask import request
 
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.web.auth import permission
 from lagniappe.web import responses
 
@@ -12,8 +12,7 @@ from . import users
 # @testable true
 # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
 # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
-# @features user-groups
-# @dimensions group-create nav
+# @matrix user-groups : group-create nav
 @users.route("/create-group", methods=["POST"])
 @permission(Resource.USER_GROUPS, Action.CREATE)
 def create_group():
@@ -26,6 +25,7 @@ def create_group():
 # @testable true
 # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
 # @tests tests_unit/test_009e_user_groups.py::test_public_permissions
+# @matrix public-groups : permissions public
 @users.route("/public-permissions", methods=["GET", "PUT"])
 @permission(Resource.SITE)
 def public_permissions():
@@ -43,8 +43,7 @@ def public_permissions():
 # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
 # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
 # @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
-# @features user-groups
-# @dimensions permission-update general-permissions entity-permissions rename
+# @matrix user-groups : entity-permissions general-permissions permission-update rename
 @users.route("/group-permissions/<key>", methods=["PUT", "GET"])
 @permission(Resource.USER_GROUPS, Action.EDIT)
 def group_permissions(key, **kwargs):
@@ -68,12 +67,13 @@ def group_permissions(key, **kwargs):
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_groups_membership_changes_recalculate_permissions
+# @pair user-groups:membership-change
 @users.route("/delete-group/<key>", methods=["DELETE"])
 @permission(Resource.USER_GROUPS, Action.DELETE)
 def delete_group(key, **kwargs):
     group = kwargs["entity"]
 
-    users_in_group = database.get.users(group=group.key, limit=None)
+    users_in_group = database_get.users(group=group.key, limit=None)
     users = Entities.fetch(*users_in_group.results, request=Fetch.direct())
     for user in users:
         user.properties.groups.remove(group)

@@ -211,8 +211,7 @@ const executeTransition = async (entries) => {
  * @tests tests_js/test_011_view_transitions_frontend.py::test_transition_resolves_after_update_without_waiting_for_animation
  * @tests tests_js/test_011_view_transitions_frontend.py::test_same_turn_commits_share_one_transition_and_run_once
  * @tests tests_js/test_011_view_transitions_frontend.py::test_ready_rejection_does_not_replay_commit
- * @features view-transition
- * @dimensions nested-callback error-reporting exact-once ready-rejection coalescing animation-lifecycle queueing update-completion
+ * @matrix view-transition : animation-lifecycle coalescing error-reporting exact-once nested-callback queueing ready-rejection update-completion
  */
 export const withTransition = (callback, { label = "unlabeled" } = {}) => {
 	if (transitionDepth > 0) {
@@ -278,20 +277,35 @@ export const showBriefly = (element, content, duration = 1500) => {
 };
 
 /**
- * @testable infrastructure
+ * @testable true
+ * @tests tests_js/test_020_shared_utilities.py::test_debounce_cancel_prevents_delayed_callback
+ * @pair async-query:debounce-teardown
  */
 export const debounce = (func, wait) => {
-	let timeout;
-	return function (...args) {
+	let timeout = null;
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/utilities.mjs::debounce
+	 * @reason callable wrapper behavior is exercised through the debounce contract
+	 */
+	const debounced = function (...args) {
 		clearTimeout(timeout);
-		timeout = setTimeout(() => func.apply(this, args), wait);
+		timeout = setTimeout(() => {
+			timeout = null;
+			func.apply(this, args);
+		}, wait);
 	};
+	debounced.cancel = () => {
+		clearTimeout(timeout);
+		timeout = null;
+	};
+	return debounced;
 };
 
 /**
  * @testable true
  * @tests tests_js/test_020_shared_utilities.py::test_wait_for_attribute_resolves_and_cleans_up_observers
- * @pairs frontend-utilities:mutation-observer frontend-utilities:cleanup
+ * @matrix frontend-utilities : cleanup mutation-observer
  */
 export function waitForAttribute(element, attributeName, timeout = 10000) {
 	if (element.hasAttribute(attributeName)) {
@@ -337,7 +351,10 @@ export function waitForAttribute(element, attributeName, timeout = 10000) {
  * @reason object sorting is private deep-comparison normalization
  */
 function _sortObject(obj) {
-	if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
+	if (Array.isArray(obj)) {
+		return obj.map((value) => _sortObject(value));
+	}
+	if (obj === null || typeof obj !== "object") {
 		return obj;
 	}
 	return Object.keys(obj)
@@ -351,7 +368,7 @@ function _sortObject(obj) {
 /**
  * @testable true
  * @tests tests_js/test_020_shared_utilities.py::test_are_equal_normalizes_object_keys_but_preserves_array_order
- * @pairs frontend-utilities:deep-equality frontend-utilities:array-order
+ * @matrix frontend-utilities : array-order deep-equality
  */
 export const areEqual = (a, b) => {
 	return JSON.stringify(_sortObject(a)) === JSON.stringify(_sortObject(b));

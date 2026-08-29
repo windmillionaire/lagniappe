@@ -13,8 +13,7 @@ _RESOURCE_REGION_ALIASES = {
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_google_location_aliases_keep_app_engine_and_regional_resources_distinct
-# @features config setup
-# @dimensions app-engine-location resource-region compatibility
+# @matrix config setup : app-engine-location compatibility resource-region
 def normalize_app_engine_location(value):
     """Return the App Engine spelling for a configured Google location."""
     normalized = str(value or "").strip().lower()
@@ -23,8 +22,7 @@ def normalize_app_engine_location(value):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_google_location_aliases_keep_app_engine_and_regional_resources_distinct
-# @features config setup
-# @dimensions app-engine-location resource-region compatibility
+# @matrix config setup : app-engine-location compatibility resource-region
 def normalize_resource_region(value):
     """Return the regional-service spelling for a configured Google location."""
     normalized = str(value or "").strip().lower()

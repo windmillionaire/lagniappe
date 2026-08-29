@@ -20,6 +20,7 @@ import pytest
 from playwright.sync_api import expect
 
 from config import SETTINGS, constants
+from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database.core import DATA, KINDS
 from testing.definitions import SitePages, Users
@@ -101,8 +102,7 @@ def _analytics_request(user, path, method="GET"):
     )
 
 
-# @features home
-# @dimensions directory-list
+# @pair home:directory-list
 @pytest.mark.e2e
 def test_directory_links_present(get_user):
     """Test that all directory links are present."""
@@ -121,8 +121,7 @@ def test_directory_links_present(get_user):
     expect(list_root).not_to_be_visible()
 
 
-# @features manual
-# @dimensions page-load
+# @pair manual:page-load
 # @template manual/content/overview.html::open_source
 @pytest.mark.e2e
 def test_navigate_to_manual_from_home_button(get_user):
@@ -132,14 +131,13 @@ def test_navigate_to_manual_from_home_button(get_user):
 
     user.locate(home.MANUAL_BUTTON).click()
 
-    expect(user.page).to_have_title("Manual")
+    expect(user.page).to_have_title(f"Overview — {CONFIG.APP_NAME} Manual")
     source_link = user.locate(f"a[href='{constants.DEFAULT_SOURCE_URL}']")
     expect(source_link).to_be_visible()
     expect(source_link).to_contain_text("Source for this installation")
 
 
-# @features admin
-# @dimensions page-load site-settings
+# @matrix admin : page-load site-settings
 @pytest.mark.e2e
 def test_admin_directory_link_opens_admin_settings(get_user):
     """The owner can open the Admin settings view from the home directory."""
@@ -159,8 +157,7 @@ def test_admin_directory_link_opens_admin_settings(get_user):
     expect(settings).to_be_visible()
 
 
-# @features analytics
-# @dimensions dashboard page-load accordion period-controls owner-filter retention-clear
+# @matrix analytics : accordion dashboard owner-filter page-load period-controls retention-clear
 @pytest.mark.e2e
 def test_analytics_dashboard_owner_filter_and_retention_clear(
     get_user, browser_failures
@@ -266,12 +263,8 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(
     assert DATA.datastore.get(recent_key) is None
 
 
-# @pair ai-observability:independent-clear
-# @pair ai-observability:ai-only
-# @pair ai-observability:independent-flags
-# @pair analytics:page-tracking
-# @pair ai-observability:job-correlation
-# @pair deferred-jobs:diagnostics
+# @matrix ai-observability : ai-only independent-clear independent-flags job-correlation
+# @pairs analytics:page-tracking deferred-jobs:diagnostics
 # @template analytics/index.html::ai_observability
 @pytest.mark.e2e
 def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
@@ -329,15 +322,14 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     assert DATA.datastore.get(job.key) is None
 
 
-# @features manual
-# @dimensions section-navigation popstate
+# @matrix manual : metadata popstate section-navigation
 @pytest.mark.e2e
 def test_manual_ajax_section_navigation_and_popstate(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
 
     user.locate(home.MANUAL_BUTTON).click()
-    expect(user.page).to_have_title("Manual")
+    expect(user.page).to_have_title(f"Overview — {CONFIG.APP_NAME} Manual")
     expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
 
     user.page.evaluate("window.__manualNavigationToken = 'preserved'")
@@ -346,28 +338,31 @@ def test_manual_ajax_section_navigation_and_popstate(get_user):
     with user.page.expect_response("**/manual/section/forms"):
         user.page.locator("button[data-section='forms']").first.click()
     expect(user.page).to_have_url(re.compile(r".*/manual/forms$"))
+    expect(user.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
     expect(content).to_contain_text("What Forms Are For")
     assert user.page.evaluate("window.__manualNavigationToken") == "preserved"
 
     with user.page.expect_response("**/manual/section/tasks"):
         user.page.locator("button[data-section='tasks']").first.click()
     expect(user.page).to_have_url(re.compile(r".*/manual/tasks$"))
+    expect(user.page).to_have_title(f"Tasks — {CONFIG.APP_NAME} Manual")
     expect(content).to_contain_text("Tasks Live on Pages")
     assert user.page.evaluate("window.__manualNavigationToken") == "preserved"
 
     with user.page.expect_response("**/manual/section/forms"):
         user.page.go_back()
     expect(user.page).to_have_url(re.compile(r".*/manual/forms$"))
+    expect(user.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
     expect(content).to_contain_text("What Forms Are For")
 
     with user.page.expect_response("**/manual/section/tasks"):
         user.page.go_forward()
     expect(user.page).to_have_url(re.compile(r".*/manual/tasks$"))
+    expect(user.page).to_have_title(f"Tasks — {CONFIG.APP_NAME} Manual")
     expect(content).to_contain_text("Tasks Live on Pages")
 
 
-# @features manual
-# @dimensions section-navigation
+# @pair manual:section-navigation
 @pytest.mark.e2e
 def test_manual_security_section_loads(get_user):
     user = get_user(Users.OWNER)
@@ -474,8 +469,7 @@ def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
         assert bounds["shellRight"] <= bounds["contentRight"] + 0.5
 
 
-# @features manual
-# @dimensions anonymous-access no-auth-bootstrap
+# @matrix manual : anonymous-access no-auth-bootstrap
 @pytest.mark.e2e
 def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
     anonymous = get_user(Users.ANONYMOUS)
@@ -494,7 +488,7 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
     )
 
     assert response.ok
-    expect(anonymous.page).to_have_title("Manual")
+    expect(anonymous.page).to_have_title(f"Security — {CONFIG.APP_NAME} Manual")
     expect(anonymous.locate("meta[name='mode']")).to_have_attribute("content", "public")
     expect(anonymous.locate("[lp-view][data-kind='manual']")).to_have_attribute(
         "initialized", ""
@@ -509,8 +503,7 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
     assert auth_bootstrap_paths == []
 
 
-# @features manual
-# @dimensions anonymous-access direct-section ajax-section ai-email address-redaction no-auth-bootstrap
+# @matrix manual : address-redaction ai-email ajax-section anonymous-access direct-section no-auth-bootstrap
 @pytest.mark.e2e
 def test_ai_manual_keeps_account_addresses_authenticated(get_user):
     anonymous = get_user(Users.ANONYMOUS)

@@ -1,8 +1,7 @@
 """DOM-light checks for user widget reconciliation behavior."""
 
 
-# @features users
-# @dimensions create-form create-form-reset focus-preservation
+# @matrix users : create-form create-form-reset focus-preservation
 def test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus(
     run_node,
 ):
@@ -154,8 +153,7 @@ function createWidget(visible) {
     )
 
 
-# @features user-groups
-# @dimensions rename reset-rebinding
+# @matrix user-groups : rename reset-rebinding
 def test_group_permissions_tracks_rename_draft_after_target_rebuild(run_node):
     run_node(
         r'''

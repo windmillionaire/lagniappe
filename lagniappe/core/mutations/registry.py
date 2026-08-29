@@ -2,6 +2,7 @@
 
 from .base import StandardMutation
 from .save import (
+    CategoryMutation,
     FileMutation,
     FilterMutation,
     FormMutation,
@@ -26,7 +27,7 @@ SAVE_PLANNERS = {
     "file": FileMutation(),
     "ingress": STANDARD,
     "form": FormMutation(),
-    "category": STANDARD,
+    "category": CategoryMutation(),
     "users": STANDARD,
     "page": PageMutation(),
     "task": TaskMutation(),
@@ -49,8 +50,7 @@ SAVE_PLANNERS = {
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @features mutations
-# @dimensions contract completeness planner-registry
+# @matrix mutations : completeness contract planner-registry
 def planner_for(entity):
     kind = getattr(entity, "entity_kind", None) or getattr(entity, "kind", None)
     try:

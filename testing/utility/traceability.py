@@ -114,6 +114,14 @@ SUPPRESSIVE_TESTABLE_VALUES = {True, False, TESTABLE_INFRASTRUCTURE}
 TEST_FUNCTION_SOURCE_CACHE: dict[str, str] = {}
 
 
+@dataclass(frozen=True)
+class MatrixClause:
+    """One declared Cartesian feature/dimension rectangle."""
+
+    features: tuple[str, ...]
+    dimensions: tuple[str, ...]
+
+
 @dataclass
 class Metadata:
     testable: bool | str | None = None
@@ -121,9 +129,11 @@ class Metadata:
     test_scaffolds: list[str] = field(default_factory=list)
     templates: list[str] = field(default_factory=list)
     styles: list[str] = field(default_factory=list)
+    matrices: list[MatrixClause] = field(default_factory=list)
     features: list[str] = field(default_factory=list)
     dimensions: list[str] = field(default_factory=list)
     pairs: list[str] = field(default_factory=list)
+    sources: list[str] = field(default_factory=list)
     todos: list[str] = field(default_factory=list)
     reason: str | None = None
     covered_by: list[str] = field(default_factory=list)
@@ -139,9 +149,11 @@ class Metadata:
             or self.test_scaffolds
             or self.templates
             or self.styles
+            or self.matrices
             or self.features
             or self.dimensions
             or self.pairs
+            or self.sources
             or self.todos
             or self.reason
             or self.covered_by
@@ -247,6 +259,10 @@ class Report:
 class TestReferenceExpansion:
     links: list[tuple[str, str]]
     stale_by_source: dict[str, list[str]]
+    candidates: list[dict[str, object]] = field(default_factory=list)
+    realized_pairs: dict[tuple[str, str], set[str]] = field(default_factory=dict)
+    fallback_links: set[tuple[str, str]] = field(default_factory=set)
+    issues: list[dict[str, object]] = field(default_factory=list)
 
 
 def repo_root_from_file() -> Path:
@@ -463,6 +479,17 @@ def unique(values: Iterable[str]) -> list[str]:
     return result
 
 
+def parse_matrix_clause(value: str) -> MatrixClause:
+    if value.count(":") != 1:
+        raise ValueError("@matrix must use FEATURES : DIMENSIONS")
+    raw_features, raw_dimensions = value.split(":", 1)
+    features = tuple(unique(split_values(raw_features)))
+    dimensions = tuple(unique(split_values(raw_dimensions)))
+    if not features or not dimensions:
+        raise ValueError("@matrix must use FEATURES : DIMENSIONS")
+    return MatrixClause(features=features, dimensions=dimensions)
+
+
 def parse_metadata(text: str) -> Metadata:
     metadata = Metadata(raw=text.strip())
     recognized_tags = {
@@ -478,12 +505,15 @@ def parse_metadata(text: str) -> Metadata:
         "template-partials",
         "style",
         "styles",
+        "matrix",
         "feature",
         "features",
         "dimension",
         "dimensions",
         "pair",
         "pairs",
+        "source",
+        "sources",
         "todo",
         "todos",
         "reason",
@@ -537,10 +567,26 @@ def parse_metadata(text: str) -> Metadata:
             add_unique(metadata.templates, split_values(value, preserve_brackets=True))
         elif tag in {"style", "styles"}:
             add_unique(metadata.styles, split_values(value, preserve_brackets=True))
+        elif tag == "matrix":
+            try:
+                clause = parse_matrix_clause(value)
+            except ValueError as exc:
+                metadata.issues.append(str(exc))
+            else:
+                if clause in metadata.matrices:
+                    metadata.issues.append(f"duplicate @matrix clause: {value}")
+                else:
+                    metadata.matrices.append(clause)
+                    add_unique(metadata.features, clause.features)
+                    add_unique(metadata.dimensions, clause.dimensions)
         elif tag in {"feature", "features"}:
-            add_unique(metadata.features, split_values(value))
+            metadata.issues.append(
+                f"@{tag} is no longer supported; use @matrix FEATURES : DIMENSIONS"
+            )
         elif tag in {"dimension", "dimensions"}:
-            add_unique(metadata.dimensions, split_values(value))
+            metadata.issues.append(
+                f"@{tag} is no longer supported; use @matrix FEATURES : DIMENSIONS"
+            )
         elif tag in {"pair", "pairs"}:
             for pair in split_values(value):
                 try:
@@ -553,6 +599,8 @@ def parse_metadata(text: str) -> Metadata:
                 add_unique(metadata.pairs, [f"{feature}:{dimension}"])
                 add_unique(metadata.features, [feature])
                 add_unique(metadata.dimensions, [dimension])
+        elif tag in {"source", "sources"}:
+            add_unique(metadata.sources, split_values(value, preserve_brackets=True))
         elif tag in {"todo", "todos"}:
             if value:
                 add_unique(metadata.todos, [value])
@@ -575,8 +623,11 @@ def parse_metadata(text: str) -> Metadata:
             "features",
             "dimension",
             "dimensions",
+            "matrix",
             "pair",
             "pairs",
+            "source",
+            "sources",
             "template",
             "templates",
             "style",
@@ -1478,6 +1529,8 @@ def add_expanded_test_reference(
     source_id: str,
     reference: str,
     all_test_ids: set[str],
+    *,
+    location: str,
 ) -> None:
     if is_test_pattern(reference):
         normalized_pattern = re.sub(r"\[[^]]*\]$", "", reference)
@@ -1491,21 +1544,150 @@ def add_expanded_test_reference(
             expansion.stale_by_source.setdefault(source_id, []).append(reference)
             return
         for nodeid in matches:
-            add_expanded_test_link(expansion, source_id, nodeid)
+            add_test_candidate(
+                expansion,
+                source_id,
+                nodeid,
+                origin="@tests",
+                reference=reference,
+                broad=True,
+                location=location,
+            )
     elif reference in all_test_ids or base_nodeid(reference) in all_test_ids:
-        add_expanded_test_link(expansion, source_id, base_nodeid(reference))
+        add_test_candidate(
+            expansion,
+            source_id,
+            base_nodeid(reference),
+            origin="@tests",
+            reference=reference,
+            broad=False,
+            location=location,
+        )
     else:
         expansion.stale_by_source.setdefault(source_id, []).append(reference)
 
 
-def add_expanded_test_link(
+def add_test_candidate(
     expansion: TestReferenceExpansion,
     source_id: str,
     nodeid: str,
+    *,
+    origin: str,
+    reference: str,
+    broad: bool,
+    location: str,
 ) -> None:
-    link = (source_id, nodeid)
-    if link not in expansion.links:
+    candidate = {
+        "source_id": source_id,
+        "nodeid": nodeid,
+        "origin": origin,
+        "reference": reference,
+        "broad": broad,
+        "location": location,
+    }
+    if candidate not in expansion.candidates:
+        expansion.candidates.append(candidate)
+
+
+def qualify_test_candidates(
+    expansion: TestReferenceExpansion,
+    symbols: Iterable[SourceSymbol],
+    tests: dict[str, TestCase],
+) -> None:
+    source_by_id = {symbol.source_id: symbol for symbol in symbols}
+    candidates_by_link: dict[tuple[str, str], list[dict[str, object]]] = {}
+    broad_declarations: dict[tuple[str, str, str], dict[str, object]] = {}
+    qualified_broad: set[tuple[str, str, str]] = set()
+    for candidate in expansion.candidates:
+        source_id = str(candidate["source_id"])
+        nodeid = str(candidate["nodeid"])
+        candidates_by_link.setdefault((source_id, nodeid), []).append(candidate)
+        if candidate["broad"]:
+            key = (
+                source_id,
+                str(candidate["origin"]),
+                str(candidate["reference"]),
+            )
+            broad_declarations[key] = candidate
+
+    for link, candidates in sorted(candidates_by_link.items()):
+        source_id, nodeid = link
+        source = source_by_id.get(source_id)
+        test = tests.get(nodeid)
+        if source is None or test is None:
+            continue
+
+        origins = {str(candidate["origin"]) for candidate in candidates}
+        if "@tests" in origins and "@source" in origins:
+            expansion.issues.append(
+                {
+                    "kind": "duplicate-direct-link",
+                    "severity": "warning",
+                    "location": test.location,
+                    "message": f"{source_id} and {nodeid} declare the same edge twice",
+                }
+            )
+
+        source_pairs = feature_dimension_pairs(source.metadata)
+        test_pairs = feature_dimension_pairs(test.metadata)
+        realized = source_pairs & test_pairs
+        if realized:
+            expansion.links.append(link)
+            expansion.realized_pairs[link] = realized
+            for candidate in candidates:
+                if candidate["broad"]:
+                    qualified_broad.add(
+                        (
+                            source_id,
+                            str(candidate["origin"]),
+                            str(candidate["reference"]),
+                        )
+                    )
+            continue
+
+        exact_candidates = [candidate for candidate in candidates if not candidate["broad"]]
+        if not exact_candidates:
+            continue
+
         expansion.links.append(link)
+        expansion.fallback_links.add(link)
+        missing = []
+        if not source_pairs:
+            missing.append("source")
+        if not test_pairs:
+            missing.append("test")
+        if missing:
+            message = (
+                f"{source_id} and {nodeid} have no qualifying behavior claims "
+                f"on: {', '.join(missing)}"
+            )
+            kind = "unqualified-direct-link"
+        else:
+            message = f"{source_id} and {nodeid} declare disjoint behavior cells"
+            kind = "disjoint-direct-link"
+        expansion.issues.append(
+            {
+                "kind": kind,
+                "severity": "error",
+                "location": str(exact_candidates[0]["location"]),
+                "message": message,
+            }
+        )
+
+    for key, candidate in sorted(broad_declarations.items()):
+        if key in qualified_broad:
+            continue
+        expansion.issues.append(
+            {
+                "kind": "unqualified-test-pattern",
+                "severity": "error",
+                "location": str(candidate["location"]),
+                "message": (
+                    f"{candidate['origin']} {candidate['reference']} matched tests "
+                    "but none shared a declared behavior cell"
+                ),
+            }
+        )
 
 
 def expand_test_references(
@@ -1513,7 +1695,10 @@ def expand_test_references(
     tests: dict[str, TestCase],
     scaffold_symbols: Iterable[SourceSymbol] | None = None,
     repo_root: Path | None = None,
+    known_source_ids: set[str] | None = None,
 ) -> TestReferenceExpansion:
+    symbol_list = list(symbols)
+    source_by_id = {symbol.source_id: symbol for symbol in symbol_list}
     all_test_ids = set(tests)
     expansion = TestReferenceExpansion(
         links=[],
@@ -1521,13 +1706,17 @@ def expand_test_references(
     )
     scaffolds_by_ref = scaffold_symbols_by_reference(scaffold_symbols)
 
-    for symbol in symbols:
+    for symbol in symbol_list:
         if symbol.metadata.testable is not True:
             continue
 
         for reference in symbol.metadata.tests:
             add_expanded_test_reference(
-                expansion, symbol.source_id, reference, all_test_ids
+                expansion,
+                symbol.source_id,
+                reference,
+                all_test_ids,
+                location=symbol_line(symbol),
             )
 
         for scaffold_ref in symbol.metadata.test_scaffolds:
@@ -1544,9 +1733,84 @@ def expand_test_references(
             for scaffold in scaffolds:
                 for test in tests.values():
                     if test_uses_scaffold(test, scaffold, repo_root):
-                        add_expanded_test_link(expansion, symbol.source_id, test.nodeid)
+                        add_test_candidate(
+                            expansion,
+                            symbol.source_id,
+                            test.nodeid,
+                            origin="@scaffolding",
+                            reference=scaffold_ref,
+                            broad=True,
+                            location=symbol_line(symbol),
+                        )
+
+    for test in tests.values():
+        for source_id in test.metadata.sources:
+            if "::" not in source_id:
+                expansion.issues.append(
+                    {
+                        "kind": "invalid-source-reference",
+                        "severity": "error",
+                        "location": test.location,
+                        "message": f"@source must use PATH::QUALNAME: {source_id}",
+                    }
+                )
+                continue
+            source = source_by_id.get(source_id)
+            if source is None:
+                if known_source_ids is not None and source_id not in known_source_ids:
+                    expansion.issues.append(
+                        {
+                            "kind": "stale-source-reference",
+                            "severity": "error",
+                            "location": test.location,
+                            "message": source_id,
+                        }
+                    )
+                continue
+            if source.metadata.testable is not True:
+                expansion.issues.append(
+                    {
+                        "kind": "source-reference-not-testable",
+                        "severity": "error",
+                        "location": test.location,
+                        "message": f"@source target is not @testable true: {source_id}",
+                    }
+                )
+            add_test_candidate(
+                expansion,
+                source_id,
+                test.nodeid,
+                origin="@source",
+                reference=source_id,
+                broad=False,
+                location=test.location,
+            )
+
+    qualify_test_candidates(expansion, symbol_list, tests)
 
     return expansion
+
+
+def metadata_matrix_clauses(metadata: Metadata) -> list[MatrixClause]:
+    """Return declared matrices, including programmatic legacy test fixtures."""
+    if metadata.matrices:
+        return list(metadata.matrices)
+    if metadata.pairs or not metadata.features or not metadata.dimensions:
+        return []
+    return [
+        MatrixClause(
+            features=tuple(metadata.features),
+            dimensions=tuple(metadata.dimensions),
+        )
+    ]
+
+
+def matrix_clause_pairs(clause: MatrixClause) -> set[str]:
+    return {
+        f"{feature}:{dimension}"
+        for feature in clause.features
+        for dimension in clause.dimensions
+    }
 
 
 def feature_dimension_coverage_gaps(
@@ -1555,27 +1819,36 @@ def feature_dimension_coverage_gaps(
     refs = list(known_refs)
     gaps: list[dict[str, str]] = []
 
-    declared_pairs = feature_dimension_pairs(metadata)
-    if declared_pairs:
-        for pair in sorted(declared_pairs):
-            feature, dimension = pair.split(":", 1)
-            if not any(pair in feature_dimension_pairs(tests[test].metadata) for test in refs):
-                gaps.append(
-                    {
-                        "kind": "pair",
-                        "feature": feature,
-                        "dimension": dimension,
-                        "name": pair,
-                    }
-                )
-        return gaps
+    claimed_by_tests = {
+        test: feature_dimension_pairs(tests[test].metadata)
+        for test in refs
+        if test in tests
+    }
+    for pair in sorted(set(metadata.pairs)):
+        feature, dimension = pair.split(":", 1)
+        if not any(pair in claims for claims in claimed_by_tests.values()):
+            gaps.append(
+                {
+                    "kind": "pair",
+                    "feature": feature,
+                    "dimension": dimension,
+                    "name": pair,
+                }
+            )
 
-    for feature in metadata.features:
-        if not any(feature in tests[test].metadata.features for test in refs):
-            gaps.append({"kind": "feature", "name": feature})
-    for dimension in metadata.dimensions:
-        if not any(dimension in tests[test].metadata.dimensions for test in refs):
-            gaps.append({"kind": "dimension", "name": dimension})
+    for clause in metadata_matrix_clauses(metadata):
+        allowed = matrix_clause_pairs(clause)
+        realized = set().union(
+            *(allowed & claims for claims in claimed_by_tests.values())
+        ) if claimed_by_tests else set()
+        realized_features = {pair.split(":", 1)[0] for pair in realized}
+        realized_dimensions = {pair.split(":", 1)[1] for pair in realized}
+        for feature in clause.features:
+            if feature not in realized_features:
+                gaps.append({"kind": "feature", "name": feature})
+        for dimension in clause.dimensions:
+            if dimension not in realized_dimensions:
+                gaps.append({"kind": "dimension", "name": dimension})
     return gaps
 
 
@@ -1835,9 +2108,26 @@ def source_explanation_rows(
 ) -> list[dict[str, object]]:
     expansion = expand_test_references(symbols, tests, scaffold_symbols, repo_root)
     by_source: dict[str, list[TestCase]] = {}
+    realized_by_source: dict[str, set[str]] = {}
     for source_id, nodeid in expansion.links:
         if nodeid in tests:
             by_source.setdefault(source_id, []).append(tests[nodeid])
+            realized_by_source.setdefault(source_id, set()).update(
+                expansion.realized_pairs.get((source_id, nodeid), set())
+            )
+
+    def related_tests(source_id: str) -> list[dict[str, object]]:
+        direct_ids = {test.nodeid for test in by_source.get(source_id, [])}
+        realized = realized_by_source.get(source_id, set())
+        rows = []
+        for test in tests.values():
+            if test.nodeid in direct_ids:
+                continue
+            shared = realized & feature_dimension_pairs(test.metadata)
+            if shared:
+                rows.append({"test": test, "pairs": sorted(shared)})
+        return sorted(rows, key=lambda row: row["test"].nodeid)
+
     return [
         {
             "source": symbol,
@@ -1851,10 +2141,54 @@ def source_explanation_rows(
             "features": list(symbol.metadata.features),
             "dimensions": list(symbol.metadata.dimensions),
             "pairs": list(symbol.metadata.pairs),
+            "matrices": list(symbol.metadata.matrices),
+            "realized_pairs": sorted(realized_by_source.get(symbol.source_id, set())),
+            "related_tests": related_tests(symbol.source_id),
             "templates": list(symbol.metadata.templates),
         }
         for symbol in symbols
     ]
+
+
+def attach_source_explanations(
+    report: Report,
+    symbols: list[SourceSymbol],
+    tests: dict[str, TestCase],
+    scaffold_symbols: list[SourceSymbol] | None,
+    repo_root: Path,
+) -> None:
+    report.source_explanations = source_explanation_rows(
+        symbols, tests, scaffold_symbols, repo_root
+    )
+    required_tests = {
+        test.nodeid
+        for item in report.source_explanations
+        for test in item["tests"]
+    }
+    related_tests = {
+        item["test"].nodeid
+        for source in report.source_explanations
+        for item in source["related_tests"]
+    }
+    report.summary.update(
+        {
+            "source_required_tests": len(required_tests),
+            "source_realized_pair_links": sum(
+                len(item["realized_pairs"])
+                for item in report.source_explanations
+            ),
+            "source_related_tests": len(related_tests),
+            "source_related_test_links": sum(
+                len(item["related_tests"])
+                for item in report.source_explanations
+            ),
+            "source_related_pair_links": sum(
+                len(related["pairs"])
+                for item in report.source_explanations
+                for related in item["related_tests"]
+            ),
+        }
+    )
 
 
 def normalize_test_target(target: str | None) -> str | None:
@@ -1940,8 +2274,12 @@ def source_reference_matches_for_tests(
 
 
 def feature_dimension_pairs(metadata: Metadata) -> set[str]:
-    if metadata.pairs:
-        return set(metadata.pairs)
+    declared = set(metadata.pairs)
+    clauses = metadata_matrix_clauses(metadata)
+    for clause in clauses:
+        declared.update(matrix_clause_pairs(clause))
+    if declared:
+        return declared
     if not metadata.features or not metadata.dimensions:
         return set()
     return {
@@ -2790,7 +3128,13 @@ def classify(
         for symbol in symbols
         if symbol.metadata.testable == TESTABLE_INFRASTRUCTURE
     ]
-    expansion = expand_test_references(symbols, tests, scaffold_symbols, repo_root)
+    expansion = expand_test_references(
+        symbols,
+        tests,
+        scaffold_symbols,
+        repo_root,
+        known_source_ids=covered_by_source_ids,
+    )
     source_test_links = expansion.links
     stale_by_source = expansion.stale_by_source
     referenced = {test for _, test in source_test_links}
@@ -2837,6 +3181,7 @@ def classify(
         if symbol.metadata.testable is True
         and not symbol.metadata.tests
         and not symbol.metadata.test_scaffolds
+        and symbol.source_id not in sources_with_known_tests
     ]
     stale_test_references = []
     unfinished_coverage = []
@@ -2977,6 +3322,7 @@ def classify(
         broad_source_owners=broad_source_owners,
         test_todos=test_todos,
         orphan_runnable_tests=orphan_runnable_tests,
+        source_link_issues=expansion.issues,
     )
 
 
@@ -3233,7 +3579,10 @@ def build_report(
             for issue in report.annotation_scope_issues
             if str(issue.get("path", "")) in changed_set
         ]
-    all_source_link_issues = source_link_issues(referenceable_symbols)
+    all_source_link_issues = [
+        *source_link_issues(referenceable_symbols),
+        *report.source_link_issues,
+    ]
     scoped_source_ids = {symbol.source_id for symbol in symbols}
     report.source_link_issues = [
         issue
@@ -3273,8 +3622,8 @@ def build_report(
     if changed_mode:
         report.changed_paths = changed_path_list
         report.changed_tests = focused_tests
-        report.source_explanations = source_explanation_rows(
-            symbols, tests, scaffold_symbols, repo_root
+        attach_source_explanations(
+            report, symbols, tests, scaffold_symbols, repo_root
         )
         references = source_reference_matches_for_tests(
             all_symbols or symbols,
@@ -3328,8 +3677,8 @@ def build_report(
             scaffold_symbols=scaffold_symbols,
         )
     elif selected_source_paths:
-        report.source_explanations = source_explanation_rows(
-            symbols, tests, scaffold_symbols, repo_root
+        attach_source_explanations(
+            report, symbols, tests, scaffold_symbols, repo_root
         )
         report.summary["source_test_suggestions_enabled"] = suggest_sources
         report.source_test_suggestions = (
@@ -3442,12 +3791,22 @@ def format_feature_dimension_gap(gap: dict[str, object]) -> str:
 
 def format_metadata_tags(metadata: Metadata) -> str:
     parts = []
+    if metadata.matrices:
+        parts.append(
+            "matrices="
+            + "; ".join(
+                f"{' '.join(clause.features)} : {' '.join(clause.dimensions)}"
+                for clause in metadata.matrices
+            )
+        )
     if metadata.pairs:
         parts.append(f"pairs={', '.join(metadata.pairs)}")
-    if metadata.features:
+    if metadata.features and not metadata.matrices:
         parts.append(f"features={', '.join(metadata.features)}")
-    if metadata.dimensions:
+    if metadata.dimensions and not metadata.matrices:
         parts.append(f"dimensions={', '.join(metadata.dimensions)}")
+    if metadata.sources:
+        parts.append(f"sources={', '.join(metadata.sources)}")
     if metadata.templates:
         parts.append(f"templates={', '.join(metadata.templates)}")
     if metadata.todos:
@@ -3602,13 +3961,27 @@ def format_source_explanations(items: list[dict[str, object]]) -> list[str]:
         for owner in item["covered_by"]:
             lines.append(f"    owner: {owner}")
         for test in item["tests"]:
-            lines.append(f"    test: {test.nodeid} ({test_status(test)})")
+            lines.append(f"    required test: {test.nodeid} ({test_status(test)})")
+        for related in item["related_tests"]:
+            test = related["test"]
+            lines.append(
+                f"    related test: {test.nodeid} "
+                f"(pairs={', '.join(related['pairs'])}; {test_status(test)})"
+            )
         if item["features"]:
             lines.append(f"    features: {', '.join(item['features'])}")
         if item["dimensions"]:
             lines.append(f"    dimensions: {', '.join(item['dimensions'])}")
         if item["pairs"]:
             lines.append(f"    exact pairs: {', '.join(item['pairs'])}")
+        if item["matrices"]:
+            for matrix in item["matrices"]:
+                lines.append(
+                    f"    matrix: {' '.join(matrix.features)} : "
+                    f"{' '.join(matrix.dimensions)}"
+                )
+        if item["realized_pairs"]:
+            lines.append(f"    realized pairs: {', '.join(item['realized_pairs'])}")
         if item["templates"]:
             lines.append(f"    templates: {', '.join(item['templates'])}")
     return lines
@@ -3652,7 +4025,9 @@ def format_traceability_diagnostics(report: Report) -> list[str]:
         lines.append(f"\nSource ownership link issues: {len(report.source_link_issues)}")
         for issue in report.source_link_issues:
             source = issue.get("source")
-            location = symbol_line(source) if isinstance(source, SourceSymbol) else "source"
+            location = str(issue.get("location") or "source")
+            if isinstance(source, SourceSymbol):
+                location = symbol_line(source)
             lines.append(
                 f"  - [{str(issue['severity']).upper()}] {location}: {issue['message']}"
             )
@@ -4531,7 +4906,13 @@ def markdown_source_explanations(items: list[dict[str, object]]) -> list[str]:
             lines.append(f"  - owner: {markdown_code(owner)}")
         for test in item["tests"]:
             lines.append(
-                f"  - test: {markdown_code(test.nodeid)} _{test_status(test)}_"
+                f"  - required test: {markdown_code(test.nodeid)} _{test_status(test)}_"
+            )
+        for related in item["related_tests"]:
+            test = related["test"]
+            lines.append(
+                f"  - related test: {markdown_code(test.nodeid)} "
+                f"(pairs={markdown_list(related['pairs'])}) _{test_status(test)}_"
             )
         if item["features"]:
             lines.append(f"  - features: {markdown_list(item['features'])}")
@@ -4539,6 +4920,15 @@ def markdown_source_explanations(items: list[dict[str, object]]) -> list[str]:
             lines.append(f"  - dimensions: {markdown_list(item['dimensions'])}")
         if item["pairs"]:
             lines.append(f"  - exact pairs: {markdown_list(item['pairs'])}")
+        for matrix in item["matrices"]:
+            lines.append(
+                f"  - matrix: {markdown_list(matrix.features)} : "
+                f"{markdown_list(matrix.dimensions)}"
+            )
+        if item["realized_pairs"]:
+            lines.append(
+                f"  - realized pairs: {markdown_list(item['realized_pairs'])}"
+            )
         if item["templates"]:
             lines.append(f"  - templates: {markdown_list(item['templates'])}")
     lines.append("")
@@ -4978,7 +5368,7 @@ def report_findings(report: Report) -> list[dict[str, str]]:
             "testable-without-tests",
             "error",
             symbol_line(symbol),
-            "@testable true has no @tests or @scaffolding evidence",
+            "@testable true has no @tests, @source, or @scaffolding evidence",
         )
     for item in report.stale_test_references:
         for test in item["tests"]:
@@ -5010,7 +5400,9 @@ def report_findings(report: Report) -> list[dict[str, str]]:
         )
     for item in report.source_link_issues:
         source = item.get("source")
-        location = symbol_line(source) if isinstance(source, SourceSymbol) else "repository"
+        location = str(item.get("location") or "repository")
+        if isinstance(source, SourceSymbol):
+            location = symbol_line(source)
         add(str(item["kind"]), str(item["severity"]), location, str(item["message"]))
     for item in report.metadata_issues:
         add(

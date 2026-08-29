@@ -11,7 +11,7 @@ Maps to:
 from playwright.sync_api import expect
 
 from lagniappe.core.entities import Entities
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 from ..elements import Editor, List, SpinnerButtons, Tabs
 from .core import SiteResource

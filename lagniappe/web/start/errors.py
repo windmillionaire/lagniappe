@@ -23,8 +23,8 @@ def initialize(app):
 # @tests tests_e2e/001_site/test_001a_environment.py::test_error_handling
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
 # @tests tests_e2e/001_site/test_001b_login.py::test_csrf_failure_is_identified_for_targeted_retry
-# @features error-handling
-# @dimensions http-404 csrf
+# @matrix error-handling : csrf http-404
+# @pair login:redirect-target
 def handle_http_error(error):
     """Handle HTTP exceptions (4xx and 5xx errors)."""
     code = error.code if hasattr(error, "code") else 500
@@ -96,8 +96,7 @@ def _should_show_debug():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_error_handling
-# @features error-handling
-# @dimensions error-page
+# @pair error-handling:error-page
 def _handle_error_with_context(
     error,
     code=500,

@@ -18,18 +18,17 @@ Related Files:
 import pytest
 
 from testing.definitions import Projects, SitePages, Users
-from testing.utility import (
+from testing.utility.network import (
     expect_successful_response,
     scoped_browser_route,
-    wait_for_offline_sync_records,
 )
+from testing.utility.offline import wait_for_offline_sync_records
 from playwright.sync_api import expect
 
 pytestmark = pytest.mark.e2e
 
 OFFLINE_INDICATOR = "[data-role='offline']"
-# @features offline
-# @dimensions indicator browser-state
+# @matrix offline : browser-state indicator
 def test_offline_indicator_toggles(get_user, browser_failures):
     """
     Test that the offline indicator responds to offline state changes.
@@ -58,8 +57,7 @@ def test_offline_indicator_toggles(get_user, browser_failures):
     expect(indicator).to_be_hidden()
 
 
-# @features offline
-# @dimensions indicator server-health
+# @matrix offline : indicator server-health
 def test_failed_ping_marks_view_offline_until_next_sync_event(
     get_user,
     browser_failures,
@@ -125,8 +123,7 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
     expect(indicator).to_be_hidden()
 
 
-# @features offline
-# @dimensions indicator browser-state server-health reconnect
+# @matrix offline : browser-state indicator reconnect server-health
 def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
     """
     Test that retry polling recovers after the native online event fails.
@@ -191,7 +188,7 @@ def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
     expect(indicator).to_be_hidden()
 
 
-# @pairs sync:offline-replay sync:queue-clear
+# @matrix sync : offline-replay queue-clear
 def test_offline_prevents_sync_requests(get_user, browser_failures):
     """
     Test that going offline prevents sync network requests and that
@@ -236,8 +233,7 @@ def test_offline_prevents_sync_requests(get_user, browser_failures):
     )
 
 
-# @features offline
-# @dimensions indicator view-reset
+# @matrix offline : indicator view-reset
 def test_testing_mode_navigation_resets_offline_state(get_user, browser_failures):
     """
     Test that a new testing-mode view rechecks server state after navigation.

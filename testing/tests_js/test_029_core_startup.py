@@ -3,11 +3,7 @@
 from pathlib import Path
 
 
-# @pair startup:interaction-ready
-# @pair startup:deferred-services
-# @pair startup:single-flight
-# @pair startup:destroy-safety
-# @pair startup:performance-marks
+# @matrix startup : deferred-services destroy-safety interaction-ready performance-marks single-flight
 # @pair forms:submit-interception
 def test_shell_intercepts_interactions_before_deferred_services(run_node):
     run_node(
@@ -225,8 +221,7 @@ const createSubmit = (form, submitter) => ({
     )
 
 
-# @pair startup:first-interaction
-# @pair startup:single-flight
+# @matrix startup : first-interaction single-flight
 # @pair search:navbar-results
 def test_lazy_search_replays_the_latest_live_input_after_loading(run_node):
     core_source = Path("src/script/views/base/core.mjs").read_text()
@@ -342,15 +337,8 @@ const input = {
     )
 
 
-# @pair polling:channel
-# @pair polling:entity
-# @pair polling:refresh
-# @pair polling:active-widget
-# @pair polling:visibility
-# @pair polling:subscription-lifecycle
-# @pair polling:nonblocking
-# @pair startup:single-flight
-# @pair startup:nonblocking
+# @matrix polling : active-widget channel entity nonblocking refresh subscription-lifecycle visibility
+# @matrix startup : nonblocking single-flight
 def test_core_polling_subscription_lifecycle(run_node):
     run_node(
         r'''
@@ -527,8 +515,7 @@ vm.runInContext(source, context);
     )
 
 
-# @pair polling:blur
-# @pair polling:visibility
+# @matrix polling : blur visibility
 # @pair sync:deregistration
 def test_core_sync_distinguishes_visible_blur_from_hard_suspension(run_node):
     run_node(
@@ -638,12 +625,65 @@ Object.defineProperty(view, "offline", {
     )
 
 
-# @pair startup:deferred-services
-# @pair startup:component-render
-# @pair startup:nonblocking
-# @pair polling:subscription-lifecycle
-# @pair polling:component-render
-# @pair polling:nonblocking
+# @covers src/script/views/base/component.mjs::ViewComponent.activate
+# @matrix navigation tabs : static-component visibility
+def test_static_component_without_default_widget_activates(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = {
+  console,
+  CustomEvent: class {},
+  document: { getElementById() { return null; } },
+};
+vm.createContext(context);
+
+let source = fs.readFileSync("src/script/views/base/component.mjs", "utf8");
+source = source.replace(
+  /^import [\s\S]*?(?=\/\*\*)/,
+  `
+const NavElement = class {};
+const showBriefly = () => {};
+const withTransition = async (callback) => await callback();
+const loadWidget = async () => null;
+`,
+);
+source = source.replace("export default class ViewComponent", "class ViewComponent");
+source += "\nglobalThis.ViewComponent = ViewComponent;";
+vm.runInContext(source, context);
+
+(async () => {
+  const component = Object.create(context.ViewComponent.prototype);
+  Object.assign(component, {
+    active: null,
+    _destroyed: false,
+    _nav: null,
+    elt: {
+      dataset: {},
+      querySelector() { return null; },
+    },
+    name: "backups",
+  });
+  component.loadWidget = async () => {
+    throw new Error("A static component must not load a placeholder widget");
+  };
+
+  const activated = await component.activate("active");
+  if (activated !== true || component.active !== null) {
+    throw new Error("A static component without a default widget stayed hidden");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
+# @matrix polling : component-render nonblocking subscription-lifecycle
+# @matrix startup : component-render deferred-services nonblocking
 def test_component_render_does_not_wait_for_polling_reconciliation(run_node):
     run_node(
         r'''
@@ -791,9 +831,7 @@ def test_initial_replay_is_scheduled_after_view_readiness():
     assert "ensureOfflineQueue" not in load_body
 
 
-# @pair sync:editor-readiness
-# @pair sync:loader-free
-# @pair sync:state-only
+# @matrix sync : editor-readiness loader-free state-only
 def test_collaborative_document_renders_before_initial_state(run_node):
     run_node(
         r'''
@@ -901,18 +939,8 @@ vm.runInContext(source, context);
     )
 
 
-# @features sync editor
-# @dimensions initialization empty-content save-guard
-# @pair sync:initialization
-# @pair sync:empty-content
-# @pair sync:save-guard
-# @pair sync:intentional-clear
-# @pair sync:checkpoint
-# @pair sync:dirty-state
-# @pair sync:concurrent-edit
-# @pair editor:initialization
-# @pair editor:empty-content
-# @pair editor:save-guard
+# @matrix editor : empty-content initialization save-guard
+# @matrix sync : checkpoint concurrent-edit dirty-state empty-content initialization intentional-clear response-contract save-guard
 def test_collaborative_document_does_not_save_untouched_empty_state(run_node):
     run_node(
         r'''
@@ -986,6 +1014,17 @@ if (documentWidget._dirty) {
 }
 documentWidget._commitInitialBaseline();
 documentWidget.initialized = true;
+
+documentWidget.currentState = "current-document-state";
+documentWidget.updateQueue.push("pending-user-update");
+const syncPayload = documentWidget.syncData;
+if (
+  syncPayload?.update !== "user-update" ||
+  syncPayload?.ydoc !== "current-document-state" ||
+  documentWidget.updateQueue.length !== 0
+) {
+  throw new Error("Document sync payload did not package its delta and checkpoint");
+}
 
 if (documentWidget.saveData !== null) {
   throw new Error("Untouched fresh document produced an eager save payload");

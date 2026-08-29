@@ -15,6 +15,7 @@ from config.constants import (
     REDIS_CA_CERT_RELATIVE_PATH,
     UNSUPPORTED_SETTING_KEYS,
 )
+from config.public_pages import PUBLIC_PAGE_SETTING_KEYS
 from config.redis import redis_tls_enabled, validate_redis_ca_cert
 
 
@@ -65,13 +66,14 @@ def _mapping(value, name):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_recovery_snapshot_is_complete_flat_and_merges_live_settings
-# @features config
-# @dimensions recovery-export current-schema messaging-removal
+# @matrix config : current-schema messaging-removal recovery-export
+# @pair public-pages:recovery-export
 def build_recovery_snapshot(
     settings,
     *,
     deployment_settings=None,
     ai_settings=None,
+    public_page_settings=None,
     redis_ca_pem=None,
 ):
     """Return a complete flat recovery snapshot without redacting persisted values."""
@@ -127,12 +129,19 @@ def build_recovery_snapshot(
                 if key in AI_SETTING_KEYS
             }
         )
+    if public_page_settings:
+        snapshot.update(
+            {
+                key: value
+                for key, value in dict(public_page_settings).items()
+                if key in PUBLIC_PAGE_SETTING_KEYS
+            }
+        )
 
     snapshot["CONFIG_KIND"] = CONFIG_KIND
     snapshot["CONFIG_SCHEMA_VERSION"] = CONFIG_SCHEMA_VERSION
     snapshot.setdefault("GOOGLE_SIGNIN_ENABLED", True)
     snapshot.setdefault("BOOTSTRAP_ADMIN_EMAIL", "")
-
     if redis_tls_enabled(snapshot):
         if not redis_ca_pem:
             raise RecoveryConfigurationError(
@@ -148,8 +157,7 @@ def build_recovery_snapshot(
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_recovery_display_redacts_nested_and_flat_secrets_without_mutation
-# @features config
-# @dimensions recovery-display secrets
+# @matrix config : recovery-display secrets
 def redact_settings_for_display(settings):
     """Return a redacted browser-display copy without mutating the source mapping."""
 
@@ -231,9 +239,7 @@ def _require_project_resource(value, name, project_id):
 # @tests tests_tooling/test_003_config.py::test_recovery_validates_and_normalizes_auth_email_smtp
 # @tests tests_tooling/test_003_config.py::test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config
 # @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
-# @pairs config:recovery-validation config:project-identity config:project-number
-# @pairs config:current-schema config:required-settings config:authentication-email
-# @pairs config:ai-email config:secrets config:schema-upgrade config:messaging-removal
+# @matrix config : ai-email authentication-email current-schema messaging-removal project-identity project-number recovery-validation required-settings schema-upgrade secrets
 def validate_recovery_document(settings):
     """Validate and normalize a canonical recovery document before provider access."""
     from config.locations import (
@@ -441,8 +447,7 @@ def validate_recovery_document(settings):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_recovery_redis_ca_round_trips_through_one_file
-# @features config
-# @dimensions recovery-export redis-tls
+# @matrix config : recovery-export redis-tls
 def read_recovery_redis_ca(settings, *, app_dir=None):
     """Read the validated Redis CA PEM for inclusion in a recovery snapshot."""
     if not redis_tls_enabled(settings):
@@ -456,8 +461,7 @@ def read_recovery_redis_ca(settings, *, app_dir=None):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_recovery_redis_ca_round_trips_through_one_file
-# @features config
-# @dimensions recovery-restore redis-tls certificate-validation
+# @matrix config : certificate-validation recovery-restore redis-tls
 def materialize_recovery_redis_ca(settings, *, app_dir=None):
     """Atomically restore the managed Redis CA file before endpoint validation."""
     recovered = settings

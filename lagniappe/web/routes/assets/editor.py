@@ -4,7 +4,9 @@ from flask_login import current_user
 from lagniappe.core.definitions import AI, Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import ai, database, utility
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.files.html import clean_html
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,
@@ -18,8 +20,8 @@ from . import assets
 
 # @testable true
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-# @features html-field
-# @dimensions render-fetch submitter-key form-asset
+# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
+# @matrix html-field : authoritative-content form-asset render-fetch retry submitter-key
 @assets.route("<key>/html/<field_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def html_field(key, field_id, **kwargs):
@@ -34,6 +36,9 @@ def html_field(key, field_id, **kwargs):
 
 # @testable true
 # @tests tests_unit/test_004_form_properties.py::test_form_html_fields
+# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
+# @matrix html-field : form-asset intentional-clear server-acknowledgement
+# @pair html-field:html-fields
 @assets.route("<key>/form-html/<field_id>", methods=["PUT"])
 @permission(requested=Action.EDIT)
 def form_html(key, field_id, **kwargs):
@@ -48,8 +53,8 @@ def form_html(key, field_id, **kwargs):
 
 
 # @testable true
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_sync_response_contract_is_browser_visible
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
+# @pair sync:document
 @assets.route("<key>/document/state", methods=["GET"])
 @permission(requested=Action.VIEW)
 def get_document_state(key, **kwargs):
@@ -64,8 +69,7 @@ def get_document_state(key, **kwargs):
 # @testable true
 # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image_generate_toggle
 # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
-# @features editor
-# @dimensions image-generate-toggle image-upload
+# @matrix editor : image-generate-toggle image-upload
 @assets.route("<key>/document/image", methods=["POST"])
 @permission(requested=Action.EDIT)
 def add_document_image(key, **kwargs):
@@ -135,8 +139,7 @@ def add_document_image_direct(key, **kwargs):
 # @testable true
 # @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_explain_includes_selected_text_context
 # @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_live_page_context_with_tasks_and_files
-# @features ai
-# @dimensions generate-text selected-text explain live-provider page-context document-context
+# @matrix ai : document-context explain generate-text live-provider page-context selected-text
 @assets.route("<key>/document/generate", methods=["POST"])
 @permission(requested=Action.EDIT)
 def generate_text(key, **kwargs):
@@ -171,7 +174,7 @@ def generate_text(key, **kwargs):
     except exceptions.AIException as e:
         return responses.error(str(e), exception=e)
 
-    cleaned_html = utility.clean_html(html)
+    cleaned_html = clean_html(html)
     return responses.document_html(cleaned_html)
 
 
@@ -179,8 +182,7 @@ def generate_text(key, **kwargs):
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @features editor
-# @dimensions history-list history-restore ordering
+# @matrix editor : history-list history-pin history-restore
 @assets.route("<key>/document/history", methods=["GET"])
 @permission(requested=Action.VIEW)
 def list_document_history(key, **kwargs):
@@ -188,7 +190,7 @@ def list_document_history(key, **kwargs):
         kwargs["entity"],
         request=Fetch.direct(),
     )
-    results = database.get.document_history(entity)
+    results = database_get.document_history(entity)
     entries = Entities.fetch(*results, request=Fetch.root()) if results else []
     entries = Entities.DOCUMENT_HISTORY.ordered(entries)
     return responses.json_response(
@@ -201,8 +203,7 @@ def list_document_history(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @features editor
-# @dimensions history-pin current-content validation
+# @matrix editor : current-content history-pin validation
 @assets.route("<key>/document/history/pin", methods=["POST"])
 @permission(requested=Action.EDIT)
 def pin_document_history(key, **kwargs):
@@ -226,8 +227,7 @@ def pin_document_history(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @features editor
-# @dimensions history-clear confirmation batch cleanup
+# @matrix editor : confirmation history-clear
 @assets.route("<key>/document/history/unpinned", methods=["GET", "DELETE"])
 @permission(requested=Action.EDIT)
 def unpinned_document_history(key, **kwargs):
@@ -235,7 +235,7 @@ def unpinned_document_history(key, **kwargs):
         kwargs["entity"],
         request=Fetch.direct(),
     )
-    results = database.get.document_history(entity)
+    results = database_get.document_history(entity)
     entries = Entities.fetch(*results, request=Fetch.root()) if results else []
     unpinned_count = sum(not entry.pinned for entry in entries)
 
@@ -252,8 +252,7 @@ def unpinned_document_history(key, **kwargs):
 # @testable true
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @features editor
-# @dimensions history-restore parent-scope
+# @matrix editor : history-restore parent-scope
 @assets.route("<key>/document/history/<history_key>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def get_document_history(key, history_key, **kwargs):

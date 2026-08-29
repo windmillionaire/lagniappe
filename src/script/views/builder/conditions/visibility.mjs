@@ -4,8 +4,7 @@ import { ConditionTarget } from "./base";
  * @testable true
  * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility
  * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility_select_multiple_values
- * @features forms
- * @dimensions builder-field-visibility select-or-values
+ * @matrix forms : builder-field-visibility select-or-values
  */
 export default class Visibility extends ConditionTarget {
 	constructor(builder) {

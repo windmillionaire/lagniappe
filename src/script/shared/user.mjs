@@ -7,8 +7,8 @@ let userLocationUpdate = null;
  * @testable true
  * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_timezone_without_requesting_location
  * @tests tests_js/test_020_shared_utilities.py::test_unavailable_user_location_does_not_affect_timezone_sync
+ * @matrix timezone : page-load session-update
  * @pair location:permission-deferral
- * @pairs timezone:page-load timezone:session-update
  */
 export function updateUserData() {
 	if (userDataUpdate) return userDataUpdate;
@@ -97,8 +97,7 @@ function _getCurrentPosition(options) {
  * @tests tests_js/test_020_shared_utilities.py::test_user_location_sync_starts_on_demand_and_deduplicates
  * @tests tests_js/test_020_shared_utilities.py::test_user_location_sync_retries_failed_session_update
  * @tests tests_js/test_020_shared_utilities.py::test_unavailable_user_location_does_not_affect_timezone_sync
- * @pairs location:geolocation location:on-demand location:session-update
- * @pairs location:deduplication location:retry location:unavailable
+ * @matrix location : deduplication geolocation on-demand retry session-update unavailable
  * @pair timezone:serialized-update
  */
 export function updateUserLocation() {

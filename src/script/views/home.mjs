@@ -16,10 +16,8 @@ const HOME_CHANNELS = Object.freeze({
  * @testable true
  * @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
  * @tests tests_js/test_040_home_polling.py::test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner
- * @features home
- * @dimensions load layout mobile
- * @pairs home:foreground home:mounted-scope home:targeted-refresh home:lazy-widget
- * @pairs polling:foreground polling:mounted-scope polling:targeted-refresh polling:lazy-widget
+ * @matrix home polling : foreground lazy-widget mounted-scope targeted-refresh
+ * @pair home:mobile
  */
 export default class Home extends Core {
 	constructor(elt) {
@@ -119,8 +117,7 @@ export default class Home extends Core {
 	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
 	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
 	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
-	 * @features starred
-	 * @dimensions category project page
+	 * @matrix starred : category page project
 	 */
 	async _refreshStarred() {
 		const starredComponent = this.getComponent(
@@ -150,8 +147,7 @@ export default class Home extends Core {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
-	 * @features offline
-	 * @dimensions server-first reload
+	 * @matrix offline : reload server-first
 	 */
 	_hideEmptyLists() {
 		for (const component of Object.values(this.components)) {

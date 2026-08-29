@@ -5,8 +5,7 @@ import re
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_validators_cover_expected_inputs
-# @features setup
-# @dimensions validation
+# @pair setup:validation
 def validate_domain(domain):
     """Validate domain format."""
     domain_pattern = r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$"
@@ -15,8 +14,7 @@ def validate_domain(domain):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_validators_cover_expected_inputs
-# @features setup
-# @dimensions validation
+# @pair setup:validation
 def validate_cloudflare_api_token(api_token):
     """Reject empty or obviously malformed scoped API tokens."""
     token = api_token.strip()

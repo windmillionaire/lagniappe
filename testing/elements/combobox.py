@@ -57,6 +57,12 @@ class Select(Combobox):
     def input(self, value):
         self._input = value
 
+    def click(self):
+        if self.input.is_visible():
+            self.input.click()
+        else:
+            self.element.click()
+
     def open(self):
         panel = self.panel
         if not panel.is_visible():

@@ -7,6 +7,7 @@ from flask import (
     make_response,
     redirect,
     render_template,
+    url_for,
 )
 from flask_login import current_user
 from smartypants import smartypants
@@ -22,14 +23,16 @@ from lagniappe.core.definitions import (
     SearchFacets,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import assets as database_assets
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools import cache
-from lagniappe.core.tools.polling import (
+from lagniappe.core.tools.polling.projections import (
     channel_revision,
     channel_revisions,
     render_operation_statuses,
 )
-from lagniappe.core.tools.refresh import page_task_roots
+from lagniappe.core.tools.tasks.ordering import page_task_roots
 
 
 # --- General Responses ---
@@ -43,13 +46,18 @@ def offline():
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
 # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
-# @features request-errors
-# @dimensions plain-validation
 # @pair request-errors:plain-validation
 def error(error, exception=None):
     if exception:
         exceptions.capture(exception)
     return Response(str(error), status=422, mimetype="text/plain")
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/filters/main.py::_contract_error_response
+# @reason filter request tests assert the route-owned 400 response
+def bad_request(error):
+    return Response(str(error), status=400, mimetype="text/plain")
 
 
 def not_found(error):
@@ -73,7 +81,7 @@ def cell(field, entity, column=None, embedded=False):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_visibility_panel_includes_category_form_columns
-# @pairs category-index:mixed-form category-index:missing-field category-index:render
+# @matrix category-index : missing-field mixed-form render
 # @template cell.html::cell
 def table(entities, parent):
     template = get_template_attribute("table.html", "table")
@@ -126,9 +134,7 @@ def publish_notification_state(state):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
-# @pair web-headers:local-save
-# @pair web-headers:acknowledgement
-# @pair web-headers:entity-revision
+# @matrix web-headers : acknowledgement entity-revision local-save
 def entity_response(response, *entities):
     """Annotate a successful response with committed entity revisions."""
     revisions = getattr(g, "ENTITY_RESPONSE_REVISIONS", {})
@@ -147,8 +153,7 @@ def entity_response(response, *entities):
 # @testable false
 # @manual true
 # @reason pending/completed notification replacement is exercised through notification workflows
-# @features notifications
-# @dimensions item-html pending target
+# @matrix notifications : item-html pending target
 def notification_item(notification):
     template = get_template_attribute("notifications.html", "item")
     return template(notification).strip()
@@ -162,11 +167,10 @@ def notification_item(notification):
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_tasks_table_columns
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
-# @pair reconnect-refresh:root-fingerprint
-# @pair indexes:rendering
+# @pairs categories:first-batch indexes:rendering reconnect-refresh:root-fingerprint task-index:columns
 def index(name, index, **context):
     fingerprint = (
-        database.site_fingerprint(f"/{name}/index")
+        database_utility.site_fingerprint(f"/{name}/index")
         if name in {"forms", "tasks", "users"}
         else None
     )
@@ -202,25 +206,52 @@ def rows(entities, parent):
 # --- Document Responses ---
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/mentions.py::sanitize_mentions
-# @reason public response delegates mention privacy normalization to the tested sanitizer
+# @testable true
+# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
+# @matrix public-pages : metadata preview public-rendering
 def public_document(entity):
-    from lagniappe.core.tools.mentions import sanitize_mentions
+    from lagniappe.core.tools.email.notifications.links import absolute_url
+    from lagniappe.core.tools.site import public_pages
 
-    html = sanitize_mentions(entity.properties.document.html)
-    description = entity.description or f"Public page: {entity.name}"
-    keywords = f"{entity.name}, public page"
-    return (
+    canonical_url = absolute_url(
+        url_for("pages.public", public_id=entity.public_id)
+    )
+
+    # @testable false
+    # @covered-by lagniappe/web/responses.py::public_document
+    # @reason route-specific absolute image adapter is part of public rendering
+    def image_url(candidate):
+        name = candidate.name
+        if candidate.extension:
+            name = f"{name}.{candidate.extension}"
+        return absolute_url(
+            url_for(
+                "pages.public_image",
+                public_id=entity.public_id,
+                asset_name=name,
+            )
+        )
+
+    indexing = public_pages.runtime_settings()["PUBLIC_PAGE_INDEXING"]
+    metadata = public_pages.metadata(
+        entity,
+        canonical_url=canonical_url,
+        site_image_url=absolute_url(
+            f"/images/logo-512x512.png?v={CONFIG.BUILD_ID}"
+        ),
+        public_image_url=image_url,
+        indexing=indexing,
+    )
+    response = make_response(
         render_template(
             "public/public.html",
-            document=html,
+            document=metadata.pop("document"),
             page=entity,
-            description=description,
-            keywords=keywords,
-        ),
-        200,
+            metadata=metadata,
+        )
     )
+    response.headers["X-Robots-Tag"] = metadata["robots"]
+    return response
 
 
 def shared_document(**kwargs):
@@ -275,7 +306,7 @@ def task_settings(task):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
-# @pairs task-combine:compatible task-combine:checkbox-form
+# @matrix task-combine : checkbox-form compatible
 def task_combine_form(task, compatible):
     template = get_template_attribute("pages/tasks.html", "combine_form")
     return template(task, compatible), 200
@@ -283,8 +314,7 @@ def task_combine_form(task, compatible):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-# @pairs task-combine:delta task-combine:upsert
-# @pairs task-combine:remove task-combine:ordering
+# @matrix task-combine : delta ordering remove upsert
 def task_combine_delta(main, removed, page):
     task_template = get_template_attribute("pages/tasks.html", "task")
     empty_template = get_template_attribute("pages/tasks.html", "task_empty")
@@ -338,8 +368,46 @@ def new_form_restriction(group):
 # --- Page Responses ---
 
 
+# @testable false
+# @covered-by lagniappe/web/responses.py::page
+# @covered-by lagniappe/web/responses.py::page_document_settings
+# @reason response context adapter delegates extraction and normalization to tested services
+def _public_page_settings_context(page):
+    from lagniappe.core.tools.site import public_pages
+
+    return {
+        "settings": page.public_settings,
+        "images": [
+            {"name": image.name, "url": image.url, "alt": image.alt}
+            for image in public_pages.document_images(page)
+        ],
+        "directory_categories": [
+            {"id": category.urlsafe_key, "name": category.name}
+            for category in sorted(
+                page.categories,
+                key=lambda category: category.name.casefold(),
+            )
+        ],
+        "site_indexing": public_pages.runtime_settings()[
+            "PUBLIC_PAGE_INDEXING"
+        ],
+        "site_image": f"/images/logo-512x512.png?v={CONFIG.BUILD_ID}",
+    }
+
+
+# @testable infrastructure
 def page(page, focus_task=None):
-    return render_template("pages/page.html", page=page, focus_task=focus_task), 200
+    public_context = (
+        _public_page_settings_context(page)
+        if page.allowed(Action.PUBLISH)
+        else None
+    )
+    return render_template(
+        "pages/page.html",
+        page=page,
+        focus_task=focus_task,
+        public_context=public_context,
+    ), 200
 
 
 def page_tasks(page):
@@ -423,7 +491,10 @@ def page_permissions(page):
 def page_document_settings(entity):
     return entity_response(
         (
-            get_template_attribute("pages/document.html", "document_settings")(entity),
+            get_template_attribute("pages/document.html", "document_settings")(
+                entity,
+                _public_page_settings_context(entity),
+            ),
             200,
         ),
         entity,
@@ -510,8 +581,7 @@ def file_info(file):
 
 # @testable true
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_download_uses_original_filename_and_mimetype
-# @features file
-# @dimensions download filename mimetype
+# @matrix file : download filename mimetype
 def file_download(file_entity):
     g.NO_CACHE = True
     asset = file_entity.properties.file.value
@@ -524,7 +594,7 @@ def file_download(file_entity):
 
     if file_entity.large:
         if asset.visibility.value == "private":
-            signed_url = database.assets.get_signed_url(
+            signed_url = database_assets.get_signed_url(
                 asset.path,
                 response_disposition=disposition,
                 response_type=mimetype or "application/octet-stream",
@@ -635,8 +705,13 @@ def tool_report(report):
     return render_template("tools/report.html", report=report), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/main.py::home_page
+# @testable true
+# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_category_home_rows_only_offer_star_controls
+# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_empty_home_model_lists_settle_to_disabled_zero_state
+# @pairs permissions:active-tasks-directory permissions:home-actions permissions:own-page-only
+# @template home/categories.html::category
+# @template home/directory.html::list
+# @template home/home.html::create
 def home_page(home):
     poll_revisions = channel_revisions(("home-notes", "tasks"), current_user)
     return (
@@ -652,10 +727,22 @@ def home_page(home):
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
-# @features admin
-# @dimensions page-load site-settings
+# @matrix admin : page-load site-settings
 def admin_page():
-    return render_template("home/admin.html"), 200
+    from lagniappe.core.tools.site.data_protection import data_protection_status
+
+    try:
+        protection = data_protection_status()
+        protection_error = None
+    except Exception as error:
+        exceptions.capture(error)
+        protection = None
+        protection_error = "provider metadata could not be loaded"
+    return render_template(
+        "home/admin.html",
+        data_protection=protection,
+        data_protection_error=protection_error,
+    ), 200
 
 
 # @testable false
@@ -735,25 +822,34 @@ def home_section(section):
         return get_template_attribute("home/projects.html", "list")(section), 200
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/tasks/main.py::update
+# @reason route response adapter is exercised through its owning task mutation
 def home_task_list():
     home = Entities.HOME()
     template = get_template_attribute("home/tasks.html", "list")
     task_list_html = template(home.section("tasks"))
 
-    task_count = database.get.user_task_count(current_user.page)
+    task_count = database_get.user_task_count(current_user.page)
     count_html = get_template_attribute("common.html", "task_count")(task_count)
 
     return count_html + task_list_html, 200
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/tasks/main.py::update
+# @reason route response adapter is exercised through its owning task mutation
 def home_task(task):
     template = get_template_attribute("home/tasks.html", "task")
-    count = database.get.user_task_count(current_user.page)
+    count = database_get.user_task_count(current_user.page)
     return jsonify({"html": template(task), "count": count}), 200
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/tasks/main.py::update
+# @reason route response adapter is exercised through its owning task mutation
 def home_task_removed():
-    count = database.get.user_task_count(current_user.page)
+    count = database_get.user_task_count(current_user.page)
     return jsonify({"removed": True, "count": count}), 200
 
 
@@ -782,10 +878,17 @@ def filtered_page_index(pages, filter):
     return render_template("categories/index.html", pages=pages, filtered=filter), 200
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/filters/main.py::condition
+# @covered-by lagniappe/web/routes/filters/main.py::options
+# @reason condition and option routes own rendered filter response behavior
 def filter_condition(data, condition, filter=False, options=False):
     if filter:
         badge_template = get_template_attribute("filters.html", "filter_badge")
-        data["html"] = badge_template(condition.details, condition.description)
+        data["html"] = badge_template(
+            condition.details,
+            condition.contract_condition,
+        )
 
     if options:
         options_template = get_template_attribute("filters.html", "filter_condition")
@@ -850,8 +953,7 @@ def created_index_result(result):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_result_links_correct
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
-# @features search
-# @dimensions result-navigation result-links navbar-results task-model
+# @matrix search : navbar-results result-links result-navigation task-model
 def search_results(query, results, total):
     template = get_template_attribute("nav.html", "search_results")
     return {"results": template(query, results, total)}, 200
@@ -862,8 +964,7 @@ def search_results(query, results, total):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_titles
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_task_facet_includes_task_and_model_results_with_links
-# @features search
-# @dimensions query-display no-results result-title result-links
+# @matrix search : no-results query-display result-links result-title
 def search_page(q, results, pagination):
     return render_template(
         "search/search.html",
@@ -884,8 +985,7 @@ def location_results(results, total):
 
 # @testable true
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_form_delete_modal_lists_page_and_task_users
-# @features forms
-# @dimensions delete-modal instance-query preview-limit
+# @matrix forms : delete-modal instance-query preview-limit
 def delete_entity(entity=None, key=None):
     if not entity:
         return render_template("delete/dne.html", key=key), 200
@@ -896,7 +996,7 @@ def delete_entity(entity=None, key=None):
         instances = [
             instance
             for instance in Entities.fetch(
-                *database.get.form_instance_users(entity.key),
+                *database_get.form_instance_users(entity.key),
                 request=Fetch.direct(),
             )
             if isinstance(instance, (Entities.PAGE, Entities.TASK))
@@ -920,23 +1020,63 @@ def delete_entity(entity=None, key=None):
 # --- Manual & Reference Responses ---
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
+# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_discovery_follows_live_setting
+# @matrix manual : canonical-url metadata search-discovery section-navigation
 def manual_index(section, index):
+    from lagniappe.core.tools.site import public_pages
+
     page_content = smartypants(render_template(f"manual/content/{section}.html"))
     public_page = bool(CONFIG.PUBLIC_MANUAL and not current_user.is_authenticated)
+    indexing = bool(
+        CONFIG.PUBLIC_MANUAL
+        and public_pages.runtime_settings()["PUBLIC_PAGE_INDEXING"]
+    )
+    if CONFIG.PUBLIC_MANUAL:
+        sections = [
+            {
+                **definition,
+                "metadata": public_pages.manual_metadata(
+                    definition,
+                    indexing=indexing,
+                ),
+            }
+            for definition in index
+        ]
+        search_metadata = next(
+            definition["metadata"]
+            for definition in sections
+            if definition["key"] == section
+        )
+    else:
+        sections = index
+        search_metadata = None
+
     context = {
         "content": page_content,
-        "sections": index,
+        "sections": sections,
+        "search_metadata": search_metadata,
         "public_page": public_page,
     }
     if public_page:
         context.update(page_mode="public")
 
-    return render_template("manual/index.html", **context), 200
+    response = make_response(render_template("manual/index.html", **context))
+    if search_metadata:
+        response.headers["X-Robots-Tag"] = search_metadata["robots"]
+    return response
 
 
+# @testable true
+# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
+# @matrix manual : ajax-section noindex
 def manual_content(section):
-    return smartypants(render_template(f"manual/content/{section}.html")), 200
+    response = make_response(
+        smartypants(render_template(f"manual/content/{section}.html"))
+    )
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 def reference_topic(section):
@@ -945,7 +1085,7 @@ def reference_topic(section):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @pairs admin:recovery-export admin:configuration-display admin:secrets admin:web-headers
+# @matrix admin : configuration-display recovery-export secrets web-headers
 def reference_environment_variables(variables, download=False):
     if download:
         display_variables = variables
@@ -977,7 +1117,7 @@ def reference_environment_variables(variables, download=False):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @pairs admin:configuration-display admin:secrets
+# @matrix admin : configuration-display secrets
 def site_configuration(variables):
     from config.recovery import redact_settings_for_display
 

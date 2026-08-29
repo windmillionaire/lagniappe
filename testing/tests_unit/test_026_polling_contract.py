@@ -2,7 +2,7 @@
 
 import pytest
 
-from lagniappe.core.tools.polling_contract import (
+from lagniappe.core.tools.polling.contract import (
     MAX_POLL_REVISION,
     MAX_POLL_SUBSCRIPTIONS,
     PollContractError,
@@ -24,10 +24,7 @@ def poll_request(subscriptions=None, **overrides):
     return request
 
 
-# @source lagniappe/core/tools/polling_contract.py::parse_poll_request
-# @source lagniappe/core/tools/polling_contract.py::PollContractError
-# @features polling
-# @dimensions protocol descriptors validation
+# @matrix polling : descriptors protocol validation
 def test_poll_contract_accepts_each_descriptor_type():
     descriptors = [
         {
@@ -103,10 +100,7 @@ def test_poll_contract_accepts_each_descriptor_type():
     assert cold.notification_state["seed"] is True
 
 
-# @source lagniappe/core/tools/polling_contract.py::parse_poll_request
-# @source lagniappe/core/tools/polling_contract.py::PollContractError
-# @features polling
-# @dimensions validation diagnostics strict-fields cursor-types bounds
+# @matrix polling : bounds cursor-types diagnostics strict-fields validation
 @pytest.mark.parametrize(
     ("payload", "path", "reason"),
     [
@@ -278,9 +272,7 @@ def test_poll_contract_reports_exact_invalid_field(payload, path, reason):
     assert captured.value.reason == reason
 
 
-# @source lagniappe/core/tools/polling_contract.py::parse_poll_request
-# @features polling notifications
-# @dimensions notification-state presence validation duplicates
+# @matrix notifications polling : duplicates notification-state presence validation
 @pytest.mark.parametrize(
     ("overrides", "path", "reason"),
     [

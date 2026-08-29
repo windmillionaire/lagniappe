@@ -50,8 +50,7 @@ export default class Entity extends Core {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_page_url_tab_overrides_saved_tab
-	 * @features entity-layout
-	 * @dimensions query-tab persistence
+	 * @matrix entity-layout : persistence query-tab
 	 */
 	_initialTabId() {
 		return (
@@ -79,8 +78,7 @@ export default class Entity extends Core {
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_resize_from_mobile_filters_to_desktop_preserves_selected_tab
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_selected_section_persists_after_reload
 	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_selection_persists_after_reload
-	 * @features entity-layout
-	 * @dimensions project-mobile page-mobile persistence reload resize
+	 * @matrix entity-layout : page-mobile persistence project-mobile reload resize
 	 */
 	_tabChange(event) {
 		const { subcomponent } = event.detail;
@@ -95,8 +93,7 @@ export default class Entity extends Core {
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_flipper_reveals_section_toggles
 	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_nav_replaces_desktop_tabs
 	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_flipper_reveals_sections
-	 * @features entity-layout
-	 * @dimensions project-mobile page-mobile nav visibility flipper
+	 * @matrix entity-layout : flipper nav page-mobile project-mobile visibility
 	 */
 	get mobileNav() {
 		if (!this._mobileNav) {
@@ -260,7 +257,7 @@ export default class Entity extends Core {
 	 * @tests tests_js/test_012_entity_layout_frontend.py::test_dynamic_mobile_secondary_uses_final_layout_state
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_enabled_model_tasks_rejoins_section_switching
-	 * @pair entity-layout:dynamic-secondary
+	 * @matrix entity-layout : dynamic-secondary page-mobile project-mobile
 	 */
 	async updateLayout({
 		attribute = null,
@@ -337,9 +334,7 @@ export default class Entity extends Core {
 	 * @testable true
 	 * @tests tests_js/test_012_entity_layout_frontend.py::test_entity_layout_ignores_already_consumed_reconcile_callback
 	 * @tests tests_js/test_012_entity_layout_frontend.py::test_initial_entity_layout_prepares_widget_before_one_transition
-	 * @features entity-layout
-	 * @dimensions nested-layout reconcile-callback
-	 * @pairs entity-layout:nested-layout entity-layout:reconcile-callback
+	 * @matrix entity-layout : nested-layout reconcile-callback
 	 * @pair startup:view-ready
 	 */
 	async _renderLayoutBody() {
@@ -392,8 +387,7 @@ export default class Entity extends Core {
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_resize_from_mobile_filters_to_desktop_preserves_selected_tab
 	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_section_switching_updates_visible_panel_and_title
 	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_create_task_opens_from_tasks_section
-	 * @features entity-layout
-	 * @dimensions project-mobile page-mobile section-switch resize task-create
+	 * @matrix entity-layout : page-mobile project-mobile resize section-switch task-create
 	 */
 	_reconcileTabsCard(tabs, tabId) {
 		tabs.reconcile = () => {
@@ -414,8 +408,7 @@ export default class Entity extends Core {
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_create_model_form_opens_from_model_tasks_section
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_model_task_info_still_opens_in_models_section
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_resize_from_mobile_models_to_desktop_restores_dual_card_layout
-	 * @features entity-layout
-	 * @dimensions project-mobile secondary-create secondary-info secondary-card resize
+	 * @matrix entity-layout : project-mobile resize secondary-card secondary-create secondary-info
 	 */
 	_reconcileSecondaryCard(secondary, tabId) {
 		secondary.reconcile = () => {

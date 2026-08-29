@@ -16,7 +16,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.properties.file_ingress import Stage
 from lagniappe.core.tools import ingress as ingress_tools
-from lagniappe.core.tools.database import utility as database_utility
+from lagniappe.core.tools.database import ingress as database_ingress
 from testing.utility.test_entities import TestEntities
 
 
@@ -58,8 +58,7 @@ def _ingress(*, stage="PROCESS_CSV", highest="PROCESS_CSV", rows=None):
     return entity
 
 
-# @features ingress
-# @dimensions transition-contract
+# @pair ingress:transition-contract
 def test_transition_table_covers_every_ingress_stage():
     stages = set(CONFIGURATION_STAGES)
     stages.update(
@@ -72,8 +71,7 @@ def test_transition_table_covers_every_ingress_stage():
     assert INGRESS_TRANSITIONS["create"] == (None, IngressStage.PROCESS_CSV)
 
 
-# @features ingress
-# @dimensions stage presentation
+# @matrix ingress : presentation stage
 def test_property_stage_facade_uses_durable_workflow():
     entity = _ingress(stage="CHOOSE_TYPE")
     assert isinstance(entity.stage, Stage)
@@ -82,8 +80,7 @@ def test_property_stage_facade_uses_durable_workflow():
     assert entity.get_process("workflow")["current"] == "CHOOSE_PARENT"
 
 
-# @features ingress
-# @dimensions format-validation invalid-transition
+# @matrix ingress : format-validation invalid-transition
 def test_service_rejects_unversioned_records_and_future_navigation():
     entity = _ingress()
     entity.db.pop("ingress_format")
@@ -96,10 +93,11 @@ def test_service_rejects_unversioned_records_and_future_navigation():
         service.navigate(IngressStage.CHOOSE_FORM)
 
 
-# @features ingress
-# @dimensions invalidation configuration-lock progress-actions
+# @matrix ingress : configuration-lock invalidation progress-actions
 def test_configuration_change_invalidates_downstream_and_locks_after_start():
-    entity = _ingress(stage="CHOOSE_TYPE", highest="VERIFY_IMPORT", rows=[{"name": "A"}])
+    entity = _ingress(
+        stage="CHOOSE_TYPE", highest="VERIFY_IMPORT", rows=[{"name": "A"}]
+    )
     for stage in CONFIGURATION_STAGES[1:]:
         entity.properties.get(stage.name.lower()).section = {"complete": True}
     service = ingress_tools.IngressService(entity)
@@ -122,8 +120,7 @@ def test_configuration_change_invalidates_downstream_and_locks_after_start():
         service.update_stage(IngressStage.CHOOSE_TYPE, {"entity-type": "task"})
 
 
-# @features ingress
-# @dimensions batch cursor results terminal duplicate-delivery
+# @matrix ingress : batch cursor duplicate-delivery results terminal
 def test_testing_batch_commits_ordered_results_and_finishes(monkeypatch):
     entity = _ingress(
         stage="IMPORTING",
@@ -165,8 +162,7 @@ def test_testing_batch_commits_ordered_results_and_finishes(monkeypatch):
     assert duplicate.results == ()
 
 
-# @features ingress
-# @dimensions failure restart cursor-resume
+# @matrix ingress : cursor-resume failure restart
 def test_failed_batch_restarts_from_committed_cursor(monkeypatch):
     entity = _ingress(
         stage="IMPORTING",
@@ -184,7 +180,9 @@ def test_failed_batch_restarts_from_committed_cursor(monkeypatch):
         "plan",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("storage down")),
     )
-    monkeypatch.setattr(ingress_tools.exceptions, "capture", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        ingress_tools.exceptions, "capture", lambda *_args, **_kwargs: None
+    )
 
     with pytest.raises(RuntimeError, match="storage down"):
         service.run_batch(limit=1)
@@ -196,8 +194,7 @@ def test_failed_batch_restarts_from_committed_cursor(monkeypatch):
     assert service.cursor == 1
 
 
-# @features ingress
-# @dimensions idempotency deterministic-key row-task
+# @matrix ingress : deterministic-key idempotency row-task
 def test_mutation_planner_preallocates_stable_entity_and_history_keys():
     created = []
 
@@ -227,17 +224,13 @@ def test_mutation_planner_preallocates_stable_entity_and_history_keys():
         idempotency_key=lambda role: f"ingress:{role}",
     )
     source = SimpleNamespace()
-    first = ingress_tools.IngressMutationPlanner(
-        source, row_index=4, service=service
-    )
+    first = ingress_tools.IngressMutationPlanner(source, row_index=4, service=service)
     first.Entities = SimpleNamespace(PAGE=Factory("page"), TASK=Factory("task"))
     page = first._new_page({"name": "Ada"})
     task = first._new_task({"name": "Follow Up"})
     history_key = first._history_key("completion")
 
-    second = ingress_tools.IngressMutationPlanner(
-        source, row_index=4, service=service
-    )
+    second = ingress_tools.IngressMutationPlanner(source, row_index=4, service=service)
     second.Entities = first.Entities
     next_row = ingress_tools.IngressMutationPlanner(
         source, row_index=5, service=service
@@ -309,21 +302,20 @@ def _database(monkeypatch, execution):
     }
     datastore = FakeDatastore(entity)
     monkeypatch.setattr(
-        database_utility,
+        database_ingress,
         "DATA",
         SimpleNamespace(datastore=datastore),
     )
-    monkeypatch.setattr(database_utility, "_ingress_key", lambda _value: "ingress")
+    monkeypatch.setattr(database_ingress, "_ingress_key", lambda _value: "ingress")
     monkeypatch.setattr(
-        database_utility,
+        database_ingress,
         "update_site_fingerprints",
         lambda *_entities: [],
     )
     return entity, datastore
 
 
-# @pair ingress:cursor
-# @pair ingress:duplicate-delivery
+# @matrix ingress : cursor duplicate-delivery
 def test_ingress_row_commit_rejects_duplicate_cursor(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
     entity, _datastore = _database(
@@ -331,14 +323,14 @@ def test_ingress_row_commit_rejects_duplicate_cursor(monkeypatch):
         {"status": "queued", "cursor": 0},
     )
     candidate = SimpleNamespace(key="ingress", db=dict(entity))
-    committed = database_utility.commit_ingress_row(
+    committed = database_ingress.commit_ingress_row(
         "ingress", 0, candidate, ((candidate, None),), now
     )
     assert committed["committed"] is True
     assert committed["execution"]["cursor"] == 1
 
     duplicate = SimpleNamespace(key="ingress", db=dict(committed["entity"]))
-    rejected = database_utility.commit_ingress_row(
+    rejected = database_ingress.commit_ingress_row(
         "ingress", 0, duplicate, ((duplicate, None),), now
     )
     assert rejected["committed"] is False
@@ -358,15 +350,13 @@ def test_ingress_stop_is_durable_and_preserves_current_row_boundary(monkeypatch)
             "lease_expires": "legacy-lease",
         },
     )
-    stopped = database_utility.update_ingress_status(
-        "ingress", "stopped", now
-    )
+    stopped = database_ingress.update_ingress_status("ingress", "stopped", now)
     assert stopped["execution"]["status"] == "stopped"
     assert "lease_token" not in stopped["execution"]
     assert "lease_expires" not in stopped["execution"]
 
     candidate = SimpleNamespace(key="ingress", db=dict(entity))
-    committed = database_utility.commit_ingress_row(
+    committed = database_ingress.commit_ingress_row(
         "ingress", 0, candidate, ((candidate, None),), now
     )
     assert committed["committed"] is False
@@ -374,8 +364,7 @@ def test_ingress_stop_is_durable_and_preserves_current_row_boundary(monkeypatch)
     assert committed["execution"]["cursor"] == 0
 
 
-# @features ingress
-# @dimensions cursor compare-and-set durable-commit property-mask
+# @matrix ingress : compare-and-set cursor durable-commit property-mask
 def test_ingress_row_commit_requires_expected_cursor_and_applies_masks(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
     entity, datastore = _database(
@@ -387,13 +376,13 @@ def test_ingress_row_commit_requires_expected_cursor_and_applies_masks(monkeypat
         key="category",
         db={"type": "category", "modified": now},
     )
-    rejected = database_utility.commit_ingress_row(
+    rejected = database_ingress.commit_ingress_row(
         "ingress", 1, candidate, ((candidate, None),), now
     )
     assert rejected["committed"] is False
     assert rejected["reason"] == "cursor"
 
-    committed = database_utility.commit_ingress_row(
+    committed = database_ingress.commit_ingress_row(
         "ingress",
         2,
         candidate,
@@ -408,15 +397,14 @@ def test_ingress_row_commit_requires_expected_cursor_and_applies_masks(monkeypat
     assert mutation.property_mask.paths == ["modified"]
 
 
-# @features ingress
-# @dimensions status cursor compare-and-set stop failure
+# @matrix ingress : compare-and-set cursor failure status stop
 def test_ingress_status_update_is_cursor_checked(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
     _entity, _datastore = _database(
         monkeypatch,
         {"status": "queued", "cursor": 1},
     )
-    stale = database_utility.update_ingress_status(
+    stale = database_ingress.update_ingress_status(
         "ingress",
         "failed",
         now,
@@ -426,7 +414,7 @@ def test_ingress_status_update_is_cursor_checked(monkeypatch):
     assert stale["updated"] is False
     assert stale["reason"] == "cursor"
 
-    updated = database_utility.update_ingress_status(
+    updated = database_ingress.update_ingress_status(
         "ingress",
         "failed",
         now,

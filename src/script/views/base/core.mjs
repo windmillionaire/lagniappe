@@ -100,8 +100,7 @@ export default class Core extends ShellView {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
-	 * @pair startup:interaction-ready
-	 * @pair startup:deferred-services
+	 * @matrix startup : deferred-services interaction-ready
 	 */
 	async init() {
 		await super.init();
@@ -163,8 +162,7 @@ export default class Core extends ShellView {
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
 	 * @covered-by src/script/views/base/services.mjs::ensurePollingCoordinator
-	 * @features polling
-	 * @dimensions entity channel refresh
+	 * @matrix polling : channel entity refresh
 	 */
 	_initPollingSubscription() {
 		if (!this.PollingCoordinator) return;
@@ -256,8 +254,7 @@ export default class Core extends ShellView {
 	 *
 	 * @testable true
 	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @pairs reconnect-refresh:mounted-collection reconnect-refresh:committed-delete
-	 * @pair reconnect-refresh:destination-invalidation
+	 * @matrix reconnect-refresh : committed-delete destination-invalidation mounted-collection
 	 * @pair polling:reentrancy
 	 */
 	reconcileChange(change = {}) {
@@ -274,7 +271,7 @@ export default class Core extends ShellView {
 	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
 	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
 	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
-	 * @pairs starred:title-menu starred:accessible-state
+	 * @matrix starred : accessible-state title-menu
 	 */
 	_applyStarState({ key, starred, type } = {}) {
 		if (!key) return;
@@ -352,12 +349,10 @@ export default class Core extends ShellView {
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
 	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
 	 * @tests tests_js/test_029_core_startup.py::test_core_sync_distinguishes_visible_blur_from_hard_suspension
-	 * @features offline
-	 * @dimensions indicator browser-state server-health transitions view-reset dirty-form-preservation
-	 * @pair offline:dirty-form-preservation
-	 * @pair offline:background-replay
-	 * @pairs polling:nonblocking polling:catch-up
-	 * @pairs polling:blur polling:visibility sync:deregistration
+	 * @matrix offline : background-replay dirty-form-preservation
+	 * @matrix polling : blur catch-up nonblocking visibility
+	 * @pair sync:deregistration
+	 * @matrix offline : indicator server-health view-reset
 	 */
 	async sync({
 		hidden = document.hidden,
@@ -424,10 +419,7 @@ export default class Core extends ShellView {
 	 *
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
-	 * @features offline polling
-	 * @dimensions background-replay nonblocking settled-boundary
-	 * @pair offline:background-replay
-	 * @pair polling:nonblocking
+	 * @pairs offline:background-replay polling:nonblocking
 	 */
 	scheduleOfflineReplay() {
 		if (this._offlineReplayTask) return this._offlineReplayTask;
@@ -450,10 +442,7 @@ export default class Core extends ShellView {
 	 *
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
-	 * @features polling
-	 * @dimensions active-widget visibility subscription-lifecycle
-	 * @pairs polling:active-widget polling:visibility
-	 * @pair polling:subscription-lifecycle
+	 * @matrix polling : active-widget subscription-lifecycle visibility
 	 */
 	async reconcilePollingSubscriptions() {
 		if (this._destroyed || this.hidden || !this.online) return;
@@ -475,10 +464,8 @@ export default class Core extends ShellView {
 	 *
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
-	 * @features polling startup
-	 * @dimensions subscription-lifecycle nonblocking single-flight
-	 * @pairs polling:subscription-lifecycle polling:nonblocking
-	 * @pairs startup:single-flight startup:nonblocking
+	 * @matrix polling : nonblocking subscription-lifecycle
+	 * @matrix startup : nonblocking single-flight
 	 */
 	schedulePollingReconciliation() {
 		if (this._destroyed || this.hidden || !this.online) {
@@ -524,8 +511,7 @@ export default class Core extends ShellView {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @features reconnect-refresh
-	 * @dimensions manifest batching fallback
+	 * @matrix reconnect-refresh : batching fallback manifest
 	 */
 	_collectRefreshTargets(components) {
 		return collectRefreshTargets(this, components);
@@ -534,9 +520,7 @@ export default class Core extends ShellView {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @pair reconnect-refresh:delta-apply
-	 * @pair reconnect-refresh:legacy-fallback
-	 * @pair reconnect-refresh:cache-invalidation
+	 * @matrix reconnect-refresh : cache-invalidation delta-apply legacy-fallback
 	 */
 	async _refreshCollectionComponents(components, options = {}) {
 		return refreshCollectionComponents(this, components, options);
@@ -791,8 +775,7 @@ export default class Core extends ShellView {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002a_home.py::test_model_lists_load_on_toggle
-	 * @features home
-	 * @dimensions lazy-load loading-indicator
+	 * @matrix home : lazy-load loading-indicator
 	 */
 	_setLoadingTrigger(trigger, component, widgetName) {
 		const target = component.elt.querySelector(`[data-widget="${widgetName}"]`);
@@ -908,6 +891,7 @@ export default class Core extends ShellView {
 		this.EditWatcher?.destroy();
 		this.Notifications?.destroy?.();
 		this.PollingCoordinator?.destroy();
+		this.SearchBox?.destroy?.();
 		this.offlineModal?.destroy?.();
 		this._componentActions.clear();
 

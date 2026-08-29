@@ -2,11 +2,16 @@ from types import SimpleNamespace
 
 import pytest
 
+from google.cloud.datastore import Key
+
+from lagniappe import CONFIG
 from lagniappe.core.tools.database import get, utility
-from lagniappe.core.tools.database.filter import Results
+from lagniappe.core.definitions import Restriction
+from lagniappe.core.tools.database import filter as database_filter
+from lagniappe.core.tools.database.filter import Filter, Query, Results
 
 
-# @pairs database:restricted-results database:empty-page
+# @matrix database : empty-page restricted-results
 @pytest.mark.unit
 def test_empty_results_has_no_items_or_cursor():
     results = get._empty_results()
@@ -15,8 +20,7 @@ def test_empty_results_has_no_items_or_cursor():
     assert results.next_cursor is None
 
 
-# @features database
-# @dimensions query-results indexing slicing pagination
+# @matrix database : indexing pagination query-results slicing
 @pytest.mark.unit
 def test_results_use_normal_list_indexing_and_keep_cursor_metadata():
     results = Results(["first", "second", "third"], "next-page")
@@ -28,8 +32,72 @@ def test_results_use_normal_list_indexing_and_keep_cursor_metadata():
     assert results.next_cursor == "next-page"
 
 
-# @features users caching
-# @dimensions site-fingerprint save
+# @matrix database permissions : deny-all filter-composition
+@pytest.mark.unit
+def test_filter_preserves_explicit_deny_all_through_composition():
+    denied = Filter().requires([])
+
+    assert denied
+    assert denied.is_denied
+    assert denied.build() is not None
+    assert not Filter().requires(Restriction.UNRESTRICTED)
+
+    allowed_branch = Filter().eq("type", "page")
+    mixed = Filter().any_of(denied, allowed_branch)
+    assert not mixed.is_denied
+    assert mixed.build() is not None
+
+    only_denied = Filter().eq("active", True).any_of(
+        Filter().requires([]),
+        Filter(),
+    )
+    assert only_denied.is_denied
+    assert only_denied.build() is not None
+
+
+# @matrix database permissions : deny-all query-short-circuit terminal-results
+@pytest.mark.unit
+def test_denied_query_terminals_do_not_create_datastore_query(monkeypatch):
+    class Datastore:
+        def query(self, **kwargs):
+            raise AssertionError(f"Denied query reached Datastore: {kwargs}")
+
+    monkeypatch.setattr(
+        database_filter,
+        "DATA",
+        SimpleNamespace(datastore=Datastore()),
+    )
+
+    def denied_query():
+        return Query("instances").filter(Filter().requires([]))
+
+    results = denied_query().limit(25).cursor("cursor").fetch()
+    assert list(results) == []
+    assert results.next_cursor is None
+    assert denied_query().fetch_all() == []
+    assert denied_query().fetch_one() is None
+    assert list(denied_query().fetch_iter()) == []
+    assert denied_query().count() == 0
+    assert denied_query().exists() is False
+
+
+# @matrix database permissions : deny-all group-query
+@pytest.mark.unit
+def test_groups_with_denied_hashes_does_not_query_datastore(monkeypatch):
+    class Datastore:
+        def query(self, **kwargs):
+            raise AssertionError(f"Denied group query reached Datastore: {kwargs}")
+
+    monkeypatch.setattr(
+        database_filter,
+        "DATA",
+        SimpleNamespace(datastore=Datastore()),
+    )
+
+    assert get.groups([]) == []
+
+
+# @matrix caching users : save site-fingerprint
 @pytest.mark.unit
 def test_save_persists_user_and_users_fingerprint_record(monkeypatch):
     saved = []
@@ -61,8 +129,7 @@ def test_save_persists_user_and_users_fingerprint_record(monkeypatch):
     ]
 
 
-# @features database migrations
-# @dimensions raw-save site-fingerprint
+# @matrix database migrations : raw-save site-fingerprint
 @pytest.mark.unit
 def test_save_raw_persists_datastore_entities_without_typed_save_hooks(
     monkeypatch,
@@ -99,8 +166,7 @@ def test_save_raw_persists_datastore_entities_without_typed_save_hooks(
     ]
 
 
-# @features users caching
-# @dimensions site-fingerprint invalidation
+# @matrix caching users : invalidation site-fingerprint
 @pytest.mark.unit
 def test_update_site_fingerprints_upserts_missing_users_fingerprint(monkeypatch):
     missing_record = {"key": ("site", "users")}
@@ -123,8 +189,7 @@ def test_update_site_fingerprints_upserts_missing_users_fingerprint(monkeypatch)
     assert records == [{"key": ("site", "users"), "fingerprint": "users-fingerprint"}]
 
 
-# @pairs polling:channel polling:batching polling:mounted-scope
-# @source lagniappe/core/tools/database/utility.py::site_fingerprints
+# @matrix polling : batching channel mounted-scope
 @pytest.mark.unit
 def test_site_fingerprints_batch_reads_only_resolved_paths(monkeypatch):
     class Record(dict):
@@ -163,8 +228,7 @@ def test_site_fingerprints_batch_reads_only_resolved_paths(monkeypatch):
     assert [record.key for record in saved] == [("site", "tasks")]
 
 
-# @pairs notifications:mutation notifications:site-fingerprint-isolation
-# @source lagniappe/core/tools/database/utility.py::save_mutations
+# @matrix notifications : mutation site-fingerprint-isolation
 @pytest.mark.unit
 def test_notification_save_and_delete_skip_site_fingerprints(monkeypatch):
     fingerprinted = []
@@ -205,9 +269,7 @@ def test_notification_save_and_delete_skip_site_fingerprints(monkeypatch):
     ]
 
 
-# @features mutations database
-# @dimensions property-mask update full-upsert site-fingerprint document-checkpoint
-# @source lagniappe/core/tools/database/utility.py::save_mutations
+# @matrix database mutations : document-checkpoint full-upsert property-mask site-fingerprint update
 @pytest.mark.unit
 def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     class Mutation:
@@ -291,3 +353,49 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     assert batch.mutations[3].update is deferred_reference.db
     assert batch.mutations[3].property_mask.paths == ["deferred_job"]
     assert batch.mutations[4].upsert is fingerprint
+
+
+# @pair database:named-key-encoding
+@pytest.mark.unit
+def test_database_aware_urlsafe_key_round_trip():
+    from config.datastore import decode_urlsafe_key, encode_urlsafe_key
+
+    key = Key(
+        "instances",
+        "page-1",
+        project=CONFIG.GOOGLE_CLOUD_PROJECT,
+        namespace="owner-space",
+        database="current-db",
+    )
+    decoded = decode_urlsafe_key(encode_urlsafe_key(key))
+    assert decoded.flat_path == key.flat_path
+    assert decoded.project == key.project
+    assert decoded.namespace == key.namespace
+    assert decoded.database == "current-db"
+
+    explicit_default = Key(
+        "instances",
+        "page-2",
+        project=CONFIG.GOOGLE_CLOUD_PROJECT,
+        namespace="owner-space",
+        database="(default)",
+    )
+    default_decoded = decode_urlsafe_key(encode_urlsafe_key(explicit_default))
+    assert default_decoded.flat_path == explicit_default.flat_path
+    assert default_decoded.project == explicit_default.project
+    assert default_decoded.namespace == explicit_default.namespace
+    assert default_decoded.database is None
+
+
+# @pair database:named-key-encoding
+@pytest.mark.unit
+def test_datastore_key_decodes_without_runtime_rebinding():
+    from config.datastore import encode_urlsafe_key
+
+    source = Key("instances", "page-1", project="source-proj1", database="source-db")
+    decoded = get.datastore_key(encode_urlsafe_key(source))
+    assert decoded == source
+    assert get.datastore_key("not-a-key") is None
+    assert get.datastore_key(source) is source
+    holder = SimpleNamespace(key=source)
+    assert get.datastore_key(holder) is source

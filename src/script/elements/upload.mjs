@@ -543,8 +543,7 @@ const directUploadChunk = ({ file, sessionUrl, offset, end }) =>
 /**
  * @testable true
  * @tests tests_js/test_014_direct_upload_retry.py::test_direct_upload_resumes_after_network_reset
- * @features direct-upload
- * @dimensions retry resumable-range
+ * @matrix direct-upload : resumable-range retry
  */
 const uploadDirectFile = async ({
 	file,

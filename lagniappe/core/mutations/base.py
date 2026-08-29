@@ -232,6 +232,27 @@ class MutationPlanBuilder:
             reason,
         )
 
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_scheduled_uncomplete_dispatch_is_planned_after_task_write
+    # @matrix mutations task-scheduling : durable-first post-commit
+    def dispatch_scheduled_uncomplete(self, entity, *, reason):
+        self._add_entity_cache_effect(
+            MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH,
+            entity,
+            reason,
+        )
+
+    # @testable infrastructure
+    def invalidate_public_discovery(self, *, reason):
+        key = (MutationEffectType.PUBLIC_DISCOVERY_INVALIDATE,)
+        existing = self._effects.get(key)
+        reasons = _unique((*(existing.reasons if existing else ()), reason))
+        self._effects[key] = MutationEffect(
+            MutationEffectType.PUBLIC_DISCOVERY_INVALIDATE,
+            MutationPhase.POST_COMMIT,
+            reasons=reasons,
+        )
+
     # @testable infrastructure
     def clear_cache_state(self, cache_key, *, reason):
         if not cache_key:
@@ -336,6 +357,13 @@ class MutationPlanBuilder:
                     intent.entity,
                     reason=intent.reason,
                 )
+            elif intent.intent is MutationIntentType.SCHEDULED_UNCOMPLETE_DISPATCH:
+                self.dispatch_scheduled_uncomplete(
+                    intent.entity,
+                    reason=intent.reason,
+                )
+            elif intent.intent is MutationIntentType.PUBLIC_DISCOVERY_INVALIDATE:
+                self.invalidate_public_discovery(reason=intent.reason)
             else:
                 raise ValueError(f"Unsupported mutation intent: {intent.intent}")
 

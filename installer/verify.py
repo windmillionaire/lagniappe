@@ -3,8 +3,7 @@
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_installation_is_read_only_and_activation_is_explicit
-# @features setup
-# @dimensions gcloud-config deploy-surface transactional-state
+# @matrix setup : deploy-surface gcloud-config transactional-state
 def validate_installation():
     """Validate local setup state without creating or retargeting resources."""
     from config import verify_generation_manifest
@@ -27,8 +26,7 @@ def verify_installation():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_installation_is_read_only_and_activation_is_explicit
-# @features setup
-# @dimensions gcloud-config activation
+# @matrix setup : activation gcloud-config
 def activate_installation():
     """Explicitly activate the installation's saved local gcloud context."""
     from runner.gcloud import config_gcloud
@@ -59,8 +57,7 @@ def initialize_installation():
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_repair_runs_reconciliation_then_validation
-# @features setup
-# @dimensions repair explicit-mutation validation
+# @matrix setup : explicit-mutation repair validation
 def repair_installation():
     """Explicitly reconcile setup state and validate the resulting installation."""
     from installer import wrap_text

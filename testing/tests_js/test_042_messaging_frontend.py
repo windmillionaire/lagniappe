@@ -3,12 +3,7 @@
 import textwrap
 
 
-# @pairs mentions:node-attributes mentions:pending-occurrence mentions:query-detection
-# @pairs mentions:keyboard mentions:mouse
-# @pair mentions:profile-link
-# @source src/script/elements/editor/extensions/mention.mjs::LagniappeMention
-# @source src/script/elements/editor/extensions/mention.mjs::MentionSuggestions
-# @source src/script/elements/editor/extensions/mention.mjs::collectMentions
+# @matrix mentions : keyboard mouse node-attributes pending-occurrence profile-link query-detection
 def test_mention_node_collection_insertion_and_keyboard_contract(run_node):
     run_node(
         textwrap.dedent(
@@ -24,6 +19,15 @@ def test_mention_node_collection_insertion_and_keyboard_contract(run_node):
               request: {},
               console,
               crypto: globalThis.crypto,
+              debounce(callback) {
+                const debounced = (...args) => callback(...args);
+                debounced.cancel = () => {};
+                return debounced;
+              },
+              QueryLifecycle: class {
+                invalidate() {}
+                destroy() {}
+              },
             };
             context.globalThis = context;
             vm.createContext(context);
@@ -174,10 +178,7 @@ def test_mention_node_collection_insertion_and_keyboard_contract(run_node):
     )
 
 
-# @pairs messaging:compose-modal messaging:prefilled-peer messaging:operation-id
-# @pairs messaging:user-kind messaging:selection-focus
-# @source src/script/elements/messageComposer.mjs::MessageComposer
-# @source src/script/elements/messageComposer.mjs::ensureMessageComposer
+# @matrix messaging : compose-modal operation-id prefilled-peer selection-focus user-kind
 def test_message_composer_prefills_peer_and_reuses_operation_on_submit(run_node):
     run_node(
         r"""
@@ -282,9 +283,7 @@ if (!source.includes("STYLES.button.submit") || !source.includes("data-role=\"ic
     )
 
 
-# @pairs notifications:exact-count notifications:bounded-page
-# @pair notifications:message-ordering
-# @source src/script/elements/notifications.mjs::Notifications
+# @matrix notifications : bounded-page exact-count message-ordering
 def test_notification_menu_keeps_authoritative_aggregate_count(run_node):
     run_node(
         r"""
@@ -367,12 +366,7 @@ if (!prevented || actions[0]?.[0] !== "compose" || actions[0]?.[1] !== menu.view
     )
 
 
-# @pairs messaging:read-race messaging:clear-confirmation messaging:inline-reply
-# @pair messaging:responsive-peer-selector
-# @pairs messaging:selection-race messaging:preserve-selection
-# @pair messaging:list-race
-# @pairs messaging:polling-revision messaging:active-polling
-# @source src/script/views/messages.mjs::Messages
+# @matrix messaging : active-polling clear-confirmation inline-reply list-race polling-revision preserve-selection read-race responsive-peer-selector selection-race
 def test_messages_view_refreshes_read_races_and_uses_delete_modal(run_node):
     run_node(
         r"""

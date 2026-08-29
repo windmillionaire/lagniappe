@@ -11,6 +11,7 @@ from testing.utility import (
     style_registry,
     style_traceability,
     traceability,
+    traceability_common,
 )
 
 pytestmark = pytest.mark.tooling
@@ -493,7 +494,7 @@ unused:
     report, _manifest = style_traceability.build_report(tmp_path)
     payload = style_traceability.report_payload(report)
 
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == traceability_common.TRACEABILITY_SCHEMA_VERSION
     assert payload["kind"] == "style-traceability-report"
     assert payload["finding_ids"] == [
         finding["id"] for finding in payload["findings"]

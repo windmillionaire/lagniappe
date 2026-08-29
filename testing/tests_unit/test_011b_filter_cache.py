@@ -1,10 +1,11 @@
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason, Restriction
 from lagniappe.core.tools.filters.cache import FilterCache
+from lagniappe.core.tools.filters.contract import CompiledFilter
 
 
 def _user(*, models=None, task=None):
@@ -36,8 +37,7 @@ class _FilterExpression:
         return "$..filter-expression"
 
 
-# @features filters cache permissions
-# @dimensions shared-key restrictions
+# @matrix cache filters permissions : restrictions shared-key
 @pytest.mark.unit
 def test_filter_cache_uses_shared_cache_key_without_user_restrictions():
     parent = _parent("category")
@@ -46,11 +46,10 @@ def test_filter_cache_uses_shared_cache_key_without_user_restrictions():
     restricted_cache = FilterCache(parent, user=_user(models=["category-a"]))
 
     assert owner_cache.cache_key == restricted_cache.cache_key
-    assert owner_cache.cache_key.endswith(":all")
+    assert owner_cache.cache_key.endswith(":all-v2")
 
 
-# @features filters cache permissions
-# @dimensions query allowed related-load
+# @matrix cache filters permissions : allowed query related-load
 @pytest.mark.unit
 def test_filter_cache_query_filters_loaded_entities_by_view_permission():
     viewer = _user()
@@ -59,7 +58,11 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
         allowed=lambda action, user=None: action == Action.VIEW and user is viewer
     )
     hidden = SimpleNamespace(allowed=lambda action, user=None: False)
-    entity_filter = SimpleNamespace(definitions=["definition"])
+    entity_filter = CompiledFilter(
+        definitions=("definition",),
+        contract={"version": 1, "conditions": []},
+        related=(),
+    )
 
     with patch(
         "lagniappe.core.tools.filters.cache.FilterExpression", _FilterExpression
@@ -84,35 +87,63 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
     assert results == [visible]
 
 
-# @features filters cache category
-# @dimensions source-query restrictions pagination
+# @matrix cache filters : query-boundary validation
+@pytest.mark.unit
+def test_filter_cache_rejects_uncompiled_query_definitions():
+    parent = _parent("project")
+
+    with pytest.raises(TypeError, match="CompiledFilter"):
+        FilterCache(parent, user=_user()).query(
+            SimpleNamespace(definitions=["untrusted"])
+        )
+
+
+# @matrix filters : cache category-pagination restrictions source-query
 @pytest.mark.unit
 def test_filter_cache_loads_category_pages_without_restrictions():
     parent = _parent("category")
-    page = SimpleNamespace(
-        hash="page-hash",
-        to_filter_index=lambda: {"id": "page-key", "name": "Page"},
-    )
+    pages_by_key = {
+        "page-key-1": SimpleNamespace(
+            hash="page-hash-1",
+            to_filter_index=lambda: {"id": "page-key-1", "name": "Page 1"},
+        ),
+        "page-key-2": SimpleNamespace(
+            hash="page-hash-2",
+            to_filter_index=lambda: {"id": "page-key-2", "name": "Page 2"},
+        ),
+    }
 
     with patch(
-        "lagniappe.core.tools.filters.cache.database.get.pages",
-        return_value=SimpleNamespace(results=["page-key"], next_cursor=None),
+        "lagniappe.core.tools.filters.cache.database_get.pages",
+        side_effect=[
+            SimpleNamespace(results=["page-key-1"], next_cursor="cursor-2"),
+            SimpleNamespace(results=["page-key-2"], next_cursor=None),
+        ],
     ) as pages:
         with patch(
             "lagniappe.core.tools.filters.cache.Entities.fetch",
-            return_value=[page],
+            side_effect=lambda *keys, **_kwargs: [pages_by_key[key] for key in keys],
         ):
             cache = FilterCache(parent, user=_user(models=["restricted"]))
             cache._load()
 
-    pages.assert_called_once_with(
-        parent.key,
-        start_cursor=None,
-        limit=100,
-        hashes=Restriction.UNRESTRICTED,
-    )
+    assert pages.call_args_list == [
+        call(
+            parent.key,
+            start_cursor=None,
+            limit=100,
+            hashes=Restriction.UNRESTRICTED,
+        ),
+        call(
+            parent.key,
+            start_cursor="cursor-2",
+            limit=100,
+            hashes=Restriction.UNRESTRICTED,
+        ),
+    ]
     assert cache._to_cache == {
-        "page-hash": {"id": "page-key", "name": "Page"}
+        "page-hash-1": {"id": "page-key-1", "name": "Page 1"},
+        "page-hash-2": {"id": "page-key-2", "name": "Page 2"},
     }
 
 
@@ -146,8 +177,7 @@ class _FakeQuery:
         return ["active-task-key", "completed-task-key"]
 
 
-# @features filters cache project task
-# @dimensions source-query all-tasks completed restrictions
+# @matrix cache filters project task : all-tasks completed restrictions source-query
 @pytest.mark.unit
 def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filters():
     parent = _parent("project")
@@ -164,7 +194,7 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
     with patch("lagniappe.core.tools.filters.cache.Filter", _FakeFilter):
         with patch("lagniappe.core.tools.filters.cache.Query", _FakeQuery):
             with patch(
-                "lagniappe.core.tools.filters.cache.database.get.datastore_key",
+                "lagniappe.core.tools.filters.cache.database_get.datastore_key",
                 return_value=parent.key,
             ) as datastore_key:
                 with patch(

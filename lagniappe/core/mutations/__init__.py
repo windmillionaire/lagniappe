@@ -15,8 +15,7 @@ from .registry import SAVE_PLANNERS, planner_for
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_each_explicit_save_argument_is_a_standard_root
-# @features mutations
-# @dimensions save multiple-explicit-roots standard-lifecycle property-mask
+# @matrix mutations : multiple-explicit-roots property-mask save standard-lifecycle
 def plan_mutation(operation, *entities, registry=None):
     """Route explicit roots through their registered kind planners."""
     if not isinstance(operation, MutationOperation):
@@ -39,8 +38,7 @@ def plan_mutation(operation, *entities, registry=None):
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache
 # @tests tests_unit/test_022_mutation_contracts.py::test_touch_uses_masked_root_save_and_only_updates_modified
-# @features mutations
-# @dimensions root-save property-mask lifecycle-isolation
+# @matrix mutations : lifecycle-isolation property-mask root-save
 def plan_root(*entities, property_mask=None, property_updates=()):
     return RootMutation.plan(
         *entities,
@@ -51,8 +49,7 @@ def plan_root(*entities, property_mask=None, property_updates=()):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @features mutations
-# @dimensions planner-registry completeness
+# @matrix mutations : completeness planner-registry
 def registered_kinds():
     """Kinds with explicit save and delete planner registrations."""
     return frozenset(SAVE_PLANNERS) & frozenset(DELETE_PLANNERS)

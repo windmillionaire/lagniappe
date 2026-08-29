@@ -15,11 +15,8 @@ const ROUTES = {
  * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_updates_editable_cell
  * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_keeps_revealed_completed_column_editable
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_renders_checkbox_cells
- * @pairs task-index:quick-edit
- * @pairs task-index:link-affordance
- * @pairs task-index:editable-cell
- * @pairs task-index:quick-edit task-index:column-visibility task-index:checkbox-cell
- * @pairs category-index:quick-edit category-index:checkbox-cell
+ * @matrix category-index : checkbox-cell quick-edit
+ * @matrix task-index : checkbox-cell column-visibility editable-cell link-affordance quick-edit
  */
 export class TableEditor {
 	constructor(attributes) {

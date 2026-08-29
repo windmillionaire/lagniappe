@@ -12,6 +12,7 @@ from lagniappe.core.tools.ai import core as ai_core
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.ai.prompt import Prompt
+from lagniappe.core.tools.database import analytics as analytics_database
 
 
 pytestmark = pytest.mark.unit
@@ -69,13 +70,7 @@ def _capture(monkeypatch):
     return persisted, pruned
 
 
-# @pair observability:provider-calls
-# @pair observability:tools
-# @pair observability:cache
-# @pair observability:tokens
-# @pair observability:validation
-# @pair observability:deferred-context
-# @pair observability:privacy
+# @matrix observability : cache deferred-context privacy provider-calls tokens tools validation
 @pytest.mark.unit
 def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     monkeypatch,
@@ -174,9 +169,7 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     assert summary["success"] is True
 
 
-# @pair observability:empty-response
-# @pair observability:quota
-# @pair observability:error-normalization
+# @matrix observability : empty-response error-normalization quota
 @pytest.mark.unit
 def test_generation_summary_records_empty_retry_and_bounded_quota_error(monkeypatch):
     persisted, _ = _capture(monkeypatch)
@@ -236,8 +229,7 @@ def test_generation_summary_records_empty_retry_and_bounded_quota_error(monkeypa
     )
 
 
-# @features observability
-# @dimensions in-flight provider-stage correlation privacy
+# @matrix observability : correlation in-flight privacy provider-stage
 def test_deferred_generation_overwrites_correlated_live_snapshots(monkeypatch):
     persisted, pruned = _capture(monkeypatch)
 
@@ -275,10 +267,7 @@ def test_deferred_generation_overwrites_correlated_live_snapshots(monkeypatch):
     assert "PRIVATE-GENERATED-RESULT" not in json.dumps(persisted, default=str)
 
 
-# @pair observability:nested-generation
-# @pair observability:model-repair
-# @pair observability:correlation
-# @pair observability:review-fallback
+# @matrix observability : correlation model-repair nested-generation review-fallback
 @pytest.mark.unit
 def test_nested_model_repair_gets_its_own_summary(monkeypatch):
     persisted, _ = _capture(monkeypatch)
@@ -335,12 +324,15 @@ def test_nested_model_repair_gets_its_own_summary(monkeypatch):
     assert persisted[-1]["outcome"] == "review_fallback"
 
 
-# @pair observability:disabled
-# @pair observability:persistence-failure
-# @pair observability:pruning-failure
-# @pair observability:exception-transparency
+# @matrix observability : disabled exception-transparency persistence-failure pruning-failure
 @pytest.mark.unit
 def test_observability_failures_never_change_generation_result_or_error(monkeypatch):
+    warnings = []
+
+    def record_warning(message, *args, **kwargs):
+        warnings.append((message, args, kwargs))
+
+    monkeypatch.setattr(observability.LOGGER, "warning", record_warning)
     monkeypatch.setattr(
         ai_core,
         "runtime_ai_settings",
@@ -365,6 +357,7 @@ def test_observability_failures_never_change_generation_result_or_error(monkeypa
         lambda summary: pytest.fail("disabled collection wrote a record"),
     )
     assert generator.generate_content(prompt) == "Success"
+    assert warnings == []
 
     monkeypatch.setattr(observability.CONFIG, "AI_OBSERVABILITY", True, raising=False)
     monkeypatch.setattr(
@@ -393,6 +386,12 @@ def test_observability_failures_never_change_generation_result_or_error(monkeypa
     with pytest.raises(RuntimeError) as caught:
         generator.generate_content(prompt)
     assert caught.value is original
+    assert [message for message, _args, _kwargs in warnings] == [
+        "Unable to persist AI observability summary.",
+        "Unable to prune AI observability summaries.",
+        "Unable to prune AI observability summaries.",
+    ]
+    assert all(kwargs == {"exc_info": True} for _message, _args, kwargs in warnings)
 
 
 class _Entity(dict):
@@ -427,9 +426,7 @@ class _Query:
         return self.records[:limit]
 
 
-# @pair datastore:uuid-key
-# @pair datastore:index-exclusions
-# @pair datastore:retention-bound
+# @matrix datastore : index-exclusions retention-bound uuid-key
 @pytest.mark.unit
 def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     old_records = [SimpleNamespace(key=f"old-{index}") for index in range(700)]
@@ -450,14 +447,18 @@ def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
             self.put_record = record
 
         def query(self, *, kind):
-            assert kind == observability.KINDS.ai_observability.value
+            assert kind == analytics_database.KINDS.ai_observability.value
             return query
 
         def delete_multi(self, keys):
             self.deleted.extend(keys)
 
     datastore = Datastore()
-    monkeypatch.setattr(observability, "DATA", SimpleNamespace(datastore=datastore))
+    monkeypatch.setattr(
+        analytics_database,
+        "DATA",
+        SimpleNamespace(datastore=datastore),
+    )
     identifier = str(uuid.uuid4())
     summary = observability.GenerationSummaryV1(
         correlation_id=identifier,
@@ -483,10 +484,8 @@ def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     assert query.filters[0].value == now - timedelta(days=30)
 
 
+# @matrix analytics : groups outcomes query-limit
 # @pair observability:aggregation
-# @pair analytics:groups
-# @pair analytics:outcomes
-# @pair analytics:query-limit
 @pytest.mark.unit
 def test_ai_observability_dashboard_aggregation():
     records = [
@@ -569,7 +568,7 @@ def test_ai_observability_dashboard_aggregation():
     ]
 
 
-# @pairs ai-observability:job-correlation ai-observability:privacy
+# @matrix ai-observability : job-correlation privacy
 def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
     created = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
     operation = {

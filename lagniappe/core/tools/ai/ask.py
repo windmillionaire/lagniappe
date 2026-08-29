@@ -6,10 +6,10 @@ from .guidelines import (
     HTML_GENERATION_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
 )
-from .reporting.contracts import (
+from .reporting.contracts.actions import (
     READ_ONLY_CONTEXT_TOOLS,
 )
-from .reporting.proposals import (
+from .reporting.proposals.repair import (
     generate_validated_proposal,
 )
 from .prompt import Prompt
@@ -85,8 +85,7 @@ Answer rules:
 
 # @testable true
 # @tests tests_unit/test_020b_ai_ask.py::test_ask_prompt_prioritizes_answers_and_exposes_read_tools
-# @features ai-report
-# @dimensions ask structured-output answer-only provider-validation
+# @matrix ai-report : answer-only ask provider-validation structured-output
 def ask_response_schema():
     """Return Ask's answer-only provider envelope."""
     properties = {
@@ -133,8 +132,7 @@ def _ask_prompt_base(report, user, intro, extra_contexts=()):
 # @tests tests_unit/test_020b_ai_ask.py::test_ask_prompt_prioritizes_answers_and_exposes_read_tools
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @features ai-report
-# @dimensions ask prompt search tool-context answer-only workspace-tools structured-filter
+# @matrix ai-report : answer-only ask prompt search structured-filter tool-context workspace-tools
 def ask_prompt(report, user):
     """Build the AI prompt used to answer an Ask report."""
     prompt = _ask_prompt_base(
@@ -213,8 +211,7 @@ changes to existing workspace content. Do not design or return those changes.
 
 # @testable true
 # @tests tests_unit/test_020b_ai_ask.py::test_revise_ask_prompt_preserves_question_and_adds_review_context
-# @features ai-report
-# @dimensions ask revision feedback proposal context
+# @matrix ai-report : ask context feedback proposal revision
 def revise_ask_prompt(report, user, feedback):
     """Build the AI prompt used to revise an Ask report answer."""
     prompt = _ask_prompt_base(
@@ -247,8 +244,7 @@ shape; do not return a patch. Keep actions empty.
 # @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_repairs_unusable_answers
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @features ai-report
-# @dimensions ask generate validate repair usable-answer live-provider
+# @matrix ai-report : ask generate live-provider repair usable-answer validate
 def generate_ask_report(prompt):
     """Generate and validate a usable Ask response."""
     return generate_validated_proposal(
@@ -263,8 +259,7 @@ def generate_ask_report(prompt):
 # @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_requires_a_usable_answer[confidence]
 # @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_requires_a_usable_answer[answer-html]
 # @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_discards_workspace_actions
-# @features ai-report
-# @dimensions ask validation usable-answer answer-only action-discard
+# @matrix ai-report : action-discard answer-only ask usable-answer validation
 def validate_ask_response(
     response,
     allowed_actions=None,
@@ -311,8 +306,7 @@ def validate_ask_response(
 
 # @testable true
 # @tests tests_unit/test_020b_ai_ask.py::test_ask_report_name_is_compact_and_marks_truncation
-# @features ai-report
-# @dimensions ask title-truncation
+# @matrix ai-report : ask title-truncation
 def ask_report_name(question):
     """Build a compact report title from an Ask question."""
     text = " ".join((question or "").split())

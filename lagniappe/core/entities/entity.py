@@ -9,8 +9,9 @@ from ..definitions import Action, MutationIntent
 from ..entities import Entities
 from ..exceptions import PropertyError
 from ..properties import common_entity
-from ..tools import database
-from ..tools.user_context import current_context_user
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
+from ..tools.auth.context import current_context_user
 
 
 # @testable infrastructure
@@ -85,8 +86,7 @@ class EntityProperties:
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires_subclass_entity_kind
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_preserves_key_from_empty_datastore_entity
-# @features entity
-# @dimensions initialization validation empty-datastore-entity key-preservation
+# @matrix entity : empty-datastore-entity initialization key-preservation validation
 class Entity:
     """Base class for all persistent entities.
 
@@ -119,9 +119,9 @@ class Entity:
         self._db = identifier if isinstance(identifier, datastore.Entity) else {}
 
         if identifier is not None:
-            self._key = database.get.datastore_key(identifier)
+            self._key = database_get.datastore_key(identifier)
         elif not kwargs.get("temporary") and not kwargs.get("testing"):
-            self._key = database.create_key(self.entity_kind, kwargs.get("parent"))
+            self._key = database_utility.create_key(self.entity_kind, kwargs.get("parent"))
 
         self._temporary = kwargs.get("temporary")
         self._testing = kwargs.get("testing")
@@ -262,6 +262,9 @@ class Entity:
         self._details = details
         return self._details
 
+    # @testable true
+    # @tests tests_unit/test_001_test_general_and_utilities.py::test_reference_details_does_not_derive_requirements_from_unloaded_relations
+    # @pairs entities:reference-details relations:direct
     @property
     def reference_details(self):
         """Return a non-recursive display projection for an entity reference."""
@@ -276,7 +279,7 @@ class Entity:
 
         if getattr(self, "entity_kind", None) == "user":
             page = self.properties.get("page")
-            details["id"] = database.get.urlsafe_key(page.key) if page else None
+            details["id"] = database_get.urlsafe_key(page.key) if page else None
         else:
             details["id"] = self.urlsafe_key
         return details
@@ -284,8 +287,7 @@ class Entity:
     # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_default_entity_fields_are_not_duplicated_in_submission_search_cache
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_cache_stores_detail_parent_pointers
-    # @features cache
-    # @dimensions default-fields cache-deduplication details-key parent-key
+    # @matrix cache : cache-deduplication default-fields details-key parent-key
     @property
     def to_cache(self):
         if self.reserved or not self.hash:
@@ -315,8 +317,11 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
-    # @features permissions
-    # @dimensions authenticated-user
+    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_ai_merges_submission_fields_without_nested_duplicate
+    # @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
+    # @matrix ai entity submission : single-merge submission-fields
+    # @matrix ai file : metadata permissions
+    # @pair permissions:authenticated-user
     def to_ai(self, user=None):
         user = current_context_user(user)
         if not user or not getattr(user, "is_authenticated", False):
@@ -360,9 +365,8 @@ class Entity:
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
     # @tests tests_unit/test_013_task_properties.py::test_task_filter_index_includes_restricted_related_values
     # @tests tests_unit/test_004e_submission_behavior.py::test_unset_submission_fields_do_not_erase_entity_filter_metadata
-    # @features filter-index permissions
-    # @dimensions permission-neutral related-values
-    # @pairs filter-index:unset-values filter-index:entity-metadata
+    # @matrix filter-index permissions task : column-view entity-metadata permission-neutral related-values unset-values
+    # @pairs filter-index:related-values permissions:filter-index-neutral
     def to_filter_index(self, user=None):
         values = {"id": self.urlsafe_key}
 
@@ -386,8 +390,7 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
-    # @features page, permissions, user-groups
-    # @dimensions restricted-access, group-match
+    # @matrix page permissions user-groups : group-match restricted-access
     def restricted_access(self, user):
         if not user or not user.is_authenticated:
             return True
@@ -404,8 +407,7 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_testing_entity_allowed_uses_real_permissions
-    # @features permissions testing
-    # @dimensions entity-allowed no-testing-shortcut
+    # @matrix permissions testing : entity-allowed no-testing-shortcut
     def allowed(self, action, user=None):
         user = current_context_user(user)
 
@@ -423,8 +425,7 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_key_access_without_key_raises_runtime_error
-    # @features entity
-    # @dimensions key-validation
+    # @pair entity:key-validation
     @property
     def urlsafe_key(self):
         if not self.key:
@@ -433,13 +434,12 @@ class Entity:
         if getattr(self, "_urlsafe_key", None):
             return self._urlsafe_key
 
-        self._urlsafe_key = database.get.urlsafe_key(self.key)
+        self._urlsafe_key = database_get.urlsafe_key(self.key)
         return self._urlsafe_key
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_key_access_without_key_raises_runtime_error
-    # @features entity
-    # @dimensions key-validation
+    # @pair entity:key-validation
     @property
     def db(self):
         if self._db or self._temporary or self._testing:
@@ -448,17 +448,16 @@ class Entity:
         if not self.key:
             raise RuntimeError("no key assigned")
 
-        self._db = database.get.entity(self.key)
+        self._db = database_get.entity(self.key)
 
         if not self._db:
-            self._db = database.create_entity(self.key)
+            self._db = database_utility.create_entity(self.key)
 
         return self._db
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_add_mutation_intents_requires_typed_intents_and_dedupes
-    # @features entity
-    # @dimensions typed-intent validation key-validation dedupe
+    # @matrix entity : dedupe key-validation typed-intent validation
     def add_mutation_intents(self, *intents):
         if self._mutation_intents is None:
             self._mutation_intents = []
@@ -478,7 +477,10 @@ class Entity:
         for intent in intents:
             if not isinstance(intent, MutationIntent):
                 raise TypeError("Entity mutation intents must be MutationIntent values")
-            if intent.entity is not None and getattr(intent.entity, "key", None) is None:
+            if (
+                intent.entity is not None
+                and getattr(intent.entity, "key", None) is None
+            ):
                 raise ValueError("Mutation intent entities must have a key")
             signature = (
                 intent.intent,

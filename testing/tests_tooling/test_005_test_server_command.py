@@ -12,6 +12,20 @@ import yaml
 pytestmark = pytest.mark.tooling
 
 
+class FakeAuthority:
+    nonce = "session-nonce-0123456789012345"
+    mode = "local-e2e"
+
+    def __init__(self):
+        self.updates = []
+
+    def assert_active(self, **_kwargs):
+        return True
+
+    def update(self, **changes):
+        self.updates.append(changes)
+
+
 @pytest.fixture
 def import_config_testing(monkeypatch):
     from runner import context as runner_context
@@ -92,7 +106,8 @@ def make_demo_app(tmp_path: Path) -> Path:
     return app_dir
 
 
-# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
+# @matrix frontend-build : freshness no-op
+# @pair test-server:freshness
 def test_test_frontend_bundle_skips_current_build(
     import_config_testing,
     monkeypatch,
@@ -100,13 +115,21 @@ def test_test_frontend_bundle_skips_current_build(
 ):
     testing = import_config_testing(make_demo_app(tmp_path))
     state_path = tmp_path / "test-frontend-bundle.json"
-    state = {"schema": 1, "inputs": "inputs-1", "outputs": "outputs-1"}
+    state = {"schema": 2, "inputs": "inputs-1", "outputs": "outputs-1"}
     state_path.write_text(json.dumps(state))
 
     monkeypatch.setattr(testing, "_TEST_FRONTEND_BUNDLE_STATE", state_path)
     monkeypatch.setattr(testing, "_test_frontend_input_fingerprint", lambda: "inputs-1")
     monkeypatch.setattr(
-        testing, "_test_frontend_output_fingerprint", lambda: "outputs-1"
+        testing,
+        "_inspect_test_frontend_bundle",
+        lambda **_kwargs: (
+            types.SimpleNamespace(
+                metadata={"mode": "development"},
+                output_fingerprint="outputs-1",
+            ),
+            [],
+        ),
     )
     monkeypatch.setattr(
         testing.subprocess,
@@ -114,11 +137,11 @@ def test_test_frontend_bundle_skips_current_build(
         lambda *args, **kwargs: pytest.fail("fresh bundle must not invoke npm"),
     )
 
-    assert testing.ensure_test_frontend_bundle() is False
+    assert testing.ensure_test_frontend_bundle(FakeAuthority()) is False
 
 
-# @pairs test-server:freshness frontend-build:freshness frontend-build:rebuild
-# @pair frontend-build:output-validation
+# @matrix frontend-build : freshness output-validation rebuild
+# @pair test-server:freshness
 def test_test_frontend_bundle_rebuilds_stale_build(
     import_config_testing,
     monkeypatch,
@@ -135,8 +158,14 @@ def test_test_frontend_bundle_rebuilds_stale_build(
     )
     monkeypatch.setattr(
         testing,
-        "_test_frontend_output_fingerprint",
-        lambda: next(output_fingerprints),
+        "_inspect_test_frontend_bundle",
+        lambda **_kwargs: (
+            types.SimpleNamespace(
+                metadata={"mode": "development"},
+                output_fingerprint=next(output_fingerprints),
+            ),
+            [],
+        ),
     )
 
     def fake_run(command, **kwargs):
@@ -145,65 +174,37 @@ def test_test_frontend_bundle_rebuilds_stale_build(
 
     monkeypatch.setattr(testing.subprocess, "run", fake_run)
 
-    assert testing.ensure_test_frontend_bundle() is True
+    assert testing.ensure_test_frontend_bundle(FakeAuthority()) is True
     assert calls == [
         ([testing.NPM_CLI, "run", "dev"], {"cwd": testing.APP_DIR, "check": False})
     ]
     assert json.loads(state_path.read_text()) == {
-        "schema": 1,
+        "schema": 2,
         "inputs": "inputs-new",
         "outputs": "outputs-new",
     }
 
 
-# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
-# @pair frontend-build:e2e-session-isolation
-def test_test_frontend_bundle_defers_build_during_active_e2e_session(
+# @matrix frontend-build : freshness no-op production-preservation
+# @pair test-server:freshness
+def test_test_frontend_bundle_preserves_current_production_build(
     import_config_testing,
     monkeypatch,
     tmp_path,
     capsys,
 ):
     testing = import_config_testing(make_demo_app(tmp_path))
-    lock_path = tmp_path / "lagniappe-e2e.lock"
-    monkeypatch.setattr(testing, "_e2e_session_lock_path", lambda: lock_path)
-
-    with lock_path.open("a+") as active_lock:
-        active_lock.write("pid=2468")
-        active_lock.flush()
-        testing.fcntl.flock(
-            active_lock,
-            testing.fcntl.LOCK_EX | testing.fcntl.LOCK_NB,
-        )
-        monkeypatch.setattr(
-            testing,
-            "_test_frontend_input_fingerprint",
-            lambda: pytest.fail("active E2E session must defer fingerprinting"),
-        )
-        monkeypatch.setattr(
-            testing.subprocess,
-            "run",
-            lambda *args, **kwargs: pytest.fail(
-                "active E2E session must not invoke npm"
+    monkeypatch.setattr(
+        testing,
+        "_inspect_test_frontend_bundle",
+        lambda **_kwargs: (
+            types.SimpleNamespace(
+                metadata={"mode": "production"},
+                output_fingerprint="production-outputs",
             ),
-        )
-
-        assert testing.ensure_test_frontend_bundle() is False
-        assert "preflight deferred" in capsys.readouterr().out
-
-
-# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
-# @pair frontend-build:production-preservation
-def test_test_frontend_bundle_preserves_production_build(
-    import_config_testing,
-    monkeypatch,
-    tmp_path,
-    capsys,
-):
-    testing = import_config_testing(make_demo_app(tmp_path))
-    metadata_path = tmp_path / "build.json"
-    metadata_path.write_text(json.dumps({"mode": "production"}))
-    monkeypatch.setattr(testing, "_TEST_FRONTEND_BUILD_METADATA", metadata_path)
+            [],
+        ),
+    )
     monkeypatch.setattr(
         testing,
         "_test_frontend_input_fingerprint",
@@ -217,8 +218,58 @@ def test_test_frontend_bundle_preserves_production_build(
         ),
     )
 
-    assert testing.ensure_test_frontend_bundle() is False
-    assert "Production frontend bundle detected" in capsys.readouterr().out
+    assert testing.ensure_test_frontend_bundle(FakeAuthority()) is False
+    assert "Current production frontend bundle detected" in capsys.readouterr().out
+
+
+# @matrix frontend-build : freshness production-preservation rebuild
+# @pair test-server:freshness
+def test_test_frontend_bundle_replaces_stale_production_build(
+    import_config_testing,
+    monkeypatch,
+    tmp_path,
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    state_path = tmp_path / "test-frontend-bundle.json"
+    calls = []
+    inspections = iter(
+        [
+            (None, ["Frontend build was created from different source inputs."]),
+            (
+                types.SimpleNamespace(
+                    metadata={"mode": "development"},
+                    output_fingerprint="development-outputs",
+                ),
+                [],
+            ),
+        ]
+    )
+    monkeypatch.setattr(testing, "_TEST_FRONTEND_BUNDLE_STATE", state_path)
+    monkeypatch.setattr(
+        testing, "_test_frontend_input_fingerprint", lambda: "inputs-new"
+    )
+    monkeypatch.setattr(
+        testing,
+        "_inspect_test_frontend_bundle",
+        lambda **_kwargs: next(inspections),
+    )
+    monkeypatch.setattr(
+        testing.subprocess,
+        "run",
+        lambda command, **kwargs: (
+            calls.append((command, kwargs)) or types.SimpleNamespace(returncode=0)
+        ),
+    )
+
+    assert testing.ensure_test_frontend_bundle(FakeAuthority()) is True
+    assert calls == [
+        ([testing.NPM_CLI, "run", "dev"], {"cwd": testing.APP_DIR, "check": False})
+    ]
+    assert json.loads(state_path.read_text()) == {
+        "schema": 2,
+        "inputs": "inputs-new",
+        "outputs": "development-outputs",
+    }
 
 
 def test_run_py_test_server_command_dispatches_start(monkeypatch, capsys):
@@ -230,12 +281,18 @@ def test_run_py_test_server_command_dispatches_start(monkeypatch, capsys):
         test_config={"BASE_URL": "http://127.0.0.1:5000"}
     )
     fake_config_testing = types.ModuleType("runner.testing")
-    fake_config_testing.start_managed_test_server = lambda: 2468
+    fake_config_testing.start_managed_test_server = lambda packs: {
+        "pid": 2468,
+        "keeper_pid": 2467,
+        "seed_summary": None,
+    }
 
     def unexpected_teardown():
         raise AssertionError("teardown should not run for --start")
 
     fake_config_testing.teardown_managed_test_server = unexpected_teardown
+    fake_config_testing.test_server_status = lambda: {}
+    fake_config_testing.recover_managed_test_server = lambda: {}
 
     monkeypatch.setattr(run, "GCLOUD_CLI", "/usr/bin/gcloud")
     monkeypatch.setitem(sys.modules, "config", fake_config)
@@ -257,10 +314,12 @@ def test_run_py_test_server_adc_mismatch_points_to_auth(monkeypatch, capsys):
         test_config={"BASE_URL": "http://127.0.0.1:5000"}
     )
     fake_config_testing = types.ModuleType("runner.testing")
-    fake_config_testing.start_managed_test_server = lambda: (_ for _ in ()).throw(
+    fake_config_testing.start_managed_test_server = lambda packs: (_ for _ in ()).throw(
         RuntimeError("Run python run.py auth and retry.")
     )
     fake_config_testing.teardown_managed_test_server = lambda: None
+    fake_config_testing.test_server_status = lambda: {}
+    fake_config_testing.recover_managed_test_server = lambda: {}
 
     monkeypatch.setattr(run, "GCLOUD_CLI", "/usr/bin/gcloud")
     monkeypatch.setitem(sys.modules, "config", fake_config)
@@ -272,37 +331,124 @@ def test_run_py_test_server_adc_mismatch_points_to_auth(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @features test-server
-# @dimensions readiness slow-start
-def test_wait_for_server_allows_slow_local_startup(
+# @matrix test-session : health-nonce readiness slow-start
+def test_wait_for_session_server_allows_slow_local_startup(
     import_config_testing, monkeypatch, tmp_path
 ):
     testing = import_config_testing(make_demo_app(tmp_path))
+    import requests
+
     attempts = []
     sleeps = []
+    now = [100.0]
 
-    def delayed_ping(url):
-        attempts.append(url)
+    def delayed_ping(url, timeout):
+        attempts.append((url, timeout))
         if len(attempts) <= 10:
-            raise ConnectionError("server still starting")
-        return types.SimpleNamespace(status_code=200)
+            raise requests.ConnectionError("server still starting")
+        return types.SimpleNamespace(
+            status_code=200,
+            json=lambda: {
+                "ready": True,
+                "mode": "local-e2e",
+                "session_nonce": "nonce-1",
+                "pid": 4321,
+            },
+        )
+
+    def fake_sleep(delay):
+        sleeps.append(delay)
+        now[0] += delay
 
     monkeypatch.setattr("requests.get", delayed_ping)
-    monkeypatch.setattr("time.sleep", sleeps.append)
+    monkeypatch.setattr(testing, "monotonic", lambda: now[0])
+    monkeypatch.setattr(testing, "sleep", fake_sleep)
 
-    assert testing.wait_for_server("http://127.0.0.1:5000") is True
+    assert testing.wait_for_session_server(
+        "http://127.0.0.1:5000",
+        "nonce-1",
+        expected_pid=4321,
+        expected_mode="local-e2e",
+    ) is True
     assert len(attempts) == 11
-    assert set(attempts) == {"http://127.0.0.1:5000/l/ping"}
-    assert sleeps == [2, *([0.5] * 10)]
+    assert {url for url, _timeout in attempts} == {
+        "http://127.0.0.1:5000/testing/health"
+    }
+    assert all(
+        connect > 0 and read > 0 and connect + read <= 20
+        for _url, (connect, read) in attempts
+    )
+    assert sleeps == [0.5] * 10
 
 
-def test_run_test_server_prepares_frontend_before_flask_launch(
+# @matrix test-session : deadline diagnostics readiness stalled-response
+def test_wait_for_session_server_bounds_stalled_requests_by_one_deadline(
+    import_config_testing, monkeypatch, tmp_path, capsys
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    import requests
+
+    attempts = []
+    now = [0.0]
+
+    def stalled_ping(url, timeout):
+        attempts.append((url, timeout))
+        now[0] += sum(timeout)
+        raise requests.ReadTimeout("listener did not answer")
+
+    def fake_sleep(delay):
+        now[0] += delay
+
+    monkeypatch.setattr("requests.get", stalled_ping)
+    monkeypatch.setattr(testing, "monotonic", lambda: now[0])
+    monkeypatch.setattr(testing, "sleep", fake_sleep)
+
+    assert testing.wait_for_session_server(
+        "http://127.0.0.1:5000",
+        "nonce-1",
+        expected_pid=4321,
+        expected_mode="local-e2e",
+    ) is False
+    assert now[0] <= 20.0
+    assert attempts
+    assert all(sum(timeout) <= 20.0 for _url, timeout in attempts)
+    output = capsys.readouterr().out
+    assert "timed out after 20s" in output
+    assert "ReadTimeout" in output
+
+
+# @matrix test-session : diagnostics http-state readiness
+def test_wait_for_session_server_reports_last_http_state(
+    import_config_testing, monkeypatch, tmp_path, capsys
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    now = [0.0]
+
+    monkeypatch.setattr(
+        "requests.get",
+        lambda url, timeout: types.SimpleNamespace(status_code=503),
+    )
+    monkeypatch.setattr(testing, "monotonic", lambda: now[0])
+    monkeypatch.setattr(testing, "sleep", lambda delay: now.__setitem__(0, now[0] + delay))
+
+    assert testing.wait_for_session_server(
+        "http://127.0.0.1:5000",
+        "nonce-1",
+        expected_pid=4321,
+        expected_mode="local-e2e",
+        timeout_seconds=1,
+    ) is False
+    assert "last state: HTTP 503" in capsys.readouterr().out
+
+
+def test_run_test_server_records_identity_and_requires_nonce_health(
     import_config_testing, monkeypatch, tmp_path
 ):
     testing = import_config_testing(make_demo_app(tmp_path))
     calls = []
 
     class FakeProcess:
+        pid = 4321
         stdout = object()
         stderr = object()
 
@@ -316,48 +462,47 @@ def test_run_test_server_prepares_frontend_before_flask_launch(
         def start(self):
             calls.append("thread-start")
 
-    monkeypatch.setattr(
-        testing,
-        "ensure_test_frontend_bundle",
-        lambda: calls.append("frontend-bundle"),
-    )
-    monkeypatch.setattr(
-        testing,
-        "activate_repository_gcloud",
-        lambda **kwargs: calls.append(("gcloud", kwargs)),
-    )
-    monkeypatch.setattr(
-        testing,
-        "_kill_existing_test_server",
-        lambda base_url: calls.append(("kill", base_url)),
-    )
+    monkeypatch.setattr(testing, "require_server_port_available", lambda url: calls.append(("port", url)))
     monkeypatch.setattr(
         testing,
         "_launch_test_server",
         lambda **kwargs: calls.append(("launch", kwargs)) or FakeProcess(),
     )
-    monkeypatch.setattr(testing.threading, "Thread", FakeThread)
-    monkeypatch.setattr(testing, "wait_for_server", lambda base_url: True)
+    from runner import test_session
 
-    process = testing.run_test_server()
+    identity = {
+        "pid": 4321,
+        "pgid": 4321,
+        "boot_id": "boot",
+        "started": "started",
+        "command_sha256": "hash",
+    }
+    monkeypatch.setattr(test_session, "capture_process_identity", lambda pid: identity)
+    monkeypatch.setattr(testing.threading, "Thread", FakeThread)
+    monkeypatch.setattr(
+        testing,
+        "wait_for_session_server",
+        lambda *args, **kwargs: calls.append(("health", args, kwargs)) or True,
+    )
+
+    authority = FakeAuthority()
+    process = testing.run_test_server(authority)
 
     assert isinstance(process, FakeProcess)
-    assert calls[:4] == [
-        "frontend-bundle",
-        (
-            "gcloud",
-            {
-                "ensure_adc": True,
-                "allow_runtime_adc": True,
-                "allow_adc_login": False,
-            },
-        ),
-        ("kill", "http://127.0.0.1:5000"),
+    assert calls[:2] == [
+        ("port", "http://127.0.0.1:5000"),
         (
             "launch",
-            {"stdout": testing.subprocess.PIPE, "stderr": testing.subprocess.PIPE},
+            {
+                "stdout": testing.subprocess.PIPE,
+                "stderr": testing.subprocess.PIPE,
+                "session_nonce": authority.nonce,
+                "session_mode": authority.mode,
+                "start_new_session": True,
+            },
         ),
     ]
+    assert authority.updates == [{"server": identity}]
 
 
 def test_run_py_test_server_command_dispatches_start_load(monkeypatch, capsys):
@@ -372,27 +517,31 @@ def test_run_py_test_server_command_dispatches_start_load(monkeypatch, capsys):
         test_config={"BASE_URL": "http://127.0.0.1:5000"}
     )
     fake_config_testing = types.ModuleType("runner.testing")
-    fake_config_testing.start_managed_test_server = lambda: 2468
+    def fake_start(packs):
+        calls.append(("start", packs))
+        return {
+            "pid": 2468,
+            "keeper_pid": 2467,
+            "seed_summary": {
+                "packs": packs,
+                "resources": [{"ref": "Projects.test_filter_project"}],
+                "landings": [
+                    {
+                        "name": "Filter Project",
+                        "url": "http://127.0.0.1:5000/projects/abc",
+                    }
+                ],
+            },
+        }
+
+    fake_config_testing.start_managed_test_server = fake_start
     fake_config_testing.teardown_managed_test_server = lambda: None
+    fake_config_testing.test_server_status = lambda: {}
+    fake_config_testing.recover_managed_test_server = lambda: {}
 
     fake_seed = types.ModuleType("testing.utility.test_server_seed")
     fake_seed.LOAD_REPORT = Path("reports/test-server-load.json")
     fake_seed.available_pack_names = lambda: ("project-review",)
-
-    def fake_load_packs(packs):
-        calls.append(("load", packs))
-        return {
-            "packs": packs,
-            "resources": [{"ref": "Projects.test_filter_project"}],
-            "landings": [
-                {
-                    "name": "Filter Project",
-                    "url": "http://127.0.0.1:5000/projects/abc",
-                }
-            ],
-        }
-
-    fake_seed.load_packs = fake_load_packs
 
     monkeypatch.setattr(run, "GCLOUD_CLI", "/usr/bin/gcloud")
     monkeypatch.setitem(sys.modules, "config", fake_config)
@@ -403,7 +552,7 @@ def test_run_py_test_server_command_dispatches_start_load(monkeypatch, capsys):
     assert run.run_test_server_command(["--start", "--load", "project-review"]) == 0
 
     output = capsys.readouterr().out
-    assert calls == [("load", ["project-review"])]
+    assert calls == [("start", ["project-review"])]
     assert "Loaded test-server seed pack(s): project-review (1 resources)" in output
     assert "Seed landing: Filter Project - http://127.0.0.1:5000/projects/abc" in output
 
@@ -426,89 +575,3 @@ def test_test_server_seed_static_site_page_landing_metadata():
     assert (
         test_server_seed._resource_url(landing) == "http://127.0.0.1:5000/tasks/index"
     )
-
-
-def test_start_managed_test_server_detaches_and_records_pid(
-    import_config_testing, monkeypatch, tmp_path
-):
-    testing = import_config_testing(make_demo_app(tmp_path))
-    calls = []
-
-    class FakeProcess:
-        pid = 4321
-
-        def poll(self):
-            return None
-
-    def fake_popen(command, **kwargs):
-        calls.append(("popen", command, kwargs))
-        return FakeProcess()
-
-    monkeypatch.setattr(
-        testing,
-        "activate_repository_gcloud",
-        lambda **kwargs: calls.append(
-            (
-                "gcloud",
-                testing.SETTINGS.GCLOUD_CONFIG["NAME"],
-                kwargs,
-            )
-        ),
-    )
-    monkeypatch.setattr(
-        testing,
-        "ensure_test_frontend_bundle",
-        lambda: calls.append("frontend-bundle"),
-    )
-    monkeypatch.setattr(
-        testing,
-        "_kill_existing_test_server",
-        lambda base_url: calls.append(("kill", base_url)),
-    )
-    monkeypatch.setattr(testing, "wait_for_server", lambda base_url: True)
-    monkeypatch.setattr(testing.subprocess, "Popen", fake_popen)
-
-    stale_failure = testing.Directory.TEST_FAILURES.value / "old.txt"
-    stale_failure.parent.mkdir(parents=True)
-    stale_failure.write_text("old")
-
-    pid = testing.start_managed_test_server()
-
-    assert pid == 4321
-    assert calls[0] == "frontend-bundle"
-    assert testing.File.MANAGED_TEST_SERVER_PID.value.read_text() == "4321\n"
-    assert not stale_failure.exists()
-
-    popen_call = next(call for call in calls if call[0] == "popen")
-    _, command, kwargs = popen_call
-    assert command[-2:] == ["--port", "5000"]
-    assert kwargs["cwd"] == testing.APP_DIR
-    assert kwargs["stderr"] == testing.subprocess.STDOUT
-    assert kwargs["start_new_session"] is True
-    assert kwargs["env"]["FLASK_ENV"] == "testing"
-    assert kwargs["stdout"].name == str(testing.File.MANAGED_TEST_SERVER_LOG.value)
-
-
-# @features test-server
-# @dimensions teardown process-management
-def test_teardown_managed_test_server_stops_before_cleaning(
-    import_config_testing, monkeypatch, tmp_path
-):
-    testing = import_config_testing(make_demo_app(tmp_path))
-    calls = []
-    testing.Directory.REPORTS.create()
-    testing.File.MANAGED_TEST_SERVER_PID.value.write_text("4321\n")
-
-    monkeypatch.setattr(testing, "cleanup_test_data", lambda: calls.append("cleanup"))
-    monkeypatch.setattr(
-        testing,
-        "_terminate_managed_test_server_pid",
-        lambda pid: calls.append(("terminate", pid)),
-    )
-    monkeypatch.setattr(testing, "_server_port_in_use", lambda base_url: False)
-
-    pid = testing.teardown_managed_test_server()
-
-    assert pid == 4321
-    assert calls == [("terminate", 4321), "cleanup"]
-    assert not testing.File.MANAGED_TEST_SERVER_PID.value.exists()

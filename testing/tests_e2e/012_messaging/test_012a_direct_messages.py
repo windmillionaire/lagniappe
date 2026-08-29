@@ -1,5 +1,6 @@
 """End-to-end managed-user direct-message workflows."""
 
+from dataclasses import replace
 import re
 from uuid import uuid4
 
@@ -11,7 +12,9 @@ from lagniappe.core.definitions import Action
 from testing.definitions import Groups, Projects, SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements.combobox import Dropdown
-from testing.utility import expect_poll_result
+from testing.resources import Project
+from testing.utility.network import expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 
 pytestmark = pytest.mark.e2e
@@ -34,9 +37,10 @@ def _restricted_definition(label):
     )
 
 
-def _go_messages(user):
+def _go_messages(user, conversation_id=None):
+    query = f"?with={conversation_id}" if conversation_id else ""
     response = user.page.goto(
-        f"{SETTINGS.test_config['BASE_URL']}/messages",
+        f"{SETTINGS.test_config['BASE_URL']}/messages{query}",
         wait_until="load",
     )
     assert response and response.status == 200
@@ -64,11 +68,10 @@ def _send_from_modal(user, recipient, body):
     option.click()
     expect(textarea).to_be_focused()
     textarea.fill(body)
-    with user.page.expect_response(
-        lambda response: (
-            response.url.endswith("/l/messages")
-            and response.request.method == "POST"
-        )
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/l/messages",
     ) as response_info:
         dialog.get_by_role("button", name="Send", exact=True).click()
     response = response_info.value
@@ -116,21 +119,27 @@ def _fetch(user, path, method="GET", data=None):
     )
 
 
-# @pairs mentions:floating-menu mentions:empty-results mentions:profile-link
-# @pairs mentions:node-attributes mentions:mouse
-# @pairs mentions:link-popover mentions:unlink
-# @pairs mentions:recipient-search mentions:document-view
-# @source src/script/elements/editor/extensions/mention.mjs::LagniappeMention
-# @source src/script/elements/editor/extensions/mention.mjs::MentionSuggestions
-# @source lagniappe/core/tools/collaboration.py::collaboration_user_results
-# @source lagniappe/core/tools/mentions.py::deliver_mentions
+# @matrix mentions : document-view empty-results floating-menu link-popover mouse node-attributes profile-link recipient-search unlink
 def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     owner = get_user(Users.OWNER)
-    recipient = get_user(Users.admin, creator=owner)
+    recipient = get_user(
+        UserDefinition(
+            name=f"Mention Recipient {uuid4().hex[:8]}",
+            email=f"messaging-mention-{uuid4().hex}@example.test",
+            groups=[Groups.all_create],
+        ),
+        creator=owner,
+    )
     inaccessible_recipient = get_user(
         _restricted_definition("Mention No Access"), creator=owner
     )
-    project = Projects.test_sync_document_contract.get(owner)
+    project = Project(
+        user=owner,
+        definition=replace(
+            Projects.test_sync_document_contract.value.definition,
+            name=f"Mention Document {uuid4().hex}",
+        ),
+    ).create()
     assert not project.entity.allowed(Action.VIEW, user=inaccessible_recipient.entity)
     owner.go(project)
     editor = project.editor
@@ -237,22 +246,8 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     expect(editor.text_entry).to_contain_text(f"@{recipient.name}")
 
 
-# @pairs messaging:compose-modal messaging:conversation-page messaging:history-page
-# @pairs messaging:read-race messaging:unread-count messaging:per-copy-delete
-# @pairs messaging:clear-horizon messaging:new-after-clear messaging:permission
-# @pair messaging:clear-confirmation
-# @pairs messaging:polling-revision messaging:active-polling
-# @pairs notifications:aggregate-count notifications:exact-count
-# @source lagniappe/core/tools/messages.py::send_message
-# @source lagniappe/core/tools/messages.py::conversations
-# @source lagniappe/core/tools/messages.py::conversation_history
-# @source lagniappe/core/tools/messages.py::mark_read
-# @source lagniappe/core/tools/messages.py::hide_message
-# @source lagniappe/core/tools/messages.py::clear_conversation
-# @source lagniappe/core/tools/collaboration.py::recipient_allowed
-# @source src/script/elements/messageComposer.mjs::MessageComposer
-# @source src/script/elements/notifications.mjs::Notifications
-# @source src/script/views/messages.mjs::Messages
+# @matrix messaging : active-polling clear-confirmation clear-horizon compose-modal conversation-page history-page new-after-clear per-copy-delete permission polling-revision read-race unread-count
+# @matrix notifications : aggregate-count exact-count
 def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     get_user,
     browser_failures,
@@ -312,34 +307,14 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
         "aria-label", f"Notifications: {starting_count}", timeout=15000
     )
 
-    poll_subscription = "view:channel:messages"
-    with expect_poll_result(
-        recipient.page,
-        subscription_id=poll_subscription,
-        status="changed",
-    ):
-        recipient.page.evaluate(
-            """subscription =>
-                document.querySelector("[lp-view]")._lp_view
-                    .PollingCoordinator.trigger(subscription)
-            """,
-            poll_subscription,
-        )
-
     live_body = f"Live message {uuid4().hex}"
-    _send_from_modal(sender, recipient, live_body)
     with expect_poll_result(
         recipient.page,
-        subscription_id=poll_subscription,
+        subscription_id="view:channel:messages",
         status="changed",
+        timeout=25000,
     ):
-        recipient.page.evaluate(
-            """subscription =>
-                document.querySelector("[lp-view]")._lp_view
-                    .PollingCoordinator.trigger(subscription)
-            """,
-            poll_subscription,
-        )
+        _send_from_modal(sender, recipient, live_body)
     expect(history).to_contain_text(live_body)
 
     message = history.locator(f"[data-message='{message_id}']")
@@ -418,10 +393,7 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     assert denied["status"] == 404
 
 
-# @pairs messaging:responsive-peer-selector messaging:inline-reply
-# @pairs messaging:selection-race messaging:preserve-selection
-# @pair messaging:unread-peer
-# @source src/script/views/messages.mjs::Messages
+# @matrix messaging : inline-reply preserve-selection responsive-peer-selector selection-race unread-peer
 def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     owner = get_user(Users.OWNER)
     user = get_user(_managed_definition("Mobile"), creator=owner, has_touch=True)
@@ -504,18 +476,15 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     expect(delete_modal).not_to_be_attached()
 
 
-# @pairs messaging:compose-eligibility messaging:reply-permission
-# @pairs messaging:inline-reply notifications:menu-open
-# @source lagniappe/core/tools/collaboration.py::can_initiate_messages
-# @source lagniappe/core/tools/messages.py::send_message
-# @source src/script/views/messages.mjs::Messages
+# @matrix messaging : compose-eligibility inline-reply reply-permission
+# @pair notifications:menu-open
 def test_inbound_message_allows_reply_without_compose_permission(get_user):
     owner = get_user(Users.OWNER)
     recipient = get_user(_restricted_definition("Reply Only"), creator=owner)
 
     _go_messages(owner)
     incoming = f"Inbound message {uuid4().hex}"
-    _send_from_modal(owner, recipient, incoming)
+    incoming_message = _send_from_modal(owner, recipient, incoming)
 
     home = recipient.go(SitePages.HOME)
     home.wait_for_interaction_readiness()
@@ -539,11 +508,10 @@ def test_inbound_message_allows_reply_without_compose_permission(get_user):
     expect(textarea).to_have_attribute("data-kind", "user")
     response_body = f"Reply message {uuid4().hex}"
     textarea.fill(response_body)
-    with recipient.page.expect_response(
-        lambda response: (
-            response.url.endswith("/l/messages")
-            and response.request.method == "POST"
-        )
+    with expect_successful_response(
+        recipient.page,
+        method="POST",
+        path="/l/messages",
     ) as response_info:
         reply.get_by_role("button", name="Reply", exact=True).click()
     assert response_info.value.status == 201
@@ -551,7 +519,7 @@ def test_inbound_message_allows_reply_without_compose_permission(get_user):
         response_body
     )
 
-    _go_messages(owner)
+    _go_messages(owner, incoming_message["conversation"]["id"])
     expect(owner.locate("[data-role='message-history']")).to_contain_text(
         response_body
     )

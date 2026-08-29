@@ -1,6 +1,6 @@
 from ..mixins import ColumnMixin
 from ..tools.ai import summarize_file
-from ..tools.files import get_file_text
+from ..tools.files.extract import get_file_text
 from .base_process import ProcessProperty
 from .base_property import Property
 
@@ -15,8 +15,7 @@ def _has_any(form_data, *field_names):
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_extract_process
-# @features file
-# @dimensions extract, process
+# @matrix file : extract process
 class Extract(ProcessProperty):
     """Text extraction options (OCR via Document AI).
 
@@ -33,8 +32,7 @@ class Extract(ProcessProperty):
     # @tests tests_unit/test_006_file_properties.py::test_extract_update_completes_immediately_for_text_files
     # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
     # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-    # @features file
-    # @dimensions extract, update, text-asset, process-complete, option-preservation, deferred-dispatch
+    # @matrix file : deferred-dispatch extract option-preservation process-complete text-asset update
     def update(self, data):
         if not _has_any(data, "enable-extract", "extract", "search-text"):
             return False
@@ -56,8 +54,7 @@ class Extract(ProcessProperty):
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_summarize_process
-# @features file
-# @dimensions summarize, process
+# @matrix file : process summarize
 class Summarize(ProcessProperty):
     """AI summarization options.
 
@@ -77,8 +74,7 @@ class Summarize(ProcessProperty):
     # @tests tests_unit/test_006_file_properties.py::test_summarize_update_starts_without_browser_routing_identity
     # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
     # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-    # @features file
-    # @dimensions summarize, update, option-preservation, search-opt-in, deferred-dispatch
+    # @matrix file : deferred-dispatch option-preservation search-opt-in summarize update
     def update(self, data):
         if not _has_any(data, "enable-summarize", "summarize", "search-summary"):
             return False
@@ -107,8 +103,7 @@ class Summarize(ProcessProperty):
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-# @features file deferred-jobs
-# @dimensions post-save-dispatch summary-first extraction-follow-up deferred-dispatch
+# @matrix deferred-jobs file : deferred-dispatch extraction-follow-up post-save-dispatch summary-first
 def dispatch_file_processing(file, request):
     """Start persisted file work, chaining extraction behind summarization."""
     if request.get("summarize"):
@@ -138,8 +133,7 @@ class Options(ColumnMixin, Property):
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_options
-    # @features file
-    # @dimensions options, extract, summarize
+    # @matrix file : extract options summarize
     @property
     def value(self):
         if self.is_set:

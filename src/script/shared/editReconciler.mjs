@@ -15,17 +15,9 @@ import { areEqual, withTransition } from "./utilities";
  * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_reconciles_independent_field_selections
  * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_form_submission_reconciliation_uses_latest_schema
- * @pairs edited-entity-notice:targeted-reset edited-entity-notice:reload-fallback
- * @pairs edited-entity-notice:dirty-state edited-entity-notice:active-state
- * @pairs edited-entity-notice:focused-state edited-entity-notice:comparison
- * @pairs edited-entity-notice:overlap-follow-up edited-entity-notice:coalescing
- * @pairs edited-entity-notice:renderer-capability edited-entity-notice:latest-schema
- * @pairs edited-entity-notice:schema-only edited-entity-notice:local-values
- * @pairs edited-entity-notice:submission-choice edited-entity-notice:per-field-selection
- * @pairs edited-entity-notice:whole-form-selection edited-entity-notice:clean-state
- * @pairs edited-entity-notice:transition edited-entity-notice:owned-deferred-completion
- * @pairs forms:latest-schema forms:submission-choice forms:per-field-selection
- * @pairs reconnect-refresh:dirty-form-preservation form-schema:notice
+ * @matrix edited-entity-notice : active-state clean-state coalescing comparison dirty-state focused-state latest-schema local-values mixed-submission overlap-follow-up owned-deferred-completion per-field-selection reload-fallback renderer-capability saved-default schema-only submission-choice targeted-reset transition whole-form-selection
+ * @matrix forms : latest-schema mixed-submission per-field-selection saved-default submission-choice
+ * @pairs form-schema:notice reconnect-refresh:dirty-form-preservation
  */
 export class EditReconciler {
 	constructor(

@@ -15,8 +15,7 @@ from .base_property import Property
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_category_and_form
 # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_model_project_form
-# @features form
-# @dimensions related-entities, parent, model
+# @matrix form : model parent related-entities
 class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty):
     """The form attached to an entity.
 
@@ -75,8 +74,7 @@ class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProp
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_task_history_returns_dates_submissions_and_files
-# @features ai tasks
-# @dimensions task-history context files
+# @matrix ai tasks : context files task-history
 class AttachedTask(RelatedEntityMixin, FilterMixin, AIMixin, Property):
     """A task attached to an entity (used in task history)."""
 
@@ -89,8 +87,7 @@ class AttachedTask(RelatedEntityMixin, FilterMixin, AIMixin, Property):
 
 # @testable true
 # @tests tests_unit/test_007_category_properties.py::test_category_filters_related_forms
-# @features category, filters, form
-# @dimensions entity-fields, related-forms
+# @matrix category filters form : entity-fields related-forms
 class RelatedForm(RelatedEntityMixin, FilterMixin, Property):
     """A form related to an entity (used in filter conditions).
 
@@ -125,8 +122,7 @@ class RelatedForm(RelatedEntityMixin, FilterMixin, Property):
 
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_model_project_form
-# @features task
-# @dimensions related-entities, model
+# @matrix task : model related-entities
 class AttachedModelTask(
     RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty
 ):
@@ -151,8 +147,7 @@ class AttachedModelTask(
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_project
 # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_model_project_form
-# @features project
-# @dimensions related-entities, parent, model
+# @matrix project : model parent related-entities
 class AttachedProject(
     RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty
 ):
@@ -178,8 +173,7 @@ class AttachedProject(
 
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_category_and_form
-# @features category
-# @dimensions related-entities, parent
+# @matrix category : parent related-entities
 class AttachedCategory(
     RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty
 ):
@@ -194,8 +188,7 @@ class AttachedCategory(
 
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_attached_page_details_key_uses_parent
-# @features tasks
-# @dimensions history, attached-page, parent-details
+# @matrix tasks : attached-page history parent-details
 class AttachedPage(
     RelatedEntityMixin, DetailsMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty
 ):
@@ -221,8 +214,7 @@ class AttachedPage(
 
 # @testable true
 # @tests tests_unit/test_004a_form_index.py::test_form_index_table
-# @features form-index
-# @dimensions columns
+# @pair form-index:columns
 class Categories(RelatedEntityListMixin, FilterMixin, ColumnMixin, Property):
     """Categories that an entity is associated with (for column/filter display)."""
 
@@ -248,8 +240,7 @@ class Categories(RelatedEntityListMixin, FilterMixin, ColumnMixin, Property):
 
 # @testable true
 # @tests tests_unit/test_004a_form_index.py::test_form_index_table
-# @features form-index
-# @dimensions columns
+# @pair form-index:columns
 class Projects(RelatedEntityListMixin, FilterMixin, ColumnMixin, Property):
     """Projects that an entity is associated with (for column/filter display)."""
 
@@ -318,8 +309,7 @@ class RelatedForms(RelatedEntityListMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_skips_primary_form_and_registers_relation
     # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_rejects_value_without_key
-    # @features category, form
-    # @dimensions related-forms, add, duplicate-primary, relation-registration
+    # @matrix category form : add duplicate-primary related-forms relation-registration validation
     def add(self, value):
         key = getattr(value, "key", None)
         if not key:

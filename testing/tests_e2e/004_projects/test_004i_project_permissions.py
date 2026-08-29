@@ -9,8 +9,12 @@ Verified against:
 """
 
 import pytest
+import requests
 from playwright.sync_api import expect
 
+from config import SETTINGS
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
 from testing.definitions import ModelTasks, Projects, Users
 from testing.elements import (
     Dropdown,
@@ -20,14 +24,13 @@ from testing.elements import (
     SpinnerButtons,
     Tabs,
 )
+from testing.utility.network import manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 
 
-# @features projects
-# @dimensions permission-gates
+# @pair projects:permission-gates
 def test_project_is_forbidden_without_model_permission(get_user, browser_failures):
-    """A signed-in user with no model access cannot open an existing project."""
     owner = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(owner)
 
@@ -37,10 +40,8 @@ def test_project_is_forbidden_without_model_permission(get_user, browser_failure
         expect(blocked.page).to_have_title("Error 403")
 
 
-# @features projects
-# @dimensions load readonly permission-gates
+# @matrix projects : load permission-gates readonly
 def test_project_viewer_reads_project_without_editing_controls(get_user):
-    """A model viewer reads the project but cannot change project settings or models."""
     owner = get_user(Users.OWNER)
     model_task = ModelTasks.test_create_model_task.get(owner)
     project = model_task.project
@@ -63,9 +64,6 @@ def test_project_viewer_reads_project_without_editing_controls(get_user):
     expect(description_field).to_contain_text(project.definition.description)
     expect(info_form.locator(FormElements.NAME)).not_to_be_attached()
     expect(info_form.locator(FormElements.DESCRIPTION)).not_to_be_attached()
-    # Possible product bug: the current project info template renders feature
-    # toggles and an update submitter without checking project.allowed(EDIT).
-    # The intended user story is read-only project settings for VIEW-only users.
     expect(info_form.locator("[data-role='attributes']")).not_to_be_attached()
     expect(info_form.locator(SpinnerButtons.UPDATE.value)).not_to_be_attached()
 
@@ -93,11 +91,9 @@ def test_project_viewer_reads_project_without_editing_controls(get_user):
     expect(condition).to_be_visible()
 
 
-# @features projects
-# @dimensions readonly document-tab
+# @matrix projects : document-tab readonly
 # @template projects/project.html::main
 def test_project_viewer_sees_document_tab_only_when_content_exists(get_user):
-    """Readonly viewers do not see empty document affordances, but can read saved docs."""
     owner = get_user(Users.OWNER)
     empty_project = Projects.test_readonly_document_visibility.get(owner)
     content_project = Projects.test_readonly_document_content.get(owner)
@@ -124,10 +120,8 @@ def test_project_viewer_sees_document_tab_only_when_content_exists(get_user):
     expect(document).to_contain_text(marker)
 
 
-# @features model-tasks
-# @dimensions create permission-gates
+# @matrix model-tasks : create permission-gates
 def test_project_editor_can_open_model_task_creation(get_user):
-    """A project editor sees the model-task creation path and can start a model."""
     owner = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(owner)
 
@@ -138,3 +132,48 @@ def test_project_editor_can_open_model_task_creation(get_user):
     expect(create_form).to_be_visible()
     expect(create_form.locator(FormElements.NAME)).to_be_visible()
     expect(create_form.locator("[data-role='form-select']")).to_be_visible()
+
+
+# @pair model-tasks:parent-membership
+def test_model_task_mutations_require_route_project_membership(get_user):
+    owner = get_user(Users.OWNER)
+    route_project = Projects.test_create_project_manual_mode.get(owner)
+    foreign_model = ModelTasks.test_multi_model_alpha.get(owner)
+    assert foreign_model.entity.project.key != route_project.entity.key
+
+    owner.go(route_project)
+    cookies = {
+        cookie["name"]: cookie["value"] for cookie in owner.page.context.cookies()
+    }
+    headers = manual_mutation_headers(
+        owner.page.url,
+        owner.locate("#token").input_value(),
+    )
+    original_name = foreign_model.entity.name
+    base_url = SETTINGS.test_config["BASE_URL"]
+
+    update_response = requests.put(
+        f"{base_url}/projects/{route_project.key}/update-model/{foreign_model.key}",
+        data={"name": "Forged cross-project update"},
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert update_response.status_code == 404
+    assert update_response.text == "Model task not found"
+
+    delete_response = requests.delete(
+        f"{base_url}/projects/{route_project.key}/delete-model/{foreign_model.key}",
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert delete_response.status_code == 404
+    assert delete_response.text == "Model task not found"
+
+    persisted = Entities.fetch_one(foreign_model.key, request=Fetch.direct())
+    assert persisted is not None
+    assert persisted.name == original_name
+    assert persisted.project.key == foreign_model.entity.project.key

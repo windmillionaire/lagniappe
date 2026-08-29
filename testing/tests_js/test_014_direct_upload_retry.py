@@ -133,8 +133,7 @@ const uploadElement = context.uploadElement;
     run_node(script)
 
 
-# @features direct-upload
-# @dimensions retry resumable-range
+# @matrix direct-upload : resumable-range retry
 def test_direct_upload_resumes_after_network_reset(run_node):
     run_direct_upload_check(
         run_node,
@@ -173,8 +172,7 @@ if (progressValues.join(",") !== "4,8,12") {
     )
 
 
-# @features direct-upload
-# @dimensions multipart-fallback single-file compatibility
+# @matrix direct-upload : compatibility multipart-fallback single-file
 def test_single_file_keeps_compatibility_multipart_fallback(run_node):
     run_base_upload_check(
         run_node,
@@ -201,8 +199,7 @@ if (errors.length !== 0 || instance.directUploads.length !== 0) {
     )
 
 
-# @features upload
-# @dimensions drag-drop directory-rejection
+# @matrix upload : directory-rejection drag-drop
 def test_directory_drop_is_rejected_before_file_processing(run_node):
     run_base_upload_check(
         run_node,
@@ -240,8 +237,7 @@ if (errors.length !== 1 || errors[0] !== "Only individual files are supported") 
     )
 
 
-# @features direct-upload
-# @dimensions multipart-fallback aggregate-limit partial-resume
+# @matrix direct-upload : aggregate-limit multipart-fallback partial-resume
 def test_large_multi_file_retry_preserves_completed_direct_uploads(run_node):
     run_base_upload_check(
         run_node,

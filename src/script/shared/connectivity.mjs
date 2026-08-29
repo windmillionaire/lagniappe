@@ -15,8 +15,7 @@ const DEFAULT_STATE = Object.freeze({
  *
  * @testable true
  * @tests tests_js/test_021_browser_protocol.py::test_connectivity_state_table_covers_lifecycle_transitions
- * @features connectivity
- * @dimensions startup browser-state server-health polling-recovery visibility controller
+ * @matrix connectivity : browser-state controller polling-recovery server-health startup visibility
  */
 export class ConnectivityState {
 	constructor(initial = {}) {

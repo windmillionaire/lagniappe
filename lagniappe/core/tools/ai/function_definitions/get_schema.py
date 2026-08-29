@@ -32,8 +32,7 @@ GET_SCHEMA = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_schema_returns_schema_for_form_bearing_entities
-# @features ai form-schema
-# @dimensions tool-context page task model-task form
+# @matrix ai form-schema : form model-task page task tool-context
 def execute_get_schema(args, user):
     """Return the schema for a form, page, task, or model task."""
     identifier = args.get("id")

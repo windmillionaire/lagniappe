@@ -7,17 +7,22 @@ The combobox system (`src/script/elements/combobox/`) provides typeahead, dropdo
 ```
 Combobox (base)
   ├── Dropdown                  (toolbar menus, generic dropdowns)
+  └── Submitter(Combobox)       (mixin -- adds hidden <select> + value management)
+        └── SelectBox           (form element dropdowns)
+
+RemoteQueryCombobox (extends Combobox)
   ├── SearchBox                 (global search bar)
   ├── LocationBox               (Google Places autocomplete)
-  └── Submitter(Combobox)       (mixin -- adds hidden <select> + value management)
-        ├── SelectBox           (form element dropdowns)
+  ├── editor LinkSearchBox      (internal link search)
+  └── Submitter(RemoteQueryCombobox)
         └── FacetsBox           (entity link search)
 ```
 
 `Submitter` is a mixin (higher-order class) that wraps a `Combobox` subclass
 with value selection, hidden `<select>` management, multi-select support, and
-placeholder display. `SelectBox` and `FacetsBox` use `Submitter(Combobox)`.
-`LocationBox` extends `Combobox` directly.
+placeholder display. `SelectBox` uses `Submitter(Combobox)`, while `FacetsBox`
+wraps `RemoteQueryCombobox` so it gets both selection and remote-query
+lifecycle behavior.
 
 ## Combobox Base (`combobox.mjs`)
 
@@ -34,7 +39,10 @@ handlers for keyboard, click, pointer, and intersection events.
 
 **`init()`** sets ARIA attributes (`role="combobox"`, `aria-expanded`, `aria-haspopup`), disables autocomplete and 1Password, starts the `IntersectionObserver`, and stores itself as `parent._lp_combobox`.
 
-**`destroy()`** removes all event handlers, disconnects the observer, cleans up the auto-update loop, and removes the panel from the DOM.
+**`destroy()`** permanently rejects panel mutation/opening, removes all event
+handlers and ARIA ownership, disconnects the observer, cleans up the
+auto-update loop, and removes the exact panel from the DOM. Late asynchronous
+work therefore cannot recreate a body portal after teardown.
 
 ### Handler Registration
 
@@ -61,6 +69,29 @@ reference. Title action menus use these options to anchor the panel's
 **`showPanel()`** opens the panel, starts auto-update positioning, and closes any other open combobox panels on the page.
 
 **`hidePanel()`** closes the panel, removes panel handlers, and stops auto-update.
+
+## Remote Query Lifecycle (`remote.mjs`, `shared/queryLifecycle.mjs`)
+
+`RemoteQueryCombobox` owns the exact input listener, a cancellable 200ms
+debounce, and a `QueryLifecycle`. Raw input invalidates the active epoch and
+hides mismatched rows immediately, before the debounced search begins. A panel
+cannot reopen while the latest input is waiting for its query branch to settle.
+
+`QueryLifecycle.run(key, loader, publisher)` is the common asynchronous read
+boundary. Starting work increments an epoch, optionally aborts the previous
+transport, and gives the loader an `AbortSignal`. Publication requires all of:
+
+- the component is still alive;
+- the request epoch is still current; and
+- the live input key still matches the request key.
+
+The epoch check remains authoritative because abort can arrive after a response
+has completed. Repeated keys are not special: in an A, B, A sequence, only the
+third request may publish. Hide, selection, quick-create, threshold changes,
+and destroy invalidate earlier reads. Mutation requests such as facet
+quick-create are not aborted, but their UI publication is still epoch-guarded.
+Current loader errors continue through the normal diagnostic path; only a stale
+`AbortError` is treated as expected cancellation.
 
 ### Keyboard Navigation
 
@@ -132,9 +163,11 @@ Used by the `SelectElement` form element for dropdown selects. Replaces the nati
 
 Used by the `LinkElement` for internal entity links. Searches the server index on input.
 
-**`_search(query)`** sends a GET to `/l/search-index/{index}` with the query,
-form type, and currently selected hashes (to keep them visible in results).
-Displays server-returned HTML in the panel.
+**`_search(query)`** sends a cancellable GET to `/l/search-index/{index}` with
+the query, form type, and currently selected hashes (to keep them visible in
+results). An empty query restores recent/preloaded results instead of sending
+the endpoint's empty search. Selection invalidates outstanding reads, including
+in multi-select mode.
 
 `data-permission="edit"` and `data-permission="assign"` add the corresponding
 server-side permission filter. The setting may live on either the `lp-select`
@@ -154,7 +187,11 @@ and `page`; users and model tasks are intentionally excluded.
 
 Used by the `LocationElement` for Google Places autocomplete. Ordinary authenticated page startup updates only the user's timezone and does not touch browser geolocation. `LocationBox.init()` starts the retryable, per-page location update, so the browser permission prompt appears only on a view that actually loads a location control. Clicking the control joins or retries that update as a fallback.
 
-**`_input(event)`** searches the server (`/l/search-location`) after three characters. The search awaits the shared location update before its request so the server session can bias the first Places result set.
+**`_input(event)`** searches the server (`/l/search-location`) after three
+characters. Shorter input clears stale rows. The search awaits the shared
+location update before its request so the server session can bias the first
+Places result set. A current response always retains the manual-address row,
+including when the remote request has no matches.
 
 ### SearchBox (`search.mjs`)
 
@@ -162,7 +199,9 @@ The global search bar, mounted by the observer on `[lp-search]` elements. Does *
 
 **`init()`** sets up a debounced input listener (200ms) and creates an initial panel with recent searches.
 
-**`_search(query)`** sends a GET to `/l/search-bar` with the query. Panel shows server-returned results.
+**`_search(query)`** sends a cancellable GET to `/l/search-bar` after two
+characters. Empty input restores recent results; a one-character input clears
+and hides stale results.
 
 **`selectOption(option)`** saves the selection to recent results and navigates to `option.dataset.url`.
 
@@ -170,10 +209,12 @@ The global search bar, mounted by the observer on `[lp-search]` elements. Does *
 
 ### Editor Link Search
 
-The editor `addLink` form owns a small editor-specific `Combobox` subclass. It
+The editor `addLink` form owns a small editor-specific
+`RemoteQueryCombobox` subclass. It
 queries the same `/l/search-bar` endpoint and renders the same `"search"`
 results as `SearchBox`, but selecting an option applies `option.dataset.url` to
-the current editor link instead of navigating.
+the current editor link instead of navigating. URLs and queries shorter than
+three characters clear remote rows and invalidate active reads.
 
 ### Dropdown (`dropdown.mjs`)
 
@@ -186,11 +227,13 @@ compact navigation/tools menus. It does not use `Submitter`.
 
 ## Test Boundary
 
-`testing/tests_js/test_016_combobox_frontend.py` executes the source in Node
+`testing/tests_js/test_016_combobox_frontend.py` and
+`test_046_async_query_lifecycle.py` execute the source in Node
 with small platform fakes. It covers the live-versus-explicit positioning
 reference contract, application of Floating UI results, ARIA state, keyboard
-navigation, pointer selection, and dismissal behavior. This is enough to catch
-the stale-reference regression without starting a browser.
+navigation, pointer selection, dismissal, deferred response ordering, repeated
+query keys, cancellation, and teardown. This is enough to catch stale reference
+and stale publication regressions without starting a browser.
 
 Exact viewport geometry, CSS layout, native event propagation, and rendered
 template placement still require E2E coverage because Node has no layout

@@ -7,13 +7,13 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
-from lagniappe.core.tools.deferred_jobs import deferred_job_lock_descriptors
-from lagniappe.core.tools.polling_contract import (
+from lagniappe.core.tools.deferred_jobs.locks import deferred_job_lock_descriptors
+from lagniappe.core.tools.polling.contract import (
     POLL_TYPES,
     PollContractError,
     parse_poll_request,
 )
-from lagniappe.core.tools.polling import (
+from lagniappe.core.tools.polling.projections import (
     channel_revisions as _channel_revisions,
     lock_result as _project_lock_result,
     operation_statuses as _operation_statuses,
@@ -127,18 +127,14 @@ def _document_result(descriptor, entity, client_id):
 # @testable true
 # @tests tests_e2e/001_site/test_001f_edited_entities.py::test_poll_endpoint_batches_entity_changes
 # @tests tests_e2e/001_site/test_001f_edited_entities.py::test_cold_notification_state_seeds_through_one_poll
-# @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_poll_operation_is_owner_safe
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
+# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
+# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
-# @features polling
-# @dimensions protocol entity channel operation document presence permissions authorization fingerprint identifiers unavailable owner batching progress revision timing lifecycle
-# @pairs notifications:cold-seed notifications:ping notifications:redis-projection
-# @pairs polling:personal-state polling:piggyback web-headers:notification-state
-# @pairs polling:protocol polling:operation polling:owner polling:permissions
-# @pairs polling:batching polling:progress polling:timing polling:revision
-# @pairs polling:entity polling:channel polling:fingerprint polling:authorization
-# @pair polling:validation
-# @pair polling:unavailable
-# @pair polling:identifiers
+# @matrix notifications : cold-seed ping redis-projection
+# @matrix polling : authorization batching channel entity fingerprint identifiers operation owner permissions personal-state piggyback progress protocol revision timing unavailable validation
+# @pairs notifications:deferred sync:presence web-headers:notification-state
 @internal.route("/poll", methods=["POST"])
 @logged_in
 def poll():
@@ -242,11 +238,7 @@ def poll():
     channel_revisions = _channel_revisions(
         channels,
         current_user,
-        **(
-            {"notification_state": notification_state}
-            if notification_polled
-            else {}
-        ),
+        **({"notification_state": notification_state} if notification_polled else {}),
     )
 
     results = []
@@ -313,6 +305,4 @@ def poll():
             result = _result(descriptor, "error", poll_after_ms=15_000)
         results.append(result)
 
-    return responses.json_response(
-        {"version": parsed.version, "results": results}
-    )
+    return responses.json_response({"version": parsed.version, "results": results})

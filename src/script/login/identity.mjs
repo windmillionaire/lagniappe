@@ -18,8 +18,7 @@ const ERROR_CODES = new Map([
 /**
  * @testable true
  * @tests tests_js/test_033_identity_platform.py::test_identity_platform_rest_client_contract
- * @features login
- * @dimensions identity-platform auth-errors
+ * @matrix login : auth-errors identity-platform
  */
 class IdentityPlatformError extends Error {
 	constructor(providerMessage, status = 0) {
@@ -41,8 +40,8 @@ class IdentityPlatformError extends Error {
 /**
  * @testable true
  * @tests tests_js/test_033_identity_platform.py::test_identity_platform_rest_client_contract
- * @features login
- * @dimensions identity-platform email-password action-codes browser-fetch
+ * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
+ * @matrix login : action-codes browser-fetch email-password hosted-e2e identity-platform
  */
 class IdentityPlatformClient {
 	constructor(config) {

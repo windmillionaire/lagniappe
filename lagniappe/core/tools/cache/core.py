@@ -17,8 +17,7 @@ from .keys import SEARCH_SCORE_FIELD, Keys, Search
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_runtime_redis_client_uses_shared_tls_options
-# @features cache
-# @dimensions redis-connection redis-tls
+# @matrix cache : redis-connection redis-tls
 def _create_redis_client(settings=CONFIG):
     """Create the shared runtime Redis client from application settings."""
     return redis.Redis(
@@ -46,8 +45,7 @@ def _query_context(query):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @features cache
-# @dimensions redis-connection
+# @pair cache:redis-connection
 class Cache:
     """Redis hash cache client with full-text search indexing."""
 
@@ -57,8 +55,7 @@ class Cache:
 
     # @testable true
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @features cache
-    # @dimensions redis-connection
+    # @pair cache:redis-connection
     @property
     def redis(self):
         """Return the Redis connection, initializing if needed."""
@@ -69,8 +66,7 @@ class Cache:
 
     # @testable true
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @features cache
-    # @dimensions redis-connection
+    # @pair cache:redis-connection
     def initialize(self):
         """Establish the Redis connection pool."""
         if self._redis:
@@ -81,8 +77,7 @@ class Cache:
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_search_index_indexes_empty_requires_tags
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @features cache
-    # @dimensions index-schema redis-cloud tag-syntax empty-requires search-ranking index-recreation
+    # @matrix cache : empty-requires index-recreation index-schema redis-cloud search-ranking tag-syntax
     def create_index(self):
         """Create the RediSearch full-text index if it doesn't exist."""
         try:
@@ -178,8 +173,7 @@ class Cache:
 
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_cache_search_delegates_to_redisearch_client
-    # @features search
-    # @dimensions redis-py redis-cloud parser
+    # @matrix search : parser redis-cloud redis-py
     def search(self, query):
         """Execute a RediSearch query against the primary index."""
         try:
@@ -222,8 +216,7 @@ cache = Cache()
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @features cache
-# @dimensions redis-connection
+# @pair cache:redis-connection
 class CacheJSON:
     """Redis JSON cache client for filter and relationship data."""
 
@@ -233,8 +226,7 @@ class CacheJSON:
 
     # @testable true
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @features cache
-    # @dimensions redis-connection
+    # @pair cache:redis-connection
     @property
     def redis(self):
         """Return the Redis connection, initializing if needed."""
@@ -245,8 +237,7 @@ class CacheJSON:
 
     # @testable true
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @features cache
-    # @dimensions redis-connection
+    # @pair cache:redis-connection
     def initialize(self):
         """Bind to the shared Redis connection from the hash cache."""
         self._redis = cache.redis
@@ -379,8 +370,7 @@ class CacheJSON:
 
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_json_parent_lookup_skips_empty_parent_query
-    # @features cache
-    # @dimensions parent-index redis-cloud tag-syntax empty-parent-lookup
+    # @matrix cache : empty-parent-lookup parent-index redis-cloud tag-syntax
     def get_new_parents(self, parent_hashes):
         """Return JSON key IDs for parents matching the given hashes."""
         parent_hashes = list(parent_hashes)
@@ -399,9 +389,8 @@ filter_cache = CacheJSON()
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_server_running
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
+# @matrix cache : cleanup index-recreation
 # @pair server:initialization
-# @pair cache:cleanup
-# @pair cache:index-recreation
 def initialize():
     """Initialize both cache clients and create their search indexes."""
     cache.initialize()

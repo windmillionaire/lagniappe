@@ -33,8 +33,7 @@ WEBHOOK_EVENTS = ["email.received"]
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_client_uses_full_key_for_provider_administration
-# @features ai-email
-# @dimensions setup resend-api authorization
+# @matrix ai-email setup : authorization resend-api setup
 class ResendSetupClient:
     """Bounded Resend administration adapter for the focused installer."""
 
@@ -219,8 +218,7 @@ def _open_resend_page(label, url):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_guides_full_receiving_key_creation
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt
-# @features ai-email
-# @dimensions setup resend browser instructions authorization secrets
+# @matrix ai-email resend setup : authorization browser instructions resend secrets setup
 def guide_resend_receiving_key(*, existing=False):
     """Explain the exact dashboard steps for the receiving administration key."""
     print("\nConfigure the Resend receiving administration key:")
@@ -254,8 +252,7 @@ def guide_resend_receiving_key(*, existing=False):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_explains_when_authentication_email_can_be_reused
-# @features ai-email setup resend
-# @dimensions setup resend instructions sending-domain authorization secrets reuse authentication-email
+# @matrix ai-email resend setup : authentication-email authorization instructions resend reuse secrets sending-domain setup
 def guide_resend_sending_identity(sending_domain, *, reusable_sender=None):
     """Confirm reuse of the Resend identity established by authentication email."""
     print("\nConfigure the Resend feedback-sending identity:")
@@ -287,8 +284,7 @@ def _domain_id(domain):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_reconcile_receiving_domain_creates_or_reuses_one_exact_domain
-# @features ai-email
-# @dimensions setup resend domain idempotence receiving-only
+# @matrix ai-email setup : domain idempotence receiving-only resend resend-domain setup
 def reconcile_receiving_domain(client, domain):
     """Find/create one exact receiving domain without touching unrelated domains."""
     matches = [
@@ -350,8 +346,7 @@ def _print_domain_records(domain):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_receiving_dns_guidance_prefers_cloudflare_and_keeps_manual_fallback
-# @features ai-email
-# @dimensions setup receiving-domain cloudflare-dns browser instructions manual-dns
+# @matrix ai-email setup : browser cloudflare-dns instructions manual-dns receiving-domain setup
 def guide_resend_receiving_dns(domain, *, cloudflare_default=False):
     """Guide assisted or manual DNS without dumping records unnecessarily."""
     domain_name = str(domain.get("name") or "").strip()
@@ -436,8 +431,7 @@ def _wait_for_domain(client, domain_id, *, attempts=12, sleep=time.sleep):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_reconcile_webhook_reuses_endpoint_and_disables_before_deploy
-# @features ai-email
-# @dimensions setup resend webhook idempotence disabled-first secret-retrieval
+# @matrix ai-email setup : disabled-first idempotence resend resend-webhook secret-retrieval setup webhook
 def reconcile_webhook(client, endpoint):
     """Return one exact webhook and leave it disabled for safe deployment."""
     matches = [
@@ -520,8 +514,7 @@ def _setup_config(
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_requires_custom_domain_and_supporting_services
-# @features ai-email
-# @dimensions setup prerequisites custom-domain supporting-services
+# @matrix ai-email setup : custom-domain prerequisites setup supporting-services
 def _prerequisites(settings):
     custom_domain = str(settings.get("CUSTOM_DOMAIN") or "").strip()
     auth_email = settings.get("AUTH_EMAIL_CONFIG") or {}
@@ -553,8 +546,7 @@ def _prerequisites(settings):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_disable_turns_off_provider_before_saving_and_deploying
-# @features ai-email
-# @dimensions setup disable disabled-first provider-state deploy secrets
+# @matrix ai-email setup : deploy disable disabled-first provider-state secrets setup
 def _disable(existing):
     from config import SETTINGS
     from installer import utils
@@ -589,8 +581,7 @@ def _disable(existing):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_main_install_ai_email_offer_requires_custom_domain_and_resend
-# @features setup ai-email
-# @dimensions main-install prerequisites optional deferred-activation
+# @matrix ai-email setup : deferred-activation main-install optional prerequisites
 def setup_ai_email():
     """Offer AI email during a fresh install and defer activation to its deploy."""
     from config import SETTINGS
@@ -638,8 +629,7 @@ def setup_ai_email():
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_saves_deploys_then_enables_webhook
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
-# @pair ai-email:activation
-# @pair ai-email:provider-verification
+# @matrix ai-email : activation provider-verification
 # @pair setup:main-install
 def activate_ai_email(candidate=None):
     """Enable and verify a configured webhook after its application deploy."""
@@ -681,8 +671,7 @@ def activate_ai_email(candidate=None):
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_requires_custom_domain_and_supporting_services
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_saves_deploys_then_enables_webhook
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt
-# @features ai-email
-# @dimensions setup prerequisites provider-verification deployment-guidance deploy disabled-first manual-smoke-test
+# @matrix ai-email : deploy deployment-guidance disabled-first manual-smoke-test prerequisites provider-verification setup
 def configure_ai_email(*, prepare_installation=True, deploy=True):
     """Configure production Resend receiving and optionally deploy it."""
     if prepare_installation:

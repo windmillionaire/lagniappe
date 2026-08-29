@@ -1,6 +1,6 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "b097489a"
+BUILD_ID = "b963124f"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -14,8 +14,8 @@ UNSUPPORTED_SETTING_KEYS = frozenset(
     }
 )
 DEFAULT_OCR_LOCATION = "us"
-DEFAULT_AI_MODEL = "gemini-3.5-flash"
-DEFAULT_UTILITY_AI_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_AI_MODEL = "gemini-3.7-flash"
+DEFAULT_UTILITY_AI_MODEL = "gemini-3.5-flash-lite"
 DEFAULT_AI_IMAGE_MODEL = "gemini-3.1-flash-image"
 DEFAULT_AI_LOCATION = "global"
 DEFAULT_TASK_QUEUE_NAME = "lagniappe-tasks"
@@ -29,7 +29,10 @@ DEFAULT_GOOGLE_SIGNIN_ENABLED = True
 DEFAULT_BOOTSTRAP_ADMIN_EMAIL = ""
 DEFAULT_AI_OBSERVABILITY_ENABLED = False
 DEFAULT_ERROR_MONITORING_ENABLED = False
+DEFAULT_SENTRY_TRACES_SAMPLE_RATE = 1.0
+DEFAULT_SENTRY_PROFILE_SESSION_SAMPLE_RATE = 1.0
 DEFAULT_PUBLIC_MANUAL = False
+DEFAULT_PUBLIC_PAGE_INDEXING = False
 DEFAULT_SOURCE_URL = "https://github.com/windmillionaire/lagniappe"
 DEFAULT_REDIS_TLS_ENABLED = False
 REDIS_CA_CERT_RELATIVE_PATH = "config/files/redis_ca.pem"
@@ -42,7 +45,7 @@ DEFAULT_DEPLOYMENT_SETTINGS = {
     "DEPLOY_SCALING_TYPE": "basic",
     "DEPLOY_MAX_INSTANCES": "1",
     "DEPLOY_IDLE_TIMEOUT": "15m",
-    "DEPLOY_WORKER_COUNT": "3",
+    "DEPLOY_WORKER_COUNT": "4",
     "DEPLOY_INSTANCE_CLASS": "B2",
     "DEPLOY_MIN_IDLE_INSTANCES": "1",
 }
@@ -83,6 +86,7 @@ REQUIRED_APPLICATION_SETTINGS = {
     "OCR_PROCESSOR": "Document processing",
     "OCR_PROCESSOR_ID": "Document processing",
     "PUBLIC_MANUAL": "Public manual",
+    "PUBLIC_PAGE_INDEXING": "Public pages",
     "REDIS_HOST": "Redis",
     "REDIS_PORT": "Redis",
     "REDIS_PASSWORD": "Redis",
@@ -197,6 +201,13 @@ INDEX_YAML = {
             "kind": "instances",
             "properties": [
                 {"name": "model"},
+                {"name": "modified", "direction": "desc"},
+            ],
+        },
+        {
+            "kind": "instances",
+            "properties": [
+                {"name": "categories"},
                 {"name": "modified", "direction": "desc"},
             ],
         },
@@ -453,10 +464,32 @@ INSTALLER_PROJECT_PERMISSIONS = [
     "appengine.applications.create",
     "appengine.applications.get",
     "cloudscheduler.jobs.create",
+    "cloudscheduler.jobs.enable",
     "cloudscheduler.jobs.get",
+    "cloudscheduler.jobs.pause",
     "cloudscheduler.jobs.update",
     "cloudtasks.queues.create",
     "cloudtasks.queues.get",
+    "cloudtasks.queues.pause",
+    "cloudtasks.queues.purge",
+    "cloudtasks.queues.resume",
+    "cloudtasks.tasks.fullView",
+    "cloudtasks.tasks.list",
+    "datastore.backupSchedules.create",
+    "datastore.backupSchedules.get",
+    "datastore.backupSchedules.list",
+    "datastore.backupSchedules.update",
+    "datastore.backups.get",
+    "datastore.backups.list",
+    "datastore.databases.clone",
+    "datastore.databases.create",
+    "datastore.databases.delete",
+    "datastore.databases.export",
+    "datastore.databases.getMetadata",
+    "datastore.databases.import",
+    "datastore.databases.update",
+    "datastore.operations.get",
+    "datastore.operations.list",
     "documentai.processors.create",
     "documentai.processors.get",
     "documentai.processors.list",
@@ -477,6 +510,7 @@ INSTALLER_PROJECT_PERMISSIONS = [
     "serviceusage.services.enable",
     "serviceusage.services.get",
     "serviceusage.services.list",
+    "serviceusage.services.use",
     "storage.buckets.create",
 ]
 
@@ -516,6 +550,8 @@ DEPLOYER_PROJECT_ROLES = [
 RUNTIME_PROJECT_ROLES = [
     "roles/cloudscheduler.admin",
     "roles/datastore.user",
+    "roles/datastore.backupSchedulesViewer",
+    "roles/datastore.backupsViewer",
     "roles/firebaseauth.editor",
     "roles/cloudtasks.enqueuer",
     "roles/cloudtasks.taskDeleter",
@@ -577,6 +613,7 @@ REQUIRED_GOOGLE_CLOUD_APIS = {
     "cloudtasks.googleapis.com": "Cloud Tasks API",
     "cloudscheduler.googleapis.com": "Cloud Scheduler API",
     "documentai.googleapis.com": "Cloud Document AI API",
+    "firestore.googleapis.com": "Cloud Firestore API",
     "aiplatform.googleapis.com": "AI Platform API",
     "places.googleapis.com": "Places API",
 }
@@ -646,7 +683,10 @@ APP_ROOT_ROUTE_PREFIXES = (
     "admin",
     "offline",
     "privacy-policy",
+    "public",
     "reporting_privacy",
+    "robots.txt",
+    "sitemap.xml",
 )
 
 
@@ -721,12 +761,6 @@ APP_HANDLERS = [
         "secure": "always",
         "static_files": "lagniappe/web/static/images/favicon.ico",
         "upload": "lagniappe/web/static/images/favicon\\.ico",
-    },
-    {
-        "url": "/robots.txt",
-        "static_files": "lagniappe/web/static/robots.txt",
-        "secure": "always",
-        "upload": "lagniappe/web/static/robots.txt",
     },
     {
         "url": "/images/(.*\\.(bmp|gif|jpeg|jpg|png|pdf))",

@@ -1,11 +1,20 @@
 import { Renderer } from "../../../elements/renderer";
-import { request, withTransition } from "../../../shared";
+import {
+	areEqual,
+	captureError,
+	request,
+	withTransition,
+} from "../../../shared";
 
 /**
  * @testable infrastructure
  */
 export class Header {
 	constructor(builder) {
+		this._destroyed = false;
+		this._previewGeneration = 0;
+		this._messageTimer = null;
+		this._savePromise = null;
 		this.builder = builder;
 		this.nameDisplay = document.getElementById("form-name-display");
 		this.nameInput = document.getElementById("form-name-input");
@@ -15,6 +24,10 @@ export class Header {
 		this.notification = document.getElementById("notification");
 		this.previewToggle = document.getElementById("preview-toggle");
 		this.previewPanel = document.getElementById("preview-panel");
+		this.saveButton?.setAttribute("aria-describedby", "notification");
+		this.notification?.setAttribute("role", "status");
+		this.notification?.setAttribute("aria-live", "polite");
+		this.notification?.setAttribute("aria-atomic", "true");
 
 		this.togglePreviewPanel = this.togglePreviewPanel.bind(this);
 		this.saveForm = this.saveForm.bind(this);
@@ -34,10 +47,9 @@ export class Header {
 
 	saved() {
 		if (!this.saveButton) return;
-		this.saveButton.disabled = false;
-		this.saveButton.classList.remove("opacity-50");
 		this.saveButton.dataset.saved = "true";
 		this.saveButton.dataset.kind = "saved";
+		this.clearMessage();
 	}
 
 	unsaved() {
@@ -46,21 +58,58 @@ export class Header {
 		this.saveButton.dataset.kind = "unsaved";
 	}
 
-	message(text) {
+	clearMessage() {
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		if (!this.notification) return;
+		this.notification.textContent = "";
+		this.notification.dataset.visible = "false";
+	}
+
+	message(text, { persistent = false } = {}) {
+		if (this._destroyed) return;
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
 		this.notification.textContent = text;
 		this.notification.dataset.visible = "true";
-		setTimeout(() => {
-			this.notification.dataset.visible = "false";
-		}, 3000);
+		if (!persistent) {
+			this._messageTimer = setTimeout(() => {
+				if (this._destroyed) return;
+				this.notification.dataset.visible = "false";
+			}, 3000);
+		}
+	}
+
+	get persistenceState() {
+		return {
+			schema: this.builder.schema,
+			name: this.nameHidden?.value ?? "",
+		};
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/builder/panels/header.mjs::Header.saveForm
+	 * @reason acknowledgements are only valid when the live state matches the submitted snapshot
+	 */
+	acknowledge(state) {
+		const current = this.persistenceState;
+		if (current.name === state.name && areEqual(current.schema, state.schema)) {
+			this.saved();
+			return true;
+		}
+		this.unsaved();
+		return false;
 	}
 
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
-	 * @features forms
-	 * @dimensions builder-preview
+	 * @pair forms:builder-preview
 	 */
 	async togglePreviewPanel() {
+		if (this._destroyed) return;
+		const generation = ++this._previewGeneration;
 		const active = this.previewToggle.dataset.active === "true";
 		this.previewToggle.dataset.active = active ? "false" : "true";
 		this.previewToggle.setAttribute("aria-checked", active ? "false" : "true");
@@ -75,10 +124,18 @@ export class Header {
 				submission: {},
 			});
 			await renderer.render();
+			if (this._destroyed || generation !== this._previewGeneration) {
+				renderer.destroy();
+				return;
+			}
 		}
 
 		await withTransition(
 			() => {
+				if (this._destroyed || generation !== this._previewGeneration) {
+					renderer?.destroy();
+					return;
+				}
 				if (!active) {
 					this.renderer = renderer;
 					this.builder.elt.dataset.expanded = "true";
@@ -86,7 +143,7 @@ export class Header {
 					this.builder.conditions.hide();
 					this.builder.model.hide();
 				} else {
-					this.renderer.destroy();
+					this.renderer?.destroy();
 					this.renderer = null;
 					this.builder.elt.dataset.expanded = "false";
 					this.previewPanel.dataset.visible = "false";
@@ -101,18 +158,72 @@ export class Header {
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
-	 * @features forms
-	 * @dimensions builder-save builder-reload
+	 * @tests tests_e2e/003_forms/test_003e_retryable_builder_actions.py::test_builder_save_failure_releases_control_for_retry
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
+	 * @matrix forms : builder-reload builder-save focus-recovery persistent-error retryable-action single-flight stale-acknowledgement
 	 */
-	async saveForm() {
-		if (!this.saveButton || !this.schemaForm) return;
-		this.saveButton.disabled = true;
-		this.saveButton.classList.add("opacity-50");
-		const response = await request.put(
-			this.schemaForm.dataset.route,
-			new FormData(this.schemaForm),
-		);
-		response.ok ? this.saved() : this.message(response.error);
+	saveForm() {
+		if (this._savePromise) return this._savePromise;
+		if (this._destroyed || !this.saveButton || !this.schemaForm) {
+			return Promise.resolve(false);
+		}
+
+		const button = this.saveButton;
+		const hadFocus = document.activeElement === button;
+		const state = this.persistenceState;
+		this.unsaved();
+		this.clearMessage();
+		button.disabled = true;
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+		button.classList.add("opacity-50");
+
+		const pending = (async () => {
+			try {
+				const response = await request.put(
+					this.schemaForm.dataset.route,
+					new FormData(this.schemaForm),
+					{ replaceErrorPage: false },
+				);
+				if (this._destroyed) return false;
+				if (response?.ok === true) {
+					this.acknowledge(state);
+					return true;
+				}
+				this.message(
+					response?.error || "Could not save this form. Try again.",
+					{ persistent: true },
+				);
+				return false;
+			} catch (error) {
+				captureError(error, button, { context: "builder-save" });
+				this.message("Could not save this form. Try again.", {
+					persistent: true,
+				});
+				return false;
+			} finally {
+				if (!this._destroyed && button.isConnected !== false) {
+					button.disabled = false;
+					button.setAttribute("aria-disabled", "false");
+					button.removeAttribute("aria-busy");
+					button.classList.remove("opacity-50");
+					if (
+						hadFocus &&
+						(!document.activeElement ||
+							document.activeElement === document.body ||
+							document.activeElement === button)
+					) {
+						button.focus({ preventScroll: true });
+					}
+				}
+			}
+		})();
+		this._savePromise = pending;
+		const clearPending = () => {
+			if (this._savePromise === pending) this._savePromise = null;
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
 	}
 
 	editFormName() {
@@ -125,8 +236,7 @@ export class Header {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
-	 * @pairs forms:builder-form-name entity-menu:title-menu
-	 * @pairs frontend-icons:material-icon-preservation
+	 * @pairs entity-menu:title-menu forms:builder-form-name frontend-icons:material-icon-preservation
 	 */
 	_nameBlur() {
 		const newName = this.nameInput.value.trim();
@@ -150,6 +260,13 @@ export class Header {
 	}
 
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this._previewGeneration += 1;
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		this.nameInput.removeEventListener("blur", this._nameBlur);
+		this.nameInput.removeEventListener("keydown", this._nameKeyDown);
 		this.renderer?.destroy();
 		this.renderer = null;
 	}

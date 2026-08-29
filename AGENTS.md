@@ -21,6 +21,12 @@ These instructions apply to the whole repository unless a more specific
   - `venv/bin/python run.py test setup`
   - `venv/bin/python run.py traceability`
   - `venv/bin/python run.py template-contracts`
+- The repo runner expects the user's gcloud and Application Default
+  Credentials context to be aligned before cloud-aware tests run. If the
+  runner reports an authentication or project mismatch, ask the user for
+  permission before running `venv/bin/python run.py auth`; do not run that
+  interactive, credential-changing command on standing authority or bypass the
+  repo runner with a different test command.
 - Use the shared pytest config at `testing/pytest.ini`.
 - E2E targets automatically enable strict unloaded-relation checks. For other
   suites, use the repo runner flag: `venv/bin/python run.py test --strict
@@ -30,9 +36,14 @@ These instructions apply to the whole repository unless a more specific
   `venv/bin/python run.py test testing/tests_e2e/.../test_file.py::test_name`;
   do not use legacy numeric/domain shorthand like `003b`, `003b::test_name`,
   or `home`.
+- Do not combine a suite alias with an explicit path or nodeid in one command;
+  the runner rejects that selection as ambiguous. Use the path/nodeid alone for
+  focused checks.
 - Keep long or risky test runs cancellable: prefer focused real nodeids or one
-  file at a time, expand only after probes pass, and avoid starting broad
-  E2E/full suite runs unless the user explicitly asks for them.
+  file at a time for early feedback, then expand when the affected scope makes
+  a broader run useful. Broad runs are allowed, and a task may also hand off
+  affected tests for the release-wide validation run instead of rerunning
+  everything locally; clearly state what was and was not validated.
 - Do not run E2E pytest, `test-server`, or `browser-review` sessions in
   parallel against the managed testing server. The first session to finish will
   run teardown and clear shared test data/server state out from under the

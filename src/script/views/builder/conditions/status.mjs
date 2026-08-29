@@ -4,8 +4,7 @@ import { ConditionTarget } from "./base";
 /**
  * @testable true
  * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_status_message_condition_editor
- * @features forms
- * @dimensions builder-status-message
+ * @pair forms:builder-status-message
  */
 export default class Status extends ConditionTarget {
 	constructor(builder) {

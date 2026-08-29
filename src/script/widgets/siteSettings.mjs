@@ -1,10 +1,12 @@
 import { withTransition } from "../shared";
+import { SitePublicPages } from "./siteSettings/publicPages";
 
 const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";
 const DEFAULT_SECTION = "maintenance";
 const SETTING_WIDGETS = {
 	maintenance: "SiteMaintenance",
 	administrators: "SiteAdministrators",
+	"installation-access": "SiteInstallationAccess",
 	deployment: "SiteDeployment",
 	"ai-models": "SiteAiModels",
 	"service-providers": "SiteServiceProviders",
@@ -17,9 +19,10 @@ const SETTING_WIDGETS = {
  *
  * @testable true
  * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+ * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
  * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_coordinates_section_widgets
- * @features admin
- * @dimensions site-settings sections composite-widgets persistence
+ * @matrix admin : composite-widgets persistence sections site-settings
+ * @matrix public-pages : live-settings
  */
 export class SiteSettings {
 	constructor(attributes) {
@@ -60,6 +63,14 @@ export class SiteSettings {
 				if (widget) this.settingWidgets.set(section, widget);
 			}),
 		);
+		const target = this.sections
+			.get("public-pages")
+			?.querySelector("[data-widget='SitePublicPages']");
+		if (target) {
+			const widget = new SitePublicPages({ target, kind: "page" });
+			await widget.init();
+			this.settingWidgets.set("public-pages", widget);
+		}
 	}
 
 	updated(response) {
@@ -136,5 +147,6 @@ export class SiteSettings {
 
 	destroy() {
 		this.target.removeEventListener("click", this._click);
+		this.settingWidgets.get("public-pages")?.destroy?.();
 	}
 }

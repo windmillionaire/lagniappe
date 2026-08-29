@@ -42,8 +42,7 @@ class TableColumnFields(Enum):
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_table_fields
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_merges_table_column_labels
-    # @features form-table
-    # @dimensions table-fields, search-value
+    # @matrix form-table : search-value table-fields
     @classmethod
     def create_field(cls, definition, table):
         """Create a field instance from a column definition dict."""
@@ -62,8 +61,7 @@ class TableColumnFields(Enum):
 
     # @testable true
     # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_table_filters_bad_columns
-    # @features form-schema, form-table
-    # @dimensions validation, columns
+    # @matrix form-schema form-table : columns validation
     @classmethod
     def validate_type(cls, definition):
         if not isinstance(definition, dict):
@@ -120,8 +118,7 @@ class RowSubmission(SubmissionProperty):
     # @tests tests_unit/test_003e_tables.py::test_table_import_single_row
     # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
     # @tests tests_unit/test_003e_tables.py::test_table_import_mixed_column_types
-    # @features form-table
-    # @dimensions import
+    # @pair form-table:import
     @classmethod
     def validate_import(cls, table, list_of_values, import_process=None):
         row = cls(table)
@@ -137,8 +134,7 @@ class RowSubmission(SubmissionProperty):
 
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
-    # @features form-table
-    # @dimensions ai-value, multiple-rows
+    # @matrix form-table : ai-value multiple-rows
     @classmethod
     def validate_ai(cls, table, values):
         row = cls(table)
@@ -151,8 +147,7 @@ class RowSubmission(SubmissionProperty):
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_external_link_column
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_internal_link_column
-    # @features form-table
-    # @dimensions row-submission
+    # @matrix form-table link : row-submission
     @classmethod
     def validate_submission(cls, table, values):
         row = cls(table)

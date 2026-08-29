@@ -73,8 +73,7 @@ export class ModelPanel {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_drag_component
-	 * @features forms
-	 * @dimensions builder-drag-component
+	 * @pair forms:builder-drag-component
 	 */
 	_addElement(event) {
 		const item = this.builder.createElement({
@@ -89,8 +88,7 @@ export class ModelPanel {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_drag_component
-	 * @features forms
-	 * @dimensions builder-drag-component
+	 * @pair forms:builder-drag-component
 	 */
 	_moveElement() {
 		this.builder.updateSchemaOrder();
@@ -122,8 +120,7 @@ export class ModelPanel {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
-	 * @features forms signature
-	 * @dimensions unique-component
+	 * @matrix forms signature : unique-component
 	 */
 	hasUniqueElement(type) {
 		return (
@@ -152,7 +149,8 @@ export class ModelPanel {
 	}
 
 	destroy() {
-		this.sortable.destroy();
+		this.sortable?.destroy();
+		this.sortable = null;
 	}
 }
 
@@ -171,8 +169,7 @@ const _model = (schema) => {
 /**
  * @testable true
  * @tests tests_js/test_019_form_sync_frontend.py::test_builder_model_defaults_are_presentation_only
- * @features forms form-schema
- * @dimensions builder presentation-defaults immutable-schema
+ * @matrix form-schema forms : builder immutable-schema presentation-defaults
  */
 const _presentation = (schema) => {
 	const defaults = CONFIG.PRESENTATION_DEFAULTS[schema.type] || {};
@@ -369,8 +366,7 @@ const radio = (schema) => {
 /**
  * @testable true
  * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
- * @features forms signature
- * @dimensions builder-signature-field builder-preview
+ * @matrix forms signature : builder-preview builder-signature-field
  */
 const signature = (schema) => {
 	const element = _model(schema);

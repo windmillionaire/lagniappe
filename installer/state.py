@@ -119,8 +119,7 @@ def _pid_running(pid):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @features setup
-# @dimensions process-lock
+# @pair setup:process-lock
 class SetupProcessLock:
     """Cross-platform single-process lock based on atomic file creation."""
 
@@ -187,8 +186,7 @@ class SetupProcessLock:
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @features setup
-# @dimensions operation-journal recovery
+# @matrix setup : operation-journal recovery
 class OperationJournal:
     """Persist the last safe setup boundary without settings or credentials."""
 
@@ -234,8 +232,7 @@ class OperationJournal:
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @features setup
-# @dimensions operation-journal
+# @pair setup:operation-journal
 def record_step(name):
     if _ACTIVE_JOURNAL is not None:
         _ACTIVE_JOURNAL.step(name)
@@ -243,8 +240,7 @@ def record_step(name):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @features setup
-# @dimensions operation-journal recovery
+# @matrix setup : operation-journal recovery
 def record_mutation(step, *, action, resource, identifier, details=None):
     if _ACTIVE_JOURNAL is not None:
         _ACTIVE_JOURNAL.mutation(
@@ -304,8 +300,7 @@ def _print_recovery(journal, prefix):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @features setup
-# @dimensions process-lock operation-journal recovery
+# @matrix setup : operation-journal process-lock recovery
 @contextmanager
 def setup_operation(mode, argv, *, lock_path=None, journal_path=None):
     """Lock setup and report a secret-free exact resume command on failure."""

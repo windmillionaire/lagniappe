@@ -152,8 +152,7 @@ def _definition(sequence, migration_id, runner, *, version="1.0", legacy=()):
     )
 
 
-# @features database-migrations setup
-# @dimensions fresh-install detection reserved-seeding
+# @matrix database-migrations setup : detection fresh-install reserved-seeding
 def test_database_initialize_only_marks_new_content_stores_as_fresh(monkeypatch):
     scenario = {"reserved": False, "content_kind": None}
     initialized = []
@@ -205,8 +204,7 @@ def test_database_initialize_only_marks_new_content_stores_as_fresh(monkeypatch)
     assert initialized == [True, True, True]
 
 
-# @features database migrations
-# @dimensions raw-scan copy-on-write chunks failures inactive-rows heartbeat
+# @matrix database migrations : chunks copy-on-write failures heartbeat inactive-rows raw-scan
 def test_scan_kind_is_copy_on_write_chunked_and_failure_isolated():
     rows = [
         _entity(
@@ -264,8 +262,7 @@ def test_scan_kind_is_copy_on_write_chunked_and_failure_isolated():
     assert len(heartbeats) == 3
 
 
-# @features admin database-migrations
-# @dimensions catalog no-op
+# @matrix admin database-migrations : catalog no-op
 def test_no_registered_migrations_is_a_noop_success():
     datastore = _Datastore()
 
@@ -292,8 +289,7 @@ def test_no_registered_migrations_is_a_noop_success():
     assert datastore.records == {}
 
 
-# @pairs form-schema:canonicalization form-schema:idempotence
-# @pair form-schema:history-snapshot
+# @matrix form-schema : canonicalization history-snapshot idempotence
 def test_form_schema_transform_is_idempotent_and_preserves_history_membership():
     form = _entity(
         migrations.KINDS.models.value,
@@ -322,7 +318,7 @@ def test_form_schema_transform_is_idempotent_and_preserves_history_membership():
     assert migrations.canonicalize_form_schema_record(history, snapshot=True) is False
 
 
-# @pairs form-schema:legacy-repair form-schema:copy-on-write
+# @matrix form-schema : copy-on-write legacy-repair
 def test_form_schema_transform_repairs_invalid_legacy_fields():
     row = _entity(
         migrations.KINDS.models.value,
@@ -355,7 +351,7 @@ def test_form_schema_transform_repairs_invalid_legacy_fields():
     ]
 
 
-# @pairs form-schema:malformed-data form-schema:copy-on-write
+# @matrix form-schema : copy-on-write malformed-data
 def test_form_schema_transform_rejects_unreadable_rows_without_mutation():
     row = _entity(
         migrations.KINDS.models.value,
@@ -370,8 +366,64 @@ def test_form_schema_transform_rejects_unreadable_rows_without_mutation():
     assert dict(row) == before
 
 
-# @pairs migrations:runner migrations:audit
-# @pairs form-schema:canonicalization form-schema:history-snapshot
+# @pairs disaster-recovery:asset-generation migrations:runner
+def test_asset_generation_migration_backfills_legacy_descriptors(monkeypatch):
+    page = _entity(
+        migrations.KINDS.instances.value,
+        "page-1",
+        {
+            "type": "page",
+            "assets": json.dumps(
+                {
+                    "document": {
+                        "type": "html",
+                        "path": "page-1_document.html",
+                    }
+                }
+            ),
+        },
+    )
+    site_image = _entity(
+        migrations.KINDS.site.value,
+        "image",
+        {"logo.png": "logo.png", "version": 2},
+    )
+    datastore = _Datastore([page, site_image])
+
+    class Blob:
+        generation = 41
+
+        def reload(self):
+            return None
+
+    bucket = SimpleNamespace(blob=lambda _path: Blob())
+    monkeypatch.setattr(
+        migrations,
+        "DATA",
+        SimpleNamespace(
+            bucket=lambda visibility: bucket,
+            public_bucket=bucket,
+        ),
+    )
+    result = migrations._run_asset_generation_migration(
+        migrations.MigrationContext(
+            datastore.query_factory,
+            datastore.write,
+            datastore,
+        )
+    )
+
+    assert result["changed"] == 2
+    assert json.loads(datastore.rows[page.key]["assets"])["document"][
+        "generation"
+    ] == "41"
+    assert datastore.rows[site_image.key]["asset_generations"] == {
+        "logo.png": "41"
+    }
+
+
+# @matrix form-schema : canonicalization history-snapshot
+# @matrix migrations : audit runner
 def test_registered_form_schema_migration_scans_forms_and_history():
     rows = [
         _entity(
@@ -449,7 +501,7 @@ def test_registered_form_schema_migration_scans_forms_and_history():
     ]
 
 
-# @pairs migrations:audit form-schema:malformed-data
+# @pairs form-schema:malformed-data migrations:audit
 def test_form_schema_migration_links_unreadable_row_failure_to_form():
     row = _entity(
         migrations.KINDS.models.value,
@@ -478,8 +530,7 @@ def test_form_schema_migration_links_unreadable_row_failure_to_form():
     ]
 
 
-# @features admin database-migrations
-# @dimensions catalog identity order version runner
+# @matrix admin database-migrations : catalog identity order runner version
 def test_catalog_rejects_identity_and_order_errors():
     def runner(_context):
         return {}
@@ -504,8 +555,7 @@ def test_catalog_rejects_identity_and_order_errors():
         )
 
 
-# @features admin database-migrations
-# @dimensions ordered-run checkpoint failure resume idempotence
+# @matrix admin database-migrations : checkpoint failure idempotence ordered-run resume
 def test_ordered_runner_checkpoints_completion_and_resumes_after_failure():
     datastore = _Datastore()
     clock = _Clock()
@@ -556,8 +606,7 @@ def test_ordered_runner_checkpoints_completion_and_resumes_after_failure():
     assert [len(item["attempts"]) for item in second["migrations"]] == [1, 2, 1]
 
 
-# @features admin database-migrations
-# @dimensions catalog persistence build-history sticky-completion failure-order
+# @matrix admin database-migrations : build-history catalog failure-order persistence release-metadata sticky-completion
 def test_status_reads_completed_migrations_across_builds_and_blocks_after_failure(monkeypatch):
     datastore = _Datastore()
     clock = _Clock()
@@ -580,22 +629,27 @@ def test_status_reads_completed_migrations_across_builds_and_blocks_after_failur
 
     monkeypatch.setattr(migrations.CONFIG, "VERSION", "2.0")
     monkeypatch.setattr(migrations.CONFIG, "BUILD_ID", "build-new")
+    revised_definition = _definition(1, "PINNED", runner, version="2.0")
     status = migrations.get_migration_status(
         datastore=datastore,
-        catalog=(definition,),
+        catalog=(revised_definition,),
         now=clock,
     )
 
     assert status["status"] == "current"
     assert status["current_version"] == "2.0"
+    assert status["migrations"][0]["introduced_in"] == "2.0"
     assert status["migrations"][0]["completed_version"] == "1.5"
     assert status["migrations"][0]["completed_build_id"] == "build-old"
-    migrations.run_data_migrations(datastore=datastore, catalog=(definition,), now=clock)
+    migrations.run_data_migrations(
+        datastore=datastore,
+        catalog=(revised_definition,),
+        now=clock,
+    )
     assert len(calls) == 1
 
 
-# @features admin database-migrations
-# @dimensions lease lost-lease concurrency stale-recovery interrupted-attempt
+# @matrix admin database-migrations : concurrency interrupted-attempt lease lost-lease stale-recovery
 def test_runner_rejects_concurrent_lease_and_recovers_interrupted_attempt():
     datastore = _Datastore()
     clock = _Clock()
@@ -607,7 +661,10 @@ def test_runner_rejects_concurrent_lease_and_recovers_interrupted_attempt():
         return _result(definition, changed=1)
 
     definition = _definition(1, "LEASED", runner)
-    status_key = datastore.key("site", "data-migration:LEASED")
+    status_key = datastore.key(
+        migrations.KINDS.site.value,
+        "data-migration:LEASED",
+    )
     status_record = datastore.entity(key=status_key, exclude_from_indexes=("attempts",))
     status_record.update(
         {
@@ -625,7 +682,9 @@ def test_runner_rejects_concurrent_lease_and_recovers_interrupted_attempt():
         }
     )
     datastore.put(status_record)
-    control = datastore.entity(key=datastore.key("site", "data-migrations-control"))
+    control = datastore.entity(
+        key=datastore.key(migrations.KINDS.site.value, "data-migrations-control")
+    )
     control.update(
         {
             "run_id": "old-run",
@@ -673,12 +732,11 @@ def test_runner_rejects_concurrent_lease_and_recovers_interrupted_attempt():
     assert lost["migrations"][0]["state"] == "interrupted"
 
 
-# @features admin database-migrations
-# @dimensions legacy-audit read-through normalization
+# @matrix admin database-migrations : legacy-audit normalization read-through
 def test_legacy_audit_projects_as_completed():
     datastore = _Datastore()
     clock = _Clock()
-    legacy_key = datastore.key("site", "legacy-set")
+    legacy_key = datastore.key(migrations.KINDS.site.value, "legacy-set")
     legacy = datastore.entity(key=legacy_key, exclude_from_indexes=("runs",))
     legacy["runs"] = json.dumps(
         [
@@ -736,17 +794,18 @@ def test_legacy_audit_projects_as_completed():
     )
     assert completed["status"] == "current"
     assert calls == ["new"]
-    assert datastore.get(datastore.key("site", "data-migration:LEGACY"))[
+    assert datastore.get(
+        datastore.key(migrations.KINDS.site.value, "data-migration:LEGACY")
+    )[
         "completion_source"
     ] == "legacy-audit"
 
 
-# @features admin database-migrations
-# @dimensions audit invalid-storage identity
+# @matrix admin database-migrations : audit identity invalid-storage
 def test_migration_status_rejects_malformed_ledger():
     datastore = _Datastore()
     definition = _definition(1, "BROKEN", lambda _context: None)
-    key = datastore.key("site", "data-migration:BROKEN")
+    key = datastore.key(migrations.KINDS.site.value, "data-migration:BROKEN")
     record = datastore.entity(key=key, exclude_from_indexes=("attempts",))
     record.update(
         {
@@ -771,8 +830,7 @@ def test_migration_status_rejects_malformed_ledger():
     assert "sequence" in status["migrations"][0]["audit_error"]
 
 
-# @features database-migrations setup
-# @dimensions fresh-install baseline idempotence
+# @matrix database-migrations setup : baseline fresh-install idempotence
 def test_fresh_install_baselines_catalog_without_running_steps():
     datastore = _Datastore()
     calls = []
@@ -814,8 +872,7 @@ def test_fresh_install_baselines_catalog_without_running_steps():
     assert calls == []
 
 
-# @features database-migrations setup
-# @dimensions fresh-install transaction-contention retry
+# @matrix database-migrations setup : fresh-install retry transaction-contention
 def test_fresh_install_retries_transaction_contention(monkeypatch):
     datastore = _ContendedDatastore(aborted_attempts=2)
     definition = _definition(1, "BASELINE", lambda _context: None)
@@ -838,8 +895,7 @@ def test_fresh_install_retries_transaction_contention(monkeypatch):
     )["status"] == "current"
 
 
-# @features admin database-migrations
-# @dimensions bounded-history retries
+# @matrix admin database-migrations : bounded-history retries
 def test_attempt_history_retains_only_the_latest_five_runs():
     datastore = _Datastore()
     clock = _Clock()

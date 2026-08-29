@@ -46,13 +46,13 @@ from testing.elements import (
     Tabs,
     SpinnerButtons,
 )
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
+from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
 
 pytestmark = pytest.mark.e2e
 
 
-# @features projects
-# @dimensions manual-form ai-form create-help
+# @matrix projects : ai-form create-help manual-form
 # @template home/projects.html::create
 def test_create_project_form(get_user):
     """
@@ -107,8 +107,7 @@ def test_create_project_form(get_user):
     expect(form).not_to_be_visible()
 
 
-# @features projects
-# @dimensions create-manual navigate search
+# @matrix projects : create-manual navigate search
 # @template home/projects.html::create
 def test_create_project_manual_mode(get_user):
     """
@@ -131,8 +130,7 @@ def test_create_project_manual_mode(get_user):
     expect(user.page).to_have_title(re.compile(project.definition.name))
 
 
-# @features projects
-# @dimensions ai-form ai-create explain-button ai-generated
+# @matrix projects : ai-create ai-form ai-generated explain-button
 # @template home/projects.html::create
 # @template home/projects.html::project
 @pytest.mark.ai
@@ -141,8 +139,7 @@ def test_create_project_ai_mode(get_user, results):
     Verify project creation in AI mode.
 
     Uses AI to generate project name and description from a prompt.
-    The provider-backed create request gets the same 90-second budget as the
-    other live AI generation stories.
+    The provider-backed create request gets the complete configured retry budget.
     """
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -155,14 +152,23 @@ def test_create_project_ai_mode(get_user, results):
         project.definition.description_for_ai
     )
 
-    Modal(user.page).open(create_form.locator(Buttons.EXPLAIN)).close()
+    modal = Modal(user.page)
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/projects/create",
+        timeout=15000,
+    ):
+        create_form.locator(Buttons.EXPLAIN).click()
+    expect(modal.element).to_be_visible(timeout=15000)
+    modal.close()
     expect(create_form).to_be_visible()
 
     with expect_successful_response(
         user.page,
         method="POST",
         path="/projects/create",
-        timeout=90000,
+        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS,
     ) as response_info:
         SpinnerButtons.CREATE.click(create_form)
 
@@ -175,8 +181,7 @@ def test_create_project_ai_mode(get_user, results):
     results.record("project", project.entity.db)
 
 
-# @features projects
-# @dimensions delete title-menu
+# @pair projects:delete
 # @template projects/project.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
@@ -194,8 +199,7 @@ def test_delete_project(get_user):
     expect(user.page).to_have_url(re.compile(r"/$"))
 
 
-# @features projects
-# @dimensions attribute-model-tasks
+# @pair projects:attribute-model-tasks
 # @template home/projects.html::create
 def test_create_project_without_tasks(get_user):
     """
@@ -217,8 +221,7 @@ def test_create_project_without_tasks(get_user):
     expect(model_card).to_be_hidden()
 
 
-# @features projects
-# @dimensions attribute-document
+# @pair projects:attribute-document
 # @template home/projects.html::create
 def test_create_project_without_document(get_user):
     """

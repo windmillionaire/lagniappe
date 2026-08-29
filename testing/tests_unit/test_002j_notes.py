@@ -11,6 +11,7 @@ from lagniappe.core.entities import entity as entity_module
 from lagniappe.core.mutations.delete import DeleteCollector
 from lagniappe.core.mutations import plan_mutation
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import notifications as notification_database
 from testing.utility.test_entities import TestEntities
 
 
@@ -44,15 +45,13 @@ def _note(parent, author, *, visibility="private", scope="home", body="Note"):
     return note
 
 
-# @features notes
-# @dimensions create body photo parent visibility scope
-# @source lagniappe/core/entities/note.py::Note.create
+# @matrix notes : body create parent photo scope visibility
 def test_note_create_persists_body_photo_visibility_and_scope(monkeypatch):
     author = _user("Author", "note-create-author")
     photo = SimpleNamespace(filename="note.jpg")
 
     monkeypatch.setattr(
-        entity_module.database,
+        entity_module.database_utility,
         "create_key",
         lambda kind, parent=None: f"created-{kind}",
     )
@@ -85,10 +84,7 @@ def test_note_create_persists_body_photo_visibility_and_scope(monkeypatch):
     assert note.photo == {"filename": "note.jpg", "name": "photo", "type": "image"}
 
 
-# @features notes
-# @dimensions visibility scope persistence validation
-# @source lagniappe/core/properties/activity.py::Visibility
-# @source lagniappe/core/properties/activity.py::Scope
+# @matrix notes : persistence scope validation visibility
 def test_note_visibility_and_scope_validate_values():
     author = _user("Author", "note-values-author")
     note = _note(author, author)
@@ -107,9 +103,7 @@ def test_note_visibility_and_scope_validate_values():
         note.scope = "category"
 
 
-# @features notes permissions
-# @dimensions private shared home page creator owner
-# @source lagniappe/core/entities/note.py::Note.allowed
+# @matrix notes permissions : creator home owner page private shared
 def test_note_permissions_follow_visibility_scope_and_authorship():
     author = _user("Author", "note-permission-author")
     viewer = _user("Viewer", "note-permission-viewer")
@@ -193,9 +187,7 @@ class _ActivityFilter:
         return self
 
 
-# @features activity
-# @dimensions query ancestor type-order
-# @source lagniappe/core/tools/database/get.py::activity
+# @matrix activity : ancestor query type-order
 def test_activity_query_filters_requested_types(monkeypatch):
     query = _ActivityQuery([_RawActivity("notification", type="notification")])
     activity_filter = _ActivityFilter()
@@ -215,8 +207,7 @@ def test_activity_query_filters_requested_types(monkeypatch):
     assert activity_filter.calls == [("eq", "type", "notification")]
 
 
-# @pairs notifications:bounded-page notifications:ordinary-discriminator notifications:cursor
-# @source lagniappe/core/tools/database/get.py::notifications_page
+# @matrix notifications : bounded-page cursor ordinary-discriminator
 def test_notification_page_is_bounded_and_excludes_aggregate_rows(monkeypatch):
     class PageResult(list):
         next_cursor = "next-cursor"
@@ -227,11 +218,15 @@ def test_notification_page_is_bounded_and_excludes_aggregate_rows(monkeypatch):
 
     query = PageQuery([_RawActivity(f"notification-{index}") for index in range(30)])
     activity_filter = _ActivityFilter()
-    monkeypatch.setattr(database_get, "datastore_key", lambda _parent: "parent-key")
-    monkeypatch.setattr(database_get, "Filter", lambda: activity_filter)
-    monkeypatch.setattr(database_get, "Query", lambda _kind: query)
+    monkeypatch.setattr(
+        notification_database, "datastore_key", lambda _parent: "parent-key"
+    )
+    monkeypatch.setattr(notification_database, "Filter", lambda: activity_filter)
+    monkeypatch.setattr(notification_database, "Query", lambda _kind: query)
 
-    result = database_get.notifications_page(object(), "cursor-a", limit=25)
+    result = notification_database.notifications_page(
+        object(), "cursor-a", limit=25
+    )
 
     assert len(result) == 25
     assert result.next_cursor == "next-cursor"
@@ -245,8 +240,7 @@ def test_notification_page_is_bounded_and_excludes_aggregate_rows(monkeypatch):
     ]
 
 
-# @pairs notifications:cold-seed notifications:keys-only
-# @source lagniappe/core/tools/database/get.py::notification_keys
+# @matrix notifications : cold-seed keys-only
 def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
     query = _ActivityQuery(
         [
@@ -255,11 +249,13 @@ def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
         ]
     )
     activity_filter = _ActivityFilter()
-    monkeypatch.setattr(database_get, "datastore_key", lambda _parent: "parent-key")
-    monkeypatch.setattr(database_get, "Filter", lambda: activity_filter)
-    monkeypatch.setattr(database_get, "Query", lambda _kind: query)
+    monkeypatch.setattr(
+        notification_database, "datastore_key", lambda _parent: "parent-key"
+    )
+    monkeypatch.setattr(notification_database, "Filter", lambda: activity_filter)
+    monkeypatch.setattr(notification_database, "Query", lambda _kind: query)
 
-    results = database_get.notification_keys(object())
+    results = notification_database.notification_keys(object())
 
     assert results == ["notification-one", "notification-two"]
     assert query.ancestor_key == "parent-key"
@@ -270,9 +266,7 @@ def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
     ]
 
 
-# @features notes permissions
-# @dimensions home shared private owner ordering
-# @source lagniappe/core/tools/database/get.py::home_notes
+# @matrix notes permissions : home ordering owner private shared
 def test_home_notes_return_only_visible_notes(monkeypatch):
     now = datetime.now(timezone.utc)
     public = _RawActivity(
@@ -314,9 +308,7 @@ def test_home_notes_return_only_visible_notes(monkeypatch):
     ]
 
 
-# @features notes mutations
-# @dimensions delete owner-invalidation page-cascade user-cascade
-# @source lagniappe/core/mutations/delete.py::DeleteCollector.note
+# @matrix mutations notes : delete owner-invalidation page-cascade user-cascade
 def test_note_delete_repairs_owners_and_parent_cascades(monkeypatch):
     author = _user("Author", "note-delete-author")
     page = TestEntities.get("PAGE", {"name": "Delete Notes", "hash": "delete-notes"})

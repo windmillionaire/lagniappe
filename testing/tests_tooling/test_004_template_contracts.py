@@ -270,6 +270,70 @@ def test_create_thing():
     assert template_macro_report.summary["template_references"] == 1
 
 
+def test_changed_contract_scope_selects_only_related_templates_and_frontend(
+    tmp_path,
+):
+    write_file(
+        tmp_path / "lagniappe/web/templates/alpha.html",
+        """
+{% macro panel() %}
+  <section data-role="alpha"></section>
+{% endmacro %}
+""",
+    )
+    write_file(
+        tmp_path / "lagniappe/web/templates/beta.html",
+        """
+{% macro panel() %}
+  <section data-role="beta"></section>
+{% endmacro %}
+""",
+    )
+    write_file(
+        tmp_path / "src/script/alpha.mjs",
+        """document.querySelector("[data-role='alpha']");""",
+    )
+    write_file(
+        tmp_path / "src/script/beta.mjs",
+        """document.querySelector("[data-role='beta']");""",
+    )
+    write_file(
+        tmp_path / "testing/tests_e2e/test_contracts.py",
+        """
+# @template alpha.html::panel
+def test_alpha():
+    pass
+
+
+# @template beta.html::panel
+def test_beta():
+    pass
+""",
+    )
+
+    template_report = template_contracts.build_report(
+        tmp_path,
+        changed_paths=["lagniappe/web/templates/alpha.html"],
+    )
+    frontend_report = template_contracts.build_report(
+        tmp_path,
+        changed_paths=["src/script/alpha.mjs"],
+    )
+
+    assert [entry.reference.nodeid for entry in template_report.entries] == [
+        "tests_e2e/test_contracts.py::test_alpha"
+    ]
+    assert [entry.reference.nodeid for entry in frontend_report.entries] == [
+        "tests_e2e/test_contracts.py::test_alpha"
+    ]
+    assert template_report.summary["template_references"] == 1
+    assert template_report.summary["tests"] == 1
+    assert template_report.summary["template_partials"] == 1
+    assert frontend_report.summary["template_references"] == 1
+    assert frontend_report.summary["tests"] == 1
+    assert frontend_report.summary["template_partials"] == 1
+
+
 def test_template_contract_groups_multiple_tests_for_one_partial(tmp_path):
     write_file(
         tmp_path / "lagniappe/web/templates/home/panel.html",

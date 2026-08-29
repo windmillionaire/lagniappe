@@ -5,8 +5,7 @@ import EntityIndex from "./base/index";
 /**
  * @testable true
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_from_index
- * @features users
- * @dimensions create-form create-submit created-row
+ * @matrix users : create-form create-submit created-row
  */
 export default class Users extends EntityIndex {
 	constructor(node) {
@@ -20,8 +19,7 @@ export default class Users extends EntityIndex {
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_hidden_when_public_users_disabled
 	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-	 * @features users
-	 * @dimensions index-mode-toggle table-row disabled
+	 * @matrix users : disabled index-mode-toggle table-row
 	 */
 	async init() {
 		await super.init();
@@ -35,8 +33,7 @@ export default class Users extends EntityIndex {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_group_column_link_opens_group_tools_and_tracks_url
-	 * @features user-groups
-	 * @dimensions column-link query-route same-page-navigation
+	 * @matrix user-groups : column-link query-route same-page-navigation
 	 */
 	_click(e) {
 		const groupLink = e.target.closest("a[data-kind='group'][href]");
@@ -103,8 +100,7 @@ export default class Users extends EntityIndex {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_group_column_link_opens_group_tools_and_tracks_url
-	 * @features user-groups
-	 * @dimensions query-route reload
+	 * @matrix user-groups : query-route reload
 	 */
 	_defaultToolTarget(tools) {
 		const selector = this._groupSelector(this.queryParam("group"));
@@ -121,8 +117,7 @@ export default class Users extends EntityIndex {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-	 * @features users
-	 * @dimensions index-mode-toggle table-row refresh
+	 * @matrix users : index-mode-toggle refresh table-row
 	 */
 	async refreshCollections(navigation = false, options = {}) {
 		this._syncUserModeRoute();
@@ -133,8 +128,7 @@ export default class Users extends EntityIndex {
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_delete_group_refreshes_group_navigation
 	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
-	 * @features user-groups
-	 * @dimensions group-delete nav-refresh polling unrelated-delete
+	 * @matrix user-groups : group-delete nav-refresh polling unrelated-delete
 	 */
 	async refreshSupplementalCollections(changes = []) {
 		const groupsElt = this.elt?.querySelector("[id='user-groups']");

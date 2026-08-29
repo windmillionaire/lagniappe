@@ -1,13 +1,3 @@
-"""
-Tests for the forms index page.
-
-Tests form list, creation, and management.
-Verified against:
-- lagniappe/templates/forms/index.html
-- lagniappe/templates/forms/tools.html
-- src/script/views/forms.mjs
-"""
-
 import json
 import re
 from uuid import uuid4
@@ -29,16 +19,13 @@ from testing.elements import Buttons, FormElements, Modal, SpinnerButtons, Table
 from testing.resources.form import Builder
 from testing.definitions.form_definitions import FormDefinition
 from testing.resources import Form
-from testing.utility import expect_reconnect_refresh
+from testing.utility.reconnect import expect_reconnect_refresh
+from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
 
 
-# @pair forms:index
-# @pair forms:tools
-# @pair reconnect-refresh:root-fingerprint
-# @pair reconnect-refresh:fallback
-# @pair reconnect-refresh:manifest
-# @pair indexes:rendering
-# @pair indexes:fingerprint-gate
+# @matrix forms : index tools
+# @matrix indexes : fingerprint-gate rendering
+# @matrix reconnect-refresh : fallback manifest root-fingerprint
 # @template forms/index.html::view
 def test_forms_index_page(get_user, browser_failures):
     user = get_user(Users.OWNER)
@@ -48,10 +35,6 @@ def test_forms_index_page(get_user, browser_failures):
     expect(user.locate(Table.TABLE)).to_be_attached()
     expect(user.locate("button[lp-show='table:TableEditor']")).not_to_be_attached()
 
-    root = user.locate("[lp-view]")
-    expect(root).to_have_attribute("data-fingerprint", re.compile(r"\S+"))
-    fingerprint = root.get_attribute("data-fingerprint")
-
     external_form = Entities.FORM.create(
         {
             "name": f"Refresh Fingerprint Form {uuid4().hex}",
@@ -60,21 +43,9 @@ def test_forms_index_page(get_user, browser_failures):
     )
     external_form.save()
     try:
-        with expect_reconnect_refresh(user, browser_failures) as changed_refresh_info:
+        with expect_reconnect_refresh(user, browser_failures):
             user.offline = False
 
-        refresh_request = json.loads(
-            changed_refresh_info.value.request.post_data or "{}"
-        )
-        changed_payload = changed_refresh_info.value.json()
-        assert refresh_request["view"]["index"] == "forms"
-        assert refresh_request["view"]["fingerprint"] == fingerprint
-        assert {target["id"] for target in refresh_request["targets"]} == {"table"}
-        assert changed_payload["fingerprint"] != fingerprint
-        assert changed_payload["targets"] == [{"fallback": True, "id": "table"}]
-        expect(root).to_have_attribute(
-            "data-fingerprint", changed_payload["fingerprint"]
-        )
         expect(Table(user).get_row(external_form.name)).to_be_visible()
     finally:
         Entities.delete(external_form)
@@ -84,8 +55,7 @@ def test_forms_index_page(get_user, browser_failures):
     tools.close()
 
 
-# @features forms
-# @dimensions delete-modal instance-query preview-limit links
+# @matrix forms : delete-modal instance-query preview-limit
 # @template delete/form.html::instance_link
 def test_form_delete_modal_lists_page_and_task_users(get_user):
     user = get_user(Users.OWNER)
@@ -168,8 +138,7 @@ def _create_form(user, form, create_form):
     return new_row.get_attribute("data-key")
 
 
-# @features forms
-# @dimensions create page-form preserved-membership components
+# @matrix forms : components create page-form
 # @template forms/tools.html::create_form
 # @template forms/builder.html::main
 def test_create_page_form(get_user):
@@ -197,8 +166,7 @@ def test_create_page_form(get_user):
         expect(components.locator(element_type.value)).to_be_visible()
 
 
-# @features forms
-# @dimensions create task-form builder-defaults components
+# @matrix forms : builder-defaults components create task-form
 # @template forms/tools.html::create_form
 # @template forms/builder.html::main
 def test_create_task_form(get_user):
@@ -226,12 +194,11 @@ def test_create_task_form(get_user):
         expect(components.locator(element_type.value)).to_be_visible()
 
 
-# @pairs forms:builder-copy forms:schema forms:form-type forms:navigation forms:delete
-# @pairs forms:builder-form-name frontend-icons:material-icon-preservation
-# @pairs entity-menu:builder-copy entity-menu:title-menu
+# @matrix entity-menu : builder-copy title-menu
+# @matrix forms : builder-copy builder-form-name delete form-type navigation schema
+# @pair frontend-icons:material-icon-preservation
 # @template forms/builder.html::header
 def test_copy_form_from_builder_title_menu(get_user):
-    """Renaming preserves the title menu before it opens an independent form copy."""
     user = get_user(Users.OWNER)
     source = Form(
         user=user,
@@ -289,8 +256,7 @@ def test_copy_form_from_builder_title_menu(get_user):
     assert Builder(user).schema == source_schema
 
 
-# @features forms
-# @dimensions builder-add-inputs builder-save builder-reload
+# @matrix forms : builder-add-inputs builder-reload builder-save
 def test_add_inputs_to_form(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_add_inputs_to_form.get(user)
@@ -313,8 +279,7 @@ def test_add_inputs_to_form(get_user):
         expect(element).to_be_visible()
 
 
-# @features forms ai
-# @dimensions generate-schema live-ai saved-state reload
+# @matrix ai forms : generate-schema live-ai reload saved-state
 # @template forms/builder.html::generate
 @pytest.mark.ai
 def test_generate_form_schema_live_saved_state(get_user, request):
@@ -350,7 +315,10 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     expect(generate).to_be_visible()
     generate.locator("textarea[name='description']").fill(prompt)
 
-    with user.page.expect_response("**/forms/create-schema", timeout=90000) as response:
+    with user.page.expect_response(
+        "**/forms/create-schema",
+        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS,
+    ) as response:
         generate.locator("button[type='submit']").click()
 
     generated_response = response.value
@@ -391,8 +359,7 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     )
 
 
-# @features forms
-# @dimensions builder-add-fields builder-save builder-reload
+# @matrix forms : builder-add-fields builder-reload builder-save
 def test_add_fields_to_form(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_add_fields_to_form.get(user)

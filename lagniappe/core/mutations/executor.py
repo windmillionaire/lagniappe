@@ -9,8 +9,9 @@ from ..definitions import (
     MutationPlan,
 )
 from ..exceptions import capture
-from ..tools import cache, database
-from ..tools import notification_service
+from ..tools import cache
+from lagniappe.core.tools.database import utility as database_utility
+from ..tools.notifications import service as notification_service
 
 
 WRITE_EFFECTS = {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
@@ -19,10 +20,8 @@ WRITE_EFFECTS = {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_hash_before_requires
 # @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_and_persists_user_before_owned_page
-# @pair entities:save-order
-# @pair requires:hash-before-requires
-# @pair users:user-before-page
-# @pair requires:persisted-requires
+# @matrix requires : hash-before-requires persisted-requires
+# @pairs entities:save-order users:user-before-page
 def _prepare_write(effect):
     entity = effect.entity
     for name in effect.property_updates:
@@ -68,7 +67,10 @@ def prepare_durable_writes(plan):
     return writes
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_022_mutation_contracts.py::test_public_discovery_invalidation_runs_after_durable_write
+# @matrix mutations : durable-first
+# @matrix public-pages public-directory sitemap : invalidation
 def execute_post_commit(plan):
     """Execute declared post-commit effects and return types plus errors."""
     completed = []
@@ -131,19 +133,17 @@ def execute_post_commit(plan):
         if aggregates:
             projection_changes["aggregates"] = aggregates
         cache.update_notification_projection(**projection_changes)
-        from ..tools import notification_email
+        from ..tools.email.notifications import capture as email_capture
 
         for notification in notification_upserts:
             try:
-                notification_email.record_notification(notification)
+                email_capture.record_notification(notification)
             except Exception as error:
                 capture(
                     error,
                     context={
                         "operation": "notification-email-capture",
-                        "notification_key": getattr(
-                            notification, "urlsafe_key", None
-                        ),
+                        "notification_key": getattr(notification, "urlsafe_key", None),
                     },
                 )
         if notification_upserts:
@@ -175,42 +175,70 @@ def execute_post_commit(plan):
     ]
     if blob_effects:
         errors.extend(
-            database.delete_blobs(
-                [effect.path for effect in blob_effects if effect.visibility == "private"],
-                [effect.path for effect in blob_effects if effect.visibility == "public"],
+            database_utility.delete_blobs(
+                [
+                    effect.path
+                    for effect in blob_effects
+                    if effect.visibility == "private"
+                ],
+                [
+                    effect.path
+                    for effect in blob_effects
+                    if effect.visibility == "public"
+                ],
             )
             or []
         )
         complete(MutationEffectType.BLOB_DELETE)
+
+    scheduled_uncomplete = [
+        effect.entity
+        for effect in post_commit
+        if effect.effect is MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH
+    ]
+    if scheduled_uncomplete:
+        from ..tools.tasks import scheduling
+
+        for task in scheduled_uncomplete:
+            scheduling.dispatch_scheduled_uncomplete(task)
+        complete(MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH)
+
+    if any(
+        effect.effect is MutationEffectType.PUBLIC_DISCOVERY_INVALIDATE
+        for effect in post_commit
+    ):
+        cache.invalidate_public_discovery()
+        complete(MutationEffectType.PUBLIC_DISCOVERY_INVALIDATE)
     return completed, errors
 
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
-# @features mutations
-# @dimensions save mutation-plan durable-first typed-intent-preservation post-commit-outcome cache-failure
+# @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save typed-intent-preservation
 def execute_mutation(plan):
     """Execute durable effects before rebuildable cache and blob effects."""
     if not isinstance(plan, MutationPlan):
         raise TypeError("execute_mutation requires a MutationPlan")
 
     outcome = MutationOutcome(plan.operation)
-    durable = [effect for effect in plan.effects if effect.phase is MutationPhase.DURABLE]
+    durable = [
+        effect for effect in plan.effects if effect.phase is MutationPhase.DURABLE
+    ]
     writes = prepare_durable_writes(plan)
     deletes = [
         effect for effect in durable if effect.effect is MutationEffectType.DELETE
     ]
 
     if writes:
-        database.save_mutations(
+        database_utility.save_mutations(
             (effect.entity, effect.property_mask) for effect in writes
         )
         for effect in writes:
             _completed(outcome, effect.effect)
 
     if deletes:
-        database.delete_entities(effect.entity for effect in deletes)
+        database_utility.delete_entities(effect.entity for effect in deletes)
         _completed(outcome, MutationEffectType.DELETE)
 
     consume_mutation_intents(plan)

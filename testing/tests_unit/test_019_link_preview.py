@@ -2,7 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from lagniappe.core.tools import link_preview
+from lagniappe.core.tools.http import OutboundResult, OutboundStatus
+from lagniappe.core.tools.links import preview as link_preview
 
 
 class PreviewEntity(SimpleNamespace):
@@ -25,8 +26,7 @@ def _project(allowed=True):
     return project
 
 
-# @features editor link-preview
-# @dimensions internal metadata permissions
+# @matrix editor link-preview : internal metadata permissions
 def test_internal_preview_returns_allowed_entity_metadata(monkeypatch):
     entity = _entity()
     monkeypatch.setattr(
@@ -51,8 +51,7 @@ def test_internal_preview_returns_allowed_entity_metadata(monkeypatch):
     }
 
 
-# @features editor link-preview
-# @dimensions internal metadata permissions
+# @matrix editor link-preview : internal metadata permissions
 def test_internal_status_preview_uses_project_permission(monkeypatch):
     project = _project()
     monkeypatch.setattr(
@@ -83,12 +82,9 @@ def test_internal_status_preview_uses_project_permission(monkeypatch):
     }
 
 
-# @features editor link-preview
-# @dimensions internal permissions
+# @matrix editor link-preview : internal permissions
 def test_internal_preview_hides_missing_or_forbidden_entities(monkeypatch):
-    monkeypatch.setattr(
-        link_preview.Entities, "fetch_one", lambda key, request: None
-    )
+    monkeypatch.setattr(link_preview.Entities, "fetch_one", lambda key, request: None)
 
     missing = link_preview.preview_for_url(
         "/projects/missing-key",
@@ -112,14 +108,8 @@ def test_internal_preview_hides_missing_or_forbidden_entities(monkeypatch):
     assert denied["description"] == "You do not have access to preview this link."
 
 
-# @features editor link-preview
-# @dimensions external metadata
+# @matrix editor link-preview : external metadata
 def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
-    monkeypatch.setattr(
-        link_preview,
-        "_validate_external_url",
-        lambda url: link_preview._parse_url(url),
-    )
     monkeypatch.setattr(
         link_preview,
         "_external_metadata",
@@ -149,8 +139,7 @@ def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
     assert fallback["description"] is None
 
 
-# @features editor link-preview
-# @dimensions external url-safety
+# @matrix editor link-preview : external url-safety
 def test_external_preview_rejects_unsafe_urls(monkeypatch):
     for url in [
         "javascript:alert(1)",
@@ -167,22 +156,13 @@ def test_external_preview_rejects_unsafe_urls(monkeypatch):
                 base_url="https://app.test/",
             )
 
-    class RedirectResponse:
-        is_redirect = True
-        headers = {"Location": "http://127.0.0.1/"}
-
-        def close(self):
-            pass
-
     monkeypatch.setattr(
         link_preview,
-        "_safe_host",
-        lambda host: host == "example.com",
-    )
-    monkeypatch.setattr(
-        link_preview.requests,
-        "get",
-        lambda *args, **kwargs: RedirectResponse(),
+        "fetch_user_content",
+        lambda *args, **kwargs: OutboundResult(
+            OutboundStatus.REJECTED,
+            final_url="http://127.0.0.1/",
+        ),
     )
 
     with pytest.raises(link_preview.PreviewError):
@@ -192,17 +172,18 @@ def test_external_preview_rejects_unsafe_urls(monkeypatch):
             base_url="https://app.test/",
         )
 
-    class LoginRedirectResponse:
-        is_redirect = True
-        headers = {"Location": "https://example.com/users/login?next=/projects/key"}
-
-        def close(self):
-            pass
-
     monkeypatch.setattr(
-        link_preview.requests,
-        "get",
-        lambda *args, **kwargs: LoginRedirectResponse(),
+        link_preview,
+        "fetch_user_content",
+        lambda *args, **kwargs: OutboundResult(
+            OutboundStatus.OK,
+            body=b"<html><title>Sign in</title></html>",
+            media_type="text/html",
+            http_status=200,
+            size=36,
+            redirect_count=1,
+            final_url="https://example.com/users/login?next=/projects/key",
+        ),
     )
 
     restricted = link_preview.preview_for_url(

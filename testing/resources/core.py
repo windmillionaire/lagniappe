@@ -1,3 +1,4 @@
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import expect
 
 from config import SETTINGS
@@ -48,7 +49,27 @@ class SiteResource:
                 .getEntriesByName("lagniappe:services-ready", "mark").length > 0""",
             timeout=VIEW_INITIALIZATION_TIMEOUT,
         )
-        self.user.page.evaluate("() => window.__WAIT_FOR_VIEW_TRANSITIONS__()")
+        try:
+            self.user.page.evaluate(
+                "() => window.__WAIT_FOR_VIEW_TRANSITIONS__()"
+            )
+        except PlaywrightError as error:
+            if "Execution context was destroyed" not in str(error):
+                raise
+            self.user.page.wait_for_function(
+                "() => window.__NAVIGATION_TRANSITION_SETTLED__ === true",
+                timeout=VIEW_INITIALIZATION_TIMEOUT,
+            )
+            self.user.page.wait_for_function(
+                """() => performance
+                    .getEntriesByName(
+                        "lagniappe:services-ready", "mark"
+                    ).length > 0""",
+                timeout=VIEW_INITIALIZATION_TIMEOUT,
+            )
+            self.user.page.evaluate(
+                "() => window.__WAIT_FOR_VIEW_TRANSITIONS__()"
+            )
         return self
 
     def reload(self, wait_until="load"):

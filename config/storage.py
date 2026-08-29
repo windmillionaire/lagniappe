@@ -6,7 +6,7 @@ import time
 from urllib.parse import urlparse
 
 LOGGER = logging.getLogger(__name__)
-BUCKET_KINDS = ("history", "private", "public", "export")
+BUCKET_KINDS = ("history", "private", "public")
 RECOVERY_BUCKET_KIND = "recovery"
 BUCKET_CREATE_LOCATION = "US"
 BUCKET_DEFAULT_STORAGE_CLASS = "STANDARD"
@@ -20,6 +20,7 @@ BUCKET_CORS_HEADERS = [
 ]
 BUCKET_CORS_MAX_AGE_SECONDS = 3600
 BUCKET_CONFIG_RETRY_DELAYS = (0.25, 1.0)
+RUNTIME_NONCURRENT_RETENTION_DAYS = 14 * 7
 
 
 # @testable false
@@ -66,18 +67,16 @@ def _bucket_name(settings, kind):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_storage_bucket_names_match_runtime_contract
-# @features storage setup
-# @dimensions naming
+# @matrix setup storage : naming
 def storage_bucket_names(settings):
-    """Return Lagniappe's four full bucket names for an app-settings mapping."""
+    """Return Lagniappe's three runtime bucket names for app settings."""
     return {kind: _bucket_name(settings, kind) for kind in BUCKET_KINDS}
 
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_storage_bucket_names_match_runtime_contract
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
-# @features disaster-recovery
-# @dimensions naming
+# @pairs disaster-recovery:naming storage:provisioning
 def recovery_bucket_name(settings):
     """Return the operator-only disaster-recovery bucket name."""
     return _bucket_name(settings, RECOVERY_BUCKET_KIND)
@@ -100,8 +99,7 @@ def _origin(value):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_storage_cors_origins_include_configured_urls
-# @features storage
-# @dimensions cors origins
+# @matrix storage : cors origins
 def expected_storage_cors_origins(config):
     """Return the browser origins allowed to upload/download bucket objects."""
     origins = []
@@ -130,8 +128,7 @@ def expected_storage_cors_origins(config):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_expected_storage_cors_shape
-# @features storage
-# @dimensions cors
+# @pair storage:cors
 def expected_storage_cors(config):
     """Return the expected Cloud Storage CORS rule for Lagniappe buckets."""
     origins = expected_storage_cors_origins(config)
@@ -177,6 +174,41 @@ def _normalized_cors(cors):
 
 # @testable false
 # @covered-by config/storage.py::configure_storage_bucket
+# @reason lifecycle normalization is exercised through runtime bucket reconciliation
+def _runtime_lifecycle_rules(rules):
+    """Replace only noncurrent-generation deletion rules owned by setup."""
+    preserved = []
+    for rule in rules or []:
+        condition = dict(rule.get("condition") or {})
+        action = dict(rule.get("action") or {})
+        normalized_keys = {
+            {
+                "days_since_noncurrent_time": "daysSinceNoncurrentTime",
+                "is_live": "isLive",
+            }.get(key, key)
+            for key in condition
+        }
+        if (
+            str(action.get("type") or "").casefold() == "delete"
+            and "daysSinceNoncurrentTime" in normalized_keys
+            and normalized_keys.issubset({"daysSinceNoncurrentTime", "isLive"})
+            and condition.get("isLive", condition.get("is_live", False)) is False
+        ):
+            continue
+        preserved.append(rule)
+    preserved.append(
+        {
+            "action": {"type": "Delete"},
+            "condition": {
+                "daysSinceNoncurrentTime": RUNTIME_NONCURRENT_RETENTION_DAYS
+            },
+        }
+    )
+    return preserved
+
+
+# @testable false
+# @covered-by config/storage.py::configure_storage_bucket
 # @reason retry helper owned by bucket metadata reconciliation
 def _patch_bucket_metadata(bucket):
     """Patch bucket metadata, retrying transient Cloud Storage failures."""
@@ -202,12 +234,11 @@ def _patch_bucket_metadata(bucket):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_is_idempotent
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_repairs_cors_drift
-# @tests tests_unit/test_018_database_assets.py::test_configure_bucket_repairs_storage_class_without_touching_lifecycle
+# @tests tests_unit/test_018_database_assets.py::test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_retries_transient_patch_failure
-# @features storage
-# @dimensions cors idempotent bucket-metadata transient-retry storage-class lifecycle-preservation
+# @matrix storage : bucket-metadata cors idempotent lifecycle-preservation object-versioning storage-class transient-retry
 def configure_storage_bucket(bucket, config):
-    """Reconcile setup-owned metadata while preserving retention/lifecycle."""
+    """Reconcile runtime metadata and the setup-owned version-retention rule."""
     changed = False
 
     iam_configuration = getattr(bucket, "iam_configuration", None)
@@ -232,6 +263,16 @@ def configure_storage_bucket(bucket, config):
         bucket.storage_class = BUCKET_DEFAULT_STORAGE_CLASS
         changed = True
 
+    if not bool(getattr(bucket, "versioning_enabled", False)):
+        bucket.versioning_enabled = True
+        changed = True
+
+    current_lifecycle = list(getattr(bucket, "lifecycle_rules", None) or [])
+    expected_lifecycle = _runtime_lifecycle_rules(current_lifecycle)
+    if current_lifecycle != expected_lifecycle:
+        bucket.lifecycle_rules = expected_lifecycle
+        changed = True
+
     if changed:
         _patch_bucket_metadata(bucket)
 
@@ -240,8 +281,7 @@ def configure_storage_bucket(bucket, config):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_configure_recovery_bucket_removes_cors_and_is_idempotent
-# @features disaster-recovery
-# @dimensions bucket-metadata lifecycle-preservation
+# @matrix disaster-recovery : bucket-metadata lifecycle-preservation
 def configure_recovery_bucket(bucket):
     """Reconcile recovery-bucket metadata without browser-facing CORS."""
     changed = False

@@ -14,7 +14,9 @@ from .file_consumers import (
     LARGE_ASSET_BYTES,
     enforce_file_consumer,
 )
-from ..tools import database, utility
+from lagniappe.core.tools.database import assets as database_assets
+from lagniappe.core.tools.database import get as database_get
+from ..tools.files.html import strip_tags
 from .default import DefaultEnum
 
 IMAGE_NAME = re.compile(r"image_[^.\"]+")
@@ -29,16 +31,14 @@ BUCKET_PREFIX = CONFIG.PREFIX
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_asset_uri_and_public_url_include_bucket_prefix
-# @features file storage
-# @dimensions bucket-prefix
+# @matrix file storage : bucket-prefix
 def storage_bucket_name(bucket):
     return f"{BUCKET_PREFIX}{bucket}"
 
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_asset_uri_and_public_url_include_bucket_prefix
-# @features file storage
-# @dimensions bucket-prefix public-url
+# @matrix file storage : bucket-prefix public-url
 def public_url():
     return f"https://storage.googleapis.com/{storage_bucket_name(PUBLIC_BUCKET)}"
 
@@ -73,6 +73,7 @@ class Asset:
     _fingerprint = None
     _size = None
     _large = None
+    _generation = None
 
     def __init__(self, definition=None, *, name=None, entity=None):
         definition = definition or {}
@@ -81,6 +82,7 @@ class Asset:
         self._fingerprint = definition.get("fingerprint")
         self._size = definition.get("size")
         self._large = definition.get("large")
+        self._generation = definition.get("generation")
         self.name = name
         self.entity = entity
 
@@ -91,8 +93,7 @@ class Asset:
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_text_plain_asset_uses_txt_extension
     # @tests tests_unit/test_006_file_properties.py::test_file_asset_detects_mislabeled_png_upload
-    # @features file storage
-    # @dimensions asset-extension mimetype
+    # @matrix file storage : asset-extension mimetype
     @property
     def path(self):
         if not self._path:
@@ -101,8 +102,7 @@ class Asset:
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_image_asset_content_type_falls_back_without_recursing
-    # @features file
-    # @dimensions image content-type
+    # @matrix file : content-type image
     @property
     def content_type(self):
         return self._content_type
@@ -115,8 +115,7 @@ class Asset:
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_text_plain_asset_uses_txt_extension
     # @tests tests_unit/test_006_file_properties.py::test_file_asset_detects_mislabeled_png_upload
-    # @features file storage
-    # @dimensions asset-extension mimetype
+    # @matrix file storage : asset-extension mimetype
     @property
     def extension(self):
         if self._path:
@@ -155,6 +154,14 @@ class Asset:
         return self.size > LARGE_ASSET_BYTES
 
     @property
+    def generation(self):
+        return str(self._generation) if self._generation is not None else None
+
+    @generation.setter
+    def generation(self, value):
+        self._generation = str(value) if value is not None else None
+
+    @property
     def visibility(self):
         return AssetVisibility[self._visibility]
 
@@ -166,8 +173,7 @@ class Asset:
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_asset_uri_and_public_url_include_bucket_prefix
-    # @features file storage
-    # @dimensions asset-uri bucket-prefix
+    # @matrix file storage : asset-uri bucket-prefix
     @property
     def uri(self):
         bucket = (
@@ -177,6 +183,9 @@ class Asset:
         )
         return f"gs://{storage_bucket_name(bucket)}/{self.path}"
 
+    # @testable true
+    # @tests tests_unit/test_006_file_properties.py::test_file_asset_definition_records_size_and_large_flag
+    # @matrix file storage : asset-size large-asset
     @property
     def definition(self):
         definition = {
@@ -190,30 +199,36 @@ class Asset:
         if self.size is not None:
             definition["size"] = self.size
             definition["large"] = self.large
+        if self.generation:
+            definition["generation"] = self.generation
         return definition
 
     def _record_saved_blob(self, blob):
         size = getattr(blob, "size", None)
         if size is not None:
             self.size = size
+        generation = getattr(blob, "generation", None)
+        if generation is not None:
+            self.generation = generation
 
     @property
     def cache_value(self):
         return None
 
     def get(self):
-        return database.assets.get_text(self.path, self.visibility.value)
+        return database_assets.get_text(self.path, self.visibility.value)
 
     def delete(self):
-        database.assets.delete_file(self.path, self.visibility.value)
+        database_assets.delete_file(self.path, self.visibility.value)
 
     def save(self, content):
         if not content:
             return False
 
-        database.assets.save_text(
+        blob = database_assets.save_text(
             content, self.path, self.content_type, self.visibility.value
         )
+        self._record_saved_blob(blob)
         return True
 
 
@@ -226,23 +241,24 @@ class FileAsset(Asset):
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_private_asset_url_uses_asset_name_for_shared_storage_path
-    # @features file storage
-    # @dimensions private-url shared-asset-path
+    # @matrix file storage : private-url shared-asset-path
     @property
     def url(self):
         if self.visibility == AssetVisibility.public:
             return f"{public_url()}/{self.path}"
         elif self.visibility == AssetVisibility.private:
-            key = database.get.urlsafe_key(self.entity.key)
-            identifier = f"{self.name}.{self.extension}" if self.extension else self.name
+            key = database_get.urlsafe_key(self.entity.key)
+            identifier = (
+                f"{self.name}.{self.extension}" if self.extension else self.name
+            )
             return f"/assets/{key}/{identifier}"
         return None
 
     def get(self):
-        return database.assets.download_file(self.path, self.visibility.value)
+        return database_assets.download_file(self.path, self.visibility.value)
 
     def text(self):
-        return database.assets.get_text(
+        return database_assets.get_text(
             self.path, self.visibility.value, self.entity.encoding
         )
 
@@ -252,7 +268,7 @@ class FileAsset(Asset):
 
         if not getattr(content, "lagniappe_direct_upload", False):
             content.seek(0)
-        blob = database.assets.save_file(
+        blob = database_assets.save_file(
             content, self.path, self.content_type, self.visibility.value
         )
         self._record_saved_blob(blob)
@@ -348,7 +364,7 @@ class HTMLAsset(Asset):
 
     @property
     def cache_value(self):
-        return utility.strip_tags(self.get()).strip()
+        return strip_tags(self.get()).strip()
 
 
 # @testable infrastructure

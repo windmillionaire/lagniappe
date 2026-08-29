@@ -1,7 +1,10 @@
 import pytest
 from playwright.sync_api import expect
 
-from config import SETTINGS
+from lagniappe import CONFIG
+from lagniappe.core.tools import cache
+from lagniappe.web import app
+from lagniappe.web import auth as web_auth
 from testing.definitions import Categories, Projects, SitePages, Tasks, Users
 from testing.elements import HeaderSearch, List
 from testing.resources import Task
@@ -9,20 +12,74 @@ from testing.resources import Task
 pytestmark = pytest.mark.e2e
 
 
-# @features home permissions
-# @dimensions anonymous-access
-def test_anonymous_home_redirects_to_login(get_user):
-    """The home permission wrapper redirects an anonymous request to login."""
-    anonymous = get_user(Users.ANONYMOUS)
-    base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
+# @matrix home permissions public-directory : anonymous-access datastore-free-redirect
+def test_anonymous_home_redirects_to_public_directory_without_entity_reads(
+    monkeypatch,
+):
+    """The root redirect does not enter the entity-backed auth loader."""
+    monkeypatch.setattr(
+        web_auth,
+        "_load_request_context",
+        lambda: (_ for _ in ()).throw(AssertionError("unexpected entity read")),
+    )
 
-    anonymous.page.goto(f"{base_url}/")
+    response = app.test_client().get("/", follow_redirects=False)
 
-    expect(anonymous.page).to_have_url(f"{base_url}/users/login?next=/")
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/public/"
 
 
-# @features permissions
-# @dimensions resource-gates search
+# @matrix public-directory : collapsible empty-state metadata page-cards redis-cache
+def test_public_directory_renders_cached_page_groups(monkeypatch):
+    snapshot = {
+        "schema": 1,
+        "site_indexing": True,
+        "groups": [
+            {
+                "id": "category:published",
+                "name": "Published Essays",
+                "pages": [
+                    {
+                        "path": "/pages/public/example",
+                        "title": "AI-aided development",
+                        "description": "A public description.",
+                    }
+                ],
+            }
+        ],
+    }
+    monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", False)
+    monkeypatch.setattr(
+        cache,
+        "cached_public_directory",
+        lambda builder: snapshot,
+    )
+
+    response = app.test_client().get("/public/")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert response.headers["X-Robots-Tag"] == "index, follow"
+    assert "<details class=" in html
+    assert "<details open" not in html
+    assert "Published Essays" in html
+    assert "AI-aided development" in html
+    assert "A public description." in html
+    assert 'href="/pages/public/example"' in html
+
+    empty = {"schema": 1, "site_indexing": True, "groups": []}
+    monkeypatch.setattr(
+        cache,
+        "cached_public_directory",
+        lambda builder: empty,
+    )
+    empty_response = app.test_client().get("/public/")
+
+    assert empty_response.headers["X-Robots-Tag"] == "noindex, follow"
+    assert "No public pages yet" in empty_response.get_data(as_text=True)
+
+
+# @matrix permissions : resource-gates search
 def test_one_category_permissions(get_user):
     """
     Verify that a user with one category can access the home page and see their category
@@ -65,8 +122,7 @@ def test_one_category_permissions(get_user):
     search.verify_entity_not_in_results(other_category)
 
 
-# @features permissions
-# @dimensions owner global-resources
+# @matrix permissions : global-resources owner
 def test_admin_permissions(get_user):
     """
     Verify that an admin can access the home page and see model lists and tools.
@@ -93,8 +149,7 @@ def test_admin_permissions(get_user):
     expect(user.locate("#ingress[lp-component]")).not_to_be_attached()
 
 
-# @features permissions
-# @dimensions global-resources
+# @pair permissions:global-resources
 def test_directory_general_models_view_only(get_user):
     """Directory: Active Tasks; Manual is a standalone home link."""
     user = get_user(Users.general_models_view_only)
@@ -106,8 +161,7 @@ def test_directory_general_models_view_only(get_user):
     expect(root.locator('a:has-text("Users")')).not_to_be_attached()
 
 
-# @features permissions
-# @dimensions global-resources
+# @pair permissions:global-resources
 def test_directory_general_forms_view_only(get_user):
     """Directory: Active Tasks and Forms; Manual is a standalone home link."""
     user = get_user(Users.general_forms_view_only)
@@ -119,8 +173,7 @@ def test_directory_general_forms_view_only(get_user):
     expect(root.locator('a:has-text("Users")')).not_to_be_attached()
 
 
-# @features permissions
-# @dimensions global-resources
+# @pair permissions:global-resources
 def test_directory_general_users_view_only(get_user):
     """Directory: Active Tasks and Users; Manual is a standalone home link."""
     user = get_user(Users.general_users_view_only)
@@ -132,8 +185,8 @@ def test_directory_general_users_view_only(get_user):
     expect(root.locator('a:has-text("Forms")')).not_to_be_attached()
 
 
-# @pairs home:lazy-empty-list home:unavailable-toggle
-# @pairs permissions:own-page-only permissions:active-tasks-directory
+# @matrix home : lazy-empty-list unavailable-toggle
+# @matrix permissions : active-tasks-directory own-page-only
 # @template home/home.html::create
 # @template home/directory.html::list
 def test_empty_home_model_lists_settle_to_disabled_zero_state(get_user):
@@ -184,8 +237,7 @@ def test_empty_home_model_lists_settle_to_disabled_zero_state(get_user):
         expect(toggle).to_contain_class("opacity-50")
 
 
-# @features permissions
-# @dimensions global-resources
+# @pair permissions:global-resources
 # @template home/categories.html::list
 # @template home/home.html::links
 def test_create_toggles_require_global_models_create(get_user):
@@ -202,8 +254,7 @@ def test_create_toggles_require_global_models_create(get_user):
     expect(admin.locate(home_a.CREATE_CATEGORY_TOGGLE)).to_be_attached()
 
 
-# @features permissions
-# @dimensions global-resources
+# @pair permissions:global-resources
 def test_create_category_hides_form_picker_without_forms_view(get_user):
     """Create category form omits Default Form when user lacks General.FORMS VIEW."""
     user = get_user(Users.models_create_forms_none)
@@ -214,8 +265,7 @@ def test_create_category_hides_form_picker_without_forms_view(get_user):
     expect(form.locator('[data-role="form-select"]')).not_to_be_attached()
 
 
-# @features permissions
-# @dimensions resource-gates home-actions
+# @matrix permissions : home-actions resource-gates
 # @template home/categories.html::category
 def test_category_home_rows_only_offer_star_controls(get_user):
     """Home category rows omit delete even when the user may delete the entity."""
@@ -232,8 +282,7 @@ def test_category_home_rows_only_offer_star_controls(get_user):
         expect(row.locator("button[lp-control='delete']")).not_to_be_attached()
 
 
-# @features home
-# @dimensions permissions task-list view-only
+# @matrix home : permissions task-list view-only
 # @template home/tasks.html::task
 def test_home_task_list_shows_view_only_page_tasks_without_controls(get_user):
     """A readable page task appears on home without task action controls."""

@@ -62,7 +62,28 @@ strings for transport. Shared helpers `base64ToUint8Array` and
 
 Used for standalone rich text fields (e.g. HTML form elements). No collaboration, no Yjs -- just TipTap with history (undo/redo).
 
-**Saving**: On blur or destroy, if the HTML content has changed, it's saved via PUT. A `this.saving` guard prevents concurrent saves. Empty documents (`<p></p>` or `<p><br></p>`) are not saved.
+The editor remains inert until its GET returns `ok`. A failed initial load does
+not publish blank content or set `loaded`; it shows an inline Retry action. The
+authoritative response becomes `acknowledgedContent` only after successful
+load.
+
+`flush()` compares normalized editor HTML with that acknowledged baseline and
+returns `Promise<boolean>`. PUTs are serialized. If content changes while a
+request is active, the latest value is coalesced into one follow-up PUT. Only an
+`ok` response advances `acknowledgedContent`; a failed response retains
+`dirtyContent` and exposes the same inline Retry action.
+
+TipTap's empty forms (`<p></p>` and `<p><br></p>`) normalize to `""`. Sending
+that value is an intentional clear and causes the form HTML asset to be deleted
+by the backend. Empty content is therefore different from an omitted save.
+
+Blur starts a keepalive-compatible flush. Payloads whose encoded JSON body
+exceeds 64 KiB fall back to an ordinary PUT; eligible keepalive delivery remains
+best effort and shares the browser's request quota. The owning `FormBuilder`
+also flushes registered independent documents when the view becomes hidden and
+after connectivity recovers. `destroy()` performs cleanup only; it never starts
+an unowned save, does not block navigation, and does not create an IndexedDB
+draft.
 
 ### Shared Behavior
 
@@ -73,9 +94,10 @@ Both document types:
 - Save on blur (with a `requestAnimationFrame` check to skip if focus moved to the toolbar or a dropdown)
 - Have `destroy()` methods that clean up the editor, toolbar, and (for collaborative) the Yjs document
 
-Independent documents also save on editor destroy and expose `hide()`/`show()`
-for tab visibility. Collaborative documents leave visibility and final save
-behavior to the widget/component lifecycle plus `SyncManager`.
+Independent documents expose `hide()`/`show()` for tab visibility and delegate
+final flush ownership to `FormBuilder`. Collaborative documents leave
+visibility and final save behavior to the widget/component lifecycle plus
+`SyncManager`.
 
 ## Editor Configuration (`editor.mjs`)
 

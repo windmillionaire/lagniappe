@@ -43,8 +43,7 @@ from testing.elements import Buttons, Modal
 from testing.resources import File
 
 
-# @features ingress
-# @dimensions upload-form
+# @pair ingress:upload-form
 @pytest.mark.e2e
 def test_open_import_form(get_user):
     """
@@ -61,8 +60,7 @@ def test_open_import_form(get_user):
     expect(form).to_be_visible()
 
 
-# @features ingress
-# @dimensions file-input upload-counts delete
+# @matrix ingress : delete file-input upload-counts
 @pytest.mark.e2e
 def test_import_csv_via_file_input(get_user):
     """
@@ -97,8 +95,7 @@ def test_import_csv_via_file_input(get_user):
     expect(file_item).not_to_be_visible()
 
 
-# @features ingress
-# @dimensions drag-drop upload-counts delete
+# @matrix ingress : delete drag-drop upload-counts
 @pytest.mark.e2e
 def test_import_csv_via_drag_drop(get_user):
     """

@@ -6,17 +6,22 @@ import ShellView from "./base/shell";
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
+ * @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
  * @tests tests_js/test_038_startup_specializations.py::test_manual_dropdown_loads_only_in_mobile_mode
- * @pairs manual:section-navigation manual:popstate manual:responsive-navigation
+ * @matrix manual : popstate responsive-navigation section-navigation
  * @pair startup:mobile-only-dropdown
  */
 export default class Manual extends ShellView {
 	async init() {
 		await super.init();
 		this.endpoints = ENDPOINTS.manual;
-		this.copyResetTimers = new Map();
 
 		if (!this.elt) return;
+		const sectionData =
+			this.elt.querySelector("#manual-nav-button")?.dataset?.sections;
+		this.sections = new Map(
+			JSON.parse(sectionData || "[]").map((section) => [section.key, section]),
+		);
 
 		this._manualClick = (e) => {
 			const mobileNavButton = e.target.closest("#manual-nav-button");
@@ -29,13 +34,6 @@ export default class Manual extends ShellView {
 					(dropdown) => dropdown?.showPanel?.(),
 					mobileNavButton,
 				);
-				return;
-			}
-
-			const copyButton = e.target.closest("[data-role='manual-command-copy']");
-			if (copyButton) {
-				e.preventDefault();
-				this.copyCommand(copyButton);
 				return;
 			}
 
@@ -63,6 +61,25 @@ export default class Manual extends ShellView {
 		return this;
 	}
 
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/manual.mjs::Manual.fetchSection
+	 * @reason head metadata changes are part of the tested manual navigation commit
+	 */
+	_updateMetadata(key) {
+		const metadata = this.sections.get(key)?.metadata;
+		if (!metadata) return null;
+
+		document.title = metadata.title;
+		const description = document.querySelector("meta[name='description']");
+		const robots = document.querySelector("meta[name='robots']");
+		const canonical = document.querySelector("link[rel='canonical']");
+		description?.setAttribute("content", metadata.description);
+		robots?.setAttribute("content", metadata.robots);
+		canonical?.setAttribute("href", metadata.canonical_url);
+		return metadata;
+	}
+
 	async _ensureMobileDropdown() {
 		if (this.mobileDropdown || this._mobileDropdownPromise) {
 			return this.mobileDropdown || this._mobileDropdownPromise;
@@ -73,9 +90,8 @@ export default class Manual extends ShellView {
 		this._mobileDropdownPromise = import("../elements/combobox/dropdown")
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
-				const sections = JSON.parse(mobileNavButton.dataset.sections);
 				const menu = {
-					items: sections.map((section) => ({
+					items: Array.from(this.sections.values()).map((section) => ({
 						name: section.name,
 						icon: section.icon,
 						kind: section.kind,
@@ -106,68 +122,9 @@ export default class Manual extends ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_installation_commands_are_copyable_and_scroll_on_mobile
-	 * @tests tests_js/test_038_startup_specializations.py::test_manual_copy_command_falls_back_when_clipboard_is_unavailable
-	 * @features manual
-	 * @dimensions command-copy clipboard-fallback
-	 */
-	async copyCommand(button) {
-		const command = button
-			.closest("[data-role='manual-command-shell']")
-			?.querySelector("[data-role='manual-command'] code")?.textContent;
-		if (!command) return;
-
-		let copied = false;
-		try {
-			if (navigator.clipboard?.writeText) {
-				await navigator.clipboard.writeText(command);
-				copied = true;
-			}
-		} catch {
-			copied = false;
-		}
-
-		if (!copied) {
-			const textarea = document.createElement("textarea");
-			textarea.value = command;
-			textarea.setAttribute("readonly", "");
-			textarea.style.position = "fixed";
-			textarea.style.opacity = "0";
-			document.body.append(textarea);
-			textarea.select();
-			try {
-				copied = document.execCommand("copy");
-			} catch {
-				copied = false;
-			}
-			textarea.remove();
-			button.focus();
-		}
-
-		const resetTimer = this.copyResetTimers.get(button);
-		if (resetTimer) clearTimeout(resetTimer);
-		button.textContent = copied ? "Copied!" : "Copy failed";
-		button.setAttribute(
-			"aria-label",
-			copied ? "Command copied" : "Command could not be copied",
-		);
-		this.copyResetTimers.set(
-			button,
-			setTimeout(() => {
-				if (button.isConnected) {
-					button.textContent = "Copy";
-					button.setAttribute("aria-label", "Copy command");
-				}
-				this.copyResetTimers.delete(button);
-			}, 2000),
-		);
-	}
-
-	/**
-	 * @testable true
 	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
-	 * @features manual
-	 * @dimensions section-navigation popstate
+	 * @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
+	 * @matrix manual : canonical-url metadata popstate section-navigation
 	 */
 	async fetchSection(key, pushState) {
 		if (this.loading) return;
@@ -180,8 +137,9 @@ export default class Manual extends ShellView {
 			await withTransition(
 				() => {
 					if (newTarget) target.replaceChildren(newTarget);
+					const metadata = this._updateMetadata(key);
 					if (pushState) {
-						const url = `/manual/${key}`;
+						const url = metadata?.path || `/manual/${key}`;
 						history.pushState({ manualSection: key }, "", url);
 					}
 				},
@@ -194,10 +152,6 @@ export default class Manual extends ShellView {
 	}
 
 	destroy() {
-		for (const timer of this.copyResetTimers?.values() || []) {
-			clearTimeout(timer);
-		}
-		this.copyResetTimers?.clear();
 		if (this._onPopState) {
 			window.removeEventListener("popstate", this._onPopState);
 		}

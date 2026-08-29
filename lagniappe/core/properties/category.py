@@ -14,8 +14,7 @@ from ..mixins import ColumnMixin
 
 # @testable true
 # @tests tests_unit/test_007a_category_index.py::test_category_index
-# @features category-index
-# @dimensions table, columns
+# @matrix category-index : columns table
 class CategoryTable(Columns):
     _id = "table"
     _kind = "page"
@@ -56,8 +55,7 @@ class CategoryTable(Columns):
 
 # @testable true
 # @tests tests_unit/test_007_category_properties.py::test_category_filters
-# @features category, filters, page
-# @dimensions conditions, entity-fields, filter-value
+# @matrix category filters page : conditions entity-fields filter-value
 class CategoryFilters(Filters):
     def __init__(self, *args, entity=None, **kwargs):
         super().__init__(*args, entity=entity, **kwargs)

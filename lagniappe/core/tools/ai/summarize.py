@@ -5,8 +5,8 @@ from flask_login import current_user
 from ... import exceptions
 from ...definitions import FileConsumer, enforce_file_consumer
 from ..database import assets as storage_assets
-from ..files import extract_ooxml_text, is_supported_ooxml
-from ..files.ooxml import OOXMLExtractionError
+from ..files.ooxml import extract_ooxml, is_supported_ooxml
+from ..files.ooxml import OOXMLExtractionError, OOXMLTruncationReason
 from .core import ai_model, provider_error_details
 from .guidelines import SUMMARY_GENERATION_GUIDELINES
 from .prompt import Prompt
@@ -16,7 +16,29 @@ EXTRACTED_CONTEXT_NOTE = (
     "# This text was automatically extracted from {filename}. Formatting, "
     "formulas, dates, and embedded objects may be incomplete."
 )
-TRUNCATION_NOTE = "\n\n[Extracted text truncated at 200000 characters.]"
+TRUNCATION_NOTES = {
+    OOXMLTruncationReason.OUTPUT: (
+        "\n\n[Extracted text is partial because the prompt-text limit was reached.]"
+    ),
+    OOXMLTruncationReason.XML_BYTES: (
+        "\n\n[Extracted text is partial because the XML processing limit was reached.]"
+    ),
+    OOXMLTruncationReason.ELEMENTS: (
+        "\n\n[Extracted text is partial because the XML element limit was reached.]"
+    ),
+    OOXMLTruncationReason.SHEETS: (
+        "\n\n[Extracted text is partial because the worksheet limit was reached.]"
+    ),
+    OOXMLTruncationReason.ROWS: (
+        "\n\n[Extracted text is partial because the worksheet row limit was reached.]"
+    ),
+    OOXMLTruncationReason.CELLS: (
+        "\n\n[Extracted text is partial because the worksheet cell limit was reached.]"
+    ),
+    OOXMLTruncationReason.DEADLINE: (
+        "\n\n[Extracted text is partial because the extraction time limit was reached.]"
+    ),
+}
 SUMMARY_RETRIEVAL_TERM_COUNT = 2
 UNREADABLE_PDF_SUMMARY_ERROR = (
     "This PDF could not be read. It may be encrypted or password-protected."
@@ -28,8 +50,7 @@ PDF_PAGE_LIMIT_SUMMARY_ERROR = (
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_summary_eligibility_includes_ooxml_fallback
-# @features ai
-# @dimensions summary-prompt ooxml eligibility
+# @matrix ai : eligibility ooxml summary-prompt
 def can_summarize_file(file):
     """Return whether a file has an AI-readable original or OOXML fallback."""
     if _file_part(file):
@@ -44,7 +65,8 @@ def can_summarize_file(file):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_summary_eligibility_includes_ooxml_fallback
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-# @pairs ai:summary-prompt ai:ooxml ai:eligibility ai:task-queue
+# @matrix ai : eligibility ooxml summary-prompt task-queue
+# @pair file:summary-first
 def summarize_file(
     file,
     *,
@@ -64,7 +86,7 @@ def summarize_file(
         summarize.status = "Summarizing file..."
         if dispatch:
             from ...definitions import DeferredJobSpec, DeferredJobType
-            from ..deferred_jobs import DeferredJobs
+            from ..deferred_jobs.service import DeferredJobs
 
             DeferredJobs.start(
                 DeferredJobSpec(
@@ -98,14 +120,26 @@ def _file_part(file):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
 # @reason prompt truncation is part of the OOXML fallback prompt contract
-def _extracted_context(filename, text):
+def _extracted_context_header(filename):
     label = filename or "the uploaded file"
-    context = f"{EXTRACTED_CONTEXT_NOTE.format(filename=label)}\n\n{text.strip()}"
+    return f"{EXTRACTED_CONTEXT_NOTE.format(filename=label)}\n\n"
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
+# @reason typed OOXML truncation metadata is formatted through summary generation
+def _extracted_context(filename, result):
+    header = _extracted_context_header(filename)
+    text = result.text.strip()
+    note = TRUNCATION_NOTES.get(result.truncation_reason, "")
+    if note:
+        cutoff = max(0, EXTRACTED_CONTEXT_LIMIT - len(header) - len(note))
+        text = text[:cutoff].rstrip()
+    context = f"{header}{text}{note}"
     if len(context) <= EXTRACTED_CONTEXT_LIMIT:
         return context
 
-    cutoff = max(0, EXTRACTED_CONTEXT_LIMIT - len(TRUNCATION_NOTE))
-    return f"{context[:cutoff].rstrip()}{TRUNCATION_NOTE}"
+    return context[:EXTRACTED_CONTEXT_LIMIT].rstrip()
 
 
 # @testable false
@@ -129,20 +163,26 @@ def _add_ooxml_context(prompt, file):
                 filename=filename,
             )
         content = asset.get() if asset else None
-        text = extract_ooxml_text(content, filename=filename, mimetype=mimetype)
+        text_limit = EXTRACTED_CONTEXT_LIMIT - len(_extracted_context_header(filename))
+        result = extract_ooxml(
+            content,
+            filename=filename,
+            mimetype=mimetype,
+            max_characters=text_limit,
+        )
     except (AttributeError, OOXMLExtractionError, ValueError) as error:
         raise exceptions.AIException(
             f"Could not extract text from {filename or 'Office file'}."
         ) from error
 
-    if not str(text or "").strip():
+    if result is None or not str(result.text or "").strip():
         raise exceptions.AIException(
             f"No extractable text found in {filename or 'Office file'}."
         )
 
     prompt.add_context(
         "extracted_file_text",
-        _extracted_context(filename, text),
+        _extracted_context(filename, result),
     )
     return True
 
@@ -180,13 +220,13 @@ def _is_pdf_page_limit_error(file, error):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_updates_file_status_from_model_result
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_uses_docx_text_fallback
+# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_marks_partial_ooxml_context
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_reports_ooxml_extraction_errors
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_marks_unreadable_pdf_without_capture
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_marks_pdf_page_limit_without_capture
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_rejects_oversized_ooxml_before_download
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_populates_file_search_cache
-# @features ai
-# @dimensions summary-prompt status errors cache quota ooxml docx unreadable-pdf pdf-page-limit
+# @matrix ai : cache docx errors ooxml pdf-page-limit quota status summary-prompt unreadable-pdf
 def generate_summary(
     file,
     raise_quota=False,

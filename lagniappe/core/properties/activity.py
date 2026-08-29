@@ -1,7 +1,7 @@
 """DB and related-entity properties for activity entities."""
 
 from ..mixins import RelatedEntityListMixin, RelatedEntityMixin
-from ..tools import utility
+from ..tools.files.html import strip_tags
 from .base_asset import AssetProperty
 from .base_db import DBProperty
 
@@ -12,8 +12,7 @@ NOTE_SCOPES = frozenset({"home", "page"})
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_note_visibility_and_scope_validate_values
-# @features notes
-# @dimensions visibility persistence validation
+# @matrix notes : persistence validation visibility
 class Visibility(DBProperty):
     """Who may see a note within its owning surface."""
 
@@ -33,8 +32,7 @@ class Visibility(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_note_visibility_and_scope_validate_values
-# @features notes
-# @dimensions scope persistence validation
+# @matrix notes : persistence scope validation
 class Scope(DBProperty):
     """Surface that owns and displays a note."""
 
@@ -66,13 +64,6 @@ class AttachedUser(RelatedEntityMixin, DBProperty):
     _id = "user"
 
 
-class Target(RelatedEntityMixin, DBProperty):
-    """The entity a notification points back to."""
-
-    # Property Attributes
-    _id = "target"
-
-
 class InputFiles(RelatedEntityListMixin, DBProperty):
     """Files uploaded as input for an AI report."""
 
@@ -94,35 +85,10 @@ class Instructions(DBProperty):
     _id = "instructions"
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/notification.py::Notification.create
-# @reason pending is notification metadata exercised through notification workflows
-class Pending(DBProperty):
-    """Whether a notification represents work still in progress."""
-
-    _id = "pending"
-    _truthy = {True, "true", "True", "1", 1, "on", "yes"}
-
-    @property
-    def value(self):
-        return self.entity.db.get(self.db_key, False) in self._truthy
-
-    @value.setter
-    def value(self, value):
-        pending = value in self._truthy
-        self._value = pending
-
-        if pending:
-            self.entity.db[self.db_key] = True
-        else:
-            self.entity.db.pop(self.db_key, None)
-
-
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
-# @features activity notes notifications
-# @dimensions body html-stripping
+# @matrix activity notes notifications : body html-stripping
 class Body(DBProperty):
     """Plain-text body for notes and notifications."""
 
@@ -135,14 +101,13 @@ class Body(DBProperty):
 
     @value.setter
     def value(self, value):
-        body = utility.strip_tags(value).strip() if value else None
+        body = strip_tags(value).strip() if value else None
         DBProperty.value.fset(self, body)
 
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
-# @features activity notes
-# @dimensions photo asset-lifecycle
+# @matrix activity notes : asset-lifecycle photo
 class Photo(AssetProperty):
     """Optional image asset attached to a note."""
 

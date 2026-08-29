@@ -69,8 +69,7 @@ const viewData = (action) => {
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
- * @features analytics
- * @dimensions page-load
+ * @pair analytics:page-load
  */
 class AnalyticsManager {
 	get enabled() {

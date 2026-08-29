@@ -542,8 +542,7 @@ const hidePhotoLayout = async (
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_empty_page_photo_prompt_can_disable_photo_without_reload
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
- * @features pages
- * @dimensions photo-prompt image-generate image-add photo-disable desktop-tabs mobile-photo-tab
+ * @matrix pages : desktop-tabs image-add image-generate mobile-photo-tab photo-disable photo-prompt
  */
 const photoPrompt = (form) => {
 	const section = form.target.querySelector("[data-role='photo-prompt']");

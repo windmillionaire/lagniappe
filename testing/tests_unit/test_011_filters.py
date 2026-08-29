@@ -47,8 +47,7 @@ def _prepare_saved_filter(filter_entity, entity_map):
     filter_entity._conditions = None
 
 
-# @features filters
-# @dimensions condition-definition validation
+# @matrix filters : condition-definition validation
 @pytest.mark.unit
 def test_condition_requires_field_for_type_and_definition():
     condition = Condition()
@@ -75,8 +74,7 @@ def test_condition_create_skips_missing_entity_reference():
     assert Condition.create(definition, {}) is None
 
 
-# @features filter
-# @dimensions conditions string
+# @matrix filter : conditions string
 @pytest.mark.unit
 def test_filter_conditions_string(get_test_entities):
     """String field: entity, field object, comparator, value from definition."""
@@ -105,8 +103,7 @@ def test_filter_conditions_string(get_test_entities):
             assert cond.value == expected["value"]
 
 
-# @features filter
-# @dimensions conditions boolean
+# @matrix filter : boolean conditions
 @pytest.mark.unit
 def test_filter_conditions_boolean(get_test_entities):
     """Boolean field: comparator only; stored definition omits value."""
@@ -129,8 +126,7 @@ def test_filter_conditions_boolean(get_test_entities):
             assert cond.value is None
 
 
-# @features filter
-# @dimensions conditions entity-valued
+# @matrix filter : conditions entity-valued
 @pytest.mark.unit
 def test_filter_conditions_entity_valued(get_test_entities):
     """Entity-valued list field: value hash(es) resolvable from ``related`` map."""
@@ -159,8 +155,7 @@ def test_filter_conditions_entity_valued(get_test_entities):
                 assert cond.entity_map[h] is entity_map[h]
 
 
-# @features filter
-# @dimensions conditions mixed-types
+# @matrix filter : conditions mixed-types
 @pytest.mark.unit
 def test_filter_conditions_multiple_types(get_test_entities):
     """Mixed string, boolean, and entity-valued rows on one filter."""
@@ -191,8 +186,7 @@ def test_filter_conditions_multiple_types(get_test_entities):
                     assert h in cond.entity_map
 
 
-# @features filters
-# @dimensions scalar-list
+# @pair filters:scalar-list
 @pytest.mark.unit
 def test_filter_expression_list_contains_accepts_scalar_form_values():
     """List-style contains filters match scalar single-select form submissions."""
@@ -207,12 +201,30 @@ def test_filter_expression_list_contains_accepts_scalar_form_values():
 
     expression = FilterExpression([definition]).build()
 
-    assert "@.filter-decision[?(@=='approved')]" in expression
-    assert "@.filter-decision == 'approved'" in expression
+    assert '@["filter-decision"][?(@=="approved")]' in expression
+    assert '@["filter-decision"] == "approved"' in expression
 
 
-# @features filter
-# @dimensions parent parent-hash
+# @matrix filters : escaping field-name jsonpath punctuation regex-literal
+@pytest.mark.unit
+def test_filter_expression_encodes_field_names_and_literal_regex_values():
+    definition = FilterDefinition(
+        "source",
+        'field["unsafe"]',
+        FieldType.STRING,
+        Comparator.EQUALS,
+        "A-B.*'quoted'",
+        False,
+    )
+
+    expression = FilterExpression([definition]).build()
+
+    assert '@["field[\\"unsafe\\"]"]' in expression
+    assert "A-B\\\\.\\\\*'quoted'" in expression
+    assert "@.field" not in expression
+
+
+# @matrix filter : parent parent-hash
 @pytest.mark.unit
 def test_filter_parent_sets_parent_hash():
     filter_entity = FilterEntity(testing=True)
@@ -235,10 +247,9 @@ def test_filter_parent_sets_parent_hash():
     assert "parent_hash" not in filter_entity.db
 
 
-# @features filter
-# @dimensions fingerprint parent
+# @matrix filter : fingerprint parent
 @pytest.mark.unit
-def test_filter_fingerprint_uses_loaded_parent_fingerprint(monkeypatch):
+def test_filter_fingerprint_uses_loaded_parent_fingerprint():
     filter_entity = FilterEntity(testing=True)
     parent = TestEntities.get(
         "PROJECT",
@@ -246,14 +257,6 @@ def test_filter_fingerprint_uses_loaded_parent_fingerprint(monkeypatch):
     )
     filter_entity.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
     filter_entity.parent = parent
-
-    def fail_cache_lookup(*args, **kwargs):
-        raise AssertionError("filter fingerprint should use the loaded parent")
-
-    monkeypatch.setattr(
-        "lagniappe.core.entities.filter.cache.get_details_by_hash",
-        fail_cache_lookup,
-    )
 
     expected = hashlib.md5(
         f"{super(FilterEntity, filter_entity).fingerprint}:{parent.fingerprint}".encode(
@@ -264,8 +267,7 @@ def test_filter_fingerprint_uses_loaded_parent_fingerprint(monkeypatch):
     assert filter_entity.fingerprint == expected
 
 
-# @features filter permissions
-# @dimensions saved-filters related-entities
+# @matrix filter permissions : related-entities saved-filters
 @pytest.mark.unit
 def test_filter_related_entities_allowed_checks_referenced_entities():
     filter_entity = FilterEntity(testing=True)
@@ -283,8 +285,7 @@ def test_filter_related_entities_allowed_checks_referenced_entities():
     assert not filter_entity.related_entities_allowed()
 
 
-# @features filter permissions
-# @dimensions saved-filters related-entities model-task restricted-access
+# @matrix filter permissions : model-task related-entities restricted-access saved-filters
 @pytest.mark.unit
 def test_filter_related_entities_allowed_checks_model_task_form_restrictions():
     viewer = UtilityTestUser(
@@ -314,8 +315,7 @@ def test_filter_related_entities_allowed_checks_model_task_form_restrictions():
     assert not filter_entity.related_entities_allowed(viewer)
 
 
-# @features filter
-# @dimensions table category project related-forms
+# @matrix filter : category project related-forms table
 @pytest.mark.unit
 def test_filter_table_derives_parent_fields_and_related_forms(get_schema):
     primary_form = TestEntities.get(

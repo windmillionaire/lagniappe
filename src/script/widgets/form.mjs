@@ -6,8 +6,7 @@ import { RadioElement } from "../elements/radio";
  * @testable true
  * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
  * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
- * @features forms
- * @dimensions create page-form task-form
+ * @matrix forms : create page-form task-form
  */
 export class CreateForm extends FormElement {
 	init() {

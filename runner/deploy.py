@@ -13,6 +13,7 @@ from config import (
     _atomic_write_text,
     verify_generation_manifest,
 )
+from runner.frontend_build import verify_frontend_build
 from runner.process import run_command
 
 PACKAGE_IMPORTS = {
@@ -24,6 +25,7 @@ PACKAGE_IMPORTS = {
     "google.auth": "google-auth",
     "google.cloud.datastore": "google-cloud-datastore",
     "google.cloud.documentai": "google-cloud-documentai",
+    "google.cloud.firestore_admin_v1": "google-cloud-firestore",
     "google.cloud.storage": "google-cloud-storage",
     "google.cloud.tasks_v2": "google-cloud-tasks",
     "google.genai": "google-genai",
@@ -245,8 +247,7 @@ def _is_stdlib_module(root):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirements
 # @tests tests_tooling/test_003_config.py::test_runtime_upload_boundary_has_no_local_orchestration_imports
-# @features deploy
-# @dimensions deploy-surface imports requirements gcloudignore package-boundary
+# @matrix deploy : deploy-surface gcloudignore imports package-boundary requirements
 def runtime_deploy_surface_issues(app_dir=None):
     """Return import issues that would break after App Engine upload/install."""
     app_dir = Path(app_dir or Directory.APP.value)
@@ -298,8 +299,7 @@ def runtime_deploy_surface_issues(app_dir=None):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirements
-# @features deploy
-# @dimensions deploy-surface imports requirements gcloudignore
+# @matrix deploy : deploy-surface gcloudignore imports requirements
 def verify_runtime_deploy_surface(app_dir=None):
     issues = runtime_deploy_surface_issues(app_dir)
     if not issues:
@@ -313,8 +313,7 @@ def verify_runtime_deploy_surface(app_dir=None):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_version_update_keeps_package_lock_in_sync
-# @features deploy
-# @dimensions version package-lock transactional-state utf8
+# @matrix deploy : package-lock transactional-state utf8 version
 def update_package_lock_version(version, lock_path=None):
     """Keep package-lock root metadata aligned with package.json."""
     path = lock_path or File.PACKAGE_JSON.value.with_name("package-lock.json")
@@ -368,26 +367,41 @@ def update_manifest():
 # @testable false
 # @covered-by runner/deploy.py::deploy
 # @reason gcloud deployment adapter is exercised through publish-mode deployment
-def _deploy_app_yaml(file_ref, quiet=False):
+def _deploy_app_yaml(file_ref, quiet=False, *, capture_output=False):
     command = [GCLOUD_CLI, "app", "deploy", str(file_ref.value)]
     if quiet:
         command.append("--quiet")
-    result = run_command(command, check=False, capture_output=False)
+    project = str(
+        SETTINGS.APP.get("GOOGLE_CLOUD_PROJECT")
+        or (getattr(SETTINGS, "GCLOUD_CONFIG", {}) or {}).get("PROJECT")
+        or ""
+    ).strip()
+    if project:
+        command.extend(["--project", project])
+    result = run_command(
+        command,
+        check=False,
+        capture_output=capture_output,
+    )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"gcloud app deploy failed with exit code {result.returncode}."
-        )
+        message = f"gcloud app deploy failed with exit code {result.returncode}."
+        if capture_output:
+            details = str(result.stderr or result.stdout or "").strip()
+            if details:
+                message = f"{message}\n{details}"
+        raise RuntimeError(message)
 
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
-# @features deploy
-# @dimensions version build app-yaml index-yaml
+# @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
 def deploy(
     *,
     build_assets=True,
     deploy_indexes=False,
     quiet=False,
+    capture_output=False,
+    announce_progress=True,
     announce_completion=True,
 ):
     """Build frontend assets, refresh generated metadata, and deploy the app."""
@@ -397,24 +411,39 @@ def deploy(
         update_manifest()
         SETTINGS.save()
 
-    if build_assets:
-        Directory.JS_CHUNKS.clean()
-
+    if build_assets and announce_progress:
         print("Building static files...")
+    if build_assets:
         run_command([NPM_CLI, "run", "build"], check=True, capture_output=False)
 
-    verify_generation_manifest()
-    print(
-        "Deployment includes config/files/lagniappe_settings.yaml and, when "
-        "configured, config/files/redis_ca.pem. Keep both files secure."
+    verify_frontend_build(
+        app_dir=Directory.APP.value,
+        expected_mode="production",
+        expected_version=str(SETTINGS.APP["VERSION"]),
     )
+    verify_generation_manifest()
+    if announce_progress:
+        print(
+            "Deployment includes config/files/lagniappe_settings.yaml and, when "
+            "configured, config/files/redis_ca.pem. Keep both files secure."
+        )
 
     if deploy_indexes:
-        print("Deploying indexes...")
-        _deploy_app_yaml(File.INDEX_YAML, quiet=quiet)
+        if announce_progress:
+            print("Deploying indexes...")
+        _deploy_app_yaml(
+            File.INDEX_YAML,
+            quiet=quiet,
+            capture_output=capture_output,
+        )
 
-    print("Deploying app...")
-    _deploy_app_yaml(File.APP_YAML, quiet=quiet)
+    if announce_progress:
+        print("Deploying app...")
+    _deploy_app_yaml(
+        File.APP_YAML,
+        quiet=quiet,
+        capture_output=capture_output,
+    )
 
     if announce_completion:
         print("Deployment complete!")

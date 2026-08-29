@@ -1,26 +1,16 @@
-"""
-Tests for page creation and management from category index.
-
-Tests page creation flows and page navigation.
-
-Maps to:
-- Entity: lagniappe/core/entities/page.py
-- Routes: lagniappe/web/routes/pages/
-- Templates: lagniappe/web/templates/pages/, lagniappe/web/templates/categories/
-- View: src/script/views/page.mjs, src/script/views/category.mjs
-"""
-
 import re
+from urllib.parse import urlsplit
 
 from playwright.sync_api import expect
 import pytest
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Categories, Forms, Pages, Submissions, Users
+from testing.definitions import Categories, Forms, Pages, Submissions, Uploads, Users
 from testing.elements import (
     Attributes,
     Buttons,
+    EditorAddImage,
     FormSelect,
     Modal,
     Select,
@@ -28,16 +18,14 @@ from testing.elements import (
     Table,
     Tabs,
 )
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 from testing.utility.test_file import TestFile as UploadTestFile
 
 pytestmark = pytest.mark.e2e
 
 
-# @features entity-layout
-# @dimensions query-tab persistence
+# @matrix entity-layout : persistence query-tab
 def test_page_url_tab_overrides_saved_tab(get_user):
-    """A tab query parameter wins over the previously saved entity tab."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)
@@ -61,8 +49,7 @@ def test_page_url_tab_overrides_saved_tab(get_user):
     )
 
 
-# @features pages
-# @dimensions attributes-live-toggle tabs no-reload
+# @matrix pages : attributes-live-toggle no-reload tabs
 # @template pages/page.html::main
 # @template pages/info.html::info_form
 def test_page_attribute_toggle_updates_tabs_without_reload(get_user):
@@ -90,10 +77,8 @@ def test_page_attribute_toggle_updates_tabs_without_reload(get_user):
     assert user.page.evaluate("window.__attributeToggleNoReload") is True
 
 
-# @features pages
-# @dimensions submission default-form
+# @matrix pages : default-form submission
 def test_page_with_default_category_form(get_user):
-    """Test a page with the default category form."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_with_default_category_form.get(user)
     user.go(page)
@@ -104,8 +89,7 @@ def test_page_with_default_category_form(get_user):
     page.submit_and_verify_submission(submission)
 
 
-# @features pages
-# @dimensions form-switch info-form
+# @matrix pages : form-switch info-form
 def test_switch_page_form(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_switch_page_form.get(user)
@@ -124,8 +108,7 @@ def test_switch_page_form(get_user):
         expect(field.locate(info_form)).to_be_visible()
 
 
-# @features pages
-# @dimensions form-clear info-form
+# @matrix pages : form-clear info-form
 def test_clear_page_info_form_selector_keeps_widget_stable(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_switch_page_form.get(user)
@@ -156,11 +139,12 @@ def _document_save_response(text):
     return predicate
 
 
-# @features pages
-# @dimensions document-visibility public private public-document
+# @matrix pages : document-visibility private public public-document
+# @pair public-directory:category
 def test_document_visibility_can_toggle_public_private(get_user, browser_failures):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_document_visibility_page)
+    category = page.definition.category.get(user)
 
     editor = page.editor
     editor.clear_text()
@@ -172,11 +156,26 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
 
     settings = _open_document_settings(user, page)
     settings.locator("input[value='public']").check()
+    directory_category = settings.locator("select[name='directory-category']")
+    directory_category_select = Select(
+        settings.locator("[data-role='directory-category']")
+    )
+    expect(directory_category).to_be_hidden()
+    expect(directory_category.locator("option")).to_contain_text(
+        ["Public Pages", category.definition.name]
+    )
+    expect(directory_category_select.input).to_have_attribute(
+        "placeholder", "Public Pages"
+    )
+    directory_category_select.select_by_key(category.key)
     with user.page.expect_response("**/visibility"):
         SpinnerButtons.UPDATE.click(settings)
 
-    expect(settings).to_contain_text("This document is currently public")
+    expect(settings).to_contain_text("This page is public")
     expect(settings.locator("input[value='public']")).to_be_checked()
+    expect(settings.locator("select[name='directory-category']")).to_have_value(
+        category.key
+    )
     public_link = settings.locator("a")
     expect(public_link).to_be_visible()
     public_url = public_link.evaluate("(element) => element.href")
@@ -187,17 +186,125 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
 
     user.go(page)
     settings = _open_document_settings(user, page)
-    expect(settings).to_contain_text("This document is currently public")
+    expect(settings).to_contain_text("This page is public")
     expect(settings.locator("input[value='public']")).to_be_checked()
     assert settings.locator("a").evaluate("(element) => element.href") == public_url
+
+    directory_category_select = Select(
+        settings.locator("[data-role='directory-category']")
+    )
+    expect(directory_category_select.input).to_have_attribute(
+        "placeholder", category.definition.name
+    )
+    directory_category_select.select_by_name("Public Pages")
+    with user.page.expect_response("**/visibility"):
+        SpinnerButtons.UPDATE.click(settings)
+    assert SpinnerButtons.UPDATE_SUCCESS.successful(settings)
+    expect(
+        Select(settings.locator("[data-role='directory-category']")).input
+    ).to_have_attribute("placeholder", "Public Pages")
 
     settings.locator("input[value='private']").check()
     with user.page.expect_response("**/visibility"):
         SpinnerButtons.UPDATE.click(settings)
 
-    expect(settings).to_contain_text("This document is currently private")
+    expect(settings).to_contain_text("This page is private")
     expect(settings.locator("input[value='private']")).to_be_checked()
     expect(settings.locator("a")).to_have_count(0)
+
+
+# @matrix public-pages : document-image metadata preview public-rendering public-route revocation
+# @template public/nav.html::public_nav
+def test_public_document_images_are_anonymous_and_revocable(
+    get_user,
+    browser,
+    browser_failures,
+    setup_test_server,
+):
+    user = get_user(Users.OWNER)
+    page = user.go(Pages.test_document_visibility_page)
+    editor = page.editor
+    editor.clear_text()
+    marker = "Public image route marker"
+    editor.type_text(marker)
+
+    image_form = EditorAddImage(editor).form
+    Uploads.editor_test_image.set(image_form)
+    with user.page.expect_response("**/document/image"):
+        SpinnerButtons.UPLOAD.click(image_form)
+    image = editor.get_element("img")
+    expect(image).to_be_visible()
+    editor.wait_for_render()
+    with user.page.expect_response(_document_save_response(marker)):
+        user.page.evaluate("window.dispatchEvent(new CustomEvent('sync-save'))")
+
+    user.go(page)
+    settings = _open_document_settings(user, page)
+    settings.locator("input[value='public']").check()
+    preview = settings.locator(
+        "input[name='preview-image-asset']:not([value=''])"
+    )
+    expect(preview).to_have_count(1)
+    preview.check()
+    settings.locator("input[name='public-title']").fill("Public image preview")
+    with user.page.expect_response("**/visibility"):
+        SpinnerButtons.UPDATE.click(settings)
+    public_url = settings.locator("a").evaluate("element => element.href")
+
+    anonymous_context = browser.new_context()
+    if setup_test_server.browser_cookies:
+        anonymous_context.add_cookies(list(setup_test_server.browser_cookies))
+    try:
+        anonymous = anonymous_context.new_page()
+        anonymous.add_init_script(
+            """
+            Object.defineProperty(navigator, "share", {
+              configurable: true,
+              value: undefined,
+            });
+            Object.defineProperty(navigator, "clipboard", {
+              configurable: true,
+              value: { writeText: async () => {} },
+            });
+            """
+        )
+        response = anonymous.goto(public_url)
+        assert response.status == 200
+        expect(anonymous.locator("meta[property='og:title']")).to_have_attribute(
+            "content", "Public image preview"
+        )
+        share_button = anonymous.locator("[data-role='share-button']")
+        expect(share_button).to_contain_class("action-button")
+        expect(share_button.locator("[data-icon='share']")).to_be_visible()
+        share_button.click()
+        expect(share_button.locator("[data-role='share-label']")).to_have_text(
+            "Copied"
+        )
+        expect(anonymous.locator("[data-role='share-status']")).to_have_text(
+            "Link copied"
+        )
+        public_image = anonymous.locator("#content img")
+        expect(public_image).to_be_visible()
+        public_image_url = public_image.get_attribute("src")
+        assert "/pages/public/" in public_image_url
+        assert "/images/image_" in public_image_url
+        public_image_path = urlsplit(public_image_url).path
+        origin = anonymous.evaluate("location.origin")
+        image_response = anonymous_context.request.get(
+            f"{origin}{public_image_path}"
+        )
+        assert image_response.status == 200
+    finally:
+        anonymous_context.close()
+
+    user.go(page)
+    settings = _open_document_settings(user, page)
+    settings.locator("input[value='private']").check()
+    with user.page.expect_response("**/visibility"):
+        SpinnerButtons.UPDATE.click(settings)
+
+    revoked = user.page.context.request.get(f"{origin}{public_image_path}")
+    assert revoked.status == 404
     with browser_failures.expect_http_error(
         user,
         status=404,
@@ -207,8 +314,7 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
     assert private_response.status == 404
 
 
-# @features pages
-# @dimensions file-upload delete
+# @matrix pages : delete file-upload
 # @template pages/files.html::file_list_item
 def test_add_file_to_page(get_user):
     user = get_user(Users.OWNER)
@@ -246,8 +352,7 @@ def test_add_file_to_page(get_user):
     expect(file_list.locator("li").filter(has_text="editor_test_image")).to_have_count(0)
 
 
-# @features file pages
-# @dimensions file-upload page-upload multi-file
+# @matrix file pages : file-upload multi-file page-upload
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 def test_add_multiple_files_to_page_hides_existing_file_select(get_user):
@@ -292,8 +397,7 @@ def test_add_multiple_files_to_page_hides_existing_file_select(get_user):
         assert file_entity.name == expected_name
 
 
-# @features pages
-# @dimensions category-add
+# @pair pages:category-add
 def test_add_category_to_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_category_edit_page)
@@ -315,14 +419,14 @@ def test_add_category_to_page(get_user):
     expect(user.locate(page.PAGE_TITLE)).to_contain_text(page.definition.name)
 
 
-# @features pages
-# @dimensions delete title-menu parentless
+# @matrix pages : delete parentless title-menu
 # @template pages/page.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
 def test_delete_page_from_title_menu(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_delete_page)
+    page.wait_for_interaction_readiness()
 
     trigger = user.page.get_by_role("button", name="Page actions")
     trigger.hover()
@@ -341,8 +445,7 @@ def test_delete_page_from_title_menu(get_user):
     assert Entities.fetch_one(page.key, request=Fetch.root()) is None
 
 
-# @features pages
-# @dimensions category-remove
+# @pair pages:category-remove
 def test_remove_category_from_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_category_edit_page)

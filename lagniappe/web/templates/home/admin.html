@@ -1,7 +1,7 @@
 {% set view_entry = "admin" %}
 {% extends "layouts/base.html" %}
 {% from 'home/site_settings.html' import site_settings %}
-{% from 'home/export.html' import export_tab %}
+{% from 'manual/macros.html' import card as manual_card, code as command_block, subheading as manual_subheading with context %}
 {% import 'home/ingress.html' as ingress %}
 {% import 'controls.html' as controls %}
 
@@ -25,19 +25,19 @@
             class="{{ styles.entity.tabIcon }}">
       {{ render_icon("siteOwner") }}
     </button>
-    <button lp-show="exports:active"
-            data-kind="file"
-            title="Export"
-            aria-label="Export"
-            class="{{ styles.entity.tabIcon }}">
-      {{ render_icon("download") }}
-    </button>
     <button lp-show="ingress:active"
             data-kind="file"
             title="Import Data"
             aria-label="Import Data"
             class="{{ styles.entity.tabIcon }}">
       {{ render_icon("import", kind="file") }}
+    </button>
+    <button lp-show="backups:active"
+            data-kind="default"
+            title="Backups & Archives"
+            aria-label="Backups & Archives"
+            class="{{ styles.entity.tabIcon }}">
+      {{ render_icon("database") }}
     </button>
   </nav>
 {% endmacro %}
@@ -107,6 +107,119 @@
   </div>
 {% endmacro %}
 
+{% macro backups_tab() %}
+  <div id="backups"
+       lp-component
+       data-title="Backups & Archives"
+       data-tab="true"
+       data-visible="false"
+       data-kind="default"
+       data-role="manual-content"
+       class="mt-4 sm:mt-0 p-4 sm:p-6"
+       data-parent-nav="tabs">
+    {% call manual_card() %}
+      {{ manual_subheading("Data protection") }}
+      {% if data_protection_error %}
+        <p class="mt-2 text-red-700">Backup status is currently unavailable: {{ data_protection_error }}</p>
+      {% else %}
+        <p class="mt-2">Database <code>{{ data_protection.database }}</code> · {{ data_protection.pitr }}</p>
+        {% if data_protection.earliest_version_time %}
+          <p class="mt-1 text-sm">Earliest recoverable point: {{ data_protection.earliest_version_time }}</p>
+        {% endif %}
+        <ul class="mt-3 list-disc pl-6">
+          {% for schedule in data_protection.schedules %}
+            <li>{{ schedule.recurrence }} backup · retention {{ schedule.retention }}</li>
+          {% else %}
+            <li>No native backup schedules were reported.</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endcall %}
+    {% if data_protection %}
+      {% call manual_card() %}
+        {{ manual_subheading("Automatic backups") }}
+        <p class="text-sm text-base-medium">
+          Google creates and expires these on the schedules above. They protect the database,
+          but must be prepared as a manual backup before Lagniappe can restore one together with
+          its exact referenced files.
+        </p>
+        {% if data_protection.native_backups %}
+          <details class="mt-4 rounded-lg bg-base-bg">
+            <summary class="cursor-pointer px-4 py-3 text-base-dark marker:text-kind-default">
+              <span class="ml-1 font-medium">
+                Show {{ data_protection.native_backups|length }} automatic
+                backup{{ "s" if data_protection.native_backups|length != 1 else "" }}
+              </span>
+            </summary>
+            <ul class="space-y-4 border-t border-base-light/40 p-4">
+              {% for backup in data_protection.native_backups %}
+                <li class="rounded-lg bg-white p-4">
+                  <div><code>{{ backup.id }}</code> · {{ backup.state }} · snapshot {{ backup.snapshot_time or "pending" }}{% if backup.expire_time %} · expires {{ backup.expire_time }}{% endif %}</div>
+                  {% if backup.prepare_command %}
+                    <p class="mt-3 font-medium">Prepare as a manual backup</p>
+                    {{ command_block(backup.prepare_command) }}
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
+        {% else %}
+          <p class="mt-4">No automatic backups were reported yet.</p>
+        {% endif %}
+      {% endcall %}
+      {% call manual_card() %}
+        {{ manual_subheading("Manual backups") }}
+        <p class="text-sm text-base-medium">
+          A manual backup contains one exact database snapshot and copies of every referenced
+          file version. It remains available until you delete it.
+        </p>
+        <p class="mt-3 font-medium">Create a new manual backup</p>
+        {{ command_block(data_protection.instructions.create_manual) }}
+        <ul class="mt-5 space-y-4">
+          {% for backup in data_protection.recovery_sets %}
+            <li class="rounded-lg bg-base-bg p-4">
+              <div>
+                <code>{{ backup.backup_id }}</code> · {{ backup.snapshot_time }} ·
+                {{ backup.entity_count }} entities · {{ backup.asset_count }} assets
+              </div>
+              <dl class="mt-4 space-y-4 text-sm">
+                <div><dt class="font-medium">Check the restore without changing data</dt><dd>{{ command_block("./setup.sh restore " ~ backup.backup_id ~ " --dry-run") }}</dd></div>
+                <div><dt class="font-medium">Restore this manual backup</dt><dd>{{ command_block("./setup.sh restore " ~ backup.backup_id) }}</dd></div>
+                <div><dt class="font-medium">Create a portable archive</dt><dd>{{ command_block("./setup.sh archive " ~ backup.backup_id) }}</dd></div>
+                <div><dt class="font-medium">Validate the default portable archive path</dt><dd>{{ command_block('./setup.sh archive validate "archives/' ~ backup.backup_id ~ '"') }}</dd></div>
+                <div><dt class="font-medium">Permanently delete this manual backup</dt><dd>{{ command_block("./setup.sh backup delete " ~ backup.backup_id) }}</dd></div>
+              </dl>
+            </li>
+          {% else %}
+            <li>No manual backups have been created or prepared yet.</li>
+          {% endfor %}
+        </ul>
+      {% endcall %}
+      {% call manual_card() %}
+        {{ manual_subheading("Portable archives and restores") }}
+        <p class="text-sm text-base-medium">
+          Run backup and restore commands from the installation checkout. Restores must be run
+          with the CLI. The check command performs the restore preflight without changing data.
+        </p>
+        <p class="mt-3 text-sm text-base-medium">
+          Point-in-time recovery and automatic backups stay inside Google Cloud and are available
+          only for their retention window. A portable archive is an independent, downloadable copy
+          of a manual backup with portable data, documents, and files. It can be validated without
+          Google access, but it is not itself the source used by the restore command.
+        </p>
+        <p class="mt-3 text-sm text-base-medium">
+          Archive validation is a read-only, offline integrity check. It verifies the manifest and
+          checksums, portable data schema and relationships, local viewer links, and saved-file
+          inventory. Pass the directory or ZIP path printed when the archive was created; replace
+          the default path above when a custom output path was used.
+        </p>
+        <p class="mt-3 font-medium">Validate any portable archive</p>
+        {{ command_block('./setup.sh archive validate "ARCHIVE_PATH"') }}
+      {% endcall %}
+    {% endif %}
+  </div>
+{% endmacro %}
+
 {% macro main() %}
   <div lp-view
        data-kind="admin"
@@ -129,8 +242,8 @@
           {{ toggles('tabs') }}
         </div>
         {{ settings_tab() }}
-        {{ export_tab() }}
         {{ ingress_tab() }}
+        {{ backups_tab() }}
       </div>
     </div>
   </div>

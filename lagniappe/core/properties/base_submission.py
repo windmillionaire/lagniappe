@@ -62,8 +62,7 @@ class SubmissionProperty:
 
     # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_db_value_omits_unset_number_field
-    # @features submission
-    # @dimensions db-value, empty-field
+    # @matrix submission : db-value empty-field
     @property
     def db_value(self):
         submission = {
@@ -97,8 +96,7 @@ class SubmissionProperty:
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_merges_table_column_labels
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_accepts_scalar_boolean_values
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_omits_blank_search_fields
-    # @features form-table submission
-    # @dimensions search-value
+    # @matrix form-table submission : search-value
     @property
     def search_value(self):
         keys, values = [], []

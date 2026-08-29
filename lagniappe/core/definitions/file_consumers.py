@@ -81,6 +81,7 @@ class FileConsumerLimitError(ValueError):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_file_consumer_limits_use_metadata_before_reading
+# @pair files:size-limit
 def known_file_size(source):
     """Return a file-like object's byte size without reading its contents."""
     if isinstance(source, int):
@@ -126,6 +127,7 @@ def _megabyte_label(size):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_file_consumer_limits_use_metadata_before_reading
 # @tests tests_unit/test_018_database_assets.py::test_direct_upload_full_read_requires_named_bounded_consumer
+# @matrix files : bounded-consumer size-limit
 def enforce_file_consumer(source, consumer, *, filename=None, size=None):
     """Authorize a named consumer after checking size without reading bytes."""
     if not isinstance(consumer, FileConsumer):

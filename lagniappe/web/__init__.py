@@ -30,8 +30,8 @@ if CONFIG.capture_errors:
     sentry_sdk.init(
         dsn=CONFIG.SENTRY_DSN,
         send_default_pii=False,
-        traces_sample_rate=1.0,
-        profile_session_sample_rate=1.0,
+        traces_sample_rate=CONFIG.SENTRY_TRACES_SAMPLE_RATE,
+        profile_session_sample_rate=CONFIG.SENTRY_PROFILE_SESSION_SAMPLE_RATE,
         profile_lifecycle="trace",
         before_send=filter_sentry_event,
         before_send_transaction=sanitize_sentry_event,
@@ -68,10 +68,7 @@ GOOGLE_IDENTITY_BASE = "https://accounts.google.com/gsi/"
 GOOGLE_IDENTITY_SCRIPT = f"{GOOGLE_IDENTITY_BASE}client"
 GOOGLE_IDENTITY_STYLE = f"{GOOGLE_IDENTITY_BASE}style"
 SCRIPT_SRC = f"script-src 'self' {GOOGLE_IDENTITY_SCRIPT}"
-CONNECT_SRC = (
-    "connect-src 'self' https://*.googleapis.com "
-    f"{GOOGLE_IDENTITY_BASE}"
-)
+CONNECT_SRC = f"connect-src 'self' https://*.googleapis.com {GOOGLE_IDENTITY_BASE}"
 STORAGE_SRC = "https://storage.googleapis.com"
 
 if SENTRY_LOADED and CONFIG.SENTRY_JS_DSN:
@@ -93,10 +90,7 @@ CSP = "; ".join(
         f"media-src 'self' {STORAGE_SRC}",
         "font-src 'self'",
         CONNECT_SRC,
-        (
-            "frame-src 'self' https://www.youtube-nocookie.com "
-            f"{GOOGLE_IDENTITY_BASE}"
-        ),
+        (f"frame-src 'self' https://www.youtube-nocookie.com {GOOGLE_IDENTITY_BASE}"),
         "frame-ancestors 'self'",
         "worker-src 'self' blob:",
         "manifest-src 'self'",
@@ -125,16 +119,16 @@ def clear_request_notification_state():
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/notification_email.py::record_site_activity
+# @covered-by lagniappe/core/tools/email/notifications/presence.py::record_site_activity
 # @reason Flask response-hook wiring delegates to the tested coarse activity service
 @app.after_request
 def record_authenticated_site_activity(response):
     """Keep a coarse Redis activity hint without adding browser requests."""
     user_key = session.get(CONFIG.LOGIN_USER_KEY) if session.get("_user_id") else None
     if user_key and request.endpoint != "static":
-        from lagniappe.core.tools import notification_email
+        from lagniappe.core.tools.email.notifications import presence
 
-        notification_email.record_site_activity(user_key)
+        presence.record_site_activity(user_key)
     return response
 
 
@@ -142,8 +136,8 @@ def record_authenticated_site_activity(response):
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
-# @features web-headers
-# @dimensions etag security conditional-request missing-fingerprint entity-revision
+# @matrix web-headers : conditional-request entity-revision etag missing-fingerprint security
+# @pair login:logout
 @app.after_request
 def add_lagniappe_headers(response):
     """Add security headers, ETag fingerprinting, and cache invalidation flag."""

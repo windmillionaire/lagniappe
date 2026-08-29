@@ -21,8 +21,7 @@ from lagniappe.core.properties.schema import SCHEMA_FORMAT_VERSION
 from testing.utility.test_entities import TestEntities
 
 
-# @features form-schema
-# @dimensions cache
+# @pair form-schema:cache
 @pytest.mark.unit
 def test_form_schema_change_refreshes_table_fields_and_filter_conditions(get_schema):
     """Replacing ``form.schema`` must invalidate table and filter caches."""
@@ -53,8 +52,7 @@ def test_form_schema_change_refreshes_table_fields_and_filter_conditions(get_sch
     ]
 
 
-# @features form
-# @dimensions update schema form-type
+# @matrix form : form-type schema update
 @pytest.mark.unit
 def test_form_update_sets_name_form_type_and_schema(get_schema):
     """``Form.update`` handles ``name``, ``form-type``, and ``schema`` (str or list)."""
@@ -73,8 +71,7 @@ def test_form_update_sets_name_form_type_and_schema(get_schema):
     assert form.schema == get_schema("number_input_only")
 
 
-# @features form-schema
-# @dimensions canonicalization write-gateway membership
+# @matrix form-schema : canonicalization membership write-gateway
 @pytest.mark.unit
 def test_form_schema_write_gateway_canonicalizes_without_adding_page_fields():
     page_form = TestEntities.get(
@@ -117,8 +114,7 @@ def test_form_schema_write_gateway_canonicalizes_without_adding_page_fields():
     ]
 
 
-# @features form
-# @dimensions schema-version update
+# @matrix form : schema-version update
 @pytest.mark.unit
 def test_schema_version_update_changes_when_schema_changes(get_schema):
     """``SchemaVersion.update`` returns prior hash or ``False`` when unchanged."""
@@ -139,9 +135,7 @@ def test_schema_version_update_changes_when_schema_changes(get_schema):
     assert form.version != previous_hash
 
 
-# @features form
-# @dimensions save schema-history relations
-# @source lagniappe/core/mutations/save.py::FormMutation.plan_save
+# @matrix form : relations save schema-history
 @pytest.mark.unit
 def test_form_save_records_schema_history_on_version_change(get_schema):
     """The Form planner should stage history for the previous schema."""
@@ -165,7 +159,7 @@ def test_form_save_records_schema_history_on_version_change(get_schema):
             "create",
             return_value=history,
         ) as create_history,
-        patch.object(form_module.database.get, "form_users", return_value=[]),
+        patch.object(form_module.database_get, "form_users", return_value=[]),
         patch.object(form_module.Entities, "fetch", return_value=[]),
     ):
         plan = plan_mutation(MutationOperation.SAVE, form, registry=Entities)
@@ -182,8 +176,7 @@ def test_form_save_records_schema_history_on_version_change(get_schema):
     assert all(effect.property_mask is None for effect in writes[:2])
 
 
-# @features form-type
-# @dimensions property column details cache
+# @matrix form-type : cache column details property
 @pytest.mark.unit
 def test_form_type(get_test_entities):
     """Test FormType property with ColumnMixin, DetailsMixin, CacheMixin.
@@ -214,8 +207,7 @@ def test_form_type(get_test_entities):
         assert form.to_cache["type"] == form.form_type
 
 
-# @features form-schema
-# @dimensions property fields
+# @matrix form-schema : fields property
 @pytest.mark.unit
 def test_form_schema(get_test_entities, get_schema):
     """Test Schema property setter creates correct field objects.
@@ -242,8 +234,7 @@ def test_form_schema(get_test_entities, get_schema):
             assert field.label == element["title"]
 
 
-# @features form-schema form-table
-# @dimensions table-fields
+# @matrix form-schema form-table : table-fields
 @pytest.mark.unit
 def test_form_table_fields(get_test_entities, get_schema):
     """Test table_fields returns column fields from Table elements."""
@@ -261,8 +252,7 @@ def test_form_table_fields(get_test_entities, get_schema):
             assert table_fields == {}
 
 
-# @features form-schema html-field
-# @dimensions html-fields
+# @matrix form-schema html-field : html-fields
 @pytest.mark.unit
 def test_form_html_fields(get_test_entities, get_schema):
     """Test html_fields returns HTML field objects."""
@@ -277,8 +267,7 @@ def test_form_html_fields(get_test_entities, get_schema):
             assert html_fields == []
 
 
-# @features form filters
-# @dimensions conditions schema-fields exclude-table-fields
+# @matrix filters form : conditions exclude-table-fields schema-fields
 @pytest.mark.unit
 def test_form_filters(get_test_entities, get_schema):
     """Test FormFilters.conditions transforms schema into filter conditions.
