@@ -7,7 +7,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Action
 from lagniappe.core.entities import Entities
-from testing.definitions import Users
+from testing.definitions import SitePages, Users
 from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields
 from testing.definitions.user_definitions import UserDefinition
@@ -43,6 +43,7 @@ def test_builder_save_failure_releases_control_for_retry(
         ),
         creator=owner,
     )
+    user.go(SitePages.HOME).wait_for_interaction_readiness()
     _set_forms_permission(user, Action.EDIT)
     form.user = user
     builder = form.builder
