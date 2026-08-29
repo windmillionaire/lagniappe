@@ -1,9 +1,10 @@
 import pytest
 from playwright.sync_api import expect
 
+from lagniappe import CONFIG
+from lagniappe.core.tools import cache
 from lagniappe.web import app
 from lagniappe.web import auth as web_auth
-from lagniappe.web.routes.home import public as public_routes
 from testing.definitions import Categories, Projects, SitePages, Tasks, Users
 from testing.elements import HeaderSearch, List
 from testing.resources import Task
@@ -47,9 +48,9 @@ def test_public_directory_renders_cached_page_groups(monkeypatch):
             }
         ],
     }
-    monkeypatch.setattr(public_routes.CONFIG, "PUBLIC_MANUAL", False)
+    monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", False)
     monkeypatch.setattr(
-        public_routes.cache,
+        cache,
         "cached_public_directory",
         lambda builder: snapshot,
     )
@@ -68,7 +69,7 @@ def test_public_directory_renders_cached_page_groups(monkeypatch):
 
     empty = {"schema": 1, "site_indexing": True, "groups": []}
     monkeypatch.setattr(
-        public_routes.cache,
+        cache,
         "cached_public_directory",
         lambda builder: empty,
     )
