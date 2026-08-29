@@ -199,6 +199,7 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
     directory_category_select.select_by_name("Public Pages")
     with user.page.expect_response("**/visibility"):
         SpinnerButtons.UPDATE.click(settings)
+    assert SpinnerButtons.UPDATE_SUCCESS.successful(settings)
     expect(
         Select(settings.locator("[data-role='directory-category']")).input
     ).to_have_attribute("placeholder", "Public Pages")
