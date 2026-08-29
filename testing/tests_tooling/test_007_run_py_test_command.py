@@ -2617,7 +2617,7 @@ def test_run_py_version_set_updates_package_settings_and_release_file(
     }
     assert lock_versions == ["1.25"]
     assert (tmp_path / "documentation" / "releases" / "1.25.md").read_text() == (
-        "# Version 1.25\n\n"
+        "# Version 1.25\n"
     )
     assert "**Applies to:** Lagniappe 1.25  " in reporting_markdown.read_text()
     assert "**Effective date:** July 26, 2026  " in reporting_markdown.read_text()
