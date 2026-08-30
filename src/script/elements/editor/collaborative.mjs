@@ -14,6 +14,7 @@ import { Toolbar } from "./toolbar";
  * @tests tests_e2e/004_projects/test_004d_document.py::test_editor_loads_and_saves_text
  * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
  * @tests tests_e2e/004_projects/test_004d_document.py::test_formatting_persists
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_inline_code_style_formats_selected_text_and_persists
  * @matrix editor : reload text-save
  * @pair sync:save-guard
  */

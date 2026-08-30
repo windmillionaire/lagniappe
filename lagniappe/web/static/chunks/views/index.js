@@ -1,5 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1b86abbe-7568-4394-8892-fdb295658a23",e._sentryDebugIdIdentifier="sentry-dbid-1b86abbe-7568-4394-8892-fdb295658a23");}catch(e){}}();import"../foundation.js?v=b623c224";import{E as i}from"../index-foundation.js?v=b623c224";import"../core-foundation.js?v=b623c224";import"../connectivity.js?v=b623c224";export{i as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../foundation.js?v=b881d5e5';
-export { E as default } from '../index-foundation.js?v=b881d5e5';
-import '../core-foundation.js?v=b881d5e5';
-import '../connectivity.js?v=b881d5e5';

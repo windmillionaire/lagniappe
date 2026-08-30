@@ -54,5 +54,6 @@ class Projects(ResourceEnumMixin, Enum):
 
     # Editor tests (005c, 005e, 005f) - reuse existing project with document
     test_formatting_persists = test_create_project_manual_mode
+    test_inline_code_style = test_create_project_manual_mode
     test_toolbar_buttons_visible = test_create_project_manual_mode
     test_editor_forms = test_create_project_manual_mode

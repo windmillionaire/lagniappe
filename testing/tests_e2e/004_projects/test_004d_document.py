@@ -145,6 +145,41 @@ def test_formatting_persists(get_user):
     expect(editor.get_element("ul")).to_contain_text("Second item")
 
 
+# @matrix editor : formatting inline-code reload selection toggle
+def test_inline_code_style_formats_selected_text_and_persists(get_user):
+    user = get_user(Users.OWNER)
+    project = Projects.test_inline_code_style.get(user)
+    user.go(project)
+
+    editor = project.editor
+    editor.clear_text()
+
+    prefix = "Plain text before"
+    code_text = "inline_code"
+    full_text = f"{prefix} {code_text}"
+    editor.type_text(full_text)
+    editor.text_entry.press("Control+Shift+ArrowLeft")
+
+    EditorMenuOptions.INLINE_CODE.click(editor)
+    inline_code = editor.get_element("p > code")
+    expect(inline_code).to_have_count(1)
+    expect(inline_code).to_have_text(code_text)
+    expect(editor.get_element("p")).to_have_text(full_text)
+
+    EditorMenuOptions.INLINE_CODE.click(editor)
+    expect(editor.get_element("p > code")).to_have_count(0)
+
+    EditorMenuOptions.INLINE_CODE.click(editor)
+    expect(editor.get_element("p > code")).to_have_text(code_text)
+
+    editor.blur()
+    user.go(project)
+    editor = project.editor
+
+    expect(editor.get_element("p > code")).to_have_text(code_text)
+    expect(editor.get_element("p")).to_have_text(full_text)
+
+
 # @matrix editor markdown : conversion paste
 def test_pasting_markdown_table_preserves_table_after_reload(get_user):
     user = get_user(Users.OWNER)
