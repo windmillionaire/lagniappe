@@ -381,16 +381,31 @@ def _release_note_path(version: str) -> Path:
 
 def _ensure_release_note(version: str) -> Path:
     path = _release_note_path(version)
+    heading = f"# Version {version}"
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"# Version {version}\n\n", encoding="utf-8")
+        path.write_text(f"{heading}\n", encoding="utf-8")
+        return path
+
+    content = path.read_text(encoding="utf-8")
+    first_line, separator, remainder = content.partition("\n")
+    if re.fullmatch(r"# Version \S+", first_line.rstrip("\r")):
+        line_ending = "\r\n" if first_line.endswith("\r") else "\n"
+        updated = heading
+        if separator:
+            updated = f"{heading}{line_ending}{remainder}"
+        if updated != content:
+            path.write_text(updated, encoding="utf-8")
     return path
 
 
 def _append_version_note(version: str, message: str) -> Path:
     path = _ensure_release_note(version)
     content = path.read_text(encoding="utf-8")
-    if content and not content.endswith("\n"):
+    heading = f"# Version {version}"
+    if content.rstrip("\n") == heading:
+        content = f"{heading}\n\n"
+    elif content and not content.endswith("\n"):
         content += "\n"
     path.write_text(f"{content}- {message}\n", encoding="utf-8")
     return path

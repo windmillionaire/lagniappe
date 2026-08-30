@@ -65,11 +65,7 @@ export async function sharePublicPage(button, root = document) {
 	const fallback = container?.querySelector('[data-role="share-fallback"]');
 	const input = fallback?.querySelector('[data-role="share-url"]');
 	const label = button.querySelector?.('[data-role="share-label"]');
-	const payload = {
-		title: button.dataset.shareTitle,
-		text: button.dataset.shareText,
-		url: button.dataset.shareUrl,
-	};
+	const payload = { url: button.dataset.shareUrl };
 	if (status) status.textContent = "";
 
 	if (typeof navigator.share === "function") {

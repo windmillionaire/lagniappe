@@ -2552,6 +2552,12 @@ def test_run_py_version_set_updates_package_settings_and_release_file(
     monkeypatch, tmp_path, capsys
 ):
     monkeypatch.setattr(run, "RELEASES_DIR", tmp_path / "documentation" / "releases")
+    release_note = tmp_path / "documentation" / "releases" / "1.25.md"
+    release_note.parent.mkdir(parents=True)
+    release_note.write_text(
+        "# Version 1.24\n\n- Existing release detail\n",
+        encoding="utf-8",
+    )
     reporting_markdown = tmp_path / "ERROR_REPORTING_PRIVACY.md"
     reporting_template = (
         tmp_path / "lagniappe/web/templates/home/reporting_privacy.html"
@@ -2616,8 +2622,8 @@ def test_run_py_version_set_updates_package_settings_and_release_file(
         "settings": {"VERSION": "1.25"},
     }
     assert lock_versions == ["1.25"]
-    assert (tmp_path / "documentation" / "releases" / "1.25.md").read_text() == (
-        "# Version 1.25\n\n"
+    assert release_note.read_text() == (
+        "# Version 1.25\n\n- Existing release detail\n"
     )
     assert "**Applies to:** Lagniappe 1.25  " in reporting_markdown.read_text()
     assert "**Effective date:** July 26, 2026  " in reporting_markdown.read_text()

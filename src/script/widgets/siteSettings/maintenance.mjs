@@ -134,7 +134,7 @@ export class SiteMaintenance extends SiteSetting {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_migration_status_uses_generic_release_states
-	 * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repairs running version-history
+	 * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repair-filtering repairs running version-history
 	 */
 	_renderMigrationStatus(status) {
 		const panel = this.target.querySelector("[data-role='migration-status']");
@@ -147,9 +147,6 @@ export class SiteMaintenance extends SiteSetting {
 		const results = panel.querySelector(
 			"[data-role='migration-status-results']",
 		);
-		const repairs = panel.querySelector(
-			"[data-role='migration-status-repairs']",
-		);
 		const errors = panel.querySelector("[data-role='migration-status-errors']");
 		const updateButton = this.target.querySelector("[data-role='site-update']");
 		const cacheButton = this.target.querySelector(
@@ -157,7 +154,6 @@ export class SiteMaintenance extends SiteSetting {
 		);
 
 		results.replaceChildren();
-		repairs?.replaceChildren();
 		errors.replaceChildren();
 		panel.dataset.visible = "true";
 
@@ -214,12 +210,10 @@ export class SiteMaintenance extends SiteSetting {
 					: `${version}No site updates are required.`;
 		}
 
-		const appendDetail = (list, migrationId, detail) => {
+		const appendDetail = (list, detail, label = "") => {
 			if (!list) return;
 			const item = document.createElement("li");
-			item.textContent = detail.url
-				? `${migrationId}: ${detail.message} `
-				: `${migrationId} ${detail.key}: ${detail.message}`;
+			item.textContent = `${label ? `${label}: ` : ""}${detail.message}${detail.url ? " " : ""}`;
 			if (detail.url) {
 				const link = document.createElement("a");
 				link.href = detail.url;
@@ -286,10 +280,11 @@ export class SiteMaintenance extends SiteSetting {
 					migrationItem.appendChild(completion);
 				}
 				if (migration.audit_error) {
-					appendDetail(errors, migration.id, {
-						key: "audit",
-						message: migration.audit_error,
-					});
+					appendDetail(
+						errors,
+						{ message: migration.audit_error },
+						`${migration.id} audit`,
+					);
 				}
 				if (attempts.length) {
 					const history = document.createElement("ul");
@@ -302,20 +297,28 @@ export class SiteMaintenance extends SiteSetting {
 					}
 					migrationItem.appendChild(history);
 				}
-				for (const repair of detailAttempt?.repairs || []) {
-					appendDetail(repairs, migration.id, repair);
+				const repairDetails =
+					migration.id === "MSG-001" ? [] : detailAttempt?.repairs || [];
+				if (repairDetails.length) {
+					const notes = document.createElement("ul");
+					notes.className = STYLES.siteSettings.migration.attemptList;
+					for (const repair of repairDetails) {
+						appendDetail(notes, repair, repair.url ? "" : repair.key);
+					}
+					migrationItem.appendChild(notes);
 				}
 				for (const failure of detailAttempt?.errors || []) {
-					appendDetail(errors, migration.id, failure);
+					appendDetail(
+						errors,
+						failure,
+						failure.url ? migration.id : `${migration.id} ${failure.key}`,
+					);
 				}
 				migrationList.appendChild(migrationItem);
 			}
 			releaseDetails.appendChild(migrationList);
 			releaseItem.appendChild(releaseDetails);
 			results.appendChild(releaseItem);
-		}
-		if (repairs) {
-			repairs.dataset.visible = repairs.childElementCount ? "true" : "false";
 		}
 		errors.dataset.visible = errors.childElementCount ? "true" : "false";
 	}

@@ -50,8 +50,6 @@ const container = {
 };
 const button = {
   dataset: {
-    shareTitle: "Title",
-    shareText: "Description",
     shareUrl: "https://site.test/pages/public/id",
   },
   closest() { return container; },
@@ -100,6 +98,11 @@ vm.runInContext(source, context);
   await context.sharePublicPage(button, root);
   if (state.native.length !== 1 || state.clipboard.length !== 0) {
     throw new Error("Native share was not preferred");
+  }
+  const nativePayload = state.native[0];
+  if (Object.keys(nativePayload).join(",") !== "url" ||
+      nativePayload.url !== button.dataset.shareUrl) {
+    throw new Error("Native share included content other than the public URL");
   }
   if (label.textContent !== "Shared" || status.textContent !== "Page shared") {
     throw new Error("Native share completion was not visible");
