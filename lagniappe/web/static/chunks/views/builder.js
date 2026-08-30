@@ -1,21 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.1.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="d3c921d7-09b9-4590-99b0-b5fa790d3024",e._sentryDebugIdIdentifier="sentry-dbid-d3c921d7-09b9-4590-99b0-b5fa790d3024");}catch(e){}}();import"../search.js?v=b0c5f697";import"../entityMenu.js?v=b0c5f697";import"../foundation.js?v=b0c5f697";import"../connectivity.js?v=b0c5f697";import"../modal.js?v=b0c5f697";import{F as n}from"../builder.js?v=b0c5f697";import"../styles.js?v=b0c5f697";import"../remote.js?v=b0c5f697";import"../queryLifecycle.js?v=b0c5f697";import"../combobox.js?v=b0c5f697";import"../primitives.js?v=b0c5f697";import"../icons.js?v=b0c5f697";import"../results.js?v=b0c5f697";import"../storage.js?v=b0c5f697";import"../formatting.js?v=b0c5f697";import"../dropdown.js?v=b0c5f697";import"../baseForm.js?v=b0c5f697";import"../loader.js?v=b0c5f697";import"../facets.js?v=b0c5f697";import"../submitter.js?v=b0c5f697";export{n as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=bdbb928b';
-import '../entityMenu.js?v=bdbb928b';
-import '../foundation.js?v=bdbb928b';
-import '../connectivity.js?v=bdbb928b';
-import '../modal.js?v=bdbb928b';
-export { F as default } from '../builder.js?v=bdbb928b';
-import '../styles.js?v=bdbb928b';
-import '../remote.js?v=bdbb928b';
-import '../queryLifecycle.js?v=bdbb928b';
-import '../combobox.js?v=bdbb928b';
-import '../primitives.js?v=bdbb928b';
-import '../icons.js?v=bdbb928b';
-import '../results.js?v=bdbb928b';
-import '../storage.js?v=bdbb928b';
-import '../formatting.js?v=bdbb928b';
-import '../dropdown.js?v=bdbb928b';
-import '../baseForm.js?v=bdbb928b';
-import '../loader.js?v=bdbb928b';
-import '../facets.js?v=bdbb928b';
-import '../submitter.js?v=bdbb928b';
