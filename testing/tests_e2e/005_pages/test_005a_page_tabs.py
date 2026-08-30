@@ -9,7 +9,6 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Forms, Pages, Submissions, Uploads, Users
 from testing.elements import (
-    Attributes,
     Buttons,
     EditorAddImage,
     FormSelect,
@@ -49,34 +48,6 @@ def test_page_url_tab_overrides_saved_tab(get_user):
     expect(user.locate(Tabs.TASKS_TOGGLE_DESKTOP)).to_have_attribute(
         "data-selected", "true"
     )
-
-
-# @matrix pages : attributes-live-toggle no-reload tabs
-# @template pages/page.html::main
-# @template pages/info.html::info_form
-def test_page_attribute_toggle_updates_tabs_without_reload(get_user):
-    user = get_user(Users.OWNER)
-    page = Pages.test_page_loads.get(user)
-    user.go(page)
-    info_form = page.info_form
-    attributes = Attributes(info_form)
-    tasks_toggle = user.locate(Tabs.TASKS_TOGGLE_DESKTOP)
-
-    expect(tasks_toggle).to_be_visible()
-    user.page.evaluate("window.__attributeToggleNoReload = true")
-
-    with user.page.expect_response("**/attributes/tasks"):
-        attributes.set_selected("tasks", False)
-
-    expect(tasks_toggle).not_to_be_visible()
-    expect(user.locate(page.TASK_LIST)).not_to_be_visible()
-    assert user.page.evaluate("window.__attributeToggleNoReload") is True
-
-    with user.page.expect_response("**/attributes/tasks"):
-        attributes.set_selected("tasks", True)
-
-    expect(tasks_toggle).to_be_visible()
-    assert user.page.evaluate("window.__attributeToggleNoReload") is True
 
 
 # @matrix pages : default-form submission

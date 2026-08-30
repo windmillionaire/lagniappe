@@ -16,7 +16,7 @@
 				}
 			],
 			["PROJECT", { "name": "No Desc" }],
-			["PROJECT", { "name": "No Features", "attributes": [] }]
+			["PROJECT", { "name": "No Features" }]
 		]
 	},
 	"test_project_document": {
@@ -35,8 +35,7 @@
 				{
 					"name": "Document With No Features",
 					"assets": { "document": { "type": "html", "path": "test.html" } },
-					"document": "Document text content with no features.",
-					"attributes": []
+					"document": "Document text content with no features."
 				}
 			]
 		]
@@ -45,27 +44,6 @@
 		"entities": [
 			["PROJECT", { "name": "Public Project", "public": true }],
 			["PROJECT", { "name": "Private Project" }]
-		]
-	},
-	"test_project_attributes": {
-		"entities": [
-			[
-				"PROJECT",
-				{
-					"name": "Attributes 1",
-					"attributes": ["tasks", "document"]
-				}
-			],
-			[
-				"PROJECT",
-				{ "name": "Attributes 2", "attributes": ["tasks"] }
-			],
-			[
-				"PROJECT",
-				{ "name": "Attributes 3", "attributes": ["document"] }
-			],
-			["PROJECT", { "name": "No Attributes", "attributes": [] }],
-			["PROJECT", { "name": "Default Attributes" }]
 		]
 	},
 	"test_project_filters": {

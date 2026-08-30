@@ -1,4 +1,4 @@
-from flask import abort, request
+from flask import request
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import ai, filters
@@ -6,7 +6,6 @@ from lagniappe.core.definitions import (
     AI,
     Action,
     MutationIntent,
-    ProjectAttributes,
     Resource,
 )
 from lagniappe.core import exceptions
@@ -20,7 +19,7 @@ from . import projects
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_is_forbidden_without_model_permission
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_reads_project_without_editing_controls
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_sees_document_tab_only_when_content_exists
+# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_can_read_document_content
 # @matrix projects : document-tab load navigate permission-gates readonly
 @projects.route("/<key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
@@ -42,77 +41,29 @@ def info(key, **kwargs):
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_without_tasks
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_without_document
-# @matrix projects : attribute-document attribute-model-tasks
+# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
+# @matrix projects : create-manual
 def create_update_data(form):
     return {
         "name": form.get("name"),
         "description": form.get("description"),
-        "attributes": [a.name for a in ProjectAttributes if form.get(a.name)],
     }
 
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_form
-# @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_tasks_attribute
-# @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_document_attribute
-# @matrix projects : attribute-document attribute-model-tasks info-form update
+# @matrix projects : info-form update
 @projects.route("<key>/update", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
 def update(key, **kwargs):
     project = kwargs["entity"]
 
-    old_attributes = [a.name for a in project.attributes if project.has(a.name)]
     update_data = create_update_data(request.form)
     project.update(update_data)
-    new_attributes = [a.name for a in project.attributes if project.has(a.name)]
 
     Entities.save(project, *project.model_tasks)
 
-    if set(old_attributes) != set(new_attributes):
-        return responses.json_response({"reload": True})
-    else:
-        return responses.project_info(project)
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/projects/main.py::set_attribute
-# @reason attribute-set persistence is owned by the project attribute endpoint
-def _set_project_attribute(project, attribute, active):
-    active_attributes = {
-        item.name for item in project.attributes if project.has(item.name)
-    }
-    if active:
-        active_attributes.add(attribute)
-    else:
-        active_attributes.discard(attribute)
-    project.attributes = [
-        item.name for item in project.attributes if item.name in active_attributes
-    ]
-
-
-# @testable true
-# @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_tasks_attribute
-# @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_document_attribute
-# @matrix projects : attribute-document attribute-model-tasks attributes-live-toggle no-reload
-@projects.route("<key>/attributes/<attribute>", methods=["PUT"])
-@permission(Resource.PROJECT, Action.EDIT)
-def set_attribute(key, attribute, **kwargs):
-    if attribute not in ProjectAttributes.__members__:
-        abort(404)
-
-    project = kwargs["entity"]
-    data = request.get_json(silent=True) or {}
-    active = bool(data.get("active"))
-
-    _set_project_attribute(project, attribute, active)
-    Entities.save(project, *project.model_tasks)
-
-    return responses.entity_response(
-        responses.json_response({"attribute": attribute, "active": active}),
-        project,
-    )
+    return responses.project_info(project)
 
 
 # @testable false

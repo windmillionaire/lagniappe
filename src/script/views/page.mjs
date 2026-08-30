@@ -37,30 +37,6 @@ export default class Page extends Entity {
 	}
 
 	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.setAttributeActive
-	 * @reason the photo card has attribute state distinct from image/secondary visibility
-	 */
-	secondaryCardForAttribute(attribute) {
-		if (attribute === "photo") return this.elt.querySelector("#photo");
-		return super.secondaryCardForAttribute(attribute);
-	}
-
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity._renderLayout
-	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
-	 * @reason page-specific inactive attribute guard feeds the shared layout renderer
-	 */
-	_prerender(tabId, secondaryElement = undefined) {
-		const tab = this._tabElement(tabId);
-		if (tab?.dataset.hasAttribute === "false") {
-			tabId = this._defaultTabId;
-		}
-		return super._prerender(tabId, secondaryElement);
-	}
-
-	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_create_task_opens_from_tasks_section
 	 * @matrix entity-layout : page-mobile task-create

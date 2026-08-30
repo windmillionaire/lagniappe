@@ -1,44 +1,4 @@
 {
-	"test_category_attributes": {
-		"entities": [
-			[
-				"CATEGORY",
-				{
-					"name": "All Attributes",
-					"attributes": [
-						"tasks",
-						"document",
-						"photo",
-						"notes",
-						"files"
-					]
-				}
-			],
-			[
-				"CATEGORY",
-				{
-					"name": "Tasks Only",
-					"attributes": ["tasks"]
-				}
-			],
-			[
-				"CATEGORY",
-				{
-					"name": "Document Only",
-					"attributes": ["document"]
-				}
-			],
-			[
-				"CATEGORY",
-				{
-					"name": "Photo Notes Files",
-					"attributes": ["photo", "notes", "files"]
-				}
-			],
-			["CATEGORY", { "name": "No Attributes", "attributes": [] }],
-			["CATEGORY", { "name": "Default Attributes" }]
-		]
-	},
 	"test_category_filters": {
 		"entities": [
 			[

@@ -18,7 +18,7 @@ from lagniappe.core.tools.auth.references import (
     UNAVAILABLE_REFERENCE_ERROR,
 )
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
-from lagniappe.core.definitions import PageAttributes, Action, Fetch, Resource
+from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import (
     abort_public_user_action,
     logged_in,
@@ -55,26 +55,9 @@ def _load_user_settings_groups(page):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_restricted_schedules_are_forbidden
-# @pair public-users:attribute-preservation
-def _preserve_public_user_page_attributes(page, page_data):
-    if not getattr(current_user, "is_public", False):
-        return
-
-    preserved = {"photo", "files"}
-    submitted = set(page_data.get("attributes") or [])
-    existing = {attribute.name for attribute in page.attributes if attribute.active}
-    if _is_public_users_own_page(page):
-        page_data["attributes"] = sorted(existing)
-        return
-
-    page_data["attributes"] = sorted(submitted | (existing & preserved))
-
-
-# @testable true
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_is_forbidden_without_model_or_page_permission
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_sees_document_tab_only_when_content_exists
+# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_can_read_document_content
 # @matrix pages : document-tab load permission-gates readonly tabs
 @pages.route("<key>", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
@@ -165,7 +148,6 @@ def _page_data(form, page=None, category=None):
         e.urlsafe_key: e for e in Entities.fetch(*entities, request=Fetch.direct())
     }
 
-    attributes = [a.name for a in PageAttributes if form.get(a.name)]
     category_keys = form.getlist("category")
     form_key = form.get("form")
     resolver = SubmittedReferenceResolver(
@@ -204,7 +186,6 @@ def _page_data(form, page=None, category=None):
         "name": form.get("name"),
         "description": form.get("description"),
         "email": form.get("email"),
-        "attributes": attributes,
         "categories": categories,
         "form": selected_form,
         "model": loaded.get(category.urlsafe_key) if category else None,
@@ -354,15 +335,12 @@ def update(key, **kwargs):
             "The autofill attachment was not uploaded. Try attaching it again."
         )
 
-    old_attributes = [a.name for a in page.attributes if page.has(a.name)]
     old_image = page.image.path if page.image else None
 
     try:
         page_data = _page_data(request.form, page=page)
     except exceptions.ValidationError as error:
         return responses.error(str(error))
-    _preserve_public_user_page_attributes(page, page_data)
-
     if role == "user-settings":
         try:
             _apply_user_settings_update(page, page_data, user=current_user)
@@ -417,10 +395,9 @@ def update(key, **kwargs):
             page,
         )
 
-    new_attributes = [a.name for a in page.attributes if page.has(a.name)]
     new_image = page.image.path if page.image else None
 
-    if set(old_attributes) != set(new_attributes) or old_image != new_image:
+    if old_image != new_image:
         return responses.json_response({"reload": True})
 
     return responses.page_info(page)
@@ -439,46 +416,6 @@ def update_direct(key, **kwargs):
     if locked:
         return locked
     return direct_uploads.direct_upload_response()
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::set_attribute
-# @reason attribute-set persistence is owned by the page attribute endpoint
-def _set_page_attribute(page, attribute, active):
-    active_attributes = {item.name for item in page.attributes if page.has(item.name)}
-    if active:
-        active_attributes.add(attribute)
-    else:
-        active_attributes.discard(attribute)
-    page.attributes = [
-        item.name for item in page.attributes if item.name in active_attributes
-    ]
-
-
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_page_attribute_toggle_updates_tabs_without_reload
-# @tests tests_e2e/005_pages/test_005f_page_image.py::test_empty_page_photo_prompt_can_disable_photo_without_reload
-# @matrix pages : attributes-live-toggle no-reload photo-disable photo-prompt tabs
-@pages.route("<key>/attributes/<attribute>", methods=["PUT"])
-@permission(Resource.PAGE, Action.EDIT)
-def set_attribute(key, attribute, **kwargs):
-    if attribute not in PageAttributes.__members__:
-        abort(404)
-
-    page = kwargs["entity"]
-    if getattr(current_user, "is_public", False) and attribute in {"photo", "files"}:
-        abort_public_user_action()
-
-    data = request.get_json(silent=True) or {}
-    active = bool(data.get("active"))
-
-    _set_page_attribute(page, attribute, active)
-    page.save()
-
-    return responses.entity_response(
-        responses.json_response({"attribute": attribute, "active": active}),
-        page,
-    )
 
 
 # @testable true

@@ -10,7 +10,6 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Categories, Forms, Pages, Users
 from testing.elements import (
-    Attributes,
     Buttons,
     FormElements,
     FormSelect,
@@ -260,8 +259,6 @@ def test_update_category_info_from_tools(get_user):
     )
     expect(info_form.locator("[data-icon='builder.unsaved']")).to_be_visible()
     FormSelect(info_form).select(updated_form)
-    Attributes(info_form).set_selected("files", False)
-
     with user.page.expect_response("**/update"):
         SpinnerButtons.UPDATE.click(info_form)
 
@@ -271,7 +268,6 @@ def test_update_category_info_from_tools(get_user):
     expect(info_form.locator("#name")).to_contain_text(updated_name)
     expect(info_form.locator("#description")).to_contain_text(updated_description)
     FormSelect(info_form).contains(updated_form)
-    Attributes(info_form).expect_selected("files", False)
 
 
 # @matrix pages : category-index create related-forms

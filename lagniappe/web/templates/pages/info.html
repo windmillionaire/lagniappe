@@ -1,4 +1,4 @@
-{% from 'common.html' import attribute_button, autofill %}
+{% from 'common.html' import autofill %}
 {% import 'controls.html' as controls %}
 {% import 'pages/restrictions.html' as restrictions %}
 
@@ -199,11 +199,10 @@
         {% if page.form %}data-submission='{{ page.properties.submission.form_value|tojson }}'{% endif %}
         class="{{ styles.form.default }} mt-4 sm:mt-0">
     {% if page.allowed(Action.EDIT) %}
-      {% if not current_user.is_public and not page.image %}
+      {% if not current_user.is_public %}
         <div data-role="photo-prompt"
-             data-visible="{{ page.has('photo')|yesno }}"
-             class="flex flex-col gap-2"
-             data-endpoint-disable="{{ url_for('pages.set_attribute', key=page.urlsafe_key, attribute='photo') }}">
+             data-visible="{{ (not page.image)|yesno }}"
+             class="flex flex-col gap-2">
           <div class="inline-flex min-h-10 w-fit overflow-hidden rounded-md border border-base-light/50 bg-white text-base-dark shadow-sm">
             <span class="grid w-9 place-items-center border-r border-base-light/50 bg-base-bg text-kind-default"
                   aria-hidden="true">{{ render_icon("image") }}</span>
@@ -223,13 +222,6 @@
                 {{ render_icon("generate") }}
               </button>
             {% endif %}
-            <button type="button"
-                    data-role="photo-disable"
-                    title="Turn photo off"
-                    aria-label="Turn photo off"
-                    class="grid w-9 place-items-center text-delete-default hover:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default">
-              {{ render_icon("x") }}
-            </button>
           </div>
           <p data-role="photo-prompt-error"
              data-visible="false"
@@ -241,16 +233,6 @@
           </template>
         </div>
       {% endif %}
-      <div data-role="attributes" class="flex flex-col gap-1">
-        <h3 class="{{ styles.label.default }}">Page Features</h3>
-        <div class="{{ styles.attributes.container }}">
-          {% for attribute in page.attributes %}
-            {% if not current_user.is_public or attribute.name not in ['files', 'photo'] %}
-              {{ attribute_button(attribute) }}
-            {% endif %}
-          {% endfor %}
-        </div>
-      </div>
     {% endif %}
     {% if page.allowed(Action.VIEW) %}
       {% set category_preload = page.properties.categories.column_value %}

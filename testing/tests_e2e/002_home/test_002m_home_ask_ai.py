@@ -275,7 +275,6 @@ def _medical_project(owner, case, slug):
         {
             "name": f"{slug}-Pediatric Visits",
             "description": "Structured visit records used by the Ask E2E.",
-            "attributes": ["tasks"],
         }
     )
     model = Entities.MODEL_TASK.create(

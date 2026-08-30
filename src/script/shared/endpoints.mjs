@@ -31,19 +31,6 @@ export const ENDPOINTS = {
 			remove: `/assets/${settings.key}/remove-page-image`,
 		};
 	},
-	PageInfo: (settings) => {
-		return {
-			attribute: (attribute) =>
-				`/pages/${settings.key}/attributes/${attribute}`,
-			disablePhoto: `/pages/${settings.key}/attributes/photo`,
-		};
-	},
-	ProjectInfo: (settings) => {
-		return {
-			attribute: (attribute) =>
-				`/projects/${settings.key}/attributes/${attribute}`,
-		};
-	},
 	SiteAiModels: () => {
 		return {
 			setAiSettings: "/l/set-ai-settings",

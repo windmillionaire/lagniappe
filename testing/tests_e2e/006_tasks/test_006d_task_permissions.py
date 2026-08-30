@@ -59,7 +59,6 @@ def _submitted_reference_page(category, suffix):
         {
             "name": f"Submitted reference page {suffix}",
             "description": "Submitted reference authorization coverage.",
-            "attributes": ["tasks", "files"],
             "categories": [],
             "model": category.entity,
             "form": None,

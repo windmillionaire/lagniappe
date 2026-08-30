@@ -7,11 +7,6 @@
 	display: none;
 }
 
-/* data-visible="true" usually restores the element's normal display. */
-[data-has-attribute="false"] {
-	display: none !important;
-}
-
 table[data-visible="true"]:not(.hidden):not([hidden]) {
 	display: table;
 }

@@ -41,11 +41,9 @@ class Page(SiteResource):
     INFO_FORM = "[data-widget='PageInfo']"
     INFO_NAME = ":is(#name, [id^='name-renderer-'])"
     INFO_DESCRIPTION = ":is(#description, [id^='description-renderer-'])"
-    INFO_ATTRIBUTES = "[data-role='attributes']"
     PHOTO_PROMPT = "[data-role='photo-prompt']"
     PHOTO_PROMPT_UPLOAD = "[data-role='photo-upload']"
     PHOTO_PROMPT_GENERATE = "[data-role='photo-generate']"
-    PHOTO_PROMPT_DISABLE = "[data-role='photo-disable']"
 
     SITE_SETTINGS_TOGGLE = "[data-nav='tabs'] button[lp-show='info:SiteSettings']"
     SITE_SETTINGS_FORM = "[data-widget='SiteSettings']"
@@ -124,7 +122,6 @@ class Page(SiteResource):
             "description": self.definition.description,
             "model": category.entity,
             "form": form_entity,
-            "attributes": self.definition.attributes,
             "submission": submission,
         }
 

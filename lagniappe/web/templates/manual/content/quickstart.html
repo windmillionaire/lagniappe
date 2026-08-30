@@ -38,8 +38,8 @@
     </p>
     {% call callout("tip", False) %}
       Controls only appear when they apply. If an icon described here is
-      missing, the feature may be turned off for that record or your account
-      may not have permission to use it. Many icon-only action controls also
+      missing, your account may not have permission to use it or the control
+      may not apply to the current content. Many icon-only action controls also
       show their name when you hover on desktop.
     {% endcall %}
   {% endcall %}
@@ -126,7 +126,7 @@
       result inside a list to leave Home and open the record.
     </p>
     <div class="grid gap-3 sm:grid-cols-2">
-      {{ guide_item("user", "My Page", "Goes directly to your user page, including your own information and any enabled page features.", "user") }}
+      {{ guide_item("user", "My Page", "Goes directly to your user page and its related information.", "user") }}
       {{ guide_item("directory", "Directory", "Expands links to Active Tasks, Forms, Users, Analytics, and Admin when you have access.") }}
       {{ guide_item("page", "Pages", "Expands recent pages; plus starts a page by choosing its category.") }}
       {{ guide_item("notes", "Notes", "Expands workspace notes; plus opens a quick text or photo note.", "note") }}
@@ -154,17 +154,16 @@
       Star, Add note, and Delete when available.
     </p>
     <div class="grid gap-3 sm:grid-cols-2">
-      {{ guide_item("image", "Image", "Shows or changes the page image. Upload, Generate, and Turn photo off appear in Info when no image is set.") }}
+      {{ guide_item("image", "Image", "Shows or changes the page image. Upload and Generate appear in Info when no image is set.") }}
       {{ guide_item("document", "Document", "Opens the collaborative rich-text document. It autosaves and can be edited by several people.") }}
-      {{ guide_item("info", "Info", "Shows the page name, description, categories, attached form, structured fields, and enabled features.") }}
+      {{ guide_item("info", "Info", "Shows the page name, description, categories, attached form, and structured fields.") }}
       {{ guide_item("task", "Tasks", "Shows active work on this page. The contextual plus creates a task here.", "task") }}
       {{ guide_item("files", "Files", "Shows files attached to the page. The contextual plus opens the uploader.", "file") }}
-      {{ guide_item("notes", "Notes", "Add note lives in the title actions; notes stay visible beneath the page heading when enabled.", "note") }}
+      {{ guide_item("notes", "Notes", "Add note lives in the title actions; notes stay visible beneath the page heading.", "note") }}
     </div>
     <p class="mt-4 text-sm leading-relaxed text-base-medium">
-      In <strong>Info</strong>, Page Features are toggles for turning whole
-      sections on or off; those changes still need to be saved. A
-      <strong>globe</strong> opens document publishing settings, while a
+      Page documents, tasks, files, notes, and image tools are available from
+      their dedicated sections. A <strong>globe</strong> opens document publishing settings, while a
       <strong>person</strong> or <strong>open lock</strong> opens user or page
       access settings.
     </p>
@@ -199,8 +198,8 @@
     "category"
     ) %}
     <p class="mb-4 text-base-medium">
-      A category is a collection of pages and can provide their default form
-      and features. Select a table row to open its record. Active Tasks, Forms,
+      A category is a collection of pages and can provide their default form.
+      Select a table row to open its record. Active Tasks, Forms,
       and Users use the same basic table layout, so these controls repeat.
     </p>
     <div class="grid gap-3 sm:grid-cols-2">
@@ -226,7 +225,7 @@
     <div class="grid gap-3 sm:grid-cols-2">
       {{ guide_item("model", "Model Tasks", "Shows the project's task templates. Plus creates another template.", "project") }}
       {{ guide_item("document", "Document", "Opens the project's collaborative, autosaving document.", "project") }}
-      {{ guide_item("info", "Info", "Edits the project name, description, and enabled features. Use the save button.", "project") }}
+      {{ guide_item("info", "Info", "Edits the project name and description. Use the save button.", "project") }}
       {{ guide_item("filter.list", "Task Filters", "Builds and saves cross-page views of tasks tracked by the project.", "task") }}
     </div>
   {% endcall %}

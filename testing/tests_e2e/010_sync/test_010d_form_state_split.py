@@ -37,7 +37,6 @@ def _create_reconciliation_page(user):
         {
             "name": f"Schema Reconciliation Category {uuid4().hex}",
             "form": form,
-            "attributes": [],
         }
     )
     category.save()
@@ -47,7 +46,6 @@ def _create_reconciliation_page(user):
             "description": template.definition.description,
             "model": category,
             "form": form,
-            "attributes": list(template.definition.attributes),
             "submission": deepcopy(
                 template.entity.properties.submission.form_value
             ),

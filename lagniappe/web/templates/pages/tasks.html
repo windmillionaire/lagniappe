@@ -3,7 +3,7 @@
 {% import 'badge.html' as badges %}
 {% import 'menus.html' as menus %}
 
-{% macro task_tab(page, active=True) %}
+{% macro task_tab(page) %}
   <div id="tasks"
        lp-component
        data-title="Tasks"
@@ -11,8 +11,6 @@
        data-tab="true"
        data-visible="false"
        data-kind="task"
-       data-attribute="tasks"
-       data-has-attribute="{{ active|yesno }}"
        data-parent-nav="tabs">
     {% if page.allowed(Action.EDIT) %}
       <form lp-create

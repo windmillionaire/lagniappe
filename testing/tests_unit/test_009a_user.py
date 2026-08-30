@@ -644,7 +644,7 @@ def test_user_page_default_form_submission_keeps_email_on_user():
     assert submission["email"] == "form-only@example.test"
 
 
-# @matrix public-users user : auto-create lazy-load limited-attrs owner-link personal-page public-user
+# @matrix public-users user : auto-create lazy-load owner-link personal-page public-user
 @pytest.mark.unit
 def test_user_page_auto_create_lazy_load_and_owner_link():
     """UserPage auto-creates missing pages and links loaded pages back to the user."""
@@ -697,10 +697,9 @@ def test_user_page_auto_create_lazy_load_and_owner_link():
     ):
         public_user.page = None
 
-    public_page_data = create_public_page.call_args.args[0]
-    assert set(public_page_data["attributes"]) == {"tasks", "document", "notes"}
-    assert "photo" not in public_page_data["attributes"]
-    assert "files" not in public_page_data["attributes"]
+    create_public_page.assert_called_once_with(
+        {"model": model, "user": public_user, "name": "Public Page Owner"}
+    )
     assert public_user.page is public_page
     assert public_page.user is public_user
 
@@ -967,7 +966,7 @@ def test_user_create_does_not_leave_initial_cache_invalidation():
     assert user.invalidate_cache is False
 
 
-# @matrix public-users user : create limited-attrs personal-page public-group public-user
+# @matrix public-users user : create personal-page public-group public-user
 @pytest.mark.unit
 def test_user_create_public_user_assigns_public_group():
     page = TestEntities.get("PAGE", {"name": "Public Page", "hash": "pg009f"})
@@ -1032,5 +1031,4 @@ def test_user_create_public_user_assigns_public_group():
     assert page.model is users_model
     assert created.groups == [public_group]
     assert created.db["groups"] == [public_group.key]
-    assert set(page.db["attributes"]) == {"tasks", "document", "notes"}
     assert create_permissions.called

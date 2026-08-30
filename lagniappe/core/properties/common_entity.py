@@ -1,12 +1,6 @@
 from datetime import datetime, timezone
 
-from ..definitions import (
-    Attribute,
-    EntityAttributes,
-    FieldType,
-    FilterOptions,
-    Ordering,
-)
+from ..definitions import FieldType, FilterOptions, Ordering
 from ..definitions.identifiers import random_hash, short_hash, short_uuid
 from ..entities import Entities
 from ..exceptions import PropertyError, ValidationError
@@ -547,84 +541,6 @@ class Hash(DetailsMixin, CacheMixin, FilterMixin, AIMixin, DBProperty):
     @property
     def filter_key(self):
         return "cache_key"
-
-
-# @testable true
-# @tests tests_unit/test_005_project_properties.py::test_project_attributes_empty_list_stays_persisted
-# @matrix project : attributes blank-persistence
-class Attributes(DBProperty):
-    """Configurable entity attributes (e.g. scheduling, document features).
-
-    Stores a list of active attribute names in entity.db. On get, returns
-    initialized Attribute objects. Falls back to the entity's model
-    attributes if none are set directly.
-
-    Set:
-        value (list): Attribute names or Attribute objects.
-
-    Get:
-        value (list[Attribute]): Initialized Attribute objects.
-    """
-
-    # Property Attributes
-    _id = "attributes"
-    _blank_values = (None,)
-
-    @property
-    def kind(self):
-        return self.entity.entity_kind
-
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_attributes
-    # @tests tests_unit/test_007_category_properties.py::test_category_attributes
-    # @tests tests_unit/test_008_page_properties.py::test_page_attributes
-    # @matrix category page project : attributes defaults
-    @property
-    def value(self):
-        if self.is_set:
-            return self._value
-
-        selected = super().value
-        if (
-            not isinstance(selected, list)
-            and self.entity.properties.get("model")
-            and self.entity.model
-        ):
-            self._value = self.entity.model.attributes
-            return self._value
-
-        self._value = EntityAttributes[self.kind].initialize(self.entity, selected)
-
-        return self._value
-
-    @value.setter
-    def value(self, names):
-        if names is None:
-            DBProperty.value.fset(self, None)
-            return
-
-        names = names if isinstance(names, list) else []
-
-        if all(isinstance(n, str) for n in names):
-            self._value = EntityAttributes[self.kind].initialize(self.entity, names)
-        elif names and all(isinstance(n, Attribute) for n in names):
-            self._value = names
-        else:
-            selected = super().value
-            if (
-                selected is None
-                and self.entity.properties.get("model")
-                and self.entity.model
-            ):
-                self._value = self.entity.model.attributes
-            elif selected is None:
-                self._value = EntityAttributes[self.kind].initialize(self.entity)
-            else:
-                self._value = EntityAttributes[self.kind].initialize(
-                    self.entity, selected
-                )
-
-        self.entity.db[self.id] = [a.name for a in self._value if a.active]
 
 
 # @testable true

@@ -92,32 +92,6 @@
   </div>
 {% endmacro %}
 
-{% macro attribute_button(attribute) %}
-  <label data-role="attribute"
-         data-attribute="{{ attribute.name }}"
-         data-selected="{{ attribute.active|yesno }}"
-         data-kind="{{ attribute.entity_kind }}"
-         tabindex="0"
-         class="{{ styles.attributes.button }}">
-    <div data-role="attribute-icons" class="{{ styles.attributes.iconStack }}">
-      <div data-role="icon"
-           class="{{ styles.attributes.icon }}"
-           data-kind="{{ attribute.kind }}">{{ render_icon((attribute.icon)) }}</div>
-      <div data-role="remove"
-           class="{{ styles.attributes.icon }}"
-           data-kind="delete">{{ render_icon("attribute.remove") }}</div>
-      <div data-role="add"
-           class="{{ styles.attributes.icon }}"
-           data-kind="success">{{ render_icon("attribute.add") }}</div>
-    </div>
-    <div data-role="text" class="font-semibold">{{ attribute.title }}</div>
-    <input type="checkbox"
-           class="hidden"
-           name="{{ attribute.name }}"
-           {{ 'checked' if attribute.active else '' }}>
-  </label>
-{% endmacro %}
-
 {% macro generate(kind) %}
   <div data-role="generate" class="flex flex-col gap-6">
     <div class="{{ styles.form.submit.buttons }}">

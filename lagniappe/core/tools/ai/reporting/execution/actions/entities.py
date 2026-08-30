@@ -76,7 +76,6 @@ def _create_category(action, _report, user, created):
             "name": data.get("name") or "Generated category",
             "description": data.get("description"),
             "form": form,
-            "attributes": data.get("attributes"),
         }
     )
     category.ai_generated = True
@@ -96,7 +95,6 @@ def _create_project(action, _report, user, _created):
         {
             "name": data.get("name") or "Generated project",
             "description": data.get("description"),
-            "attributes": data.get("attributes"),
         }
     )
     project.ai_generated = True
@@ -180,7 +178,6 @@ def _create_page(action, _report, user, created):
             "model": category,
             "categories": data.get("categories") or [],
             "form": page_form,
-            "attributes": data.get("attributes"),
         }
     )
     if page_form is not None and "submission" in data:

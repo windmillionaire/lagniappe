@@ -118,10 +118,6 @@ export class PageForm extends FormElement {
 		return section;
 	}
 
-	get attributesElement() {
-		return sections.attributes(this);
-	}
-
 	get photoPromptElement() {
 		return sections.photoPrompt(this);
 	}
@@ -147,7 +143,6 @@ export class PageForm extends FormElement {
 	get append() {
 		return [
 			this.formSelectElement,
-			this.attributesElement,
 			this.categoriesElement,
 			this.autofillElement,
 		];
@@ -337,7 +332,6 @@ export class CreatePage extends PageForm {
 			this.descriptionElement,
 			this.formSelectElement,
 			this.relatedFormsElement,
-			this.attributesElement,
 			this.categoriesElement,
 			this.autofillElement,
 		];

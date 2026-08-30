@@ -1,13 +1,13 @@
 """
 Form-specific UI element helpers.
 
-Provides helpers for form interactions including action buttons with dropdowns,
-attribute selection, and submit buttons with loading states.
+Provides helpers for form interactions including action buttons with dropdowns
+and submit buttons with loading states.
 
 Related Files:
     Templates (organized by feature):
         - lagniappe/web/templates/forms/: Form builder templates
-        - lagniappe/web/templates/categories/: Category forms (use attributes)
+        - lagniappe/web/templates/categories/: Category forms
         - lagniappe/web/templates/pages/: Page forms
 
     Scripts:
@@ -17,10 +17,6 @@ Usage:
     # Select buttons open dropdowns for entity selection
     FormSelect.select(widget, form_entity)
     DateSelect.select(widget, due_date)
-
-    # Attributes for toggling entity features
-    attrs = Attributes(form)
-    attrs.select(defaults=["tasks", "document"], selected=["tasks"])
 
     # Submit buttons with loading spinner verification
     SpinnerButtons.CREATE.click(form)  # Verifies spinner appears
@@ -176,91 +172,6 @@ class FileSelect(SelectButton):
     value = '[data-role="file-select"]'
     form_value = '[data-role="file-form"]'
     default_text = "File"
-
-
-class Attributes:
-    """
-    Helper for entity attribute toggles.
-
-    Attributes are features that can be enabled/disabled for entities
-    (e.g., tasks, document, notes, files). The UI shows them as toggleable
-    icons that can be clicked to enable/disable.
-
-    Selectors:
-        SECTION: Container for all attributes
-        ATTRIBUTE: Individual attribute element
-        ADD/REMOVE: Toggle action buttons (shown on hover)
-        ICON/TEXT: Attribute display elements
-
-    Usage:
-        attrs = Attributes(create_form)
-        # Deselect attributes not in the selected list
-        attrs.select(
-            defaults=["tasks", "document", "notes", "files"],
-            selected=["tasks", "document"]
-        )
-    """
-
-    SECTION = "[data-role='attributes']"
-    ATTRIBUTE = "[data-role='attribute']"
-    ADD = "[data-role='add']"
-    REMOVE = "[data-role='remove']"
-    ICON = "[data-role='icon']"
-    TEXT = "[data-role='text']"
-
-    def __init__(self, element):
-        """
-        Initialize Attributes helper.
-
-        Args:
-            element: Form or widget containing the attributes section
-        """
-        self.element = element
-        self.section = element.locator(self.SECTION)
-        expect(self.section).to_be_visible()
-
-    def attribute(self, name):
-        """
-        Get locator for a specific attribute by name.
-
-        Args:
-            name: Attribute name (e.g., "tasks", "document")
-
-        Returns:
-            Locator: The attribute element
-        """
-        return self.section.locator(f"{self.ATTRIBUTE}[data-attribute='{name}']")
-
-    def expect_selected(self, name, selected=True):
-        """Verify an attribute's selected state."""
-        expected = "true" if selected else "false"
-        expect(self.attribute(name)).to_have_attribute("data-selected", expected)
-
-    def set_selected(self, name, selected=True):
-        """Toggle an attribute only when it is not already in the target state."""
-        attr = self.attribute(name)
-        expected = "true" if selected else "false"
-        current = attr.get_attribute("data-selected")
-        if current == expected:
-            return
-
-        attr.hover()
-        action = self.ADD if selected else self.REMOVE
-        expect(attr.locator(action)).to_be_visible()
-        attr.click()
-        self.expect_selected(name, selected)
-
-    def select(self, defaults, selected):
-        """
-        Configure attributes by deselecting those not in selected list.
-
-        Args:
-            defaults: List of attribute names that are on by default
-            selected: List of attribute names that should remain on
-        """
-        deselect = [a for a in defaults if a not in selected]
-        for attribute_name in deselect:
-            self.set_selected(attribute_name, False)
 
 
 class SpinnerButtons(Enum):

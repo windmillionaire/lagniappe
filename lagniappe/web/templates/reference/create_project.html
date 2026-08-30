@@ -7,7 +7,7 @@
       Projects collect related tasks into one place while the tasks still live on their original pages. They are useful for recurring workflows, multi-step processes, and shared work that needs filtering.
     </p>
     {% call callout("tip") %}
-      A simple project can just group tasks. A more structured project can also have a document and model tasks.
+      A simple project can just group tasks. Its document and model tasks are ready when the workflow needs more structure.
     {% endcall %}
   </section>
   <section>
@@ -15,9 +15,6 @@
     <div class="space-y-3">
       {% call feature("Generate or Manual", icon="generate", kind="project") %}
         Describe a workflow and let AI draft a project, or create a simpler project manually.
-      {% endcall %}
-      {% call feature("Project Features", icon="settings.page", kind="project") %}
-        Enable a project document for notes or procedures, and enable tasks when you want model tasks and task filtering.
       {% endcall %}
       {% call feature("Model Tasks", icon="model", kind="task") %}
         Model tasks are optional templates or phases. They can carry task forms so repeated work collects the same data every time.
@@ -27,7 +24,7 @@
   <section>
     {{ subheading("Typical Flow") }}
     {% call step(1, "Create the project") %}
-      <p class="text-sm text-base-medium">Give it a clear name and enable only the features the workflow needs.</p>
+      <p class="text-sm text-base-medium">Give it a clear name and an optional description of the workflow.</p>
     {% endcall %}
     {% call step(2, "Add model tasks if useful") %}
       <p class="text-sm text-base-medium">Use model tasks for phases like Intake, Review, Approval, or Follow-up.</p>

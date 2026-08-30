@@ -20,8 +20,7 @@ Creation Flow:
     2. Open create category form
     3. Fill name (manual) or AI description (AI mode)
     4. Optionally select form to attach
-    5. Configure attributes (tasks, document, notes, files)
-    6. Submit and capture key/url from new list item
+    5. Submit and capture key/url from new list item
 
 Category Index Page:
     The category index (/categories/{key}) shows a table of pages
@@ -109,7 +108,6 @@ class Category(SiteResource):
         data = {
             "name": self.definition.name,
             "form": form_resource.entity if form_resource else None,
-            "attributes": self.definition.attributes,
         }
 
         entity = Entities.CATEGORY.create(data)

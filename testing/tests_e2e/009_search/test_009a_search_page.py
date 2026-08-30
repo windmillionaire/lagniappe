@@ -31,7 +31,6 @@ def _create_project(name, description=""):
         {
             "name": name,
             "description": description,
-            "attributes": ["tasks", "document"],
         }
     )
     project.save()
@@ -43,7 +42,6 @@ def _create_category(name, description=""):
         {
             "name": name,
             "description": description,
-            "attributes": ["tasks", "document", "notes", "files"],
         }
     )
     category.save()

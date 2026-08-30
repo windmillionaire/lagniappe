@@ -60,11 +60,7 @@ export class ProjectInfo extends ProjectForm {
 	}
 
 	get html() {
-		return [
-			this.nameElement,
-			this.descriptionElement,
-			this.readonly ? null : sections.attributes(this),
-		];
+		return [this.nameElement, this.descriptionElement];
 	}
 
 	postreconcile() {
@@ -97,12 +93,7 @@ export class CreateProject extends ProjectForm {
 		name.dataset.role = "manual";
 		description.dataset.role = "manual";
 
-		return [
-			sections.generateEntityForm(this),
-			name,
-			description,
-			sections.attributes(this),
-		];
+		return [sections.generateEntityForm(this), name, description];
 	}
 
 	postreconcile() {

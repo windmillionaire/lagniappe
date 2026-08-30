@@ -15,8 +15,6 @@ class Projects(ResourceEnumMixin, Enum):
     test_create_model_task_with_form = test_create_project_manual_mode
     test_delete_project = Project(definition=pd.delete_project)
     test_create_project_ai_mode = Project(definition=pd.ai_generated)
-    test_create_project_without_tasks = Project(definition=pd.without_tasks)
-    test_create_project_without_document = Project(definition=pd.without_document)
     test_project_info_form = Project(definition=pd.edit_project_info)
     test_page_tasks_multi_model = Project(definition=pd.multi_model_project)
     test_filter_project = Project(definition=pd.filter_project)

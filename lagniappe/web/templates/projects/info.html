@@ -1,4 +1,3 @@
-{% from 'common.html' import attribute_button %}
 {% import 'controls.html' as controls %}
 
 {% macro info_tab(project) %}
@@ -21,12 +20,6 @@
         data-name="{{ project.name }}"
         {% if project.description %}data-description="{{ project.description }}"{% endif %}
         class="{{ styles.form.default }}">
-    <div data-role="attributes">
-      <h3 class="{{ styles.label.sectionHeading }}">Project Features</h3>
-      <div class="{{ styles.attributes.container }}">
-        {% for attribute in project.attributes %}{{ attribute_button(attribute) }}{% endfor %}
-      </div>
-    </div>
     {{ controls.edited_marker(url_for('projects.info', key=project.urlsafe_key)) }}
     <button type="submit" class="{{ styles.button.submit }}"></button>
   </form>

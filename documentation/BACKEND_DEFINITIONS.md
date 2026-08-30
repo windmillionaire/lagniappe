@@ -1,6 +1,6 @@
 # Backend Definitions and Exceptions
 
-The definitions module (`lagniappe/core/definitions/`) provides enums and configuration classes used throughout the entity system -- permissions, filter types, entity attributes, column ordering, asset types, search facets, and import stages. The exceptions module (`lagniappe/core/exceptions/`) provides custom exception types and error capture.
+The definitions module (`lagniappe/core/definitions/`) provides enums and configuration classes used throughout the entity system -- permissions, filter types, column ordering, asset types, search facets, and import stages. The exceptions module (`lagniappe/core/exceptions/`) provides custom exception types and error capture.
 
 ## Permissions (`definitions/permissions.py`)
 
@@ -101,26 +101,6 @@ Also includes domain-specific boolean options: `DocumentOptions`, `ImageOptions`
 ### FilterDefinition
 
 A dataclass-like class that serializes filter conditions for storage and transport. Contains the field, comparator, value(s), and label for display.
-
-## Attributes (`definitions/attributes.py`)
-
-Entity feature flags that control what functionality is available.
-
-### Attribute Base Class
-
-Each attribute has a `name`, `icon`, `title`, and `kind`. It tracks whether it's `active` based on the entity's configured attribute names. `None` names means all are active (inherits from model).
-
-### Entity Attribute Enums
-
-| Enum | Available Attributes |
-|---|---|
-| `ProjectAttributes` | tasks (ModelTasks), document |
-| `PageAttributes` | tasks, document, photo, notes, files |
-| `CategoryAttributes` | tasks, document, photo, notes, files |
-
-### EntityAttributes
-
-Top-level enum mapping entity kinds (`project`, `page`, `category`) to their attribute enum. `EntityAttributes[kind].initialize(entity, names)` creates a list of `Attribute` instances with active/inactive state.
 
 ## Ordering (`definitions/ordering.py`)
 

@@ -19,13 +19,12 @@ Creation Flow:
     1. Navigate to home page
     2. Open create project form
     3. Fill name/description (manual) or AI description (AI mode)
-    4. Configure attributes (tasks, document)
-    5. Submit and capture key/url from new list item
+    4. Submit and capture key/url from new list item
 
 Project Page:
     The project page (/projects/{key}) shows:
-    - Model tasks card (if tasks attribute enabled)
-    - Document tab (if document attribute enabled)
+    - Model tasks card
+    - Document tab
     - Info tab with project details
 """
 
@@ -55,9 +54,6 @@ class Project(SiteResource):
         MOBILE_SLIDER: Slider button to reveal section icons
         MOBILE_SECTION_ICONS: Container for section toggle buttons
 
-    Attributes (configurable during creation):
-        - tasks: Show model tasks card
-        - document: Show document tab
     """
 
     _initialize = True
@@ -92,7 +88,6 @@ class Project(SiteResource):
     INFO_FORM = "[data-widget='ProjectInfo']"
     INFO_NAME = "#name"
     INFO_DESCRIPTION = "#description"
-    INFO_ATTRIBUTES = "[data-role='attributes']"
 
     # --- Filters Tab ---
     FILTERS_TAB = "#filters"
@@ -113,7 +108,6 @@ class Project(SiteResource):
         data = {
             "name": self.definition.name,
             "description": self.definition.description,
-            "attributes": self.definition.attributes,
         }
 
         entity = Entities.PROJECT.create(data)

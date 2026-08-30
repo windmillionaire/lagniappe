@@ -23,6 +23,7 @@ from .entity import Entity
 # @matrix cache page : public-user
 class Page(AssetMixin, SubmitterMixin, Entity):
     entity_kind = "page"
+    retired_fields = frozenset({"attributes"})
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -98,8 +99,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_008_page_properties.py::test_page_details
-    # @tests tests_unit/test_008_page_properties.py::test_page_attributes
-    # @matrix page : details inheritance kind parent
+    # @matrix page : details kind parent
     def _get_properties(self):
         properties = super()._get_properties()
         properties.update(
@@ -112,7 +112,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 "user": page_related.PageUser,
                 "files": page_related.PageFiles,
                 "document": common_assets.Document,
-                "attributes": common_entity.Attributes,
                 "image": page_assets.Image,
                 "is_public": page_public.PageIsPublic,
                 "public_id": common_entity.PublicID,
@@ -257,7 +256,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
         self.name = data.get("name")
         self.description = data.get("description")
-        self.attributes = data.get("attributes")
 
         if data.get("submission"):
             self.properties.submission.value = data.get("submission")

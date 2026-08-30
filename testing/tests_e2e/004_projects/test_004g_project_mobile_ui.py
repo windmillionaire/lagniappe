@@ -12,7 +12,7 @@ These tests cover the current mobile navigation contract for project pages:
 from playwright.sync_api import expect
 
 from testing.definitions import ModelTasks, Projects, Users
-from testing.elements import Attributes, FormElements, MobileNav, Tabs
+from testing.elements import FormElements, MobileNav, Tabs
 from testing.resources import Project
 from testing.utility.network import scoped_browser_route
 
@@ -105,17 +105,13 @@ def test_mobile_section_switching_updates_visible_cards_and_title(get_user):
 
 
 # @matrix entity-layout : dynamic-secondary project-mobile
-# @matrix projects : attribute-model-tasks mobile-model-tasks
+# @matrix projects : mobile-model-tasks
 # @template projects/project.html::main
-def test_mobile_enabled_model_tasks_rejoins_section_switching(get_user):
+def test_mobile_model_tasks_rejoins_section_switching(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_project_info_form.get(user)
-    user.go(project)
-    attributes = Attributes(project.info_form)
-
-    attributes.set_selected("tasks", False)
     user.mobile = True
-    attributes.set_selected("tasks", True)
+    user.go(project)
 
     model_tasks = project.model_tasks_card
     expect(user.locate("#tabs > #model-tasks")).to_have_count(1)

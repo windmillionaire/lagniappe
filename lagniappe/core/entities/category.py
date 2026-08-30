@@ -12,6 +12,7 @@ UNCATEGORIZED_PAGES_NAME = "Uncategorized Pages"
 # @matrix category form-schema : delegation schema
 class Category(Entity):
     entity_kind = "category"
+    retired_fields = frozenset({"attributes"})
 
     @property
     def exclude_from_index(self):
@@ -33,7 +34,6 @@ class Category(Entity):
                 "forms": common_related.RelatedForms,
                 "description": common_entity.Description,
                 "restricted_to": common_entity.RestrictedTo,
-                "attributes": common_entity.Attributes,
                 "filters": category.CategoryFilters,
                 "ai_generated": common_entity.AiGenerated,
             }
@@ -64,7 +64,6 @@ class Category(Entity):
     def update(self, data):
         self.form = data.get("form")
         self.name = data.get("name")
-        self.attributes = data.get("attributes")
         self.description = data.get("description")
 
     # @testable true

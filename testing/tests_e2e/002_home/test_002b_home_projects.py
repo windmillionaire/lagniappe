@@ -24,10 +24,6 @@ Project Creation Modes:
     - Manual mode: User enters name and description directly
     - AI mode: User provides a prompt, AI generates name and description
 
-Project Attributes:
-    Projects can have optional attributes toggled during creation:
-    - tasks: Enable model tasks on the project
-    - document: Enable document tab
 """
 
 import re
@@ -42,8 +38,6 @@ from testing.elements import (
     HeaderSearch,
     Link,
     Modal,
-    Attributes,
-    Tabs,
     SpinnerButtons,
 )
 from testing.utility.network import expect_successful_response
@@ -79,11 +73,6 @@ def test_create_project_form(get_user):
     manual_description = form.locator(FormElements.DESCRIPTION)
     expect(manual_name).to_be_visible()
     expect(manual_description).to_be_visible()
-
-    attributes = Attributes(form)
-    for attribute in ["tasks", "document"]:
-        expect(attributes.attribute(attribute)).to_be_visible()
-        attributes.expect_selected(attribute)
 
     form.locator(Buttons.AI_MODE).click()
     ai_description = form.locator(FormElements.AI_DESCRIPTION)
@@ -197,48 +186,3 @@ def test_delete_project(get_user):
 
     Modal(user.page).delete()
     expect(user.page).to_have_url(re.compile(r"/$"))
-
-
-# @pair projects:attribute-model-tasks
-# @template home/projects.html::create
-def test_create_project_without_tasks(get_user):
-    """
-    Verify project created without tasks attribute.
-
-    When tasks attribute is deselected during creation, the project
-    page should not show the model tasks card.
-
-    Uses definition with attributes excluding 'tasks'.
-    """
-    user = get_user(Users.OWNER)
-    project = Projects.test_create_project_without_tasks.get(user, create=False)
-    home = user.go(SitePages.HOME)
-
-    home.create_manual_project(project)
-
-    project_page = user.go(project)
-    model_card = user.locate(project_page.MODEL_TASKS_CARD)
-    expect(model_card).to_be_hidden()
-
-
-# @pair projects:attribute-document
-# @template home/projects.html::create
-def test_create_project_without_document(get_user):
-    """
-    Verify project created without document attribute.
-
-    When document attribute is deselected during creation, the project
-    page should not show the document tab.
-
-    Uses definition with attributes excluding 'document'.
-    """
-    user = get_user(Users.OWNER)
-    project = Projects.test_create_project_without_document.get(user, create=False)
-    home = user.go(SitePages.HOME)
-
-    home.create_manual_project(project)
-
-    user.go(project)
-    tabs = Tabs(user)
-    document_tab = user.locate(tabs.DOCUMENT_TOGGLE_DESKTOP)
-    expect(document_tab).to_be_hidden()

@@ -275,7 +275,6 @@ def test_entity_delete_project_cascades_models_forms_filters_and_cache():
         {
             "name": _name("model-only-project"),
             "description": "Project deleted by entity lifecycle tests.",
-            "attributes": [],
         }
     )
     model_only_project.save()
@@ -287,7 +286,6 @@ def test_entity_delete_project_cascades_models_forms_filters_and_cache():
         {
             "name": _name("shared-form-project"),
             "description": "Project deleted while preserving a shared form.",
-            "attributes": [],
         }
     )
     shared_project.save()

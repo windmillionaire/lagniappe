@@ -1,2 +1,94 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="ea73dffa-2748-4fc5-add9-15128bcef371",e._sentryDebugIdIdentifier="sentry-dbid-ea73dffa-2748-4fc5-add9-15128bcef371");}catch(e){}}();class s{constructor(e){Object.assign(this,e)}get target(){return this.view.elt.querySelector("[data-widget='MobileTableControls']")}async init(){const e=await this.component.loadWidget("TableVisibility");this._syncVisibilityButtons(e.visibleColumns),this.target.addEventListener("click",t=>this._handleButtonClick(t))}postreconcile(){const e=this.component.widgets.TableSorting;e?.initialized&&e.refreshRows()}_syncVisibilityButtons(e){this.target.querySelectorAll("button[data-toggle='visibility']").forEach(t=>{const i=t.closest("[data-column]").dataset.column;t.dataset.active=e.includes(i)?"true":"false"})}_handleButtonClick(e){const t=e.target.closest("button");if(!t)return;const i=t.dataset.active==="false";t.dataset.active=i?"true":"false",t.matches("[data-toggle='visibility']")?this._dispatchVisibilityToggle(t,i):t.matches("[data-toggle='filter']")&&this._dispatchFilterToggle(t)}_dispatchVisibilityToggle(e,t){const i=new CustomEvent("toggle-column-visibility",{detail:{column:e.closest("[data-column]").dataset.column,active:t},bubbles:!0});this.target.dispatchEvent(i)}_dispatchFilterToggle(e){const t=new CustomEvent("toggle-column-filter",{detail:{column:e.closest("[data-column]").dataset.column},bubbles:!0});this.target.dispatchEvent(t)}}export{s as MobileTableControls};
 /*! Third-party licenses: /third-party-licenses.txt */
+/**
+ * @testable infrastructure
+ * @tests tests_e2e/008_users/test_008a_user_index.py::test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load
+ */
+class MobileTableControls {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+	}
+
+	get target() {
+		return this.view.elt.querySelector("[data-widget='MobileTableControls']");
+	}
+
+	async init() {
+		const visibility = await this.component.loadWidget("TableVisibility");
+
+		this._syncVisibilityButtons(visibility.visibleColumns);
+		this.target.addEventListener("click", (e) => this._handleButtonClick(e));
+	}
+
+	postreconcile() {
+		const sorting = this.component.widgets.TableSorting;
+		if (sorting?.initialized) sorting.refreshRows();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_controls_open_with_task_columns
+	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_open_with_page_columns
+	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_handle_form_columns
+	 * @matrix table-controls : columns form-columns mobile-controls
+	 */
+	_syncVisibilityButtons(visibleColumns) {
+		this.target
+			.querySelectorAll("button[data-toggle='visibility']")
+			.forEach((button) => {
+				const column = button.closest("[data-column]").dataset.column;
+				button.dataset.active = visibleColumns.includes(column)
+					? "true"
+					: "false";
+			});
+	}
+
+	_handleButtonClick(e) {
+		const button = e.target.closest("button");
+		if (!button) return;
+
+		const active = button.dataset.active === "false";
+		button.dataset.active = active ? "true" : "false";
+
+		if (button.matches("[data-toggle='visibility']")) {
+			this._dispatchVisibilityToggle(button, active);
+		} else if (button.matches("[data-toggle='filter']")) {
+			this._dispatchFilterToggle(button);
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_visibility_toggle_hides_column
+	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_visibility_toggle_hides_column
+	 * @matrix table-controls : column-visibility mobile-controls
+	 */
+	_dispatchVisibilityToggle(button, active) {
+		const event = new CustomEvent("toggle-column-visibility", {
+			detail: {
+				column: button.closest("[data-column]").dataset.column,
+				active: active,
+			},
+			bubbles: true,
+		});
+		this.target.dispatchEvent(event);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_filter_button_opens_sorting_panel
+	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_filter_button_opens_sorting_panel
+	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_handle_form_columns
+	 * @matrix table-controls : form-columns mobile-controls sorting
+	 */
+	_dispatchFilterToggle(button) {
+		const event = new CustomEvent("toggle-column-filter", {
+			detail: {
+				column: button.closest("[data-column]").dataset.column,
+			},
+			bubbles: true,
+		});
+		this.target.dispatchEvent(event);
+	}
+}
+
+export { MobileTableControls };

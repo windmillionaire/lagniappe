@@ -103,7 +103,6 @@ def test_category_viewer_opens_readonly_settings(get_user):
     expect(form_select.locator("[data-action='select-form']")).not_to_be_attached()
     expect(form_select.locator("[data-combobox-id]")).not_to_be_attached()
     expect(settings.locator("[data-role='clear']")).not_to_be_attached()
-    expect(settings.locator("[data-role='attributes']")).not_to_be_attached()
     expect(settings.locator("button[type='submit']")).not_to_be_attached()
 
     expect(tools.locate(Category.CREATE_PAGE_TOGGLE)).not_to_be_attached()
@@ -122,7 +121,6 @@ def test_category_viewer_opens_readonly_settings(get_user):
             "name": category.entity.name,
             "description": forbidden_description,
             "form": form.key,
-            **{attribute.name: "true" for attribute in category.entity.attributes},
         },
         cookies=cookies,
         headers=manual_mutation_headers(

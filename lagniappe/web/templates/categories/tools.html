@@ -1,4 +1,4 @@
-{% from 'common.html' import attribute_button, autofill, explain_prompt %}
+{% from 'common.html' import autofill, explain_prompt %}
 {% from 'filters.html' import filter_form, filter_item %}
 {% import 'controls.html' as controls %}
 
@@ -36,14 +36,6 @@
         data-nav="true"
         data-controls="true"
         class="{{ styles.form.tools }}">
-    {% if category_editable %}
-      <div data-role="attributes" data-entity="category">
-        <h3 class="{{ styles.label.sectionHeading }}">Default Page Features</h3>
-        <div class="{{ styles.attributes.container }}">
-          {% for attribute in category.attributes %}{{ attribute_button(attribute) }}{% endfor %}
-        </div>
-      </div>
-    {% endif %}
     {% if Resource.FORMS.allowed(Action.VIEW) and (category_editable or form_preload) %}
       <div data-role="form-select"
            data-kind="form"
@@ -84,12 +76,6 @@
         data-nav="true"
         data-controls="true"
         class="{{ styles.form.tools }}">
-    <div data-role="attributes" class="flex flex-col gap-1">
-      <h3 class="{{ styles.label.default }}">Page Features</h3>
-      <div class="{{ styles.attributes.container }}">
-        {% for attribute in category.attributes %}{{ attribute_button(attribute) }}{% endfor %}
-      </div>
-    </div>
     {% if Resource.FORMS.allowed(Action.VIEW) %}
       <div data-role="form-select"
            data-kind="form"

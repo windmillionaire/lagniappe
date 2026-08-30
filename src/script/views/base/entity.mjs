@@ -38,16 +38,6 @@ export default class Entity extends Core {
 	}
 
 	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.setAttributeActive
-	 * @reason attribute-specific secondary-card lookup feeds nav toggle visibility decisions
-	 */
-	secondaryCardForAttribute(attribute) {
-		const secondary = this.secondaryCard;
-		return secondary?.dataset.attribute === attribute ? secondary : null;
-	}
-
-	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_page_url_tab_overrides_saved_tab
 	 * @matrix entity-layout : persistence query-tab
@@ -122,78 +112,6 @@ export default class Entity extends Core {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.setAttributeActive
-	 * @reason secondary toggle filtering is private attribute-state plumbing
-	 */
-	_isSecondaryAttributeToggle(element, attribute) {
-		const show = element.getAttribute("lp-show");
-		if (!show) return false;
-
-		const [componentId] = show.split(":");
-		const component = this._componentElement(componentId);
-		const secondary = this.secondaryCardForAttribute(attribute);
-		return (
-			component === secondary &&
-			component?.dataset.attribute === attribute &&
-			component?.dataset.secondaryAttribute !== "true"
-		);
-	}
-
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.setAttributeActive
-	 * @reason form attribute button state is private layout metadata plumbing
-	 */
-	_setAttributeSelected(attribute, active) {
-		this.elt
-			.querySelectorAll(
-				`[data-role='attribute'][data-attribute='${attribute}']`,
-			)
-			.forEach((element) => {
-				element.dataset.selected = active ? "true" : "false";
-				const checkbox = element.querySelector("input[type='checkbox']");
-				if (checkbox) checkbox.checked = active;
-			});
-	}
-
-	/**
-	 * @testable infrastructure
-	 */
-	setAttributeActive(
-		attribute,
-		active,
-		{ includeSecondaryToggles = false } = {},
-	) {
-		this.elt
-			.querySelectorAll(`[data-has-attribute][data-attribute='${attribute}']`)
-			.forEach((element) => {
-				if (
-					!includeSecondaryToggles &&
-					this._isSecondaryAttributeToggle(element, attribute)
-				) {
-					return;
-				}
-				element.dataset.hasAttribute = active ? "true" : "false";
-			});
-		this._setAttributeSelected(attribute, active);
-	}
-
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.setSecondaryCardActive
-	 * @reason secondary-card nav toggles are derived from secondary visibility
-	 */
-	setSecondaryToggleActive(attribute, active) {
-		this.elt
-			.querySelectorAll(`[data-has-attribute][data-attribute='${attribute}']`)
-			.forEach((element) => {
-				if (!this._isSecondaryAttributeToggle(element, attribute)) return;
-				element.dataset.hasAttribute = active ? "true" : "false";
-			});
-	}
-
-	/**
-	 * @testable false
 	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
 	 * @reason root width and card persistence are coordinated by the public layout updater
 	 */
@@ -206,10 +124,6 @@ export default class Entity extends Core {
 		this.elt.classList.toggle("max-w-5xl", !active);
 		element.dataset.visible = active ? "true" : "false";
 		element.dataset.persistent = active ? "true" : "false";
-
-		if (element.dataset.attribute) {
-			this.setSecondaryToggleActive(element.dataset.attribute, active);
-		}
 	}
 
 	/**
@@ -256,15 +170,12 @@ export default class Entity extends Core {
 	 * @testable true
 	 * @tests tests_js/test_012_entity_layout_frontend.py::test_dynamic_mobile_secondary_uses_final_layout_state
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_enabled_model_tasks_rejoins_section_switching
+	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_model_tasks_rejoins_section_switching
 	 * @matrix entity-layout : dynamic-secondary page-mobile project-mobile
 	 */
 	async updateLayout({
-		attribute = null,
-		active = null,
-		attributeActive = active,
 		secondary = null,
-		secondaryActive = active,
+		secondaryActive = null,
 		activeTabId = null,
 		mutate = null,
 	} = {}) {
@@ -295,9 +206,6 @@ export default class Entity extends Core {
 		await withTransition(
 			() => {
 				commitMutation?.();
-				if (attribute && attributeActive !== null) {
-					this.setAttributeActive(attribute, attributeActive);
-				}
 				if (secondaryElement && secondaryActive !== null) {
 					this.setSecondaryCardActive(secondaryElement, secondaryActive);
 				}

@@ -58,52 +58,7 @@
 					"name": "No Feature Document Page",
 					"hash": "doc003",
 					"assets": { "document": true },
-					"document": "Document text for a page with limited features.",
-					"attributes": ["tasks", "document"]
-				}
-			]
-		]
-	},
-	"test_page_attributes": {
-		"entities": [
-			[
-				"PAGE",
-				{
-					"name": "Page With Own Attributes",
-					"hash": "attr01",
-					"attributes": ["tasks", "document"]
-				}
-			],
-			[
-				"PAGE",
-				{
-					"name": "Page Inherits From Model",
-					"hash": "attr02",
-					"model": {
-						"name": "Category With Attrs",
-						"hash": "catattr",
-						"attributes": ["document", "photo", "files"]
-					}
-				}
-			],
-			[
-				"PAGE",
-				{
-					"name": "Page No Attributes",
-					"hash": "attr03"
-				}
-			],
-			[
-				"PAGE",
-				{
-					"name": "Page Overrides Model",
-					"hash": "attr04",
-					"attributes": ["tasks", "notes"],
-					"model": {
-						"name": "Category With Different Attrs",
-						"hash": "catdiff",
-						"attributes": ["document", "photo", "files"]
-					}
+					"document": "Document text for a page with limited features."
 				}
 			]
 		]

@@ -21,7 +21,7 @@
   </form>
 {% endmacro %}
 
-{% macro document_tab(page, active=True, public_context=None) %}
+{% macro document_tab(page, public_context=None) %}
   <div lp-component
        id="document"
        data-title="Document"
@@ -29,8 +29,6 @@
        data-kind="page"
        data-visible="false"
        data-tab="true"
-       data-attribute="document"
-       data-has-attribute="{{ active|yesno }}"
        data-parent-nav="tabs">
     {% if page.allowed(Action.PUBLISH) %}{{ document_settings(page, public_context) }}{% endif %}
     <div data-widget="CollaborativeDocument"

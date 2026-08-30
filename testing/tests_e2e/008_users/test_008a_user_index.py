@@ -228,7 +228,6 @@ def test_owner_create_adopts_public_user_and_resets_form(get_user):
         {
             "name": f"Adopted User Page {suffix}",
             "model": category.entity,
-            "attributes": [],
         }
     )
     target_page.save()
@@ -417,7 +416,6 @@ def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user
             "name": f"Attach Existing Page {suffix}",
             "model": category.entity,
             "form": form.entity,
-            "attributes": [],
         }
     )
     existing_page.save()

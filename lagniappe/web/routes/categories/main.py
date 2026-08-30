@@ -9,7 +9,6 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.definitions import (
     AI,
     Action,
-    CategoryAttributes,
     DeferredJobSpec,
     DeferredJobType,
     MutationIntent,
@@ -86,7 +85,6 @@ def _category_data(form, category=None):
         "name": form.get("name"),
         "description": form.get("description"),
         "form": selected_form,
-        "attributes": [a.name for a in CategoryAttributes if form.get(a.name)],
     }
 
 

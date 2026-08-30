@@ -66,7 +66,6 @@ def _create_user_page_reassign_target(owner, name):
         {
             "name": name,
             "model": category.entity,
-            "attributes": [],
         }
     )
     page.save()
@@ -497,7 +496,6 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
             "name": f"Attached User Settings Page {suffix}",
             "model": category.entity,
             "form": form.entity,
-            "attributes": [],
             "submission": _submission_payload(initial_submission),
         }
     )

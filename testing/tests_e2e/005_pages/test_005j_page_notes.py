@@ -59,7 +59,7 @@ def _open_note_composer(user):
     return composer
 
 
-# @matrix notes pages : attribute-gate load owner private shared viewer
+# @matrix notes pages : load owner private shared viewer
 # @matrix permissions : load owner private shared viewer
 # @template pages/page.html::view_header
 # @template pages/notes.html::notes_section

@@ -33,7 +33,6 @@ def _upload_file(user, upload):
     category = Entities.CATEGORY.create(
         {
             "name": f"File Upload Category {suffix}",
-            "attributes": ["files"],
         }
     )
     category.save()
@@ -41,7 +40,6 @@ def _upload_file(user, upload):
         {
             "name": f"File Upload Page {suffix}",
             "model": category,
-            "attributes": ["files"],
         }
     )
     page_entity.save()
@@ -50,7 +48,6 @@ def _upload_file(user, upload):
         definition=PageDefinition(
             name=page_entity.name,
             category=Pages.test_file_upload_page.value.definition.category,
-            attributes=["files"],
         ),
     )
     page.entity = page_entity

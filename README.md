@@ -6,7 +6,7 @@ Lagniappe is a private web app for individuals and small organizations that supp
 
 The tour and manual are public, although the demo examples linked to in the tour require you to log in.
 
-## Contextual Organization
+## Contextual organization
 
 The main unit of organization in Lagniappe is a page: a car, a job you're trying to get, an apartment you manage — anything, really. A page can have as much structure as you choose to give it, and its related tasks, files, images, and notes are attached directly to that page. Structure is defined by reusable forms that you build yourself or generate with AI and attach to pages or tasks. Because those forms provide structure without determining where something belongs, a page can cohesively organize many different kinds of information.
 

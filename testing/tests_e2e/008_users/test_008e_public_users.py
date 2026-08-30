@@ -126,8 +126,6 @@ def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user)
     scenario = limited_public_user
     user = scenario.user
     page = scenario.page
-    assert not scenario.entity.page.has("files")
-    assert not scenario.entity.page.has("photo")
 
     expect(user.locate(Tabs.FILES_TOGGLE_DESKTOP)).to_have_count(0)
     expect(
@@ -140,13 +138,6 @@ def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user)
     expect(info_form.locator("button[type='submit']")).to_be_visible()
     expect(info_form.locator("[data-role='show-autofill']")).to_have_count(0)
     expect(info_form.locator("[data-role='autofill']")).to_have_count(0)
-    expect(
-        info_form.locator("[data-role='attribute'][data-attribute='files']")
-    ).to_have_count(0)
-    expect(
-        info_form.locator("[data-role='attribute'][data-attribute='photo']")
-    ).to_have_count(0)
-
     settings_panel = open_user_settings(user, page)
     expect(
         settings_panel.locator("input[name='notification_email_mode']")
@@ -221,7 +212,6 @@ def test_public_user_creates_task_with_reduced_schedule_options(
         {
             "name": f"Public task boundary {uuid4().hex}",
             "description": "Project used to verify public task tracking restrictions.",
-            "attributes": [],
         }
     )
     project.save()
@@ -387,35 +377,24 @@ def test_public_user_file_and_photo_actions_are_forbidden(
     )
 
 
-# @matrix public-users : ai-schedule-guard attribute-preservation restriction-gate
+# @matrix public-users : ai-schedule-guard restriction-gate
 def test_public_user_restricted_schedules_are_forbidden(
     limited_public_user, browser_failures
 ):
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
     task_key = scenario.task.urlsafe_key
-    initial_attributes = {
-        attribute.name
-        for attribute in scenario.entity.page.attributes
-        if attribute.active
-    }
     metadata_update = browser_fetch(
         scenario.user,
         f"/pages/{page_key}/update",
         method="PUT",
         data={
             "name": scenario.entity.page.name,
-            "photo": "on",
-            "files": "on",
         },
     )
     assert metadata_update["status"] == 200
     saved_page = Entities.fetch_one(scenario.entity.page.key, request=Fetch.direct())
-    assert not saved_page.has("photo")
-    assert not saved_page.has("files")
-    assert {
-        attribute.name for attribute in saved_page.attributes if attribute.active
-    } == initial_attributes
+    assert saved_page.name == scenario.entity.page.name
 
     _assert_routes_forbidden(
         scenario.user,

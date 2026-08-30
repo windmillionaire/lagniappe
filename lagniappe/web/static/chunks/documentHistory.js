@@ -1,2 +1,142 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7da9b39c-64bb-40cf-982d-01a2850144a5",e._sentryDebugIdIdentifier="sentry-dbid-7da9b39c-64bb-40cf-982d-01a2850144a5");}catch(e){}}();import{STYLES as i}from"./styles.js?v=b623c224";import{r as a}from"./foundation.js?v=b623c224";import"./connectivity.js?v=b623c224";import{s as d}from"./icons.js?v=b623c224";import{Modal as l}from"./modal.js?v=b623c224";import{Dropdown as c}from"./dropdown.js?v=b623c224";import"./combobox.js?v=b623c224";import"./primitives.js?v=b623c224";class h{constructor(e){this.toolbar=e,this.active=!1,this.button=document.createElement("button"),this._dropdown=null,this._restore=this._restore.bind(this),this._loadEntries=this._loadEntries.bind(this),this.refresh=this.refresh.bind(this)}init(e){Object.assign(this,e),this.button.title=this.title,this.button.className=`${i.editor.toolbar.tool}`;const n=document.createElement("span");d(n,this.icon,i.editor.toolbar.historyIcon),this.button.replaceChildren(n),this._dropdown=new c(this.button),this._dropdown.init({loadOptions:this._loadEntries,placement:"bottom-end",styles:{panel:`${i.dropdown.panel} ${i.editor.toolbar.portalIconContext}`}})}show(){this.button.hidden=!1}async _loadEntries(){const e=this.toolbar.endpoints.history;if(!e)return[];const n=await a.get(e,{refresh:Date.now()});if(!n?.ok)return[];const s=n.entries||[],o=[{name:"Pin Version",icon:"pin",onClick:()=>this.toolbar.openForm("pinVersion")}];return n.unpinned_count>0&&o.push({name:"Clear Unpinned Versions",icon:"delete",onClick:t=>this._confirmClear(t)}),o.push(...s.map(t=>{const r=t.created?new Date(t.created).toLocaleString():"";return{name:t.pinned?`${t.name} \u2014 ${r}`:r,icon:t.pinned?"pin":"history",onClick:()=>this._restore(t.key)}})),o}async refresh(){const e=await this._loadEntries();this._dropdown?.updateOptions(e)}async _confirmClear(e){const n=this.toolbar.endpoints.history;if(!n)return;const s=new l(this.toolbar.document.view,e);await s.load(`${n}/unpinned?refresh=${Date.now()}`);const o=s.modal?.querySelector("[data-role='delete']");o&&(o.addEventListener("click",async()=>{o.disabled=!0;const t=o.querySelector("#spinner");if(t&&(t.dataset.visible="true"),!(await a.delete(o.dataset.route))?.ok){o.disabled=!1,t&&(t.dataset.visible="false");return}await s.remove(),await this.refresh()}),o.focus())}async _restore(e){const n=this.toolbar.endpoints.history,s=await a.get(`${n}/${e}`);if(!s?.markup)return;this.toolbar.document.editor.commands.setContent(s.markup,{emitUpdate:!1})}destroy(){this._dropdown&&(this._dropdown.destroy(),this._dropdown=null)}}export{h as documentHistory};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=bdbb928b';
+import { r as request } from './foundation.js?v=bdbb928b';
+import './connectivity.js?v=bdbb928b';
+import { s as setIcon } from './icons.js?v=bdbb928b';
+import { Modal } from './modal.js?v=bdbb928b';
+import { Dropdown } from './dropdown.js?v=bdbb928b';
+import './combobox.js?v=bdbb928b';
+import './primitives.js?v=bdbb928b';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
+ * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
+ * @matrix editor : history-list history-restore
+ */
+class DocumentHistoryButton {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.active = false;
+		this.button = document.createElement("button");
+		this._dropdown = null;
+		this._restore = this._restore.bind(this);
+		this._loadEntries = this._loadEntries.bind(this);
+		this.refresh = this.refresh.bind(this);
+	}
+
+	init(settings) {
+		Object.assign(this, settings);
+		this.button.title = this.title;
+		this.button.className = `${STYLES.editor.toolbar.tool}`;
+
+		const iconElement = document.createElement("span");
+		setIcon(iconElement, this.icon, STYLES.editor.toolbar.historyIcon);
+		this.button.replaceChildren(iconElement);
+
+		this._dropdown = new Dropdown(this.button);
+		this._dropdown.init({
+			loadOptions: this._loadEntries,
+			placement: "bottom-end",
+			styles: {
+				panel: `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext}`,
+			},
+		});
+	}
+
+	show() {
+		this.button.hidden = false;
+	}
+
+	async _loadEntries() {
+		const endpoint = this.toolbar.endpoints.history;
+		if (!endpoint) return [];
+
+		const response = await request.get(endpoint, { refresh: Date.now() });
+		if (!response?.ok) return [];
+
+		const entries = response.entries || [];
+		const items = [
+			{
+				name: "Pin Version",
+				icon: "pin",
+				onClick: () => this.toolbar.openForm("pinVersion"),
+			},
+		];
+
+		if (response.unpinned_count > 0) {
+			items.push({
+				name: "Clear Unpinned Versions",
+				icon: "delete",
+				onClick: (option) => this._confirmClear(option),
+			});
+		}
+
+		items.push(
+			...entries.map((entry) => {
+				const date = entry.created
+					? new Date(entry.created).toLocaleString()
+					: "";
+				return {
+					name: entry.pinned ? `${entry.name} — ${date}` : date,
+					icon: entry.pinned ? "pin" : "history",
+					onClick: () => this._restore(entry.key),
+				};
+			}),
+		);
+
+		return items;
+	}
+
+	async refresh() {
+		const items = await this._loadEntries();
+		this._dropdown?.updateOptions(items);
+	}
+
+	async _confirmClear(trigger) {
+		const endpoint = this.toolbar.endpoints.history;
+		if (!endpoint) return;
+
+		const modal = new Modal(this.toolbar.document.view, trigger);
+		await modal.load(`${endpoint}/unpinned?refresh=${Date.now()}`);
+		const deleteButton = modal.modal?.querySelector("[data-role='delete']");
+		if (!deleteButton) return;
+
+		deleteButton.addEventListener("click", async () => {
+			deleteButton.disabled = true;
+			const spinner = deleteButton.querySelector("#spinner");
+			if (spinner) spinner.dataset.visible = "true";
+
+			const response = await request.delete(deleteButton.dataset.route);
+			if (!response?.ok) {
+				deleteButton.disabled = false;
+				if (spinner) spinner.dataset.visible = "false";
+				return;
+			}
+
+			await modal.remove();
+			await this.refresh();
+		});
+		deleteButton.focus();
+	}
+
+	async _restore(historyKey) {
+		const endpoint = this.toolbar.endpoints.history;
+		const response = await request.get(`${endpoint}/${historyKey}`);
+		if (!response?.markup) return;
+
+		const doc = this.toolbar.document;
+		doc.editor.commands.setContent(response.markup, {
+			emitUpdate: false,
+		});
+	}
+
+	destroy() {
+		if (this._dropdown) {
+			this._dropdown.destroy();
+			this._dropdown = null;
+		}
+	}
+}
+
+export { DocumentHistoryButton as documentHistory };

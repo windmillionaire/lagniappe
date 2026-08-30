@@ -1,4 +1,4 @@
-import { request, withTransition } from "../shared";
+import { withTransition } from "../shared";
 import { setIcon } from "../shared/icons";
 import { AutofillUpload } from "./autofill";
 import { buttons } from "./buttons";
@@ -94,113 +94,6 @@ const generateEntityForm = (form) => {
 };
 
 /**
- * @testable infrastructure
- */
-const attributes = (form) => {
-	const section = form.target.querySelector('[data-role="attributes"]');
-	if (!section) return null;
-	if (form.readonly) return section;
-
-	const controller = new AbortController();
-	const signal = controller.signal;
-
-	section.querySelectorAll("[data-role='attribute']").forEach((attribute) => {
-		const checkbox = attribute.querySelector("input[type='checkbox']");
-		const attributeName = attribute.dataset.attribute;
-
-		/**
-		 * @testable false
-		 * @covered-by src/script/elements/sections.mjs::attributes
-		 * @reason selected-state update is private attributes-section plumbing
-		 */
-		const updateSelected = (selected = checkbox.checked) => {
-			const wasSelected = attribute.dataset.selected === "true";
-			attribute.dataset.selected = selected.toString();
-			checkbox.checked = selected;
-			// If just selected (false → true), suppress hover effects until mouseout
-			if (!wasSelected && selected) {
-				attribute.dataset.justSelected = "true";
-			}
-		};
-
-		/**
-		 * @testable false
-		 * @covered-by src/script/elements/sections.mjs::attributes
-		 * @reason live page-attribute persistence is private attributes-section plumbing
-		 */
-		const persistSelected = async (selected) => {
-			if (!form.endpoints?.attribute || !attributeName) return;
-
-			attribute.classList.add("opacity-50", "pointer-events-none");
-			try {
-				const route = form.endpoints.attribute(attributeName);
-				const response = await request.put(route, { active: selected });
-				if (!form.view.successfulResponse(response, form.component)) {
-					updateSelected(!selected);
-					return;
-				}
-
-				await reconcilePageAttribute(form, attributeName, selected);
-			} catch (error) {
-				updateSelected(!selected);
-				form.component?.showError?.(
-					error.message || "Unable to update page feature.",
-				);
-			} finally {
-				attribute.classList.remove("opacity-50", "pointer-events-none");
-			}
-		};
-
-		attribute.addEventListener(
-			"click",
-			async (e) => {
-				e.stopPropagation();
-				e.preventDefault();
-				const selected = attribute.dataset.selected !== "true";
-				updateSelected(selected);
-				if (!form.endpoints?.attribute) {
-					checkbox.dispatchEvent(new Event("change", { bubbles: true }));
-				}
-				await persistSelected(selected);
-			},
-			{ signal },
-		);
-
-		attribute.addEventListener(
-			"keydown",
-			async (e) => {
-				if (e.key === "Enter" || e.key === " ") {
-					e.stopPropagation();
-					e.preventDefault();
-					const selected = !checkbox.checked;
-					updateSelected(selected);
-					if (!form.endpoints?.attribute) {
-						checkbox.dispatchEvent(new Event("change", { bubbles: true }));
-					}
-					await persistSelected(selected);
-				}
-			},
-			{ signal },
-		);
-
-		attribute.addEventListener(
-			"mouseleave",
-			() => {
-				attribute.blur();
-				delete attribute.dataset.justSelected;
-			},
-			{ signal },
-		);
-	});
-
-	form.destroyables.push({
-		destroy: () => controller.abort(),
-	});
-
-	return section;
-};
-
-/**
  * @testable false
  * @covered-by src/script/elements/sections.mjs::photoPrompt
  * @reason private compact photo prompt UI state helper
@@ -250,86 +143,12 @@ const photoMobileToggleTemplate = (section) => {
 /**
  * @testable false
  * @covered-by src/script/elements/sections.mjs::photoPrompt
- * @covered-by src/script/elements/sections.mjs::attributes
- * @reason private compact photo prompt attribute-state helper
- */
-const setAttributeSelected = (form, name, selected) => {
-	const attribute = form.target.querySelector(
-		`[data-role='attribute'][data-attribute='${name}']`,
-	);
-	if (!attribute) return;
-
-	attribute.dataset.selected = selected ? "true" : "false";
-	const checkbox = attribute.querySelector("input[type='checkbox']");
-	if (checkbox) checkbox.checked = selected;
-};
-
-/**
- * @testable false
- * @covered-by src/script/elements/sections.mjs::photoPrompt
- * @covered-by src/script/elements/sections.mjs::attributes
- * @reason private page attribute visibility helper
- */
-const setEntityAttributeActive = (form, name, active) => {
-	if (typeof form.view.setAttributeActive === "function") {
-		form.view.setAttributeActive(name, active);
-		return;
-	}
-
-	form.view.elt
-		.querySelectorAll(`[data-has-attribute][data-attribute='${name}']`)
-		.forEach((element) => {
-			const photoToggle = element.matches("button[lp-show='photo:active']");
-			if (name === "photo" && photoToggle) return;
-			element.dataset.hasAttribute = active ? "true" : "false";
-		});
-	setAttributeSelected(form, name, active);
-};
-
-/**
- * @testable false
- * @covered-by src/script/elements/sections.mjs::photoPrompt
- * @covered-by src/script/elements/sections.mjs::attributes
- * @reason private photo secondary-card toggle helper
- */
-const setPhotoToggleActive = (form, active) => {
-	if (typeof form.view.setSecondaryToggleActive === "function") {
-		form.view.setSecondaryToggleActive("photo", active);
-		return;
-	}
-
-	form.view.elt
-		.querySelectorAll(
-			"[data-has-attribute][data-attribute='photo'][lp-show='photo:active']",
-		)
-		.forEach((element) => {
-			element.dataset.hasAttribute = active ? "true" : "false";
-		});
-};
-
-/**
- * @testable false
- * @covered-by src/script/elements/sections.mjs::photoPrompt
- * @covered-by src/script/elements/sections.mjs::attributes
- * @reason private page-photo image-state helper
- */
-const photoContainsImage = (form) => {
-	return !!form.view.elt.querySelector(
-		"#photo [data-role='existing-image'] img",
-	);
-};
-
-/**
- * @testable false
- * @covered-by src/script/elements/sections.mjs::photoPrompt
- * @covered-by src/script/elements/sections.mjs::attributes
  * @reason private compact photo prompt visibility helper
  */
-const syncPhotoPrompt = (form, active) => {
+const syncPhotoPrompt = (form, visible) => {
 	const prompt = form.target.querySelector("[data-role='photo-prompt']");
 	if (!prompt) return;
-	prompt.dataset.visible =
-		active && !photoContainsImage(form) ? "true" : "false";
+	prompt.dataset.visible = visible ? "true" : "false";
 };
 
 /**
@@ -350,71 +169,11 @@ const ensurePhotoMobileToggle = (form, section) => {
 			mobileToggles.prepend(toggle);
 			form.view._mobileNav = null;
 		}
+	} else {
+		mobileToggles
+			?.querySelector("[lp-show='photo:active']")
+			?.setAttribute("data-visible", "true");
 	}
-};
-
-/**
- * @testable false
- * @covered-by src/script/elements/sections.mjs::attributes
- * @reason private page attribute tab visibility helper
- */
-const reconcileTabAttribute = async (form, name, active) => {
-	const component = form.view.elt.querySelector(
-		`[lp-component][data-has-attribute][data-attribute='${name}']`,
-	);
-	const selected = localStorage.getItem(`${form.view.hash}-active`);
-	const activeTabId =
-		!active &&
-		(selected === component?.id || component?.dataset.visible === "true")
-			? "info"
-			: null;
-	const secondary =
-		component?.dataset.secondaryAttribute === "true" ? component : null;
-
-	if (typeof form.view.updateLayout === "function") {
-		await form.view.updateLayout({
-			attribute: name,
-			active,
-			secondary,
-			activeTabId,
-		});
-		return;
-	}
-
-	setEntityAttributeActive(form, name, active);
-	if (activeTabId) {
-		localStorage.setItem(`${form.view.hash}-active`, activeTabId);
-		if (typeof form.view._renderLayout === "function") {
-			await form.view._renderLayout();
-		}
-	}
-};
-
-/**
- * @testable false
- * @covered-by src/script/elements/sections.mjs::attributes
- * @covered-by src/script/elements/sections.mjs::photoPrompt
- * @reason private page attribute DOM reconciliation helper
- */
-const reconcilePageAttribute = async (form, name, active) => {
-	if (name === "photo") {
-		if (!active) {
-			await hidePhotoLayout(form, {
-				attributeActive: false,
-				promptActive: false,
-			});
-		} else if (photoContainsImage(form)) {
-			await showPhotoLayout(form, form.target);
-		} else {
-			await hidePhotoLayout(form, {
-				attributeActive: true,
-				promptActive: true,
-			});
-		}
-		return;
-	}
-
-	await reconcileTabAttribute(form, name, active);
 };
 
 /**
@@ -456,8 +215,6 @@ const showPhotoLayout = async (form, section, callback = null) => {
 
 	if (typeof form.view.updateLayout === "function") {
 		await form.view.updateLayout({
-			attribute: "photo",
-			attributeActive: true,
 			secondary: photo,
 			secondaryActive: true,
 			activeTabId: form.view.mobile ? "photo" : null,
@@ -471,8 +228,6 @@ const showPhotoLayout = async (form, section, callback = null) => {
 	form.view.elt.classList.add("max-w-7xl");
 	photo.dataset.visible = "true";
 	photo.dataset.persistent = "true";
-	setEntityAttributeActive(form, "photo", true);
-	setPhotoToggleActive(form, true);
 	if (form.view.mobile) {
 		localStorage.setItem(`${form.view.hash}-active`, "photo");
 	}
@@ -484,65 +239,13 @@ const showPhotoLayout = async (form, section, callback = null) => {
 	}
 	return widget;
 };
-
-/**
- * @testable false
- * @covered-by src/script/elements/sections.mjs::photoPrompt
- * @reason private compact photo prompt layout handoff helper
- */
-const hidePhotoLayout = async (
-	form,
-	{ attributeActive = null, promptActive = false } = {},
-) => {
-	const photo = form.view.elt.querySelector("#photo");
-	const activeTabId =
-		localStorage.getItem(`${form.view.hash}-active`) === "photo"
-			? "info"
-			: null;
-
-	if (typeof form.view.updateLayout === "function") {
-		await form.view.updateLayout({
-			attribute: attributeActive === null ? null : "photo",
-			attributeActive,
-			secondary: photo,
-			secondaryActive: false,
-			activeTabId,
-			mutate: () => () => syncPhotoPrompt(form, promptActive),
-		});
-		return;
-	}
-
-	form.view.elt.dataset.secondary = "false";
-	form.view.elt.classList.remove("max-w-7xl");
-	form.view.elt.classList.add("max-w-5xl");
-	if (attributeActive !== null) {
-		setEntityAttributeActive(form, "photo", attributeActive);
-	}
-	setPhotoToggleActive(form, false);
-	syncPhotoPrompt(form, promptActive);
-
-	if (photo) {
-		photo.dataset.visible = "false";
-		photo.dataset.persistent = "false";
-	}
-
-	if (activeTabId) {
-		localStorage.setItem(`${form.view.hash}-active`, activeTabId);
-	}
-
-	if (typeof form.view._renderLayout === "function") {
-		await form.view._renderLayout();
-	}
-};
-
 /**
  * @testable true
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop
- * @tests tests_e2e/005_pages/test_005f_page_image.py::test_empty_page_photo_prompt_can_disable_photo_without_reload
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
- * @matrix pages : desktop-tabs image-add image-generate mobile-photo-tab photo-disable photo-prompt
+ * @matrix pages : desktop-tabs image-add image-generate mobile-photo-tab photo-prompt
  */
 const photoPrompt = (form) => {
 	const section = form.target.querySelector("[data-role='photo-prompt']");
@@ -552,7 +255,6 @@ const photoPrompt = (form) => {
 	const signal = controller.signal;
 	const upload = section.querySelector("[data-role='photo-upload']");
 	const generate = section.querySelector("[data-role='photo-generate']");
-	const disable = section.querySelector("[data-role='photo-disable']");
 
 	/**
 	 * @testable false
@@ -575,7 +277,6 @@ const photoPrompt = (form) => {
 			setPhotoPromptBusy(section, false);
 			setPhotoPromptButtonIcon(upload, "upload");
 			setPhotoPromptButtonIcon(generate, "generate");
-			setPhotoPromptButtonIcon(disable, "x");
 		}
 	};
 
@@ -595,33 +296,6 @@ const photoPrompt = (form) => {
 			await reveal(generate, (widget, options) =>
 				widget.showGenerateForm(options),
 			);
-		},
-		{ signal },
-	);
-
-	disable?.addEventListener(
-		"click",
-		async () => {
-			showPhotoPromptError(section, "");
-			setPhotoPromptButtonIcon(disable, "spinner");
-			setPhotoPromptBusy(section, true);
-
-			try {
-				const route =
-					section.dataset.endpointDisable || form.endpoints.disablePhoto;
-				const response = await request.put(route, { active: false });
-				if (!form.view.successfulResponse(response, form.component)) return;
-
-				await reconcilePageAttribute(form, "photo", false);
-			} catch (error) {
-				showPhotoPromptError(
-					section,
-					error.message || "Unable to turn photo off.",
-				);
-			} finally {
-				setPhotoPromptBusy(section, false);
-				setPhotoPromptButtonIcon(disable, "x");
-			}
 		},
 		{ signal },
 	);
@@ -703,7 +377,6 @@ const generateImageForm = () => {
 
 export const sections = {
 	generateEntityForm,
-	attributes,
 	photoPrompt,
 	generateImageForm,
 	autofill,

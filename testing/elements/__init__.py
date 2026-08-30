@@ -16,7 +16,7 @@ Architecture:
 
 Modules:
     site_common.py: Core selectors (Buttons, FormElements, Roles) and helpers (Modal, Link)
-    forms_common.py: Form-specific helpers (SpinnerButtons, Attributes, FormSelect, ProjectSelect, DateSelect, UserSelect, FileSelect)
+    forms_common.py: Form-specific helpers (SpinnerButtons, FormSelect, ProjectSelect, DateSelect, UserSelect, FileSelect)
     indexes.py: Index page helpers (Table, Tools)
     tabs.py: Tab navigation helper (Tabs)
     tasks.py: Task-specific helpers (PostponeDropdown)
@@ -64,7 +64,6 @@ from .editor import (
 )
 from .filters import CategoryFilterConditions, Filters, ProjectFilterConditions
 from .forms_common import (
-    Attributes,
     DateSelect,
     FileSelect,
     FormSelect,
@@ -99,7 +98,6 @@ __all__ = [
     "MobileNav",
     "Tools",
     "HeaderSearch",
-    "Attributes",
     "PostponeDropdown",
     "UploadDropdown",
     "IngressWizard",

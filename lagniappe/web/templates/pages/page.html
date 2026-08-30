@@ -18,17 +18,9 @@
 {% set view_permissions = Resource.USER.allowed(Action.PERMISSIONS) %}
 {% set can_view_user_settings = page.user and (is_own_page or view_permissions) %}
 {% set can_edit_page = page.allowed(Action.EDIT) %}
-{% set has_photo = page.has('photo') and not is_public_own_page %}
-{% set has_document = page.has('document') %}
-{% set has_document_content = 'document' in page.assets %}
-{% set has_tasks = page.has('tasks') %}
-{% set has_files = page.has('files') and not is_public_own_page %}
-{% set has_notes = page.has('notes') %}
-{% set has_image = has_photo and page.image %}
-{% set render_photo = has_photo or (can_edit_page and not is_public_user) %}
-{% set render_document = has_document_content or can_edit_page %}
-{% set render_tasks = has_tasks or can_edit_page %}
-{% set render_files = has_files or (can_edit_page and not is_public_user) %}
+{% set has_image = page.image and not is_public_own_page %}
+{% set render_photo = has_image or (can_edit_page and not is_public_user) %}
+{% set render_files = not is_public_own_page %}
 
 {% macro view_header(page) %}
   <nav class="{{ styles.layout.view.title }}" data-nav="view">
@@ -55,7 +47,7 @@
         <span data-role="title">{{- page.name -}}</span>
         {% call menus.title("Page actions") %}
           {{ menus.star(is_starred(page)) }}
-          {% if can_edit_page and has_notes %}{{ menus.show("Add note", "notes", "page-notes:CreateNote", "note") }}{% endif %}
+          {% if can_edit_page %}{{ menus.show("Add note", "notes", "page-notes:CreateNote", "note") }}{% endif %}
           {% if page.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
         {% endcall %}
       </span>
@@ -63,40 +55,28 @@
   </nav>
 {% endmacro %}
 
-{% macro toggles(nav, has_image=false) %}
+{% macro toggles(nav, show_photo=false) %}
   <nav class="{{ styles.layout.nav.toggles }}"
        data-nav="{{ nav }}"
        data-persistent="true"
        data-standalone="true">
-    {% if render_photo %}
+    {% if render_photo and show_photo %}
       <button lp-show="photo:active"
               data-kind="page"
-              data-attribute="photo"
-              data-has-attribute="{{ has_image|yesno }}"
               class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("image") }}</button>
     {% endif %}
-    {% if render_document %}
-      <button lp-show="document:active"
-              data-kind="page"
-              data-attribute="document"
-              data-has-attribute="{{ has_document|yesno }}"
-              class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
-    {% endif %}
+    <button lp-show="document:active"
+            data-kind="page"
+            class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
     <button lp-show="info:active"
             data-kind="page"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("info") }}</button>
-    {% if render_tasks %}
-      <button lp-show="tasks:active"
-              data-kind="task"
-              data-attribute="tasks"
-              data-has-attribute="{{ has_tasks|yesno }}"
-              class="{{ styles.entity.tabIcon }}">{{ render_icon("task") }}</button>
-    {% endif %}
+    <button lp-show="tasks:active"
+            data-kind="task"
+            class="{{ styles.entity.tabIcon }}">{{ render_icon("task") }}</button>
     {% if render_files %}
       <button lp-show="files:active"
               data-kind="file"
-              data-attribute="files"
-              data-has-attribute="{{ has_files|yesno }}"
               class="{{ styles.entity.tabIcon }}">{{ render_icon("files") }}</button>
     {% endif %}
   </nav>
@@ -114,30 +94,24 @@
             data-visible="false"
             class="{{ styles.toggle.container }}">{{ render_icon("permissions") }}</button>
   {% endif %}
-  {% if page.allowed(Action.PUBLISH) and render_document %}
+  {% if page.allowed(Action.PUBLISH) %}
     <button lp-show="document:DocumentSettings"
             data-kind="default"
             data-visible="false"
-            data-attribute="document"
-            data-has-attribute="{{ has_document|yesno }}"
             class="{{ styles.toggle.container }}">
       {{ render_icon("public", styles.toggle.icon.documentSettings) }}
     </button>
   {% endif %}
-  {% if page.allowed(Action.EDIT) and render_tasks %}
+  {% if page.allowed(Action.EDIT) %}
     <button lp-show="tasks:CreateTask"
             data-kind="task"
             data-visible="false"
-            data-attribute="tasks"
-            data-has-attribute="{{ has_tasks|yesno }}"
             class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
   {% endif %}
   {% if page.allowed(Action.EDIT) and not is_public_user and render_files %}
     <button lp-show="files:FileUpload"
             data-kind="file"
             data-visible="false"
-            data-attribute="files"
-            data-has-attribute="{{ has_files|yesno }}"
             class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
   {% endif %}
 {% endmacro %}
@@ -160,7 +134,7 @@
 {% endmacro %}
 
 {% macro page_photo(page) %}
-  {{ photo_card(page, has_image, has_photo, is_public_user) }}
+  {{ photo_card(page, has_image, is_public_user) }}
 {% endmacro %}
 
 {% macro main() %}
@@ -183,7 +157,7 @@
           <span>{{- page.description -}}</span>
         {%- endif -%}
       </div>
-      {% if has_notes %}{{ notes_section(page) }}{% endif %}
+      {{ notes_section(page) }}
     </div>
     {{ mobile_nav(page, has_image) }}
     <div id="layout" class="{{ styles.entity.cards }} sm:mt-4">
@@ -201,9 +175,9 @@
           {{ toggles('tabs', false) }}
         </div>
         {{ info_tab(page, is_owner_page, is_admin_viewer, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) }}
-        {% if render_document %}{{ document_tab(page, has_document, public_context) }}{% endif %}
-        {% if render_tasks %}{{ task_tab(page, has_tasks) }}{% endif %}
-        {% if render_files %}{{ files_tab(page, has_files) }}{% endif %}
+        {{ document_tab(page, public_context) }}
+        {{ task_tab(page) }}
+        {% if render_files %}{{ files_tab(page) }}{% endif %}
       </div>
     </div>
   </div>

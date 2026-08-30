@@ -23,7 +23,6 @@ Related Files:
 Category Features:
     Categories are containers for pages. They can have:
     - An attached form (defines fields for pages in this category)
-    - Attributes: tasks, document, notes, files (inherited by pages)
     - AI-generated or manually entered name/description
 """
 
@@ -40,7 +39,6 @@ from testing.elements import (
     FormElements,
     Link,
     Modal,
-    Attributes,
     SpinnerButtons,
 )
 from testing.utility.network import expect_successful_response
@@ -55,13 +53,6 @@ def _create_category(user, home, definition):
         create_form.locator(Buttons.AI_MODE).click()
         create_form.locator(FormElements.AI_DESCRIPTION).fill(
             definition.description_for_ai
-        )
-
-    if len(definition.attributes) < 5:
-        attributes = Attributes(create_form)
-        attributes.select(
-            defaults=["tasks", "document", "notes", "files", "photo"],
-            selected=definition.attributes,
         )
 
     if definition.form:

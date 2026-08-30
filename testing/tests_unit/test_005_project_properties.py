@@ -1,7 +1,7 @@
 """Unit tests for Project entity properties exercised via TestEntity harness.
 
 Covers common mixins wired on ``Project`` in ``lagniappe/core/entities/project.py``:
-Description, Document, IsPublic, Attributes, and ``ProjectFilters`` (conditions,
+Description, Document, IsPublic, and ``ProjectFilters`` (conditions,
 ``entity_fields`` from attached model tasks/forms, and task ``to_filter_index``).
 
 ``ProjectFilters`` and ``ModelTasks`` live in ``lagniappe/core/properties/project.py``.
@@ -11,7 +11,7 @@ through the test entity JSON (see ``005_project_properties.json``).
 ``ModelTaskProject`` and ``ModelTaskForm`` in ``properties/project.py`` are used on
 ModelTask entities; they are not asserted here—see task / model-task test modules.
 
-Out of scope for this file: ``public_id``, ``ai_generated``, ``update`` / ``save`` /
+Out of scope for this file: ``public_id``, ``ai_generated``, ``save`` /
 ``index``, and the production ``database.get.model_tasks`` path
 (covered elsewhere or in e2e).
 """
@@ -47,9 +47,6 @@ def test_project_description(get_test_entities):
     """
     for project in get_test_entities():
         raw_value = project.test_spec.get("description")
-
-        if "attributes" in project.test_spec:
-            project.db["attributes"] = project.test_spec["attributes"]
 
         if raw_value:
             project.description = raw_value
@@ -98,8 +95,6 @@ def test_project_document(get_test_entities):
     - filter_key is "has_document"
     """
     for project in get_test_entities():
-        if "attributes" in project.test_spec:
-            project.db["attributes"] = project.test_spec["attributes"]
         document_text = project.text_for_cache("document")
 
         # FilterMixin - filter_value is boolean
@@ -152,49 +147,6 @@ def test_project_is_public(get_test_entities):
 
         # Filter index
         assert project.to_filter_index()["is_public"] is is_public
-
-
-# @matrix project : attributes defaults
-@pytest.mark.unit
-def test_project_attributes(get_test_entities):
-    """Test Attributes property with FilterMixin.
-
-    Attributes has:
-    - filter_value is boolean
-    - filter_key is "attributes"
-    - Value reads from entity.db["attributes"]
-    """
-    for project in get_test_entities():
-        if "attributes" in project.test_spec:
-            project.db["attributes"] = project.test_spec["attributes"]
-        else:
-            assert project.has("tasks") is True
-            assert project.has("document") is True
-            continue
-
-        assert project.has("tasks") == ("tasks" in project.db["attributes"])
-        assert project.has("document") == ("document" in project.db["attributes"])
-
-
-# @matrix project : attributes blank-persistence
-@pytest.mark.unit
-def test_project_attributes_empty_list_stays_persisted():
-    """An explicit empty attributes list is distinct from missing attributes."""
-    project = TestEntities.get(
-        "PROJECT",
-        {
-            "name": "No attributes",
-            "hash": "proj_attrs_empty",
-            "attributes": [],
-        },
-    )
-
-    project.attributes = []
-
-    assert [a.name for a in project.attributes if a.active] == []
-    assert project.db["attributes"] == []
-    assert project.has("tasks") is False
-    assert project.has("document") is False
 
 
 # @matrix filters project task : conditions entity-fields filter-value
@@ -440,25 +392,21 @@ def test_model_tasks_load_attach_and_order_from_database():
     assert model_two.order == 2
 
 
-# @matrix project : attributes description identity update
+# @matrix project : description identity update
 @pytest.mark.unit
-def test_project_update_sets_identity_description_and_attributes():
-    """Project.update owns identity, description normalization, and attributes."""
+def test_project_update_sets_identity_and_description():
+    """Project.update owns identity and description normalization."""
     project = Project(testing=True)
 
     project.update(
         {
             "name": "Updated Project",
             "description": "<p>Safe <strong>description</strong></p>",
-            "attributes": ["tasks"],
         }
     )
 
     assert project.name == "Updated Project"
     assert project.description == "Safe description"
-    assert project.db["attributes"] == ["tasks"]
-    assert project.has("tasks")
-    assert not project.has("document")
 
 
 # @matrix model-task project : create ordering relation-save update
