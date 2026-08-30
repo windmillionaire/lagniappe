@@ -45,7 +45,8 @@ const mainInputs = {
 const settings = yaml.load(
 	readFileSync("./config/files/lagniappe_settings.yaml", "utf8"),
 );
-const sentry = resolveSentryBuild(settings);
+const packageMetadata = JSON.parse(readFileSync("./package.json", "utf8"));
+const sentry = resolveSentryBuild(settings, packageMetadata);
 const sentryPlugins = (project, sourcemaps) =>
 	sentry.enabled
 		? sentryRollupPlugin({
@@ -53,7 +54,7 @@ const sentryPlugins = (project, sourcemaps) =>
 				project,
 				authToken: sentry.authToken,
 				release: {
-					name: settings.VERSION,
+					name: sentry.release,
 				},
 				sourcemaps,
 				telemetry: false,

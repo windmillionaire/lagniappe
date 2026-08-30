@@ -343,7 +343,8 @@ def save_file(file, path, content_type, visibility):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_download_file_passes_optional_byte_range
-# @matrix file storage : byte-range
+# @tests tests_unit/test_018_database_assets.py::test_missing_blob_download_and_size_return_none
+# @matrix file storage : byte-range missing-object
 def download_file(path, visibility, start=None, end=None):
     """Download a blob's contents as bytes from the specified bucket."""
     bucket = DATA.bucket(visibility)
@@ -353,17 +354,24 @@ def download_file(path, visibility, start=None, end=None):
         options["start"] = start
     if end is not None:
         options["end"] = end
-    return blob.download_as_bytes(**options)
+    try:
+        return blob.download_as_bytes(**options)
+    except google_exceptions.NotFound:
+        return None
 
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_file_size_reloads_blob_metadata
-# @matrix file storage : byte-range metadata
+# @tests tests_unit/test_018_database_assets.py::test_missing_blob_download_and_size_return_none
+# @matrix file storage : byte-range metadata missing-object
 def file_size(path, visibility):
     """Return a blob's byte size from storage metadata."""
     bucket = DATA.bucket(visibility)
     blob = bucket.blob(path)
-    blob.reload()
+    try:
+        blob.reload()
+    except google_exceptions.NotFound:
+        return None
     return blob.size
 
 
@@ -447,13 +455,17 @@ def get_signed_url(
     return url
 
 
-# @testable false
-# @reason cloud storage behavior is owned by E2E coverage against configured services
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_delete_file_ignores_missing_blob
+# @matrix storage : idempotent-delete missing-object
 def delete_file(path, visibility):
     """Delete a blob from the specified bucket."""
     bucket = DATA.bucket(visibility)
     blob = bucket.blob(path)
-    blob.delete()
+    try:
+        blob.delete()
+    except google_exceptions.NotFound:
+        pass
 
 
 # @testable true
