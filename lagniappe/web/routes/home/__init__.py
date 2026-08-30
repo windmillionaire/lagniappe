@@ -6,6 +6,7 @@ internal = Blueprint("internal", __name__)
 
 from . import (
     admin,
+    markdown,
     preview,
     search,
     site,

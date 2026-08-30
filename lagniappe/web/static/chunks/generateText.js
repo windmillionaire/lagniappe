@@ -1,14 +1,14 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bd163a0f';
-import { r as request } from './foundation.js?v=bd163a0f';
-import './connectivity.js?v=bd163a0f';
-import { Modal } from './modal.js?v=bd163a0f';
-import { B as BaseForm } from './baseForm.js?v=bd163a0f';
-import { b as buttons } from './buttons.js?v=bd163a0f';
-import { p as primitives } from './primitives.js?v=bd163a0f';
-import './icons.js?v=bd163a0f';
-import './loader.js?v=bd163a0f';
-import './formatting.js?v=bd163a0f';
+import { STYLES } from './styles.js?v=b881d5e5';
+import { r as request } from './foundation.js?v=b881d5e5';
+import './connectivity.js?v=b881d5e5';
+import { Modal } from './modal.js?v=b881d5e5';
+import { B as BaseForm } from './baseForm.js?v=b881d5e5';
+import { b as buttons } from './buttons.js?v=b881d5e5';
+import { p as primitives } from './primitives.js?v=b881d5e5';
+import './icons.js?v=b881d5e5';
+import './loader.js?v=b881d5e5';
+import './formatting.js?v=b881d5e5';
 
 /**
  * @testable true
@@ -210,15 +210,8 @@ class GenerateText {
 	}
 
 	_selectionRange() {
-		const highlight = this.editor.storage.selectionHighlight;
-		if (
-			highlight?.active &&
-			highlight.from !== null &&
-			highlight.to !== null &&
-			highlight.from !== highlight.to
-		) {
-			return { from: highlight.from, to: highlight.to };
-		}
+		const highlight = this.editor.commands.getSelectionHighlightRange();
+		if (highlight) return highlight;
 
 		const { from, to } = this._capturedRange ?? this.editor.state.selection;
 		if (from !== to) {

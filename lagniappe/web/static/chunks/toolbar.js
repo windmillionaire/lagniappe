@@ -1,11 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=bd163a0f';
-import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=bd163a0f';
-import './connectivity.js?v=bd163a0f';
-import { STYLES } from './styles.js?v=bd163a0f';
-import { Q as QueryLifecycle } from './queryLifecycle.js?v=bd163a0f';
-import { s as setIcon } from './icons.js?v=bd163a0f';
-import { Dropdown } from './dropdown.js?v=bd163a0f';
+import { STYLES } from './styles.js?v=b881d5e5';
+import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=b881d5e5';
+import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=b881d5e5';
+import './connectivity.js?v=b881d5e5';
+import { Q as QueryLifecycle } from './queryLifecycle.js?v=b881d5e5';
+import { s as setIcon } from './icons.js?v=b881d5e5';
+import { Dropdown } from './dropdown.js?v=b881d5e5';
+import { b as buttons } from './buttons.js?v=b881d5e5';
 
 /**
  * Utility module to work with key-value stores.
@@ -47381,6 +47382,16 @@ var StarterKit = Extension.create({
   }
 });
 
+const SELECTION_RANGE = "selectionHighlight";
+
+// @testable false
+// @covered-by src/script/elements/editor/extensions/highlight.mjs::SelectionHighlight
+// @reason storage lookup is exercised through the selection highlight contract
+const selectionRange = (editor) => {
+	const range = editor?.storage?.trackedRanges?.ranges?.get(SELECTION_RANGE);
+	return range ? { ...range } : null;
+};
+
 /**
  * @testable true
  * @tests tests_js/test_041_editor_decorations.py::test_selection_highlight_decorations_and_range_mapping
@@ -47390,14 +47401,6 @@ var StarterKit = Extension.create({
 const SelectionHighlight = Extension.create({
 	name: "selectionHighlight",
 
-	addStorage() {
-		return {
-			active: false,
-			from: null,
-			to: null,
-		};
-	},
-
 	addCommands() {
 		return {
 			setSelectionHighlight:
@@ -47405,9 +47408,7 @@ const SelectionHighlight = Extension.create({
 				({ editor }) => {
 					const { from, to } = editor.state.selection;
 					if (from !== to) {
-						editor.storage.selectionHighlight.active = true;
-						editor.storage.selectionHighlight.from = from;
-						editor.storage.selectionHighlight.to = to;
+						editor.commands.setTrackedRange(SELECTION_RANGE, { from, to });
 						editor.commands.updateDecorations("selectionHighlight");
 					}
 					return true;
@@ -47415,37 +47416,30 @@ const SelectionHighlight = Extension.create({
 			clearSelectionHighlight:
 				() =>
 				({ editor }) => {
-					editor.storage.selectionHighlight.active = false;
-					editor.storage.selectionHighlight.from = null;
-					editor.storage.selectionHighlight.to = null;
+					editor.commands.clearTrackedRange(SELECTION_RANGE);
 					editor.commands.updateDecorations("selectionHighlight");
 					return true;
 				},
 			getSelectionHighlightRange:
 				() =>
 				({ editor }) => {
-					const storage = editor.storage.selectionHighlight;
-					if (storage.active && storage.from !== null && storage.to !== null) {
-						return { from: storage.from, to: storage.to };
-					}
-					return null;
+					return selectionRange(editor);
 				},
 		};
 	},
 
 	addDecorations() {
-		const storage = this.storage;
+		const editor = this.editor;
 
 		return {
 			update: "manual",
 			create: ({ state }) => {
-				if (!storage.active || storage.from === null || storage.to === null) {
-					return [];
-				}
+				const range = selectionRange(editor);
+				if (!range) return [];
 
 				const docEnd = state.doc.content.size;
-				const rangeStart = Math.min(storage.from, storage.to);
-				const rangeEnd = Math.max(storage.from, storage.to);
+				const rangeStart = Math.min(range.from, range.to);
+				const rangeEnd = Math.max(range.from, range.to);
 				const from = Math.max(0, Math.min(rangeStart, docEnd));
 				const to = Math.max(from, Math.min(rangeEnd, docEnd));
 				if (from >= to) return [];
@@ -47469,29 +47463,6 @@ const SelectionHighlight = Extension.create({
 				return decorations;
 			},
 		};
-	},
-
-	onTransaction({ transaction, appendedTransactions }) {
-		const storage = this.storage;
-		if (!storage.active || storage.from === null || storage.to === null) {
-			return;
-		}
-
-		for (const tr of [transaction, ...appendedTransactions]) {
-			if (!tr.docChanged) continue;
-
-			const from = tr.mapping.map(storage.from, 1);
-			const to = tr.mapping.map(storage.to, -1);
-			if (from >= to) {
-				storage.active = false;
-				storage.from = null;
-				storage.to = null;
-				return;
-			}
-
-			storage.from = from;
-			storage.to = to;
-		}
 	},
 });
 
@@ -48564,6 +48535,48 @@ const CustomLink = Link.extend({
 });
 
 /**
+ * An editable, persistable source block for pasted Markdown awaiting a user
+ * conversion decision.
+ *
+ * @testable true
+ * @tests tests_js/test_048_markdown_paste.py::test_markdown_source_schema_is_distinct_from_code_blocks
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_keeping_pasted_markdown_preserves_source_block
+ * @matrix editor markdown : paste source-block
+ */
+const MarkdownSource = Node3.create({
+	name: "markdownSource",
+	priority: 1000,
+	content: "text*",
+	marks: "",
+	group: "block",
+	code: true,
+	defining: true,
+
+	addOptions() {
+		return { HTMLAttributes: {} };
+	},
+
+	parseHTML() {
+		return [
+			{
+				tag: 'pre[data-type="markdownSource"]',
+				preserveWhitespace: "full",
+			},
+		];
+	},
+
+	renderHTML({ HTMLAttributes }) {
+		return [
+			"pre",
+			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
+				"data-type": this.name,
+			}),
+			["code", 0],
+		];
+	},
+});
+
+/**
  * @testable true
  * @tests tests_js/test_042_messaging_frontend.py::test_mention_node_collection_insertion_and_keyboard_contract
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
@@ -48928,511 +48941,288 @@ class MentionSuggestions {
 	}
 }
 
-const SAFE_TAGS = new Set([
-	"a",
-	"blockquote",
-	"br",
-	"code",
-	"em",
-	"h1",
-	"h2",
-	"h3",
-	"h4",
-	"h5",
-	"h6",
-	"hr",
-	"li",
-	"ol",
-	"p",
-	"pre",
-	"s",
-	"strike",
-	"strong",
-	"sub",
-	"sup",
-	"table",
-	"tbody",
-	"td",
-	"th",
-	"thead",
-	"tr",
-	"u",
-	"ul",
-]);
-
-const DROP_TAGS = new Set([
-	"applet",
-	"base",
-	"button",
-	"canvas",
-	"embed",
-	"form",
-	"frame",
-	"frameset",
-	"iframe",
-	"img",
-	"input",
-	"link",
-	"math",
-	"meta",
-	"noscript",
-	"object",
-	"option",
-	"picture",
-	"script",
-	"select",
-	"source",
-	"style",
-	"svg",
-	"textarea",
-	"video",
-]);
-
-const SAFE_LINK_SCHEMES = new Set(["", "http", "https", "mailto"]);
-const HTML_FRAGMENT_PATTERN = /<\/?[a-z][\s\S]*>/i;
+const TRACKED_RANGE_META = "trackedRanges";
 
 // @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason tiny string escaping helper owned by paste normalization
-const escapeHtml = (value) =>
-	String(value ?? "")
-		.replaceAll("&", "&amp;")
-		.replaceAll("<", "&lt;")
-		.replaceAll(">", "&gt;")
-		.replaceAll('"', "&quot;");
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::sanitizePastedHtml
-// @reason link scheme filtering is part of the paste sanitizer contract
-const safeHref = (href) => {
-	const value = String(href || "").trim();
-	if (!value) return null;
-
-	try {
-		const parsed = new URL(value, globalThis.window?.location?.href);
-		if (SAFE_LINK_SCHEMES.has(parsed.protocol.replace(":", "").toLowerCase())) {
-			return value;
-		}
-	} catch (_error) {
-		if (value.startsWith("#") || value.startsWith("/")) return value;
+// @covered-by src/script/elements/editor/extensions/trackedRanges.mjs::TrackedRanges
+// @reason validation and clamping are exercised through tracked range mapping
+const normalizedRange = (range, docEnd) => {
+	if (!range) return null;
+	const from = Math.max(0, Math.min(Number(range.from), docEnd));
+	const to = Math.max(0, Math.min(Number(range.to), docEnd));
+	if (!Number.isInteger(from) || !Number.isInteger(to) || from >= to) {
+		return null;
 	}
-
-	return null;
+	return { from, to };
 };
 
 // @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::sanitizePastedHtml
-// @reason table cell span filtering is part of the paste sanitizer contract
-const safeSpan = (value) => {
-	const span = Number.parseInt(value, 10);
-	return Number.isInteger(span) && span > 1 && span <= 100
-		? String(span)
-		: null;
+// @covered-by src/script/elements/editor/extensions/trackedRanges.mjs::TrackedRanges
+// @reason transaction metadata composition is exercised through tracked ranges
+const addOperation = (transaction, operation) => {
+	const meta = transaction.getMeta(TRACKED_RANGE_META) || { operations: [] };
+	transaction.setMeta(TRACKED_RANGE_META, {
+		operations: [...meta.operations, operation],
+	});
+	return transaction;
 };
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::sanitizePastedHtml
-// @reason helper-owned-by-paste-sanitizer
-const unwrapElement = (element) => {
-	const parent = element.parentNode;
-	if (!parent) return;
+/**
+ * Associate a named range with the document produced by a transaction.
+ *
+ * @testable true
+ * @tests tests_js/test_041_editor_decorations.py::test_named_tracked_ranges_map_independently
+ * @matrix editor : inserted-range range-mapping
+ */
+const setTrackedRangeInTransaction = (transaction, key, range) =>
+	addOperation(transaction, { type: "set", key, range });
 
-	while (element.firstChild) parent.insertBefore(element.firstChild, element);
-	element.remove();
-};
+/**
+ * Keep independently named document ranges current across local, remote, and
+ * appended ProseMirror transactions.
+ *
+ * @testable true
+ * @tests tests_js/test_041_editor_decorations.py::test_named_tracked_ranges_map_independently
+ * @matrix ai editor markdown : inserted-range range-mapping
+ */
+const TrackedRanges = Extension.create({
+	name: "trackedRanges",
 
-// @testable true
-// @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
-// @matrix editor : paste-html sanitization
-const sanitizePastedHtml = (content) => {
-	if (!content || !HTML_FRAGMENT_PATTERN.test(content)) return "";
+	addStorage() {
+		return { ranges: new Map() };
+	},
 
-	const parser = new DOMParser();
-	const document = parser.parseFromString(content, "text/html");
+	addCommands() {
+		return {
+			setTrackedRange:
+				(key, range) =>
+				({ state, tr, dispatch }) => {
+					const normalized = normalizedRange(range, state.doc.content.size);
+					if (typeof key !== "string" || !key || !normalized) return false;
+					if (dispatch)
+						dispatch(addOperation(tr, { type: "set", key, range: normalized }));
+					return true;
+				},
+			getTrackedRange:
+				(key) =>
+				({ editor }) => {
+					const range = editor.storage.trackedRanges.ranges.get(key);
+					return range ? { ...range } : null;
+				},
+			clearTrackedRange:
+				(key) =>
+				({ tr, dispatch }) => {
+					if (typeof key !== "string" || !key) return false;
+					if (dispatch) dispatch(addOperation(tr, { type: "clear", key }));
+					return true;
+				},
+			clearTrackedRanges:
+				() =>
+				({ tr, dispatch }) => {
+					if (dispatch) dispatch(addOperation(tr, { type: "clearAll" }));
+					return true;
+				},
+		};
+	},
 
-	for (const node of Array.from(
-		document.body.querySelectorAll("script, style, template"),
-	)) {
-		node.remove();
-	}
+	onTransaction({ transaction, appendedTransactions = [] }) {
+		const ranges = this.storage.ranges;
 
-	const walker = document.createTreeWalker(
-		document.body,
-		NodeFilter.SHOW_ELEMENT,
-	);
-	const elements = [];
-	while (walker.nextNode()) elements.push(walker.currentNode);
-
-	for (const element of elements) {
-		const name = element.tagName.toLowerCase();
-
-		if (DROP_TAGS.has(name)) {
-			element.remove();
-			continue;
-		}
-
-		if (!SAFE_TAGS.has(name)) {
-			unwrapElement(element);
-			continue;
-		}
-
-		const attrs = {};
-		if (name === "a") {
-			const href = safeHref(element.getAttribute("href"));
-			if (href) attrs.href = href;
-			const title = element.getAttribute("title");
-			if (title) attrs.title = title;
-		} else if (name === "td" || name === "th") {
-			const colspan = safeSpan(element.getAttribute("colspan"));
-			const rowspan = safeSpan(element.getAttribute("rowspan"));
-			if (colspan) attrs.colspan = colspan;
-			if (rowspan) attrs.rowspan = rowspan;
-		}
-
-		for (const attr of Array.from(element.attributes)) {
-			element.removeAttribute(attr.name);
-		}
-		for (const [key, value] of Object.entries(attrs)) {
-			element.setAttribute(key, value);
-		}
-	}
-
-	return document.body.innerHTML.trim();
-};
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-table-parser
-const splitMarkdownRow = (line) => {
-	const trimmed = line.trim();
-	const source = trimmed.startsWith("|") ? trimmed.slice(1) : trimmed;
-	const withoutTrailingPipe = source.endsWith("|")
-		? source.slice(0, -1)
-		: source;
-	const cells = [];
-	let current = "";
-	let escaped = false;
-
-	for (const char of withoutTrailingPipe) {
-		if (escaped) {
-			current += char;
-			escaped = false;
-		} else if (char === "\\") {
-			escaped = true;
-		} else if (char === "|") {
-			cells.push(current.trim());
-			current = "";
-		} else {
-			current += char;
-		}
-	}
-	cells.push(current.trim());
-
-	return cells;
-};
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-table-parser
-const isDividerRow = (line) => {
-	const cells = splitMarkdownRow(line);
-	return (
-		cells.length > 1 &&
-		cells.every((cell) => /^:?-{3,}:?$/.test(cell.replaceAll(" ", "")))
-	);
-};
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-table-parser
-const looksLikeTableRow = (line) =>
-	line.includes("|") && splitMarkdownRow(line).length > 1;
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-parser
-const renderInlineMarkdown = (value) => {
-	const parts = String(value ?? "").split(/(`[^`]+`)/g);
-	const linkPlaceholders = [];
-
-	// @testable false
-	// @covered-by src/script/elements/editor/extensions/paste.mjs::renderInlineMarkdown
-	// @reason helper-owned-by-inline-markdown-renderer
-	const linkToken = (html) => {
-		const token = `\u0000LINK${linkPlaceholders.length}\u0000`;
-		linkPlaceholders.push([token, html]);
-		return token;
-	};
-
-	const html = parts
-		.map((part) => {
-			if (part.startsWith("`") && part.endsWith("`") && part.length > 1) {
-				return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
-			}
-
-			let linked = "";
-			let start = 0;
-			const linkPattern = /\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g;
-
-			for (const match of part.matchAll(linkPattern)) {
-				linked += escapeHtml(part.slice(start, match.index));
-
-				const href = safeHref(match[2]);
-				if (href) {
-					const title = match[3] ? ` title="${escapeHtml(match[3])}"` : "";
-					linked += linkToken(
-						`<a href="${escapeHtml(href)}"${title}>${escapeHtml(match[1])}</a>`,
+		for (const tr of [transaction, ...appendedTransactions]) {
+			if (tr.docChanged) {
+				for (const [key, range] of ranges) {
+					const mapped = normalizedRange(
+						{
+							from: tr.mapping.map(range.from, 1),
+							to: tr.mapping.map(range.to, -1),
+						},
+						tr.doc.content.size,
 					);
-				} else {
-					linked += escapeHtml(match[1]);
+					if (mapped) ranges.set(key, mapped);
+					else ranges.delete(key);
 				}
-
-				start = match.index + match[0].length;
 			}
 
-			linked += escapeHtml(part.slice(start));
-			return linked
-				.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-				.replace(/__([^_]+)__/g, "<strong>$1</strong>")
-				.replace(/~~([^~]+)~~/g, "<s>$1</s>")
-				.replace(/\*([^*\s][^*]*?)\*/g, "<em>$1</em>")
-				.replace(/_([^_\s][^_]*?)_/g, "<em>$1</em>");
-		})
-		.join("");
+			const meta = tr.getMeta(TRACKED_RANGE_META);
+			for (const operation of meta?.operations || []) {
+				if (operation.type === "clearAll") {
+					ranges.clear();
+				} else if (operation.type === "clear") {
+					ranges.delete(operation.key);
+				} else if (operation.type === "set") {
+					const range = normalizedRange(operation.range, tr.doc.content.size);
+					if (typeof operation.key === "string" && operation.key && range) {
+						ranges.set(operation.key, range);
+					}
+				}
+			}
+		}
+	},
+});
 
-	return linkPlaceholders.reduce(
-		(result, [token, link]) => result.replaceAll(token, link),
-		html,
-	);
-};
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-parser
-const renderList = (type, items) =>
-	`<${type}>${items.map((item) => `<li><p>${renderInlineMarkdown(item)}</p></li>`).join("")}</${type}>`;
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-parser
-const renderMarkdownTable = (headers, rows) =>
-	[
-		"<table>",
-		"<thead><tr>",
-		...headers.map((cell) => `<th><p>${renderInlineMarkdown(cell)}</p></th>`),
-		"</tr></thead>",
-		"<tbody>",
-		...rows.map((row) => {
-			const cells = headers.map((_, cellIndex) => row[cellIndex] || "");
-			return [
-				"<tr>",
-				...cells.map((cell) => `<td><p>${renderInlineMarkdown(cell)}</p></td>`),
-				"</tr>",
-			].join("");
-		}),
-		"</tbody>",
-		"</table>",
-	].join("");
+const BLOCK_MARKDOWN_PATTERNS = [
+	/^\s{0,3}#{1,6}\s+\S/,
+	/^\s{0,3}(?:\x60{3}|~{3})/,
+	/^\s{0,3}>\s?\S/,
+	/^\s{0,3}(?:[-+*]|\d+\.)\s+\S/,
+	/^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/,
+];
+const INLINE_MARKDOWN_PATTERNS = [
+	/\x60[^\x60\n]+\x60/,
+	/\*\*[^*\n]+\*\*/,
+	/__[^_\n]+__/,
+	/~~[^~\n]+~~/,
+	/(^|[^*])\*(?!\s)[^*\n]+\*/,
+	/(^|[^_])_(?!\s)[^_\n]+_/,
+	/!?\[[^\]\n]+\]\([^\s)]+(?:\s+"[^"]*")?\)/,
+];
+const HTML_FRAGMENT_PATTERN = /<\/?[a-z][^>]*>/i;
+const TABLE_DIVIDER_PATTERN =
+	/^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+const SETEXT_PATTERN = /^\s{0,3}(?:=+|-+)\s*$/;
+const FENCE_PATTERN = /^\s{0,3}(\x60{3}|~{3})/;
+const INDENTED_CODE_PATTERN = /^(?: {4}|\t)/;
+const HARD_BREAK_PATTERN = /(?: {2,}|\\)$/;
+const SOFT_WRAP_MINIMUM = 40;
 
 // @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-parser
-const renderCodeBlock = (lines) =>
-	`<pre><code>${escapeHtml(lines.join("\n"))}</code></pre>`;
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-parser
-const headingMatch = (line) => line.match(/^(#{1,6})\s+(.+)$/);
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-parser
-const unorderedListMatch = (line) => line.match(/^\s{0,3}[-*+]\s+(.+)$/);
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-parser
-const orderedListMatch = (line) => line.match(/^\s{0,3}\d+[.)]\s+(.+)$/);
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-parser
-const quoteMatch = (line) => line.match(/^\s{0,3}>\s?(.*)$/);
-
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-// @reason helper-owned-by-markdown-parser
-const isHorizontalRule = (line) =>
-	/^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/.test(line);
-
-// @testable true
-// @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_markdown_table_preserves_table_after_reload
-// @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_common_markdown_preserves_formatting
-// @matrix editor : paste-markdown paste-markdown-table reload
-const markdownToHtml = (content) => {
-	const lines = String(content || "")
+// @covered-by src/script/elements/editor/extensions/paste.mjs::looksLikeConvertibleMarkup
+// @reason clipboard line-ending normalization is part of Markdown detection
+const normalizeLineEndings = (value) =>
+	String(value || "")
 		.replaceAll("\r\n", "\n")
-		.split("\n");
-	const html = [];
-	let convertedMarkdown = false;
-	let paragraph = [];
-	let codeBlock = null;
+		.replaceAll("\r", "\n");
 
-	// @testable false
-	// @covered-by src/script/elements/editor/extensions/paste.mjs::markdownToHtml
-	// @reason helper-owned-by-markdown-parser
-	const flushParagraph = () => {
-		if (paragraph.length === 0) return;
-		html.push(`<p>${paragraph.map(renderInlineMarkdown).join("<br>")}</p>`);
-		paragraph = [];
-	};
+/**
+ * Conservatively identify plain clipboard text worth offering to the shared
+ * Markdown renderer. This detects; it never interprets or converts source.
+ *
+ * @testable true
+ * @tests tests_js/test_048_markdown_paste.py::test_markdown_detection_is_conservative
+ * @matrix editor markdown : detection paste soft-wrap
+ */
+const looksLikeConvertibleMarkup = (content) => {
+	const source = normalizeLineEndings(content);
+	if (!source.trim()) return false;
+	const lines = source.split("\n");
 
-	for (let index = 0; index < lines.length; index += 1) {
-		const line = lines[index];
+	if (
+		HTML_FRAGMENT_PATTERN.test(source) ||
+		lines.some((line) =>
+			BLOCK_MARKDOWN_PATTERNS.some((pattern) => pattern.test(line)),
+		) ||
+		lines.some((line, index) => {
+			return index > 0 && lines[index - 1].trim() && SETEXT_PATTERN.test(line);
+		}) ||
+		lines.some((line) => TABLE_DIVIDER_PATTERN.test(line)) ||
+		INLINE_MARKDOWN_PATTERNS.some((pattern) => pattern.test(source))
+	) {
+		return true;
+	}
+
+	let fence = null;
+	const proseLines = lines.map((line) => {
+		const marker = line.match(FENCE_PATTERN)?.[1] || null;
+		if (marker) {
+			fence = fence === marker ? null : fence || marker;
+			return false;
+		}
+		return !fence && !INDENTED_CODE_PATTERN.test(line);
+	});
+
+	return lines.some((line, index) => {
 		const next = lines[index + 1];
-		const trimmed = line.trim();
-
-		if (codeBlock) {
-			if (trimmed.startsWith("```")) {
-				html.push(renderCodeBlock(codeBlock.lines));
-				codeBlock = null;
-				convertedMarkdown = true;
-			} else {
-				codeBlock.lines.push(line);
-			}
-			continue;
+		if (next === undefined || !proseLines[index] || !proseLines[index + 1]) {
+			return false;
 		}
-
-		if (trimmed.startsWith("```")) {
-			flushParagraph();
-			codeBlock = { lines: [] };
-			continue;
-		}
-
-		if (looksLikeTableRow(line) && next && isDividerRow(next)) {
-			flushParagraph();
-			const headers = splitMarkdownRow(line);
-			const rows = [];
-			index += 2;
-
-			while (index < lines.length && looksLikeTableRow(lines[index])) {
-				rows.push(splitMarkdownRow(lines[index]));
-				index += 1;
-			}
-			index -= 1;
-			convertedMarkdown = true;
-
-			html.push(renderMarkdownTable(headers, rows));
-			continue;
-		}
-
-		const heading = headingMatch(line);
-		if (heading) {
-			flushParagraph();
-			const level = heading[1].length;
-			html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
-			convertedMarkdown = true;
-			continue;
-		}
-
-		const unordered = unorderedListMatch(line);
-		if (unordered) {
-			flushParagraph();
-			const items = [];
-			while (index < lines.length) {
-				const item = unorderedListMatch(lines[index]);
-				if (!item) break;
-				items.push(item[1]);
-				index += 1;
-			}
-			index -= 1;
-			html.push(renderList("ul", items));
-			convertedMarkdown = true;
-			continue;
-		}
-
-		const ordered = orderedListMatch(line);
-		if (ordered) {
-			flushParagraph();
-			const items = [];
-			while (index < lines.length) {
-				const item = orderedListMatch(lines[index]);
-				if (!item) break;
-				items.push(item[1]);
-				index += 1;
-			}
-			index -= 1;
-			html.push(renderList("ol", items));
-			convertedMarkdown = true;
-			continue;
-		}
-
-		const quote = quoteMatch(line);
-		if (quote) {
-			flushParagraph();
-			const quoteLines = [];
-			while (index < lines.length) {
-				const item = quoteMatch(lines[index]);
-				if (!item) break;
-				quoteLines.push(item[1]);
-				index += 1;
-			}
-			index -= 1;
-			html.push(
-				`<blockquote><p>${quoteLines.map(renderInlineMarkdown).join("<br>")}</p></blockquote>`,
-			);
-			convertedMarkdown = true;
-			continue;
-		}
-
-		if (isHorizontalRule(line)) {
-			flushParagraph();
-			html.push("<hr>");
-			convertedMarkdown = true;
-			continue;
-		}
-
-		if (line.trim()) paragraph.push(line);
-		else flushParagraph();
-	}
-
-	if (codeBlock) {
-		html.push(renderCodeBlock(codeBlock.lines));
-		convertedMarkdown = true;
-	}
-
-	flushParagraph();
-
-	return convertedMarkdown ? html.join("") : "";
+		return (
+			line.trim().length >= SOFT_WRAP_MINIMUM &&
+			next.trim() &&
+			!HARD_BREAK_PATTERN.test(line)
+		);
+	});
 };
 
-// @testable true
-// @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_markdown_table_preserves_table_after_reload
-// @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
-// @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_common_markdown_preserves_formatting
-// @matrix editor : paste-html paste-markdown paste-markdown-table sanitization
+/**
+ * Insert source as one MarkdownSource node and atomically register its exact
+ * transaction-produced range.
+ *
+ * @testable true
+ * @tests tests_js/test_048_markdown_paste.py::test_source_insertion_tracks_the_inserted_block
+ * @matrix editor markdown : inserted-range paste source-block
+ */
+const insertMarkdownSource = (view, content, rangeKey) => {
+	const { state } = view;
+	const sourceType = state.schema.nodes.markdownSource;
+	if (!sourceType || typeof rangeKey !== "string" || !rangeKey) return false;
+
+	const source = normalizeLineEndings(content);
+	const node = sourceType.create(
+		null,
+		source ? state.schema.text(source) : undefined,
+	);
+	const transaction = state.tr.replaceSelectionWith(node);
+	let range = null;
+	transaction.doc.descendants((child, position) => {
+		if (child === node) {
+			range = { from: position, to: position + node.nodeSize };
+		}
+		return range === null;
+	});
+	if (!range) return false;
+
+	transaction.setSelection(TextSelection.create(transaction.doc, range.to - 1));
+	setTrackedRangeInTransaction(transaction, rangeKey, range);
+	view.dispatch(transaction.scrollIntoView());
+	return true;
+};
+
+/**
+ * Intercept only detected plain-text markup when an owning toolbar can offer
+ * an explicit conversion decision.
+ *
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_markdown_table_preserves_table_after_reload
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_common_markdown_preserves_formatting
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_keeping_pasted_markdown_preserves_source_block
+ * @matrix editor markdown : conversion paste source-block
+ */
 const EditorPaste = Extension.create({
 	name: "editorPaste",
 
+	addStorage() {
+		return {
+			confirm: null,
+			sequence: 0,
+		};
+	},
+
 	addProseMirrorPlugins() {
+		const editor = this.editor;
+		const storage = this.storage;
 		return [
 			new Plugin({
 				key: new PluginKey("editorPaste"),
 				props: {
-					handlePaste: (_view, event) => {
+					handlePaste: (view, event) => {
 						const clipboard = event.clipboardData;
-						if (!clipboard) return false;
+						if (!clipboard || typeof storage.confirm !== "function") {
+							return false;
+						}
 
 						const richHtml = clipboard.getData("text/html");
 						const text = clipboard.getData("text/plain");
-						if (!text || richHtml) return false;
+						if (!text || richHtml || !looksLikeConvertibleMarkup(text)) {
+							return false;
+						}
 
-						const html = markdownToHtml(text) || sanitizePastedHtml(text);
-						if (!html) return false;
+						const rangeKey = ["markdownPaste", ++storage.sequence].join(":");
+						if (!insertMarkdownSource(view, text, rangeKey)) return false;
 
 						event.preventDefault();
-						return this.editor.commands.insertContent(html);
+						storage.confirm({ editor, rangeKey });
+						return true;
 					},
 				},
 			}),
@@ -49784,7 +49574,11 @@ const collaborativeEditor = (target, ydoc, editable = true) => {
 			},
 		}),
 		FlashRemoteChanges,
+		TrackedRanges,
 		SelectionHighlight,
+		MarkdownSource.configure({
+			HTMLAttributes: { class: STYLES.editor.markdownSource },
+		}),
 		EditorPaste,
 		TabCharacter,
 		LagniappeMention,
@@ -49847,7 +49641,11 @@ const independentEditor = (target) => {
 		FontFamily.configure({
 			types: ["textStyle"],
 		}),
+		TrackedRanges,
 		SelectionHighlight,
+		MarkdownSource.configure({
+			HTMLAttributes: { class: STYLES.editor.markdownSource },
+		}),
 		EditorPaste,
 		TabCharacter,
 	];
@@ -50157,44 +49955,274 @@ const toolbarDropdown = (menu, items) => {
 	return menuButton;
 };
 
+/**
+ * Own the nonmodal decision and asynchronous replacement for one pasted
+ * Markdown source block at a time.
+ *
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_markdown_table_preserves_table_after_reload
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_common_markdown_preserves_formatting
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_keeping_pasted_markdown_preserves_source_block
+ * @matrix editor markdown : conversion paste source-block
+ */
+class MarkdownPastePrompt {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.editor = toolbar.editor;
+		this.current = null;
+		this.requestController = null;
+		this.requestGeneration = 0;
+		this.applying = false;
+		this.confirm = this.open.bind(this);
+		this.submit = this._submit.bind(this);
+		this.keydown = this._keydown.bind(this);
+		this.transaction = this._transaction.bind(this);
+	}
+
+	init() {
+		const headingId = generateElementId("markdown-paste-heading");
+		this.target = document.createElement("form");
+		this.target.className = STYLES.editor.toolbar.markdownPrompt;
+		this.target.dataset.role = "markdown-paste-prompt";
+		this.target.dataset.active = "false";
+		this.target.setAttribute("aria-labelledby", headingId);
+
+		const heading = document.createElement("h3");
+		heading.id = headingId;
+		heading.className = STYLES.editor.toolbar.optionHeader;
+		heading.textContent = "Convert pasted text?";
+
+		const message = document.createElement("p");
+		message.className = STYLES.editor.toolbar.markdownPromptMessage;
+		message.textContent =
+			"This looks like Markdown or wrapped text. Convert it to formatted document content?";
+
+		this.status = document.createElement("p");
+		this.status.className = STYLES.editor.toolbar.markdownPromptStatus;
+		this.status.dataset.role = "markdown-paste-status";
+		this.status.setAttribute("role", "status");
+		this.status.setAttribute("aria-live", "polite");
+
+		const actions = document.createElement("div");
+		actions.className = STYLES.editor.toolbar.markdownPromptActions;
+		this.convertAction = buttons.active({
+			type: "submit",
+			text: "Convert",
+			processingText: "Converting…",
+			kind: "editor",
+			data: { action: "convert" },
+		});
+		this.keepButton = buttons.default({
+			type: "submit",
+			text: "Keep as text",
+			style: STYLES.editor.toolbar.markdownPromptKeep,
+			data: { action: "keep" },
+		});
+		actions.append(this.convertAction.element, this.keepButton);
+		this.target.append(heading, message, this.status, actions);
+		this.toolbar.element.appendChild(this.target);
+
+		this.target.addEventListener("submit", this.submit);
+		this.target.addEventListener("keydown", this.keydown);
+		this.editorElement = this.editor.view.dom;
+		this.editorElement.addEventListener("keydown", this.keydown);
+		this.editor.on("transaction", this.transaction);
+		this.editor.storage.editorPaste.confirm = this.confirm;
+	}
+
+	_source() {
+		if (!this.current || this.editor.isDestroyed) return null;
+		const storedRange = this.editor.storage.trackedRanges.ranges.get(
+			this.current.rangeKey,
+		);
+		if (!storedRange) return null;
+		const range = { ...storedRange };
+		const node = this.editor.state.doc.nodeAt(range.from);
+		if (
+			node?.type.name !== "markdownSource" ||
+			range.to !== range.from + node.nodeSize
+		) {
+			return null;
+		}
+		return { range, node, text: node.textContent };
+	}
+
+	open({ rangeKey }) {
+		if (typeof rangeKey !== "string" || !rangeKey) return;
+		if (this.current) this._close({ clearRange: true });
+		this.current = { rangeKey, submittedText: null };
+		if (!this._source()) {
+			this._close({ clearRange: false });
+			return;
+		}
+		this._setStatus("");
+		this.convertAction.deactivate("Convert");
+		this.target.dataset.active = "true";
+	}
+
+	_submit(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (event.submitter?.dataset.action === "keep") {
+			this._close({ clearRange: true });
+			return;
+		}
+		void this._convert();
+	}
+
+	_keydown(event) {
+		if (event.key !== "Escape" || !this.current) return;
+		event.preventDefault();
+		event.stopPropagation();
+		this._close({ clearRange: true });
+	}
+
+	_transaction() {
+		if (!this.current || this.applying) return;
+		const source = this._source();
+		if (!source) {
+			this._close({ clearRange: false });
+			return;
+		}
+		if (this.requestController && this.current.submittedText !== source.text) {
+			this._abortRequest();
+			this._setStatus("The source changed. Convert again when it is ready.");
+		}
+	}
+
+	async _convert() {
+		const source = this._source();
+		if (!source || this.requestController) return;
+		if (!source.text) {
+			this._setStatus("There is no source text to convert.");
+			return;
+		}
+
+		const generation = ++this.requestGeneration;
+		const rangeKey = this.current.rangeKey;
+		this.current.submittedText = source.text;
+		this.requestController = new AbortController();
+		this._setStatus("");
+		this.convertAction.activate();
+
+		const response = await request.post(
+			ENDPOINTS.markdown,
+			{ markdown: source.text },
+			{ signal: this.requestController.signal },
+		);
+		if (
+			generation !== this.requestGeneration ||
+			this.current?.rangeKey !== rangeKey
+		) {
+			return;
+		}
+
+		this.requestController = null;
+		this.convertAction.deactivate("Convert");
+		const currentSource = this._source();
+		if (!currentSource) {
+			this._close({ clearRange: false });
+			return;
+		}
+		if (currentSource.text !== source.text) {
+			this.current.submittedText = null;
+			this._setStatus("The source changed. Convert again when it is ready.");
+			return;
+		}
+		if (!response?.ok || typeof response.markup !== "string") {
+			this.current.submittedText = null;
+			this._setStatus(response?.error || "Unable to convert the pasted text.");
+			return;
+		}
+
+		this.applying = true;
+		const chain = this.editor.chain().focus();
+		const converted = response.markup
+			? chain.insertContentAt(currentSource.range, response.markup).run()
+			: chain.deleteRange(currentSource.range).run();
+		this.applying = false;
+		if (converted) {
+			this._close({ clearRange: false });
+		} else {
+			this._setStatus("Unable to replace the pasted source.");
+		}
+	}
+
+	_abortRequest() {
+		this.requestGeneration += 1;
+		this.requestController?.abort();
+		this.requestController = null;
+		if (this.current) this.current.submittedText = null;
+		this.convertAction.deactivate("Convert");
+	}
+
+	_setStatus(message) {
+		this.status.textContent = message;
+	}
+
+	_close({ clearRange }) {
+		const rangeKey = this.current?.rangeKey;
+		this.current = null;
+		this._abortRequest();
+		this._setStatus("");
+		this.target.dataset.active = "false";
+		if (clearRange && rangeKey && !this.editor.isDestroyed) {
+			this.editor.commands.clearTrackedRange(rangeKey);
+		}
+	}
+
+	destroy() {
+		const storage = this.editor.storage.editorPaste;
+		if (storage?.confirm === this.confirm) storage.confirm = null;
+		this.current = null;
+		this._abortRequest();
+		this.target.removeEventListener("submit", this.submit);
+		this.target.removeEventListener("keydown", this.keydown);
+		this.editorElement?.removeEventListener("keydown", this.keydown);
+		this.editor.off("transaction", this.transaction);
+		this.target.remove();
+	}
+}
+
 const OPTION_REGISTRY = {
-	toggleFocus: () => import('./toolbarButtons.js?v=bd163a0f'),
-	toggleBold: () => import('./toolbarButtons.js?v=bd163a0f'),
-	toggleItalic: () => import('./toolbarButtons.js?v=bd163a0f'),
-	toggleBulletList: () => import('./toolbarButtons.js?v=bd163a0f'),
-	toggleOrderedList: () => import('./toolbarButtons.js?v=bd163a0f'),
-	toggleTaskList: () => import('./toolbarButtons.js?v=bd163a0f'),
-	undo: () => import('./toolbarButtons.js?v=bd163a0f'),
-	redo: () => import('./toolbarButtons.js?v=bd163a0f'),
-	documentHistory: () => import('./documentHistory.js?v=bd163a0f'),
-	setFontFamily: () => import('./menuItems.js?v=bd163a0f'),
-	setColor: () => import('./menuItems.js?v=bd163a0f'),
-	toggleUnderline: () => import('./menuItems.js?v=bd163a0f'),
-	toggleStrike: () => import('./menuItems.js?v=bd163a0f'),
-	toggleSuperscript: () => import('./menuItems.js?v=bd163a0f'),
-	toggleSubscript: () => import('./menuItems.js?v=bd163a0f'),
-	clearFormat: () => import('./menuItems.js?v=bd163a0f'),
-	toggleHeading: () => import('./menuItems.js?v=bd163a0f'),
-	setParagraph: () => import('./menuItems.js?v=bd163a0f'),
-	addLink: () => import('./menuItems.js?v=bd163a0f'),
-	addImage: () => import('./menuItems.js?v=bd163a0f'),
-	addYouTube: () => import('./menuItems.js?v=bd163a0f'),
-	generateText: () => import('./menuItems.js?v=bd163a0f'),
-	setHorizontalRule: () => import('./menuItems.js?v=bd163a0f'),
-	toggleCodeBlock: () => import('./menuItems.js?v=bd163a0f'),
-	toggleBlockquote: () => import('./menuItems.js?v=bd163a0f'),
-	setTextAlign: () => import('./menuItems.js?v=bd163a0f'),
+	toggleFocus: () => import('./toolbarButtons.js?v=b881d5e5'),
+	toggleBold: () => import('./toolbarButtons.js?v=b881d5e5'),
+	toggleItalic: () => import('./toolbarButtons.js?v=b881d5e5'),
+	toggleBulletList: () => import('./toolbarButtons.js?v=b881d5e5'),
+	toggleOrderedList: () => import('./toolbarButtons.js?v=b881d5e5'),
+	toggleTaskList: () => import('./toolbarButtons.js?v=b881d5e5'),
+	undo: () => import('./toolbarButtons.js?v=b881d5e5'),
+	redo: () => import('./toolbarButtons.js?v=b881d5e5'),
+	documentHistory: () => import('./documentHistory.js?v=b881d5e5'),
+	setFontFamily: () => import('./menuItems.js?v=b881d5e5'),
+	setColor: () => import('./menuItems.js?v=b881d5e5'),
+	toggleUnderline: () => import('./menuItems.js?v=b881d5e5'),
+	toggleStrike: () => import('./menuItems.js?v=b881d5e5'),
+	toggleSuperscript: () => import('./menuItems.js?v=b881d5e5'),
+	toggleSubscript: () => import('./menuItems.js?v=b881d5e5'),
+	clearFormat: () => import('./menuItems.js?v=b881d5e5'),
+	toggleHeading: () => import('./menuItems.js?v=b881d5e5'),
+	setParagraph: () => import('./menuItems.js?v=b881d5e5'),
+	addLink: () => import('./menuItems.js?v=b881d5e5'),
+	addImage: () => import('./menuItems.js?v=b881d5e5'),
+	addYouTube: () => import('./menuItems.js?v=b881d5e5'),
+	generateText: () => import('./menuItems.js?v=b881d5e5'),
+	setHorizontalRule: () => import('./menuItems.js?v=b881d5e5'),
+	toggleCodeBlock: () => import('./menuItems.js?v=b881d5e5'),
+	toggleBlockquote: () => import('./menuItems.js?v=b881d5e5'),
+	setTextAlign: () => import('./menuItems.js?v=b881d5e5'),
 };
 
 const FORM_REGISTRY = {
-	pinVersion: () => import('./pinVersion.js?v=bd163a0f'),
-	setColor: () => import('./setColor.js?v=bd163a0f'),
-	setFontFamily: () => import('./setFontFamily.js?v=bd163a0f'),
-	setImage: () => import('./setImage.js?v=bd163a0f'),
-	addLink: () => import('./addLink.js?v=bd163a0f'),
-	addImage: () => import('./addImage.js?v=bd163a0f'),
-	addYouTube: () => import('./addYouTube.js?v=bd163a0f'),
-	generateText: () => import('./generateText.js?v=bd163a0f'),
+	pinVersion: () => import('./pinVersion.js?v=b881d5e5'),
+	setColor: () => import('./setColor.js?v=b881d5e5'),
+	setFontFamily: () => import('./setFontFamily.js?v=b881d5e5'),
+	setImage: () => import('./setImage.js?v=b881d5e5'),
+	addLink: () => import('./addLink.js?v=b881d5e5'),
+	addImage: () => import('./addImage.js?v=b881d5e5'),
+	addYouTube: () => import('./addYouTube.js?v=b881d5e5'),
+	generateText: () => import('./generateText.js?v=b881d5e5'),
 };
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";
@@ -50340,6 +50368,7 @@ class Toolbar {
 		this.error = null;
 		this.active = null;
 		this.userManager = null;
+		this.markdownPastePrompt = null;
 		this.editorState = debounce(
 			this._editorState.bind(this),
 			DEBOUNCE_DELAY_MS,
@@ -50361,6 +50390,8 @@ class Toolbar {
 		this.element.className = `${STYLES.editor.toolbar.container[this.kind]} ${STYLES.editor.toolbar.iconContext}`;
 
 		this._createTools();
+		this.markdownPastePrompt = new MarkdownPastePrompt(this);
+		this.markdownPastePrompt.init();
 		this.userManager = new UserManager(this);
 		this.element.addEventListener("submit", this.formSubmit);
 		this.editor.on("transaction", this.editorState);
@@ -50531,24 +50562,25 @@ class Toolbar {
 
 		const primaryTools = document.createElement("div");
 		primaryTools.className = STYLES.editor.toolbar.section;
-		const buttons = await Promise.all(
-			TOOLBAR_TOOLS.map((tool) => this._createToolbarButton(tool)),
-		);
-		primaryTools.append(...buttons.filter(Boolean));
 		toolRow.appendChild(primaryTools);
 
 		const menuTools = document.createElement("div");
 		menuTools.className = STYLES.editor.toolbar.section;
 		menuTools.dataset.role = "toolbar-menus";
+		toolRow.appendChild(menuTools);
+		this.element.appendChild(toolRow);
+
+		const buttons = await Promise.all(
+			TOOLBAR_TOOLS.map((tool) => this._createToolbarButton(tool)),
+		);
+		primaryTools.append(...buttons.filter(Boolean));
+
 		const dropdownButtons = await Promise.all(
 			Object.values(TOOLBAR_MENUS).map(async (menu) => {
 				return await this._createToolbarMenu(menu);
 			}),
 		);
 		menuTools.append(...dropdownButtons);
-		toolRow.appendChild(menuTools);
-
-		this.element.appendChild(toolRow);
 	}
 
 	_toolAllowed(tool) {
@@ -50611,6 +50643,7 @@ class Toolbar {
 	}
 
 	destroy() {
+		this.markdownPastePrompt?.destroy();
 		Object.values(this.forms).forEach((form) => {
 			if (form.destroy) form.destroy();
 		});

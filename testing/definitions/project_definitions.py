@@ -95,6 +95,11 @@ editor_common_markdown_paste = ProjectDefinition(
     description="Project used for testing common markdown paste in the editor.",
 )
 
+editor_markdown_source_paste = ProjectDefinition(
+    name="Editor Markdown Source Paste Project",
+    description="Project used for testing retained markdown source in the editor.",
+)
+
 editor_task_list = ProjectDefinition(
     name="Editor Task List Project",
     description="Project used for testing task lists in the editor.",

@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bd163a0f';
-import { c as captureError, E as ENDPOINTS, r as request, w as withTransition } from './foundation.js?v=bd163a0f';
-import './connectivity.js?v=bd163a0f';
+import { STYLES } from './styles.js?v=b881d5e5';
+import { c as captureError, E as ENDPOINTS, r as request, w as withTransition } from './foundation.js?v=b881d5e5';
+import './connectivity.js?v=b881d5e5';
 
 /**
  * @testable true

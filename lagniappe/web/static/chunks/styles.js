@@ -82,6 +82,7 @@ const STYLES = {
     }
   },
   "editor": {
+    "markdownSource": "markdown-source",
     "toolbar": {
       "container": {
         "page": "group/toolbar sticky top-16 z-40 border-b border-base-light/50 bg-base-bg p-4 sm:border-t sm:px-6",
@@ -96,6 +97,11 @@ const STYLES = {
       "menu": "flex min-h-8 w-fit flex-row items-center gap-1 rounded-md bg-white outline outline-base-light/50 px-2 py-1 text-center text-base font-semibold shadow-sm",
       "optionHeader": "text-lg font-bold pt-2 text-kind-default pb-1",
       "optionPanel": "outline rounded-md px-4 pb-4 flex flex-col bg-white outline-base-light mt-2",
+      "markdownPrompt": "mt-4 hidden flex-col gap-2 rounded-md border border-file-light bg-file-bg p-4 data-[active=true]:flex",
+      "markdownPromptMessage": "text-sm text-base-default",
+      "markdownPromptActions": "flex flex-col gap-2 sm:flex-row",
+      "markdownPromptKeep": "grid w-full grow place-items-center rounded-md border border-base-light bg-white px-3 py-1.5 text-base font-semibold text-base-dark shadow-sm hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-kind-default",
+      "markdownPromptStatus": "empty:hidden text-sm font-semibold text-delete-default",
       "tools": "flex flex-row flex-wrap items-center gap-2 sm:gap-3",
       "imageSettings": "group mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form='setImage']/toolbar:flex",
       "iconContext": "editor-toolbar-icon-context",

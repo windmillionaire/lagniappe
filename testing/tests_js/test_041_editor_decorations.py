@@ -13,6 +13,7 @@ def test_selection_highlight_decorations_and_range_mapping(run_node):
             import { StarterKit } from "@tiptap/starter-kit";
             import { EditorState, TextSelection } from "@tiptap/pm/state";
             import { SelectionHighlight } from "./src/script/elements/editor/extensions/highlight.mjs";
+            import { TrackedRanges } from "./src/script/elements/editor/extensions/trackedRanges.mjs";
 
             const schema = getSchema([StarterKit]);
             const doc = schema.nodeFromJSON({
@@ -34,21 +35,40 @@ def test_selection_highlight_decorations_and_range_mapping(run_node):
               selection: TextSelection.create(doc, 2, 10),
             });
 
-            const storage = SelectionHighlight.config.addStorage();
-            const context = { storage };
+            const trackedStorage = TrackedRanges.config.addStorage();
+            const trackedContext = { storage: trackedStorage };
+            const trackedCommands = TrackedRanges.config.addCommands();
+            let editor;
+            const dispatch = transaction => {
+              state = state.apply(transaction);
+              editor.state = state;
+              TrackedRanges.config.onTransaction.call(trackedContext, {
+                transaction,
+                appendedTransactions: [],
+              });
+            };
+            editor = {
+              state,
+              storage: { trackedRanges: trackedStorage },
+              commands: {},
+            };
+            editor.commands.setTrackedRange = (key, range) =>
+              trackedCommands.setTrackedRange(key, range)({
+                state,
+                tr: state.tr,
+                dispatch,
+              });
+            editor.commands.clearTrackedRange = key =>
+              trackedCommands.clearTrackedRange(key)({ tr: state.tr, dispatch });
+
+            const context = { editor };
             const decorationSpec =
               SelectionHighlight.config.addDecorations.call(context);
             const commands = SelectionHighlight.config.addCommands();
             const decorationUpdates = [];
-            const editor = {
-              state,
-              storage: { selectionHighlight: storage },
-              commands: {
-                updateDecorations(name) {
-                  decorationUpdates.push(name);
-                  return true;
-                },
-              },
+            editor.commands.updateDecorations = name => {
+              decorationUpdates.push(name);
+              return true;
             };
 
             assert.equal(decorationSpec.update, "manual");
@@ -86,12 +106,7 @@ def test_selection_highlight_decorations_and_range_mapping(run_node):
             );
 
             const insertBefore = state.tr.insertText("Z", 1);
-            state = state.apply(insertBefore);
-            editor.state = state;
-            SelectionHighlight.config.onTransaction.call(context, {
-              transaction: insertBefore,
-              appendedTransactions: [],
-            });
+            dispatch(insertBefore);
 
             assert.deepEqual(
               commands.getSelectionHighlightRange()({ editor }),
@@ -107,16 +122,9 @@ def test_selection_highlight_decorations_and_range_mapping(run_node):
             assert.deepEqual(decorationUpdates, ["selectionHighlight"]);
 
             const deleteSelection = state.tr.delete(3, 11);
-            state = state.apply(deleteSelection);
-            editor.state = state;
-            SelectionHighlight.config.onTransaction.call(context, {
-              transaction: deleteSelection,
-              appendedTransactions: [],
-            });
+            dispatch(deleteSelection);
 
-            assert.equal(storage.active, false);
-            assert.equal(storage.from, null);
-            assert.equal(storage.to, null);
+            assert.equal(trackedStorage.ranges.has("selectionHighlight"), false);
             assert.deepEqual(decorationSpec.create({ state }), []);
 
             assert.equal(commands.clearSelectionHighlight()({ editor }), true);
@@ -125,12 +133,76 @@ def test_selection_highlight_decorations_and_range_mapping(run_node):
               "selectionHighlight",
             ]);
 
-            editor.state = state.apply(
-              state.tr.setSelection(TextSelection.create(state.doc, 1)),
-            );
+            dispatch(state.tr.setSelection(TextSelection.create(state.doc, 1)));
             assert.equal(commands.setSelectionHighlight()({ editor }), true);
-            assert.equal(storage.active, false);
+            assert.equal(trackedStorage.ranges.has("selectionHighlight"), false);
             assert.equal(decorationUpdates.length, 2);
+            """
+        ),
+        module=True,
+    )
+
+
+# @matrix ai editor markdown : inserted-range range-mapping
+def test_named_tracked_ranges_map_independently(run_node):
+    run_node(
+        textwrap.dedent(
+            r"""
+            import assert from "node:assert/strict";
+            import { getSchema } from "@tiptap/core";
+            import { StarterKit } from "@tiptap/starter-kit";
+            import { EditorState } from "@tiptap/pm/state";
+            import {
+              setTrackedRangeInTransaction,
+              TrackedRanges,
+            } from "./src/script/elements/editor/extensions/trackedRanges.mjs";
+
+            const schema = getSchema([StarterKit]);
+            let state = EditorState.create({
+              schema,
+              doc: schema.nodeFromJSON({
+                type: "doc",
+                content: [
+                  { type: "paragraph", content: [{ type: "text", text: "alpha" }] },
+                  { type: "paragraph", content: [{ type: "text", text: "beta" }] },
+                ],
+              }),
+            });
+            const storage = TrackedRanges.config.addStorage();
+            const context = { storage };
+            const apply = (transaction, appendedTransactions = []) => {
+              state = state.apply(transaction);
+              for (const appended of appendedTransactions) state = state.apply(appended);
+              TrackedRanges.config.onTransaction.call(context, {
+                transaction,
+                appendedTransactions,
+              });
+            };
+
+            const setup = state.tr;
+            setTrackedRangeInTransaction(setup, "first", { from: 2, to: 6 });
+            setTrackedRangeInTransaction(setup, "second", { from: 8, to: 12 });
+            apply(setup);
+            assert.deepEqual([...storage.ranges], [
+              ["first", { from: 2, to: 6 }],
+              ["second", { from: 8, to: 12 }],
+            ]);
+
+            apply(state.tr.insertText("Z", 1));
+            assert.deepEqual([...storage.ranges], [
+              ["first", { from: 3, to: 7 }],
+              ["second", { from: 9, to: 13 }],
+            ]);
+
+            apply(state.tr.delete(3, 7));
+            assert.equal(storage.ranges.has("first"), false);
+            assert.deepEqual(storage.ranges.get("second"), { from: 5, to: 9 });
+
+            const primary = state.tr.insertText("P", 1);
+            const intermediate = state.apply(primary);
+            const appended = intermediate.tr.insertText("Q", 1);
+            apply(primary, [appended]);
+            assert.deepEqual(storage.ranges.get("second"), { from: 7, to: 11 });
             """
         ),
         module=True,

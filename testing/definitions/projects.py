@@ -36,6 +36,9 @@ class Projects(ResourceEnumMixin, Enum):
     test_editor_common_markdown_paste = Project(
         definition=pd.editor_common_markdown_paste
     )
+    test_editor_markdown_source_paste = Project(
+        definition=pd.editor_markdown_source_paste
+    )
     test_editor_task_list = Project(definition=pd.editor_task_list)
     test_sync_document_collaboration = Project(
         definition=pd.sync_document_collaboration

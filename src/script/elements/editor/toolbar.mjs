@@ -2,6 +2,7 @@ import { STYLES } from "styles";
 import { TOOLBAR_MENUS, TOOLBAR_TOOLS } from "../../config/editor";
 import { debounce, withTransition } from "../../shared";
 import { toolbarDropdown } from "./dropdowns";
+import { MarkdownPastePrompt } from "./options/markdownPaste";
 import { FORM_REGISTRY, OPTION_REGISTRY } from "./options/registry";
 import { UserManager } from "./users";
 
@@ -33,6 +34,7 @@ export class Toolbar {
 		this.error = null;
 		this.active = null;
 		this.userManager = null;
+		this.markdownPastePrompt = null;
 		this.editorState = debounce(
 			this._editorState.bind(this),
 			DEBOUNCE_DELAY_MS,
@@ -54,6 +56,8 @@ export class Toolbar {
 		this.element.className = `${STYLES.editor.toolbar.container[this.kind]} ${STYLES.editor.toolbar.iconContext}`;
 
 		this._createTools();
+		this.markdownPastePrompt = new MarkdownPastePrompt(this);
+		this.markdownPastePrompt.init();
 		this.userManager = new UserManager(this);
 		this.element.addEventListener("submit", this.formSubmit);
 		this.editor.on("transaction", this.editorState);
@@ -224,24 +228,25 @@ export class Toolbar {
 
 		const primaryTools = document.createElement("div");
 		primaryTools.className = STYLES.editor.toolbar.section;
-		const buttons = await Promise.all(
-			TOOLBAR_TOOLS.map((tool) => this._createToolbarButton(tool)),
-		);
-		primaryTools.append(...buttons.filter(Boolean));
 		toolRow.appendChild(primaryTools);
 
 		const menuTools = document.createElement("div");
 		menuTools.className = STYLES.editor.toolbar.section;
 		menuTools.dataset.role = "toolbar-menus";
+		toolRow.appendChild(menuTools);
+		this.element.appendChild(toolRow);
+
+		const buttons = await Promise.all(
+			TOOLBAR_TOOLS.map((tool) => this._createToolbarButton(tool)),
+		);
+		primaryTools.append(...buttons.filter(Boolean));
+
 		const dropdownButtons = await Promise.all(
 			Object.values(TOOLBAR_MENUS).map(async (menu) => {
 				return await this._createToolbarMenu(menu);
 			}),
 		);
 		menuTools.append(...dropdownButtons);
-		toolRow.appendChild(menuTools);
-
-		this.element.appendChild(toolRow);
 	}
 
 	_toolAllowed(tool) {
@@ -304,6 +309,7 @@ export class Toolbar {
 	}
 
 	destroy() {
+		this.markdownPastePrompt?.destroy();
 		Object.values(this.forms).forEach((form) => {
 			if (form.destroy) form.destroy();
 		});

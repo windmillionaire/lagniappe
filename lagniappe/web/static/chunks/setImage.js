@@ -1,14 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bd163a0f';
-import { I as IMAGE_GROUPS } from './toolbar.js?v=bd163a0f';
-import { ToolbarButton } from './toolbarButtons.js?v=bd163a0f';
-import './combobox.js?v=bd163a0f';
-import './foundation.js?v=bd163a0f';
-import './connectivity.js?v=bd163a0f';
-import './primitives.js?v=bd163a0f';
-import './icons.js?v=bd163a0f';
-import './queryLifecycle.js?v=bd163a0f';
-import './dropdown.js?v=bd163a0f';
+import { STYLES } from './styles.js?v=b881d5e5';
+import { I as IMAGE_GROUPS } from './toolbar.js?v=b881d5e5';
+import { ToolbarButton } from './toolbarButtons.js?v=b881d5e5';
+import './combobox.js?v=b881d5e5';
+import './foundation.js?v=b881d5e5';
+import './connectivity.js?v=b881d5e5';
+import './primitives.js?v=b881d5e5';
+import './icons.js?v=b881d5e5';
+import './queryLifecycle.js?v=b881d5e5';
+import './dropdown.js?v=b881d5e5';
+import './buttons.js?v=b881d5e5';
+import './formatting.js?v=b881d5e5';
 
 /**
  * @testable infrastructure

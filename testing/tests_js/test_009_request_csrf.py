@@ -311,15 +311,20 @@ if (fetchCalls.some((call) => call.url === "/l/token")) {
 
 # @source src/script/shared/request.mjs::_request
 # @pair request:abort-signal
-def test_get_request_forwards_abort_signal_to_fetch(run_node):
+def test_requests_forward_abort_signal_to_fetch(run_node):
     run_request_check(
         run_node,
         """
 const controller = new AbortController();
 await request.get("/unchanged", null, { signal: controller.signal });
-const call = fetchCalls.find((item) => item.url === "/unchanged");
-if (call?.signal !== controller.signal) {
-  throw new Error("GET request did not forward its AbortSignal to fetch");
+await request.post(
+  "/unchanged",
+  { value: "convert" },
+  { signal: controller.signal },
+);
+const calls = fetchCalls.filter((item) => item.url === "/unchanged");
+if (calls.length !== 2 || calls.some((call) => call.signal !== controller.signal)) {
+  throw new Error("Request helper did not forward its AbortSignal to fetch");
 }
 """,
     )

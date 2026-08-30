@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as connectivity } from './connectivity.js?v=bd163a0f';
+import { c as connectivity } from './connectivity.js?v=b881d5e5';
 
 /**
  * @testable false
@@ -855,6 +855,7 @@ const ENDPOINTS = {
 		page: "/l/search-page",
 	},
 	linkPreview: "/l/preview",
+	markdown: "/l/markdown",
 	location: "/l/search-location",
 	facet: (index) => {
 		return `/l/search-index/${index}`;
@@ -1164,13 +1165,14 @@ const refreshToken = async () => {
 const postRequest = async (
 	url,
 	body,
-	{ keepalive = false, headers = {} } = {},
+	{ keepalive = false, headers = {}, signal = undefined } = {},
 ) => {
 	return _request(url, {
 		method: "POST",
 		body,
 		keepalive,
 		requestHeaders: headers,
+		signal,
 	});
 };
 
@@ -1442,7 +1444,7 @@ class ShellView {
 			"_pollingPromise",
 			"PollingCoordinator",
 			async () => {
-				const { PollingCoordinator } = await import('./polling.js?v=bd163a0f');
+				const { PollingCoordinator } = await import('./polling.js?v=b881d5e5');
 				return this._destroyed ? null : new PollingCoordinator(this).init();
 			},
 		);
@@ -1452,7 +1454,7 @@ class ShellView {
 		return this._loadShellManager("_searchPromise", "SearchBox", async () => {
 			const search = document.querySelector("[lp-search]");
 			if (!search) return null;
-			const { SearchBox } = await import('./search.js?v=bd163a0f');
+			const { SearchBox } = await import('./search.js?v=b881d5e5');
 			if (this._destroyed) return null;
 			const box = new SearchBox(search);
 			await box.init();
@@ -1467,7 +1469,7 @@ class ShellView {
 			async () => {
 				if (!document.querySelector("[data-role='notifications']")) return null;
 				await this.ensurePollingCoordinator();
-				const { Notifications } = await import('./notifications.js?v=bd163a0f');
+				const { Notifications } = await import('./notifications.js?v=b881d5e5');
 				if (this._destroyed) return null;
 				const notifications = new Notifications(this);
 				notifications.init();

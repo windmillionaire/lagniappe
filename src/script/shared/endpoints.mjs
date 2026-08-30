@@ -116,6 +116,7 @@ export const ENDPOINTS = {
 		page: "/l/search-page",
 	},
 	linkPreview: "/l/preview",
+	markdown: "/l/markdown",
 	location: "/l/search-location",
 	facet: (index) => {
 		return `/l/search-index/${index}`;

@@ -204,15 +204,8 @@ class GenerateText {
 	}
 
 	_selectionRange() {
-		const highlight = this.editor.storage.selectionHighlight;
-		if (
-			highlight?.active &&
-			highlight.from !== null &&
-			highlight.to !== null &&
-			highlight.from !== highlight.to
-		) {
-			return { from: highlight.from, to: highlight.to };
-		}
+		const highlight = this.editor.commands.getSelectionHighlightRange();
+		if (highlight) return highlight;
 
 		const { from, to } = this._capturedRange ?? this.editor.state.selection;
 		if (from !== to) {

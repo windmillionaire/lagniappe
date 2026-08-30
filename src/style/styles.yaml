@@ -262,6 +262,12 @@ dropdown:
       css: [src/style/content.css]
 
 editor:
+  markdownSource:
+    classes: markdown-source
+    intent: light editable source block for pasted Markdown awaiting conversion
+    surfaces: [frontend]
+    hooks: [markdown-source]
+    css: [src/style/editor.css]
   toolbar:
     container:
       page:
@@ -307,6 +313,26 @@ editor:
     optionPanel:
       classes: outline rounded-md px-4 pb-4 flex flex-col bg-white outline-base-light mt-2
       intent: option panel presentation within editor toolbar
+      surfaces: [frontend]
+    markdownPrompt:
+      classes: mt-4 hidden flex-col gap-2 rounded-md border border-file-light bg-file-bg p-4 data-[active=true]:flex
+      intent: nonmodal pasted Markdown conversion prompt
+      surfaces: [frontend]
+    markdownPromptMessage:
+      classes: text-sm text-base-default
+      intent: explanatory copy within pasted Markdown prompt
+      surfaces: [frontend]
+    markdownPromptActions:
+      classes: flex flex-col gap-2 sm:flex-row
+      intent: conversion and keep actions within pasted Markdown prompt
+      surfaces: [frontend]
+    markdownPromptKeep:
+      classes: grid w-full grow place-items-center rounded-md border border-base-light bg-white px-3 py-1.5 text-base font-semibold text-base-dark shadow-sm hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-kind-default
+      intent: secondary keep-source action within pasted Markdown prompt
+      surfaces: [frontend]
+    markdownPromptStatus:
+      classes: empty:hidden text-sm font-semibold text-delete-default
+      intent: conversion failure or stale-source status within pasted Markdown prompt
       surfaces: [frontend]
     tools:
       classes: flex flex-row flex-wrap items-center gap-2 sm:gap-3

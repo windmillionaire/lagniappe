@@ -1,30 +1,30 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=bd163a0f';
-import { InputElement } from './input.js?v=bd163a0f';
-import { RadioElement } from './radio.js?v=bd163a0f';
-import { s as sections } from './sections.js?v=bd163a0f';
-import { S as SectionToggle } from './sectionToggle.js?v=bd163a0f';
-import { TextareaElement } from './textarea.js?v=bd163a0f';
-import { r as request, c as captureError, w as withTransition } from './foundation.js?v=bd163a0f';
-import './connectivity.js?v=bd163a0f';
-import { PagePermissions } from './pagePermissions.js?v=bd163a0f';
-import './baseForm.js?v=bd163a0f';
-import './icons.js?v=bd163a0f';
-import './primitives.js?v=bd163a0f';
-import './styles.js?v=bd163a0f';
-import './loader.js?v=bd163a0f';
-import './baseElement.js?v=bd163a0f';
-import './formatting.js?v=bd163a0f';
-import './baseUpload.js?v=bd163a0f';
-import './buttons.js?v=bd163a0f';
-import './dropdown.js?v=bd163a0f';
-import './combobox.js?v=bd163a0f';
-import './facets.js?v=bd163a0f';
-import './remote.js?v=bd163a0f';
-import './queryLifecycle.js?v=bd163a0f';
-import './results.js?v=bd163a0f';
-import './storage.js?v=bd163a0f';
-import './submitter.js?v=bd163a0f';
+import { F as FormElement } from './form2.js?v=b881d5e5';
+import { InputElement } from './input.js?v=b881d5e5';
+import { RadioElement } from './radio.js?v=b881d5e5';
+import { s as sections } from './sections.js?v=b881d5e5';
+import { S as SectionToggle } from './sectionToggle.js?v=b881d5e5';
+import { TextareaElement } from './textarea.js?v=b881d5e5';
+import { r as request, c as captureError, w as withTransition } from './foundation.js?v=b881d5e5';
+import './connectivity.js?v=b881d5e5';
+import { PagePermissions } from './pagePermissions.js?v=b881d5e5';
+import './baseForm.js?v=b881d5e5';
+import './icons.js?v=b881d5e5';
+import './primitives.js?v=b881d5e5';
+import './styles.js?v=b881d5e5';
+import './loader.js?v=b881d5e5';
+import './baseElement.js?v=b881d5e5';
+import './formatting.js?v=b881d5e5';
+import './baseUpload.js?v=b881d5e5';
+import './buttons.js?v=b881d5e5';
+import './dropdown.js?v=b881d5e5';
+import './combobox.js?v=b881d5e5';
+import './facets.js?v=b881d5e5';
+import './remote.js?v=b881d5e5';
+import './queryLifecycle.js?v=b881d5e5';
+import './results.js?v=b881d5e5';
+import './storage.js?v=b881d5e5';
+import './submitter.js?v=b881d5e5';
 
 /**
  * @testable infrastructure
