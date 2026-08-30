@@ -112,8 +112,8 @@ def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_user):
 # @template pages/page.html::main
 def test_mobile_photo_prompt_rejoins_section_switching(get_user):
     user = get_user(Users.OWNER)
-    user.mobile = True
     page = user.go(Pages.test_generated_image_page)
+    user.mobile = True
     prompt = _photo_prompt(page)
 
     prompt.locator(page.PHOTO_PROMPT_UPLOAD).click()

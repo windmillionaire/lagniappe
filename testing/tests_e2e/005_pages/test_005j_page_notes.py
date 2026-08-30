@@ -65,7 +65,7 @@ def _open_note_composer(user):
 # @template pages/notes.html::notes_section
 # @template pages/notes.html::note_list
 # @template notes.html::note_item
-def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
+def test_page_notes_visibility_and_title_menu(get_user):
     owner = get_user(Users.OWNER)
     page = Pages.acl_lab_visible.get(owner)
     shared_body = _unique("Shared Page note")
@@ -97,10 +97,8 @@ def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
     assert composer_box["y"] >= header_box["y"] + header_box["height"]
 
     page_without_notes = Pages.test_create_page_task.get(owner)
-    notes_url = f"{page_without_notes.url}/notes"
-    with browser_failures.expect_http_error(owner, status=404, path=notes_url):
-        owner.navigate(notes_url)
-        expect(owner.page).to_have_title("Error 404")
+    _go_with_page_notes(owner, page_without_notes)
+    expect(owner.locate("#page-notes")).to_be_hidden()
 
 
 # @matrix notes pages : body create photo scope validation visibility

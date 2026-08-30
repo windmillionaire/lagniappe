@@ -110,8 +110,8 @@ def test_mobile_section_switching_updates_visible_cards_and_title(get_user):
 def test_mobile_model_tasks_rejoins_section_switching(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_project_info_form.get(user)
-    user.mobile = True
     user.go(project)
+    user.mobile = True
 
     model_tasks = project.model_tasks_card
     expect(user.locate("#tabs > #model-tasks")).to_have_count(1)
