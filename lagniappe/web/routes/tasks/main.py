@@ -43,7 +43,7 @@ from . import tasks
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_restricted_schedules_are_forbidden
 # @pair public-users:ai-schedule-guard
 def _ai_schedule_requested(form):
     schedule_type = form.get("schedule-type")
@@ -338,7 +338,7 @@ def _task_project_data(loaded, request):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_creates_task_with_reduced_schedule_options
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_creates_task_with_reduced_schedule_options
 # @pair public-users:task-project-link
 def _public_task_tracking(task, project_key, model_key):
     if not getattr(current_user, "is_public", False):
@@ -742,7 +742,7 @@ def update_direct(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_creates_task_with_reduced_schedule_options
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_creates_task_with_reduced_schedule_options
 # @matrix tasks : basic create
 @tasks.route("<key>/create", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)

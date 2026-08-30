@@ -1,20 +1,20 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from '../styles.js?v=bb782d98';
-import { ensureMessageComposer } from '../messageComposer.js?v=bb782d98';
-import { r as request, E as ENDPOINTS } from '../foundation.js?v=bb782d98';
-import '../connectivity.js?v=bb782d98';
-import { c as createIcon } from '../icons.js?v=bb782d98';
-import { C as Core } from '../core-foundation.js?v=bb782d98';
-import '../modal.js?v=bb782d98';
-import '../facets.js?v=bb782d98';
-import '../remote.js?v=bb782d98';
-import '../queryLifecycle.js?v=bb782d98';
-import '../combobox.js?v=bb782d98';
-import '../primitives.js?v=bb782d98';
-import '../results.js?v=bb782d98';
-import '../storage.js?v=bb782d98';
-import '../formatting.js?v=bb782d98';
-import '../submitter.js?v=bb782d98';
+import { STYLES } from '../styles.js?v=bd163a0f';
+import { ensureMessageComposer } from '../messageComposer.js?v=bd163a0f';
+import { r as request, E as ENDPOINTS } from '../foundation.js?v=bd163a0f';
+import '../connectivity.js?v=bd163a0f';
+import { c as createIcon } from '../icons.js?v=bd163a0f';
+import { C as Core } from '../core-foundation.js?v=bd163a0f';
+import '../modal.js?v=bd163a0f';
+import '../facets.js?v=bd163a0f';
+import '../remote.js?v=bd163a0f';
+import '../queryLifecycle.js?v=bd163a0f';
+import '../combobox.js?v=bd163a0f';
+import '../primitives.js?v=bd163a0f';
+import '../results.js?v=bd163a0f';
+import '../storage.js?v=bd163a0f';
+import '../formatting.js?v=bd163a0f';
+import '../submitter.js?v=bd163a0f';
 
 const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
 
@@ -259,7 +259,7 @@ class Messages extends Core {
 		if (this.conversationDropdown || this._conversationDropdownPromise) {
 			return this.conversationDropdown || this._conversationDropdownPromise;
 		}
-		this._conversationDropdownPromise = import('../dropdown.js?v=bb782d98')
+		this._conversationDropdownPromise = import('../dropdown.js?v=bd163a0f')
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				this.conversationDropdown = new Dropdown(this.selector).init({

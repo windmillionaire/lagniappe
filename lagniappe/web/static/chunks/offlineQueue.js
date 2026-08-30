@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { getOfflineMutations, deleteOfflineMutations, setOfflineMutation } from './offline.js?v=bb782d98';
-import { r as request } from './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
+import { getOfflineMutations, deleteOfflineMutations, setOfflineMutation } from './offline.js?v=bd163a0f';
+import { r as request } from './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
 
 const REPLAY_RESULT = Object.freeze({
 	BLOCKED: "blocked",

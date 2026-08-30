@@ -11,7 +11,7 @@ const display = (value) => value || "None";
  * Presents the Owner-safe installation identity and cleanup boundary.
  *
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
+ * @tests tests_e2e/008_users/test_008f_site_administrators.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
  * @matrix owner : authentication-email delegated-handoff identity-metadata provider-cleanup
  */
 export class SiteInstallationAccess extends SiteSetting {

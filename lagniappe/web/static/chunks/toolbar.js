@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=bb782d98';
-import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
-import { STYLES } from './styles.js?v=bb782d98';
-import { Q as QueryLifecycle } from './queryLifecycle.js?v=bb782d98';
-import { s as setIcon } from './icons.js?v=bb782d98';
-import { Dropdown } from './dropdown.js?v=bb782d98';
+import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=bd163a0f';
+import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
+import { STYLES } from './styles.js?v=bd163a0f';
+import { Q as QueryLifecycle } from './queryLifecycle.js?v=bd163a0f';
+import { s as setIcon } from './icons.js?v=bd163a0f';
+import { Dropdown } from './dropdown.js?v=bd163a0f';
 
 /**
  * Utility module to work with key-value stores.
@@ -50158,43 +50158,43 @@ const toolbarDropdown = (menu, items) => {
 };
 
 const OPTION_REGISTRY = {
-	toggleFocus: () => import('./toolbarButtons.js?v=bb782d98'),
-	toggleBold: () => import('./toolbarButtons.js?v=bb782d98'),
-	toggleItalic: () => import('./toolbarButtons.js?v=bb782d98'),
-	toggleBulletList: () => import('./toolbarButtons.js?v=bb782d98'),
-	toggleOrderedList: () => import('./toolbarButtons.js?v=bb782d98'),
-	toggleTaskList: () => import('./toolbarButtons.js?v=bb782d98'),
-	undo: () => import('./toolbarButtons.js?v=bb782d98'),
-	redo: () => import('./toolbarButtons.js?v=bb782d98'),
-	documentHistory: () => import('./documentHistory.js?v=bb782d98'),
-	setFontFamily: () => import('./menuItems.js?v=bb782d98'),
-	setColor: () => import('./menuItems.js?v=bb782d98'),
-	toggleUnderline: () => import('./menuItems.js?v=bb782d98'),
-	toggleStrike: () => import('./menuItems.js?v=bb782d98'),
-	toggleSuperscript: () => import('./menuItems.js?v=bb782d98'),
-	toggleSubscript: () => import('./menuItems.js?v=bb782d98'),
-	clearFormat: () => import('./menuItems.js?v=bb782d98'),
-	toggleHeading: () => import('./menuItems.js?v=bb782d98'),
-	setParagraph: () => import('./menuItems.js?v=bb782d98'),
-	addLink: () => import('./menuItems.js?v=bb782d98'),
-	addImage: () => import('./menuItems.js?v=bb782d98'),
-	addYouTube: () => import('./menuItems.js?v=bb782d98'),
-	generateText: () => import('./menuItems.js?v=bb782d98'),
-	setHorizontalRule: () => import('./menuItems.js?v=bb782d98'),
-	toggleCodeBlock: () => import('./menuItems.js?v=bb782d98'),
-	toggleBlockquote: () => import('./menuItems.js?v=bb782d98'),
-	setTextAlign: () => import('./menuItems.js?v=bb782d98'),
+	toggleFocus: () => import('./toolbarButtons.js?v=bd163a0f'),
+	toggleBold: () => import('./toolbarButtons.js?v=bd163a0f'),
+	toggleItalic: () => import('./toolbarButtons.js?v=bd163a0f'),
+	toggleBulletList: () => import('./toolbarButtons.js?v=bd163a0f'),
+	toggleOrderedList: () => import('./toolbarButtons.js?v=bd163a0f'),
+	toggleTaskList: () => import('./toolbarButtons.js?v=bd163a0f'),
+	undo: () => import('./toolbarButtons.js?v=bd163a0f'),
+	redo: () => import('./toolbarButtons.js?v=bd163a0f'),
+	documentHistory: () => import('./documentHistory.js?v=bd163a0f'),
+	setFontFamily: () => import('./menuItems.js?v=bd163a0f'),
+	setColor: () => import('./menuItems.js?v=bd163a0f'),
+	toggleUnderline: () => import('./menuItems.js?v=bd163a0f'),
+	toggleStrike: () => import('./menuItems.js?v=bd163a0f'),
+	toggleSuperscript: () => import('./menuItems.js?v=bd163a0f'),
+	toggleSubscript: () => import('./menuItems.js?v=bd163a0f'),
+	clearFormat: () => import('./menuItems.js?v=bd163a0f'),
+	toggleHeading: () => import('./menuItems.js?v=bd163a0f'),
+	setParagraph: () => import('./menuItems.js?v=bd163a0f'),
+	addLink: () => import('./menuItems.js?v=bd163a0f'),
+	addImage: () => import('./menuItems.js?v=bd163a0f'),
+	addYouTube: () => import('./menuItems.js?v=bd163a0f'),
+	generateText: () => import('./menuItems.js?v=bd163a0f'),
+	setHorizontalRule: () => import('./menuItems.js?v=bd163a0f'),
+	toggleCodeBlock: () => import('./menuItems.js?v=bd163a0f'),
+	toggleBlockquote: () => import('./menuItems.js?v=bd163a0f'),
+	setTextAlign: () => import('./menuItems.js?v=bd163a0f'),
 };
 
 const FORM_REGISTRY = {
-	pinVersion: () => import('./pinVersion.js?v=bb782d98'),
-	setColor: () => import('./setColor.js?v=bb782d98'),
-	setFontFamily: () => import('./setFontFamily.js?v=bb782d98'),
-	setImage: () => import('./setImage.js?v=bb782d98'),
-	addLink: () => import('./addLink.js?v=bb782d98'),
-	addImage: () => import('./addImage.js?v=bb782d98'),
-	addYouTube: () => import('./addYouTube.js?v=bb782d98'),
-	generateText: () => import('./generateText.js?v=bb782d98'),
+	pinVersion: () => import('./pinVersion.js?v=bd163a0f'),
+	setColor: () => import('./setColor.js?v=bd163a0f'),
+	setFontFamily: () => import('./setFontFamily.js?v=bd163a0f'),
+	setImage: () => import('./setImage.js?v=bd163a0f'),
+	addLink: () => import('./addLink.js?v=bd163a0f'),
+	addImage: () => import('./addImage.js?v=bd163a0f'),
+	addYouTube: () => import('./addYouTube.js?v=bd163a0f'),
+	generateText: () => import('./generateText.js?v=bd163a0f'),
 };
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";

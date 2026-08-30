@@ -1,16 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bb782d98';
-import { b as buttons } from './buttons.js?v=bb782d98';
-import { r as request, w as withTransition, a as clearRecentSearchResults } from './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
-import { Modal } from './modal.js?v=bb782d98';
-import { S as SiteSetting } from './base.js?v=bb782d98';
-import './icons.js?v=bb782d98';
-import './formatting.js?v=bb782d98';
+import { STYLES } from './styles.js?v=bd163a0f';
+import { b as buttons } from './buttons.js?v=bd163a0f';
+import { r as request, w as withTransition, a as clearRecentSearchResults } from './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
+import { Modal } from './modal.js?v=bd163a0f';
+import { S as SiteSetting } from './base.js?v=bd163a0f';
+import './icons.js?v=bd163a0f';
+import './formatting.js?v=bd163a0f';
 
 /**
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
  * @pair admin:configuration-modal
  */
 class SiteMaintenance extends SiteSetting {

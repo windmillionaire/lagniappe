@@ -8,7 +8,7 @@ const SPLASH_PREFIX = "splash-";
 
 /**
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
  * @matrix admin : generated-images lazy-initialization metadata public-preview site-image-upload
  */
 export class SiteImage extends SiteSetting {

@@ -1,27 +1,27 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList } from './baseList.js?v=bb782d98';
-import { F as FormElement } from './form2.js?v=bb782d98';
-import { InputElement } from './input.js?v=bb782d98';
-import { S as SectionToggle } from './sectionToggle.js?v=bb782d98';
-import './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
-import './baseForm.js?v=bb782d98';
-import './icons.js?v=bb782d98';
-import './primitives.js?v=bb782d98';
-import './styles.js?v=bb782d98';
-import './loader.js?v=bb782d98';
-import './baseElement.js?v=bb782d98';
-import './formatting.js?v=bb782d98';
-import './facets.js?v=bb782d98';
-import './remote.js?v=bb782d98';
-import './queryLifecycle.js?v=bb782d98';
-import './combobox.js?v=bb782d98';
-import './results.js?v=bb782d98';
-import './storage.js?v=bb782d98';
-import './submitter.js?v=bb782d98';
-import './buttons.js?v=bb782d98';
-import './baseUpload.js?v=bb782d98';
-import './dropdown.js?v=bb782d98';
+import { BaseList } from './baseList.js?v=bd163a0f';
+import { F as FormElement } from './form2.js?v=bd163a0f';
+import { InputElement } from './input.js?v=bd163a0f';
+import { S as SectionToggle } from './sectionToggle.js?v=bd163a0f';
+import './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
+import './baseForm.js?v=bd163a0f';
+import './icons.js?v=bd163a0f';
+import './primitives.js?v=bd163a0f';
+import './styles.js?v=bd163a0f';
+import './loader.js?v=bd163a0f';
+import './baseElement.js?v=bd163a0f';
+import './formatting.js?v=bd163a0f';
+import './facets.js?v=bd163a0f';
+import './remote.js?v=bd163a0f';
+import './queryLifecycle.js?v=bd163a0f';
+import './combobox.js?v=bd163a0f';
+import './results.js?v=bd163a0f';
+import './storage.js?v=bd163a0f';
+import './submitter.js?v=bd163a0f';
+import './buttons.js?v=bd163a0f';
+import './baseUpload.js?v=bd163a0f';
+import './dropdown.js?v=bd163a0f';
 
 /**
  * @testable infrastructure

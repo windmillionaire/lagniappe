@@ -53,7 +53,7 @@ def public_directory():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
 # @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_discovery_follows_live_setting
 # @matrix public-pages robots : disabled enabled
 # @matrix manual robots : disabled enabled fragment
@@ -69,7 +69,7 @@ def robots():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
 # @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_discovery_follows_live_setting
 # @matrix public-pages sitemap : disabled enabled redis-cache
 # @matrix manual sitemap : disabled enabled public-url

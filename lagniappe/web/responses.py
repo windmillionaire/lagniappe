@@ -726,7 +726,7 @@ def home_page(home):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_settings_requires_administrator
 # @matrix admin : page-load site-settings
 def admin_page():
     from lagniappe.core.tools.site.data_protection import data_protection_status
@@ -1119,7 +1119,7 @@ def reference_topic(section):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
 # @matrix admin : configuration-display recovery-export secrets web-headers
 def reference_environment_variables(variables, download=False):
     if download:
@@ -1151,7 +1151,7 @@ def reference_environment_variables(variables, download=False):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
 # @matrix admin : configuration-display secrets
 def site_configuration(variables):
     from config.recovery import redact_settings_for_display

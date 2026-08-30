@@ -14,7 +14,7 @@ const DEFAULT_INSTANCE_CLASS = {
 
 /**
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
  * @matrix admin : deployment-settings metadata scaling-controls
  */
 export class SiteDeployment extends SiteSetting {

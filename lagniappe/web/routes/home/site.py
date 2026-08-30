@@ -55,7 +55,7 @@ def _site_image_response(paths):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
 # @matrix admin : managed-users roster
 # @matrix owner : awaiting-first-sign-in role-controls
 def _administrator_payload():
@@ -110,7 +110,7 @@ def _administrator_payload():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
 # @matrix owner : authentication-email delegated-handoff identity-metadata provider-cleanup
 def _installation_access_payload():
     """Return an Owner-safe view of saved operator and provider identities."""
@@ -227,7 +227,7 @@ def offline():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
 # @matrix cache : current redis-connection
 @internal.route("/rebuild-cache", methods=["POST"])
 @permission(Resource.SITE)
@@ -242,7 +242,7 @@ def rebuild_cache():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
 # @matrix admin : site-update success
 @internal.route("/site-update", methods=["POST"])
 @permission(Resource.SITE)
@@ -256,10 +256,10 @@ def site_update():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_settings_requires_administrator
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_additional_admin_cannot_access_owner_configuration
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_owner_installation_access_distinguishes_handoff_from_provider_cleanup
 # @matrix admin owner : admin-only identity-metadata public-preview site-settings
 @internal.route("/site-settings", methods=["GET"])
 @permission(Resource.SITE, no_store=True)
@@ -381,7 +381,7 @@ def site_settings():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
 # @pairs admin:promotion cache:cache-invalidation cache:invalidation-acknowledgement owner:owner-only
 @internal.route("/site-administrators", methods=["POST"])
 @owner_only
@@ -406,7 +406,7 @@ def promote_site_administrator():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
 # @matrix admin : account-preservation confirmation-modal demotion
 # @pairs cache:cache-invalidation cache:invalidation-acknowledgement owner:owner-only
 @internal.route("/site-administrators/<key>", methods=["GET", "DELETE"])
@@ -433,7 +433,7 @@ def demote_site_administrator(key):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
 # @matrix admin : deployment-settings metadata validation
 @internal.route("/set-deployment-settings", methods=["POST"])
 @permission(Resource.SITE)
@@ -450,7 +450,7 @@ def set_deployment_settings():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_ai_form_saves_current_models_through_route
 # @matrix admin : ai-settings validation
 @internal.route("/set-ai-settings", methods=["POST"])
 @permission(Resource.SITE)
@@ -478,7 +478,7 @@ def set_ai_settings():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
 # @matrix admin public-pages : live-settings sitemap-invalidation validation
 @internal.route("/site-settings/public-pages", methods=["GET", "POST"])
 @permission(Resource.SITE, no_store=True)
@@ -502,8 +502,8 @@ def set_public_page_settings():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_additional_admin_cannot_access_owner_configuration
 # @matrix owner : configuration sensitive-configuration
 # @pair admin:site-settings
 @internal.route("/site-configuration", methods=["GET"])
@@ -514,7 +514,7 @@ def site_configuration():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @matrix admin : generated-images metadata public-preview site-image-upload
 @internal.route("/set-site-image", methods=["POST"])
 @permission(Resource.SITE)
@@ -653,7 +653,8 @@ def update_session():
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_access_can_read_create_report_without_create_actions
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_settings_requires_administrator
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_search_matches_explicit_denial_and_administrator_content_access
 # @pair cache:invalidation-acknowledgement
 @internal.route("/validate-user", methods=["POST"])
 @logged_in

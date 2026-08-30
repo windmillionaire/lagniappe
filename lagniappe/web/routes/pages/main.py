@@ -33,8 +33,8 @@ from . import pages
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_file_and_photo_actions_are_forbidden
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_file_and_photo_actions_are_forbidden
 # @matrix public-users : file-photo-gates own-page
 def _is_public_users_own_page(page):
     return bool(
@@ -55,7 +55,7 @@ def _load_user_settings_groups(page):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_restricted_schedules_are_forbidden
 # @pair public-users:attribute-preservation
 def _preserve_public_user_page_attributes(page, page_data):
     if not getattr(current_user, "is_public", False):

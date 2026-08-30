@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as connectivity } from './connectivity.js?v=bb782d98';
+import { c as connectivity } from './connectivity.js?v=bd163a0f';
 
 /**
  * @testable false
@@ -1442,7 +1442,7 @@ class ShellView {
 			"_pollingPromise",
 			"PollingCoordinator",
 			async () => {
-				const { PollingCoordinator } = await import('./polling.js?v=bb782d98');
+				const { PollingCoordinator } = await import('./polling.js?v=bd163a0f');
 				return this._destroyed ? null : new PollingCoordinator(this).init();
 			},
 		);
@@ -1452,7 +1452,7 @@ class ShellView {
 		return this._loadShellManager("_searchPromise", "SearchBox", async () => {
 			const search = document.querySelector("[lp-search]");
 			if (!search) return null;
-			const { SearchBox } = await import('./search.js?v=bb782d98');
+			const { SearchBox } = await import('./search.js?v=bd163a0f');
 			if (this._destroyed) return null;
 			const box = new SearchBox(search);
 			await box.init();
@@ -1467,7 +1467,7 @@ class ShellView {
 			async () => {
 				if (!document.querySelector("[data-role='notifications']")) return null;
 				await this.ensurePollingCoordinator();
-				const { Notifications } = await import('./notifications.js?v=bb782d98');
+				const { Notifications } = await import('./notifications.js?v=bd163a0f');
 				if (this._destroyed) return null;
 				const notifications = new Notifications(this);
 				notifications.init();

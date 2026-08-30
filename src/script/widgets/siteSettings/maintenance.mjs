@@ -10,7 +10,7 @@ import { SiteSetting } from "./base";
 
 /**
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
  * @pair admin:configuration-modal
  */
 export class SiteMaintenance extends SiteSetting {

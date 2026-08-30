@@ -1,17 +1,17 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request, w as withTransition } from './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
-import { b as buttons } from './buttons.js?v=bb782d98';
-import { S as SiteSetting } from './base.js?v=bb782d98';
-import './styles.js?v=bb782d98';
-import './icons.js?v=bb782d98';
-import './formatting.js?v=bb782d98';
+import { r as request, w as withTransition } from './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
+import { b as buttons } from './buttons.js?v=bd163a0f';
+import { S as SiteSetting } from './base.js?v=bd163a0f';
+import './styles.js?v=bd163a0f';
+import './icons.js?v=bd163a0f';
+import './formatting.js?v=bd163a0f';
 
 const PUBLIC_PAGE_SETTINGS_ENDPOINT = "/l/site-settings/public-pages";
 
 /**
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
  * @matrix admin public-pages : live-settings sitemap-invalidation
  */
 class SitePublicPages extends SiteSetting {
@@ -112,8 +112,8 @@ const SETTING_WIDGETS = {
  * is owned by a focused persistent widget.
  *
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_public_page_indexing_saves_live_setting
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
  * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_coordinates_section_widgets
  * @matrix admin : composite-widgets persistence sections site-settings
  * @matrix public-pages : live-settings

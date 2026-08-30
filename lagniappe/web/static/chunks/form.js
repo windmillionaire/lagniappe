@@ -1,16 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=bb782d98';
-import { InputElement } from './input.js?v=bb782d98';
-import { RadioElement } from './radio.js?v=bb782d98';
-import './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
-import './baseForm.js?v=bb782d98';
-import './icons.js?v=bb782d98';
-import './primitives.js?v=bb782d98';
-import './styles.js?v=bb782d98';
-import './loader.js?v=bb782d98';
-import './baseElement.js?v=bb782d98';
-import './formatting.js?v=bb782d98';
+import { F as FormElement } from './form2.js?v=bd163a0f';
+import { InputElement } from './input.js?v=bd163a0f';
+import { RadioElement } from './radio.js?v=bd163a0f';
+import './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
+import './baseForm.js?v=bd163a0f';
+import './icons.js?v=bd163a0f';
+import './primitives.js?v=bd163a0f';
+import './styles.js?v=bd163a0f';
+import './loader.js?v=bd163a0f';
+import './baseElement.js?v=bd163a0f';
+import './formatting.js?v=bd163a0f';
 
 /**
  * @testable true

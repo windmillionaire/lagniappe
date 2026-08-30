@@ -31,7 +31,7 @@ def _document_seed(entity):
 # @testable true
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
 # @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_edits_document_without_ai_or_image_tools
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_edits_document_without_ai_or_image_tools
 # @matrix sync : checkpoint delta document offline-replay persistence revision
 @internal.route("/sync", methods=["POST"])
 @logged_in

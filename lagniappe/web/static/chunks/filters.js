@@ -1,20 +1,20 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList } from './baseList.js?v=bb782d98';
-import { b as buttons } from './buttons.js?v=bb782d98';
-import { r as request, w as withTransition } from './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
-import { p as primitives } from './primitives.js?v=bb782d98';
-import { F as FacetsBox } from './facets.js?v=bb782d98';
-import { S as SelectBox } from './select2.js?v=bb782d98';
-import './styles.js?v=bb782d98';
-import './icons.js?v=bb782d98';
-import './formatting.js?v=bb782d98';
-import './remote.js?v=bb782d98';
-import './queryLifecycle.js?v=bb782d98';
-import './combobox.js?v=bb782d98';
-import './results.js?v=bb782d98';
-import './storage.js?v=bb782d98';
-import './submitter.js?v=bb782d98';
+import { BaseList } from './baseList.js?v=bd163a0f';
+import { b as buttons } from './buttons.js?v=bd163a0f';
+import { r as request, w as withTransition } from './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
+import { p as primitives } from './primitives.js?v=bd163a0f';
+import { F as FacetsBox } from './facets.js?v=bd163a0f';
+import { S as SelectBox } from './select2.js?v=bd163a0f';
+import './styles.js?v=bd163a0f';
+import './icons.js?v=bd163a0f';
+import './formatting.js?v=bd163a0f';
+import './remote.js?v=bd163a0f';
+import './queryLifecycle.js?v=bd163a0f';
+import './combobox.js?v=bd163a0f';
+import './results.js?v=bd163a0f';
+import './storage.js?v=bd163a0f';
+import './submitter.js?v=bd163a0f';
 
 /**
  * @testable infrastructure

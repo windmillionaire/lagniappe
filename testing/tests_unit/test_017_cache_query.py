@@ -591,7 +591,7 @@ def test_search_results_are_hydrated_from_details_hashes(monkeypatch):
     kind_results = query.kind_search(
         "Page", "page", Restriction.UNRESTRICTED, [], include_users=False
     )
-    full_results, total = query.search("Page", [], [])
+    full_results, total = query.search("Page", Restriction.UNRESTRICTED, [])
 
     for result in [entity_results[0], kind_results[0], full_results[0]]:
         assert result["details"]["parent"]["name"] == "Category"
@@ -633,7 +633,7 @@ def test_search_prunes_stale_rows_without_entity_details(monkeypatch):
     assert deleted == [Search.user.value.format("deleted-user-page")]
 
 
-# @matrix search : empty-access permissions redis-cloud tag-syntax
+# @matrix search : permissions redis-cloud tag-syntax
 @pytest.mark.unit
 def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
     calls = []
@@ -671,17 +671,19 @@ def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
         "(@name:Alpha*) (@kind:{ project | model }) (ismissing(@restricted_to))"
     )
 
-    calls.clear()
-    assert query.search("Alpha", [], [], kinds=["task"]) == ([], 0)
 
-    assert calls[0] == (
-        "((@name:Alpha*) | (@desc:Alpha*) | (@doc:Alpha*) | (@values:Alpha*)) "
-        "~((@kind:{ category | project | page }) (@name:Alpha*)) "
-        "=> { $weight: 4.0; } "
-        '(@kind:{ task | model }) (@requires:{""}) '
-        "(ismissing(@restricted_to))"
-    )
-    assert ":{}" not in calls[0]
+# @matrix search : empty-access permissions
+@pytest.mark.unit
+def test_search_empty_access_returns_without_querying_redis(monkeypatch):
+    class FailingCache:
+        def search(self, _redis_query):
+            pytest.fail("deny-all search must not query Redis")
+
+    monkeypatch.setattr(query, "cache", FailingCache())
+
+    assert query.entity_search("Alpha", [], []) == []
+    assert query.kind_search("Alpha", "project", [], [], models=True) == []
+    assert query.search("Alpha", [], [], kinds=["task"]) == ([], 0)
 
 
 # @matrix search : permissions validation
@@ -689,6 +691,9 @@ def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
 def test_search_permission_fragments_require_lists():
     with pytest.raises(TypeError, match="Required must be a list"):
         query._add_required("models")
+
+    with pytest.raises(ValueError, match="at least one hash"):
+        query._add_required([])
 
     with pytest.raises(TypeError, match="Restricted to must be a list"):
         query._add_restricted_to("group")

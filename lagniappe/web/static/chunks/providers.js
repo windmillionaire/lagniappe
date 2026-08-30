@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { s as setIcon } from './icons.js?v=bb782d98';
-import { S as SiteSetting } from './base.js?v=bb782d98';
+import { s as setIcon } from './icons.js?v=bd163a0f';
+import { S as SiteSetting } from './base.js?v=bd163a0f';
 
 /**
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
  * @matrix admin : external-links service-providers
  */
 class SiteServiceProviders extends SiteSetting {

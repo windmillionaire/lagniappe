@@ -23,8 +23,8 @@ def section(section):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_settings_requires_administrator
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
 # @matrix admin : environment-variables site-settings
 @reference.route("/environment-variables")
 @permission(Resource.SITE)
@@ -36,8 +36,8 @@ def environment_variables():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_additional_admin_cannot_access_owner_configuration
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
 # @matrix admin owner : recovery-export
 @reference.route("/download-settings")
 @owner_only

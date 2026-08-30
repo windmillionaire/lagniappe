@@ -1,23 +1,23 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { u as uploadElement, B as BaseUpload, U as UploadMenu } from './baseUpload.js?v=bb782d98';
-import { r as request, w as withTransition } from './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
-import { s as setIcon } from './icons.js?v=bb782d98';
-import { S as SiteSetting } from './base.js?v=bb782d98';
-import './styles.js?v=bb782d98';
-import './buttons.js?v=bb782d98';
-import './formatting.js?v=bb782d98';
-import './dropdown.js?v=bb782d98';
-import './combobox.js?v=bb782d98';
-import './primitives.js?v=bb782d98';
-import './baseForm.js?v=bb782d98';
-import './loader.js?v=bb782d98';
+import { u as uploadElement, B as BaseUpload, U as UploadMenu } from './baseUpload.js?v=bd163a0f';
+import { r as request, w as withTransition } from './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
+import { s as setIcon } from './icons.js?v=bd163a0f';
+import { S as SiteSetting } from './base.js?v=bd163a0f';
+import './styles.js?v=bd163a0f';
+import './buttons.js?v=bd163a0f';
+import './formatting.js?v=bd163a0f';
+import './dropdown.js?v=bd163a0f';
+import './combobox.js?v=bd163a0f';
+import './primitives.js?v=bd163a0f';
+import './baseForm.js?v=bd163a0f';
+import './loader.js?v=bd163a0f';
 
 const SPLASH_PREFIX = "splash-";
 
 /**
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
  * @matrix admin : generated-images lazy-initialization metadata public-preview site-image-upload
  */
 class SiteImage extends SiteSetting {

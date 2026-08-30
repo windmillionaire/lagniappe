@@ -1,25 +1,25 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
-import { Modal } from './modal.js?v=bb782d98';
-import { F as FacetsBox } from './facets.js?v=bb782d98';
-import { S as SiteSetting } from './base.js?v=bb782d98';
-import './styles.js?v=bb782d98';
-import './remote.js?v=bb782d98';
-import './queryLifecycle.js?v=bb782d98';
-import './combobox.js?v=bb782d98';
-import './primitives.js?v=bb782d98';
-import './icons.js?v=bb782d98';
-import './results.js?v=bb782d98';
-import './storage.js?v=bb782d98';
-import './formatting.js?v=bb782d98';
-import './submitter.js?v=bb782d98';
+import { r as request } from './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
+import { Modal } from './modal.js?v=bd163a0f';
+import { F as FacetsBox } from './facets.js?v=bd163a0f';
+import { S as SiteSetting } from './base.js?v=bd163a0f';
+import './styles.js?v=bd163a0f';
+import './remote.js?v=bd163a0f';
+import './queryLifecycle.js?v=bd163a0f';
+import './combobox.js?v=bd163a0f';
+import './primitives.js?v=bd163a0f';
+import './icons.js?v=bd163a0f';
+import './results.js?v=bd163a0f';
+import './storage.js?v=bd163a0f';
+import './formatting.js?v=bd163a0f';
+import './submitter.js?v=bd163a0f';
 
 /**
  * Renders the primary Owner and additional-Administrator roster.
  *
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+ * @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
  * @matrix admin : confirmation-modal demotion failure-state promotion read-only responsive roster
  * @pair owner:role-controls
  */

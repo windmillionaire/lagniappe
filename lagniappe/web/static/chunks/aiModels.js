@@ -1,22 +1,22 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { b as buttons } from './buttons.js?v=bb782d98';
-import { r as request, w as withTransition } from './foundation.js?v=bb782d98';
-import './connectivity.js?v=bb782d98';
-import { S as SelectBox } from './select2.js?v=bb782d98';
-import { S as SiteSetting } from './base.js?v=bb782d98';
-import './styles.js?v=bb782d98';
-import './icons.js?v=bb782d98';
-import './formatting.js?v=bb782d98';
-import './combobox.js?v=bb782d98';
-import './primitives.js?v=bb782d98';
-import './results.js?v=bb782d98';
-import './storage.js?v=bb782d98';
-import './submitter.js?v=bb782d98';
+import { b as buttons } from './buttons.js?v=bd163a0f';
+import { r as request, w as withTransition } from './foundation.js?v=bd163a0f';
+import './connectivity.js?v=bd163a0f';
+import { S as SelectBox } from './select2.js?v=bd163a0f';
+import { S as SiteSetting } from './base.js?v=bd163a0f';
+import './styles.js?v=bd163a0f';
+import './icons.js?v=bd163a0f';
+import './formatting.js?v=bd163a0f';
+import './combobox.js?v=bd163a0f';
+import './primitives.js?v=bd163a0f';
+import './results.js?v=bd163a0f';
+import './storage.js?v=bd163a0f';
+import './submitter.js?v=bd163a0f';
 
 /**
  * @testable true
  * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_initializes_ai_selects_before_syncing_saved_values
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_ai_form_saves_current_models_through_route
  * @matrix admin : ai-settings model-options model-selection saved-values
  */
 class SiteAiModels extends SiteSetting {
@@ -150,7 +150,7 @@ class SiteAiModels extends SiteSetting {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_ai_submission_uses_visible_combobox_values
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
+	 * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_ai_form_saves_current_models_through_route
 	 * @matrix admin : ai-settings model-selection submission
 	 */
 	_aiSettingsFormData() {

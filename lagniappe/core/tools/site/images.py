@@ -54,7 +54,7 @@ def flood_fill_background(image, tolerance=30):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @tests tests_unit/test_018_database_assets.py::test_site_image_rejects_oversized_input_before_decode
 # @matrix admin : generated-images metadata site-image-upload
 def create_site_image(image, remove_bg=True, bg_tolerance=30):
@@ -402,7 +402,7 @@ def create_splash_screen(
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @pair admin:generated-images
 def generate_site_images(source_image):
     """

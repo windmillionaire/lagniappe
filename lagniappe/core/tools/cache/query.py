@@ -171,7 +171,7 @@ def _add_required(required):
     if not isinstance(required, list):
         raise TypeError("Required must be a list of hashes")
     if not required:
-        return '(@requires:{""})'
+        raise ValueError("Required must contain at least one hash")
     return f"(@requires:{{ {' | '.join(required)} }})"
 
 
@@ -273,8 +273,13 @@ def _expand_result_kinds(kinds):
 
 
 # @testable infrastructure
+# @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
+# @matrix search : empty-access permissions
 def entity_search(query_string, restrictions, belongs_to):
     """Search cached entities by query string with permission filtering."""
+    if Restriction.is_denied(restrictions):
+        return []
+
     term_list = _build_term_list(query_string)
 
     if not Restriction.is_unrestricted(restrictions):
@@ -317,9 +322,13 @@ def _add_models(results, project_hashes):
 
 # @testable infrastructure
 # @tests tests_unit/test_017_cache_query.py::test_search_queries_use_redis_cloud_compatible_tag_syntax
+# @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
 # @matrix search : empty-access permissions redis-cloud tag-syntax
 def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
     """Search cached entities filtered by kind and optional form type."""
+    if Restriction.is_denied(restrictions):
+        return []
+
     term_list = _build_term_list(query_string) if query_string else []
 
     if kind == "project" and kwargs.get("models"):
@@ -360,9 +369,14 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_returns_results
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_primary_name_matches_rank_above_file_name_and_description_matches
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_search_matches_explicit_denial_and_administrator_content_access
+# @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
 # @matrix search : empty-access no-results permissions primary-name-ranking redis-cloud results tag-syntax
 def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
     """Run a full-text search with highlighting, snippets, and pagination."""
+    if Restriction.is_denied(required):
+        return [], 0
+
     term_list = _build_term_list(user_query, expanded=True)
 
     expanded_kinds = _expand_result_kinds(kinds)
