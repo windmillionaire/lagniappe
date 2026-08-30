@@ -394,9 +394,6 @@ assert.equal(clear.textContent, "do_not_disturb_on");
 const historyFill = module.createIcon("historyFill");
 assert.equal(historyFill.textContent, "settings_backup_restore");
 
-const attributeAdd = module.createIcon("attribute.add");
-assert.equal(attributeAdd.textContent, "add_circle");
-
 const attributeRemove = module.createIcon("attribute.remove");
 assert.equal(attributeRemove.textContent, "do_not_disturb_on");
 

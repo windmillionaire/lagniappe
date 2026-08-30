@@ -135,7 +135,6 @@ button[type="submit"] .icon[data-icon="generate"] {
 	--icon-offset-y: 0.5px;
 }
 
-.icon[data-icon="attribute.add"],
 .icon[data-icon="attribute.remove"] {
 	--icon-offset-y: 1px;
 }

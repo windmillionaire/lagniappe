@@ -45,10 +45,6 @@ ICONS = {
 		"fill": 1
 	},
 	"attribute": {
-		"add": {
-			"glyph": "add_circle",
-			"fill": 1
-		},
 		"remove": {
 			"glyph": "do_not_disturb_on",
 			"fill": 1
