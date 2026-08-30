@@ -1,7 +1,7 @@
 """
 Tests for project info tab functionality.
 
-Tests project info editing and attribute management.
+Tests project info editing.
 Verified against:
 - lagniappe/web/templates/projects/info.html
 - src/script/widgets/projectInfo.mjs (ProjectInfo)
@@ -9,7 +9,6 @@ Verified against:
 """
 
 from dataclasses import replace
-import re
 from uuid import uuid4
 
 from playwright.sync_api import expect
@@ -17,7 +16,7 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, SubmissionFields, Users
-from testing.elements import SpinnerButtons, Attributes, Tabs
+from testing.elements import SpinnerButtons
 from testing.resources import Project
 from testing.utility.network import expect_successful_response
 from testing.utility.polling import expect_poll_result
@@ -233,53 +232,3 @@ def test_project_revision_notice_only_resets_changed_form(
     )
     expect(owner_form.locator("[lp-edited-marker]")).to_be_hidden()
     assert owner.page.evaluate("window.__revisionResetSentinel") == "mounted"
-
-
-# @matrix projects : attribute-model-tasks attributes-live-toggle no-reload
-# @template projects/info.html::info_form
-def test_toggle_tasks_attribute(get_user):
-    user = get_user(Users.OWNER)
-    project = Projects.test_project_info_form.get(user)
-    user.go(project)
-    info_form = project.info_form
-    user.page.evaluate("window.__projectAttributeNoReload = true")
-
-    attributes = Attributes(info_form)
-    with user.page.expect_response("**/attributes/tasks"):
-        attributes.set_selected("tasks", False)
-
-    model_tasks = user.locate(project.MODEL_TASKS_CARD)
-    expect(model_tasks).not_to_be_visible()
-    expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-5xl.*"))
-    assert user.page.evaluate("window.__projectAttributeNoReload") is True
-
-    with user.page.expect_response("**/attributes/tasks"):
-        attributes.set_selected("tasks", True)
-
-    expect(model_tasks).to_be_visible()
-    expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-7xl.*"))
-    assert user.page.evaluate("window.__projectAttributeNoReload") is True
-
-
-# @matrix projects : attribute-document attributes-live-toggle no-reload
-# @template projects/info.html::info_form
-def test_toggle_document_attribute(get_user):
-    user = get_user(Users.OWNER)
-    project = Projects.test_project_info_form.get(user)
-    user.go(project)
-    info_form = project.info_form
-    user.page.evaluate("window.__projectDocumentNoReload = true")
-
-    attributes = Attributes(info_form)
-    with user.page.expect_response("**/attributes/document"):
-        attributes.set_selected("document", False)
-
-    document_tab = user.locate(Tabs.DOCUMENT_TAB)
-    expect(document_tab).not_to_be_visible()
-    assert user.page.evaluate("window.__projectDocumentNoReload") is True
-
-    with user.page.expect_response("**/attributes/document"):
-        attributes.set_selected("document", True)
-
-    expect(user.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).to_be_visible()
-    assert user.page.evaluate("window.__projectDocumentNoReload") is True

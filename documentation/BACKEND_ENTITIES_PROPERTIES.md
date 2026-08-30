@@ -19,8 +19,7 @@ consumers use the property object itself.
 
 `Property` distinguishes unset, explicit `None`, `False`, and empty containers.
 `DBProperty` treats `(None, [], {})` as blank unless a subclass overrides
-`_blank_values`. For example, `Attributes` persists `[]`, so missing and
-explicitly empty configurations remain different.
+`_blank_values` to preserve an otherwise blank value.
 
 Do not use truthiness to decide whether a field was loaded or submitted. Use
 `is_set`, `value`, and the property's normalization contract.

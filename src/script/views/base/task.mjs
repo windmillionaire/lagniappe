@@ -1,3 +1,4 @@
+import { withTransition } from "../../shared";
 import ViewComponent from "./component";
 
 const ISOLATED_TASK_ACTIONS = new Set(["TaskMove", "TaskCombine"]);
@@ -6,9 +7,11 @@ const ISOLATED_TASK_ACTIONS = new Set(["TaskMove", "TaskCombine"]);
  * @testable true
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_uncomplete_from_loaded_task_history_opens_settings
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
  * @matrix task-combine : delta isolated-form lazy-reload linked-page no-reload view-page
+ * @matrix tasks : active-widget history-refresh settings uncomplete
  * @matrix tasks : create list-state readonly refresh update-state while-open
  */
 export class Task extends ViewComponent {
@@ -95,6 +98,18 @@ export class Task extends ViewComponent {
 		}
 
 		const update = response.html?.querySelector(`[id='${this.name}']`);
+		const activeHistory =
+			this.completed && this.active?.name === "TaskHistory"
+				? this.active
+				: null;
+		const openSettings = Boolean(
+			activeHistory &&
+				update?.dataset.completed === "false" &&
+				update.querySelector("[data-widget='TaskSettings']"),
+		);
+		const historyReplacement = openSettings
+			? update.querySelector("[data-widget='TaskHistory']")?.cloneNode(true)
+			: null;
 
 		if (update) {
 			Object.assign(this.elt.dataset, update.dataset);
@@ -103,6 +118,24 @@ export class Task extends ViewComponent {
 		}
 
 		await super.updated(response);
+		if (!openSettings) return;
+
+		await this.activate("TaskSettings");
+		await this.prepareRender(true);
+		await withTransition(
+			() => {
+				// Uncompletion archives a new row, so the loaded history is stale.
+				if (historyReplacement) {
+					activeHistory.target.replaceWith(historyReplacement);
+				} else {
+					activeHistory.target.remove();
+				}
+				activeHistory.destroy?.();
+				delete this.widgets.TaskHistory;
+				this.render(true);
+			},
+			{ label: `${this.name}:uncomplete-history` },
+		);
 	}
 
 	_replaceNav(update) {

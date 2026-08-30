@@ -15,8 +15,6 @@ class Projects(ResourceEnumMixin, Enum):
     test_create_model_task_with_form = test_create_project_manual_mode
     test_delete_project = Project(definition=pd.delete_project)
     test_create_project_ai_mode = Project(definition=pd.ai_generated)
-    test_create_project_without_tasks = Project(definition=pd.without_tasks)
-    test_create_project_without_document = Project(definition=pd.without_document)
     test_project_info_form = Project(definition=pd.edit_project_info)
     test_page_tasks_multi_model = Project(definition=pd.multi_model_project)
     test_filter_project = Project(definition=pd.filter_project)
@@ -36,6 +34,9 @@ class Projects(ResourceEnumMixin, Enum):
     test_editor_common_markdown_paste = Project(
         definition=pd.editor_common_markdown_paste
     )
+    test_editor_markdown_source_paste = Project(
+        definition=pd.editor_markdown_source_paste
+    )
     test_editor_task_list = Project(definition=pd.editor_task_list)
     test_sync_document_collaboration = Project(
         definition=pd.sync_document_collaboration
@@ -51,5 +52,6 @@ class Projects(ResourceEnumMixin, Enum):
 
     # Editor tests (005c, 005e, 005f) - reuse existing project with document
     test_formatting_persists = test_create_project_manual_mode
+    test_inline_code_style = test_create_project_manual_mode
     test_toolbar_buttons_visible = test_create_project_manual_mode
     test_editor_forms = test_create_project_manual_mode

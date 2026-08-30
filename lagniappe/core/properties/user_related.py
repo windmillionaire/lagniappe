@@ -1,4 +1,4 @@
-from ..definitions import Fetch, MutationIntent, Ordering, PageAttributes
+from ..definitions import Fetch, MutationIntent, Ordering
 from ..entities import Entities
 from ..mixins import (
     ColumnMixin,
@@ -98,7 +98,7 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
 # @tests tests_unit/test_009a_user.py::test_user_page_auto_create_lazy_load_and_owner_link
 # @tests tests_unit/test_009a_user.py::test_user_page_missing_key_raises_runtime_error
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
-# @matrix user : auto-create lazy-load limited-attrs owner-link personal-page public-user validation
+# @matrix user : auto-create lazy-load owner-link personal-page public-user validation
 # @matrix public-users : auto-create lazy-load owner-link public-user
 # @pair user-settings:page-remove
 class UserPage(RelatedEntityMixin, DBProperty):
@@ -138,8 +138,6 @@ class UserPage(RelatedEntityMixin, DBProperty):
             page = self._create_user_page(user_model)
 
         self._set_user_model(page, user_model)
-        if self.entity.is_public:
-            page.attributes = self._public_user_page_attributes()
         RelatedEntityMixin.value.fset(self, page)
         page.user = self.entity
         self.entity.add_mutation_intents(
@@ -152,20 +150,7 @@ class UserPage(RelatedEntityMixin, DBProperty):
             "user": self.entity,
             "name": self.entity.name,
         }
-        if self.entity.is_public:
-            data["attributes"] = self._public_user_page_attributes()
         return Entities.PAGE.create(data)
-
-    # @testable true
-    # @tests tests_unit/test_009a_user.py::test_user_page_auto_create_lazy_load_and_owner_link
-    # @tests tests_unit/test_009a_user.py::test_user_create_public_user_assigns_public_group
-    # @matrix public-users : limited-attrs personal-page
-    def _public_user_page_attributes(self):
-        return [
-            attribute.value.name
-            for attribute in PageAttributes
-            if attribute.value.name not in {"files", "photo"}
-        ]
 
     def _user_model(self, page=None):
         model = page.model if page else None

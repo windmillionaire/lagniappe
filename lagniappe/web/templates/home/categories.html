@@ -1,7 +1,7 @@
 {% import 'controls.html' as controls %}
-{% from 'common.html' import generate, explain_prompt, attribute_button %}
+{% from 'common.html' import generate, explain_prompt %}
 
-{% macro create(attributes) %}
+{% macro create() %}
   <form lp-create
         data-widget="CreateCategory"
         data-mode="manual"
@@ -17,14 +17,6 @@
       </div>
     </div>
     {% if current_user.access(AI.CREATE) %}{{ generate('category') }}{% endif %}
-    <div data-role="attributes"
-         data-entity="category"
-         class="group-data-[mode=ai]/form:hidden">
-      <h3 class="{{ styles.label.sectionHeading }}">Page Features</h3>
-      <div class="{{ styles.attributes.container }}">
-        {% for attribute in attributes %}{{ attribute_button(attribute) }}{% endfor %}
-      </div>
-    </div>
     {% if Resource.FORMS.allowed(Action.VIEW) %}
       <div data-role="form-select"
            class="{{ styles.select.container }} group-data-[mode=ai]/form:hidden">

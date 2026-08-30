@@ -20,6 +20,10 @@ Every entity passed directly to `Entities.save(*entities)` is a complete root
 write. Lifecycle properties, requirements, process serialization, and the full
 `exclude_from_indexes` set are prepared by the executor.
 
+An entity may declare `retired_fields` for obsolete stored keys. The executor
+discards those keys while preparing any otherwise-requested complete save,
+allowing old records to converge without a global data migration.
+
 Domain code can register typed `MutationIntent` values while it changes an
 entity. `standard` means another complete domain write; `patch` and `touch`
 name narrow dependent changes; cache-state and search-delete intents are

@@ -8,7 +8,7 @@ Maps to:
 - View: src/script/views/page.mjs
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from .categories import Categories
@@ -23,19 +23,6 @@ class PageDefinition:
     description: str = ""
     form: Optional[Forms] = None
     submission: Optional[Submissions] = None
-    attributes: list = field(
-        default_factory=lambda: [
-            "tasks",
-            "document",
-            "notes",
-            "files",
-            "photo",
-        ]
-    )
-
-    @property
-    def defaults(self):
-        return ["tasks", "document", "notes", "files", "photo"]
 
 
 create_page = PageDefinition(
@@ -53,35 +40,30 @@ page_with_form = PageDefinition(
 page_for_tasks = PageDefinition(
     name="Page for Tasks",
     description="A page used for testing task creation.",
-    attributes=["tasks"],
     category=Categories.test_create_page_task,
 )
 
 empty_page_task_list = PageDefinition(
     name="Empty Page Task List",
     description="A page reserved for testing the empty task-list state.",
-    attributes=["tasks"],
     category=Categories.test_create_page_task,
 )
 
 page_for_tasks_with_project = PageDefinition(
     name="Attach Project to Task",
     description="A page used for testing task creation with a project.",
-    attributes=["tasks"],
     category=Categories.test_create_page_task,
 )
 
 task_pages_move_source = PageDefinition(
     name="Task Pages Source",
     description="A page used for moving a task between page task lists.",
-    attributes=["tasks"],
     category=Categories.test_create_page_task,
 )
 
 task_pages_move_target = PageDefinition(
     name="Task Pages Target",
     description="A page that receives a task from another page.",
-    attributes=["tasks"],
     category=Categories.test_create_page_task,
 )
 
@@ -107,7 +89,6 @@ autofill_page = PageDefinition(
     name="Autofill Evidence Page",
     description="A page with attached evidence for deferred autofill tests.",
     category=Categories.test_basic_inputs_submission,
-    attributes=["tasks", "files"],
 )
 
 page_review_workspace = PageDefinition(

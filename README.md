@@ -6,41 +6,37 @@ Lagniappe is a private web app for individuals and small organizations that supp
 
 The tour and manual are public, although the demo examples linked to in the tour require you to log in.
 
-## Pages, not folders
+## Contextual organization
 
-The main unit of organization in Lagniappe is a page: a car, a job you're trying to get, an apartment you manage — anything, really. A page can have as much structure as you choose to give it, and its related tasks, files, images, and notes are attached directly to it.
+The main unit of organization in Lagniappe is a page: a car, a job you're trying to get, an apartment you manage — anything, really. A page can have as much structure as you choose to give it, and its related tasks, files, images, and notes are attached directly to that page. Structure is defined by reusable forms that you build yourself or generate with AI and attach to pages or tasks. Because those forms provide structure without determining where something belongs, a page can cohesively organize many different kinds of information.
 
-Rather than a folder containing a collection of files, a page represents the thing itself. Pieces of it can appear elsewhere—in search, filters, or project-tracked task lists—but they remain attached to that page. This fits the way I organize things in my own head, so I tried to recreate it. It also happens to be convenient for optional AI, because the relevant context is already bundled together.
+Rather than a folder containing a collection of files, a page represents a thing or a concept itself. Pieces of it can appear elsewhere — in search, filters, or project-tracked task lists — but they remain attached to that page. This fits the way I organize things in my own head, and it also happens to be convenient for always-optional AI features, because the relevant context is already bundled together.
 
-| Structured information | Collaborative Document |
+| Structured information | Collaborative document |
 |:---:|:---:|
-| <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/01-milo-info.png" alt="Milo's structured adoption record in Lagniappe"> | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/02-milo-document.png" alt="A collaborative Document in Lagniappe"> |
+| <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/01-milo-info.png" alt="Milo's structured adoption record"> | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/02-milo-document.png" alt="A collaborative document"> |
 
-| Detailed contextual task | Attached files |
+| Contextual task | Attached files |
 |:---:|:---:|
 | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/03-milo-task-detail.png" alt="A customizable task attached to Milo's page"> | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/04-milo-files.png" alt="Two supporting PDF records attached to Milo's page"> |
 
 All four views belong to Milo's one page: structured information, a collaborative document, work to be done, and supporting records.
 
-## Good fit / Less of a fit
+## Who Lagniappe is for
 
-### Good fit
-
-Lagniappe is a great fit for an individual or organization that needs to be organized but has some trouble actually keeping things organized. If you're mildly technical and have a collection of side projects, clubs, or papers you don't want to lose—and you want to give a wide variety of people controlled access to selected material—you might like it.
+Lagniappe is a great fit for an individual or organization that needs to be organized but has some trouble actually keeping things organized. If you're mildly technical and have a collection of side projects, clubs, or papers you don't want to lose — and you want to give a wide variety of people controlled access to selected material — you might like it.
 
 It can also fit a small business or nonprofit that has to keep track of a lot, provide different views of that information to customers, vendors, employees, or others, and structure its data without having to type everything into a spreadsheet.
-
-### Less of a fit
 
 If you don't like the idea of hosting your data in GCP, don't want to be technically involved, or would simply rather have someone else manage your software, Lagniappe probably isn't a great fit. Installation and maintenance aren't especially complicated, but you are still the operator of your own deployment and Redis database, plus a domain registrar if you want a custom URL.
 
 ## More of the system
 
-| Recurring Task history | Reviewable AI report |
+| Task history | Reviewable AI report |
 |:---:|:---:|
 | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/05-task-history.png" alt="Structured completion history for a recurring relationship task"> | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/08-ai-report.png" alt="A completed and reversible AI file-organization report"> |
 
-| Form builder and permissions | Project filtering |
+| Form builder | Project filtering |
 |:---:|:---:|
 | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/07-form-builder-permissions.png" alt="The form builder with reusable components and access restrictions"> | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/06-project-task-filter.png" alt="A project filter with nested structured task results"> |
 

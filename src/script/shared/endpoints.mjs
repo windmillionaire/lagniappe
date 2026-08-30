@@ -31,19 +31,6 @@ export const ENDPOINTS = {
 			remove: `/assets/${settings.key}/remove-page-image`,
 		};
 	},
-	PageInfo: (settings) => {
-		return {
-			attribute: (attribute) =>
-				`/pages/${settings.key}/attributes/${attribute}`,
-			disablePhoto: `/pages/${settings.key}/attributes/photo`,
-		};
-	},
-	ProjectInfo: (settings) => {
-		return {
-			attribute: (attribute) =>
-				`/projects/${settings.key}/attributes/${attribute}`,
-		};
-	},
 	SiteAiModels: () => {
 		return {
 			setAiSettings: "/l/set-ai-settings",
@@ -116,6 +103,7 @@ export const ENDPOINTS = {
 		page: "/l/search-page",
 	},
 	linkPreview: "/l/preview",
+	markdown: "/l/markdown",
 	location: "/l/search-location",
 	facet: (index) => {
 		return `/l/search-index/${index}`;

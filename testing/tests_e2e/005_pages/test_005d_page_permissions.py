@@ -38,8 +38,8 @@ def test_page_viewer_reads_page_without_page_editing_affordances(get_user):
 
     tabs = Tabs(viewer)
     expect(tabs.info).to_be_visible()
-    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).not_to_be_attached()
-    expect(viewer.locate(Tabs.DOCUMENT_TAB)).not_to_be_attached()
+    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).to_be_visible()
+    expect(viewer.locate(Tabs.DOCUMENT_TAB)).to_be_attached()
     expect(tabs.tasks).to_be_visible()
 
     expect(viewer.locate(Page.CREATE_TASK_TOGGLE)).not_to_be_attached()
@@ -55,14 +55,13 @@ def test_page_viewer_reads_page_without_page_editing_affordances(get_user):
     expect(description_field).to_contain_text(page.definition.description)
     expect(info_form.locator(FormElements.NAME)).not_to_be_attached()
     expect(info_form.locator(FormElements.DESCRIPTION)).not_to_be_attached()
-    expect(info_form.locator(Page.INFO_ATTRIBUTES)).not_to_be_attached()
     expect(info_form.locator("[data-role='categories']")).not_to_be_attached()
     expect(info_form.locator("[data-role='autofill']")).not_to_be_attached()
 
 
 # @matrix pages : document-tab readonly
 # @template pages/page.html::main
-def test_page_viewer_sees_document_tab_only_when_content_exists(get_user):
+def test_page_viewer_can_read_document_content(get_user):
     owner = get_user(Users.OWNER)
     page = Pages.acl_lab_document.get(owner)
     marker = "Readonly document content marker"
@@ -143,7 +142,6 @@ def test_page_submission_rejects_hidden_internal_link_target(get_user):
         {
             "name": "Submitted reference internal-link page",
             "description": "Reject hidden link targets.",
-            "attributes": [],
             "categories": [],
             "model": category.entity,
             "form": form,

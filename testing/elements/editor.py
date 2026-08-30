@@ -42,6 +42,7 @@ class EditorMenuOptions(Enum):
     # Style menu
     UNDERLINE = EditorOption(menu="Style", title="Underline")
     STRIKE = EditorOption(menu="Style", title="Strikethrough")
+    INLINE_CODE = EditorOption(menu="Style", title="Inline Code")
     SUPERSCRIPT = EditorOption(menu="Style", title="Superscript")
     SUBSCRIPT = EditorOption(menu="Style", title="Subscript")
     CLEAR_FORMAT = EditorOption(menu="Style", title="Clear Format")

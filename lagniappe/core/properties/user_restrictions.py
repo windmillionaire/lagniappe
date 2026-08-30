@@ -29,7 +29,7 @@ class Restrictions(Property):
     """
 
     _id = "restrictions"
-    _session_version = 8
+    _session_version = 9
     _session_key = "restrictions"
     _access_fields = (
         "search",
@@ -65,6 +65,8 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
+    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_only_project_permissions_that_imply_view
+    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_uses_owner_capability
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
     # @matrix permissions restrictions : search
     @property
@@ -159,7 +161,9 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_builds_group_membership_from_stored_requires
+    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_uses_owner_capability
     # @matrix permissions : group-membership stored-requires
+    # @pair restrictions:search
     # @pair restrictions:root-fetch
     @property
     def belongs_to(self):
@@ -389,12 +393,12 @@ class Restrictions(Property):
     def _create(self):
         if self.entity.is_admin:
             restricted_to = ["forms", "models", "users"]
-            belongs_to = ["owner" if self.entity.is_owner else "admin"]
+            belongs_to = ["owner"]
         else:
             restricted_to = [
                 h
-                for h in self.entity.permissions
-                if Action[self.entity.permissions[h]] != Action.RESTRICTED
+                for h, action in self.entity.permissions.items()
+                if Action[action].implies(Action.VIEW)
             ]
 
             # ``User.requires`` persists the user's group hashes. Permission

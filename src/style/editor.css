@@ -104,55 +104,46 @@
 }
 
 .html-content ul[data-type="taskList"] > li > label {
-	display: grid;
+	display: flex;
 	flex: 0 0 auto;
 	width: 1.25rem;
 	height: 1.25rem;
 	margin-top: 0.16rem;
-	place-items: center;
+	align-items: center;
+	justify-content: center;
 	user-select: none;
 }
 
 .html-content ul[data-type="taskList"] > li input[type="checkbox"] {
-	z-index: 1;
-	grid-area: 1 / 1;
-	width: 1.25rem;
-	height: 1.25rem;
-	margin: 0;
-	opacity: 0;
-}
-
-.html-content ul[data-type="taskList"] > li input[type="checkbox"] + span {
 	box-sizing: border-box;
 	display: grid;
-	grid-area: 1 / 1;
+	place-content: center;
 	width: 1rem;
 	height: 1rem;
+	margin: 0;
+	appearance: none;
 	background-color: white;
-	border: 0.5px solid var(--color-base-light);
+	border: 1px solid var(--color-base-light);
 	border-radius: 0.25rem;
+	opacity: 1;
+	cursor: pointer;
 	transition:
 		background-color 0.12s ease,
 		border-color 0.12s ease,
-		outline-color 0.12s ease;
-	pointer-events: none;
+		box-shadow 0.12s ease;
 }
 
-.html-content ul[data-type="taskList"] > li input[type="checkbox"]:hover + span,
-.html-content
-	ul[data-type="taskList"]
-	> li
-	input[type="checkbox"]:focus-visible
-	+ span {
-	outline: 2px solid var(--color-task-default);
-	outline-offset: 2px;
+.html-content ul[data-type="taskList"] > li input[type="checkbox"]::after {
+	content: "";
+	display: none;
+	width: 0.3125rem;
+	height: 0.5625rem;
+	border: solid white;
+	border-width: 0 0.125rem 0.125rem 0;
+	transform: translateY(-0.0625rem) rotate(45deg);
 }
 
-.html-content
-	ul[data-type="taskList"]
-	> li
-	input[type="checkbox"]:checked
-	+ span {
+.html-content ul[data-type="taskList"] > li input[type="checkbox"]:checked {
 	background-color: var(--color-task-default);
 	border-color: var(--color-task-default);
 }
@@ -160,16 +151,40 @@
 .html-content
 	ul[data-type="taskList"]
 	> li
-	input[type="checkbox"]:checked
-	+ span::after {
-	content: "";
-	width: 0.3125rem;
-	height: 0.5625rem;
-	border: solid white;
-	border-width: 0 0.125rem 0.125rem 0;
-	place-self: center;
-	transform: translateY(0.0625rem) rotate(45deg)
-		translate(-0.0625rem, -0.0625rem);
+	input[type="checkbox"]:checked::after {
+	display: block;
+}
+
+.html-content ul[data-type="taskList"] > li input[type="checkbox"] + span {
+	display: none;
+}
+
+.html-content
+	ul[data-type="taskList"]
+	> li
+	input[type="checkbox"]:not(:disabled):hover,
+.html-content
+	ul[data-type="taskList"]
+	> li
+	input[type="checkbox"]:focus-visible {
+	outline: none;
+	box-shadow:
+		0 0 0 2px white,
+		0 0 0 4px var(--color-task-default);
+}
+
+.html-content ul[data-type="taskList"] > li input[type="checkbox"]:disabled {
+	cursor: default;
+}
+
+@media (forced-colors: active) {
+	.html-content ul[data-type="taskList"] > li input[type="checkbox"] {
+		appearance: auto;
+	}
+
+	.html-content ul[data-type="taskList"] > li input[type="checkbox"]::after {
+		display: none;
+	}
 }
 
 .html-content ul[data-type="taskList"] > li > div {
@@ -337,6 +352,15 @@
 	padding: 1rem;
 	margin-bottom: 1rem;
 	overflow-x: auto;
+}
+
+/* @style editor.markdownSource */
+.html-content pre.markdown-source,
+.html-content pre[data-type="markdownSource"] {
+	color: var(--color-base-dark);
+	caret-color: black;
+	background-color: var(--color-file-bg);
+	border: 1px solid var(--color-file-light);
 }
 
 .html-content code {

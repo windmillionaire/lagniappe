@@ -4,7 +4,10 @@ import { setIcon } from "../../../shared/icons";
 /**
  * @testable true
  * @tests tests_js/test_033_editor_menu_items.py::test_editor_menu_item_serializes_current_active_state
+ * @tests tests_js/test_033_editor_menu_items.py::test_editor_inline_code_menu_item_toggles_from_local_active_state
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_inline_code_style_formats_selected_text_and_persists
  * @matrix editor : dropdown-rerender menu-active-state
+ * @matrix editor : formatting inline-code selection toggle
  */
 class ToolbarMenuItem {
 	constructor(toolbar) {
@@ -71,6 +74,8 @@ class ToolbarMenuItem {
 				chain.unsetUnderline().run();
 			} else if (this.command === "toggleStrike") {
 				chain.unsetStrike().run();
+			} else if (this.command === "toggleCode") {
+				chain.unsetCode().run();
 			} else if (this.command === "toggleSuperscript") {
 				chain.unsetSuperscript().run();
 			} else if (this.command === "toggleSubscript") {
@@ -137,6 +142,7 @@ export {
 	FormMenuItem as generateText, // Insert
 	ToolbarMenuItem as toggleUnderline, // Style
 	ToolbarMenuItem as toggleStrike, // Style
+	ToolbarMenuItem as toggleCode, // Style
 	ToolbarMenuItem as toggleSuperscript, // Style
 	ToolbarMenuItem as toggleSubscript, // Style
 	ToolbarMenuItem as toggleHeading, // Headings

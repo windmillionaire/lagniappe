@@ -8,7 +8,7 @@ The editor system (`src/script/elements/editor/`) provides a rich text document 
 Widget (CollaborativeDocument or IndependentDocument)
   ├── Editor (TipTap)
   │     ├── StarterKit (bold, italic, lists, links, etc.)
-  │     ├── Extensions (CustomImage, FlashRemoteChanges, SelectionHighlight)
+  │     ├── Extensions (custom content, paste handling, tracked ranges)
   │     └── Collaboration (Yjs -- collaborative mode only)
   ├── Toolbar
   │     ├── Tool buttons (OPTION_REGISTRY)
@@ -107,7 +107,7 @@ Two factory functions create TipTap `Editor` instances with shared extension con
 
 **`independentEditor(target)`** -- enables built-in history, no collaboration extensions.
 
-The document editors include: `StarterKit` (with underline; built-in links disabled), `CustomLink`, `Typography`, `Color`, `TextStyle`, `TextAlign`, `Superscript`, `Subscript`, `Youtube`, `CustomImage`, `FontFamily`, `SelectionHighlight`.
+The document editors include: `StarterKit` (with underline; built-in links disabled), `CustomLink`, `Typography`, `Color`, `TextStyle`, `TextAlign`, `Superscript`, `Subscript`, `Youtube`, `CustomImage`, `FontFamily`, `TrackedRanges`, `SelectionHighlight`, `MarkdownSource`, and `EditorPaste`.
 
 ## Custom Extensions (`extensions/`)
 
@@ -157,13 +157,49 @@ A ProseMirror plugin that briefly highlights text inserted by remote collaborato
 
 ### SelectionHighlight (`highlight.mjs`)
 
-Preserves the visual selection highlight when focus moves away from the editor (e.g. to a toolbar form). Provides commands:
+Preserves the visual selection highlight when focus moves away from the editor
+(e.g. to a toolbar form). Its saved selection uses the shared `TrackedRanges`
+extension so document edits continue to map it correctly. Provides commands:
 
 | Command | Description |
 |---|---|
 | `setSelectionHighlight()` | Saves the current selection range and shows a blue highlight decoration |
 | `clearSelectionHighlight()` | Removes the highlight |
 | `getSelectionHighlightRange()` | Returns `{from, to}` if a highlight is active |
+
+### TrackedRanges (`trackedRanges.mjs`)
+
+Maintains independently named ProseMirror ranges across local, remote, and
+appended transactions. A range can be registered on the same transaction that
+creates its content, avoiding a selection-position guess after collaborative
+normalization. Selection highlighting, AI insertion, and Markdown paste
+replacement share this range mechanism.
+
+### MarkdownSource and EditorPaste (`markdownSource.mjs`, `paste.mjs`)
+
+`EditorPaste` conservatively detects Markdown, literal HTML source, and likely
+soft-wrapped prose in plain-text clipboard data. Rich HTML clipboard payloads
+keep the browser/TipTap paste path. Detected plain text is inserted immediately
+as an editable `MarkdownSource` node, which is visually code-like but uses a
+light document background and persists as a distinct document node.
+
+The toolbar displays a nonmodal decision form for that tracked source block:
+
+- **Convert** posts the source to the authenticated internal `/l/markdown`
+  route and replaces exactly the tracked block with the returned sanitized
+  editor HTML.
+- **Keep as text** closes the prompt and leaves the editable source block in
+  the document.
+
+Conversion uses the backend's shared Markdown renderer, also used by Markdown
+file previews. It removes source newlines from flow text before TipTap's
+whitespace-preserving HTML insertion, while preserving fenced code and explicit
+Markdown hard breaks. GFM task-list syntax is normalized to TipTap's
+`taskList`/`taskItem` markup and displayed with native checkbox controls. The
+backend owns parsing and sanitization; the frontend only detects candidate text
+and manages the explicit decision and range-safe replacement. If the source
+changes during an active conversion, the request is discarded and the user can
+convert the updated text again.
 
 ## Toolbar (`toolbar.mjs`)
 

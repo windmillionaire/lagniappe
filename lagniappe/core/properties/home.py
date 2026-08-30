@@ -1,6 +1,6 @@
 from flask_login import current_user
 
-from ..definitions import Action, EntityAttributes, Fetch
+from ..definitions import Action, Fetch
 from ..entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from .base_property import UNSET
@@ -75,11 +75,6 @@ class ProjectList(HomeProperty):
 
         return self._list
 
-    @property
-    def attributes(self):
-        return EntityAttributes.project.initialize(self)
-
-
 # @testable true
 # @tests tests_unit/test_002i_home_properties.py::test_home_category_list_restrictions_and_cursor
 # @matrix home : categories pagination restrictions
@@ -103,11 +98,6 @@ class CategoryList(HomeProperty):
         self.cursor = db.next_cursor
 
         return self._list
-
-    @property
-    def attributes(self):
-        return EntityAttributes.category.initialize(self)
-
 
 # @testable true
 # @tests tests_unit/test_002i_home_properties.py::test_home_page_list_restrictions_and_cursor

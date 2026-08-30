@@ -55,6 +55,12 @@ const TOOLBAR_MENUS = {
 				name: "strike",
 			},
 			{
+				command: "toggleCode",
+				title: "Inline Code",
+				icon: "code",
+				name: "code",
+			},
+			{
 				command: "toggleSuperscript",
 				title: "Superscript",
 				icon: "superscript",

@@ -1,5 +1,15 @@
 import { Decoration, Extension } from "@tiptap/core";
 
+const SELECTION_RANGE = "selectionHighlight";
+
+// @testable false
+// @covered-by src/script/elements/editor/extensions/highlight.mjs::SelectionHighlight
+// @reason storage lookup is exercised through the selection highlight contract
+const selectionRange = (editor) => {
+	const range = editor?.storage?.trackedRanges?.ranges?.get(SELECTION_RANGE);
+	return range ? { ...range } : null;
+};
+
 /**
  * @testable true
  * @tests tests_js/test_041_editor_decorations.py::test_selection_highlight_decorations_and_range_mapping
@@ -9,14 +19,6 @@ import { Decoration, Extension } from "@tiptap/core";
 export const SelectionHighlight = Extension.create({
 	name: "selectionHighlight",
 
-	addStorage() {
-		return {
-			active: false,
-			from: null,
-			to: null,
-		};
-	},
-
 	addCommands() {
 		return {
 			setSelectionHighlight:
@@ -24,9 +26,7 @@ export const SelectionHighlight = Extension.create({
 				({ editor }) => {
 					const { from, to } = editor.state.selection;
 					if (from !== to) {
-						editor.storage.selectionHighlight.active = true;
-						editor.storage.selectionHighlight.from = from;
-						editor.storage.selectionHighlight.to = to;
+						editor.commands.setTrackedRange(SELECTION_RANGE, { from, to });
 						editor.commands.updateDecorations("selectionHighlight");
 					}
 					return true;
@@ -34,37 +34,30 @@ export const SelectionHighlight = Extension.create({
 			clearSelectionHighlight:
 				() =>
 				({ editor }) => {
-					editor.storage.selectionHighlight.active = false;
-					editor.storage.selectionHighlight.from = null;
-					editor.storage.selectionHighlight.to = null;
+					editor.commands.clearTrackedRange(SELECTION_RANGE);
 					editor.commands.updateDecorations("selectionHighlight");
 					return true;
 				},
 			getSelectionHighlightRange:
 				() =>
 				({ editor }) => {
-					const storage = editor.storage.selectionHighlight;
-					if (storage.active && storage.from !== null && storage.to !== null) {
-						return { from: storage.from, to: storage.to };
-					}
-					return null;
+					return selectionRange(editor);
 				},
 		};
 	},
 
 	addDecorations() {
-		const storage = this.storage;
+		const editor = this.editor;
 
 		return {
 			update: "manual",
 			create: ({ state }) => {
-				if (!storage.active || storage.from === null || storage.to === null) {
-					return [];
-				}
+				const range = selectionRange(editor);
+				if (!range) return [];
 
 				const docEnd = state.doc.content.size;
-				const rangeStart = Math.min(storage.from, storage.to);
-				const rangeEnd = Math.max(storage.from, storage.to);
+				const rangeStart = Math.min(range.from, range.to);
+				const rangeEnd = Math.max(range.from, range.to);
 				const from = Math.max(0, Math.min(rangeStart, docEnd));
 				const to = Math.max(from, Math.min(rangeEnd, docEnd));
 				if (from >= to) return [];
@@ -88,28 +81,5 @@ export const SelectionHighlight = Extension.create({
 				return decorations;
 			},
 		};
-	},
-
-	onTransaction({ transaction, appendedTransactions }) {
-		const storage = this.storage;
-		if (!storage.active || storage.from === null || storage.to === null) {
-			return;
-		}
-
-		for (const tr of [transaction, ...appendedTransactions]) {
-			if (!tr.docChanged) continue;
-
-			const from = tr.mapping.map(storage.from, 1);
-			const to = tr.mapping.map(storage.to, -1);
-			if (from >= to) {
-				storage.active = false;
-				storage.from = null;
-				storage.to = null;
-				return;
-			}
-
-			storage.from = from;
-			storage.to = to;
-		}
 	},
 });

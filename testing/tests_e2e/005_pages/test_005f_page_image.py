@@ -5,7 +5,7 @@ import pytest
 from playwright.sync_api import expect
 
 from testing.definitions import Pages, Uploads, Users
-from testing.elements import Attributes, UploadDropdown
+from testing.elements import UploadDropdown
 from testing.resources import Page
 from testing.utility.network import (
     expect_successful_response,
@@ -40,7 +40,7 @@ def _upload_image_from_prompt(user, page):
             form.locator("[data-role='dropzone']").click()
         chooser.value.set_files(Uploads.editor_test_image.definition.file.path)
 
-    expect(prompt).not_to_be_attached()
+    expect(prompt).to_be_hidden()
     expect(form.locator("img")).to_be_visible()
     return form
 
@@ -113,11 +113,7 @@ def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_user):
 def test_mobile_photo_prompt_rejoins_section_switching(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_generated_image_page)
-    attributes = Attributes(page.info_form)
-
-    attributes.set_selected("photo", False)
     user.mobile = True
-    attributes.set_selected("photo", True)
     prompt = _photo_prompt(page)
 
     prompt.locator(page.PHOTO_PROMPT_UPLOAD).click()
@@ -184,33 +180,8 @@ def test_generate_image_on_page(get_user):
             generate_form.locator("button[data-role='generate']").click()
 
         expect(form.locator("img[alt='Generated test image']")).to_be_visible()
-        expect(prompt).not_to_be_attached()
+        expect(prompt).to_be_hidden()
         expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-7xl.*"))
-
-# @matrix pages : photo-disable photo-prompt
-def test_empty_page_photo_prompt_can_disable_photo_without_reload(get_user):
-    user = get_user(Users.OWNER)
-    page = user.go(Pages.test_generated_image_page)
-    info_form = page.info_form
-    prompt = _photo_prompt(page)
-    expect(user.locate(page.PHOTO_FORM)).not_to_be_visible()
-    expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-5xl.*"))
-
-    user.page.evaluate("window.__photoPromptNoReload = true")
-    with user.page.expect_response("**/attributes/photo"):
-        prompt.locator(page.PHOTO_PROMPT_DISABLE).click()
-
-    expect(prompt).not_to_be_visible()
-    expect(user.locate(page.PHOTO_FORM)).not_to_be_visible()
-    Attributes(info_form).expect_selected("photo", False)
-    assert user.page.evaluate("window.__photoPromptNoReload") is True
-
-    with user.page.expect_response("**/attributes/photo"):
-        Attributes(info_form).set_selected("photo", True)
-
-    expect(prompt).to_be_visible()
-    expect(user.locate(page.PHOTO_FORM)).not_to_be_visible()
-    assert user.page.evaluate("window.__photoPromptNoReload") is True
 
 
 # @pair pages:image-paste
@@ -256,4 +227,6 @@ def test_remove_image_from_page(get_user):
         UploadDropdown.REMOVE.select(form)
 
     expect(user.locate(page.PHOTO_EXISTING_IMAGE).locator("img")).not_to_be_attached()
-    expect(user.locate(page.PHOTO_FEEDBACK)).to_be_visible()
+    expect(form).to_be_hidden()
+    expect(_photo_prompt(page)).to_be_visible()
+    expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-5xl.*"))

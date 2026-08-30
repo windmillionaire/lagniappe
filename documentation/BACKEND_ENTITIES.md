@@ -55,14 +55,13 @@ mixin rather than by entity-specific branches:
 
 The base class provides `name`, `created`, `modified`, `kind`, `requires`,
 `hash`, and `active`. Other shared properties—such as `Description`,
-`Attributes`, `RestrictedTo`, `IsPublic`, and `PublicID`—are added only by the
-entity types that use them.
+`RestrictedTo`, `IsPublic`, and `PublicID`—are added only by the entity types
+that use them.
 
 Important methods and values:
 
 - `allowed(action, user)` delegates instance authorization to
   `user.has_permission(...)`.
-- `has(attribute_name)` checks an entity's configured feature attributes.
 - `related_keys` collects stored relationship keys for batch loading.
 - `attach(key_map)` connects already-loaded entities to relation properties.
 - `save()` and delete operations go through the `Entities` registry and the

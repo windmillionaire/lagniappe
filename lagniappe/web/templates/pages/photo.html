@@ -10,7 +10,7 @@
   </form>
 {% endmacro %}
 
-{% macro card(page, active=True, enabled=True, readonly=false) %}
+{% macro card(page, active=True, readonly=false) %}
   <div id="photo"
        lp-component
        data-title="Image"
@@ -19,8 +19,6 @@
        data-default="PagePhoto"
        data-persistent="{{ active|yesno }}"
        data-readonly="{{ readonly|yesno }}"
-       data-attribute="photo"
-       data-has-attribute="{{ enabled|yesno }}"
        data-kind="page"
        class="{{ styles.card.image }} p-4 sm:p-0">
     {{ image(page) }}

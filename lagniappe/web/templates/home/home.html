@@ -267,7 +267,7 @@
                   class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
         {% endif %}
       </div>
-      {% if Resource.PROJECT.allowed(Action.CREATE) %}{{ project.create(home.projects.attributes) }}{% endif %}
+      {% if Resource.PROJECT.allowed(Action.CREATE) %}{{ project.create() }}{% endif %}
       <ul lp-load
           data-widget="HomeProjectList"
           data-route='{{ url_for("internal.get", kind="projects") }}'
@@ -307,7 +307,7 @@
                   class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
         {% endif %}
       </div>
-      {% if Resource.CATEGORY.allowed(Action.CREATE) %}{{ category.create(home.categories.attributes) }}{% endif %}
+      {% if Resource.CATEGORY.allowed(Action.CREATE) %}{{ category.create() }}{% endif %}
       <ul lp-load
           data-widget="HomeCategoryList"
           data-route='{{ url_for("internal.get", kind="categories") }}'

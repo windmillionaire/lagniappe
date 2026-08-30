@@ -162,9 +162,9 @@ def seed_login_session(user, invalidate_cache=False):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_ai_actions_are_forbidden
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_file_and_photo_actions_are_forbidden
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_ai_actions_are_forbidden
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_file_and_photo_actions_are_forbidden
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_restricted_schedules_are_forbidden
 # @matrix public-users : metered-actions restriction-gate
 def abort_public_user_action():
     """Reject actions that public users may not invoke despite edit access."""
@@ -173,7 +173,7 @@ def abort_public_user_action():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_ai_actions_are_forbidden
+# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_ai_actions_are_forbidden
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
 # @pairs ai-access:route-gate public-users:metered-actions
 def require_ai_access(required):
@@ -437,7 +437,7 @@ def logged_in(f):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_additional_admin_cannot_access_owner_configuration
 # @matrix owner : route-gate sensitive-configuration
 def owner_only(f):
     """Require the configured primary Owner, not an additional Admin."""

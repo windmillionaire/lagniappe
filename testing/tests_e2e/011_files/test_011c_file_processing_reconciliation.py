@@ -34,7 +34,6 @@ def test_file_summary_completion_stages_authoritative_info_until_reset(
     category = Entities.CATEGORY.create(
         {
             "name": f"File Reconciliation Category {suffix}",
-            "attributes": ["files"],
         }
     )
     category.save()
@@ -42,7 +41,6 @@ def test_file_summary_completion_stages_authoritative_info_until_reset(
         {
             "name": f"File Reconciliation Page {suffix}",
             "model": category,
-            "attributes": ["files"],
         }
     )
     page_entity.save()
@@ -51,7 +49,6 @@ def test_file_summary_completion_stages_authoritative_info_until_reset(
         definition=PageDefinition(
             name=page_entity.name,
             category=Pages.test_file_upload_page.value.definition.category,
-            attributes=["files"],
         ),
     )
     page.entity = page_entity

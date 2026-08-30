@@ -8,10 +8,11 @@ from .index import TaskIndex
 
 
 # @testable true
-# @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_description_and_attributes
+# @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_and_description
 # @pair project:update
 class Project(Entity, AssetMixin):
     entity_kind = "project"
+    retired_fields = frozenset({"attributes"})
 
     @property
     def exclude_from_index(self):
@@ -32,7 +33,6 @@ class Project(Entity, AssetMixin):
                 "model_tasks": project.ModelTasks,
                 "description": common_entity.Description,
                 "document": common_assets.Document,
-                "attributes": common_entity.Attributes,
                 "filters": project.ProjectFilters,
                 "is_public": common_entity.IsPublic,
                 "public_id": common_entity.PublicID,
@@ -76,9 +76,8 @@ class Project(Entity, AssetMixin):
         return new_project
 
     # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_description_and_attributes
-    # @matrix project : attributes description identity update
+    # @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_and_description
+    # @matrix project : description identity update
     def update(self, data):
         self.name = data["name"]
         self.description = data.get("description")
-        self.attributes = data.get("attributes")

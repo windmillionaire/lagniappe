@@ -118,10 +118,6 @@ export class PageForm extends FormElement {
 		return section;
 	}
 
-	get attributesElement() {
-		return sections.attributes(this);
-	}
-
 	get photoPromptElement() {
 		return sections.photoPrompt(this);
 	}
@@ -147,7 +143,6 @@ export class PageForm extends FormElement {
 	get append() {
 		return [
 			this.formSelectElement,
-			this.attributesElement,
 			this.categoriesElement,
 			this.autofillElement,
 		];
@@ -337,7 +332,6 @@ export class CreatePage extends PageForm {
 			this.descriptionElement,
 			this.formSelectElement,
 			this.relatedFormsElement,
-			this.attributesElement,
 			this.categoriesElement,
 			this.autofillElement,
 		];
@@ -519,7 +513,7 @@ export class UserSettings extends PagePermissions {
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
+	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
 	 * @matrix notification-email : default-daily public-user user-only user-setting
 	 */
 	get notificationEmailElement() {
@@ -585,7 +579,7 @@ export class UserSettings extends PagePermissions {
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
+	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
 	 * @pair user-settings:field-order
 	 */
@@ -616,7 +610,7 @@ export class UserSettings extends PagePermissions {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
+	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
 	 * @pair public-users:email-consent
 	 */
 	get formData() {

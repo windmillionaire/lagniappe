@@ -354,9 +354,6 @@ class TestEntityMixin:
                 }
             )
 
-        if "attributes" in test_spec:
-            self.db["attributes"] = test_spec["attributes"]
-
         # Set owner flag from top-level test_spec
         if test_spec.get("owner"):
             self.is_owner = True

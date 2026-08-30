@@ -66,7 +66,6 @@ def test_form_delete_modal_lists_page_and_task_users(get_user):
     category = Entities.CATEGORY.create(
         {
             "name": f"Delete Usage Category {suffix}",
-            "attributes": ["tasks", "document", "notes", "files"],
         }
     )
     form.save()

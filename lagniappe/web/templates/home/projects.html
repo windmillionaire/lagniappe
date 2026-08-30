@@ -1,7 +1,7 @@
 {% import 'controls.html' as controls %}
-{% from "common.html" import generate, attribute_button, explain_prompt %}
+{% from "common.html" import generate, explain_prompt %}
 
-{% macro create(attributes) %}
+{% macro create() %}
   <form lp-create
         data-widget="CreateProject"
         data-route="{{ url_for('projects.create') }}"
@@ -16,14 +16,6 @@
       </div>
     </div>
     {% if current_user.access(AI.CREATE) %}{{ generate('project') }}{% endif %}
-    <div data-role="attributes"
-         data-entity="project"
-         class="group-data-[mode=ai]/form:hidden">
-      <h3 class="{{ styles.label.default }} mb-1.5">Project Features</h3>
-      <div class="{{ styles.attributes.container }}">
-        {% for attribute in attributes %}{{ attribute_button(attribute) }}{% endfor %}
-      </div>
-    </div>
     <div class="{{ styles.form.submit.group }} -mt-2" data-role="submit-group">
       {% if current_user.access(AI.CREATE) %}{{ explain_prompt('generate') }}{% endif %}
       <button type="submit" class="{{ styles.button.submit }} mt-2"></button>

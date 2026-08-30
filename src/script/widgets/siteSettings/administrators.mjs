@@ -6,7 +6,7 @@ import { SiteSetting } from "./base";
  * Renders the primary Owner and additional-Administrator roster.
  *
  * @testable true
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+ * @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
  * @matrix admin : confirmation-modal demotion failure-state promotion read-only responsive roster
  * @pair owner:role-controls
  */

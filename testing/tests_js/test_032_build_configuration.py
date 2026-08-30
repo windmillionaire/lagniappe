@@ -1,25 +1,48 @@
 """Node-backed checks for pure frontend build configuration helpers."""
 
 
-# @matrix build : optional-credentials sentry source-maps
-def test_sentry_build_requires_nonblank_upload_token(run_node):
+# @matrix build : optional-credentials release-version sentry source-maps
+def test_sentry_build_uses_package_release_and_requires_upload_token(run_node):
     run_node(
-        """
+        r"""
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
 import("./build/sentry.mjs").then(({ resolveSentryBuild }) => {
   for (const settings of [{}, { SENTRY_AUTH_TOKEN: null }, { SENTRY_AUTH_TOKEN: "  " }]) {
-    const result = resolveSentryBuild(settings);
-    if (result.enabled || result.sourcemap !== false || result.authToken !== null) {
+    const result = resolveSentryBuild(settings, { version: "1.1.0" });
+    if (
+      result.enabled || result.sourcemap !== false || result.authToken !== null ||
+      result.release !== "1.1.0"
+    ) {
       throw new Error(`Blank Sentry token enabled uploads: ${JSON.stringify(result)}`);
     }
   }
 
-  const enabled = resolveSentryBuild({ SENTRY_AUTH_TOKEN: "  maintainer-token  " });
+  const enabled = resolveSentryBuild(
+    { SENTRY_AUTH_TOKEN: "  maintainer-token  ", VERSION: "1.0.1" },
+    { version: "  1.1.0  " },
+  );
   if (!enabled.enabled || enabled.sourcemap !== "hidden") {
     throw new Error(`Valid Sentry token did not enable source maps: ${JSON.stringify(enabled)}`);
   }
   if (enabled.authToken !== "maintainer-token") {
     throw new Error("Sentry token was not normalized");
   }
+  if (enabled.release !== "1.1.0") {
+    throw new Error(`Sentry release did not use package.json: ${JSON.stringify(enabled)}`);
+  }
+  try {
+    resolveSentryBuild({ SENTRY_AUTH_TOKEN: "token" }, { version: "  " });
+    throw new Error("Enabled Sentry upload accepted a blank package version");
+  } catch (error) {
+    if (!String(error.message).includes("package.json version")) throw error;
+  }
+
+  const rollupConfig = readFileSync("./build/rollup.config.mjs", "utf8");
+  assert.match(rollupConfig, /resolveSentryBuild\(settings, packageMetadata\)/);
+  assert.match(rollupConfig, /name: sentry\.release/);
+  assert.doesNotMatch(rollupConfig, /name: settings\.VERSION/);
 });
 """
     )

@@ -83,6 +83,66 @@ def test_file_size_reloads_blob_metadata(monkeypatch):
     assert calls == [{"path": "files/source.pdf"}, "reload"]
 
 
+# @matrix file storage : missing-object
+@pytest.mark.unit
+def test_missing_blob_download_and_size_return_none(monkeypatch):
+    calls = []
+
+    class Blob:
+        def download_as_bytes(self, **kwargs):
+            calls.append(("download", kwargs))
+            raise assets.google_exceptions.NotFound("missing")
+
+        def reload(self):
+            calls.append(("reload",))
+            raise assets.google_exceptions.NotFound("missing")
+
+    class Bucket:
+        def blob(self, path):
+            calls.append(("blob", path))
+            return Blob()
+
+    monkeypatch.setattr(
+        assets,
+        "DATA",
+        SimpleNamespace(bucket=lambda visibility: Bucket()),
+    )
+
+    assert assets.download_file("missing.jpeg", "private") is None
+    assert assets.file_size("missing.jpeg", "private") is None
+    assert calls == [
+        ("blob", "missing.jpeg"),
+        ("download", {}),
+        ("blob", "missing.jpeg"),
+        ("reload",),
+    ]
+
+
+# @matrix storage : idempotent-delete missing-object
+@pytest.mark.unit
+def test_delete_file_ignores_missing_blob(monkeypatch):
+    calls = []
+
+    class Blob:
+        def delete(self):
+            calls.append("delete")
+            raise assets.google_exceptions.NotFound("missing")
+
+    class Bucket:
+        def blob(self, path):
+            calls.append(("blob", path))
+            return Blob()
+
+    monkeypatch.setattr(
+        assets,
+        "DATA",
+        SimpleNamespace(bucket=lambda visibility: Bucket()),
+    )
+
+    assets.delete_file("missing.jpeg", "private")
+    assert calls == [("blob", "missing.jpeg"), "delete"]
+
+
 # @matrix file storage : asset-size metadata
 @pytest.mark.unit
 def test_save_file_returns_reloaded_blob_metadata(monkeypatch):

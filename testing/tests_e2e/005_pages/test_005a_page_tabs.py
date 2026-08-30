@@ -1,14 +1,14 @@
 import re
 from urllib.parse import urlsplit
 
-from playwright.sync_api import expect
 import pytest
+from bs4 import BeautifulSoup
+from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Forms, Pages, Submissions, Uploads, Users
 from testing.elements import (
-    Attributes,
     Buttons,
     EditorAddImage,
     FormSelect,
@@ -18,6 +18,7 @@ from testing.elements import (
     Table,
     Tabs,
 )
+from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
 from testing.utility.network import expect_successful_response
 from testing.utility.test_file import TestFile as UploadTestFile
 
@@ -47,34 +48,6 @@ def test_page_url_tab_overrides_saved_tab(get_user):
     expect(user.locate(Tabs.TASKS_TOGGLE_DESKTOP)).to_have_attribute(
         "data-selected", "true"
     )
-
-
-# @matrix pages : attributes-live-toggle no-reload tabs
-# @template pages/page.html::main
-# @template pages/info.html::info_form
-def test_page_attribute_toggle_updates_tabs_without_reload(get_user):
-    user = get_user(Users.OWNER)
-    page = Pages.test_page_loads.get(user)
-    user.go(page)
-    info_form = page.info_form
-    attributes = Attributes(info_form)
-    tasks_toggle = user.locate(Tabs.TASKS_TOGGLE_DESKTOP)
-
-    expect(tasks_toggle).to_be_visible()
-    user.page.evaluate("window.__attributeToggleNoReload = true")
-
-    with user.page.expect_response("**/attributes/tasks"):
-        attributes.set_selected("tasks", False)
-
-    expect(tasks_toggle).not_to_be_visible()
-    expect(user.locate(page.TASK_LIST)).not_to_be_visible()
-    assert user.page.evaluate("window.__attributeToggleNoReload") is True
-
-    with user.page.expect_response("**/attributes/tasks"):
-        attributes.set_selected("tasks", True)
-
-    expect(tasks_toggle).to_be_visible()
-    assert user.page.evaluate("window.__attributeToggleNoReload") is True
 
 
 # @matrix pages : default-form submission
@@ -352,12 +325,15 @@ def test_add_file_to_page(get_user):
     expect(file_list.locator("li").filter(has_text="editor_test_image")).to_have_count(0)
 
 
+# @matrix ai : batch-summary provider-boundary
 # @matrix file pages : file-upload multi-file page-upload
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
-def test_add_multiple_files_to_page_hides_existing_file_select(get_user):
+@pytest.mark.ai
+def test_add_multiple_files_to_page_hides_existing_file_select(get_user, request):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_file_upload_page)
+    report = request.node.ai_results
 
     files_tab = page.files_tab
     upload_form = files_tab.locator(page.UPLOAD_FILE_FORM)
@@ -377,24 +353,62 @@ def test_add_multiple_files_to_page_hides_existing_file_select(get_user):
     expect(upload_form.locator("[data-role='dropzone']")).to_contain_text(
         "2 files selected"
     )
+    upload_form.locator("input[name='summarize']").check()
+    search_summary = upload_form.locator("input[name='search-summary']")
+    expect(search_summary).to_be_visible()
+    search_summary.check()
 
-    with user.page.expect_response("**/upload"):
+    report.record(
+        "upload_batch",
+        {
+            "files": ["sample_notes.txt", "sample_document.pdf"],
+            "summarize": True,
+            "search_summary": True,
+        },
+    )
+    with user.page.expect_response(
+        "**/upload",
+        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS * 2,
+    ) as response_info:
         SpinnerButtons.UPLOAD.click(upload_form)
 
-    file_list = files_tab.locator("[data-widget='BaseList']")
-    notes_item = file_list.locator("li").filter(has_text="sample_notes").first
-    document_item = file_list.locator("li").filter(has_text="sample_document").first
-    expect(notes_item).to_be_visible()
-    expect(document_item).to_be_visible()
+    response = response_info.value
+    response_body = response.text()
+    report.record("upload_response_status", response.status)
+    assert response.ok, response_body
 
-    for item, expected_name in [
-        (notes_item, "sample_notes"),
-        (document_item, "sample_document"),
-    ]:
-        expect(item).to_have_attribute("data-key", re.compile(r"\S+"))
-        file_key = item.get_attribute("data-key")
+    created_items = BeautifulSoup(response_body, "html.parser").select(
+        "li[data-key][data-name]"
+    )
+    created_keys = {
+        item["data-name"]: item["data-key"]
+        for item in created_items
+    }
+    assert set(created_keys) == {"sample_notes", "sample_document"}
+
+    file_list = files_tab.locator("[data-widget='BaseList']")
+    summaries = []
+    for expected_name, file_key in created_keys.items():
+        item = file_list.locator(f"li[data-key='{file_key}']")
+        expect(item).to_be_visible()
+        expect(item.locator("p")).not_to_be_empty()
+
         file_entity = Entities.fetch_one(file_key, request=Fetch.direct())
         assert file_entity.name == expected_name
+        assert file_entity.summary
+        assert file_entity.properties.summarize.enabled is True
+        assert file_entity.properties.summarize.complete is True
+        assert file_entity.properties.summarize.search is True
+        assert file_entity.properties.summarize.error is None
+        summaries.append(
+            {
+                "file": file_entity.filename,
+                "summary": file_entity.summary,
+                "search": file_entity.properties.summarize.search,
+            }
+        )
+
+    report.record("persisted_file_summaries", summaries)
 
 
 # @pair pages:category-add

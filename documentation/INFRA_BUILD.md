@@ -101,7 +101,9 @@ from entering every Core view's static closure.
 
 When `SENTRY_AUTH_TOKEN` is configured, Rollup uploads hidden JavaScript source
 maps and removes them from static output. Without a token, source-map creation
-and upload plugins are disabled. CSS source maps are not emitted.
+and upload plugins are disabled. Sentry names the uploaded release from the
+`package.json` version, independent of the version currently deployed from the
+checkout's application settings. CSS source maps are not emitted.
 
 ## Development behavior
 

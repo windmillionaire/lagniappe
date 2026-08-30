@@ -119,24 +119,6 @@ export class PagePhoto extends BaseUpload {
 	_markImageAvailable() {
 		if (!this.dropzone.containsImage) return;
 
-		if (typeof this.view.setAttributeActive === "function") {
-			this.view.setAttributeActive("photo", true);
-		} else {
-			this.view.elt
-				.querySelectorAll("[data-has-attribute][data-attribute='photo']")
-				.forEach((element) => {
-					element.dataset.hasAttribute = "true";
-				});
-			const attribute = this.view.elt.querySelector(
-				"[data-role='attribute'][data-attribute='photo']",
-			);
-			if (attribute) {
-				attribute.dataset.selected = "true";
-				const checkbox = attribute.querySelector("input[type='checkbox']");
-				if (checkbox) checkbox.checked = true;
-			}
-		}
-
 		if (typeof this.view.setSecondaryCardActive === "function") {
 			this.view.setSecondaryCardActive(this.component.elt, true);
 		} else {
@@ -147,16 +129,17 @@ export class PagePhoto extends BaseUpload {
 			this.component.elt.dataset.persistent = "true";
 		}
 
-		this._removePhotoPrompt();
+		this._hidePhotoPrompt();
 	}
 
 	/**
 	 * @testable false
 	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._markImageAvailable
-	 * @reason prompt teardown is a small part of page image availability reconciliation
+	 * @reason prompt visibility is a small part of page image availability reconciliation
 	 */
-	_removePhotoPrompt() {
-		this.view.elt.querySelector("[data-role='photo-prompt']")?.remove();
+	_hidePhotoPrompt() {
+		const prompt = this.view.elt.querySelector("[data-role='photo-prompt']");
+		if (prompt) prompt.dataset.visible = "false";
 	}
 
 	/**
@@ -168,13 +151,11 @@ export class PagePhoto extends BaseUpload {
 	async _updateImageLayout(mutate) {
 		if (typeof this.view.updateLayout === "function") {
 			await this.view.updateLayout({
-				attribute: "photo",
-				attributeActive: true,
 				secondary: this.component.elt,
 				secondaryActive: true,
 				mutate: () => () => {
 					mutate();
-					this._removePhotoPrompt();
+					this._hidePhotoPrompt();
 				},
 			});
 			return;
@@ -183,6 +164,47 @@ export class PagePhoto extends BaseUpload {
 		return await withTransition(() => {
 			mutate();
 			this._markImageAvailable();
+		});
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._removeImage
+	 * @reason image removal restores the compact prompt and collapses the empty photo card
+	 */
+	async _hideEmptyPhotoLayout(mutate) {
+		const activeTabId =
+			localStorage.getItem(`${this.view.hash}-active`) === "photo"
+				? "info"
+				: null;
+		const commit = () => {
+			mutate();
+			const prompt = this.view.elt.querySelector("[data-role='photo-prompt']");
+			if (prompt) prompt.dataset.visible = "true";
+			this.view.elt
+				.querySelectorAll("button[lp-show='photo:active']")
+				.forEach((toggle) => {
+					toggle.dataset.visible = "false";
+				});
+		};
+
+		if (typeof this.view.updateLayout === "function") {
+			await this.view.updateLayout({
+				secondary: this.component.elt,
+				secondaryActive: false,
+				activeTabId,
+				mutate: () => commit,
+			});
+			return;
+		}
+
+		await withTransition(() => {
+			commit();
+			this.view.elt.dataset.secondary = "false";
+			this.view.elt.classList.remove("max-w-7xl");
+			this.view.elt.classList.add("max-w-5xl");
+			this.component.elt.dataset.visible = "false";
+			this.component.elt.dataset.persistent = "false";
 		});
 	}
 
@@ -224,7 +246,7 @@ export class PagePhoto extends BaseUpload {
 		const response = await request.delete(this.endpoints.remove);
 		if (!this.view.successfulResponse(response, this.component)) return;
 
-		withTransition(() => {
+		await this._hideEmptyPhotoLayout(() => {
 			this._replaceDropzone(response.html);
 		});
 	}

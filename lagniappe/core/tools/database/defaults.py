@@ -28,7 +28,6 @@ DEFAULT_USER_PAGE = {
     "reserved": True,
     "type": "users",
     "created": datetime.now(timezone.utc),
-    "attributes": ["photo", "document", "tasks", "notes", "files"],
 }
 
 DEFAULT_USER_FORM = {

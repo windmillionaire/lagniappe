@@ -182,8 +182,8 @@ class User(AssetMixin, UserMixin, Entity):
     # @tests tests_unit/test_009a_user.py::test_user_create_public_user_assigns_public_group
     # @tests tests_unit/test_009f_user_ai_access.py::test_user_create_defaults_non_owner_to_none
     # @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
-    # @matrix public-users : create limited-attrs personal-page public-group public-user
-    # @matrix user : cache-invalidation create groups limited-attrs new-user-default owner page page-reassign personal-page public-adoption public-group public-user submitted-create-data
+    # @matrix public-users : create personal-page public-group public-user
+    # @matrix user : cache-invalidation create groups new-user-default owner page page-reassign personal-page public-adoption public-group public-user submitted-create-data
     @classmethod
     def create(cls, data, *, adopt_public=False):
         if not data.get("name"):

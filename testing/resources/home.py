@@ -42,12 +42,7 @@ from html.parser import HTMLParser
 
 from playwright.sync_api import expect
 
-from ..elements import (
-    List,
-    SpinnerButtons,
-    FormElements,
-    Attributes,
-)
+from ..elements import List, SpinnerButtons, FormElements
 
 from .site import SitePage
 
@@ -325,13 +320,6 @@ class HomePage(SitePage):
         create_form = self.create_project_form()
         create_form.locator(FormElements.NAME).fill(definition.name)
         create_form.locator(FormElements.DESCRIPTION).fill(definition.description)
-        if len(definition.attributes) < 2:
-            attributes = Attributes(create_form)
-            attributes.select(
-                defaults=["tasks", "document"],
-                selected=definition.attributes,
-            )
-
         with self.user.page.expect_response("**/create") as response_info:
             SpinnerButtons.CREATE.click(create_form)
 

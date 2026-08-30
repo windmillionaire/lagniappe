@@ -1,7 +1,7 @@
 """Unit tests for Page entity properties in page.py.
 
-Covers ``details``, ``Document`` (filter/cache/AI), ``Attributes`` (own vs model),
-``IsPublic``, page owner save relations, and ``Page.to_cache`` when the linked
+Covers ``details``, ``Document`` (filter/cache/AI), ``IsPublic``, page owner save
+relations, and ``Page.to_cache`` when the linked
 user is a public profile.
 
 Out of scope here: ``Description``; deep ``FormSubmission`` / field hydration
@@ -123,8 +123,6 @@ def test_page_document(get_test_entities):
     - ai_key is "page_document" for PAGE
     """
     for page in get_test_entities():
-        if "attributes" in page.test_spec:
-            page.db["attributes"] = page.test_spec["attributes"]
         document_text = page.text_for_cache("document")
 
         if document_text:
@@ -136,44 +134,6 @@ def test_page_document(get_test_entities):
             assert page.to_ai()["page_document"] == document_text
         else:
             assert page.to_filter_index()["has_document"] is False
-
-
-# @matrix page : attributes defaults inheritance
-@pytest.mark.unit
-def test_page_attributes(get_test_entities):
-    """Test Attributes property for Page entities.
-
-    Page attributes (from CategoryAttributes): tasks, document, photo, notes, files.
-    Pages can either have their own attributes or inherit from their model (category).
-    entity.has(attr) returns True if attr is in db["attributes"] or if no attributes defined.
-    """
-    all_attrs = ["tasks", "document", "photo", "notes", "files"]
-
-    for page in get_test_entities():
-        if "attributes" in page.test_spec:
-            # Page has its own attributes (overrides model if present)
-            for attr in all_attrs:
-                assert page.has(attr) == (attr in page.db["attributes"])
-
-            # Verify override: if model has different attrs, page's take precedence
-            if page.model and "attributes" in page.model.test_spec:
-                model_attrs = page.model.test_spec["attributes"]
-                page_attrs = page.test_spec["attributes"]
-                for attr in all_attrs:
-                    if attr in page_attrs and attr not in model_attrs:
-                        assert page.has(attr) is True
-                    if attr in model_attrs and attr not in page_attrs:
-                        assert page.has(attr) is False
-
-        elif page.model and "attributes" in page.model.test_spec:
-            # Page inherits attributes from model (category)
-            for attr in all_attrs:
-                assert page.has(attr) == (attr in page.model.db["attributes"])
-
-        else:
-            # No attributes defined - all enabled by default
-            for attr in all_attrs:
-                assert page.has(attr) is True
 
 
 # @matrix page : filter-value public
@@ -266,8 +226,6 @@ def test_page_to_cache_public_user(get_test_entities):
             assert page.to_cache == {}
         else:
             page.name = page.test_spec.get("name")
-            if "attributes" in page.test_spec:
-                page.db["attributes"] = page.test_spec["attributes"]
             text = page.text_for_cache("document")
             if text:
                 assert page.to_cache.get("doc") == text

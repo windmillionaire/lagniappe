@@ -134,4 +134,3 @@ def test_category_mobile_tools_dropdown_opens_new_page_form(get_user):
 
     create_page = user.locate(Category.CREATE_PAGE_WIDGET)
     expect(create_page).to_be_visible()
-    expect(create_page.locator("[data-role='attributes']")).to_be_visible()

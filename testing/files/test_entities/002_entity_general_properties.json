@@ -281,7 +281,7 @@
 		"entities": [
 			["PROJECT", { "name": "Simple Project" }],
 			["PROJECT", { "name": "The Great Project" }],
-			["PROJECT", { "name": "No Features", "attributes": [] }],
+			["PROJECT", { "name": "No Features" }],
 			["PAGE", { "name": "Page Name" }],
 			["TASK", { "name": "Task Name" }],
 			["CATEGORY", { "name": "Category Name" }],

@@ -147,6 +147,55 @@ def test_restrictions(get_permissions_test_data):
                 )
 
 
+# @matrix permissions restrictions : search
+@pytest.mark.unit
+def test_restrictions_only_project_permissions_that_imply_view():
+    user = TestEntities.get(
+        "USER",
+        {
+            "name": "Explicit Denial User",
+            "hash": "explicit-denial-user",
+            "page": {"name": "Own Page", "hash": "own-page"},
+            "permissions": {
+                "forms": "NONE",
+                "cat-denied": "RESTRICTED",
+                "own-page": "EDIT",
+                "page-view": "VIEW",
+                "page-edit": "EDIT",
+                "public": "TRUE",
+            },
+        },
+    )
+
+    with MockRestrictions().patch_cache():
+        restrictions = user.properties.restrictions
+        expected = ["own-page", "page-edit", "page-view"]
+
+        assert restrictions.value == expected
+        assert restrictions.search == expected
+        assert restrictions.form == expected
+
+
+# @pair restrictions:search
+@pytest.mark.unit
+def test_administrator_search_membership_uses_owner_capability():
+    administrator = TestEntities.get(
+        "USER",
+        {
+            "name": "Additional Administrator",
+            "hash": "additional-administrator",
+            "page": {"name": "Administrator Page", "hash": "admin-page"},
+        },
+    )
+    administrator.is_admin = True
+
+    with MockRestrictions().patch_cache():
+        restrictions = administrator.properties.restrictions
+
+        assert restrictions.search is Restriction.UNRESTRICTED
+        assert restrictions.belongs_to == ["owner"]
+
+
 # @matrix permissions restrictions : empty-access session-blob stale-session
 # @pair messaging:compose-eligibility
 @pytest.mark.unit

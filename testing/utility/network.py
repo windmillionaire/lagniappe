@@ -11,6 +11,60 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 
+# @testable false
+# @reason Reusable E2E request protocol; consuming tests assert product outcomes.
+def browser_fetch(
+    user: Any,
+    path: str,
+    method: str = "POST",
+    data: Any = None,
+) -> dict[str, Any]:
+    """Issue a same-origin request from the user's page and return its status/body."""
+
+    return user.page.evaluate(
+        """async ({ path, method, data }) => {
+            const csrfMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+            const bodyMethods = new Set(["POST", "PUT", "PATCH"]);
+            const formBody = () => {
+                const body = new FormData();
+                for (const [key, value] of Object.entries(data || {})) {
+                    const values = Array.isArray(value) ? value : [value];
+                    values.forEach((item) => body.append(key, item));
+                }
+                return body;
+            };
+            const send = async () => {
+                const headers = { "X-Lagniappe-Request": "true" };
+                if (csrfMethods.has(method)) {
+                    headers["X-CSRFToken"] =
+                        document.getElementById("token")?.value || "";
+                }
+                return fetch(path, {
+                    method,
+                    credentials: "include",
+                    headers,
+                    body: bodyMethods.has(method) ? formBody() : undefined,
+                });
+            };
+
+            let response = await send();
+            if (response.status === 400 && csrfMethods.has(method)) {
+                const tokenResponse = await fetch("/l/token");
+                const token = await tokenResponse.text();
+                const tokenElt = document.getElementById("token");
+                if (tokenElt) tokenElt.value = token;
+                response = await send();
+            }
+
+            const text = await response.text();
+            let parsed = text;
+            try { parsed = JSON.parse(text); } catch {}
+            return {status: response.status, text: text.slice(0, 240), data: parsed};
+        }""",
+        {"path": path, "method": method, "data": data or {}},
+    )
+
+
 # @testable true
 # @tests tests_tooling/test_004_network_waits.py::test_lagniappe_error_response_contract
 # @matrix e2e : error-contract manual-http side-effect-free

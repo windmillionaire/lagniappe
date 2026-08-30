@@ -1,4 +1,5 @@
 from dataclasses import replace
+import re
 from uuid import uuid4
 
 from playwright.sync_api import expect
@@ -8,6 +9,8 @@ from testing.definitions import Categories, Forms, Pages, Users
 from testing.resources import Page
 from testing.elements import FormElements, FormSelect, SpinnerButtons, Table, Tools
 from testing.elements.filters import CategoryFilterConditions, Filters
+from testing.utility.polling import expect_poll_result
+from testing.utility.reconnect import expect_reconnect_refresh
 
 pytestmark = pytest.mark.e2e
 
@@ -343,7 +346,9 @@ def test_category_filter_by_attached_form_select_condition(get_user):
 
 
 # @matrix filters : reload-persistence save saved-filters
-def test_category_saved_filter_save_and_run(get_user):
+# @pairs polling:category-index reconnect-refresh:category-index
+# @template categories/index.html::view
+def test_category_saved_filter_save_and_run(get_user, browser_failures):
     user = get_user(Users.OWNER)
     category, matching_page, excluded_page, _, _ = _category_filter_context(user)
     user.go(category)
@@ -370,6 +375,12 @@ def test_category_saved_filter_save_and_run(get_user):
         reloaded_filter.locator("a[href*='/filters/']").click()
     user.page.wait_for_selector("[lp-view][initialized]")
 
+    root = user.locate("[lp-view]")
+    expect(root).to_have_attribute("data-key", filter_key)
+    expect(root).to_have_attribute("data-poll-channel", "categories")
+    expect(root).to_have_attribute("data-fingerprint", re.compile(r".+"))
+    expect(root).to_have_attribute("data-poll-revision", re.compile(r".+"))
+
     table = user.locate("#table")
     expect(
         table.locator("tr").filter(has_text=matching_page.definition.name)
@@ -377,3 +388,25 @@ def test_category_saved_filter_save_and_run(get_user):
     expect(
         table.locator("tr").filter(has_text=excluded_page.definition.name)
     ).not_to_be_visible()
+
+    refreshed_page = Page(
+        user=user,
+        definition=replace(
+            matching_page.definition,
+            name=f"Urgent Filter Reconnect Page {uuid4().hex}",
+        ),
+    )
+    refreshed_row = table.locator("tr").filter(
+        has_text=refreshed_page.definition.name
+    )
+    expect(refreshed_row).not_to_be_attached()
+
+    with expect_poll_result(
+        user.page,
+        subscription_id="view:channel:categories",
+    ):
+        with expect_reconnect_refresh(user, browser_failures):
+            refreshed_page.create()
+            user.offline = False
+
+    expect(refreshed_row).to_be_visible()

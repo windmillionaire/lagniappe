@@ -3,7 +3,7 @@
 {% import 'badge.html' as badges %}
 {% import 'menus.html' as menus %}
 
-{% macro task_tab(page, active=True) %}
+{% macro task_tab(page) %}
   <div id="tasks"
        lp-component
        data-title="Tasks"
@@ -11,8 +11,6 @@
        data-tab="true"
        data-visible="false"
        data-kind="task"
-       data-attribute="tasks"
-       data-has-attribute="{{ active|yesno }}"
        data-parent-nav="tabs">
     {% if page.allowed(Action.EDIT) %}
       <form lp-create
@@ -300,7 +298,7 @@
   {% set form_preload = task.properties.form.column_value if task and task.form else none %}
   <div class="flex flex-row flex-wrap gap-2 w-full empty:hidden {{ styles.task.actionIconContext }}"
        data-role="action-buttons">
-    {% if Resource.PROJECTS.allowed(Action.RESTRICTED) %}
+    {% if not current_user.is_public and Resource.PROJECTS.allowed(Action.RESTRICTED) %}
       <button type="button"
               lp-select
               data-kind="project"

@@ -20,10 +20,16 @@ WRITE_EFFECTS = {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_hash_before_requires
 # @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_and_persists_user_before_owned_page
+# @tests tests_unit/test_002_entity_general_properties.py::test_save_preparation_discards_retired_entity_fields
 # @matrix requires : hash-before-requires persisted-requires
+# @matrix entity mutations : retired-field save-time-cleanup
 # @pairs entities:save-order users:user-before-page
 def _prepare_write(effect):
     entity = effect.entity
+    if effect.property_mask is None:
+        for name in getattr(entity, "retired_fields", ()):
+            entity.db.pop(name, None)
+
     for name in effect.property_updates:
         if name in entity.properties:
             entity.properties[name].update()

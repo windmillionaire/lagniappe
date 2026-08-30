@@ -6,13 +6,6 @@
 {% from 'projects/document.html' import document_tab %}
 {% from 'projects/info.html' import info_tab %}
 {% from 'projects/model_tasks.html' import create_model_task, model_task_list %}
-{% set can_edit_project = project.allowed(Action.EDIT) %}
-{% set has_tasks = project.has('tasks') %}
-{% set has_document = project.has('document') %}
-{% set has_document_content = 'document' in project.assets %}
-{% set render_tasks = has_tasks or can_edit_project %}
-{% set render_document = has_document_content or can_edit_project %}
-
 {% macro view_header(project) %}
   <nav class="{{ styles.layout.view.title }}" data-nav="view">
     <div>
@@ -32,20 +25,14 @@
        data-standalone="true"
        data-persistent="true"
        data-nav="{{ nav }}">
-    {% if render_tasks and models %}
+    {% if models %}
       <button lp-show="model-tasks:ModelTaskList"
               data-kind="model-task"
-              data-attribute="tasks"
-              data-has-attribute="{{ has_tasks|yesno }}"
               class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("model") }}</button>
     {% endif %}
-    {% if render_document %}
-      <button lp-show="document:active"
-              data-kind="project"
-              data-attribute="document"
-              data-has-attribute="{{ has_document|yesno }}"
-              class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
-    {% endif %}
+    <button lp-show="document:active"
+            data-kind="project"
+            class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
     <button lp-show="info:active"
             data-kind="project"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("info") }}</button>
@@ -62,33 +49,28 @@
        data-nav="mobile">
     <div class="{{ styles.layout.nav.title }}" data-role="header">
       <span class="text-kind-dark" data-kind="default" data-role="title"></span>
-      {% if project.allowed(Action.EDIT) and render_tasks %}
+      {% if project.allowed(Action.EDIT) %}
         <button lp-show="model-tasks:CreateModelTask"
                 data-kind="model-task"
-                data-attribute="tasks"
-                data-has-attribute="{{ has_tasks|yesno }}"
                 class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
       {% endif %}
     </div>
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
       <button data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
-      {{ toggles('mobile', render_tasks) }}
+      {{ toggles('mobile', true) }}
     </div>
     {{ controls.page_controls() }}
   </div>
 {% endmacro %}
 
-{% macro model_tasks(project, active=True) %}
+{% macro model_tasks(project) %}
   <div id="model-tasks"
        lp-component
        data-title="Model Tasks"
-       data-visible="{{ active|yesno }}"
+       data-visible="true"
        data-tab="true"
        data-default="ModelTaskList"
        data-kind="model-task"
-       data-attribute="tasks"
-       data-has-attribute="{{ active|yesno }}"
-       data-secondary-attribute="true"
        class="{{ styles.card.secondary }}">
     <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="model-tasks">
       <div data-role="header" class="{{ styles.layout.nav.header }}">
@@ -98,8 +80,6 @@
       <nav class="{{ styles.layout.nav.card }}">
         {% if project.allowed(Action.EDIT) %}
           <button lp-show="model-tasks:CreateModelTask"
-                  data-attribute="tasks"
-                  data-has-attribute="{{ active|yesno }}"
                   class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
         {% endif %}
       </nav>
@@ -116,8 +96,8 @@
        data-fingerprint="{{ project.fingerprint }}"
        data-hash="{{ project.hash }}"
        data-kind="project"
-       data-secondary="{{ has_tasks|yesno }}"
-       class="group/view {{ 'max-w-5xl mx-auto' if not has_tasks else 'max-w-7xl mx-auto' }}"
+       data-secondary="true"
+       class="group/view max-w-7xl mx-auto"
        data-readonly="{{ project.readonly|yesno }}">
     <div class="{{ styles.layout.view.header }}">
       {{ view_header(project) }}
@@ -130,7 +110,7 @@
     </div>
     {{ mobile_nav() }}
     <div id="layout" class="{{ styles.entity.cards }} sm:mt-4">
-      {% if render_tasks %}{{ model_tasks(project, has_tasks) }}{% endif %}
+      {{ model_tasks(project) }}
       <div id="tabs"
            lp-component
            data-visible="false"
@@ -143,7 +123,7 @@
           {{ toggles('tabs') }}
         </div>
         {{ info_tab(project) }}
-        {% if render_document %}{{ document_tab(project, has_document) }}{% endif %}
+        {{ document_tab(project) }}
         {{ task_filters(project) }}
       </div>
     </div>

@@ -27,7 +27,7 @@ def key(identifier):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @matrix admin : metadata public-preview
 def image():
     """Fetch the stored site image metadata entity."""
@@ -35,7 +35,7 @@ def image():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
 # @matrix admin : deployment-settings metadata
 def deployment():
     """Fetch the stored deployment settings metadata entity."""
@@ -43,7 +43,7 @@ def deployment():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_ai_form_saves_current_models_through_route
 # @matrix admin : ai-settings metadata
 def ai():
     """Fetch the stored AI model settings metadata entity."""
@@ -59,7 +59,7 @@ def public_pages():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @tests tests_unit/test_018_database_assets.py::test_save_site_image_persists_version_without_mutating_input
 # @matrix admin : metadata site-image-upload
 def save_image(data):

@@ -6,7 +6,7 @@ import { SiteSetting } from "./base";
 /**
  * @testable true
  * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_initializes_ai_selects_before_syncing_saved_values
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_ai_form_saves_current_models_through_route
  * @matrix admin : ai-settings model-options model-selection saved-values
  */
 export class SiteAiModels extends SiteSetting {
@@ -140,7 +140,7 @@ export class SiteAiModels extends SiteSetting {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_ai_submission_uses_visible_combobox_values
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
+	 * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_ai_form_saves_current_models_through_route
 	 * @matrix admin : ai-settings model-selection submission
 	 */
 	_aiSettingsFormData() {

@@ -12,13 +12,6 @@ from .file_consumers import (
 )
 from .ordering import Ordering
 from .filters import FieldType, Comparator, FilterOptions, FilterDefinition
-from .attributes import (
-    Attribute,
-    EntityAttributes,
-    ProjectAttributes,
-    CategoryAttributes,
-    PageAttributes,
-)
 from .facets import SearchFacets
 from .ingress import (
     CONFIGURATION_STAGES,

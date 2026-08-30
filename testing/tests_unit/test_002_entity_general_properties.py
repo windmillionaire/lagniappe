@@ -265,6 +265,27 @@ def test_save_entities_updates_hash_before_requires():
     assert list(database_save.call_args.args[0]) == [(entity, None)]
 
 
+# @matrix mutations entity : retired-field save-time-cleanup
+def test_save_preparation_discards_retired_entity_fields():
+    for entity_type in ("PAGE", "PROJECT", "CATEGORY"):
+        entity = TestEntities.get(
+            entity_type,
+            {"name": "Retired field", "hash": f"retired-{entity_type.lower()}"},
+        )
+        entity.db["attributes"] = ["document"]
+        effect = SimpleNamespace(
+            entity=entity,
+            property_mask=None,
+            property_updates=(),
+            serialize_processes=False,
+        )
+
+        mutation_executor._prepare_write(effect)
+
+        assert entity.db["name"] == "Retired field"
+        assert "attributes" not in entity.db
+
+
 # @pairs requires:persisted-requires users:user-before-page
 def test_save_entities_updates_and_persists_user_before_owned_page():
     class EntityDict(dict):

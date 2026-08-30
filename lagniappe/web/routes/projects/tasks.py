@@ -197,6 +197,6 @@ def status(key, task_key, **kwargs):
         limit=None,
     )
     cached = Entities.fetch(*db.results, request=Fetch.direct())
-    filter.route = request.path
+    filter.route = request.full_path.removesuffix("?")
 
     return responses.filtered_task_index(sort_tasks(cached), filter)

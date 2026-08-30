@@ -111,6 +111,7 @@ class Entity:
     _key = None
     _db = None
     _state = None
+    retired_fields = frozenset()
 
     def __init__(self, *args, **kwargs):
         if not getattr(type(self), "entity_kind", None):
@@ -195,16 +196,6 @@ class Entity:
             f"Column {field_id!r} not found on {self.entity_kind}",
             entity=self,
         )
-
-    def has(self, attribute_name):
-        """Check if a toggleable attribute is enabled (True if entity has no attributes)."""
-        if not self.properties.get("attributes"):
-            return True  # Entity doesn't have attributes - all features enabled
-        elif attribute_name in self.db.get("attributes", []):
-            return True
-
-        active = [a.name for a in self.attributes if a.active]
-        return attribute_name in active
 
     @property
     def relations(self):

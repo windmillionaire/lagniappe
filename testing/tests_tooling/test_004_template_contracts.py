@@ -553,23 +553,7 @@ def test_template_contract_counts_common_helper_evidence(tmp_path):
   </li>
 {% endmacro %}
 
-{% macro info() %}
-  <form lp-update data-widget="ThingInfo">
-    <div data-role="attributes">
-      <label data-role="attribute"
-             data-attribute="{{ attr }}"
-             data-selected="{{ selected }}">
-        <div data-role="add"></div>
-        <div data-role="remove"></div>
-      </label>
-    </div>
-  </form>
-{% endmacro %}
 """,
-    )
-    write_file(
-        tmp_path / "src/script/widgets/thing.mjs",
-        "export class ThingInfo {}\n",
     )
     write_file(
         tmp_path / "src/script/views/base/core.mjs",
@@ -585,14 +569,9 @@ export default class Core {
         tmp_path / "testing/tests_e2e/test_thing.py",
         """
 # @template things.html::item
-# @template things.html::info
-def test_common_helpers(project_list, info_form):
+def test_common_helpers(project_list):
     item = project_list.new_ai_generated_item()
     Link(item).click()
-    attributes = Attributes(info_form)
-    attributes.select(defaults=["tasks"], selected=[])
-    attributes.expect_selected("tasks", False)
-    attributes.set_selected("tasks", True)
 """,
     )
 
@@ -600,10 +579,6 @@ def test_common_helpers(project_list, info_form):
     item_group = next(
         group for group in report.groups if group.template_ref == "things.html::item"
     )
-    info_group = next(
-        group for group in report.groups if group.template_ref == "things.html::info"
-    )
-
     assert item_group.touched_by_attribute["lp-entity"] == [
         "tests_e2e/test_thing.py::test_common_helpers via List.new_ai_generated_item"
     ]
@@ -613,33 +588,6 @@ def test_common_helpers(project_list, info_form):
     assert item_group.touched_by_attribute["data-role=title"] == [
         "tests_e2e/test_thing.py::test_common_helpers via Link.click"
     ]
-    assert info_group.touched_by_attribute["data-role=attributes"] == [
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.select",
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.set_selected",
-    ]
-    assert info_group.touched_by_attribute["data-role=attribute"] == [
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.select",
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.expect_selected",
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.set_selected",
-    ]
-    assert info_group.touched_by_attribute["data-attribute={{ attr }}"] == [
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.select",
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.expect_selected",
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.set_selected",
-    ]
-    assert info_group.touched_by_attribute["data-role=remove"] == [
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.select",
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.set_selected",
-    ]
-    assert info_group.touched_by_attribute["data-selected={{ selected }}"] == [
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.expect_selected",
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.set_selected",
-    ]
-    assert info_group.touched_by_attribute["data-role=add"] == [
-        "tests_e2e/test_thing.py::test_common_helpers via Attributes.set_selected"
-    ]
-
-
 def test_template_contract_counts_resource_property_evidence(tmp_path):
     write_file(
         tmp_path / "lagniappe/web/templates/projects/info.html",

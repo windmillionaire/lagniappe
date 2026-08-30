@@ -69,7 +69,7 @@
   </ul>
 {% endmacro %}
 
-{% macro files_tab(page, active=True) %}
+{% macro files_tab(page) %}
   <div id="files"
        lp-component
        data-title="Files"
@@ -77,8 +77,6 @@
        data-tab="true"
        data-visible="false"
        data-kind="file"
-       data-attribute="files"
-       data-has-attribute="{{ active|yesno }}"
        data-parent-nav="tabs">
     {% if page.allowed(Action.EDIT) and not current_user.is_public %}{{ files_form(page) }}{% endif %}
     {{ file_list(page) }}

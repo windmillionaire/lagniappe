@@ -1,7 +1,7 @@
 """Unit tests for Category entity properties wired in category entity and category.py.
 
-Covers ``Attributes``, ``CategoryFilters`` (conditions, entity-valued form conditions,
-page ``to_filter_index``), ``Category.schema`` (delegates to ``form.schema``), and
+Covers ``CategoryFilters`` (conditions, entity-valued form conditions, page
+``to_filter_index``), ``Category.schema`` (delegates to ``form.schema``), and
 ``RelatedForms.add``.
 
 Out of scope here: ``PageIndex.pages`` (database + ``url_for``),
@@ -19,28 +19,6 @@ from lagniappe.core.definitions import Action, MutationIntentType
 from lagniappe.core.entities.category import Category, UNCATEGORIZED_PAGES_NAME
 from lagniappe.core.entities import category as category_module
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
-
-
-# @matrix category : attributes defaults
-@pytest.mark.unit
-def test_category_attributes(get_test_entities):
-    """Test Attributes property for Category entities.
-
-    CategoryAttributes includes: tasks, document, photo, notes, files.
-    entity.has(attr) returns True if attr is in db["attributes"] or if no attributes defined.
-    """
-    all_attrs = ["tasks", "document", "photo", "notes", "files"]
-
-    for category in get_test_entities():
-        if "attributes" in category.test_spec:
-            category.db["attributes"] = category.test_spec["attributes"]
-
-            for attr in all_attrs:
-                assert category.has(attr) == (attr in category.db["attributes"])
-        else:
-            # default: all attributes enabled
-            for attr in all_attrs:
-                assert category.has(attr) is True
 
 
 # @matrix category filters page : conditions entity-fields filter-value

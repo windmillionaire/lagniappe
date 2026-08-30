@@ -1,4 +1,4 @@
-{% macro document_tab(project, active=True) %}
+{% macro document_tab(project) %}
   <div lp-component
        id="document"
        data-title="Document"
@@ -7,8 +7,6 @@
        data-visible="false"
        data-tab="true"
        data-open="false"
-       data-attribute="document"
-       data-has-attribute="{{ active|yesno }}"
        data-parent-nav="tabs">
     <div data-widget="CollaborativeDocument"
          lp-sync="{{ project.sync_ids.document.id }}"

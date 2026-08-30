@@ -414,7 +414,7 @@ def _append_version_note(version: str, message: str) -> Path:
 def _current_version() -> str:
     from config import SETTINGS
 
-    return str(SETTINGS.APP.get("VERSION") or SETTINGS.NODE.get("version"))
+    return str(SETTINGS.NODE.get("version") or SETTINGS.APP.get("VERSION"))
 
 
 def _update_reporting_privacy_version(version: str) -> tuple[Path, ...]:

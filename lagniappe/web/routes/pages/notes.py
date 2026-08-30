@@ -1,4 +1,4 @@
-from flask import abort, request
+from flask import request
 from flask_login import current_user
 
 from lagniappe.core.definitions import Action, Fetch, Resource
@@ -13,20 +13,11 @@ from . import pages
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_notes_visibility_and_title_menu
-# @matrix notes pages : attribute-gate
-def _notes_enabled(page):
-    if not page.has("notes"):
-        abort(404)
-
-
-# @testable true
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_notes_visibility_and_title_menu
 # @matrix notes pages permissions : load owner private shared viewer
 @pages.route("<key>/notes", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def get_notes(key, **kwargs):
     page = kwargs["entity"]
-    _notes_enabled(page)
 
     loaded = Entities.fetch(
         *database_get.page_notes(page),
@@ -49,7 +40,6 @@ def get_notes(key, **kwargs):
 @permission(Resource.PAGE, Action.EDIT)
 def create_note(key, **kwargs):
     page = kwargs["entity"]
-    _notes_enabled(page)
 
     body = (request.form.get("body") or "").strip()
     photo = request.files.get("note-file")

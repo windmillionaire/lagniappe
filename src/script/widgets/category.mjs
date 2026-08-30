@@ -91,12 +91,7 @@ export class CategoryInfo extends CategoryForm {
 	}
 
 	get html() {
-		return [
-			this.nameElement,
-			this.descriptionElement,
-			this.formSelectElement,
-			sections.attributes(this),
-		];
+		return [this.nameElement, this.descriptionElement, this.formSelectElement];
 	}
 
 	postreconcile() {
@@ -146,7 +141,6 @@ export class CreateCategory extends CategoryForm {
 			name,
 			description,
 			this.formSelectElement,
-			sections.attributes(this),
 		];
 	}
 }

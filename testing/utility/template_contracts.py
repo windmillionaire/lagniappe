@@ -1442,7 +1442,7 @@ def collect_test_selector_evidence(
                 if value
                 else None
             )
-            if name in {"Attributes", "Link", "List"}:
+            if name in {"Link", "List"}:
                 targets = child.targets if isinstance(child, ast.Assign) else [child.target]
                 for target in targets:
                     if isinstance(target, ast.Name):
@@ -1491,34 +1491,6 @@ def collect_test_selector_evidence(
             owner = helper_name(child.func.value)
             if owner == "Link" and child.func.attr == "click":
                 selectors.append(("Link.click", "a[data-role='title']"))
-            elif owner == "Attributes" and child.func.attr == "select":
-                selectors.extend(
-                    [
-                        ("Attributes.select", "[data-role='attributes']"),
-                        ("Attributes.select", "[data-role='attribute']"),
-                        ("Attributes.select", "[data-attribute]"),
-                        ("Attributes.select", "[data-role='remove']"),
-                    ]
-                )
-            elif owner == "Attributes" and child.func.attr == "set_selected":
-                selectors.extend(
-                    [
-                        ("Attributes.set_selected", "[data-role='attributes']"),
-                        ("Attributes.set_selected", "[data-role='attribute']"),
-                        ("Attributes.set_selected", "[data-attribute]"),
-                        ("Attributes.set_selected", "[data-selected]"),
-                        ("Attributes.set_selected", "[data-role='add']"),
-                        ("Attributes.set_selected", "[data-role='remove']"),
-                    ]
-                )
-            elif owner == "Attributes" and child.func.attr == "expect_selected":
-                selectors.extend(
-                    [
-                        ("Attributes.expect_selected", "[data-role='attribute']"),
-                        ("Attributes.expect_selected", "[data-attribute]"),
-                        ("Attributes.expect_selected", "[data-selected]"),
-                    ]
-                )
             elif child.func.attr in {"new_item", "new_ai_generated_item", "get_item"}:
                 selectors.append(
                     (f"List.{child.func.attr}", "li[lp-entity][data-key]")

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -6,28 +6,11 @@ class ProjectDefinition:
     name: str = ""
     description: str = ""
     description_for_ai: str = ""
-    attributes: list = field(default_factory=lambda: ["tasks", "document"])
-
-    @property
-    def defaults(self):
-        return ["tasks", "document"]
 
 
 create_project = ProjectDefinition(
     name="Test Project",
     description="A standard test project created from home page.",
-)
-
-without_tasks = ProjectDefinition(
-    name="Test Project Without Tasks",
-    description="A test project created from home page without tasks.",
-    attributes=["document"],
-)
-
-without_document = ProjectDefinition(
-    name="Test Project Without Documents",
-    description="A test project created from home page without documents.",
-    attributes=["tasks"],
 )
 
 delete_project = ProjectDefinition(
@@ -93,6 +76,11 @@ editor_plain_html_paste = ProjectDefinition(
 editor_common_markdown_paste = ProjectDefinition(
     name="Editor Common Markdown Paste Project",
     description="Project used for testing common markdown paste in the editor.",
+)
+
+editor_markdown_source_paste = ProjectDefinition(
+    name="Editor Markdown Source Paste Project",
+    description="Project used for testing retained markdown source in the editor.",
 )
 
 editor_task_list = ProjectDefinition(

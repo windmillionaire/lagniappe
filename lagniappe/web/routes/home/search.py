@@ -85,7 +85,7 @@ def _index_result(entity):
 # @testable true
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_category_search_permission_filter_returns_editable_categories
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
 # @matrix permissions : assign category-edit
 # @pairs admin:owner-only search:permission-filter
 def _search_restrictions(kind):
@@ -114,7 +114,7 @@ def _search_restrictions(kind):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
 # @matrix admin : managed-user-search privileged-account
 def _administrator_results(results):
     """Keep the role selector limited to ordinary managed-user pages."""
@@ -173,7 +173,7 @@ def _quick_create_entity(kind, form):
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_model_task_form_selector_quick_creates_form
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_home_create_category_form_selector_quick_creates_form
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_info_category_multiselect_quick_creates_category
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
 # @matrix quick-create : created-option form-type
 # @pairs admin:managed-user-search categories:index-filter facets:command-row search:search-results
 @internal.route("/search-index/<kind>")

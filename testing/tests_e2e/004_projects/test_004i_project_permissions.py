@@ -64,7 +64,6 @@ def test_project_viewer_reads_project_without_editing_controls(get_user):
     expect(description_field).to_contain_text(project.definition.description)
     expect(info_form.locator(FormElements.NAME)).not_to_be_attached()
     expect(info_form.locator(FormElements.DESCRIPTION)).not_to_be_attached()
-    expect(info_form.locator("[data-role='attributes']")).not_to_be_attached()
     expect(info_form.locator(SpinnerButtons.UPDATE.value)).not_to_be_attached()
 
     model_info = model_task.open_info()
@@ -93,7 +92,7 @@ def test_project_viewer_reads_project_without_editing_controls(get_user):
 
 # @matrix projects : document-tab readonly
 # @template projects/project.html::main
-def test_project_viewer_sees_document_tab_only_when_content_exists(get_user):
+def test_project_viewer_can_read_document_content(get_user):
     owner = get_user(Users.OWNER)
     empty_project = Projects.test_readonly_document_visibility.get(owner)
     content_project = Projects.test_readonly_document_content.get(owner)
@@ -101,8 +100,8 @@ def test_project_viewer_sees_document_tab_only_when_content_exists(get_user):
     viewer = get_user(Users.general_models_view_only)
     viewer.go(empty_project)
 
-    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).not_to_be_attached()
-    expect(viewer.locate(Tabs.DOCUMENT_TAB)).not_to_be_attached()
+    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).to_be_visible()
+    expect(viewer.locate(Tabs.DOCUMENT_TAB)).to_be_attached()
 
     marker = "Readonly project document content marker"
     if marker not in (content_project.entity.properties.document.html or ""):

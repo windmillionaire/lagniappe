@@ -93,7 +93,6 @@ def _create_task_target_pages(user):
                 "name": name,
                 "description": f"Target page for {name}",
                 "model": category.entity,
-                "attributes": ["tasks"],
             }
         )
         page.save()

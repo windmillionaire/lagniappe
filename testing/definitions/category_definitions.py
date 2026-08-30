@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .forms import Forms
 from typing import Optional
@@ -9,19 +9,6 @@ class CategoryDefinition:
     name: str = ""
     form: Optional[Forms] = None
     description_for_ai: str = ""
-    attributes: list = field(
-        default_factory=lambda: [
-            "tasks",
-            "document",
-            "notes",
-            "files",
-            "photo",
-        ]
-    )
-
-    @property
-    def defaults(self):
-        return ["tasks", "document", "notes", "files", "photo"]
 
 
 create_category = CategoryDefinition(

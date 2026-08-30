@@ -252,13 +252,14 @@ const refreshToken = async () => {
 const postRequest = async (
 	url,
 	body,
-	{ keepalive = false, headers = {} } = {},
+	{ keepalive = false, headers = {}, signal = undefined } = {},
 ) => {
 	return _request(url, {
 		method: "POST",
 		body,
 		keepalive,
 		requestHeaders: headers,
+		signal,
 	});
 };
 

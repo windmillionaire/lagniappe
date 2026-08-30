@@ -97,3 +97,81 @@ def test_editor_menu_item_serializes_current_active_state(run_node):
             """
         )
     )
+
+
+# @matrix editor : inline-code toggle
+def test_editor_inline_code_menu_item_toggles_from_local_active_state(run_node):
+    run_node(
+        textwrap.dedent(
+            r"""
+            import assert from "node:assert/strict";
+            import { readFileSync } from "node:fs";
+            import vm from "node:vm";
+
+            const context = {
+              document: {
+                createElement: () => ({ dataset: {} }),
+              },
+              setIcon() {},
+              STYLES: {
+                dropdown: {
+                  icon: "",
+                  option: { action: "" },
+                },
+              },
+            };
+            vm.createContext(context);
+
+            let source = readFileSync(
+              "src/script/elements/editor/options/menuItems.mjs",
+              "utf8",
+            );
+            source = source
+              .replace(/^import .*;\n/gm, "")
+              .replace(
+                /export \{[\s\S]*?\};\s*$/,
+                "globalThis.ToolbarMenuItem = ToolbarMenuItem;",
+              );
+            vm.runInContext(source, context);
+
+            const calls = [];
+            const chain = {
+              focus() {
+                calls.push("focus");
+                return this;
+              },
+              toggleCode() {
+                calls.push("toggleCode");
+                return this;
+              },
+              unsetCode() {
+                calls.push("unsetCode");
+                return this;
+              },
+              run() {
+                calls.push("run");
+                return true;
+              },
+            };
+            const toolbar = {
+              editor: {
+                chain: () => chain,
+              },
+            };
+            const item = new context.ToolbarMenuItem(toolbar);
+            item.command = "toggleCode";
+            item.name = "code";
+
+            item._onClick(item.button);
+            assert.deepEqual(calls, ["focus", "toggleCode", "run"]);
+            assert.equal(item.active, true);
+            assert.equal(item.button.dataset.active, "true");
+
+            calls.length = 0;
+            item._onClick(item.button);
+            assert.deepEqual(calls, ["focus", "unsetCode", "run"]);
+            assert.equal(item.active, false);
+            assert.equal(item.button.dataset.active, "false");
+            """
+        )
+    )

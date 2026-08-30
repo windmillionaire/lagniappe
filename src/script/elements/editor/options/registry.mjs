@@ -12,6 +12,7 @@ export const OPTION_REGISTRY = {
 	setColor: () => import("./menuItems"),
 	toggleUnderline: () => import("./menuItems"),
 	toggleStrike: () => import("./menuItems"),
+	toggleCode: () => import("./menuItems"),
 	toggleSuperscript: () => import("./menuItems"),
 	toggleSubscript: () => import("./menuItems"),
 	clearFormat: () => import("./menuItems"),

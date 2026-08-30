@@ -10,14 +10,17 @@ import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { Typography } from "@tiptap/extension-typography";
 import { Youtube } from "@tiptap/extension-youtube";
 import { StarterKit } from "@tiptap/starter-kit";
+import { STYLES } from "styles";
 import {
 	CustomImage,
 	CustomLink,
 	EditorPaste,
 	FlashRemoteChanges,
 	LagniappeMention,
+	MarkdownSource,
 	SelectionHighlight,
 	TabCharacter,
+	TrackedRanges,
 } from "./extensions";
 
 /**
@@ -99,7 +102,11 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 			},
 		}),
 		FlashRemoteChanges,
+		TrackedRanges,
 		SelectionHighlight,
+		MarkdownSource.configure({
+			HTMLAttributes: { class: STYLES.editor.markdownSource },
+		}),
 		EditorPaste,
 		TabCharacter,
 		LagniappeMention,
@@ -162,7 +169,11 @@ export const independentEditor = (target) => {
 		FontFamily.configure({
 			types: ["textStyle"],
 		}),
+		TrackedRanges,
 		SelectionHighlight,
+		MarkdownSource.configure({
+			HTMLAttributes: { class: STYLES.editor.markdownSource },
+		}),
 		EditorPaste,
 		TabCharacter,
 	];

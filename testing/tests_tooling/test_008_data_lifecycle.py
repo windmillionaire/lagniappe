@@ -1579,7 +1579,7 @@ def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
     category = _record(
         "category",
         "category0001",
-        {"name": "Recovery Pages", "attributes": ["tasks", "files"]},
+        {"name": "Recovery Pages"},
     )
     page = _record(
         "page",
