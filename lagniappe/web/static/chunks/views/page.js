@@ -1,2 +1,94 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="379af76c-79b3-4a99-b2bc-07e94218e75e",e._sentryDebugIdIdentifier="sentry-dbid-379af76c-79b3-4a99-b2bc-07e94218e75e");}catch(e){}}();import{w as s}from"../foundation.js?v=b54a3d61";import"../connectivity.js?v=b54a3d61";import{E as i}from"../entity-foundation.js?v=b54a3d61";import"../core-foundation.js?v=b54a3d61";class r extends i{async init(){const t=new URLSearchParams(window.location.search).get("task")||this.elt.dataset.focusTask;t&&(localStorage.setItem(`${this.hash}-active`,"tasks"),this.postRender=this._focusTask.bind(this,t)),await super.init();const e=this.elt.querySelector("#photo");if(e){const a=this.getComponent(e);(a?.active||this.isSecondaryCardVisible(e))&&!a.active&&await a.activate("PagePhoto")}}get secondaryCard(){return this.elt.dataset.secondary!=="true"?null:this.elt.querySelector("#photo")}secondaryCardForAttribute(t){return t==="photo"?this.elt.querySelector("#photo"):super.secondaryCardForAttribute(t)}_prerender(t,e=void 0){return this._tabElement(t)?.dataset.hasAttribute==="false"&&(t=this._defaultTabId),super._prerender(t,e)}async _focusTask(t){const e=this.getComponent(this.elt.querySelector("#tasks"));await e.activate("PageTaskList"),await e.prepareRender(!0),await s(()=>e.render(!0),{label:"page:focus-task-tab"}),await e.active.focusTask(t),this._replaceFocusedTaskUrl(),this.postRender=null}_replaceFocusedTaskUrl(){const t=this.key?`/pages/${this.key}`:window.location.pathname;history.replaceState(null,"",t)}}export{r as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { w as withTransition } from '../foundation.js?v=bd7dbd9a';
+import '../connectivity.js?v=bd7dbd9a';
+import { E as Entity } from '../entity-foundation.js?v=bd7dbd9a';
+import '../core-foundation.js?v=bd7dbd9a';
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
+ * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
+ * @tests tests_js/test_038_startup_specializations.py::test_page_photo_initializes_only_when_selected_or_visible
+ * @matrix pages : image-add mobile-photo-tab photo-lazy-activation photo-prompt photo-visible-startup
+ */
+class Page extends Entity {
+	async init() {
+		const taskId =
+			new URLSearchParams(window.location.search).get("task") ||
+			this.elt.dataset.focusTask;
+		if (taskId) {
+			localStorage.setItem(`${this.hash}-active`, "tasks");
+			this.postRender = this._focusTask.bind(this, taskId);
+		}
+
+		await super.init();
+
+		const photo = this.elt.querySelector("#photo");
+		if (photo) {
+			const component = this.getComponent(photo);
+			const initiallyVisible =
+				component?.active || this.isSecondaryCardVisible(photo);
+			if (initiallyVisible && !component.active) {
+				await component.activate("PagePhoto");
+			}
+		}
+	}
+
+	get secondaryCard() {
+		if (this.elt.dataset.secondary !== "true") return null;
+		return this.elt.querySelector("#photo");
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/entity.mjs::Entity.setAttributeActive
+	 * @reason the photo card has attribute state distinct from image/secondary visibility
+	 */
+	secondaryCardForAttribute(attribute) {
+		if (attribute === "photo") return this.elt.querySelector("#photo");
+		return super.secondaryCardForAttribute(attribute);
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/entity.mjs::Entity._renderLayout
+	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
+	 * @reason page-specific inactive attribute guard feeds the shared layout renderer
+	 */
+	_prerender(tabId, secondaryElement = undefined) {
+		const tab = this._tabElement(tabId);
+		if (tab?.dataset.hasAttribute === "false") {
+			tabId = this._defaultTabId;
+		}
+		return super._prerender(tabId, secondaryElement);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_create_task_opens_from_tasks_section
+	 * @matrix entity-layout : page-mobile task-create
+	 */
+	async _focusTask(taskId) {
+		const taskTab = this.getComponent(this.elt.querySelector("#tasks"));
+		await taskTab.activate("PageTaskList");
+		await taskTab.prepareRender(true);
+		await withTransition(() => taskTab.render(true), {
+			label: "page:focus-task-tab",
+		});
+		await taskTab.active.focusTask(taskId);
+		this._replaceFocusedTaskUrl();
+		this.postRender = null;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_route_rewrites_to_page_url_after_focus
+	 * @matrix tasks : canonical-url navigation reload
+	 */
+	_replaceFocusedTaskUrl() {
+		const pagePath = this.key ? `/pages/${this.key}` : window.location.pathname;
+		history.replaceState(null, "", pagePath);
+	}
+}
+
+export { Page as default };

@@ -300,7 +300,7 @@
   {% set form_preload = task.properties.form.column_value if task and task.form else none %}
   <div class="flex flex-row flex-wrap gap-2 w-full empty:hidden {{ styles.task.actionIconContext }}"
        data-role="action-buttons">
-    {% if Resource.PROJECTS.allowed(Action.RESTRICTED) %}
+    {% if not current_user.is_public and Resource.PROJECTS.allowed(Action.RESTRICTED) %}
       <button type="button"
               lp-select
               data-kind="project"

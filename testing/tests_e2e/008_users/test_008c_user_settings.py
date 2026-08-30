@@ -12,7 +12,15 @@ import yaml
 
 from config import SETTINGS, recovery
 from lagniappe import CONFIG
-from lagniappe.core.definitions import AI, Action, Fetch, General, Levels, Site
+from lagniappe.core.definitions import (
+    AI,
+    Action,
+    Fetch,
+    FetchReason,
+    General,
+    Levels,
+    Site,
+)
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import site as site_database
@@ -555,9 +563,11 @@ def test_public_user_edits_document_without_ai_or_image_tools(limited_public_use
     user.page.keyboard.press("Escape")
 
 
-# @pair tasks:create
+# @pairs tasks:create public-users:task-project-link
 # @template pages/tasks.html::action_buttons
-def test_public_user_creates_task_with_reduced_schedule_options(limited_public_user):
+def test_public_user_creates_task_with_reduced_schedule_options(
+    limited_public_user, browser_failures
+):
     scenario = limited_public_user
     user = scenario.user
     page = scenario.page
@@ -565,6 +575,68 @@ def test_public_user_creates_task_with_reduced_schedule_options(limited_public_u
     expect(create_form.locator("button[type='submit']")).to_be_visible()
     expect(create_form.locator("[data-role='show-autofill']")).to_have_count(0)
     expect(create_form.locator("[data-role='file-select']")).to_have_count(0)
+    expect(create_form.locator("[data-role='project-select']")).to_have_count(0)
+
+    project = Entities.PROJECT.create(
+        {
+            "name": f"Public task boundary {uuid4().hex}",
+            "description": "Project used to verify public task tracking restrictions.",
+            "attributes": [],
+        }
+    )
+    project.save()
+    assert project.allowed(Action.VIEW, user=scenario.entity)
+
+    page_key = scenario.entity.page.urlsafe_key
+    task_key = scenario.task.urlsafe_key
+    _assert_routes_forbidden(
+        user,
+        [
+            (
+                "POST",
+                f"/tasks/{page_key}/create",
+                {
+                    "name": "Forged project-linked public task",
+                    "project": project.urlsafe_key,
+                },
+            ),
+            (
+                "POST",
+                f"/tasks/{page_key}/create",
+                {
+                    "name": "Forged model-linked public task",
+                    "model": "forged-model-key",
+                },
+            ),
+            (
+                "PUT",
+                f"/tasks/{task_key}/update",
+                {
+                    "active": "TaskSettings",
+                    "name": scenario.task.name,
+                    "project": project.urlsafe_key,
+                },
+            ),
+        ],
+        browser_failures,
+    )
+
+    scenario.task.project = project
+    scenario.task.save()
+    renamed_task = f"Public task without tracking controls {uuid4().hex}"
+    ordinary_update = _fetch_status(
+        user,
+        f"/tasks/{task_key}/update",
+        method="PUT",
+        data={"active": "TaskSettings", "name": renamed_task},
+    )
+    assert ordinary_update["status"] == 200
+    saved_task = Entities.fetch_one(
+        scenario.task.key,
+        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+    )
+    assert saved_task.name == renamed_task
+    assert saved_task.project.key == project.key
 
     schedule_button = create_form.locator("[data-role='date-select']")
     expect(schedule_button).to_have_attribute("data-ai-enabled", "false")

@@ -1,2 +1,792 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="f1fd0265-82f7-488d-8cc2-d5ca7c3d397f",e._sentryDebugIdIdentifier="sentry-dbid-f1fd0265-82f7-488d-8cc2-d5ca7c3d397f");}catch(e){}}();import{p as c}from"./primitives.js?v=b54a3d61";import{w as u}from"./foundation.js?v=b54a3d61";import"./connectivity.js?v=b54a3d61";import{s as l}from"./storage.js?v=b54a3d61";import"./styles.js?v=b54a3d61";import"./icons.js?v=b54a3d61";class d{constructor(e){Object.assign(this,e),this.columns=this.component.preload("columns")||[],this.sorts=new Map,this.containers=new Map,this.toggles=new Map,this.headers=new Map,this.lastReorderColumn=null,this.initialized=!1}get storageKey(){return`sorts-${this.view.hash}`}get header(){return this.component.elt.querySelector("thead > tr:first-child")}get body(){return this.component.elt.querySelector("tbody")}get rows(){return Array.from(this.body.querySelectorAll("tr")).filter(e=>e.dataset.visible!=="false")}init(){if(this.initialized)return;this.initialized=!0,this._setSortingToggles();const e=this._loadState();this.header.querySelectorAll("th[data-ordering]").forEach(async t=>{const s=t.dataset.column,i=t.dataset.ordering;this.headers.set(s,t),this._enableSort(this._createSort(s,i)).restore(e?.sorts?.[s])}),this._restoreLastReorderColumn(e),this._hasActiveSorts()&&this.sort(),this.view.elt.addEventListener("toggle-column-filter",t=>{const s=t.detail.column;if(this.view.mobile){u(()=>{if(this._enableSort(this.sorts.get(s)).active){const a=this.toggles.get(s);a.dataset.active="true"}const r=this.containers.get(s),o=r.dataset.visible==="true";r.dataset.visible=o?"false":"true"},{label:"table-sorting:toggle-mobile"});return}else{const i=t.detail.button;this._toggleColumn(s,i)}})}reset(){this.containers.forEach(e=>{e.remove()}),this.sorts.forEach(e=>{e.clear()}),this._clearState(),this.containers=new Map,this.toggles=new Map,this.headers=new Map,this.lastReorderColumn=null,this._setSortingToggles(),this.header.querySelectorAll("th[data-ordering]").forEach(e=>{const t=e.dataset.column;this.headers.set(t,e),e.dataset.sorting="false",this._enableSort(this._createSort(t,e.dataset.ordering))})}refreshRows(){if(!this.initialized)return;const e={lastReorderColumn:this.lastReorderColumn,sorts:Object.fromEntries(Array.from(this.sorts,([t,s])=>[t,s.state]))};this.containers.forEach(t=>{t.remove()}),this.sorts=new Map,this.containers=new Map,this.toggles=new Map,this.headers=new Map,this.lastReorderColumn=null,this._setSortingToggles(),this.header.querySelectorAll("th[data-ordering]").forEach(t=>{const s=t.dataset.column;this.headers.set(s,t),t.dataset.sorting="false",this._enableSort(this._createSort(s,t.dataset.ordering)).restore(e.sorts[s])}),this._restoreLastReorderColumn(e),this._hasActiveSorts()&&this.sort()}_loadState(){const e=l.getJSON(this.storageKey);return e===null?null:typeof e=="object"&&!Array.isArray(e)?e:(l.remove(this.storageKey),null)}_saveState(){const e={};this.sorts.forEach(t=>{const s=t.state;s&&(e[t.column]=s)}),Object.keys(e).length?l.setJSON(this.storageKey,{lastReorderColumn:this.lastReorderColumn,sorts:e}):this._clearState()}_clearState(){l.remove(this.storageKey)}_restoreLastReorderColumn(e){const t=this.sorts.get(e?.lastReorderColumn);if(t?.active&&t.reordering){this.lastReorderColumn=t.column;return}const s=Array.from(this.sorts.values()).find(i=>i.active&&i.reordering);this.lastReorderColumn=s?.column||null}_hasActiveSorts(){return Array.from(this.sorts.values()).some(e=>e.active)}_markSortActive(e){if(this.headers.get(e.column).dataset.sorting="true",!this.view.mobile)return;const t=this.toggles.get(e.column);t&&(t.dataset.active="true")}_setSortingToggles(){(this.view.mobile?document.getElementById("mobile-controls"):this.header).querySelectorAll("button[data-toggle='filter']").forEach(t=>{this.toggles.set(t.closest("[data-column]").dataset.column,t)})}async _toggleColumn(e,t){await u(()=>{const s=this._enableSort(this.sorts.get(e));if(s.disabled)return;const i=this.visible,r=this.containers.get(e);this.containers.forEach(o=>{o!==r&&(o.dataset.visible="false")}),t&&s.active?(this.visible=!1,s.sortedBy=null,this.sort()):this.visible&&r.dataset.visible==="true"?this.visible=!1:(r.dataset.visible="true",this.visible=!0),this.modified=i!==this.visible,this.modified&&this.visible?(this.component.active=this,this.component.render(!0)):this.modified&&!this.visible&&(this.component.active=null,this.component.render(!1))},{label:"table-sorting:toggle"})}_resetRows(e,t){if(!e&&t.size===0)return null;const s=e?new WeakMap:null;return this.body.querySelectorAll("tr").forEach(i=>{if(t.has(i)&&(i.dataset.visible="true"),!s)return;const r=Number(i.querySelector('td[data-column="modified"]')?.dataset.sortValue||0);s.set(i,r*-1)}),s}sort(){let e=!1,t=new Set;this.sorts.forEach(r=>{r.reordering&&this.lastReorderColumn!==r.column&&(r.sortedBy=null),!(r.active||!r.sorted)&&(t=r.hiddenRows?t.union(r.hiddenRows):t,r.reordering&&(e=!0),this._resetSort(r))}),this.sorts.forEach(r=>{!r.active||!r.hiddenRows||r.hiddenRows.forEach(o=>{t.add(o)})});const s=this._resetRows(e,t);this.sorts.forEach(r=>{!r.active||r.reordering||(r.sort(),this._markSortActive(r))});const i=this.sorts.get(this.lastReorderColumn);if(i?.active)i.sort(),this._markSortActive(i);else if(s){const r=this.rows;r.sort((o,a)=>s.get(o)-s.get(a)),this.body.append(...r),this.lastReorderColumn=null}this._saveState()}_createContainer(e){return this.containers.set(e,this.view.mobile?this._createSection(e):this._createCell(e)),this.containers.get(e)}_createCell(e){const t=document.createElement("td");return t.colSpan=this.component.elt.querySelectorAll("th").length,t.className="p-3 border-t bg-kind-bg border-slate-300",t.dataset.sorts=e,t.dataset.visible="false",this.target.appendChild(t),t}_createSection(e){const t=document.createElement("div");return t.className="flex flex-col gap-2 p-4 bg-white outline-kind-default rounded-md outline-1",t.dataset.sorts=e,t.dataset.visible="false",document.getElementById("mobile-controls").querySelector(`[data-column="${e}"]`).after(t),t}_createCheckboxElement(e){const s=this.containers.get(e.column).appendChild(document.createElement("div"));e.options!==null&&(Object.keys(e.options).length>4&&!this.view.mobile?s.className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-4":this.view.mobile?s.className="flex flex-col gap-2":s.className="flex flex-row flex-wrap gap-4",e.createOptions(s))}_createRadioElement(e){const s=this.containers.get(e.column).appendChild(document.createElement("fieldset"));s.className="flex flex-row flex-wrap gap-4",e.createOptions(s)}_createSortElement(e){e.ordering==="categorical"?this._createCheckboxElement(e):this._createRadioElement(e)}_enableSort(e){e.init();const t=this.toggles.get(e.column);return t.dataset.visible=e.disabled?"false":"true",e.disabled||(this.containers.has(e.column)?this.containers.get(e.column):this._createContainer(e.column)).children.length||this._createSortElement(e),e}_resetSort(e){e.clear();const t=this.containers.get(e.column);t&&(t.remove(),this.containers.delete(e.column));const s=this.headers.get(e.column);if(s&&(s.dataset.sorting="false"),this.view.mobile){const i=this.toggles.get(e.column);i&&(i.dataset.active="false")}}_createSort(e,t){return this.sorts.set(e,t==="categorical"?new g(this,e,t):new f(this,e,t)),this.sorts.get(e)}}class f{constructor(e,t,s){this.orchestrator=e,this.column=t,this.ordering=s,this.reordering=this.ordering==="numeric"||this.ordering==="lexical",this.rowValues=null,this.hiddenRows=null,this.sortedBy=null,this.sortValue=null,this.initialized=!1,this.sorted=!1}get disabled(){return!1}get active(){return this.sortedBy!=null}get defaultValue(){return["boolean","exists"].includes(this.ordering)?"all":"none"}get state(){return this.active?{value:this.sortValue}:null}get options(){const e=t=>(this.sortValue===null&&(this.sortValue=this.defaultValue),t);switch(this.ordering){case"boolean":return e([{value:"all",label:"All"},{value:"true",label:"True"},{value:"false",label:"False"}]);case"exists":return e([{value:"all",label:"All"},{value:"with",label:"With"},{value:"without",label:"Without"}]);case"numeric":return e([{value:"none",label:"None"},{value:"asc",label:"Low \u2192 High"},{value:"desc",label:"High \u2192 Low"}]);default:return e([{value:"none",label:"None"},{value:"asc",label:"A \u2192 Z"},{value:"desc",label:"Z \u2192 A"}])}}createOptions(e){for(const t of this.options)e.appendChild(c.radio({name:this.column,value:t.value,label:t.label,kind:this.orchestrator.kind,checked:this.sortValue===t.value}));e.addEventListener("change",t=>{this.sortValue=t.target.value,this.sortedBy=this.sortBy(this.sortValue),this.rowValues||this.init(),this.reordering&&(this.orchestrator.lastReorderColumn=this.sortedBy!==null?this.column:null),this.orchestrator.sort()})}restore(e){e?.value&&this.options.some(t=>t.value===e.value)&&(this.sortValue=e.value,this.sortedBy=this.sortBy(this.sortValue),this.active&&this.orchestrator.containers.get(this.column)?.querySelectorAll("input[type='radio']").forEach(t=>{t.name===this.column&&(t.checked=t.value===this.sortValue)}))}init(){if(!this.initialized)return this.rowValues=new WeakMap,this.orchestrator.rows.forEach(e=>{const t=e.querySelector(`td[data-column="${this.column}"][data-sort-value]`);t&&this.rowValues.set(e,JSON.parse(t.dataset.sortValue))}),this.initialized=!0,this}sortBy(e){switch(e){case"none":return null;case"all":return null;case"asc":return 1;case"desc":return-1;case"true":return!0;case"false":return!1;case"with":return!0;case"without":return!1;default:return null}}sort(){this.hiddenRows=new Set;const e=this.orchestrator.rows;if(typeof this.sortedBy=="boolean"){e.forEach(i=>{(this.rowValues.get(i)??!1)===this.sortedBy?i.dataset.visible="true":(i.dataset.visible="false",this.hiddenRows.add(i))}),this.sorted=!0;return}const[t,s]=[[],[]];this.orchestrator.rows.forEach(i=>{this.rowValues.get(i)?t.push(i):s.push(i)}),s.forEach(i=>{i.dataset.visible="false",this.hiddenRows.add(i)}),this.ordering==="numeric"?t.sort((i,r)=>{const o=this.rowValues.get(i),a=this.rowValues.get(r);return(o-a)*this.sortedBy}):this.ordering==="lexical"&&t.sort((i,r)=>{const o=this.rowValues.get(i),a=this.rowValues.get(r);return o.localeCompare(a)*this.sortedBy}),this.orchestrator.body.append(...t),this.sorted=!0}clear(){this.initialized=!1,this.sortedBy=null,this.hiddenRows=null,this.rowValues=null,this.sorted=!1,this.sortValue=this.defaultValue}}const n=Symbol("options");class g{constructor(e,t,s){this.orchestrator=e,this.column=t,this.ordering=s,this.reordering=!1,this.rowValues=null,this.hiddenRows=null,this.options=n,this.sortedBy=null,this.sortValues=[],this.initialized=!1,this.sorted=!1}get active(){return this.sortedBy!=null}get state(){return this.active?{values:this.sortValues}:null}get disabled(){return this.options===n&&this.init(),this.options===null}init(){if(this.initialized)return;this.rowValues=new WeakMap;const e={};for(const t of this.orchestrator.body.querySelectorAll("tr")){const s=t.querySelector(`td[data-column="${this.column}"][data-sort-value]`);if(!s)continue;const i=JSON.parse(s.dataset.sortValue);Object.assign(e,i),this.rowValues.set(t,Object.keys(i))}return this.options=Object.keys(e).length?e:null,this.initialized=!0,this}createOptions(e){this.options!==null&&(Object.entries(this.options).forEach(([t,s])=>{e.appendChild(c.checkbox({name:t,kind:this.orchestrator.kind,label:s,checked:this.sortValues.includes(t)}))}),e.addEventListener("change",t=>{this.sortValues=t.target.checked?[...this.sortValues,t.target.name]:this.sortValues.filter(s=>s!==t.target.name),this.sortedBy=this.sortValues.length?this.sortValues:null,this.orchestrator.sort()}))}restore(e){this.options===null||!Array.isArray(e?.values)||(this.sortValues=e.values.filter(t=>Object.hasOwn(this.options,t)),this.sortedBy=this.sortValues.length?this.sortValues:null,this.active&&this.orchestrator.containers.get(this.column)?.querySelectorAll("input[type='checkbox']").forEach(t=>{t.checked=this.sortValues.includes(t.name)}))}sort(){const e=new Set;this.orchestrator.rows.forEach(t=>{(this.rowValues.get(t)||[]).some(i=>this.sortValues.includes(i))?t.dataset.visible="true":(t.dataset.visible="false",e.add(t))}),this.hiddenRows=e,this.sorted=!0}clear(){this.sortedBy=null,this.sortValues=[],this.rowValues=null,this.hiddenRows=null,this.sorted=!1,this.options=n,this.initialized=!1}}export{d as TableSorting};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { p as primitives } from './primitives.js?v=bd7dbd9a';
+import { w as withTransition } from './foundation.js?v=bd7dbd9a';
+import './connectivity.js?v=bd7dbd9a';
+import { s as sessionStore } from './storage.js?v=bd7dbd9a';
+import './styles.js?v=bd7dbd9a';
+import './icons.js?v=bd7dbd9a';
+
+/**
+ * @testable infrastructure
+ */
+class TableSorting {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+		this.columns = this.component.preload("columns") || [];
+		this.sorts = new Map();
+		this.containers = new Map();
+		this.toggles = new Map();
+		this.headers = new Map();
+		this.lastReorderColumn = null;
+		this.initialized = false;
+	}
+
+	get storageKey() {
+		return `sorts-${this.view.hash}`;
+	}
+
+	get header() {
+		return this.component.elt.querySelector("thead > tr:first-child");
+	}
+
+	get body() {
+		return this.component.elt.querySelector("tbody");
+	}
+
+	get rows() {
+		return Array.from(this.body.querySelectorAll("tr")).filter(
+			(row) => row.dataset.visible !== "false",
+		);
+	}
+
+	init() {
+		if (this.initialized) return;
+		this.initialized = true;
+
+		this._setSortingToggles();
+		const saved = this._loadState();
+
+		this.header.querySelectorAll("th[data-ordering]").forEach(async (th) => {
+			const column = th.dataset.column;
+			const ordering = th.dataset.ordering;
+			this.headers.set(column, th);
+
+			const sort = this._enableSort(this._createSort(column, ordering));
+			sort.restore(saved?.sorts?.[column]);
+		});
+
+		this._restoreLastReorderColumn(saved);
+		if (this._hasActiveSorts()) this.sort();
+
+		this.view.elt.addEventListener("toggle-column-filter", (e) => {
+			const column = e.detail.column;
+
+			if (this.view.mobile) {
+				void withTransition(
+					() => {
+						const sort = this._enableSort(this.sorts.get(column));
+						if (sort.active) {
+							const toggle = this.toggles.get(column);
+							toggle.dataset.active = "true";
+						}
+						const container = this.containers.get(column);
+						const visible = container.dataset.visible === "true";
+						container.dataset.visible = visible ? "false" : "true";
+					},
+					{ label: "table-sorting:toggle-mobile" },
+				);
+				return;
+			} else {
+				const button = e.detail.button;
+				this._toggleColumn(column, button);
+			}
+		});
+	}
+
+	reset() {
+		this.containers.forEach((container) => {
+			container.remove();
+		});
+		this.sorts.forEach((sort) => {
+			sort.clear();
+		});
+		this._clearState();
+		this.containers = new Map();
+		this.toggles = new Map();
+		this.headers = new Map();
+		this.lastReorderColumn = null;
+		this._setSortingToggles();
+		this.header.querySelectorAll("th[data-ordering]").forEach((th) => {
+			const column = th.dataset.column;
+			this.headers.set(column, th);
+			th.dataset.sorting = "false";
+			this._enableSort(this._createSort(column, th.dataset.ordering));
+		});
+	}
+
+	/**
+	 * Rebuild row-value caches after server row replacement while preserving active sorts.
+	 *
+	 * @testable infrastructure
+	 * @covered-by src/script/widgets/tables.mjs::IndexTable.refreshDelta
+	 * @covered-by src/script/widgets/tables.mjs::IndexTable.refresh
+	 */
+	refreshRows() {
+		if (!this.initialized) return;
+
+		const saved = {
+			lastReorderColumn: this.lastReorderColumn,
+			sorts: Object.fromEntries(
+				Array.from(this.sorts, ([column, sort]) => [column, sort.state]),
+			),
+		};
+		this.containers.forEach((container) => {
+			container.remove();
+		});
+		this.sorts = new Map();
+		this.containers = new Map();
+		this.toggles = new Map();
+		this.headers = new Map();
+		this.lastReorderColumn = null;
+		this._setSortingToggles();
+
+		this.header.querySelectorAll("th[data-ordering]").forEach((th) => {
+			const column = th.dataset.column;
+			this.headers.set(column, th);
+			th.dataset.sorting = "false";
+			const sort = this._enableSort(
+				this._createSort(column, th.dataset.ordering),
+			);
+			sort.restore(saved.sorts[column]);
+		});
+
+		this._restoreLastReorderColumn(saved);
+		if (this._hasActiveSorts()) this.sort();
+	}
+
+	_loadState() {
+		const saved = sessionStore.getJSON(this.storageKey);
+		if (saved === null) return null;
+		if (typeof saved === "object" && !Array.isArray(saved)) return saved;
+		sessionStore.remove(this.storageKey);
+		return null;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_persists_after_back_navigation
+	 * @matrix table-controls : persistence sorting
+	 */
+	_saveState() {
+		const sorts = {};
+
+		this.sorts.forEach((sort) => {
+			const state = sort.state;
+			if (state) sorts[sort.column] = state;
+		});
+
+		if (Object.keys(sorts).length) {
+			sessionStore.setJSON(this.storageKey, {
+				lastReorderColumn: this.lastReorderColumn,
+				sorts: sorts,
+			});
+		} else {
+			this._clearState();
+		}
+	}
+
+	_clearState() {
+		sessionStore.remove(this.storageKey);
+	}
+
+	_restoreLastReorderColumn(saved) {
+		const savedSort = this.sorts.get(saved?.lastReorderColumn);
+		if (savedSort?.active && savedSort.reordering) {
+			this.lastReorderColumn = savedSort.column;
+			return;
+		}
+
+		const activeSort = Array.from(this.sorts.values()).find((sort) => {
+			return sort.active && sort.reordering;
+		});
+		this.lastReorderColumn = activeSort?.column || null;
+	}
+
+	_hasActiveSorts() {
+		return Array.from(this.sorts.values()).some((sort) => sort.active);
+	}
+
+	_markSortActive(sort) {
+		this.headers.get(sort.column).dataset.sorting = "true";
+		if (!this.view.mobile) return;
+
+		const toggle = this.toggles.get(sort.column);
+		if (toggle) toggle.dataset.active = "true";
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_filter_button_opens_sorting_panel
+	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_filter_button_opens_sorting_panel
+	 * @matrix table-controls : mobile-controls sorting
+	 */
+	_setSortingToggles() {
+		const container = this.view.mobile
+			? document.getElementById("mobile-controls")
+			: this.header;
+
+		container
+			.querySelectorAll("button[data-toggle='filter']")
+			.forEach((button) => {
+				this.toggles.set(
+					button.closest("[data-column]").dataset.column,
+					button,
+				);
+			});
+	}
+
+	async _toggleColumn(column, button) {
+		await withTransition(
+			() => {
+				const sort = this._enableSort(this.sorts.get(column));
+				if (sort.disabled) return;
+
+				const visible = this.visible;
+				const container = this.containers.get(column);
+				this.containers.forEach((candidate) => {
+					if (candidate !== container) candidate.dataset.visible = "false";
+				});
+
+				if (button && sort.active) {
+					this.visible = false;
+					sort.sortedBy = null;
+					this.sort();
+				} else if (this.visible && container.dataset.visible === "true") {
+					this.visible = false;
+				} else {
+					container.dataset.visible = "true";
+					this.visible = true;
+				}
+
+				this.modified = visible !== this.visible;
+				if (this.modified && this.visible) {
+					this.component.active = this;
+					this.component.render(true);
+				} else if (this.modified && !this.visible) {
+					this.component.active = null;
+					this.component.render(false);
+				}
+			},
+			{ label: "table-sorting:toggle" },
+		);
+	}
+
+	_resetRows(reorderRows, showRows) {
+		if (!reorderRows && showRows.size === 0) return null;
+		const initialOrder = reorderRows ? new WeakMap() : null;
+
+		this.body.querySelectorAll("tr").forEach((row) => {
+			if (showRows.has(row)) {
+				row.dataset.visible = "true";
+			}
+			if (!initialOrder) return;
+
+			const modifiedColumn = Number(
+				row.querySelector(`td[data-column="modified"]`)?.dataset.sortValue || 0,
+			);
+			initialOrder.set(row, modifiedColumn * -1);
+		});
+
+		return initialOrder;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_ascending_reorders_rows
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_descending_reorders_rows
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_clearing_sort_restores_default_order
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_boolean_column_filter_clear_restores_rows
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_exists_column_filter_treats_phone_values_as_present
+	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_name_sort_ascending_reorders_rows
+	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_due_date_sort_filters_to_dated_rows
+	 * @matrix table-controls : boolean-column due-date exists-column filtering name phone sort-asc sort-clear sort-desc sorting
+	 */
+	sort() {
+		let reorderRows = false;
+		let showRows = new Set();
+
+		// clear inactive sorts, track rows hidden by inactive sorts
+		this.sorts.forEach((sort) => {
+			if (sort.reordering && this.lastReorderColumn !== sort.column) {
+				// deactivate previous reordering sort
+				sort.sortedBy = null;
+			}
+
+			if (sort.active || !sort.sorted) return;
+
+			showRows = sort.hiddenRows ? showRows.union(sort.hiddenRows) : showRows;
+
+			if (sort.reordering) reorderRows = true;
+
+			this._resetSort(sort);
+		});
+
+		// Active filters may change from one value to another. Restore rows hidden
+		// by the previous active values before applying the current active filters.
+		this.sorts.forEach((sort) => {
+			if (!sort.active || !sort.hiddenRows) return;
+			sort.hiddenRows.forEach((row) => {
+				showRows.add(row);
+			});
+		});
+
+		// Reset visibility and return initial order (date modified)
+		const initialOrder = this._resetRows(reorderRows, showRows);
+
+		// filter by non-reordering sorts
+		this.sorts.forEach((sort) => {
+			if (!sort.active || sort.reordering) return;
+			sort.sort();
+			this._markSortActive(sort);
+		});
+
+		// most recent reordering sort or initial order
+		const reorderingSort = this.sorts.get(this.lastReorderColumn);
+		if (reorderingSort?.active) {
+			reorderingSort.sort();
+			this._markSortActive(reorderingSort);
+		} else if (initialOrder) {
+			const rows = this.rows;
+			rows.sort((a, b) => {
+				return initialOrder.get(a) - initialOrder.get(b);
+			});
+			this.body.append(...rows);
+			this.lastReorderColumn = null;
+		}
+
+		this._saveState();
+	}
+
+	_createContainer(column) {
+		this.containers.set(
+			column,
+			this.view.mobile ? this._createSection(column) : this._createCell(column),
+		);
+		return this.containers.get(column);
+	}
+
+	_createCell(column) {
+		const cell = document.createElement("td");
+		cell.colSpan = this.component.elt.querySelectorAll("th").length;
+		cell.className = `p-3 border-t bg-kind-bg border-slate-300`;
+		cell.dataset.sorts = column;
+		cell.dataset.visible = "false";
+		this.target.appendChild(cell);
+		return cell;
+	}
+
+	_createSection(column) {
+		const section = document.createElement("div");
+		section.className = `flex flex-col gap-2 p-4 bg-white outline-kind-default rounded-md outline-1`;
+		section.dataset.sorts = column;
+		section.dataset.visible = "false";
+		const controls = document.getElementById("mobile-controls");
+		controls.querySelector(`[data-column="${column}"]`).after(section);
+		return section;
+	}
+
+	_createCheckboxElement(sort) {
+		const container = this.containers.get(sort.column);
+		const element = container.appendChild(document.createElement("div"));
+		if (sort.options === null) return;
+
+		if (Object.keys(sort.options).length > 4 && !this.view.mobile) {
+			element.className = `grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-4`;
+		} else if (!this.view.mobile) {
+			element.className = `flex flex-row flex-wrap gap-4`;
+		} else {
+			element.className = `flex flex-col gap-2`;
+		}
+		sort.createOptions(element);
+	}
+
+	_createRadioElement(sort) {
+		const container = this.containers.get(sort.column);
+		const element = container.appendChild(document.createElement("fieldset"));
+		element.className = `flex flex-row flex-wrap gap-4`;
+		sort.createOptions(element);
+	}
+
+	_createSortElement(sort) {
+		if (sort.ordering === "categorical") {
+			this._createCheckboxElement(sort);
+		} else {
+			this._createRadioElement(sort);
+		}
+	}
+
+	_enableSort(sort) {
+		sort.init();
+
+		const toggle = this.toggles.get(sort.column);
+		toggle.dataset.visible = sort.disabled ? "false" : "true";
+		if (sort.disabled) return sort;
+
+		const container = this.containers.has(sort.column)
+			? this.containers.get(sort.column)
+			: this._createContainer(sort.column);
+
+		if (!container.children.length) {
+			this._createSortElement(sort);
+		}
+
+		return sort;
+	}
+
+	_resetSort(sort) {
+		sort.clear();
+		const container = this.containers.get(sort.column);
+		if (container) {
+			container.remove();
+			this.containers.delete(sort.column);
+		}
+		const header = this.headers.get(sort.column);
+		if (header) header.dataset.sorting = "false";
+		if (this.view.mobile) {
+			const toggle = this.toggles.get(sort.column);
+			if (toggle) toggle.dataset.active = "false";
+		}
+	}
+
+	_createSort(column, ordering) {
+		this.sorts.set(
+			column,
+			ordering === "categorical"
+				? new CheckboxSort(this, column, ordering)
+				: new RadioSort(this, column, ordering),
+		);
+
+		return this.sorts.get(column);
+	}
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/tableSorting.mjs::TableSorting.sort
+ * @reason private sort strategy exercised through the TableSorting orchestrator
+ */
+class RadioSort {
+	constructor(orchestrator, column, ordering) {
+		this.orchestrator = orchestrator;
+		this.column = column;
+		this.ordering = ordering;
+		this.reordering =
+			this.ordering === "numeric" || this.ordering === "lexical";
+		this.rowValues = null;
+		this.hiddenRows = null;
+		this.sortedBy = null;
+		this.sortValue = null;
+		this.initialized = false;
+		this.sorted = false;
+	}
+
+	get disabled() {
+		return false;
+	}
+
+	get active() {
+		return this.sortedBy != null;
+	}
+
+	get defaultValue() {
+		return ["boolean", "exists"].includes(this.ordering) ? "all" : "none";
+	}
+
+	get state() {
+		return this.active ? { value: this.sortValue } : null;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_image_column_sort_panel_offers_presence_options
+	 * @matrix table-controls : exists-column sorting
+	 */
+	get options() {
+		const setOptions = (options) => {
+			if (this.sortValue === null) this.sortValue = this.defaultValue;
+			return options;
+		};
+
+		switch (this.ordering) {
+			case "boolean":
+				return setOptions([
+					{ value: "all", label: "All" },
+					{ value: "true", label: "True" },
+					{ value: "false", label: "False" },
+				]);
+			case "exists":
+				return setOptions([
+					{ value: "all", label: "All" },
+					{ value: "with", label: "With" },
+					{ value: "without", label: "Without" },
+				]);
+			case "numeric":
+				return setOptions([
+					{ value: "none", label: "None" },
+					{ value: "asc", label: "Low → High" },
+					{ value: "desc", label: "High → Low" },
+				]);
+			default:
+				return setOptions([
+					{ value: "none", label: "None" },
+					{ value: "asc", label: "A → Z" },
+					{ value: "desc", label: "Z → A" },
+				]);
+		}
+	}
+
+	createOptions(element) {
+		for (const option of this.options) {
+			element.appendChild(
+				primitives.radio({
+					name: this.column,
+					value: option.value,
+					label: option.label,
+					kind: this.orchestrator.kind,
+					checked: this.sortValue === option.value,
+				}),
+			);
+		}
+
+		element.addEventListener("change", (e) => {
+			this.sortValue = e.target.value;
+			this.sortedBy = this.sortBy(this.sortValue);
+			if (!this.rowValues) this.init();
+			if (this.reordering) {
+				this.orchestrator.lastReorderColumn =
+					this.sortedBy !== null ? this.column : null;
+			}
+			this.orchestrator.sort();
+		});
+	}
+
+	restore(state) {
+		if (!state?.value) return;
+		if (!this.options.some((option) => option.value === state.value)) return;
+
+		this.sortValue = state.value;
+		this.sortedBy = this.sortBy(this.sortValue);
+		if (!this.active) return;
+
+		this.orchestrator.containers
+			.get(this.column)
+			?.querySelectorAll("input[type='radio']")
+			.forEach((input) => {
+				if (input.name === this.column) {
+					input.checked = input.value === this.sortValue;
+				}
+			});
+	}
+
+	init() {
+		if (this.initialized) return;
+
+		this.rowValues = new WeakMap();
+		this.orchestrator.rows.forEach((row) => {
+			const cell = row.querySelector(
+				`td[data-column="${this.column}"][data-sort-value]`,
+			);
+			if (!cell) return;
+			this.rowValues.set(row, JSON.parse(cell.dataset.sortValue));
+		});
+		this.initialized = true;
+		return this;
+	}
+
+	sortBy(value) {
+		switch (value) {
+			case "none":
+				return null;
+			case "all":
+				return null;
+			case "asc":
+				return 1;
+			case "desc":
+				return -1;
+			case "true":
+				return true;
+			case "false":
+				return false;
+			case "with":
+				return true;
+			case "without":
+				return false;
+			default:
+				return null;
+		}
+	}
+
+	sort() {
+		this.hiddenRows = new Set();
+
+		const rows = this.orchestrator.rows;
+
+		if (typeof this.sortedBy === "boolean") {
+			rows.forEach((row) => {
+				const data = this.rowValues.get(row);
+				if ((data ?? false) === this.sortedBy) {
+					row.dataset.visible = "true";
+				} else {
+					row.dataset.visible = "false";
+					this.hiddenRows.add(row);
+				}
+			});
+			this.sorted = true;
+			return;
+		}
+
+		const [visible, hidden] = [[], []];
+		this.orchestrator.rows.forEach((row) => {
+			this.rowValues.get(row) ? visible.push(row) : hidden.push(row);
+		});
+
+		hidden.forEach((row) => {
+			row.dataset.visible = "false";
+			this.hiddenRows.add(row);
+		});
+
+		if (this.ordering === "numeric") {
+			visible.sort((a, b) => {
+				const aVal = this.rowValues.get(a);
+				const bVal = this.rowValues.get(b);
+				return (aVal - bVal) * this.sortedBy;
+			});
+		} else if (this.ordering === "lexical") {
+			visible.sort((a, b) => {
+				const aVal = this.rowValues.get(a);
+				const bVal = this.rowValues.get(b);
+				return aVal.localeCompare(bVal) * this.sortedBy;
+			});
+		}
+
+		this.orchestrator.body.append(...visible);
+		this.sorted = true;
+	}
+
+	clear() {
+		this.initialized = false;
+		this.sortedBy = null;
+		this.hiddenRows = null;
+		this.rowValues = null;
+		this.sorted = false;
+		this.sortValue = this.defaultValue;
+	}
+}
+
+const OPTIONS = Symbol("options");
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/tableSorting.mjs::TableSorting.sort
+ * @reason private sort strategy exercised through the TableSorting orchestrator
+ */
+class CheckboxSort {
+	constructor(orchestrator, column, ordering) {
+		this.orchestrator = orchestrator;
+		this.column = column;
+		this.ordering = ordering;
+		this.reordering = false;
+		this.rowValues = null;
+		this.hiddenRows = null;
+		this.options = OPTIONS;
+		this.sortedBy = null;
+		this.sortValues = [];
+		this.initialized = false;
+		this.sorted = false;
+	}
+
+	get active() {
+		return this.sortedBy != null;
+	}
+
+	get state() {
+		return this.active ? { values: this.sortValues } : null;
+	}
+
+	get disabled() {
+		if (this.options === OPTIONS) this.init();
+		return this.options === null;
+	}
+
+	init() {
+		if (this.initialized) return;
+
+		this.rowValues = new WeakMap();
+		const options = {};
+
+		for (const row of this.orchestrator.body.querySelectorAll("tr")) {
+			const cell = row.querySelector(
+				`td[data-column="${this.column}"][data-sort-value]`,
+			);
+			if (!cell) continue;
+
+			const parsed = JSON.parse(cell.dataset.sortValue);
+			Object.assign(options, parsed);
+			this.rowValues.set(row, Object.keys(parsed));
+		}
+
+		this.options = Object.keys(options).length ? options : null;
+
+		this.initialized = true;
+		return this;
+	}
+
+	createOptions(element) {
+		if (this.options === null) return;
+
+		Object.entries(this.options).forEach(([key, value]) => {
+			element.appendChild(
+				primitives.checkbox({
+					name: key,
+					kind: this.orchestrator.kind,
+					label: value,
+					checked: this.sortValues.includes(key),
+				}),
+			);
+		});
+
+		element.addEventListener("change", (e) => {
+			this.sortValues = e.target.checked
+				? [...this.sortValues, e.target.name]
+				: this.sortValues.filter((value) => value !== e.target.name);
+			this.sortedBy = this.sortValues.length ? this.sortValues : null;
+			this.orchestrator.sort();
+		});
+	}
+
+	restore(state) {
+		if (this.options === null || !Array.isArray(state?.values)) return;
+
+		this.sortValues = state.values.filter((value) => {
+			return Object.hasOwn(this.options, value);
+		});
+		this.sortedBy = this.sortValues.length ? this.sortValues : null;
+		if (!this.active) return;
+
+		this.orchestrator.containers
+			.get(this.column)
+			?.querySelectorAll("input[type='checkbox']")
+			.forEach((input) => {
+				input.checked = this.sortValues.includes(input.name);
+			});
+	}
+
+	sort() {
+		const hiddenRows = new Set();
+
+		this.orchestrator.rows.forEach((row) => {
+			const values = this.rowValues.get(row) || [];
+			if (values.some((value) => this.sortValues.includes(value))) {
+				row.dataset.visible = "true";
+			} else {
+				row.dataset.visible = "false";
+				hiddenRows.add(row);
+			}
+		});
+
+		this.hiddenRows = hiddenRows;
+		this.sorted = true;
+	}
+
+	clear() {
+		this.sortedBy = null;
+		this.sortValues = [];
+		this.rowValues = null;
+		this.hiddenRows = null;
+		this.sorted = false;
+		this.options = OPTIONS;
+		this.initialized = false;
+	}
+}
+
+export { TableSorting };
