@@ -69,9 +69,9 @@ git mv documentation/releases/A.B.C.md documentation/releases/X.0.0.md
 venv/bin/python run.py version set X.0.0
 ```
 
-Update the moved note's title and add a prominent **Required post-upgrade
-maintenance** section. Set each new migration's `introduced_in` value to
-`X.0`, commit the complete retargeting change, then publish the renamed branch:
+Add a prominent **Required post-upgrade maintenance** section to the moved
+note. Set each new migration's `introduced_in` value to `X.0`, commit the
+complete retargeting change, then publish the renamed branch:
 
 ```bash
 git push -u origin next/X.0.0
@@ -80,9 +80,10 @@ git push origin --delete next/A.B.C
 
 Verify the new remote branch before deleting the old one. `version set`
 updates package metadata, generated application settings, the lockfile, and
-the privacy-notice version; it does not rename an existing release note or Git
-branch. `release-check` rejects new migration catalog entries without a major
-increase, matching `introduced_in`, and the required release-note section.
+the privacy-notice version, and synchronizes the target release note's title;
+it does not rename an existing release note or Git branch. `release-check`
+rejects new migration catalog entries without a major increase, matching
+`introduced_in`, and the required release-note section.
 
 ## Release `next/X.Y.Z` to `main`
 

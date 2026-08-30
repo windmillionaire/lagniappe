@@ -3,8 +3,8 @@
   {% call card() %}
     <p class="text-base-medium text-lg leading-relaxed mb-3">
       More than one person can work in the same workspace at the same time.
-      Documents and forms update live for everyone looking at them, and you can
-      keep working when your connection drops.
+      Documents update live for everyone looking at them. Saved form changes
+      refresh other open views, while unsaved typing remains local.
     </p>
     <p class="text-base-medium">
       Collaboration follows the same access rules as everything else: people
@@ -26,22 +26,23 @@
     </p>
   {% endcall %}
 
-  {{ heading("Live Forms", icon="form", kind="form") }}
+  {{ heading("Shared Forms", icon="form", kind="form") }}
   {% call card() %}
     <p class="text-base-medium">
-      Form fields stay in sync between everyone viewing the same page or task.
-      When someone else changes a value, it appears for you within a second or
-      two without reloading the page. This keeps a shared record consistent when
-      two people happen to open it together.
+      Structured forms use explicit saves rather than character-by-character
+      collaboration. After someone saves, the new values appear for other open
+      viewers without reloading the page. Unsaved typing stays local; if the
+      saved record changes elsewhere, Lagniappe protects the local draft for
+      review instead of silently replacing it.
     </p>
   {% endcall %}
 
   {{ heading("Presence", icon="users", kind="user") }}
   {% call card() %}
     <p class="text-base-medium">
-      When others are viewing the same document or form, you can see who is
-      there. That makes it easy to notice when a colleague is already working on
-      the same record before you both start editing.
+      When others are viewing the same collaborative document, you can see who
+      is there. That makes it easy to notice when a colleague is already working
+      in the document before you both start editing.
     </p>
   {% endcall %}
 
@@ -85,10 +86,11 @@
   {{ heading("Offline and Installable") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
-      Lagniappe keeps working when the network does not. If your connection
-      drops mid-edit, document changes and form submissions are queued on your
-      device and replayed when you come back online, so a brief outage does not
-      cost you work.
+      Previously viewed pages remain readable while the server is waking or the
+      network is unavailable. If your connection drops mid-edit, document
+      changes and supported form submissions are queued on your device and
+      replayed when you come back online. Other actions wait until the server is
+      reachable.
     </p>
     <p class="text-base-medium">
       It is also a progressive web app, so you can install it straight from the
@@ -116,7 +118,7 @@
   {{ heading("Good to Know") }}
   {% call card() %}
     <ul class="text-base-medium space-y-2">
-      <li>Live editing and presence work best for a handful of people on a record, not large simultaneous crowds.</li>
+      <li>Live document editing and presence work best for a handful of people, not large simultaneous crowds.</li>
       <li>Offline edits are held on the device that made them; they replay from that device when it reconnects.</li>
       <li>Visibility still comes from permissions -- collaboration never widens who can see a document or form.</li>
       <li>Direct messages are intentionally lightweight and polling-based, not a full Slack-style real-time chat product.</li>

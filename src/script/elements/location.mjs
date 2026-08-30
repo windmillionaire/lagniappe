@@ -104,11 +104,26 @@ export class LocationElement extends BaseElement {
 		return true;
 	}
 
+	/**
+	 * @testable true
+	 * @pair location:read-layout
+	 */
 	get read() {
 		if (this._read) return this._read;
 
 		this._read = document.createElement("div");
-		this._read.className = STYLES.form.submission.grows;
+		const sub = this.submission;
+		const name = cleanText(sub.name);
+		const address = addressWithUnit(sub);
+		const details =
+			name &&
+			address &&
+			name.toLowerCase() !== cleanText(sub.address).toLowerCase()
+				? address
+				: null;
+		this._read.className = details
+			? STYLES.form.submission.grows
+			: STYLES.form.submission.default;
 
 		const container = this._read.appendChild(document.createElement("div"));
 		container.className = `flex flex-row items-start gap-2`;
@@ -123,12 +138,10 @@ export class LocationElement extends BaseElement {
 		link.dataset.kind = "page";
 		link.className = STYLES.link.default;
 		link.target = "_blank";
-		const sub = this.submission;
 		link.href = mapsUrl(sub);
 
-		link.textContent = sub.name || addressWithUnit(sub);
+		link.textContent = details ? name : address || name;
 
-		const details = sub.name ? addressWithUnit(sub) : null;
 		if (details) {
 			const detail = text.appendChild(document.createElement("span"));
 			detail.className = "text-xs font-normal text-base-medium";

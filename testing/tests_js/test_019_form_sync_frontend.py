@@ -436,7 +436,7 @@ if (linkCall?.attributes?.label !== "Link" || linkCall?.attributes?.icon !== "ou
     )
 
 
-# @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repairs running version-history
+# @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repair-filtering repairs running version-history
 # @template home/site_settings.html::site_settings
 def test_site_settings_migration_status_uses_generic_release_states(run_node):
     run_node(
@@ -462,7 +462,6 @@ class FakeNode {
 const title = new FakeNode();
 const summary = new FakeNode();
 const results = new FakeNode();
-const repairs = new FakeNode();
 const errors = new FakeNode();
 const updateButton = new FakeNode();
 const cacheButton = new FakeNode();
@@ -471,7 +470,6 @@ panel.nodes = {
   "[data-role='migration-status-title']": title,
   "[data-role='migration-status-summary']": summary,
   "[data-role='migration-status-results']": results,
-  "[data-role='migration-status-repairs']": repairs,
   "[data-role='migration-status-errors']": errors,
 };
 const target = new FakeNode();
@@ -587,15 +585,29 @@ const completion = completedRelease.children[1].children[0].children[0];
 if (!completion.textContent.includes("version 0.1, build old-build")) {
   throw new Error(`Completion build was not retained: ${completion.textContent}`);
 }
-const repairLink = repairs.children[0].children[0];
+const completedMigration = completedRelease.children[1].children[0];
+const repairNotes = completedMigration.children[2];
+const repairLink = repairNotes.children[0].children[0];
 if (repairLink?.href !== "/forms/repairable-form" || repairLink?.textContent !== "Open form") {
   throw new Error("Repair detail did not link to the affected form");
 }
-if (repairs.children[0].textContent.includes("long-repair-key")) {
+if (repairNotes.children[0].textContent.includes("long-repair-key")) {
   throw new Error("Linked repair detail exposed the raw Datastore key");
 }
 if (errors.childElementCount) {
   throw new Error("Resolved errors from an older attempt remained actionable");
+}
+
+settings._renderMigrationStatus({
+  status: "current",
+  current_version: "0.3",
+  cache_refresh_allowed: true,
+  counts: { complete: 1, total: 1 },
+  migrations: [{ ...completed, id: "MSG-001", label: "Messaging notification aggregates" }],
+});
+const messagingMigration = results.children[0].children[0].children[1].children[0];
+if (messagingMigration.children.length !== 2) {
+  throw new Error("MSG-001 exposed routine per-record repair notes");
 }
 
 const pending = {
