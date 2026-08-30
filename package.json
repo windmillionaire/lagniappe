@@ -54,5 +54,5 @@
     "format": "biome format --write src/script src/style build",
     "watch": "chokidar './src/**/*.{css,js,mjs,yaml}' 'lagniappe/web/templates/*.html' 'lagniappe/web/templates/**/*.html' -c 'node build/run-rollup.mjs development'"
   },
-  "version": "1.0.1"
+  "version": "1.1.0"
 }
