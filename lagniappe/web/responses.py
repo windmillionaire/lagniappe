@@ -856,6 +856,17 @@ def home_task_removed():
 # --- Filter Responses ---
 
 
+# @testable false
+# @covered-by lagniappe/web/responses.py::filtered_task_index
+# @covered-by lagniappe/web/responses.py::filtered_page_index
+# @reason filtered index response tests exercise the rendered polling contract
+def _filtered_index_poll_context(channel):
+    return {
+        "poll_channel": channel,
+        "poll_revision": channel_revisions((channel,), current_user)[channel],
+    }
+
+
 def new_filter(filter):
     template = get_template_attribute("filters.html", "filter_item")
     return template(filter), 200
@@ -870,12 +881,36 @@ def saved_filters(entity, filters):
         return template(entity, filters), 200
 
 
+# @testable true
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_saved_in_progress_filter_removes_completed_task_after_back_navigation
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_saved_in_progress_filter_refreshes_after_reconnect
+# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_completed_button
+# @pairs filters:saved-filter polling:task-index reconnect-refresh:task-index
 def filtered_task_index(tasks, filter):
-    return render_template("tasks/index.html", tasks=tasks, filtered=filter), 200
+    return (
+        render_template(
+            "tasks/index.html",
+            tasks=tasks,
+            filtered=filter,
+            **_filtered_index_poll_context("tasks"),
+        ),
+        200,
+    )
 
 
+# @testable true
+# @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filter_save_and_run
+# @pairs polling:category-index reconnect-refresh:category-index
 def filtered_page_index(pages, filter):
-    return render_template("categories/index.html", pages=pages, filtered=filter), 200
+    return (
+        render_template(
+            "categories/index.html",
+            pages=pages,
+            filtered=filter,
+            **_filtered_index_poll_context("categories"),
+        ),
+        200,
+    )
 
 
 # @testable false

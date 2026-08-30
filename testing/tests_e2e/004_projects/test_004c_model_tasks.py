@@ -37,10 +37,17 @@ See Also:
     - test_005a_projects.py: Project creation and model task creation tests
 """
 
+from dataclasses import replace
+from urllib.parse import urlsplit
+from uuid import uuid4
+
 from playwright.sync_api import expect
 
 from testing.definitions import Forms, ModelTasks, SubmissionFields, Tasks, Users
 from testing.elements import Buttons, FormSelect, Modal, SpinnerButtons
+from testing.resources import Task
+from testing.utility.network import expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 
 # @pair model-tasks:info-form
@@ -159,12 +166,58 @@ def _click_status_filter(model_task, label):
 
 
 # @matrix model-tasks : completed status-filter
-def test_completed_button(get_user):
+# @pairs polling:task-index reconnect-refresh:task-index
+# @template tasks/index.html::view
+def test_completed_button(get_user, browser_failures):
     user = get_user(Users.OWNER)
     model_task, completed_task, in_progress_task = _status_filter_context(user)
 
     results = _click_status_filter(model_task, "Completed")
 
+    root = user.locate("[lp-view]")
+    expect(root).to_have_attribute("data-poll-channel", "tasks")
+    assert root.get_attribute("data-poll-revision")
+    assert root.get_attribute("data-key") is None
+    assert root.get_attribute("data-index") is None
+
+    route = results.locator("tbody").get_attribute("data-route")
+    assert route and urlsplit(route).query == "completed=true"
+
+    expect(results.locator(f"tr[data-key='{completed_task.key}']")).to_be_visible()
+    expect(
+        results.locator(f"tr[data-key='{in_progress_task.key}']")
+    ).not_to_be_visible()
+
+    offline_indicator = user.locate("[data-role='offline']")
+    with browser_failures.expect_offline(user):
+        user.offline = True
+        expect(offline_indicator).to_be_visible()
+
+    Task(
+        user=user,
+        definition=replace(
+            in_progress_task.definition,
+            name=f"Status Filter Reconnect Task {uuid4().hex}",
+        ),
+    ).create()
+    status_path = urlsplit(user.page.url).path
+    try:
+        with expect_poll_result(
+            user.page,
+            subscription_id="view:channel:tasks",
+        ):
+            with expect_successful_response(
+                user.page,
+                method="GET",
+                path=status_path,
+                query={"completed": "true"},
+            ):
+                user.offline = False
+    finally:
+        if user.offline:
+            user.offline = False
+
+    expect(offline_indicator).to_be_hidden()
     expect(results.locator(f"tr[data-key='{completed_task.key}']")).to_be_visible()
     expect(
         results.locator(f"tr[data-key='{in_progress_task.key}']")
@@ -177,6 +230,9 @@ def test_in_progress_button(get_user):
     model_task, completed_task, in_progress_task = _status_filter_context(user)
 
     results = _click_status_filter(model_task, "In Progress")
+
+    route = results.locator("tbody").get_attribute("data-route")
+    assert route and urlsplit(route).query == "completed=false"
 
     expect(results.locator(f"tr[data-key='{in_progress_task.key}']")).to_be_visible()
     expect(

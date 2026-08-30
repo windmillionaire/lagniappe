@@ -1,21 +1,21 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=bd7dbd9a';
-import { EntityMenu } from './entityMenu.js?v=bd7dbd9a';
-import { w as withTransition, r as request, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=bd7dbd9a';
-import { c as connectivity } from './connectivity.js?v=bd7dbd9a';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=bd7dbd9a';
-import { STYLES } from './styles.js?v=bd7dbd9a';
-import { s as setIcon } from './icons.js?v=bd7dbd9a';
-import { p as primitives } from './primitives.js?v=bd7dbd9a';
-import { B as BaseForm, R as Renderer } from './baseForm.js?v=bd7dbd9a';
-import { F as FacetsBox } from './facets.js?v=bd7dbd9a';
+import { SearchBox } from './search.js?v=bb782d98';
+import { EntityMenu } from './entityMenu.js?v=bb782d98';
+import { w as withTransition, r as request, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=bb782d98';
+import { c as connectivity } from './connectivity.js?v=bb782d98';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=bb782d98';
+import { STYLES } from './styles.js?v=bb782d98';
+import { s as setIcon } from './icons.js?v=bb782d98';
+import { p as primitives } from './primitives.js?v=bb782d98';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=bb782d98';
+import { F as FacetsBox } from './facets.js?v=bb782d98';
 
 const CONDITION_REGISTRY = {
-	html: () => import('./html.js?v=bd7dbd9a'),
-	status: () => import('./status.js?v=bd7dbd9a'),
-	visibility: () => import('./visibility.js?v=bd7dbd9a'),
-	columns: () => import('./columns.js?v=bd7dbd9a'),
-	options: () => import('./options.js?v=bd7dbd9a'),
+	html: () => import('./html.js?v=bb782d98'),
+	status: () => import('./status.js?v=bb782d98'),
+	visibility: () => import('./visibility.js?v=bb782d98'),
+	columns: () => import('./columns.js?v=bb782d98'),
+	options: () => import('./options.js?v=bb782d98'),
 };
 
 /**

@@ -36,14 +36,17 @@
   <div lp-view
        data-kind="task"
        {% if filtered %}
-         {% if not filtered.temporary %}data-key="{{ filtered.urlsafe_key }}"{% endif %}
+         {% if not filtered.temporary %}
+         data-key="{{ filtered.urlsafe_key }}"
+         data-fingerprint="{{ filtered.fingerprint }}"
+         {% endif %}
        data-hash="{{ filtered.hash }}"
        {% else %}
        data-index="tasks"
        data-fingerprint="{{ fingerprint }}"
+       {% endif %}
        data-poll-channel="{{ poll_channel }}"
        data-poll-revision="{{ poll_revision }}"
-       {% endif %}
        class="group">
     <div class="{{ styles.layout.view.header }}">
       {{ view_header() }}

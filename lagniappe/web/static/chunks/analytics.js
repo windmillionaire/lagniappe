@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './foundation.js?v=bd7dbd9a';
-import './connectivity.js?v=bd7dbd9a';
+import { r as request } from './foundation.js?v=bb782d98';
+import './connectivity.js?v=bb782d98';
 
 /**
  * @testable false

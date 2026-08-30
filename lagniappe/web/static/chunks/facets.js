@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as ENDPOINTS, r as request } from './foundation.js?v=bd7dbd9a';
-import './connectivity.js?v=bd7dbd9a';
-import { R as RemoteQueryCombobox } from './remote.js?v=bd7dbd9a';
-import { R as Results } from './results.js?v=bd7dbd9a';
-import { S as Submitter } from './submitter.js?v=bd7dbd9a';
+import { E as ENDPOINTS, r as request } from './foundation.js?v=bb782d98';
+import './connectivity.js?v=bb782d98';
+import { R as RemoteQueryCombobox } from './remote.js?v=bb782d98';
+import { R as Results } from './results.js?v=bb782d98';
+import { S as Submitter } from './submitter.js?v=bb782d98';
 
 /**
  * @testable infrastructure

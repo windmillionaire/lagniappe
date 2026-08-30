@@ -415,6 +415,37 @@ vm.runInContext(source, context);
   await channel.options.onResult({ status: "changed" });
   if (refreshes !== 1) throw new Error("Collection polling did not refresh");
 
+  let filteredRefreshes = 0;
+  const filtered = Object.create(context.Core.prototype);
+  Object.assign(filtered, {
+    PollingCoordinator: polling,
+    elt: {
+      dataset: {
+        fingerprint: "filter-v1",
+        pollChannel: "tasks",
+        pollRevision: "tasks-v1",
+      },
+      querySelector() { return null; },
+    },
+    kind: "task",
+    key: "filter-key",
+    async refresh() { filteredRefreshes += 1; },
+  });
+  filtered._initPollingSubscription();
+  const filteredSubscription = subscriptions[1];
+  if (
+    filteredSubscription.descriptor.id !== "view:channel:tasks" ||
+    filteredSubscription.descriptor.type !== "channel" ||
+    filteredSubscription.descriptor.channel !== "tasks" ||
+    filteredSubscription.descriptor.revision !== "tasks-v1"
+  ) {
+    throw new Error("A keyed filtered root did not prefer its collection channel");
+  }
+  await filteredSubscription.options.onResult({ status: "changed" });
+  if (filteredRefreshes !== 1) {
+    throw new Error("Filtered collection polling did not refresh");
+  }
+
   const changes = [];
   const editResults = [];
   const watcher = {
@@ -434,7 +465,7 @@ vm.runInContext(source, context);
     async reconcileChange(change) { changes.push(change); },
   });
   entity._initPollingSubscription();
-  const entitySubscription = subscriptions[1];
+  const entitySubscription = subscriptions[2];
   await entitySubscription.options.onResult({ status: "changed" });
   await entitySubscription.options.onResult({ status: "unavailable" });
   if (

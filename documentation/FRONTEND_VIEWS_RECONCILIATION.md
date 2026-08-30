@@ -69,6 +69,13 @@ revisions. Home widgets own independent channels—Notes, Tasks, Starred, Pages,
 Projects, Categories, Ingress, and Tool Reports—so a change refreshes only its
 consumer.
 
+Full-page saved filters subscribe to the collection they project: project
+filters use the Tasks channel and category filters use the Categories channel.
+Their durable filter key and hash let `/l/refresh` recompute membership through
+the saved filter cache. Temporary project status filters use the same Tasks
+channel but retain their complete focused route, including query parameters,
+and fall back to replacing that collection from the route.
+
 Star and delete are collection changes, not form revision changes. A committed
 delete removes exact entity-key DOM nodes before collection and supplemental
 navigation refresh.

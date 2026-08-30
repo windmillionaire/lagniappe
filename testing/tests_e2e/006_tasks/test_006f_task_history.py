@@ -190,6 +190,41 @@ def test_task_history_appears_after_completion_cycle(get_user):
     expect(attachment_link).to_have_attribute("href", re.compile(r"/files/.+"))
 
 
+# @matrix tasks : active-widget history-refresh settings uncomplete
+# @template pages/tasks.html::task
+# @template pages/tasks.html::settings_form
+def test_uncomplete_from_loaded_task_history_opens_settings(get_user):
+    user = get_user(Users.OWNER)
+    task_name = f"History Uncomplete Task {uuid4().hex}"
+    task = _create_combine_task(
+        user,
+        Pages.test_create_page_task.get(user).entity,
+        task_name,
+    )
+    task.definition = replace(
+        Tasks.test_history_task.value.definition,
+        name=task_name,
+    )
+    user.go(task)
+
+    _complete_then_uncomplete(task)
+    task.complete()
+    history = _open_history(task)
+    expect(history.locator("tbody tr[lp-entity]")).to_have_count(1)
+
+    task.uncomplete()
+
+    expect(task.element).to_have_attribute("data-completed", "false")
+    expect(task.element).to_have_attribute("data-open", "TaskSettings")
+    settings = task.element.locator(Task.SETTINGS_FORM)
+    expect(settings).to_have_attribute("rendered", "")
+    expect(settings).to_be_visible()
+    expect(task.element.locator(Task.TASK_HISTORY)).to_be_hidden()
+
+    refreshed_history = _open_history(task)
+    expect(refreshed_history.locator("tbody tr[lp-entity]")).to_have_count(2)
+
+
 # @matrix table-controls : column-visibility persistence
 # @matrix tasks : history reload
 # @template pages/tasks.html::task_tab

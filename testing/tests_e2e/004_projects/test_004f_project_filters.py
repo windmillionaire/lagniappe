@@ -45,6 +45,8 @@ from testing.elements import (
     ProjectFilterConditions,
 )
 from testing.resources import Task
+from testing.utility.polling import expect_poll_result
+from testing.utility.reconnect import expect_reconnect_refresh
 
 pytestmark = pytest.mark.e2e
 
@@ -667,4 +669,53 @@ def test_saved_in_progress_filter_removes_completed_task_after_back_navigation(
     user.page.go_back()
     user.page.wait_for_selector("[lp-view][initialized]")
     expect(filtered_row).not_to_be_attached(timeout=15000)
+    expect(user.locate("#table tbody")).to_have_attribute("loaded", "")
+
+
+# @pair filters:saved-filter
+# @pairs polling:task-index reconnect-refresh:task-index
+# @template tasks/index.html::view
+# @template table.html::row
+def test_saved_in_progress_filter_refreshes_after_reconnect(
+    get_user,
+    browser_failures,
+):
+    user = get_user(Users.OWNER)
+    task = Task(
+        user=user,
+        definition=replace(
+            Tasks.test_filter_by_completed.value.definition,
+            name=f"Saved Filter Reconnect Task {uuid4().hex}",
+        ),
+    ).create()
+    project = user.go(task.project)
+
+    filters = Filters(user, project)
+    filters.set_condition(ProjectFilterConditions.COMPLETED)
+    filters.boolean("in progress").add_filter()
+    saved_filter = filters.save_filter()
+    filter_key = saved_filter.get_attribute("data-key")
+
+    with user.page.expect_navigation():
+        saved_filter.locator("a[href*='/filters/']").click()
+    user.page.wait_for_selector("[lp-view][initialized]")
+
+    root = user.locate("[lp-view]")
+    expect(root).to_have_attribute("data-key", filter_key)
+    expect(root).to_have_attribute("data-poll-channel", "tasks")
+    assert root.get_attribute("data-fingerprint")
+    assert root.get_attribute("data-poll-revision")
+
+    filtered_row = user.locate(f"#table tbody tr[data-key='{task.key}']")
+    expect(filtered_row).to_be_visible()
+
+    with expect_poll_result(
+        user.page,
+        subscription_id="view:channel:tasks",
+    ):
+        with expect_reconnect_refresh(user, browser_failures):
+            task.mark_completed()
+            user.offline = False
+
+    expect(filtered_row).not_to_be_attached()
     expect(user.locate("#table tbody")).to_have_attribute("loaded", "")
