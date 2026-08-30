@@ -30,6 +30,7 @@ Test Framework:
 from dataclasses import replace
 from datetime import datetime
 import json
+import re
 from uuid import uuid4
 
 import pytest
@@ -703,8 +704,8 @@ def test_saved_in_progress_filter_refreshes_after_reconnect(
     root = user.locate("[lp-view]")
     expect(root).to_have_attribute("data-key", filter_key)
     expect(root).to_have_attribute("data-poll-channel", "tasks")
-    assert root.get_attribute("data-fingerprint")
-    assert root.get_attribute("data-poll-revision")
+    expect(root).to_have_attribute("data-fingerprint", re.compile(r".+"))
+    expect(root).to_have_attribute("data-poll-revision", re.compile(r".+"))
 
     filtered_row = user.locate(f"#table tbody tr[data-key='{task.key}']")
     expect(filtered_row).to_be_visible()

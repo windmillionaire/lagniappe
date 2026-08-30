@@ -38,6 +38,7 @@ See Also:
 """
 
 from dataclasses import replace
+import re
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -176,12 +177,14 @@ def test_completed_button(get_user, browser_failures):
 
     root = user.locate("[lp-view]")
     expect(root).to_have_attribute("data-poll-channel", "tasks")
-    assert root.get_attribute("data-poll-revision")
-    assert root.get_attribute("data-key") is None
-    assert root.get_attribute("data-index") is None
+    expect(root).to_have_attribute("data-poll-revision", re.compile(r".+"))
+    expect(root).not_to_have_attribute("data-key", re.compile(r".*"))
+    expect(root).not_to_have_attribute("data-index", re.compile(r".*"))
 
-    route = results.locator("tbody").get_attribute("data-route")
-    assert route and urlsplit(route).query == "completed=true"
+    expect(results.locator("tbody")).to_have_attribute(
+        "data-route",
+        re.compile(r"[?&]completed=true(?:&|$)"),
+    )
 
     expect(results.locator(f"tr[data-key='{completed_task.key}']")).to_be_visible()
     expect(
@@ -231,8 +234,10 @@ def test_in_progress_button(get_user):
 
     results = _click_status_filter(model_task, "In Progress")
 
-    route = results.locator("tbody").get_attribute("data-route")
-    assert route and urlsplit(route).query == "completed=false"
+    expect(results.locator("tbody")).to_have_attribute(
+        "data-route",
+        re.compile(r"[?&]completed=false(?:&|$)"),
+    )
 
     expect(results.locator(f"tr[data-key='{in_progress_task.key}']")).to_be_visible()
     expect(

@@ -1,4 +1,5 @@
 from dataclasses import replace
+import re
 from uuid import uuid4
 
 from playwright.sync_api import expect
@@ -377,8 +378,8 @@ def test_category_saved_filter_save_and_run(get_user, browser_failures):
     root = user.locate("[lp-view]")
     expect(root).to_have_attribute("data-key", filter_key)
     expect(root).to_have_attribute("data-poll-channel", "categories")
-    assert root.get_attribute("data-fingerprint")
-    assert root.get_attribute("data-poll-revision")
+    expect(root).to_have_attribute("data-fingerprint", re.compile(r".+"))
+    expect(root).to_have_attribute("data-poll-revision", re.compile(r".+"))
 
     table = user.locate("#table")
     expect(
