@@ -132,6 +132,9 @@ def plan_contract(report, user):
         "workflow_rules": [
             "Upload and finalize at least one file before submitting a proposal.",
             "Read tools are available only while the plan remains a draft.",
+            "Before analyzing files, call get_guidelines with task=organize and "
+            "follow that shared end-to-end workflow; retrieve the specialized "
+            "guideline bundles it requires.",
             "Fetch this contract after finalizing uploads and immediately before "
             "constructing the proposal.",
             "Submission saves a ready report for browser review and never executes "

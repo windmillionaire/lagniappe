@@ -42,13 +42,17 @@ generic client does not need separate prompt instructions.
 3. `POST /plans/{id}/uploads` creates resumable Cloud Storage sessions.
 4. Upload bytes to each returned `session_url`, then call
    `POST /plans/{id}/uploads/finalize`.
-5. `GET /tools` returns plain JSON Schema tool definitions. Run a tool with
-   `POST /plans/{id}/tools/{tool_name}` and an `arguments` object.
-6. `GET /plans/{id}/contract` returns the final proposal schema, workflow and
+5. `GET /tools` returns plain JSON Schema tool definitions. Before analyzing
+   files, call `get_guidelines` with `task: organize`; this returns the same
+   end-to-end Organize workflow used by the internal Gemini prompt. Run tools
+   with `POST /plans/{id}/tools/{tool_name}` and an `arguments` object.
+6. Call other read tools and the specialized guideline bundles required by the
+   shared Organize workflow while the plan remains a draft.
+7. `GET /plans/{id}/contract` returns the final proposal schema, workflow and
    reference rules, allowed actions, permission context, file references, and
    limits. Fetch it after uploads and immediately before constructing the
    proposal.
-7. `POST /plans/{id}/submit` validates and saves the proposal as a ready report.
+8. `POST /plans/{id}/submit` validates and saves the proposal as a ready report.
    The response's `review_url` opens the normal deterministic report workflow.
 
 Submission is idempotent when the same normalized proposal is sent again. A
@@ -101,10 +105,17 @@ curl --fail --silent --show-error \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/uploads/finalize"
 ```
 
-Fetch the contract after finalization and submit the external model's final
-JSON proposal:
+Fetch the shared Organize workflow after finalization, use the required read
+tools and specialized bundles, then fetch the contract and submit the external
+model's final JSON proposal:
 
 ```bash
+curl --fail --silent --show-error \
+  -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"task":"organize"}}' \
+  "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/tools/get_guidelines"
+
 curl --fail --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/contract"
@@ -173,9 +184,14 @@ with path.open("rb") as source:
     ).raise_for_status()
 
 session.post(f"{base}/plans/{plan['id']}/uploads/finalize", json={}).raise_for_status()
+tools = session.get(f"{base}/tools").json()
+organize_guidelines = session.post(
+    f"{base}/plans/{plan['id']}/tools/get_guidelines",
+    json={"arguments": {"task": "organize"}},
+).json()["result"]
 contract = session.get(f"{base}/plans/{plan['id']}/contract").json()
-# Give plan instructions, contract, and GET /tools output to the external model,
-# run requested read tools, then POST its final proposal to /submit.
+# Give the model the plan, tools, shared Organize guidelines, and contract; run
+# requested reads and specialized guideline calls, then POST to /submit.
 ```
 
 ## REST versus MCP

@@ -7,7 +7,14 @@ from lagniappe.core.tools.ai.guidelines import (
     CATEGORY_GENERATION_GUIDELINES,
     DOCUMENT_GUIDELINES,
     FORM_AUTOFILL_RULES,
+    LAGNIAPPE_WORKSPACE_CONCEPTS,
     ORGANIZE_ACTION_GUIDELINES,
+    ORGANIZE_PLANNING_ACTIONS,
+    ORGANIZE_PLANNING_CONCEPTS,
+    ORGANIZE_PLANNING_OUTPUT,
+    ORGANIZE_PLANNING_POLICY,
+    ORGANIZE_PLANNING_PREFLIGHT,
+    ORGANIZE_PLANNING_TOOLS,
     PAGE_FORM_CONTENT_GUIDELINES,
     PAGE_FORM_REQUIREMENTS,
     PAGE_FORM_SCHEMA_FORMAT,
@@ -25,6 +32,20 @@ from lagniappe.core.tools.ai.guidelines import (
 
 
 GUIDELINE_BUNDLES = {
+    "organize": {
+        "description": (
+            "Shared end-to-end workflow for constructing an Organize proposal."
+        ),
+        "sections": (
+            LAGNIAPPE_WORKSPACE_CONCEPTS,
+            ORGANIZE_PLANNING_CONCEPTS,
+            ORGANIZE_PLANNING_POLICY,
+            ORGANIZE_PLANNING_TOOLS,
+            ORGANIZE_PLANNING_ACTIONS,
+            ORGANIZE_PLANNING_OUTPUT,
+            ORGANIZE_PLANNING_PREFLIGHT,
+        ),
+    },
     "category": {
         "description": "Rules for proposing a new category and optional page form.",
         "sections": (
@@ -95,10 +116,11 @@ GET_GUIDELINES = types.FunctionDeclaration(
     name="get_guidelines",
     description=(
         "Return detailed prompt guidelines for one report-planning subtask. Use this "
-        "when a proposal would benefit from detailed rules for generated structure, "
-        "form schemas, form submissions, page documents, file summaries, or "
-        "action data. Request one bundle per call. Independent bundles may be "
-        "requested in parallel when the client supports it."
+        "tool with task=organize when the caller has not already received the shared "
+        "end-to-end Organize workflow. Use the other tasks for detailed rules about "
+        "generated structure, form schemas, form submissions, page documents, file "
+        "summaries, or action data. Request one bundle per call. Independent bundles "
+        "may be requested in parallel when the client supports it."
     ),
     parameters={
         "type": "object",

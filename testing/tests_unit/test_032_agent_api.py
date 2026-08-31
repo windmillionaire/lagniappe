@@ -74,6 +74,10 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         "Upload and finalize at least one file" in rule
         for rule in contract["workflow_rules"]
     )
+    assert any(
+        "get_guidelines with task=organize" in rule
+        for rule in contract["workflow_rules"]
+    )
     assert any("never executes" in rule for rule in contract["workflow_rules"])
     assert contract["limits"]["max_tool_calls"] == external_api.MAX_PLAN_TOOL_CALLS
 

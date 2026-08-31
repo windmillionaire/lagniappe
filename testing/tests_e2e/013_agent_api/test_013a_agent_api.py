@@ -104,6 +104,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert openapi.json["openapi"] == "3.1.0"
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
     assert "does not execute proposed actions" in openapi.json["info"]["description"]
+    assert "task=organize" in openapi.json["info"]["description"]
     operations = [
         operation
         for path in openapi.json["paths"].values()
@@ -118,6 +119,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert create_schema["required"] == ["instructions"]
     upload_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/uploads"]["post"]
     assert upload_operation["requestBody"]["required"] is True
+    tools_operation = openapi.json["paths"]["/api/v1/tools"]["get"]
+    assert "task=organize" in tools_operation["description"]
     submit_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/submit"]["post"]
     assert "Requires at least one finalized file" in submit_operation["description"]
     submit_schema = submit_operation["requestBody"]["content"]["application/json"][

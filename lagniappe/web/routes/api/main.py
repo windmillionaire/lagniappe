@@ -416,8 +416,9 @@ def openapi_document():
                 "description": (
                     "Returns every available tool with its JSON input schema. Tool "
                     "calls run as the bearer-key user and may only inspect data that "
-                    "user can access. Use returned hash: references in later calls "
-                    "and in the proposal."
+                    "user can access. An external Organize client should fetch the "
+                    "get_guidelines task=organize bundle before analyzing files. Use "
+                    "returned hash: references in later calls and in the proposal."
                 ),
                 "tags": ["Discovery"],
                 "responses": {
@@ -680,10 +681,12 @@ def openapi_document():
                 "Use this API as a permission-bounded Organize backend for an "
                 "external model. Workflow: (1) verify the actor with getCurrentActor; "
                 "(2) create a draft; (3) upload and finalize at least one file; "
-                "(4) discover and call read tools as needed while the plan is a "
-                "draft; (5) fetch the plan-specific contract after uploads and "
-                "construct a conforming proposal; (6) submit it and stop for human "
-                "browser review. This API does not execute proposed actions."
+                "(4) discover the read tools and fetch get_guidelines with "
+                "task=organize for the shared end-to-end planning workflow; (5) call "
+                "other read tools and required specialized guideline bundles while "
+                "the plan is a draft; (6) fetch the plan-specific contract after "
+                "uploads and construct a conforming proposal; (7) submit it and stop "
+                "for human browser review. This API does not execute proposed actions."
             ),
         },
         "servers": [{"url": request.url_root.rstrip("/")}],
