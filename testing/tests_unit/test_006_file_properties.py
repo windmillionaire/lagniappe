@@ -614,6 +614,31 @@ def test_uploaded_file_story_records_metadata_before_asset_save():
     assert image_asset.image == "/assets/file"
     assert image_asset.uri == "gs://bucket/file"
 
+    class TextUpload(BytesIO):
+        def __init__(self, content, content_type):
+            super().__init__(content)
+            self.content_type = content_type
+
+    charset_file = FakeFile("notes.txt")
+    charset_asset = FileAsset(entity=charset_file, user=object())
+    charset_upload = TextUpload(b"cafe notes", "Text/Plain; charset=utf-8")
+
+    charset_asset.value = charset_upload
+
+    assert charset_file.mimetype == "text/plain"
+    assert charset_file.encoding == "utf-8"
+    assert charset_upload.lagniappe_content_type == "text/plain"
+
+    vcard_file = FakeFile("person.vcf")
+    vcard_asset = FileAsset(entity=vcard_file, user=object())
+    vcard_upload = TextUpload(b"BEGIN:VCARD\nFN:Avery Rowan\nEND:VCARD\n", "text/vcard")
+
+    vcard_asset.value = vcard_upload
+
+    assert vcard_file.mimetype == "text/vcard"
+    assert vcard_file.encoding == "utf-8"
+    assert vcard_upload.lagniappe_content_type == "text/vcard"
+
 
 # @matrix file storage : direct-upload large-video metadata
 @pytest.mark.unit

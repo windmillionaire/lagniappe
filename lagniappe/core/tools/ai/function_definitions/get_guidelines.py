@@ -9,18 +9,16 @@ from lagniappe.core.tools.ai.guidelines import (
     FORM_AUTOFILL_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
     ORGANIZE_ACTION_GUIDELINES,
-    ORGANIZE_PLANNING_ACTIONS,
     ORGANIZE_PLANNING_CONCEPTS,
-    ORGANIZE_PLANNING_OUTPUT,
     ORGANIZE_PLANNING_POLICY,
     ORGANIZE_PLANNING_PREFLIGHT,
-    ORGANIZE_PLANNING_TOOLS,
     PAGE_FORM_CONTENT_GUIDELINES,
     PAGE_FORM_REQUIREMENTS,
     PAGE_FORM_SCHEMA_FORMAT,
     PROJECT_COMPLEXITY_GUIDELINES,
     PROJECT_GENERATION_GUIDELINES,
     REPORT_OUTPUT_REQUIREMENTS,
+    REPORT_PREFLIGHT_CHECKS,
     SCHEMA_TYPE_GUIDELINES,
     SCHEMA_EVOLUTION_GUIDELINES,
     SUBMISSION_OUTPUT_REQUIREMENTS,
@@ -36,14 +34,24 @@ GUIDELINE_BUNDLES = {
         "description": (
             "Shared end-to-end workflow for constructing an Organize proposal."
         ),
+        "instructions": (
+            "Apply this as a two-phase workflow. First use the planning sections "
+            "to settle structure and file assignments without submission fields; "
+            "do not submit that intermediate plan. Then use Action Planning, the "
+            "form_autofill bundle, each exact form schema, and the current plan "
+            "contract to add final submission or update values. An external client "
+            "must complete both phases before /submit because the server will not "
+            "call a model to finish or repair the proposal. The current plan "
+            "contract is authoritative if an illustrative shape differs. Read tools "
+            "only inspect context and never execute the proposal."
+        ),
         "sections": (
             LAGNIAPPE_WORKSPACE_CONCEPTS,
             ORGANIZE_PLANNING_CONCEPTS,
             ORGANIZE_PLANNING_POLICY,
-            ORGANIZE_PLANNING_TOOLS,
-            ORGANIZE_PLANNING_ACTIONS,
-            ORGANIZE_PLANNING_OUTPUT,
             ORGANIZE_PLANNING_PREFLIGHT,
+            ORGANIZE_ACTION_GUIDELINES,
+            REPORT_PREFLIGHT_CHECKS,
         ),
     },
     "category": {
@@ -164,12 +172,13 @@ def execute_get_guidelines(args, _user):
         section_count=len(bundle["sections"]),
         chars=len(guidelines),
     )
+    instructions = bundle.get(
+        "instructions",
+        "Apply these guidelines when deciding or shaping report proposal action "
+        "data. Do not change the final report JSON shape.",
+    )
     return {
         "task": task,
         "description": bundle["description"],
-        "guidelines": (
-            "Apply these guidelines when deciding or shaping report proposal action data. "
-            "Do not change the final report JSON shape.\n\n"
-            f"{guidelines}"
-        ),
+        "guidelines": f"{instructions}\n\n{guidelines}",
     }

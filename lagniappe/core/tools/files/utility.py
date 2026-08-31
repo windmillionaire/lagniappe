@@ -51,6 +51,7 @@ def determine_encoding(upload):
 # @reason upload metadata decisions are owned by the file asset upload contract
 def determine_mimetype(upload, filename, mimetype, encoding):
     """Resolve an upload MIME type from magic bytes and its extension."""
+    mimetype = str(mimetype or "").partition(";")[0].strip().casefold()
     if mimetype in GENERIC_MIMETYPES:
         kind = filetype.guess(_upload_sample(upload))
         if kind:

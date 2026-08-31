@@ -135,6 +135,10 @@ def plan_contract(report, user):
             "Before analyzing files, call get_guidelines with task=organize and "
             "follow that shared end-to-end workflow; retrieve the specialized "
             "guideline bundles it requires.",
+            "Apply the organize guidance in two phases: settle structure and file "
+            "assignments first, then use the form_autofill bundle and exact schemas "
+            "to add final form submissions or updates before submission. The server "
+            "will not call a model to complete or repair them.",
             "Fetch this contract after finalizing uploads and immediately before "
             "constructing the proposal.",
             "Submission saves a ready report for browser review and never executes "

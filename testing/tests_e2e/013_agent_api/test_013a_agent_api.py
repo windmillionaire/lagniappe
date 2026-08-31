@@ -105,6 +105,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
     assert "does not execute proposed actions" in openapi.json["info"]["description"]
     assert "task=organize" in openapi.json["info"]["description"]
+    assert "shared two-phase workflow" in openapi.json["info"]["description"]
+    assert "does not call a model" in openapi.json["info"]["description"]
     operations = [
         operation
         for path in openapi.json["paths"].values()
@@ -272,6 +274,78 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "arguments": {"query": "records"},
         "user": actor,
     }
+
+    class DownloadableFile:
+        properties = SimpleNamespace(
+            file=SimpleNamespace(value=SimpleNamespace(path="private/person.vcf"))
+        )
+
+        def allowed(self, action, user=None):
+            return user is actor
+
+    monkeypatch.setattr(api_routes.Entities, "FILE", DownloadableFile)
+    monkeypatch.setattr(
+        api_routes.Entities,
+        "fetch_one",
+        lambda identifier, request: DownloadableFile(),
+    )
+    monkeypatch.setattr(
+        api_routes.ai_functions,
+        "execute_registered_tool",
+        lambda name, arguments, user: (
+            {
+                "filename": "person.vcf",
+                "original_file": {
+                    "supported": False,
+                    "attached": False,
+                    "reason": "Provider does not support this MIME type.",
+                },
+            },
+            [],
+        ),
+    )
+    signed = []
+    monkeypatch.setattr(
+        api_routes.storage_assets,
+        "get_signed_url",
+        lambda path, expires_in: signed.append((path, expires_in))
+        or "https://storage.example/download",
+    )
+
+    original_available = client.post(
+        "/api/v1/plans/report-key/tools/get_file",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"arguments": {"id": "hash:filehash1234"}},
+    )
+    assert original_available.status_code == 200
+    assert original_available.json["result"]["original_file"] == {
+        "supported": True,
+        "attached": False,
+        "reason": (
+            "Original content was not included by default. Call get_file again "
+            "with include_original=true to receive a five-minute signed download URL."
+        ),
+    }
+    assert signed == []
+
+    original_requested = client.post(
+        "/api/v1/plans/report-key/tools/get_file",
+        headers={"Authorization": "Bearer valid-key"},
+        json={
+            "arguments": {
+                "id": "hash:filehash1234",
+                "include_original": True,
+            }
+        },
+    )
+    assert original_requested.status_code == 200
+    assert original_requested.json["result"]["original_file"] == {
+        "supported": True,
+        "attached": False,
+        "download_url": "https://storage.example/download",
+        "expires_in": 300,
+    }
+    assert signed == [("private/person.vcf", 300)]
 
     def submit(current, user, proposal, *, contract_version):
         assert user is actor

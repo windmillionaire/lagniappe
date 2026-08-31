@@ -682,11 +682,13 @@ def openapi_document():
                 "external model. Workflow: (1) verify the actor with getCurrentActor; "
                 "(2) create a draft; (3) upload and finalize at least one file; "
                 "(4) discover the read tools and fetch get_guidelines with "
-                "task=organize for the shared end-to-end planning workflow; (5) call "
-                "other read tools and required specialized guideline bundles while "
-                "the plan is a draft; (6) fetch the plan-specific contract after "
-                "uploads and construct a conforming proposal; (7) submit it and stop "
-                "for human browser review. This API does not execute proposed actions."
+                "task=organize for the shared two-phase workflow; (5) settle structure "
+                "and file assignments, then use required specialized bundles, exact "
+                "schemas, and form_autofill to add final form values while the plan "
+                "is a draft; (6) fetch the plan-specific contract after uploads and "
+                "construct a conforming proposal; (7) submit it and stop for human "
+                "browser review. The server does not call a model to complete or "
+                "repair the proposal, and this API does not execute proposed actions."
             ),
         },
         "servers": [{"url": request.url_root.rstrip("/")}],
@@ -997,9 +999,15 @@ def _original_file_download(tool_name, arguments, result):
     if tool_name != "get_file" or not isinstance(arguments, dict):
         return result
     include_original = arguments.get("include_original")
-    if not (
+    include_original = (
         include_original is True
         or str(include_original).strip().casefold() in {"1", "true", "yes", "on"}
+    )
+    original_file = result.get("original_file") if isinstance(result, dict) else None
+    if (
+        not include_original
+        and isinstance(original_file, dict)
+        and original_file.get("supported") is not False
     ):
         return result
 
@@ -1014,10 +1022,22 @@ def _original_file_download(tool_name, arguments, result):
     if not asset or not asset.path:
         return result
 
-    download_url = storage_assets.get_signed_url(asset.path, expires_in=300)
     if not isinstance(result, dict):
         result = {"result": result}
     result = dict(result)
+    if not include_original:
+        result["original_file"] = {
+            "supported": True,
+            "attached": False,
+            "reason": (
+                "Original content was not included by default. Call get_file "
+                "again with include_original=true to receive a five-minute signed "
+                "download URL."
+            ),
+        }
+        return result
+
+    download_url = storage_assets.get_signed_url(asset.path, expires_in=300)
     result["original_file"] = {
         "supported": True,
         "attached": False,

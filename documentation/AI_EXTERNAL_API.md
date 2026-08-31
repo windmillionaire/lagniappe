@@ -43,11 +43,14 @@ generic client does not need separate prompt instructions.
 4. Upload bytes to each returned `session_url`, then call
    `POST /plans/{id}/uploads/finalize`.
 5. `GET /tools` returns plain JSON Schema tool definitions. Before analyzing
-   files, call `get_guidelines` with `task: organize`; this returns the same
-   end-to-end Organize workflow used by the internal Gemini prompt. Run tools
-   with `POST /plans/{id}/tools/{tool_name}` and an `arguments` object.
+   files, call `get_guidelines` with `task: organize`. Its first phase uses the
+   same structural planning policy as the internal Gemini Organize prompt; do
+   not submit that intermediate structure. Run tools with
+   `POST /plans/{id}/tools/{tool_name}` and an `arguments` object.
 6. Call other read tools and the specialized guideline bundles required by the
-   shared Organize workflow while the plan remains a draft.
+   shared workflow while the plan remains a draft. In the second phase, use
+   `form_autofill` and each exact form schema to add final submissions or
+   updates to the structural actions.
 7. `GET /plans/{id}/contract` returns the final proposal schema, workflow and
    reference rules, allowed actions, permission context, file references, and
    limits. Fetch it after uploads and immediately before constructing the
@@ -60,7 +63,9 @@ different proposal cannot replace an already-ready report. Pending uploads,
 unknown/inaccessible references, disallowed actions, incomplete form values,
 and files that are not placed by the plan all fail validation without model
 repair. At least one finalized uploaded file is required before submission;
-the plan contract repeats that precondition in `workflow_rules`.
+the plan contract repeats that precondition in `workflow_rules`. The external
+client must complete both planning phases: the server does not call a model to
+fill or repair form values before review or execution.
 
 Failures under `/api/v1`, including routing-level `404` and `405` responses,
 use the same JSON error envelope and request ID. A `405` preserves the HTTP
@@ -148,7 +153,15 @@ allowed action.
 When `get_file` is called with `include_original: true`, the REST adapter
 returns a five-minute `original_file.download_url` when the source is
 available. Other transports may provide direct media instead. Extracted text
-remains the default so clients do not fetch original bytes unnecessarily.
+remains the default so clients do not fetch original bytes unnecessarily. A
+metadata-only call reports when the REST download fallback is available but
+does not create a signed URL. This remains true when the configured internal
+model cannot directly attach that file's MIME type.
+
+Upload MIME types are normalized to their lowercase base media type, without
+parameters such as `charset`. Recognized text formats, including `.vcf`
+vCards, are decoded for inline `get_file` content; other stored formats remain
+available through the signed-original fallback.
 
 ## Python skeleton
 
@@ -190,8 +203,9 @@ organize_guidelines = session.post(
     json={"arguments": {"task": "organize"}},
 ).json()["result"]
 contract = session.get(f"{base}/plans/{plan['id']}/contract").json()
-# Give the model the plan, tools, shared Organize guidelines, and contract; run
-# requested reads and specialized guideline calls, then POST to /submit.
+# Give the model the plan, tools, shared two-phase Organize guidelines, and
+# contract. Run requested reads; settle structure first; then apply form_autofill
+# and exact schemas to add final values before POSTing to /submit.
 ```
 
 ## REST versus MCP
