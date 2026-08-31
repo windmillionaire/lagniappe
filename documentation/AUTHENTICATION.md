@@ -192,3 +192,12 @@ Optional browser-review access uses `AGENT_ACCESS_ENABLED`,
 `AGENT_ACCESS_EMAIL`, `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. It is off by
 default. A successful `/users/agent-login` submission resolves to a normal user
 whose permissions remain group-managed in the owner interface.
+
+## External-agent API keys
+
+External-agent API authentication is independent of browser sessions. When
+`EXTERNAL_AGENT_API_ENABLED` is true, an eligible non-public user with `CREATE`
+AI access can generate one 30-day bearer key from their own Settings panel.
+Only a digest is persisted, rotation invalidates the previous key, and
+`/api/v1` never falls back to a login cookie. See
+[External Agent API](AI_EXTERNAL_API.md).

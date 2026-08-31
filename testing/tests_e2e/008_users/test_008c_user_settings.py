@@ -209,11 +209,16 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(
         settings_panel.locator("input[name='notification_email_mode'][value='DAILY']")
     ).to_be_checked()
+    expect(settings_panel.locator("[data-role='api-key-settings']")).to_be_visible()
+    expect(settings_panel.locator("[data-role='api-key-status']")).to_have_text(
+        "No active API key."
+    )
     assert user_settings_field_order(settings_panel) == [
         "name",
         "user-email",
         "ai-access",
         "notification-email",
+        "api-key-settings",
         "owner-inbound",
     ]
 

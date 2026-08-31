@@ -1473,6 +1473,7 @@ def test_set_application_defaults_generates_fresh_settings(monkeypatch, tmp_path
     assert settings["AGENT_ACCESS_EMAIL"] == "agent@localhost"
     assert settings["AGENT_ACCESS_NAME"] == "Agent"
     assert settings["AGENT_ACCESS_CODE"] == "url-token-32"
+    assert settings["EXTERNAL_AGENT_API_ENABLED"] == "True"
     app_yaml = yaml.safe_load((tmp_path / "lagniappe.yaml").read_text())
     assert "inbound_services" not in app_yaml
     assert token_calls == [16, 32]
@@ -2033,6 +2034,7 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
             "AGENT_ACCESS_EMAIL": "",
             "AGENT_ACCESS_NAME": "Review Agent",
             "AGENT_ACCESS_CODE": "",
+            "EXTERNAL_AGENT_API_ENABLED": True,
         },
         GCLOUD_CONFIG={
             "NAME": "project-1",
@@ -2060,6 +2062,7 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     assert settings.APP["AGENT_ACCESS_EMAIL"] == constants.DEFAULT_AGENT_ACCESS_EMAIL
     assert settings.APP["AGENT_ACCESS_NAME"] == "Review Agent"
     assert settings.APP["AGENT_ACCESS_CODE"] == "generated-agent-code"
+    assert settings.APP["EXTERNAL_AGENT_API_ENABLED"] is True
     assert settings.APP["AI_MODEL"] == constants.DEFAULT_AI_MODEL
     assert settings.APP["AI_UTILITY_MODEL"] == constants.DEFAULT_UTILITY_AI_MODEL
     assert settings.APP["AI_IMAGE_MODEL"] == constants.DEFAULT_AI_IMAGE_MODEL
@@ -2080,6 +2083,9 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     )
     assert "AI_OBSERVABILITY" not in settings.APP
     assert "AI_OBSERVABILITY" not in constants.REQUIRED_APPLICATION_SETTINGS
+    assert constants.REQUIRED_APPLICATION_SETTINGS[
+        "EXTERNAL_AGENT_API_ENABLED"
+    ] == "External agent API"
     assert token_calls == [32]
 
     settings.APP.update(
@@ -2088,6 +2094,7 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
             "AGENT_ACCESS_EMAIL": "changed@example.com",
             "AGENT_ACCESS_NAME": "Changed Agent",
             "AGENT_ACCESS_CODE": "changed-code",
+            "EXTERNAL_AGENT_API_ENABLED": False,
             "AI_UTILITY_MODEL": "custom-utility-model",
             "AI_IMAGE_MODEL": "custom-image-model",
             "AI_OBSERVABILITY": True,
@@ -2105,6 +2112,7 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     assert settings.APP["AGENT_ACCESS_EMAIL"] == "changed@example.com"
     assert settings.APP["AGENT_ACCESS_NAME"] == "Changed Agent"
     assert settings.APP["AGENT_ACCESS_CODE"] == "changed-code"
+    assert settings.APP["EXTERNAL_AGENT_API_ENABLED"] is False
     assert settings.APP["AI_UTILITY_MODEL"] == "custom-utility-model"
     assert settings.APP["AI_IMAGE_MODEL"] == "custom-image-model"
     assert settings.APP["AI_OBSERVABILITY"] is True

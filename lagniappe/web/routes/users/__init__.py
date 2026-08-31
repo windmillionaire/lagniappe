@@ -6,6 +6,7 @@ from . import (
     main,
     login,
     groups,
+    api_key,
 )
 
 __all__ = ["users"]

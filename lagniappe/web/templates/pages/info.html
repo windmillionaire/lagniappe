@@ -50,6 +50,9 @@
         data-can-edit-ai="{{ can_manage_user|yesno }}"
         data-ai-access="{{ page.user.ai_access }}"
         data-notification-email-mode="{{ page.user.notification_email_mode }}"
+        {% if CONFIG.EXTERNAL_AGENT_API_ENABLED and is_own_page and not page.user.is_public and current_user.access(AI.CREATE) %}
+          data-api-key-route="{{ url_for('users.api_key') }}"
+        {% endif %}
         data-can-edit-notification-email="{{ (is_own_page and not page.user.is_public)|yesno }}"
         data-can-edit-public-email="{{ (is_own_page and page.user.is_public)|yesno }}"
         data-is-public="{{ page.user.is_public|yesno }}"
@@ -86,6 +89,48 @@
             </div>
           </div>
           {% if is_own_page and not page.user.is_public %}<div data-role="notification-email"></div>{% endif %}
+          {% if CONFIG.EXTERNAL_AGENT_API_ENABLED and is_own_page and not page.user.is_public and current_user.access(AI.CREATE) %}
+            <fieldset data-role="api-key-settings"
+                      data-kind="user"
+                      class="space-y-3 rounded-md border border-user-default p-3">
+              <legend class="{{ styles.label.default }} px-1">External agent API</legend>
+              <p class="text-sm text-base-medium">
+                Use another AI client to inspect your permitted workspace data and prepare an Organize plan for review. API plans never run automatically.
+              </p>
+              <p data-role="api-key-status" class="text-sm font-semibold text-base-dark">
+                Loading API key status...
+              </p>
+              <div data-role="api-key-secret" data-visible="false" class="space-y-2">
+                <label class="block">
+                  <span class="{{ styles.label.sectionHeading }}">Copy this key now</span>
+                  <input data-role="api-key-value"
+                         type="text"
+                         readonly
+                         autocomplete="off"
+                         spellcheck="false"
+                         class="{{ styles.input }} font-mono text-xs">
+                </label>
+                <p class="text-sm font-semibold text-delete-default">
+                  This is the only time the full key will be shown.
+                </p>
+                <button type="button"
+                        data-action="copy-api-key"
+                        class="rounded-md border border-base-light px-3 py-1.5 text-sm font-semibold text-base-dark shadow-sm">Copy API key</button>
+              </div>
+              <p data-role="api-key-message"
+                 data-visible="false"
+                 class="text-sm text-delete-default"></p>
+              <div class="flex flex-wrap gap-2">
+                <button type="button"
+                        data-action="issue-api-key"
+                        class="{{ styles.button.submit }}">Generate API key</button>
+                <button type="button"
+                        data-action="revoke-api-key"
+                        data-visible="false"
+                        class="rounded-md border border-delete-default px-3 py-1.5 text-base font-semibold text-delete-default shadow-sm">Revoke API key</button>
+              </div>
+            </fieldset>
+          {% endif %}
           {% if is_own_page and page.user.is_public %}
             <label data-role="public-email-consent" class="{{ styles.checkbox.label }}">
               <div class="{{ styles.checkbox.container }}">

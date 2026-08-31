@@ -106,6 +106,7 @@ def test_redacted_install_summary_is_allowlisted():
         "AI_UTILITY_MODEL": "gemini-2.5-flash",
         "AI_IMAGE_MODEL": "gemini-3.1-flash-image",
         "AI_OBSERVABILITY": False,
+        "EXTERNAL_AGENT_API_ENABLED": False,
         "CAPTURE_ERRORS": "False",
         "REDIS_TLS": False,
         "TASK_QUEUE_NAME": "lagniappe-tasks",

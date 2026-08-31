@@ -25,6 +25,7 @@ begin in the [README](../README.md).
 | [AI_CONTEXT.md](AI_CONTEXT.md) | Context assembly, prompt inputs, tool schemas, and privacy boundaries. |
 | [AI_WORKFLOWS.md](AI_WORKFLOWS.md) | Autofill, summarize, create, organize, and form-generation workflows. |
 | [AI_EMAIL.md](AI_EMAIL.md) | Inbound email webhooks, attachment retrieval, reports, review, and feedback. |
+| [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | REST API keys, permission-bounded tools, uploads, and external Organize proposals. |
 
 ## Backend
 

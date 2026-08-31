@@ -496,6 +496,7 @@ class Settings:
                 "AGENT_ACCESS_EMAIL": constants.DEFAULT_AGENT_ACCESS_EMAIL,
                 "AGENT_ACCESS_NAME": constants.DEFAULT_AGENT_ACCESS_NAME,
                 "AGENT_ACCESS_CODE": constants.DEFAULT_AGENT_ACCESS_TEST_CODE,
+                "EXTERNAL_AGENT_API_ENABLED": True,
                 "ANALYTICS": True,
                 "AI_OBSERVABILITY": True,
                 "PUBLIC_MANUAL": True,

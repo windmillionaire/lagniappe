@@ -375,6 +375,7 @@ export class UserSettings extends PagePermissions {
 			submitted: "User Settings Updated",
 		};
 		this._groupSelect = null;
+		this._apiKeyCopyResetTimer = null;
 	}
 
 	async reset() {
@@ -397,7 +398,141 @@ export class UserSettings extends PagePermissions {
 		this._initGroups();
 		this._initPageSelect();
 		this._initRemovePage();
+		this._initApiKey();
 		this.commitRevisionBaseline();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
+	 * @matrix agent-api user-settings : copy expiry revoke rotate shown-once
+	 */
+	_initApiKey() {
+		const section = this.target.querySelector("[data-role='api-key-settings']");
+		const route = this.target.dataset.apiKeyRoute;
+		if (!section || !route) return;
+
+		const controller = new AbortController();
+		const signal = controller.signal;
+		section
+			.querySelector("[data-action='issue-api-key']")
+			?.addEventListener(
+				"click",
+				() => void this._issueApiKey(section, route),
+				{ signal },
+			);
+		section
+			.querySelector("[data-action='revoke-api-key']")
+			?.addEventListener(
+				"click",
+				() => void this._revokeApiKey(section, route),
+				{ signal },
+			);
+		section
+			.querySelector("[data-action='copy-api-key']")
+			?.addEventListener(
+				"click",
+				() => void this._copyApiKey(section),
+				{ signal },
+			);
+		this.destroyables.push({
+			destroy: () => {
+				controller.abort();
+				clearTimeout(this._apiKeyCopyResetTimer);
+			},
+		});
+		void request
+			.get(route, null, { signal, replaceErrorPage: false })
+			.then((response) => {
+				if (response.ok) this._renderApiKey(section, response.credential);
+				else this._apiKeyError(section, response.error);
+			});
+	}
+
+	_renderApiKey(section, credential = {}, token = null) {
+		const active = credential?.active === true;
+		const status = section.querySelector("[data-role='api-key-status']");
+		const issue = section.querySelector("[data-action='issue-api-key']");
+		const revoke = section.querySelector("[data-action='revoke-api-key']");
+		const secret = section.querySelector("[data-role='api-key-secret']");
+		const value = section.querySelector("[data-role='api-key-value']");
+		if (status) {
+			const expires = credential?.expires_at
+				? new Date(credential.expires_at).toLocaleString()
+				: null;
+			status.textContent = active
+				? `${credential.display_prefix || "API key"} — expires ${expires}`
+				: "No active API key.";
+		}
+		if (issue) issue.textContent = active ? "Regenerate API key" : "Generate API key";
+		if (revoke) revoke.dataset.visible = active.toString();
+		if (secret) secret.dataset.visible = Boolean(token).toString();
+		if (value) value.value = token || "";
+		this._apiKeyError(section, null);
+	}
+
+	_apiKeyError(section, message) {
+		const target = section.querySelector("[data-role='api-key-message']");
+		if (!target) return;
+		target.textContent = message || "";
+		target.dataset.visible = Boolean(message).toString();
+	}
+
+	async _issueApiKey(section, route) {
+		const issue = section.querySelector("[data-action='issue-api-key']");
+		const isRotation = issue?.textContent?.includes("Regenerate");
+		if (
+			isRotation &&
+			!window.confirm("Regenerate this API key? The current key will stop working.")
+		) {
+			return;
+		}
+		if (issue) issue.disabled = true;
+		const response = await request.post(route, {});
+		if (issue) issue.disabled = false;
+		if (!response.ok) return this._apiKeyError(section, response.error);
+		this._renderApiKey(section, response.credential, response.token);
+	}
+
+	async _revokeApiKey(section, route) {
+		if (!window.confirm("Revoke this API key? Any client using it will stop working.")) {
+			return;
+		}
+		const revoke = section.querySelector("[data-action='revoke-api-key']");
+		if (revoke) revoke.disabled = true;
+		const response = await request.delete(route);
+		if (revoke) revoke.disabled = false;
+		if (!response.ok) return this._apiKeyError(section, response.error);
+		this._renderApiKey(section, response.credential);
+	}
+
+	async _copyApiKey(section) {
+		const value = section.querySelector("[data-role='api-key-value']");
+		const button = section.querySelector("[data-action='copy-api-key']");
+		if (!value?.value || !button) return;
+		let copied = false;
+		try {
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(value.value);
+				copied = true;
+			}
+		} catch {
+			copied = false;
+		}
+		if (!copied) {
+			value.select();
+			try {
+				copied = document.execCommand("copy");
+			} catch {
+				copied = false;
+			}
+			button.focus();
+		}
+		button.textContent = copied ? "Copied" : "Copy failed";
+		clearTimeout(this._apiKeyCopyResetTimer);
+		this._apiKeyCopyResetTimer = setTimeout(() => {
+			if (button.isConnected) button.textContent = "Copy API key";
+		}, 2000);
 	}
 
 	/**
@@ -559,6 +694,10 @@ export class UserSettings extends PagePermissions {
 		return this.target.querySelector("[data-role='user-groups']");
 	}
 
+	get apiKeyElement() {
+		return this.target.querySelector("[data-role='api-key-settings']");
+	}
+
 	get ownerInboundElement() {
 		return this.target.querySelector("[data-role='owner-inbound']");
 	}
@@ -599,6 +738,7 @@ export class UserSettings extends PagePermissions {
 				this.userGroupsElement,
 				this.userAiAccessElement,
 				this.notificationEmailElement,
+				this.apiKeyElement,
 				publicEmailConsent,
 				this.ownerInboundElement,
 				userPage,

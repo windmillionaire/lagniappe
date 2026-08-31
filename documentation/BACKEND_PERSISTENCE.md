@@ -26,6 +26,7 @@ selected through runtime configuration.
 | `analytics`, `ai_observability` | Owner analytics and bounded AI summaries. |
 | `site` | Singleton settings, fingerprints, controls, and ledgers. |
 | `jobs`, `job_locks` | Durable background work and target locks. |
+| `agent_api_credentials` | One expiring, digest-only external-agent credential per user. |
 
 ## Keys, reads, and writes
 
@@ -56,6 +57,10 @@ Domain-specific transaction modules stay concrete:
 - `ai_email.py` owns inbound event claims;
 - `site.py` owns singleton site settings; and
 - `analytics.py` owns analytics and AI-observability rows.
+
+`agent_api.py` owns transactional bearer-key rotation and revocation. Its
+stable opaque credential id supports lookup without exposing the user's key;
+the row never stores the shown-once bearer secret.
 
 Shared bounded Datastore contention retry lives in `transactions.py`. A retry
 must repeat the complete read/check/write transaction body.

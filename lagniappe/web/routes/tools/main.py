@@ -471,13 +471,19 @@ def undo_report(key):
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_revision_is_provider_blocked
 # @matrix ai-report : async completed-state feedback live-submit organize ready-state revision route-guard
+# @pair agent-api:provider-free-revision
 @tools.route("/reports/<key>/revise", methods=["POST"])
 @ai_access(AI.ASK)
 def revise_report(key):
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
+    if report.origin == "api":
+        return responses.error(
+            "Externally submitted plans cannot be revised with the AI provider."
+        )
     if report.tool != "ask":
         require_ai_access(AI.CREATE)
     if report.tool not in {"organize", "ask", "create"}:

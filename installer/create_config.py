@@ -1639,6 +1639,10 @@ def _build_app_settings():
         or constants.DEFAULT_AGENT_ACCESS_NAME,
         "AGENT_ACCESS_CODE": SETTINGS.APP.get("AGENT_ACCESS_CODE")
         or secrets.token_urlsafe(32),
+        "EXTERNAL_AGENT_API_ENABLED": SETTINGS.APP.get(
+            "EXTERNAL_AGENT_API_ENABLED",
+            constants.DEFAULT_EXTERNAL_AGENT_API_ENABLED,
+        ),
         "APP_ENGINE_LOCATION": app_engine_location,
         "RESOURCE_REGION": resource_region,
         "OCR_LOCATION": SETTINGS.APP.get(

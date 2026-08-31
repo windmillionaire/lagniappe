@@ -218,7 +218,7 @@
   {% set report_title = report.name %}
   {% set report_icon = "ask" if report.tool == "ask" else "create" if report.tool == "create" else "organize" if report.tool == "organize" else "generate" %}
   {% set can_create_ai = current_user.access(AI.CREATE) %}
-  {% set can_revise = report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" and (is_ask or can_create_ai) %}
+  {% set can_revise = report.origin != "api" and report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" and (is_ask or can_create_ai) %}
   {% set completed_result_actions = report.result.actions|selectattr("status", "equalto", "complete")|list if report.result and report.result.actions else [] %}
   {% set can_retry = report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
   {% set can_undo = can_create_ai and report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone %}
@@ -292,6 +292,20 @@
                     <h2 class="text-sm font-semibold text-base-dark">Message</h2>
                     <p class="whitespace-pre-wrap text-sm text-base-dark">{{ inbound.body }}</p>
                   </div>
+                {% endif %}
+              </div>
+            </details>
+          {% endif %}
+          {% if report.origin == "api" %}
+            <details data-role="api-submission"
+                     class="rounded-md bg-base-bg">
+              <summary class="cursor-pointer px-3 py-3 text-sm text-base-dark marker:text-kind-default">
+                <span class="font-semibold">External API submission</span>
+              </summary>
+              <div class="flex flex-col gap-2 border-t border-base-light px-3 pb-3 pt-3">
+                <span class="w-fit rounded-full bg-kind-default px-2 py-0.5 text-xs font-semibold text-white">API plan</span>
+                {% if report.instructions %}
+                  <p class="whitespace-pre-wrap text-sm text-base-dark">{{ report.instructions }}</p>
                 {% endif %}
               </div>
             </details>

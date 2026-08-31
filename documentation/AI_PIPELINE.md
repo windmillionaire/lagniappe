@@ -12,6 +12,7 @@ Use the focused guides alongside this overview:
 | [AI_CONTEXT.md](AI_CONTEXT.md) | Prompt construction, model calls, tools, context growth, validation, and observability. |
 | [AI_WORKFLOWS.md](AI_WORKFLOWS.md) | Ask, Create, Organize, Autofill, file summary, and reviewed report execution. |
 | [AI_EMAIL.md](AI_EMAIL.md) | Resend setup, signed inbound email, workflow routing, and feedback. |
+| [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | Bearer credentials, shared read tools, uploads, and provider-free Organize proposals. |
 | [BACKEND_JOBS.md](BACKEND_JOBS.md) | Durable job records, locks, leases, retries, recovery, and browser status. |
 
 ## End-to-end path
@@ -41,6 +42,11 @@ The polling payload never transports prompts or generated content. It returns
 only bounded state, phase, retry timing, revision, and destination metadata.
 Terminal means the operation has reached an outcome; the refetched report or
 target determines whether that outcome succeeded.
+
+External clients can enter the report pipeline without invoking the configured
+provider. The external-agent API creates a draft report, exposes the shared
+read-tool registry, validates the same Organize proposal contract, and
+publishes the report at the normal ready-for-review boundary.
 
 ## Safety boundaries
 

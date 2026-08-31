@@ -186,6 +186,12 @@ Optional agent access uses `AGENT_ACCESS_ENABLED`, `AGENT_ACCESS_EMAIL`,
 `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. Successful login resolves to a
 normal User and normal group permissions.
 
+`EXTERNAL_AGENT_API_ENABLED` is a required generated setting for the
+bearer-authenticated external planning API and defaults to enabled. Setup
+preserves an operator's saved choice; when disabled, both key-management
+controls and `/api/v1` expose no usable surface. Enabling it does not enable an
+AI provider or grant AI access to any user.
+
 ## Runtime-safe exports
 
 Runtime code imports only configuration surfaces:

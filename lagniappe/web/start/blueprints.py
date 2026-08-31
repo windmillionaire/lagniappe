@@ -22,6 +22,7 @@ def initialize(app, csrf):
     from lagniappe.web.routes import testing
     from lagniappe.web.routes import messages, message_internal
     from lagniappe.web.routes.webhooks import webhooks
+    from lagniappe.web.routes.api import api
 
     app.register_blueprint(home)
     app.register_blueprint(internal, url_prefix="/l")
@@ -42,6 +43,7 @@ def initialize(app, csrf):
     app.register_blueprint(messages, url_prefix="/messages")
     app.register_blueprint(message_internal, url_prefix="/l/messages")
     app.register_blueprint(webhooks, url_prefix="/webhooks")
+    app.register_blueprint(api, url_prefix="/api/v1")
     if getattr(CONFIG, "ANALYTICS", False) or getattr(
         CONFIG,
         "AI_OBSERVABILITY",
@@ -53,3 +55,4 @@ def initialize(app, csrf):
     csrf.exempt(process)
     csrf.exempt(testing)
     csrf.exempt(webhooks)
+    csrf.exempt(api)

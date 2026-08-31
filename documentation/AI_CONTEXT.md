@@ -57,6 +57,10 @@ Function tools are retrieval only. Application mutation is performed by
 validated Autofill handlers or the reviewed report executor after the model
 conversation has ended.
 
+The external-agent REST API publishes ordinary JSON Schema definitions for
+this same registry and invokes the same handlers as the bearer key's user. It
+does not maintain a separate privileged data-access path.
+
 ## Structured output
 
 When JSON, tools, and a provider response schema are enabled together, the
