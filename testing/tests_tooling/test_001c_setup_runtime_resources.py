@@ -2465,11 +2465,19 @@ def test_image_restore_uses_loaded_metadata_and_timeouts(monkeypatch, tmp_path):
 
         def get(self, key, **kwargs):
             datastore_calls.append({"key": key, **kwargs})
-            return {"version": 3, "logo.png": True}
+            return {
+                "version": 3,
+                "logo.png": "stored/logo.png",
+                "asset_generations": {"logo.png": "41"},
+            }
 
     monkeypatch.setattr(image, "get_datastore_client", lambda: FakeDatastore())
 
-    assert image.get_images() == {"version": 3, "logo.png": True}
+    assert image.get_images() == {
+        "version": 3,
+        "logo.png": "stored/logo.png",
+        "asset_generations": {"logo.png": "41"},
+    }
     assert datastore_calls == [
         {"key": ("site", "image"), "timeout": image.DATASTORE_TIMEOUT}
     ]
@@ -2503,18 +2511,30 @@ def test_image_restore_uses_loaded_metadata_and_timeouts(monkeypatch, tmp_path):
 
     sp = SpinnerRecorder()
     assert image.save_images(
-        sp, {"version": 4, "logo.png": True, "nested/splash.png": True}
+        sp,
+        {
+            "version": 4,
+            "logo.png": "stored/logo.png",
+            "nested/splash.png": "nested/splash.png",
+            "asset_generations": {
+                "logo.png": "41",
+                "nested/splash.png": "42",
+            },
+            "ENTITY": '{"legacy_generation_metadata": true}',
+        },
     )
 
     assert [download["key"] for download in downloads] == [
-        "logo.png",
+        "stored/logo.png",
         "nested/splash.png",
     ]
     assert all(
         download["timeout"] == image.IMAGE_DOWNLOAD_TIMEOUT
         for download in downloads
     )
-    assert site_images_dir.joinpath("logo.png").read_bytes() == b"image:logo.png"
+    assert site_images_dir.joinpath("logo.png").read_bytes() == (
+        b"image:stored/logo.png"
+    )
     assert site_images_dir.joinpath("nested/splash.png").read_bytes() == (
         b"image:nested/splash.png"
     )
@@ -2530,12 +2550,13 @@ def test_image_restore_uses_loaded_metadata_and_timeouts(monkeypatch, tmp_path):
 
     monkeypatch.setattr(image, "get_storage_bucket", lambda: FailingBucket())
     failed_sp = SpinnerRecorder()
-    assert not image.save_images(failed_sp, {"logo.png": True})
-    assert failed_sp.fails == ["✗"]
+    assert not image.save_images(failed_sp, {"logo.png": "logo.png"})
+    assert failed_sp.fails == []
+    assert any("continuing without it" in message for message in failed_sp.messages)
 
 
-# @matrix setup : image-restore path-validation transactional-state
-def test_image_restore_rejects_unsafe_keys_and_never_swaps_partial_downloads(
+# @matrix setup : image-restore path-validation transactional-state partial-failure
+def test_image_restore_skips_invalid_entries_and_keeps_successful_downloads(
     monkeypatch,
     tmp_path,
 ):
@@ -2553,7 +2574,10 @@ def test_image_restore_rejects_unsafe_keys_and_never_swaps_partial_downloads(
         types.SimpleNamespace(Directory=directory),
     )
 
-    assert not image.save_images(SpinnerRecorder(), {"../escape.png": True})
+    assert not image.save_images(
+        SpinnerRecorder(),
+        {"../escape.png": "../escape.png"},
+    )
     assert (images_dir / "live.png").read_bytes() == b"live"
     assert not (tmp_path / "escape.png").exists()
 
@@ -2571,12 +2595,13 @@ def test_image_restore_rejects_unsafe_keys_and_never_swaps_partial_downloads(
         "get_storage_bucket",
         lambda: types.SimpleNamespace(blob=lambda key: Blob(key)),
     )
-    assert not image.save_images(
+    assert image.save_images(
         SpinnerRecorder(),
-        {"first.png": True, "second.png": True},
+        {"first.png": "first.png", "second.png": "second.png"},
     )
     assert (images_dir / "live.png").read_bytes() == b"live"
-    assert not (images_dir / "first.png").exists()
+    assert (images_dir / "first.png").read_bytes() == b"staged"
+    assert not (images_dir / "second.png").exists()
 
 
 # @matrix setup : image-restore site-image
@@ -2636,6 +2661,33 @@ def test_upgrade_restore_images_installs_storage_before_restore_spinner(monkeypa
         ("save", site_images),
     ]
     assert settings.APP["SITE_IMAGE_VERSION"] == 11
+
+
+# @matrix setup : image-restore site-image partial-failure
+def test_upgrade_restore_images_continues_when_no_remote_image_is_available(
+    monkeypatch,
+):
+    from installer import upgrade
+
+    spinner = SpinnerRecorder()
+    formatter = _fake_formatter(spinner).initialize()
+    settings = _fake_settings(app={"SITE_IMAGE_VERSION": 7})
+
+    monkeypatch.setattr(upgrade, "ensure_datastore_dependency", lambda: None)
+    monkeypatch.setattr(upgrade, "get_images", lambda: {"version": 11, "logo.png": "logo.png"})
+    monkeypatch.setattr(upgrade, "ensure_storage_dependency", lambda: None)
+    monkeypatch.setattr(upgrade, "save_images", lambda sp, images: False)
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(SETTINGS=settings),
+    )
+
+    upgrade._update_custom_images(formatter)
+
+    assert settings.APP["SITE_IMAGE_VERSION"] == 7
+    assert spinner.fails == []
+    assert spinner.oks == ["[OK]", "[OK]"]
 
 
 # @matrix config user-settings : app-yaml deployment-settings validation

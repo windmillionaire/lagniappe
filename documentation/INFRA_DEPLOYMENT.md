@@ -117,6 +117,11 @@ libraries.
    and site images; and
 6. optionally deploys.
 
+Site-image restoration is best-effort. Setup ignores Datastore metadata fields,
+restores each available object independently, and keeps existing local images
+when an object is missing or malformed. A site-image warning does not abort an
+otherwise valid update or upgrade.
+
 The runtime deploy-surface preflight runs before provider reconciliation, so a
 missing runtime requirement or excluded local import stops an update before it
 changes remote resources.

@@ -227,15 +227,22 @@ def _configure_deferred_job_recovery(f, gcloud):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_images_installs_storage_before_restore_spinner
-# @matrix setup : image-restore site-image
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_images_continues_when_no_remote_image_is_available
+# @matrix setup : image-restore site-image partial-failure
 def _update_custom_images(f):
-    """Restore site images uploaded through the app, if any are present."""
+    """Best-effort restore site images uploaded through the app."""
     from config import SETTINGS
 
     try:
         ensure_datastore_dependency()
     except Exception as error:
-        raise SetupError(f"Could not restore custom images: {error}") from error
+        print(
+            f.warning(
+                f"Could not inspect custom images; continuing with existing "
+                f"images. Reason: {error}"
+            )
+        )
+        return
 
     site_image_entity = None
     with f.yaspin(text=f.success("Checking for custom images")) as spinner:
@@ -243,10 +250,14 @@ def _update_custom_images(f):
             site_image_entity = get_images()
             spinner.ok(f.ok_glyph)
         except Exception as error:
-            spinner.fail(f.fail_glyph)
-            raise SetupError(
-                f"Could not inspect custom images: {error}"
-            ) from error
+            spinner.write(
+                f.warning(
+                    f"Could not inspect custom images; continuing with existing "
+                    f"images. Reason: {error}"
+                )
+            )
+            spinner.ok(f.ok_glyph)
+            return
 
     if not site_image_entity:
         return
@@ -256,26 +267,38 @@ def _update_custom_images(f):
     try:
         ensure_storage_dependency()
     except Exception as error:
-        raise SetupError(f"Could not restore custom images: {error}") from error
+        print(
+            f.warning(
+                f"Could not restore custom images; continuing with existing "
+                f"images. Reason: {error}"
+            )
+        )
+        return
 
     with f.yaspin(text=f.success("Restoring custom images")) as spinner:
         try:
-            if not save_images(spinner, site_image_entity):
-                raise SetupError(
-                    "Custom site-image restore was incomplete; live images "
-                    "were left unchanged."
-                )
-            SETTINGS.APP["SITE_IMAGE_VERSION"] = int(
-                site_image_entity.get("version", 0)
-            )
+            restored = save_images(spinner, site_image_entity)
+            if restored:
+                try:
+                    SETTINGS.APP["SITE_IMAGE_VERSION"] = int(
+                        site_image_entity.get("version", 0)
+                    )
+                except (TypeError, ValueError):
+                    spinner.write(
+                        f.warning(
+                            "Site images were restored, but their cache version "
+                            "was invalid; keeping the existing cache version."
+                        )
+                    )
             spinner.ok(f.ok_glyph)
         except Exception as error:
-            spinner.fail(f.fail_glyph)
-            if isinstance(error, SetupError):
-                raise
-            raise SetupError(
-                f"Could not restore custom images: {error}"
-            ) from error
+            spinner.write(
+                f.warning(
+                    f"Could not restore custom images; continuing with existing "
+                    f"images. Reason: {error}"
+                )
+            )
+            spinner.ok(f.ok_glyph)
 
 
 # @testable true
