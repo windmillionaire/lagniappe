@@ -1321,7 +1321,10 @@ def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch
 # @matrix ai : guidelines tool-dispatch
 @pytest.mark.unit
 def test_get_guidelines_returns_named_bundle():
-    assert "request those get_guidelines calls together" in (
+    assert "Request one bundle per call" in (
+        ai_get_guidelines.GET_GUIDELINES.description
+    )
+    assert "may be requested in parallel" in (
         ai_get_guidelines.GET_GUIDELINES.description
     )
 
@@ -2190,9 +2193,9 @@ def test_ai_file_tools_return_summary_and_content(monkeypatch):
             "supported": True,
             "attached": False,
             "reason": (
-                "Original file was not attached by default. Call get_file "
-                "again with include_original=true if the original file part "
-                "is necessary."
+                "Original content was not included by default. Call get_file "
+                "again with include_original=true if the original bytes are "
+                "necessary."
             ),
         },
     }
@@ -2398,9 +2401,9 @@ def test_ai_get_file_skips_large_original_unless_requested(monkeypatch):
             "supported": True,
             "attached": False,
             "reason": (
-                "Original file was not attached by default. Call get_file "
-                "again with include_original=true if the original file part "
-                "is necessary."
+                "Original content was not included by default. Call get_file "
+                "again with include_original=true if the original bytes are "
+                "necessary."
             ),
         },
     }
@@ -2461,7 +2464,7 @@ def test_ai_get_file_reports_unsupported_original_file(monkeypatch):
     assert loaded_file["original_file"] == {
         "supported": False,
         "attached": False,
-        "reason": "Original file cannot be attached to AI for this file.",
+        "reason": "Original content is unavailable for this file.",
     }
 
 

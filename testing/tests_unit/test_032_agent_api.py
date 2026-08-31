@@ -8,7 +8,6 @@ import pytest
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
-from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.auth import agent_api as agent_auth
@@ -71,6 +70,11 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     assert contract["proposal_schema"] == {"allowed": ("create_page",)}
     assert contract["permissions"] == {"allowed": ("create_page",)}
     assert contract["required_file_refs"] == ["hash:aaaaaaaaaaaa"]
+    assert any(
+        "Upload and finalize at least one file" in rule
+        for rule in contract["workflow_rules"]
+    )
+    assert any("never executes" in rule for rule in contract["workflow_rules"])
     assert contract["limits"]["max_tool_calls"] == external_api.MAX_PLAN_TOOL_CALLS
 
 
@@ -80,6 +84,15 @@ def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
     names = [tool["name"] for tool in ai_functions.tool_catalog()]
     assert names == list(ai_functions.DECLARATIONS)
     assert all(tool["input_schema"]["type"] == "object" for tool in ai_functions.tool_catalog())
+    rest_get_file = next(
+        tool
+        for tool in ai_functions.tool_catalog(transport="rest")
+        if tool["name"] == "get_file"
+    )
+    assert "short-lived download URL" in rest_get_file["description"]
+    assert "expires after five minutes" in rest_get_file["description"]
+    assert "temporary credential" in rest_get_file["description"]
+    assert "provider file part" not in rest_get_file["description"]
 
     seen = {}
 

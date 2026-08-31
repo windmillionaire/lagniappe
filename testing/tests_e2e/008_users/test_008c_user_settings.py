@@ -179,6 +179,7 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     )
 
 
+# @matrix agent-api : copy-control
 # @matrix user-settings : field-order group-selector-hidden owner-own-page readonly-email sign-out
 # @pair notification-email:default-daily
 # @template pages/info.html::user_settings
@@ -209,10 +210,25 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(
         settings_panel.locator("input[name='notification_email_mode'][value='DAILY']")
     ).to_be_checked()
-    expect(settings_panel.locator("[data-role='api-key-settings']")).to_be_visible()
-    expect(settings_panel.locator("[data-role='api-key-status']")).to_have_text(
+    api_key_settings = settings_panel.locator("[data-role='api-key-settings']")
+    expect(api_key_settings).to_be_visible()
+    expect(api_key_settings.locator("[data-role='api-key-status']")).to_have_text(
         "No active API key."
     )
+    expect(
+        api_key_settings.locator("[data-role='manual-command-shell']")
+    ).to_have_count(1)
+    expect(
+        api_key_settings.locator("[data-role='manual-command-copy']")
+    ).to_have_attribute("aria-label", "Copy API key")
+    api_key_actions = api_key_settings.locator("[data-role='api-key-actions']")
+    expect(api_key_actions).to_have_class(re.compile(r"\bflex-col\b"))
+    expect(api_key_actions).to_have_class(re.compile(r"\bsm:flex-row\b"))
+    issue_button = api_key_actions.locator("[data-action='issue-api-key']")
+    revoke_button = api_key_actions.locator("[data-action='revoke-api-key']")
+    expect(issue_button).to_have_class(re.compile(r"\baction-button\b"))
+    expect(revoke_button).to_have_class(re.compile(r"\baction-button\b"))
+    expect(revoke_button).to_have_attribute("data-kind", "delete")
     assert user_settings_field_order(settings_panel) == [
         "name",
         "user-email",

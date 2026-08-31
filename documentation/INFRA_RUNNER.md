@@ -85,6 +85,16 @@ under `reports/`. Teardown signals only a fully verified recorded process group
 before cleaning test-prefixed provider/cache state. `test-server --status` is
 read-only and `--recover` is the fail-closed stale-owner path.
 
+## Development deployment
+
+`run.py deploy` is the developer shortcut for the current generated
+configuration. It validates the production frontend against its declared
+sources and complete artifact inventory, preserving a current bundle and
+running `npm run build` only when that validation reports stale or incomplete
+output. Installation and configuration changes should still use
+`setup.sh update`; installer deployment consumes a validated prebuilt bundle
+and does not require Node.js or npm.
+
 ## Version and dependency commands
 
 `run.py version set X.Y.Z` updates `package.json`, the lockfile's root version,

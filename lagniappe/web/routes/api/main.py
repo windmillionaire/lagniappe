@@ -180,6 +180,28 @@ def annotate_response(response):
     return response
 
 
+# @testable true
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
+# @matrix agent-api : error-envelope routing
+def handle_api_http_error(error):
+    """Render routing-level API failures with the normal JSON envelope."""
+    g.NO_CACHE = True
+    if not getattr(g, "agent_api_request_id", None):
+        g.agent_api_request_id = _request_id()
+
+    status = error.code if isinstance(error, HTTPException) else 500
+    code, message = {
+        404: ("not_found", "API resource not found."),
+        405: ("method_not_allowed", "Method not allowed for this API resource."),
+    }.get(status, ("request_failed", "The API request could not be completed."))
+    response = _error(code, message, status)
+    if status == 405 and isinstance(error, HTTPException):
+        allow = error.get_response().headers.get("Allow")
+        if allow:
+            response.headers["Allow"] = allow
+    return annotate_response(response)
+
+
 # @testable false
 # @covered-by lagniappe/web/routes/api/main.py::authenticate_request
 # @reason expected problem rendering uses the same tested error envelope
@@ -339,28 +361,314 @@ def _require_draft(report):
 @api.get("/openapi.json")
 @_route
 def openapi_document():
-    """Return a compact machine-readable contract for the implemented surface."""
+    """Return the machine-readable workflow and contract for external agents."""
+    plan_parameter = {
+        "name": "plan_id",
+        "in": "path",
+        "required": True,
+        "description": "The opaque plan ID returned by createPlan.",
+        "schema": {"type": "string", "minLength": 1},
+    }
+    tool_parameter = {
+        "name": "tool_name",
+        "in": "path",
+        "required": True,
+        "description": "A registered read-tool name returned by listTools.",
+        "schema": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+        },
+    }
+
+    # @testable false
+    # @covered-by lagniappe/web/routes/api/main.py::openapi_document
+    # @reason local response-content shorthand is exercised through the public document
+    def json_content(schema):
+        return {"content": {"application/json": {"schema": schema}}}
+
+    error_response = {
+        "description": "The request failed. Inspect error.code and request_id.",
+        **json_content({"$ref": "#/components/schemas/Error"}),
+    }
     paths = {
-        "/api/v1/me": {"get": {"summary": "Describe the API actor"}},
-        "/api/v1/tools": {"get": {"summary": "List read tool definitions"}},
-        "/api/v1/plans": {"post": {"summary": "Create an organize plan"}},
+        "/api/v1/me": {
+            "get": {
+                "operationId": "getCurrentActor",
+                "summary": "Describe the API actor",
+                "description": (
+                    "Call first to verify the bearer key, its user identity, and "
+                    "the organize-only, no-execution capability boundary."
+                ),
+                "tags": ["Discovery"],
+                "responses": {
+                    "200": {
+                        "description": "Authenticated user and capabilities.",
+                        **json_content({"type": "object"}),
+                    },
+                    "default": error_response,
+                },
+            }
+        },
+        "/api/v1/tools": {
+            "get": {
+                "operationId": "listTools",
+                "summary": "List permission-bounded read tools",
+                "description": (
+                    "Returns every available tool with its JSON input schema. Tool "
+                    "calls run as the bearer-key user and may only inspect data that "
+                    "user can access. Use returned hash: references in later calls "
+                    "and in the proposal."
+                ),
+                "tags": ["Discovery"],
+                "responses": {
+                    "200": {
+                        "description": "Read-tool catalog and reference format.",
+                        **json_content({"type": "object"}),
+                    },
+                    "default": error_response,
+                },
+            }
+        },
+        "/api/v1/plans": {
+            "post": {
+                "operationId": "createPlan",
+                "summary": "Create an Organize plan draft",
+                "description": (
+                    "Starts a durable provider-free workspace. Creation does not run "
+                    "a model or change workspace data. Keep the returned opaque ID "
+                    "for every upload, tool, contract, and submission call."
+                ),
+                "tags": ["Plans"],
+                "requestBody": {
+                    "required": True,
+                    **json_content(
+                        {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["instructions"],
+                            "properties": {
+                                "tool": {
+                                    "type": "string",
+                                    "const": "organize",
+                                    "default": "organize",
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "maxLength": 120,
+                                    "description": "Optional browser-review label.",
+                                },
+                                "instructions": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": (
+                                        "The organization goal, limited to 65,536 "
+                                        "UTF-8 bytes."
+                                    ),
+                                },
+                            },
+                        }
+                    ),
+                },
+                "responses": {
+                    "201": {
+                        "description": "New draft plan.",
+                        **json_content({"$ref": "#/components/schemas/Plan"}),
+                    },
+                    "default": error_response,
+                },
+            }
+        },
         "/api/v1/plans/{plan_id}": {
-            "get": {"summary": "Get plan state"}
+            "get": {
+                "operationId": "getPlan",
+                "summary": "Get plan state",
+                "description": (
+                    "Checks draft/ready state, finalized files, pending uploads, "
+                    "contract and browser-review URLs, and any submitted proposal."
+                ),
+                "tags": ["Plans"],
+                "parameters": [plan_parameter],
+                "responses": {
+                    "200": {
+                        "description": "Current plan state.",
+                        **json_content({"$ref": "#/components/schemas/Plan"}),
+                    },
+                    "default": error_response,
+                },
+            }
         },
         "/api/v1/plans/{plan_id}/contract": {
-            "get": {"summary": "Get the proposal contract"}
+            "get": {
+                "operationId": "getPlanContract",
+                "summary": "Get the final proposal contract",
+                "description": (
+                    "Fetch after all uploads are finalized and immediately before "
+                    "constructing the proposal. The response is plan-, user-, file-, "
+                    "and permission-specific; its proposal_schema, workflow_rules, "
+                    "reference_rules, and required_file_refs are authoritative."
+                ),
+                "tags": ["Plans"],
+                "parameters": [plan_parameter],
+                "responses": {
+                    "200": {
+                        "description": "Current proposal and permission contract.",
+                        **json_content({"type": "object"}),
+                    },
+                    "default": error_response,
+                },
+            }
         },
         "/api/v1/plans/{plan_id}/uploads": {
-            "post": {"summary": "Create resumable file upload sessions"}
+            "post": {
+                "operationId": "createUploadSessions",
+                "summary": "Create resumable file upload sessions",
+                "description": (
+                    "Declare one or more local files while the plan is a draft. For "
+                    "each response entry, PUT exactly the declared bytes and content "
+                    "type to session_url, treating that URL as a short-lived secret "
+                    "and not forwarding the Lagniappe bearer key. Then call "
+                    "finalizeUploads before starting another batch or submitting."
+                ),
+                "tags": ["Uploads"],
+                "parameters": [plan_parameter],
+                "requestBody": {
+                    "required": True,
+                    **json_content(
+                        {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["files"],
+                            "properties": {
+                                "files": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "maxItems": external_api.MAX_PLAN_FILES,
+                                    "items": {
+                                        "$ref": "#/components/schemas/UploadFile"
+                                    },
+                                }
+                            },
+                        }
+                    ),
+                },
+                "responses": {
+                    "201": {
+                        "description": "Upload sessions in request-array order.",
+                        **json_content({"type": "object"}),
+                    },
+                    "default": error_response,
+                },
+            }
         },
         "/api/v1/plans/{plan_id}/uploads/finalize": {
-            "post": {"summary": "Finalize staged uploads"}
+            "post": {
+                "operationId": "finalizeUploads",
+                "summary": "Finalize staged uploads",
+                "description": (
+                    "After every session upload completes, send an empty JSON object. "
+                    "The server verifies the staged objects and attaches files to the "
+                    "draft. Calling again with no pending batch simply returns state."
+                ),
+                "tags": ["Uploads"],
+                "parameters": [plan_parameter],
+                "requestBody": {
+                    "required": False,
+                    **json_content(
+                        {
+                            "type": "object",
+                            "maxProperties": 0,
+                            "additionalProperties": False,
+                        }
+                    ),
+                },
+                "responses": {
+                    "200": {
+                        "description": "Plan with finalized file metadata.",
+                        **json_content({"$ref": "#/components/schemas/Plan"}),
+                    },
+                    "default": error_response,
+                },
+            }
         },
         "/api/v1/plans/{plan_id}/tools/{tool_name}": {
-            "post": {"summary": "Run one permission-bounded read tool"}
+            "post": {
+                "operationId": "executeTool",
+                "summary": "Run one permission-bounded read tool",
+                "description": (
+                    "Runs one listTools definition while the plan remains a draft. "
+                    "Put that definition's input in arguments. Calls read permitted "
+                    "workspace data only; independent calls may be made in parallel."
+                ),
+                "tags": ["Tools"],
+                "parameters": [plan_parameter, tool_parameter],
+                "requestBody": {
+                    "required": True,
+                    **json_content(
+                        {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "arguments": {
+                                    "type": "object",
+                                    "default": {},
+                                }
+                            },
+                        }
+                    ),
+                },
+                "responses": {
+                    "200": {
+                        "description": "The tool result in the result field.",
+                        **json_content({"type": "object"}),
+                    },
+                    "default": error_response,
+                },
+            }
         },
         "/api/v1/plans/{plan_id}/submit": {
-            "post": {"summary": "Validate and publish the final proposal"}
+            "post": {
+                "operationId": "submitPlan",
+                "summary": "Validate and publish the final proposal",
+                "description": (
+                    "Requires at least one finalized file, no pending uploads, and "
+                    "the current contract version. A valid proposal becomes a ready "
+                    "report for human browser review; it never executes actions. "
+                    "Repeating the identical normalized proposal is idempotent, while "
+                    "a different proposal after readiness returns a conflict."
+                ),
+                "tags": ["Plans"],
+                "parameters": [plan_parameter],
+                "requestBody": {
+                    "required": True,
+                    **json_content(
+                        {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["contract_version", "proposal"],
+                            "properties": {
+                                "contract_version": {
+                                    "type": "integer",
+                                    "const": external_api.CONTRACT_VERSION,
+                                },
+                                "proposal": {
+                                    "type": "object",
+                                    "description": (
+                                        "Must match the current plan contract's "
+                                        "proposal_schema."
+                                    ),
+                                },
+                            },
+                        }
+                    ),
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ready plan and browser review URL.",
+                        **json_content({"$ref": "#/components/schemas/Plan"}),
+                    },
+                    "default": error_response,
+                },
+            }
         },
     }
     return {
@@ -368,13 +676,116 @@ def openapi_document():
         "info": {
             "title": f"{CONFIG.APP_NAME} External Agent API",
             "version": "1.0.0",
+            "description": (
+                "Use this API as a permission-bounded Organize backend for an "
+                "external model. Workflow: (1) verify the actor with getCurrentActor; "
+                "(2) create a draft; (3) upload and finalize at least one file; "
+                "(4) discover and call read tools as needed while the plan is a "
+                "draft; (5) fetch the plan-specific contract after uploads and "
+                "construct a conforming proposal; (6) submit it and stop for human "
+                "browser review. This API does not execute proposed actions."
+            ),
         },
         "servers": [{"url": request.url_root.rstrip("/")}],
         "security": [{"bearerAuth": []}],
+        "tags": [
+            {"name": "Discovery", "description": "Actor and tool discovery."},
+            {"name": "Plans", "description": "Draft and review lifecycle."},
+            {"name": "Uploads", "description": "Required plan-file staging."},
+            {"name": "Tools", "description": "Permission-bounded reads."},
+        ],
         "components": {
             "securitySchemes": {
-                "bearerAuth": {"type": "http", "scheme": "bearer"}
-            }
+                "bearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "description": "A shown-once user API key generated in Settings.",
+                }
+            },
+            "schemas": {
+                "Error": {
+                    "type": "object",
+                    "required": ["error", "request_id"],
+                    "properties": {
+                        "error": {
+                            "type": "object",
+                            "required": ["code", "message"],
+                            "properties": {
+                                "code": {"type": "string"},
+                                "message": {"type": "string"},
+                                "details": {},
+                            },
+                        },
+                        "request_id": {"type": "string"},
+                    },
+                },
+                "PlanFile": {
+                    "type": "object",
+                    "required": ["ref", "name", "filename", "mimetype", "size"],
+                    "properties": {
+                        "ref": {
+                            "type": "string",
+                            "pattern": "^hash:[A-Za-z0-9_-]{12}$",
+                        },
+                        "name": {"type": "string"},
+                        "filename": {"type": "string"},
+                        "mimetype": {"type": "string"},
+                        "size": {"type": "integer", "minimum": 0},
+                    },
+                },
+                "Plan": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "status",
+                        "tool",
+                        "name",
+                        "instructions",
+                        "files",
+                        "uploads_pending",
+                        "contract_version",
+                        "contract_url",
+                        "review_url",
+                    ],
+                    "properties": {
+                        "id": {"type": "string"},
+                        "status": {"type": "string", "enum": ["draft", "ready"]},
+                        "tool": {"type": "string", "const": "organize"},
+                        "name": {"type": "string"},
+                        "instructions": {"type": "string"},
+                        "files": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/PlanFile"},
+                        },
+                        "uploads_pending": {"type": "boolean"},
+                        "contract_version": {
+                            "type": "integer",
+                            "const": external_api.CONTRACT_VERSION,
+                        },
+                        "contract_url": {"type": "string", "format": "uri"},
+                        "review_url": {"type": "string", "format": "uri"},
+                        "proposal": {"oneOf": [{"type": "object"}, {"type": "null"}]},
+                    },
+                },
+                "UploadFile": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["filename", "size"],
+                    "properties": {
+                        "filename": {"type": "string", "minLength": 1},
+                        "content_type": {
+                            "type": "string",
+                            "default": "application/octet-stream",
+                        },
+                        "size": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": external_api.MAX_FILE_BYTES,
+                            "description": "Exact file size in bytes.",
+                        },
+                    },
+                },
+            },
         },
         "paths": paths,
     }
@@ -405,7 +816,7 @@ def me():
 @_route
 def tools():
     return {
-        "tools": ai_functions.tool_catalog(),
+        "tools": ai_functions.tool_catalog(transport="rest"),
         "reference_format": "hash:<12-character-hash>",
     }
 

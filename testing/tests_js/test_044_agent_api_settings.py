@@ -1,20 +1,19 @@
 """Node-backed checks for shown-once external-agent API key controls."""
 
 
-# @matrix agent-api user-settings : copy expiry revoke rotate shown-once
+# @matrix agent-api : expiry poll-reconcile revoke rotate shown-once status
+# @matrix user-settings : poll-reconcile status
 def test_agent_api_key_controls_keep_secret_ephemeral(run_node):
     run_node(
         r'''
 const fs = require("node:fs");
 const vm = require("node:vm");
 
-let clipboard = null;
 let stored = false;
 const context = {
   AbortController,
   clearTimeout() {},
   console,
-  document: { execCommand() { return false; } },
   FormElement: class {},
   InputElement: class {},
   RadioElement: class {},
@@ -22,7 +21,6 @@ const context = {
   SectionToggle: {},
   TextareaElement: class {},
   captureError() {},
-  navigator: { clipboard: { async writeText(value) { clipboard = value; } } },
   request: {
     async post() {
       return {
@@ -43,7 +41,6 @@ const context = {
     getItem() { stored = true; throw new Error("API key read from storage"); },
     setItem() { stored = true; throw new Error("API key written to storage"); },
   },
-  setTimeout(callback) { return callback; },
   withTransition() {},
   window: { confirm() { return true; } },
 };
@@ -64,9 +61,8 @@ const elements = {
   issue: { disabled: false, textContent: "Generate API key" },
   revoke: { dataset: {}, disabled: false },
   secret: { dataset: {} },
-  value: { value: "", select() {} },
+  value: { textContent: "" },
   message: { dataset: {}, textContent: "" },
-  copy: { focus() {}, isConnected: true, textContent: "Copy API key" },
 };
 const selectors = new Map([
   ["[data-role='api-key-status']", elements.status],
@@ -75,22 +71,16 @@ const selectors = new Map([
   ["[data-role='api-key-secret']", elements.secret],
   ["[data-role='api-key-value']", elements.value],
   ["[data-role='api-key-message']", elements.message],
-  ["[data-action='copy-api-key']", elements.copy],
 ]);
 const section = { querySelector(selector) { return selectors.get(selector) || null; } };
 const widget = Object.create(context.UserSettings.prototype);
 
 (async () => {
   await widget._issueApiKey(section, "/users/me/api-key");
-  if (elements.value.value !== "lgn_identifier.secret" ||
+  if (elements.value.textContent !== "lgn_identifier.secret" ||
       elements.secret.dataset.visible !== "true" ||
       elements.issue.textContent !== "Regenerate API key") {
     throw new Error("Issued key was not shown once with rotation state");
-  }
-
-  await widget._copyApiKey(section);
-  if (clipboard !== "lgn_identifier.secret" || elements.copy.textContent !== "Copied") {
-    throw new Error("Full API key was not copied");
   }
 
   widget._renderApiKey(section, {
@@ -98,7 +88,7 @@ const widget = Object.create(context.UserSettings.prototype);
     display_prefix: "lgn_ident…",
     expires_at: "2026-09-30T12:00:00+00:00",
   });
-  if (elements.value.value !== "" || elements.secret.dataset.visible !== "false") {
+  if (elements.value.textContent !== "" || elements.secret.dataset.visible !== "false") {
     throw new Error("Status refresh retained the shown-once secret");
   }
 
@@ -108,6 +98,22 @@ const widget = Object.create(context.UserSettings.prototype);
     throw new Error("Revocation did not clear active-key controls");
   }
   if (stored) throw new Error("API key touched browser storage");
+
+  const initialized = [];
+  widget._updated = true;
+  widget.target = { dataset: {} };
+  widget.commitReset = () => initialized.push("commit");
+  widget._initGroups = () => initialized.push("groups");
+  widget._initPageSelect = () => initialized.push("page-select");
+  widget._initRemovePage = () => initialized.push("remove-page");
+  widget._initApiKey = () => initialized.push("api-key");
+  widget.setEntityMetadata = () => initialized.push("metadata");
+  widget.postreconcile();
+  if (initialized.join(",") !==
+      "commit,groups,page-select,remove-page,api-key,metadata" ||
+      widget._updated !== false || widget.target.dataset.visible !== "true") {
+    throw new Error("Polling replacement did not reinitialize API key status");
+  }
 })().catch((error) => {
   console.error(error);
   process.exit(1);

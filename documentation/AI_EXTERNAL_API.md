@@ -33,7 +33,9 @@ not be public users.
 ## Workflow
 
 All endpoints are under `/api/v1` and require the bearer key, including the
-OpenAPI document.
+OpenAPI document. The OpenAPI `info.description` and operation descriptions
+carry this lifecycle, request preconditions, and the no-execution boundary so a
+generic client does not need separate prompt instructions.
 
 1. `GET /me` verifies the actor and capability.
 2. `POST /plans` creates a durable, provider-free Organize draft.
@@ -42,8 +44,10 @@ OpenAPI document.
    `POST /plans/{id}/uploads/finalize`.
 5. `GET /tools` returns plain JSON Schema tool definitions. Run a tool with
    `POST /plans/{id}/tools/{tool_name}` and an `arguments` object.
-6. `GET /plans/{id}/contract` returns the final proposal schema, allowed
-   actions, permission context, file references, and limits.
+6. `GET /plans/{id}/contract` returns the final proposal schema, workflow and
+   reference rules, allowed actions, permission context, file references, and
+   limits. Fetch it after uploads and immediately before constructing the
+   proposal.
 7. `POST /plans/{id}/submit` validates and saves the proposal as a ready report.
    The response's `review_url` opens the normal deterministic report workflow.
 
@@ -51,7 +55,12 @@ Submission is idempotent when the same normalized proposal is sent again. A
 different proposal cannot replace an already-ready report. Pending uploads,
 unknown/inaccessible references, disallowed actions, incomplete form values,
 and files that are not placed by the plan all fail validation without model
-repair.
+repair. At least one finalized uploaded file is required before submission;
+the plan contract repeats that precondition in `workflow_rules`.
+
+Failures under `/api/v1`, including routing-level `404` and `405` responses,
+use the same JSON error envelope and request ID. A `405` preserves the HTTP
+`Allow` header.
 
 ## cURL example
 
@@ -124,6 +133,11 @@ curl --fail --silent --show-error \
 The contract's `required_file_refs` means a real file-bearing proposal cannot
 normally use an empty action list; it must place every uploaded file through an
 allowed action.
+
+When `get_file` is called with `include_original: true`, the REST adapter
+returns a five-minute `original_file.download_url` when the source is
+available. Other transports may provide direct media instead. Extracted text
+remains the default so clients do not fetch original bytes unnecessarily.
 
 ## Python skeleton
 

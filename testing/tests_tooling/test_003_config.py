@@ -1333,6 +1333,7 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
 
 
 # @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
+# @matrix frontend-build : freshness no-op rebuild
 def test_deploy_modes_separate_dev_build_from_setup_publish(
     monkeypatch,
     tmp_path,
@@ -1390,7 +1391,9 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         commands = []
         preflight_snapshots = []
         build_versions = []
+        frontend_inspections = []
         frontend_verifications = []
+        frontend_state = {"current": False}
 
         def fake_preflight(app_dir=None):
             preflight_snapshots.append(
@@ -1409,6 +1412,21 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
             deploy_module,
             "verify_frontend_build",
             lambda **kwargs: frontend_verifications.append(kwargs) or True,
+        )
+        monkeypatch.setattr(
+            deploy_module,
+            "inspect_frontend_build",
+            lambda reader, **kwargs: (
+                frontend_inspections.append(kwargs)
+                or (
+                    (types.SimpleNamespace(metadata={"mode": "production"}), [])
+                    if frontend_state["current"]
+                    else (
+                        None,
+                        ["Frontend build was created from different source inputs."],
+                    )
+                )
+            ),
         )
 
         def fake_run_command(command, **kwargs):
@@ -1467,6 +1485,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
             ),
         ]
         assert build_versions == []
+        assert frontend_inspections == []
         assert frontend_verifications == [
             {
                 "app_dir": app_dir,
@@ -1477,6 +1496,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
 
         commands.clear()
         preflight_snapshots.clear()
+        frontend_inspections.clear()
         frontend_verifications.clear()
 
         assert deploy_app()
@@ -1487,6 +1507,9 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         assert SETTINGS.APP["VERSION"] == "1.23"
         assert build_versions == ["1.23"]
         assert chunks_dir.exists()
+        assert frontend_inspections == [
+            {"expected_mode": "production", "expected_version": "1.23"}
+        ]
         assert frontend_verifications == [
             {
                 "app_dir": app_dir,
@@ -1510,6 +1533,46 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
                 ],
                 {"check": False, "capture_output": False},
             ),
+        ]
+        capsys.readouterr()
+
+        commands.clear()
+        preflight_snapshots.clear()
+        build_versions.clear()
+        frontend_inspections.clear()
+        frontend_verifications.clear()
+        frontend_state["current"] = True
+
+        assert deploy_app(announce_completion=False)
+        output = capsys.readouterr().out
+        assert "Current production frontend bundle detected; preserving it." in output
+        assert "running npm run build" not in output
+        assert preflight_snapshots == [
+            {"version": "1.23", "chunk_exists": True, "commands": []}
+        ]
+        assert build_versions == []
+        assert frontend_inspections == [
+            {"expected_mode": "production", "expected_version": "1.23"}
+        ]
+        assert frontend_verifications == [
+            {
+                "app_dir": app_dir,
+                "expected_mode": "production",
+                "expected_version": "1.23",
+            }
+        ]
+        assert commands == [
+            (
+                [
+                    deploy_module.GCLOUD_CLI,
+                    "app",
+                    "deploy",
+                    str(app_dir / "lagniappe.yaml"),
+                    "--project",
+                    "demo-project",
+                ],
+                {"check": False, "capture_output": False},
+            )
         ]
 
         def failed_deploy(command, **kwargs):

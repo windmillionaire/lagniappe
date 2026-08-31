@@ -23,11 +23,18 @@ def initialize(app):
 # @tests tests_e2e/001_site/test_001a_environment.py::test_error_handling
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
 # @tests tests_e2e/001_site/test_001b_login.py::test_csrf_failure_is_identified_for_targeted_retry
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @matrix error-handling : csrf http-404
+# @matrix agent-api : error-envelope routing
 # @pair login:redirect-target
 def handle_http_error(error):
     """Handle HTTP exceptions (4xx and 5xx errors)."""
     code = error.code if hasattr(error, "code") else 500
+
+    if request.path == "/api/v1" or request.path.startswith("/api/v1/"):
+        from lagniappe.web.routes.api.main import handle_api_http_error
+
+        return handle_api_http_error(error)
 
     if isinstance(error, CSRFError):
         response = make_response(str(error.description))

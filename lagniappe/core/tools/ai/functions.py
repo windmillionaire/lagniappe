@@ -142,9 +142,23 @@ TOOL_DEFINITIONS = {
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_tool_catalog_and_dispatch_share_registered_tools
 # @matrix agent-api ai : provider-neutral-schema tool-catalog
-def tool_catalog():
+def tool_catalog(*, transport=None):
     """Return the provider-neutral catalog used by external tool clients."""
-    return [TOOL_DEFINITIONS[name] for name in DECLARATIONS]
+    catalog = []
+    for name in DECLARATIONS:
+        definition = TOOL_DEFINITIONS[name]
+        if transport == "rest" and name == "get_file":
+            definition = {
+                **definition,
+                "description": (
+                    f"{definition['description']} In this REST API, "
+                    "include_original=true returns a signed download_url that "
+                    "expires after five minutes when original content is available; "
+                    "treat that URL as a temporary credential and do not expose it."
+                ),
+            }
+        catalog.append(definition)
+    return catalog
 
 
 # @testable true

@@ -10,7 +10,9 @@ use one reviewed source/build generation.
 
 1. deploy-surface validation for excluded local-package imports and runtime
    dependencies missing from `requirements.txt`;
-2. production frontend build;
+2. production frontend validation using the same source/artifact freshness
+   checks as the test server, running `npm run build` only when the bundle is
+   missing, incomplete, corrupt, non-production, or stale;
 3. source and artifact manifest validation for one complete production build;
 4. PWA manifest update;
 5. Datastore index deployment when requested; and

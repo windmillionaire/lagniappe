@@ -49,7 +49,7 @@ def _report(actor):
     )
 
 
-# @matrix agent-api : bearer-only contract error-envelope plan-session proposal-contract submission tool-catalog tool-dispatch uploads
+# @matrix agent-api : bearer-only contract error-envelope plan-session proposal-contract routing submission tool-catalog tool-dispatch uploads
 def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeypatch):
     actor = Actor()
     report = _report(actor)
@@ -103,6 +103,48 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert openapi.status_code == 200
     assert openapi.json["openapi"] == "3.1.0"
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
+    assert "does not execute proposed actions" in openapi.json["info"]["description"]
+    operations = [
+        operation
+        for path in openapi.json["paths"].values()
+        for operation in path.values()
+    ]
+    assert all(operation["operationId"] for operation in operations)
+    assert all(operation["description"] for operation in operations)
+    assert all(operation["responses"] for operation in operations)
+    create_schema = openapi.json["paths"]["/api/v1/plans"]["post"]["requestBody"][
+        "content"
+    ]["application/json"]["schema"]
+    assert create_schema["required"] == ["instructions"]
+    upload_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/uploads"]["post"]
+    assert upload_operation["requestBody"]["required"] is True
+    submit_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/submit"]["post"]
+    assert "Requires at least one finalized file" in submit_operation["description"]
+    submit_schema = submit_operation["requestBody"]["content"]["application/json"][
+        "schema"
+    ]
+    assert submit_schema["required"] == ["contract_version", "proposal"]
+
+    unknown = client.get(
+        "/api/v1/not-a-resource",
+        headers={"Authorization": "Bearer valid-key"},
+    )
+    assert unknown.status_code == 404
+    assert unknown.is_json
+    assert unknown.json["error"]["code"] == "not_found"
+    assert unknown.headers["Cache-Control"] == "no-store"
+    assert unknown.headers["X-Request-ID"] == unknown.json["request_id"]
+
+    unsupported_method = client.post(
+        "/api/v1/me",
+        headers={"Authorization": "Bearer valid-key"},
+        json={},
+    )
+    assert unsupported_method.status_code == 405
+    assert unsupported_method.is_json
+    assert unsupported_method.json["error"]["code"] == "method_not_allowed"
+    assert unsupported_method.headers["Cache-Control"] == "no-store"
+    assert "GET" in unsupported_method.headers["Allow"]
 
     catalog = client.get(
         "/api/v1/tools",
@@ -112,6 +154,13 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert {tool["name"] for tool in catalog.json["tools"]} == set(
         api_routes.ai_functions.DECLARATIONS
     )
+    get_file = next(
+        tool for tool in catalog.json["tools"] if tool["name"] == "get_file"
+    )
+    assert "short-lived download URL" in get_file["description"]
+    assert "expires after five minutes" in get_file["description"]
+    assert "temporary credential" in get_file["description"]
+    assert "provider file part" not in get_file["description"]
 
     monkeypatch.setattr(api_routes.external_api, "create_plan", lambda *args, **kwargs: report)
     created = client.post(

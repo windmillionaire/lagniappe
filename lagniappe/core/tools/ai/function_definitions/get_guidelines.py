@@ -97,8 +97,8 @@ GET_GUIDELINES = types.FunctionDeclaration(
         "Return detailed prompt guidelines for one report-planning subtask. Use this "
         "when a proposal would benefit from detailed rules for generated structure, "
         "form schemas, form submissions, page documents, file summaries, or "
-        "action data. Before the tool turn, identify every relevant bundle whose need "
-        "is already known and request those get_guidelines calls together."
+        "action data. Request one bundle per call. Independent bundles may be "
+        "requested in parallel when the client supports it."
     ),
     parameters={
         "type": "object",

@@ -13,7 +13,11 @@ from config import (
     _atomic_write_text,
     verify_generation_manifest,
 )
-from runner.frontend_build import verify_frontend_build
+from runner.frontend_build import (
+    FilesystemFrontendBuildReader,
+    inspect_frontend_build,
+    verify_frontend_build,
+)
 from runner.process import run_command
 
 PACKAGE_IMPORTS = {
@@ -394,6 +398,34 @@ def _deploy_app_yaml(file_ref, quiet=False, *, capture_output=False):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
+# @matrix frontend-build : freshness no-op rebuild
+# @pair deploy:build
+def ensure_production_frontend_bundle(*, announce_progress=True):
+    """Build production assets only when their sources or outputs are stale."""
+    validation, issues = inspect_frontend_build(
+        FilesystemFrontendBuildReader(Directory.APP.value),
+        expected_mode="production",
+        expected_version=str(SETTINGS.APP["VERSION"]),
+    )
+    if validation is not None:
+        if announce_progress:
+            print("Current production frontend bundle detected; preserving it.")
+        return False
+
+    if announce_progress:
+        if issues:
+            print(
+                f"Production frontend bundle is stale ({issues[0]}); "
+                "running npm run build."
+            )
+        else:
+            print("Production frontend bundle is stale; running npm run build.")
+    run_command([NPM_CLI, "run", "build"], check=True, capture_output=False)
+    return True
+
+
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
 # @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
 def deploy(
     *,
@@ -404,17 +436,15 @@ def deploy(
     announce_progress=True,
     announce_completion=True,
 ):
-    """Build frontend assets, refresh generated metadata, and deploy the app."""
+    """Prepare current frontend assets, refresh metadata, and deploy the app."""
     verify_runtime_deploy_surface()
 
     if build_assets:
         update_manifest()
         SETTINGS.save()
 
-    if build_assets and announce_progress:
-        print("Building static files...")
     if build_assets:
-        run_command([NPM_CLI, "run", "build"], check=True, capture_output=False)
+        ensure_production_frontend_bundle(announce_progress=announce_progress)
 
     verify_frontend_build(
         app_dir=Directory.APP.value,

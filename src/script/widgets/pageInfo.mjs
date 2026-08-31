@@ -375,7 +375,6 @@ export class UserSettings extends PagePermissions {
 			submitted: "User Settings Updated",
 		};
 		this._groupSelect = null;
-		this._apiKeyCopyResetTimer = null;
 	}
 
 	async reset() {
@@ -405,7 +404,8 @@ export class UserSettings extends PagePermissions {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
-	 * @matrix agent-api user-settings : copy expiry revoke rotate shown-once
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @matrix agent-api : copy-control expiry revoke rotate shown-once status
 	 */
 	_initApiKey() {
 		const section = this.target.querySelector("[data-role='api-key-settings']");
@@ -428,18 +428,8 @@ export class UserSettings extends PagePermissions {
 				() => void this._revokeApiKey(section, route),
 				{ signal },
 			);
-		section
-			.querySelector("[data-action='copy-api-key']")
-			?.addEventListener(
-				"click",
-				() => void this._copyApiKey(section),
-				{ signal },
-			);
 		this.destroyables.push({
-			destroy: () => {
-				controller.abort();
-				clearTimeout(this._apiKeyCopyResetTimer);
-			},
+			destroy: () => controller.abort(),
 		});
 		void request
 			.get(route, null, { signal, replaceErrorPage: false })
@@ -467,7 +457,7 @@ export class UserSettings extends PagePermissions {
 		if (issue) issue.textContent = active ? "Regenerate API key" : "Generate API key";
 		if (revoke) revoke.dataset.visible = active.toString();
 		if (secret) secret.dataset.visible = Boolean(token).toString();
-		if (value) value.value = token || "";
+		if (value) value.textContent = token || "";
 		this._apiKeyError(section, null);
 	}
 
@@ -504,35 +494,6 @@ export class UserSettings extends PagePermissions {
 		if (revoke) revoke.disabled = false;
 		if (!response.ok) return this._apiKeyError(section, response.error);
 		this._renderApiKey(section, response.credential);
-	}
-
-	async _copyApiKey(section) {
-		const value = section.querySelector("[data-role='api-key-value']");
-		const button = section.querySelector("[data-action='copy-api-key']");
-		if (!value?.value || !button) return;
-		let copied = false;
-		try {
-			if (navigator.clipboard?.writeText) {
-				await navigator.clipboard.writeText(value.value);
-				copied = true;
-			}
-		} catch {
-			copied = false;
-		}
-		if (!copied) {
-			value.select();
-			try {
-				copied = document.execCommand("copy");
-			} catch {
-				copied = false;
-			}
-			button.focus();
-		}
-		button.textContent = copied ? "Copied" : "Copy failed";
-		clearTimeout(this._apiKeyCopyResetTimer);
-		this._apiKeyCopyResetTimer = setTimeout(() => {
-			if (button.isConnected) button.textContent = "Copy API key";
-		}, 2000);
 	}
 
 	/**
@@ -809,6 +770,11 @@ export class UserSettings extends PagePermissions {
 		return data;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
+	 * @matrix agent-api user-settings : poll-reconcile status
+	 */
 	postreconcile() {
 		const updated = this._updated;
 		if (!updated) return;
@@ -816,6 +782,10 @@ export class UserSettings extends PagePermissions {
 		this._updated = false;
 		this.commitReset();
 		this.target.dataset.visible = "true";
+		this._initGroups();
+		this._initPageSelect();
+		this._initRemovePage();
+		this._initApiKey();
 		this.setEntityMetadata();
 		if (this._success) {
 			this.form?.success();

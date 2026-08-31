@@ -129,6 +129,14 @@ def plan_contract(report, user):
         ),
         "permissions": report_action_permission_context(user, allowed),
         "required_file_refs": report_file_references(report),
+        "workflow_rules": [
+            "Upload and finalize at least one file before submitting a proposal.",
+            "Read tools are available only while the plan remains a draft.",
+            "Fetch this contract after finalizing uploads and immediately before "
+            "constructing the proposal.",
+            "Submission saves a ready report for browser review and never executes "
+            "its actions.",
+        ],
         "reference_rules": [
             "Use hash:<12-character-hash> for every existing entity.",
             "Use *_action fields to reference entities created by earlier actions.",
