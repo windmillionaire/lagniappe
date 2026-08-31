@@ -204,6 +204,7 @@ def _capture_action_before(action, report, user, created, context=None):
                 "status": summarize.status,
                 "error": summarize.error,
                 "complete": summarize.complete,
+                "retrieval_terms": summarize.retrieval_terms,
             },
         }
     return {}

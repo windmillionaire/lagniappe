@@ -231,6 +231,47 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
     _patch_fake_keys(monkeypatch)
     user = _test_user("proposal-detail-owner")
     file = _test_file("rhythm.pdf", "application/pdf")
+    existing_form = TestEntities.get(
+        "FORM",
+        {
+            "name": "Existing Contact",
+            "hash": "existing-contact-form",
+        },
+    )
+    existing_form.schema = [
+        {
+            "id": "select-status",
+            "type": "select",
+            "title": "Status",
+            "options": [{"value": "active", "label": "Active"}],
+        },
+        {
+            "id": "link-vehicle",
+            "type": "link",
+            "title": "Vehicle",
+            "location": "in",
+        },
+    ]
+    linked_page = TestEntities.get(
+        "PAGE",
+        {
+            "name": "Civic",
+            "hash": "ahZkZW1vLWV4YW1wbGUtcHJvamVjdHILEgRwYWdlGICAgICAgICAAQ",
+        },
+    )
+    existing_entities = {
+        existing_form.urlsafe_key: existing_form,
+        linked_page.urlsafe_key: linked_page,
+    }
+    monkeypatch.setattr(
+        Entities,
+        "fetch",
+        lambda *identifiers, **_kwargs: [
+            existing_entities[identifier]
+            for identifier in identifiers
+            if identifier in existing_entities
+        ],
+    )
     report = AIReport.create(
         {
             "parent": user,
@@ -297,7 +338,45 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
                                     "id": "textarea-notes",
                                     "type": "textarea",
                                     "title": "Notes",
-                                }
+                                },
+                                {
+                                    "id": "table-actions",
+                                    "type": "table",
+                                    "title": "Action Items",
+                                    "columns": [
+                                        {
+                                            "id": "row-action",
+                                            "type": "input",
+                                            "title": "Action",
+                                        },
+                                        {
+                                            "id": "row-complete",
+                                            "type": "checkbox",
+                                            "title": "Complete",
+                                        },
+                                    ],
+                                },
+                                {
+                                    "id": "todo-checklist",
+                                    "type": "todo",
+                                    "title": "Checklist",
+                                },
+                                {
+                                    "id": "signature-approval",
+                                    "type": "signature",
+                                    "title": "Approval",
+                                },
+                                {
+                                    "id": "html-document",
+                                    "type": "html",
+                                    "title": "Document",
+                                },
+                                {
+                                    "id": "link-source",
+                                    "type": "link",
+                                    "location": "out",
+                                    "title": "Source",
+                                },
                             ],
                         },
                     },
@@ -308,7 +387,29 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
                         "data": {
                             "page_action": "page",
                             "form_action": "task_form",
-                            "submission": {"status": "ready"},
+                            "submission": {
+                                "textarea-notes": "Ready to read",
+                                "table-actions": {
+                                    "rows": [
+                                        {
+                                            "row-action": "Call Avery",
+                                            "row-complete": False,
+                                        }
+                                    ]
+                                },
+                                "todo-checklist": {
+                                    "items": [
+                                        {"text": "Call Avery", "checked": True},
+                                        {"text": "Send notes", "checked": False},
+                                    ]
+                                },
+                                "signature-approval": "signature-approval",
+                                "html-document": "<p>Prepared document</p>",
+                                "link-source": {
+                                    "title": "Official page",
+                                    "url": "https://example.test/source",
+                                },
+                            },
                         },
                     },
                     {
@@ -318,8 +419,12 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
                             "name": "Existing category page",
                             "category": "ahBSYWduaWFwcGUtNDU5MTAwchMLEgZtb2RlbBgYgICA2M",
                             "category_name": "Reading",
-                            "form": "ahBSYWduaWFwcGUtNDU5MTAwchMLEgRmb3JtGICAgN",
-                            "form_name": "Book",
+                            "form": existing_form.urlsafe_key,
+                            "form_name": "Existing Contact",
+                            "submission": {
+                                "select-status": "active",
+                                "link-vehicle": linked_page.urlsafe_key,
+                            },
                         },
                     },
                     {
@@ -387,7 +492,43 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
             "kind": "task",
             "details": [
                 {"label": "Form", "value": "Reading Task (new)", "kind": "form"},
-                {"label": "Submission", "value": "created", "kind": "default"},
+                {
+                    "label": "Submission",
+                    "value": "created",
+                    "kind": "default",
+                    "items": [
+                        {
+                            "label": "Notes",
+                            "value": "Ready to read",
+                            "kind": "default",
+                        },
+                        {
+                            "label": "Action Items",
+                            "value": "1 row",
+                            "kind": "default",
+                        },
+                        {
+                            "label": "Checklist",
+                            "value": "2 items (1 complete)",
+                            "kind": "default",
+                        },
+                        {
+                            "label": "Approval",
+                            "value": "Provided",
+                            "kind": "default",
+                        },
+                        {
+                            "label": "Document",
+                            "value": "Content provided",
+                            "kind": "default",
+                        },
+                        {
+                            "label": "Source",
+                            "value": "Official page",
+                            "kind": "default",
+                        },
+                    ],
+                },
             ],
             "support": [],
             "skip": None,
@@ -397,8 +538,16 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
     ]
     assert actions[1]["details"] == [
         {"label": "Category", "value": "Reading", "kind": "category"},
-        {"label": "Form", "value": "Book", "kind": "form"},
-        {"label": "Submission", "value": "missing", "kind": "default"},
+        {"label": "Form", "value": "Existing Contact", "kind": "form"},
+        {
+            "label": "Submission",
+            "value": "created",
+            "kind": "default",
+            "items": [
+                {"label": "Status", "value": "Active", "kind": "default"},
+                {"label": "Vehicle", "value": "Civic", "kind": "default"},
+            ],
+        },
     ]
     assert actions[2]["details"] == [
         {

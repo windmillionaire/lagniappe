@@ -1,12 +1,14 @@
 """Focused AI-report characterization coverage."""
 
 import copy
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.tools.ai import create, organize, references as ai_references
+from lagniappe.core.tools.ai.reporting.proposals import validation as proposal_validation
 from testing.utility.ai_report_fakes import (
     _assert_repair_prompt_contract,
     _prompt_context,
@@ -1491,6 +1493,39 @@ def test_validate_proposal_requires_completed_root_task_targets():
         organize.validate_proposal(proposal)
 
 
+# @matrix ai-report : completed-task future-date proposal validation
+@pytest.mark.unit
+def test_validate_proposal_rejects_future_completed_dates(monkeypatch):
+    monkeypatch.setattr(
+        proposal_validation.dates,
+        "user_today",
+        lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
+    )
+    proposal = {
+        "summary": "Record a completed inspection.",
+        "actions": [
+            {
+                "id": "inspection",
+                "type": "create_task",
+                "data": {
+                    "name": "Hive Inspection",
+                    "page": "hive-page",
+                    "completed_on": "2026-09-01",
+                },
+            }
+        ],
+    }
+
+    with pytest.raises(
+        exceptions.AIException,
+        match="completion date cannot be in the future",
+    ):
+        organize.validate_proposal(copy.deepcopy(proposal))
+
+    proposal["actions"][0]["data"]["completed_on"] = "2026-08-31"
+    assert organize.validate_proposal(proposal)["issues"] == []
+
+
 
 
 # @matrix ai-report : dependencies proposal validation
@@ -2038,7 +2073,15 @@ def test_validate_proposal_treats_action_like_submission_fields_as_content():
 
 # @matrix ai-report : file-placement proposal validation
 @pytest.mark.unit
-def test_validate_proposal_requires_every_report_file_attachment():
+def test_validate_proposal_requires_every_report_file_attachment(monkeypatch):
+    monkeypatch.setattr(
+        ai_references.cache,
+        "get_details_by_hash",
+        lambda hashes: {
+            "aaaaaaaaaaaa": {"id": "first-file-id", "kind": "file"},
+            "bbbbbbbbbbbb": {"id": "second-file-id", "kind": "file"},
+        },
+    )
     proposal = {
         "summary": "Attach one of two files.",
         "confidence": 0.7,
@@ -2047,32 +2090,156 @@ def test_validate_proposal_requires_every_report_file_attachment():
             {
                 "id": "attach_first",
                 "type": "attach_file_to_page",
-                "data": {"page": "existing-page", "file": "first-file-id"},
+                "data": {
+                    "page": "existing-page",
+                    "file": "hash:aaaaaaaaaaaa",
+                },
             },
             {
                 "id": "unresolved_second",
                 "type": "attach_file_to_page",
-                "data": {"file": "second-file-id"},
+                "data": {"file": "hash:bbbbbbbbbbbb"},
             },
         ],
     }
 
     with pytest.raises(
         exceptions.AIException,
-        match=r"Missing report_file_ref values: second-file-id",
+        match=r"Missing report_file_ref values: hash:bbbbbbbbbbbb",
     ):
         organize.validate_proposal(
             proposal,
-            required_file_refs=("first-file-id", "second-file-id"),
+            required_file_refs=("hash:aaaaaaaaaaaa", "hash:bbbbbbbbbbbb"),
         )
 
     proposal["actions"][1]["data"]["task"] = "existing-task"
     proposal["actions"][1]["type"] = "attach_file_to_task"
 
-    assert organize.validate_proposal(
+    validated = organize.validate_proposal(
         proposal,
-        required_file_refs=("first-file-id", "second-file-id"),
-    )["actions"] == proposal["actions"]
+        required_file_refs=("hash:aaaaaaaaaaaa", "hash:bbbbbbbbbbbb"),
+    )
+    assert validated["actions"][0]["data"]["file"] == "first-file-id"
+    assert validated["actions"][1]["data"]["file"] == "second-file-id"
+
+
+# @matrix ai-report : file-summary proposal validation
+@pytest.mark.unit
+def test_validate_proposal_requires_external_file_summaries(monkeypatch):
+    monkeypatch.setattr(
+        ai_references.cache,
+        "get_details_by_hash",
+        lambda hashes: {
+            "aaaaaaaaaaaa": {"id": "first-file-id", "kind": "file"},
+            "bbbbbbbbbbbb": {"id": "second-file-id", "kind": "file"},
+        },
+    )
+    proposal = {
+        "summary": "Attach and summarize two files.",
+        "confidence": 0.9,
+        "issues": [],
+        "actions": [
+            {
+                "id": "attach_first",
+                "type": "attach_file_to_page",
+                "data": {"page": "existing-page", "file": "hash:aaaaaaaaaaaa"},
+            },
+            {
+                "id": "attach_second",
+                "type": "attach_file_to_task",
+                "data": {"task": "existing-task", "file": "hash:bbbbbbbbbbbb"},
+            },
+        ],
+    }
+    required = ("hash:aaaaaaaaaaaa", "hash:bbbbbbbbbbbb")
+
+    with pytest.raises(
+        exceptions.AIException,
+        match=r"Missing report_file_ref values: hash:aaaaaaaaaaaa, hash:bbbbbbbbbbbb",
+    ):
+        organize.validate_proposal(
+            copy.deepcopy(proposal),
+            required_file_refs=required,
+            require_file_summaries=True,
+        )
+
+    proposal["actions"].extend(
+        [
+            {
+                "id": "summarize_first",
+                "type": "summarize_file",
+                "data": {
+                    "file": "hash:aaaaaaaaaaaa",
+                    "summary": "The first source concerns Avery's contact details.",
+                    "retrieval_terms": ["Avery", "contacts"],
+                    "search": True,
+                },
+            },
+            {
+                "id": "summarize_second",
+                "type": "summarize_file",
+                "data": {
+                    "file": "hash:bbbbbbbbbbbb",
+                    "summary": "The second source records apiary maintenance.",
+                    "retrieval_terms": ["apiary", "maintenance"],
+                    "search": True,
+                },
+            },
+        ]
+    )
+
+    validated = organize.validate_proposal(
+        copy.deepcopy(proposal),
+        required_file_refs=required,
+        require_file_summaries=True,
+    )
+    assert validated["actions"][2]["data"]["file"] == "first-file-id"
+    assert validated["actions"][3]["data"]["retrieval_terms"] == [
+        "apiary",
+        "maintenance",
+    ]
+
+    missing_terms = copy.deepcopy(proposal)
+    missing_terms["actions"][2]["data"].pop("retrieval_terms")
+    with pytest.raises(exceptions.AIException, match="exactly two distinct"):
+        organize.validate_proposal(
+            missing_terms,
+            required_file_refs=required,
+            require_file_summaries=True,
+        )
+
+    duplicate = copy.deepcopy(proposal)
+    duplicate["actions"].append(
+        {
+            **copy.deepcopy(duplicate["actions"][3]),
+            "id": "summarize_second_again",
+        }
+    )
+    with pytest.raises(exceptions.AIException, match="exactly one summary"):
+        organize.validate_proposal(
+            duplicate,
+            required_file_refs=required,
+            require_file_summaries=True,
+        )
+
+    unexpected = copy.deepcopy(proposal)
+    unexpected["actions"].append(
+        {
+            "id": "summarize_other",
+            "type": "summarize_file",
+            "data": {
+                "file": "other-file-id",
+                "summary": "This file is not part of the report.",
+                "retrieval_terms": ["other", "unrelated"],
+            },
+        }
+    )
+    with pytest.raises(exceptions.AIException, match="must target report input"):
+        organize.validate_proposal(
+            unexpected,
+            required_file_refs=required,
+            require_file_summaries=True,
+        )
 
 
 

@@ -205,7 +205,7 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "required": ("note", "questions"),
     },
     "summarize_file": {
-        "fields": ("file", "summary", "search"),
+        "fields": ("file", "summary", "retrieval_terms", "search"),
         "required": ("file", "summary"),
     },
 }

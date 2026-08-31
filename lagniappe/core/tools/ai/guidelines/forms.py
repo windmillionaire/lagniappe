@@ -237,6 +237,10 @@ Assume factual data already supplied in the prompt is accurate unless the user
 explicitly asks for correction. Do not use tools to verify higher-priority
 context.
 
+When sources at the same priority conflict and no supplied rule resolves them,
+omit the disputed field rather than choosing a value. Preserve the conflict for
+human review when the surrounding workflow supports review actions.
+
 ### Attached Files
 
 - Attached-files entries are the complete readable metadata projections for

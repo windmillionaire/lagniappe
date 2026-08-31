@@ -1,13 +1,17 @@
 """Provider-free plan workspaces for the external agent REST API."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
 import json
+import re
+import secrets
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
-from lagniappe.core.tools import cache
+from lagniappe.core.tools import cache, dates
 from lagniappe.core.tools.database import get as database_get
 
 from .references import HASH_PREFIXED_ID_REGEX, HASH_REFERENCE_REGEX, hash_reference
@@ -24,6 +28,9 @@ from .reporting.proposals.validation import validate_proposal
 
 
 CONTRACT_VERSION = 1
+EXECUTION_KEY_PREFIX = "lgn_exec_"
+EXECUTION_KEY_LIFETIME = timedelta(hours=1)
+EXECUTION_KEY_PATTERN = re.compile(r"^lgn_exec_[A-Za-z0-9_-]{40,50}$")
 MAX_INSTRUCTIONS_BYTES = 65536
 MAX_PROPOSAL_BYTES = 1024 * 1024
 MAX_PROPOSAL_ACTIONS = 100
@@ -51,10 +58,37 @@ REFERENCE_FIELDS = frozenset(
 
 
 # @testable false
+# @covered-by lagniappe/core/tools/ai/external_api.py::issue_execution_key
+# @covered-by lagniappe/core/tools/ai/external_api.py::consume_execution_key
+# @reason domain marker is exercised through execution-key issue and rejection
+class AgentAPIExecutionKeyError(ValueError):
+    """Raised when a plan-scoped execution capability cannot be used."""
+
+
+# @testable false
 # @covered-by lagniappe/core/tools/ai/external_api.py::create_plan
 # @reason timestamp helper is exercised through draft creation and submission
 def _utcnow():
     return datetime.now(timezone.utc)
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/external_api.py::issue_execution_key
+# @covered-by lagniappe/core/tools/ai/external_api.py::consume_execution_key
+# @reason timestamp normalization is exercised through capability issue and expiry
+def _utc(value=None):
+    value = value or _utcnow()
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/external_api.py::issue_execution_key
+# @covered-by lagniappe/core/tools/ai/external_api.py::consume_execution_key
+# @reason execution keys are compared only through this one-way digest
+def _execution_key_digest(value):
+    return hashlib.sha256(str(value or "").encode("utf-8")).hexdigest()
 
 
 # @testable false
@@ -115,14 +149,26 @@ def report_file_references(report):
     return [reference for file in report.input_files if (reference := hash_reference(file))]
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai/external_api.py::plan_contract
+# @covered-by lagniappe/core/tools/ai/external_api.py::validate_external_proposal
+# @reason external plans preserve already-read file context without changing internal prompt actions
+def _external_allowed_report_actions(user):
+    allowed = allowed_report_actions(user)
+    if "summarize_file" in allowed:
+        return allowed
+    return (*allowed, "summarize_file")
+
+
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_plan_contract_is_permission_and_file_scoped
-# @matrix agent-api ai-report : file-placement permissions proposal-contract
+# @matrix agent-api ai-report : file-placement file-summary permissions proposal-contract
 def plan_contract(report, user):
-    allowed = allowed_report_actions(user)
+    allowed = _external_allowed_report_actions(user)
     return {
         "version": CONTRACT_VERSION,
         "tool": "organize",
+        "current_date": dates.user_today(user).date().isoformat(),
         "proposal_schema": report_proposal_response_schema(
             allowed_actions=allowed,
             include_submission_fields=True,
@@ -141,14 +187,21 @@ def plan_contract(report, user):
             "will not call a model to complete or repair them.",
             "Fetch this contract after finalizing uploads and immediately before "
             "constructing the proposal.",
+            "Include exactly one summarize_file action for every uploaded file. "
+            "Write the summary and two retrieval terms from the file content you "
+            "already inspected; the server will not call another model.",
             "Submission saves a ready report for browser review and never executes "
-            "its actions.",
+            "its actions. Call the separate execute operation only when the user's "
+            "request explicitly includes execution; successful validation alone is "
+            "never consent.",
         ],
         "reference_rules": [
             "Use hash:<12-character-hash> for every existing entity.",
             "Use *_action fields to reference entities created by earlier actions.",
             "Do not submit URL-safe Datastore keys.",
             "Every uploaded file must be attached to at least one page or task.",
+            "Each uploaded file must also have exactly one summarize_file action "
+            "using its report file reference.",
             "Submission values must be final; server-side model repair is unavailable.",
         ],
         "limits": {
@@ -275,7 +328,7 @@ def _validate_top_level(proposal):
 
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_proposal_validation_enforces_permissions_files_and_shape
-# @matrix agent-api ai-report : file-placement permissions proposal-validation references
+# @matrix agent-api ai-report : file-placement file-summary permissions proposal-validation references
 def validate_external_proposal(proposal, report, user):
     """Validate an external final proposal without provider repair."""
     _validate_top_level(proposal)
@@ -283,11 +336,13 @@ def validate_external_proposal(proposal, report, user):
     _validate_reference_visibility(proposal, report, user)
     return validate_proposal(
         proposal,
-        allowed_actions=allowed_report_actions(user),
+        allowed_actions=_external_allowed_report_actions(user),
         allow_empty_submission_updates=True,
         allow_pending_submissions=False,
         required_file_refs=report_file_references(report),
+        require_file_summaries=True,
         validate_reference_kinds=True,
+        user=user,
     )
 
 
@@ -324,6 +379,111 @@ def submit_plan(report, user, proposal, *, contract_version):
     return report
 
 
+# @testable true
+# @tests tests_unit/test_032_agent_api.py::test_execution_key_is_scoped_expiring_and_shown_once
+# @matrix agent-api ai-report : execution capability expiry proposal-binding user-binding
+def issue_execution_key(report, user, credential, *, now=None):
+    """Rotate and return a short-lived capability for one ready proposal."""
+    if report.status != "ready" or not isinstance(report.proposal, dict):
+        raise AgentAPIExecutionKeyError(
+            "Execution keys are available only for ready plans."
+        )
+    owner_key = getattr(getattr(report.properties, "user", None), "key", None)
+    if owner_key != getattr(user, "key", None):
+        raise AgentAPIExecutionKeyError("The execution key is invalid or expired.")
+    generation = int((credential or {}).get("generation") or 0)
+    if generation <= 0:
+        raise AgentAPIExecutionKeyError("The execution key is invalid or expired.")
+
+    now = _utc(now)
+    expires_at = now + EXECUTION_KEY_LIFETIME
+    key = f"{EXECUTION_KEY_PREFIX}{secrets.token_urlsafe(32)}"
+    digest = _execution_key_digest(key)
+    fingerprint = proposal_fingerprint(report.proposal)
+    operation_id = f"agent-api-report-execution:{report.hash}:{digest[:32]}"
+    manifest = dict(report.agent_manifest or {})
+    manifest["execution_capability"] = {
+        "version": 1,
+        "token_digest": digest,
+        "credential_generation": generation,
+        "proposal_fingerprint": fingerprint,
+        "operation_id": operation_id,
+        "issued_at": now.isoformat(),
+        "expires_at": expires_at.isoformat(),
+        "consumed_at": None,
+    }
+    report.agent_manifest = manifest
+    Entities.save(report)
+    return key, expires_at.isoformat()
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/external_api.py::consume_execution_key
+# @reason persisted capability timestamps are validated through public consumption
+def _execution_expiry(value):
+    try:
+        parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _utc(parsed)
+
+
+# @testable true
+# @tests tests_unit/test_032_agent_api.py::test_execution_key_is_scoped_expiring_and_shown_once
+# @matrix agent-api ai-report : execution capability expiry idempotency proposal-binding user-binding
+def consume_execution_key(report, user, credential, key, *, now=None):
+    """Consume a valid capability and return its deterministic operation ID."""
+    now = _utc(now)
+    key = str(key or "").strip()
+    manifest = dict(report.agent_manifest or {})
+    capability = dict(manifest.get("execution_capability") or {})
+    supplied_digest = _execution_key_digest(key)
+    stored_digest = str(capability.get("token_digest") or "")
+    owner_key = getattr(getattr(report.properties, "user", None), "key", None)
+    expires_at = _execution_expiry(capability.get("expires_at"))
+    generation = int((credential or {}).get("generation") or 0)
+    expected_fingerprint = proposal_fingerprint(report.proposal)
+    valid = all(
+        (
+            EXECUTION_KEY_PATTERN.fullmatch(key),
+            stored_digest,
+            hmac.compare_digest(stored_digest, supplied_digest),
+            owner_key == getattr(user, "key", None),
+            int(capability.get("credential_generation") or 0) == generation,
+            generation > 0,
+            capability.get("proposal_fingerprint") == expected_fingerprint,
+            expires_at is not None and expires_at > now,
+            capability.get("operation_id"),
+        )
+    )
+    if not valid:
+        raise AgentAPIExecutionKeyError("The execution key is invalid or expired.")
+
+    operation_id = capability["operation_id"]
+    if capability.get("consumed_at"):
+        active_job = report.deferred_job or {}
+        same_running_operation = (
+            report.status == "running"
+            and active_job.get("idempotency_key") == operation_id
+        )
+        completed_operation = report.status == "complete"
+        if not same_running_operation and not completed_operation:
+            raise AgentAPIExecutionKeyError(
+                "The execution key has already been consumed."
+            )
+        return operation_id
+
+    if report.status != "ready":
+        raise AgentAPIExecutionKeyError(
+            "The plan is not ready for this execution key."
+        )
+    capability["consumed_at"] = now.isoformat()
+    manifest["execution_capability"] = capability
+    report.agent_manifest = manifest
+    Entities.save(report)
+    return operation_id
+
+
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/uploads.py::prepare_report_upload_manifest
 # @reason external wrapper fixes the input name for the tested shared normalizer
@@ -352,13 +512,18 @@ def finalize_uploads(report, user):
 
 
 __all__ = [
+    "AgentAPIExecutionKeyError",
     "CONTRACT_VERSION",
+    "EXECUTION_KEY_LIFETIME",
+    "EXECUTION_KEY_PREFIX",
     "MAX_FILE_BYTES",
     "MAX_PLAN_FILES",
     "MAX_PLAN_TOOL_CALLS",
     "MAX_TOTAL_FILE_BYTES",
     "create_plan",
+    "consume_execution_key",
     "finalize_uploads",
+    "issue_execution_key",
     "plan_contract",
     "prepare_upload_manifest",
     "report_file_references",

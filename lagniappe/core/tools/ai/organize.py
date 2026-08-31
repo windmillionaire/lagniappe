@@ -2,6 +2,7 @@
 
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools import dates
 
 from .core import ai_model
 from .debug import ai_debug
@@ -267,6 +268,7 @@ def _organize_prompt_base(
     prompt.add_workspace_concepts(
         (f"{LAGNIAPPE_WORKSPACE_CONCEPTS}\n\n{ORGANIZE_PLANNING_CONCEPTS.strip()}")
     )
+    prompt.add_context("current_date", dates.user_today(user).date().isoformat())
     prompt.add_context("user_instructions", report.instructions or "None provided.")
     prompt.add_context(
         "report_input_files",

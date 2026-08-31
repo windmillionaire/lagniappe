@@ -17,7 +17,8 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @matrix ai-report files : deterministic-run exact-id report-file-reference
+# @matrix ai-report : deterministic-run exact-id file-summary report-file-reference
+# @matrix files : deterministic-run exact-id report-file-reference
 @pytest.mark.unit
 def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -55,6 +56,7 @@ def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatc
                         "data": {
                             "file": f"file:{file.urlsafe_key}",
                             "summary": "Proposal for the Pettis remodeling work.",
+                            "retrieval_terms": ["Pettis", "remodeling"],
                         },
                     },
                 ],
@@ -82,6 +84,7 @@ def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatc
     )
     assert file.db["pages"] == [page.key]
     assert file.summary == "Proposal for the Pettis remodeling work."
+    assert file.properties.summarize.retrieval_terms == ["Pettis", "remodeling"]
 
 
 

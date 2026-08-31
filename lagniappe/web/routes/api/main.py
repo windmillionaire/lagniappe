@@ -12,7 +12,13 @@ from werkzeug.exceptions import HTTPException
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import AI, Action, Fetch
+from lagniappe.core.definitions import (
+    AI,
+    Action,
+    DeferredJobSpec,
+    DeferredJobType,
+    Fetch,
+)
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import functions as ai_functions
@@ -20,6 +26,7 @@ from lagniappe.core.tools.ai.references import hash_reference, normalize_hash_re
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.core.tools.database import assets as storage_assets
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
 from . import api
 
@@ -299,6 +306,70 @@ def _file_payload(file):
 
 
 # @testable false
+# @covered-by lagniappe/web/routes/api/main.py::_execution_payload
+# @reason bounded ledger aggregation is asserted through the public plan projection
+def _execution_result_payload(report):
+    result = report.result if isinstance(getattr(report, "result", None), dict) else {}
+    actions = [
+        action
+        for action in (result.get("actions") or [])
+        if isinstance(action, dict)
+    ]
+    if not actions and not result:
+        return None
+    counts = {
+        status: sum(1 for action in actions if action.get("status") == status)
+        for status in ("pending", "applying", "complete", "skipped", "failed")
+    }
+    return {
+        "status": result.get("status"),
+        "actions_total": len(actions),
+        "action_counts": counts,
+    }
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/api/main.py::get_plan
+# @covered-by lagniappe/web/routes/api/main.py::execute_plan
+# @reason execution progress is asserted through the public plan and execute resources
+def _execution_payload(report):
+    state = {
+        "draft": "not_available",
+        "ready": "awaiting_explicit_request",
+        "running": "running",
+        "complete": "complete",
+        "failed": "failed",
+        "undoing": "undoing",
+        "undo_failed": "failed",
+    }.get(report.status, "not_available")
+    payload = {
+        "state": state,
+        "requires_explicit_user_request": True,
+        "operation": None,
+        "result": _execution_result_payload(report),
+    }
+    active_job = getattr(report, "deferred_job", None) or {}
+    if active_job.get("key"):
+        statuses = DeferredJobs.statuses(
+            [active_job["key"]],
+            g.agent_api_user,
+        )
+        if statuses:
+            operation = dict(statuses[0])
+            for internal_field in (
+                "key",
+                "source_widget",
+                "destination",
+                "entity_key",
+            ):
+                operation.pop(internal_field, None)
+            payload["operation"] = operation
+    if report.status in {"failed", "undo_failed"} and getattr(report, "error", None):
+        payload["error"] = str(report.error)[:500]
+    return payload
+
+
+# @testable false
 # @covered-by lagniappe/web/routes/api/main.py::get_plan
 # @reason plan projection is asserted through the public plan resource
 def _plan_payload(report, *, include_proposal=True):
@@ -316,11 +387,27 @@ def _plan_payload(report, *, include_proposal=True):
             plan_id=report.urlsafe_key,
             _external=True,
         ),
+        "status_url": url_for(
+            "agent_api.get_plan",
+            plan_id=report.urlsafe_key,
+            _external=True,
+        ),
+        "execute_url": url_for(
+            "agent_api.execute_plan",
+            plan_id=report.urlsafe_key,
+            _external=True,
+        ),
+        "preview_url": url_for(
+            "tools.api_plan_preview",
+            plan_hash=report.hash,
+            _external=True,
+        ),
         "review_url": url_for(
             "tools.report",
             key=report.urlsafe_key,
             _external=True,
         ),
+        "execution": _execution_payload(report),
     }
     if include_proposal:
         payload["proposal"] = report.proposal
@@ -397,7 +484,8 @@ def openapi_document():
                 "summary": "Describe the API actor",
                 "description": (
                     "Call first to verify the bearer key, its user identity, and "
-                    "the organize-only, no-execution capability boundary."
+                    "the permission-bounded Organize and explicit-execution "
+                    "capabilities."
                 ),
                 "tags": ["Discovery"],
                 "responses": {
@@ -485,7 +573,9 @@ def openapi_document():
                 "summary": "Get plan state",
                 "description": (
                     "Checks draft/ready state, finalized files, pending uploads, "
-                    "contract and browser-review URLs, and any submitted proposal."
+                    "contract and browser-review URLs, any submitted proposal, and "
+                    "bounded deterministic execution progress. The plan ID is the "
+                    "top-level id field in every plan response."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -506,7 +596,9 @@ def openapi_document():
                     "Fetch after all uploads are finalized and immediately before "
                     "constructing the proposal. The response is plan-, user-, file-, "
                     "and permission-specific; its proposal_schema, workflow_rules, "
-                    "reference_rules, and required_file_refs are authoritative."
+                    "reference_rules, and required_file_refs are authoritative. It "
+                    "requires one model-authored summary per uploaded file without "
+                    "a server-side model call."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -633,9 +725,11 @@ def openapi_document():
                 "description": (
                     "Requires at least one finalized file, no pending uploads, and "
                     "the current contract version. A valid proposal becomes a ready "
-                    "report for human browser review; it never executes actions. "
-                    "Repeating the identical normalized proposal is idempotent, while "
-                    "a different proposal after readiness returns a conflict."
+                    "report for human browser review; submission never executes "
+                    "actions. The response shows one short-lived, plan-scoped "
+                    "execution_key. Treat it as a secret. Repeating the identical "
+                    "normalized proposal is accepted and rotates that key, while a "
+                    "different proposal after readiness returns a conflict."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -664,7 +758,60 @@ def openapi_document():
                 },
                 "responses": {
                     "200": {
-                        "description": "Ready plan and browser review URL.",
+                        "description": (
+                            "Ready plan, short browser preview URL, and a shown-once "
+                            "execution key that expires after one hour."
+                        ),
+                        **json_content(
+                            {"$ref": "#/components/schemas/SubmittedPlan"}
+                        ),
+                    },
+                    "default": error_response,
+                },
+            }
+        },
+        "/api/v1/plans/{plan_id}/execute": {
+            "post": {
+                "operationId": "executePlan",
+                "summary": "Execute one validated proposal",
+                "description": (
+                    "Run the ready proposal through Lagniappe's existing deterministic "
+                    "deferred runner. Call this operation only when the user's request "
+                    "explicitly includes execution (including a clear follow-up such "
+                    "as 'execute that'). Successful validation, a high-confidence "
+                    "proposal, or receipt of execution_key is never consent. This "
+                    "operation makes no model call. Poll status_url for bounded "
+                    "progress and result counts."
+                ),
+                "tags": ["Plans"],
+                "parameters": [plan_parameter],
+                "requestBody": {
+                    "required": True,
+                    **json_content(
+                        {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["execution_key"],
+                            "properties": {
+                                "execution_key": {
+                                    "type": "string",
+                                    "pattern": "^lgn_exec_[A-Za-z0-9_-]{40,50}$",
+                                    "description": (
+                                        "The shown-once key returned by submitPlan "
+                                        "for this exact proposal."
+                                    ),
+                                }
+                            },
+                        }
+                    ),
+                },
+                "responses": {
+                    "200": {
+                        "description": "Execution reached a terminal state.",
+                        **json_content({"$ref": "#/components/schemas/Plan"}),
+                    },
+                    "202": {
+                        "description": "Execution is queued or running.",
                         **json_content({"$ref": "#/components/schemas/Plan"}),
                     },
                     "default": error_response,
@@ -686,9 +833,13 @@ def openapi_document():
                 "and file assignments, then use required specialized bundles, exact "
                 "schemas, and form_autofill to add final form values while the plan "
                 "is a draft; (6) fetch the plan-specific contract after uploads and "
-                "construct a conforming proposal; (7) submit it and stop for human "
-                "browser review. The server does not call a model to complete or "
-                "repair the proposal, and this API does not execute proposed actions."
+                "construct a conforming proposal, including one summary and two "
+                "retrieval terms for every uploaded file; (7) submit it for human "
+                "browser review and retain the returned preview_url and execution_key; "
+                "(8) stop unless the user's request explicitly includes execution, "
+                "in which case call executePlan once and poll status_url. Validation "
+                "success alone is never execution consent. The server does not call "
+                "a model to complete, repair, summarize, or execute the proposal."
             ),
         },
         "servers": [{"url": request.url_root.rstrip("/")}],
@@ -750,11 +901,26 @@ def openapi_document():
                         "uploads_pending",
                         "contract_version",
                         "contract_url",
+                        "status_url",
+                        "execute_url",
+                        "preview_url",
                         "review_url",
+                        "execution",
                     ],
                     "properties": {
                         "id": {"type": "string"},
-                        "status": {"type": "string", "enum": ["draft", "ready"]},
+                        "status": {
+                            "type": "string",
+                            "enum": [
+                                "draft",
+                                "ready",
+                                "running",
+                                "complete",
+                                "failed",
+                                "undoing",
+                                "undo_failed",
+                            ],
+                        },
                         "tool": {"type": "string", "const": "organize"},
                         "name": {"type": "string"},
                         "instructions": {"type": "string"},
@@ -768,9 +934,76 @@ def openapi_document():
                             "const": external_api.CONTRACT_VERSION,
                         },
                         "contract_url": {"type": "string", "format": "uri"},
+                        "status_url": {"type": "string", "format": "uri"},
+                        "execute_url": {"type": "string", "format": "uri"},
+                        "preview_url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": (
+                                "Short browser-session URL for the plan creator; it "
+                                "redirects to the full review report."
+                            ),
+                        },
                         "review_url": {"type": "string", "format": "uri"},
+                        "execution": {"$ref": "#/components/schemas/Execution"},
+                        "execution_key": {
+                            "type": "string",
+                            "description": (
+                                "Shown only by submitPlan. It is scoped to this plan, "
+                                "proposal, user credential generation, and expiry."
+                            ),
+                        },
+                        "execution_key_expires_at": {
+                            "type": "string",
+                            "format": "date-time",
+                        },
                         "proposal": {"oneOf": [{"type": "object"}, {"type": "null"}]},
                     },
+                },
+                "Execution": {
+                    "type": "object",
+                    "required": [
+                        "state",
+                        "requires_explicit_user_request",
+                        "operation",
+                        "result",
+                    ],
+                    "properties": {
+                        "state": {
+                            "type": "string",
+                            "enum": [
+                                "not_available",
+                                "awaiting_explicit_request",
+                                "running",
+                                "complete",
+                                "failed",
+                                "undoing",
+                            ],
+                        },
+                        "requires_explicit_user_request": {
+                            "type": "boolean",
+                            "const": True,
+                        },
+                        "operation": {
+                            "oneOf": [{"type": "object"}, {"type": "null"}]
+                        },
+                        "result": {
+                            "oneOf": [{"type": "object"}, {"type": "null"}]
+                        },
+                        "error": {"type": "string", "maxLength": 500},
+                    },
+                },
+                "SubmittedPlan": {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/Plan"},
+                        {
+                            "type": "object",
+                            "required": [
+                                "execution_key",
+                                "execution_key_expires_at",
+                            ],
+                        },
+                    ]
                 },
                 "UploadFile": {
                     "type": "object",
@@ -810,7 +1043,7 @@ def me():
             "ai_access": actor.ai_access,
         },
         "credential": g.agent_api_credential,
-        "capabilities": {"organize": True, "execute": False},
+        "capabilities": {"organize": True, "execute": True},
     }
 
 
@@ -1125,4 +1358,87 @@ def submit_plan(plan_id):
         if report.status == "ready":
             raise APIProblem("plan_state_conflict", str(error), 409) from error
         raise
-    return _plan_payload(submitted)
+    try:
+        execution_key, expires_at = external_api.issue_execution_key(
+            submitted,
+            g.agent_api_user,
+            g.agent_api_credential,
+        )
+    except external_api.AgentAPIExecutionKeyError as error:
+        raise APIProblem("execution_key_unavailable", str(error), 409) from error
+    payload = _plan_payload(submitted)
+    payload["execution_key"] = execution_key
+    payload["execution_key_expires_at"] = expires_at
+    return payload
+
+
+# @testable true
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
+# @matrix agent-api ai-report : deterministic-execution explicit-consent polling plan-capability
+@api.post("/plans/<plan_id>/execute")
+@_route
+def execute_plan(plan_id):
+    """Start or poll the exact deterministic run authorized by an execution key."""
+    report = _load_plan(plan_id)
+    if report.status not in {"ready", "running", "complete"}:
+        raise APIProblem(
+            "plan_state_conflict",
+            "This plan cannot be executed in its current state.",
+            409,
+        )
+    data = _json_body()
+    if set(data) != {"execution_key"} or not isinstance(
+        data.get("execution_key"), str
+    ):
+        raise APIProblem(
+            "invalid_execution_request",
+            "Request body must contain only execution_key.",
+            422,
+        )
+    try:
+        operation_id = external_api.consume_execution_key(
+            report,
+            g.agent_api_user,
+            g.agent_api_credential,
+            data["execution_key"],
+        )
+    except external_api.AgentAPIExecutionKeyError as error:
+        raise APIProblem("invalid_execution_key", str(error), 403) from error
+
+    if report.status == "ready":
+        try:
+            DeferredJobs.start(
+                DeferredJobSpec(
+                    job_type=DeferredJobType.REPORT_EXECUTION,
+                    actor=g.agent_api_user,
+                    idempotency_key=operation_id,
+                    inputs={"report": report},
+                    notification_body="Saving report changes...",
+                    notification_target=report,
+                    client={},
+                )
+            )
+        except exceptions.ValidationError as error:
+            raise APIProblem("execution_conflict", str(error), 409) from error
+        except Exception as error:
+            exceptions.capture(
+                error,
+                context={
+                    "agent_api": {
+                        "request_id": g.agent_api_request_id,
+                        "phase": "execution_start",
+                        "plan_hash": report.hash,
+                    }
+                },
+            )
+            raise APIProblem(
+                "service_unavailable",
+                "Plan execution could not be started. Submit the same proposal "
+                "again to obtain a new execution key before retrying.",
+                503,
+                retry_after=30,
+            ) from error
+
+    current = _load_plan(plan_id)
+    status = 202 if current.status == "running" else 200
+    return _plan_payload(current), status

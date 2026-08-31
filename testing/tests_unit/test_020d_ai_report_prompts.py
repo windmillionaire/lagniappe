@@ -1,5 +1,6 @@
 """Focused AI-report characterization coverage."""
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -22,7 +23,12 @@ from testing.utility.test_entities import TestEntities
 
 # @matrix ai-report : files iteration-limit prompt tools
 @pytest.mark.unit
-def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
+def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkeypatch):
+    monkeypatch.setattr(
+        organize.dates,
+        "user_today",
+        lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
+    )
     user = _test_user("prompt-owner")
     file = _test_file("receipt.png", "image/png")
     report = TestEntities.get(
@@ -68,6 +74,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
     assert _prompt_context(prompt, "User Instructions") == (
         "```\nThis is probably a receipt.\n```"
     )
+    assert _prompt_context(prompt, "Current Date") == "```\n2026-08-31\n```"
     input_files = _prompt_context_json(prompt, "Report Input Files")
     assert input_files[0] | {
         "display_name": "receipt",
@@ -116,8 +123,9 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
         in semantic_preview
     )
     assert "Start with the bounded workspace_searches" in semantic_preview
-    assert "list_workspace_resources only when the prefetched candidates" in (
-        semantic_preview
+    assert (
+        "list_workspace_resources only when the prefetched candidates are absent"
+        in (semantic_preview)
     )
     assert "Batch get_entity calls for plausible candidates only" in semantic_preview
     assert 'search_entities with kinds=["page"]' in semantic_preview
@@ -126,11 +134,13 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
     assert "something specific was done or needs to be done" in semantic_preview
     assert "set completed: true" in semantic_preview
     assert "solely because the exact date is unknown" in semantic_preview
+    assert "Future-dated work is not complete" in semantic_preview
     assert "If the matching page cannot be edited, use needs_review" in (
         semantic_preview
     )
     assert "no broad category-level catch-all" in semantic_preview
     assert "New page names are concise subject labels" in semantic_preview
+    assert "Review/skip may supplement but never replace" in semantic_preview
     assert "Category default forms appear only" in semantic_preview
     assert (
         "add_category requires both the existing page and the additional existing "
@@ -734,6 +744,13 @@ def test_report_prompts_attach_provider_json_schema():
             )
         )
     )
+    external_summary_actions = _response_action_schemas(
+        SimpleNamespace(
+            response_schema=organize.report_proposal_response_schema(
+                ("summarize_file",),
+            )
+        )
+    )
     organize_action_data = all_actions["create_form"]["properties"]["data"]
     organize_action_properties = all_actions["create_form"]["properties"]
     assert organize_schema["required"] == [
@@ -834,6 +851,19 @@ def test_report_prompts_attach_provider_json_schema():
     assert "submission_request" not in organize_action_data["propertyOrdering"]
     assert "submission_context" not in organize_action_data["propertyOrdering"]
     assert "submission_empty_reason" not in organize_action_data["propertyOrdering"]
+    summary_data = external_summary_actions["summarize_file"]["properties"]["data"]
+    assert set(summary_data["properties"]) == {
+        "file",
+        "summary",
+        "retrieval_terms",
+        "search",
+    }
+    assert summary_data["properties"]["retrieval_terms"] == {
+        "type": "array",
+        "items": {"type": "string"},
+        "minItems": 2,
+        "maxItems": 2,
+    }
 
     ask_schema = ask_prompt.response_schema
     assert "answer_html" in ask_schema["properties"]

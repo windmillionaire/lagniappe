@@ -105,6 +105,56 @@ def _ready_report(user):
     return report, category_name, page_name
 
 
+def _submission_preview_report(user):
+    owner = _owner(user)
+    suffix = _suffix()
+    report = Entities.REPORT.create(
+        {
+            "parent": owner,
+            "user": owner,
+            "name": f"test-submission-preview-report-{suffix}",
+            "status": "ready",
+            "pending": False,
+            "summary": "Ready submission-preview proposal.",
+            "proposal": {
+                "summary": "Create a labelled contact submission.",
+                "confidence": 1,
+                "actions": [
+                    {
+                        "id": "form",
+                        "type": "create_form",
+                        "data": {
+                            "name": f"test-contact-form-{suffix}",
+                            "form_type": "page",
+                            "schema": [
+                                {
+                                    "id": "select-status",
+                                    "type": "select",
+                                    "title": "Contact Status",
+                                    "options": [
+                                        {"value": "active", "label": "Active"}
+                                    ],
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "id": "page",
+                        "type": "create_page",
+                        "data": {
+                            "name": f"test-contact-{suffix}",
+                            "form_action": "form",
+                            "submission": {"select-status": "active"},
+                        },
+                    },
+                ],
+            },
+        }
+    )
+    Entities.save(report)
+    return report
+
+
 def _recoverable_failed_report(user):
     owner = _owner(user)
     suffix = _suffix()
@@ -877,6 +927,7 @@ def test_report_detail_runs_ready_report(get_user):
 
     report_page = user.go(Report.for_entity(user, report))
     expect(report_page.execute_button).to_be_visible()
+    expect(report_page.execute_button).to_have_attribute("data-kind", "success")
     report_page.execute()
 
     expect(user.page.get_by_text("Work done.")).to_be_visible()
@@ -926,6 +977,25 @@ def test_report_detail_runs_ready_report(get_user):
         re.compile(rf"/pages/{re.escape(page.urlsafe_key)}/delete$"),
     )
     modal.element.get_by_role("button", name="Cancel").click()
+
+
+# @matrix ai-report : details proposal submission-review
+# @pair form-schema:submission-review
+# @template tools/report.html::proposal_details
+def test_report_detail_shows_proposed_submission_values(get_user):
+    user = get_user(Users.OWNER)
+    report = _submission_preview_report(user)
+
+    report_page = user.go(Report.for_entity(user, report))
+
+    expect(report_page.proposal_actions).to_have_count(1)
+    expect(report_page.proposal_actions).to_contain_text("Submission: created")
+    expect(report_page.proposal_actions).to_contain_text("Contact Status: Active")
+    expect(
+        report_page.proposal_actions.locator("[data-role=proposal-detail]").filter(
+            has_text="Submission: created"
+        )
+    ).to_have_class(re.compile(r"\bbasis-full\b"))
 
 
 def test_email_report_detail_collapses_message_behind_subject_and_sender(get_user):

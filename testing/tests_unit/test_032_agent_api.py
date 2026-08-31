@@ -41,7 +41,7 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch):
     assert report.note == "Waiting for external plan"
 
 
-# @matrix agent-api ai-report : file-placement permissions proposal-contract
+# @matrix agent-api ai-report : file-placement file-summary permissions proposal-contract
 @pytest.mark.unit
 def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     actor = object()
@@ -63,12 +63,22 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         "report_action_permission_context",
         lambda user, allowed: {"allowed": allowed},
     )
+    monkeypatch.setattr(
+        external_api.dates,
+        "user_today",
+        lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
+    )
 
     contract = external_api.plan_contract(report, actor)
 
     assert contract["version"] == external_api.CONTRACT_VERSION
-    assert contract["proposal_schema"] == {"allowed": ("create_page",)}
-    assert contract["permissions"] == {"allowed": ("create_page",)}
+    assert contract["current_date"] == "2026-08-31"
+    assert contract["proposal_schema"] == {
+        "allowed": ("create_page", "summarize_file")
+    }
+    assert contract["permissions"] == {
+        "allowed": ("create_page", "summarize_file")
+    }
     assert contract["required_file_refs"] == ["hash:aaaaaaaaaaaa"]
     assert any(
         "Upload and finalize at least one file" in rule
@@ -81,6 +91,10 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     assert any("two phases" in rule for rule in contract["workflow_rules"])
     assert any(
         "will not call a model" in rule for rule in contract["workflow_rules"]
+    )
+    assert any(
+        "exactly one summarize_file" in rule
+        for rule in contract["workflow_rules"]
     )
     assert any("never executes" in rule for rule in contract["workflow_rules"])
     assert contract["limits"]["max_tool_calls"] == external_api.MAX_PLAN_TOOL_CALLS
@@ -130,7 +144,7 @@ def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
     assert parts == [{"uri": "gs://private/one"}]
 
 
-# @matrix agent-api ai-report : file-placement permissions proposal-validation references
+# @matrix agent-api ai-report : file-placement file-summary permissions proposal-validation references
 @pytest.mark.unit
 def test_external_proposal_validation_enforces_permissions_files_and_shape(
     monkeypatch,
@@ -155,9 +169,10 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
         "actions": [],
     }
     assert external_api.validate_external_proposal(proposal, report, actor) is proposal
-    assert captured["allowed_actions"] == ("create_page",)
+    assert captured["allowed_actions"] == ("create_page", "summarize_file")
     assert captured["allow_pending_submissions"] is False
     assert captured["required_file_refs"] == ["hash:aaaaaaaaaaaa"]
+    assert captured["require_file_summaries"] is True
     assert captured["validate_reference_kinds"] is True
 
     with pytest.raises(exceptions.AIException, match="confidence"):
@@ -250,6 +265,152 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
     assert report.proposal == proposal
     assert report.agent_manifest["proposal_fingerprint"]
     assert len(saved) == 1
+
+
+# @matrix agent-api ai-report : execution capability expiry idempotency proposal-binding user-binding
+@pytest.mark.unit
+def test_execution_key_is_scoped_expiring_and_shown_once(monkeypatch):
+    now = datetime(2026, 8, 31, 12, tzinfo=timezone.utc)
+    owner = SimpleNamespace(key="owner-key")
+    proposal = {
+        "summary": "Create one page.",
+        "confidence": 1,
+        "issues": [],
+        "actions": [],
+    }
+    report = SimpleNamespace(
+        hash="reporthash12",
+        status="ready",
+        proposal=proposal,
+        result=None,
+        deferred_job=None,
+        agent_manifest={"proposal_fingerprint": "submitted"},
+        properties=SimpleNamespace(user=SimpleNamespace(key=owner.key)),
+    )
+    credential = {"generation": 7}
+    saved = []
+    monkeypatch.setattr(
+        external_api.secrets,
+        "token_urlsafe",
+        lambda length: "a" * 43,
+    )
+    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+
+    key, expires_at = external_api.issue_execution_key(
+        report,
+        owner,
+        credential,
+        now=now,
+    )
+    capability = report.agent_manifest["execution_capability"]
+
+    assert key == f"{external_api.EXECUTION_KEY_PREFIX}{'a' * 43}"
+    assert expires_at == (now + external_api.EXECUTION_KEY_LIFETIME).isoformat()
+    assert key not in repr(report.agent_manifest)
+    assert capability["credential_generation"] == 7
+    assert capability["proposal_fingerprint"]
+    assert capability["operation_id"].startswith(
+        "agent-api-report-execution:reporthash12:"
+    )
+
+    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
+        external_api.consume_execution_key(
+            report,
+            owner,
+            credential,
+            f"{external_api.EXECUTION_KEY_PREFIX}{'b' * 43}",
+            now=now,
+        )
+    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
+        external_api.consume_execution_key(
+            report,
+            owner,
+            {"generation": 8},
+            key,
+            now=now,
+        )
+    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
+        external_api.consume_execution_key(
+            report,
+            SimpleNamespace(key="another-owner"),
+            credential,
+            key,
+            now=now,
+        )
+    report.proposal = {**proposal, "summary": "A changed proposal."}
+    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
+        external_api.consume_execution_key(
+            report,
+            owner,
+            credential,
+            key,
+            now=now,
+        )
+    report.proposal = proposal
+
+    operation_id = external_api.consume_execution_key(
+        report,
+        owner,
+        credential,
+        key,
+        now=now,
+    )
+    assert operation_id == capability["operation_id"]
+    assert report.agent_manifest["execution_capability"]["consumed_at"]
+
+    report.status = "running"
+    report.deferred_job = {"idempotency_key": operation_id}
+    assert (
+        external_api.consume_execution_key(
+            report,
+            owner,
+            credential,
+            key,
+            now=now,
+        )
+        == operation_id
+    )
+
+    report.status = "ready"
+    report.deferred_job = None
+    report.result = {"status": "undone"}
+    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="consumed"):
+        external_api.consume_execution_key(
+            report,
+            owner,
+            credential,
+            key,
+            now=now,
+        )
+
+    monkeypatch.setattr(
+        external_api.secrets,
+        "token_urlsafe",
+        lambda length: "c" * 43,
+    )
+    rotated_key, _expires_at = external_api.issue_execution_key(
+        report,
+        owner,
+        credential,
+        now=now,
+    )
+    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
+        external_api.consume_execution_key(
+            report,
+            owner,
+            credential,
+            key,
+            now=now,
+        )
+    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="expired"):
+        external_api.consume_execution_key(
+            report,
+            owner,
+            credential,
+            rotated_key,
+            now=now + external_api.EXECUTION_KEY_LIFETIME,
+        )
+    assert saved == [report, report, report]
 
 
 # @matrix agent-api : authentication expiry issue revoke shown-once

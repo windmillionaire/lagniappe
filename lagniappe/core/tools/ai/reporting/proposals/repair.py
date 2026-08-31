@@ -632,6 +632,7 @@ def validate_or_repair_proposal(
         "allow_pending_submissions": allow_pending_submissions,
     }
     if validator is validate_proposal:
+        validation_options["user"] = getattr(prompt, "_user", None)
         validation_options["allow_empty_submission_updates"] = (
             allow_empty_submission_updates
         )

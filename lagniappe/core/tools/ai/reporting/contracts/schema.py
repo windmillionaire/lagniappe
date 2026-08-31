@@ -222,6 +222,12 @@ def _report_action_data_properties():
         "note": {"type": "string"},
         "questions": {"type": "array", "items": {"type": "string"}},
         "summary": {"type": "string"},
+        "retrieval_terms": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 2,
+            "maxItems": 2,
+        },
         "search": {"type": "boolean"},
     }
 

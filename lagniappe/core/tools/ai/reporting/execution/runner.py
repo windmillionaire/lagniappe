@@ -53,6 +53,7 @@ def run_report(report, user, ensure_active=None):
         report.proposal,
         allow_empty_submission_updates=True,
         allow_pending_submissions=False,
+        user=user,
     )
     fingerprint = proposal_fingerprint(proposal)
     existing = report.result if isinstance(report.result, dict) else {}

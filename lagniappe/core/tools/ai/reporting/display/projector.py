@@ -1,5 +1,7 @@
 """Grouped display projection for stored AI report proposals."""
 
+import json
+
 from .contracts import ProposalActionGrouping
 from .details import ProposalDetailCollector
 from .references import ProposalReferenceResolver
@@ -20,7 +22,9 @@ class ProposalDisplayProjector:
 
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_decision_details
-    # @matrix ai-report : details proposal
+    # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_proposed_submission_values
+    # @matrix ai-report : details proposal submission-review
+    # @pair form-schema:submission-review
     @property
     def display_actions(self):
         if not isinstance(self.value, dict):
@@ -43,6 +47,7 @@ class ProposalDisplayProjector:
 
     def _proposal_action_items(self, actions, action_labels, file_labels):
         display_actions = []
+        actions_by_id = {action["id"]: action for action in actions if action.get("id")}
         for index, action in enumerate(actions, 1):
             definition = proposal_action_display(action.get("type"))
             if definition.hidden:
@@ -59,11 +64,165 @@ class ProposalDisplayProjector:
             )
             if definition.details:
                 definition.details(details, data, item)
+            self._add_submission_preview(details, data, actions_by_id)
             item["details"] = details.values
             item["display_label"] = self._proposal_display_action_label(item)
             display_actions.append(item)
 
         return display_actions
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector.display_actions
+    # @reason display_actions owns the schema-aware proposal detail projection
+    def _add_submission_preview(self, details, data, actions_by_id):
+        preview = self._proposal_submission_details(data, actions_by_id)
+        if not preview:
+            return
+        for detail in reversed(details.values):
+            if detail.get("label") == "Submission" and detail.get("value") == "created":
+                detail["items"] = preview
+                return
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector.display_actions
+    # @reason display_actions owns the schema-aware proposal detail projection
+    def _proposal_submission_details(self, data, actions_by_id):
+        submission = data.get("submission")
+        if not isinstance(submission, dict) or not submission:
+            return []
+
+        schema = self._proposal_submission_schema(data, actions_by_id)
+        fields = {
+            field.get("id"): field
+            for field in schema
+            if isinstance(field, dict) and field.get("id")
+        }
+        return [
+            {
+                "label": (fields.get(field_id) or {}).get("title") or field_id,
+                "value": self._proposal_submission_value(
+                    value,
+                    fields.get(field_id),
+                ),
+                "kind": "default",
+            }
+            for field_id, value in submission.items()
+        ]
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector.display_actions
+    # @reason display_actions owns the schema-aware proposal detail projection
+    def _proposal_submission_schema(self, data, actions_by_id, visited=None):
+        schema = data.get("schema")
+        if isinstance(schema, list):
+            return schema
+
+        visited = visited or set()
+        action = {"data": data}
+        for root in ("form", "category", "model", "project", "task"):
+            action_id = self.references.reference_action_id(action, root)
+            if action_id and action_id not in visited:
+                visited.add(action_id)
+                source = actions_by_id.get(action_id)
+                source_schema = self._proposal_submission_schema(
+                    (source or {}).get("data") or {},
+                    actions_by_id,
+                    visited,
+                )
+                if source_schema:
+                    return source_schema
+
+            reference = self.references.existing_entity_reference(action, root)
+            entity_details = (
+                self.references.entity_details(reference) if reference else None
+            )
+            entity_schema = (entity_details or {}).get("schema")
+            if isinstance(entity_schema, list):
+                return entity_schema
+        return []
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector.display_actions
+    # @reason display_actions owns the human-readable proposal value projection
+    def _proposal_submission_value(self, value, field):
+        def display(item, item_field=None):
+            item_field = item_field or {}
+            field_type = item_field.get("type")
+            options = [
+                (option.get("value"), option.get("label"))
+                for option in item_field.get("options") or []
+                if isinstance(option, dict) and option.get("label")
+            ]
+            for option_value, option_label in options:
+                if item == option_value:
+                    return option_label
+            if isinstance(item, bool):
+                return "Yes" if item else "No"
+            if item is None:
+                return "None"
+            if field_type == "table":
+                rows = item.get("rows") if isinstance(item, dict) else item
+                count = len(rows) if isinstance(rows, list) else 0
+                return f"{count} {'row' if count == 1 else 'rows'}"
+            if field_type == "todo":
+                items = item.get("items") if isinstance(item, dict) else item
+                count = len(items) if isinstance(items, list) else 0
+                complete = sum(
+                    1
+                    for todo in items or []
+                    if isinstance(todo, dict) and todo.get("checked") is True
+                )
+                noun = "item" if count == 1 else "items"
+                return f"{count} {noun} ({complete} complete)"
+            if field_type == "signature":
+                return "Provided" if item else "Not provided"
+            if field_type == "html":
+                return "Content provided" if item else "(blank)"
+            if (
+                field_type == "link"
+                and item_field.get("location") == "in"
+                and isinstance(item, str)
+            ):
+                if self.references.reference_is_opaque(item):
+                    return (
+                        self.references.entity_label(item)
+                        or "Linked item unavailable"
+                    )
+                return item
+            if isinstance(item, dict):
+                columns = [
+                    column
+                    for column in item_field.get("columns") or []
+                    if isinstance(column, dict) and column.get("id")
+                ]
+                if columns:
+                    by_id = {column["id"]: column for column in columns}
+                    ordered_ids = [
+                        column["id"] for column in columns if column["id"] in item
+                    ]
+                    ordered_ids.extend(key for key in item if key not in by_id)
+                    return "; ".join(
+                        f"{(by_id.get(key) or {}).get('title') or key}: "
+                        f"{display(item[key], by_id.get(key))}"
+                        for key in ordered_ids
+                    )
+                name = item.get("name") or item.get("label")
+                address = item.get("address") or item.get("formatted_address")
+                if name and address and name != address:
+                    return f"{name} — {address}"
+                if name or address:
+                    return str(name or address)
+                if field_type == "link":
+                    return str(item.get("title") or item.get("url") or "Link provided")
+                return json.dumps(item, ensure_ascii=False, sort_keys=True)
+            if isinstance(item, list):
+                return ", ".join(display(child, item_field) for child in item)
+            if item == "":
+                return "(blank)"
+            return str(item)
+
+        rendered = " ".join(display(value, field).split())
+        return f"{rendered[:297]}..." if len(rendered) > 300 else rendered
 
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_move_files_under_target_page

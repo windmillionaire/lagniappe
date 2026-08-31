@@ -47,6 +47,7 @@ def complete_organize_submissions(
         allow_empty_submission_updates=True,
         require_pending_submission_target=True,
         allow_pending_submissions=True,
+        user=user,
     )
     actions = proposal.get("actions") or []
     context = _submission_completion_context(proposal, report, user)
@@ -179,4 +180,5 @@ def complete_organize_submissions(
         proposal,
         allow_empty_submission_updates=allow_empty_submission_updates,
         allow_pending_submissions=False,
+        user=user,
     )

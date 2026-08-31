@@ -791,3 +791,20 @@ def notes_by_user(user):
 def ai_reports(user_key):
     """Fetch AI report activity records belonging to a user."""
     return activity(user_key, types=("report",))
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/tools/preview.py::api_plan_preview
+# @reason creator-scoped hash lookup is exercised through the browser redirect route
+def ai_report_by_hash(user_key, report_hash):
+    """Fetch one activity record by public hash beneath the given user."""
+    parent_key = datastore_key(user_key)
+    report_hash = str(report_hash or "").strip()
+    if not parent_key or not report_hash:
+        return None
+    return (
+        Query(KINDS.activity)
+        .ancestor(parent_key)
+        .filter(Filter().eq("hash", report_hash))
+        .fetch_one()
+    )

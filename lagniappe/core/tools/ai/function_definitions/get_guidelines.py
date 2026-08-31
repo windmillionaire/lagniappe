@@ -38,12 +38,21 @@ GUIDELINE_BUNDLES = {
             "Apply this as a two-phase workflow. First use the planning sections "
             "to settle structure and file assignments without submission fields; "
             "do not submit that intermediate plan. Then use Action Planning, the "
-            "form_autofill bundle, each exact form schema, and the current plan "
-            "contract to add final submission or update values. An external client "
-            "must complete both phases before /submit because the server will not "
-            "call a model to finish or repair the proposal. The current plan "
-            "contract is authoritative if an illustrative shape differs. Read tools "
-            "only inspect context and never execute the proposal."
+            "form_autofill bundle when form values are needed, each exact form "
+            "schema, and the current plan contract to add final submission or "
+            "update values. Fetch only specialized bundles required by actions you "
+            "will return: category for category structure, project for project/model "
+            "structure, page_form or task_form for standalone forms, "
+            "schema_evolution only for schema updates, and page_document only for "
+            "page documents. File-summary rules are already included here; do not "
+            "fetch file_summary separately for an Organize proposal. Do not fetch "
+            "report_actions because this organize bundle and the live contract "
+            "already provide the action/preflight rules. An external client must "
+            "complete both applicable phases before "
+            "/submit because the server will not call a model to finish or repair "
+            "the proposal. The current plan contract is authoritative if an "
+            "illustrative shape differs. Read tools only inspect context and never "
+            "execute the proposal."
         ),
         "sections": (
             LAGNIAPPE_WORKSPACE_CONCEPTS,
@@ -51,6 +60,7 @@ GUIDELINE_BUNDLES = {
             ORGANIZE_PLANNING_POLICY,
             ORGANIZE_PLANNING_PREFLIGHT,
             ORGANIZE_ACTION_GUIDELINES,
+            SUMMARY_GENERATION_GUIDELINES,
             REPORT_PREFLIGHT_CHECKS,
         ),
     },

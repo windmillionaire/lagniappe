@@ -6,10 +6,16 @@
   {% if details %}
     <dl class="{{ classes }} flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-medium">
       {% for detail in details %}
-        <div class="flex min-w-0 flex-row gap-1">
-          <dt data-kind="{{ detail.kind }}"
-              class="font-semibold text-kind-default">{{ detail.label }}:</dt>
-          <dd class="min-w-0">{{ detail.value }}</dd>
+        <div data-role="proposal-detail"
+             class="flex min-w-0 flex-col gap-1{% if detail.label == 'Submission' %} basis-full{% endif %}">
+          <div class="flex min-w-0 flex-row gap-1">
+            <dt data-kind="{{ detail.kind }}"
+                class="font-semibold text-kind-default">{{ detail.label }}:</dt>
+            <dd class="min-w-0 break-words">{{ detail.value }}</dd>
+          </div>
+          {% if detail.get("items") %}
+            {{ proposal_details(detail.get("items"), "pl-3 flex flex-col gap-1 border-l-2 border-base-light") }}
+          {% endif %}
         </div>
       {% endfor %}
     </dl>
@@ -554,7 +560,7 @@
                      class="{{ styles.message }}">{{ report.error }}</div>
               {% endif %}
               <button type="submit"
-                      data-kind="report"
+                      data-kind="{{ 'report' if can_retry else 'success' }}"
                       class="{{ styles.button.submit }}">{{ "Retry Proposal" if can_retry else "" }}</button>
             </form>
           {% endif %}
