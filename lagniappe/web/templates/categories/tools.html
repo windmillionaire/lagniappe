@@ -1,4 +1,4 @@
-{% from 'common.html' import autofill, explain_prompt %}
+{% from 'common.html' import autofill %}
 {% from 'filters.html' import filter_form, filter_item %}
 {% import 'controls.html' as controls %}
 
@@ -102,43 +102,6 @@
       {% endif %}
     {% endif %}
     {{ autofill(enabled=current_user.access(AI.CREATE)) }}
-  </form>
-{% endmacro %}
-
-{% macro generate_pages(category) %}
-  <form data-widget="GeneratePages"
-        lp-create
-        lp-deferred
-        data-route="{{ url_for('categories.create_pages', key=category.urlsafe_key) }}"
-        data-destination="table:IndexTable"
-        data-visible="false"
-        data-title="Generate Pages"
-        data-close="tools"
-        data-nav="true"
-        data-controls="true"
-        class="{{ styles.form.tools }}">
-    {% if Resource.FORMS.allowed(Action.VIEW) %}
-      <div data-role="form-select"
-           data-kind="form"
-           class="{{ styles.select.container }}">
-        <h3 class="{{ styles.label.sectionHeading }}">Using Form</h3>
-        <button lp-select
-                type="button"
-                {% if category.form %}data-preload='{{ category.properties.form.column_value|tojson }}'{% endif %}
-                data-action="select-form"
-                data-placeholder="select a form..."
-                data-index="form"
-                data-creatable="true"
-                data-kind="form"
-                data-title="Page Form"
-                data-form-type="page"
-                class="{{ styles.select.button }}"></button>
-      </div>
-    {% endif %}
-    <div class="flex flex-col gap-2 -mt-2" data-role="submit-group">
-      {{ explain_prompt('generate') }}
-      <button type="submit" class="{{ styles.button.submit }} mt-2"></button>
-    </div>
   </form>
 {% endmacro %}
 

@@ -11,7 +11,6 @@ from .text import (
     text_generation_prompt,
 )
 from .category import generate_category, category_creation_prompt
-from .pages import generate_pages, page_generation_prompt
 from .summarize import summarize_file, generate_summary
 from .schema import form_generation_prompt, generate_schema
 from .autofill import (
@@ -83,8 +82,6 @@ __all__ = [
     "page_image_generation_prompt",
     "generate_category",
     "category_creation_prompt",
-    "generate_pages",
-    "page_generation_prompt",
     "form_generation_prompt",
     "generate_schema",
     "summarize_file",

@@ -26,7 +26,6 @@ Category Index Page:
     The category index (/categories/{key}) shows a table of pages
     in the category with tools panel for:
     - Creating new pages
-    - Generating pages via AI
     - Viewing/editing category info
     - Managing filters
 """
@@ -50,7 +49,6 @@ class Category(SiteResource):
 
     Selectors (for category index page):
         CREATE_PAGE_*: Create page form in tools panel
-        GENERATE_PAGES_*: AI page generation in tools panel
         CATEGORY_INFO_*: Category info/edit form
         CATEGORY_FILTERS_*: Filter management
         TABLE: Main pages table (#table)
@@ -65,9 +63,6 @@ class Category(SiteResource):
     # --- Tools Panel Widgets ---
     CREATE_PAGE_TOGGLE = "[lp-show='tools:CreatePage']"
     CREATE_PAGE_WIDGET = "[data-widget='CreatePage']"
-
-    GENERATE_PAGES_TOGGLE = "[lp-show='tools:GeneratePages']"
-    GENERATE_PAGES_WIDGET = "[data-widget='GeneratePages']"
 
     CATEGORY_INFO_TOGGLE = "[lp-show='tools:CategoryInfo']"
     CATEGORY_INFO_WIDGET = "[data-widget='CategoryInfo']"
@@ -135,18 +130,6 @@ class Category(SiteResource):
         tools.open()
         tools.locate(self.CREATE_PAGE_TOGGLE).click()
         return tools.locate(self.CREATE_PAGE_WIDGET)
-
-    def generate_pages_form(self):
-        """
-        Open and return the AI page generation form from tools panel.
-
-        Returns:
-            Locator: The GeneratePages widget form element
-        """
-        tools = Tools(self.user)
-        tools.open()
-        tools.locate(self.GENERATE_PAGES_TOGGLE).click()
-        return tools.locate(self.GENERATE_PAGES_WIDGET)
 
     def category_info_form(self):
         """

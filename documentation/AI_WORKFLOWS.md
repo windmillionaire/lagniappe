@@ -39,10 +39,10 @@ Projects, Forms, and Tasks. Its output is always a proposal. It may use Search
 for public facts and workspace tools for existing structure, then passes the
 shared proposal contract and repair boundary.
 
-Page generation distinguishes top-level Page metadata from attached form
-submission. Without a form, `name` and `description` are generated directly.
-With a form, canonical top-level values win and the corresponding form fields
-mirror them consistently.
+Create Page proposals distinguish top-level Page metadata from attached form
+submissions. Without a form, `name` and `description` live directly on the
+Page action. With a form, canonical top-level values win and the corresponding
+form fields mirror them consistently.
 
 Create and Organize expose optional Page rich text to models as
 `document_markdown`. Shared proposal validation renders it to sanitized,

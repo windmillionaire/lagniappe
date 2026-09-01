@@ -22,7 +22,6 @@ from lagniappe.core.tools.ai import (
     functions as ai_functions,
     images,
     observability,
-    pages,
     project,
     references as ai_references,
     schema,
@@ -2667,9 +2666,9 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     }
 
 
-# @matrix ai : category citations pages project schedule schema validation
+# @matrix ai : category citations project schedule schema validation
 @pytest.mark.unit
-def test_ai_generation_validators_reject_bad_payloads_and_clean_citations(monkeypatch):
+def test_ai_generation_validators_reject_bad_payloads_and_clean_citations():
     submission = autofill.validate_submission(
         {
             "description": "Hello. [1]",
@@ -2752,47 +2751,6 @@ def test_ai_generation_validators_reject_bad_payloads_and_clean_citations(monkey
             }
         )
 
-    examples = pages.validate_examples(
-        [
-            {
-                "name": "Example",
-                "description": "Example page. [1]",
-                "submission": {"description": "Example page. [1]"},
-            }
-        ],
-        form_schema=[{"id": "name"}, {"id": "description"}],
-    )
-    assert examples[0]["description"] == "Example page."
-    assert examples[0]["submission"] == {
-        "name": "Example",
-        "description": "Example page.",
-    }
-    with pytest.raises(exceptions.AIException, match="valid array"):
-        pages.validate_examples({"submission": {}})
-
-    monkeypatch.setattr(
-        pages,
-        "ai_model",
-        SimpleNamespace(
-            generate_content=lambda prompt, validator=None: validator(
-                [
-                    {
-                        "name": "Generated",
-                        "description": "Generated page. [2]",
-                        "submission": {"description": "Not a form submission"},
-                    }
-                ]
-            )
-        ),
-    )
-    generated = pages.generate_pages(Prompt("Generate pages"))
-    assert generated == [
-        {
-            "name": "Generated",
-            "description": "Generated page.",
-        }
-    ]
-
     periodic = {"unit": "week", "interval": 2, "text": "Every 2 weeks"}
     assert dates.validate_schedule(periodic, mode="periodic") is periodic
     with pytest.raises(exceptions.AIException, match="Invalid unit"):
@@ -2804,83 +2762,6 @@ def test_ai_generation_validators_reject_bad_payloads_and_clean_citations(monkey
         dates.validate_schedule(
             {"unit": None, "interval": None, "text": None}, "periodic"
         )
-
-
-# @matrix ai : form-defaults no-form pages validation
-@pytest.mark.unit
-def test_page_generation_reconciles_page_and_form_default_fields():
-    form_schema = [
-        {"id": "name", "type": "input"},
-        {"id": "description", "type": "textarea"},
-        {"id": "input-topic", "type": "input"},
-    ]
-
-    direct = pages.validate_examples(
-        [
-            {
-                "name": "Direct name",
-                "description": "Direct description",
-                "submission": {
-                    "name": "Stale form name",
-                    "description": "Stale form description",
-                    "input-topic": "Kept form value",
-                },
-            }
-        ],
-        form_schema=form_schema,
-    )[0]
-    assert direct["submission"] == {
-        "name": "Direct name",
-        "description": "Direct description",
-        "input-topic": "Kept form value",
-    }
-
-    fallback = pages.validate_examples(
-        [
-            {
-                "name": "",
-                "description": None,
-                "submission": {
-                    "name": "Submission fallback",
-                    "description": "Fallback description",
-                },
-            }
-        ],
-        form_schema=form_schema,
-    )[0]
-    assert fallback["name"] == "Submission fallback"
-    assert fallback["description"] == "Fallback description"
-
-    without_form = pages.validate_examples(
-        [
-            {
-                "name": "Plain page",
-                "description": "No form attached",
-                "submission": {
-                    "name": "Phantom form name",
-                    "description": "Phantom form description",
-                },
-            }
-        ]
-    )[0]
-    assert without_form == {
-        "name": "Plain page",
-        "description": "No form attached",
-    }
-    assert (
-        pages.validate_examples(
-            [
-                {
-                    "submission": {
-                        "name": "Submission-only name",
-                        "description": "Submission-only description",
-                    }
-                }
-            ]
-        )
-        == []
-    )
-
 
 # @matrix categories : ai-create ai-generated default-form
 @pytest.mark.unit

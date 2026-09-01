@@ -10,10 +10,8 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Categories, Forms, Pages, Users
 from testing.elements import (
-    Buttons,
     FormElements,
     FormSelect,
-    Modal,
     SpinnerButtons,
     Table,
 )
@@ -416,48 +414,3 @@ def test_category_index_expands_table_submission_cell(get_user):
     expect(embedded).to_be_visible()
     expect(embedded).to_contain_text("Note")
     expect(embedded).to_contain_text("Row one")
-
-
-# @matrix pages : ai-form explain-button generate
-def test_generate_pages_explain_prompt_from_category_tools(get_user):
-    user = get_user(Users.OWNER)
-    category = Categories.test_create_page.get(user)
-    user.go(category)
-
-    generate_form = category.generate_pages_form()
-    generate_form.locator(FormElements.AI_DESCRIPTION).fill(
-        "Create a few example pages for testing."
-    )
-    generate_form.locator("input[name='num_pages']").fill("2")
-
-    explain_button = generate_form.locator(Buttons.EXPLAIN)
-    expect(explain_button).to_be_visible()
-    explain_button.click()
-
-    Modal(user.page).close()
-    expect(generate_form).to_be_visible()
-
-
-# @matrix pages : ai-form deferred-submit generate success-state
-def test_generate_pages_submit_marks_form_successful(get_user):
-    user = get_user(Users.OWNER)
-    category = Categories.test_create_page.get(user)
-    user.go(category)
-
-    generate_form = category.generate_pages_form()
-    generate_form.locator(FormElements.AI_DESCRIPTION).fill(
-        "Create a few pages about follow-up tasks."
-    )
-    generate_form.locator("input[name='num_pages']").fill("2")
-
-    submit_button = generate_form.locator(
-        "button[type='submit']:has-text('Generate Pages')"
-    )
-    with user.page.expect_response("**/generate-pages"):
-        submit_button.click()
-
-    success_button = generate_form.locator(
-        "button[type='submit']:has-text('Pages Queued')"
-    )
-    expect(success_button).to_be_visible()
-    expect(success_button.locator("[data-icon='check']")).to_be_visible()

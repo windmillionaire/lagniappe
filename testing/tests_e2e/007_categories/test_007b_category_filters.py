@@ -161,10 +161,6 @@ def test_category_saved_filters_hide_create_page_tool(get_user):
     create_page = tools.locate(category.CREATE_PAGE_WIDGET)
     expect(create_page).to_be_visible()
 
-    tools.locate(category.GENERATE_PAGES_TOGGLE).click()
-    expect(tools.locate(category.GENERATE_PAGES_WIDGET)).to_be_visible()
-    expect(create_page).to_be_hidden()
-
     tools.locate(category.CATEGORY_INFO_TOGGLE).click()
     expect(tools.locate(category.CATEGORY_INFO_WIDGET)).to_be_visible()
     expect(create_page).to_be_hidden()

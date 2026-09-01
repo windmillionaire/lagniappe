@@ -515,7 +515,6 @@ class GenAI:
     # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_content
     # @covered-by lagniappe/core/tools/ai/category.py::generate_category
     # @covered-by lagniappe/core/tools/ai/project.py::generate_project
-    # @covered-by lagniappe/core/tools/ai/pages.py::generate_pages
     # @reason single-attempt provider flow is exercised through the public retry wrapper and downstream generators
     def _generate_content_once(self, prompt, model):
         """Generate text content from a Prompt, including optional tool-call loops."""

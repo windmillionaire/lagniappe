@@ -1,2 +1,97 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.2.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="62248864-2e61-4c50-8362-05e935fbac8e",e._sentryDebugIdIdentifier="sentry-dbid-62248864-2e61-4c50-8362-05e935fbac8e");}catch(e){}}();import{C as s}from"./toolbar.js?v=b10d8a3a";import"./styles.js?v=b10d8a3a";import"./combobox.js?v=b10d8a3a";import"./foundation.js?v=b10d8a3a";import"./upstreamUnavailable.js?v=b10d8a3a";import"./connectivity.js?v=b10d8a3a";import"./primitives.js?v=b10d8a3a";import"./icons.js?v=b10d8a3a";import"./queryLifecycle.js?v=b10d8a3a";import"./dropdown.js?v=b10d8a3a";import"./buttons.js?v=b10d8a3a";import"./formatting.js?v=b10d8a3a";class c{constructor(e){this.toolbar=e,this.name="setColor",this.usedWithEditor=!0,this.active=!1,this.toggles=new Map}_colorSwatch(e,o){const t=document.createElement("button");return t.className="size-6 rounded transition-transform hover:scale-110 hover:outline-2 hover:outline-offset-2 data-[active=true]:outline-2 data-[active=true]:outline-offset-2",t.style.backgroundColor=e,t.style.outlineColor=e,t.title=o,t.dataset.active="false",t.dataset.color=e,t}setActiveColor(e){this.toggles.forEach((o,t)=>{const a=t===e;a!==o.active&&(o.button.dataset.active=a?"true":"false",o.active=a)})}init(){const e=this.toolbar.element.appendChild(document.createElement("div"));e.dataset.option=this.name,e.className='mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setColor"]/toolbar:flex group',s.forEach(({color:o,title:t})=>{const a=this._colorSwatch(o,t);this.toggles.set(o,{active:!1,button:a})}),e.append(...Array.from(this.toggles.values()).map(o=>o.button)),this.active=!0,e.addEventListener("click",o=>{const t=o.target.closest("button");if(!t)return;const a=this.toggles.get(t.dataset.color),i=Array.from(this.toggles.values()).find(r=>r.active&&r!==a);i&&(i.active=!1,i.button.dataset.active="false"),a.active=!a.active,t.dataset.active=a.active?"true":"false",a.active?this.toolbar.editor.chain().focus().setColor(t.dataset.color).run():this.toolbar.editor.chain().focus().unsetColor().run()})}}export{c as setColor};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { C as COLOR_MENU } from './toolbar.js?v=b8995073';
+import './styles.js?v=b8995073';
+import './combobox.js?v=b8995073';
+import './foundation.js?v=b8995073';
+import './upstreamUnavailable.js?v=b8995073';
+import './connectivity.js?v=b8995073';
+import './primitives.js?v=b8995073';
+import './icons.js?v=b8995073';
+import './queryLifecycle.js?v=b8995073';
+import './dropdown.js?v=b8995073';
+import './buttons.js?v=b8995073';
+import './formatting.js?v=b8995073';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_color_picker
+ * @matrix editor : color reload
+ */
+class ColorPicker {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.name = "setColor";
+		this.usedWithEditor = true;
+		this.active = false;
+		this.toggles = new Map();
+	}
+
+	_colorSwatch(color, title) {
+		const colorButton = document.createElement("button");
+		colorButton.className = `size-6 rounded transition-transform hover:scale-110 hover:outline-2 hover:outline-offset-2 data-[active=true]:outline-2 data-[active=true]:outline-offset-2`;
+		colorButton.style.backgroundColor = color;
+		colorButton.style.outlineColor = color;
+		colorButton.title = title;
+		colorButton.dataset.active = "false";
+		colorButton.dataset.color = color;
+		return colorButton;
+	}
+
+	setActiveColor(activeColor) {
+		this.toggles.forEach((toggle, color) => {
+			const isActive = color === activeColor;
+			if (isActive !== toggle.active) {
+				toggle.button.dataset.active = isActive ? "true" : "false";
+				toggle.active = isActive;
+			}
+		});
+	}
+
+	init() {
+		const colorOptions = this.toolbar.element.appendChild(
+			document.createElement("div"),
+		);
+		colorOptions.dataset.option = this.name;
+		colorOptions.className = `mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setColor"]/toolbar:flex group`;
+
+		COLOR_MENU.forEach(({ color, title }) => {
+			const colorButton = this._colorSwatch(color, title);
+			this.toggles.set(color, { active: false, button: colorButton });
+		});
+
+		colorOptions.append(
+			...Array.from(this.toggles.values()).map((toggle) => toggle.button),
+		);
+		this.active = true;
+
+		colorOptions.addEventListener("click", (e) => {
+			const colorButton = e.target.closest("button");
+			if (!colorButton) return;
+
+			const toggle = this.toggles.get(colorButton.dataset.color);
+
+			const currentActive = Array.from(this.toggles.values()).find(
+				(t) => t.active && t !== toggle,
+			);
+			if (currentActive) {
+				currentActive.active = false;
+				currentActive.button.dataset.active = "false";
+			}
+
+			toggle.active = !toggle.active;
+			colorButton.dataset.active = toggle.active ? "true" : "false";
+
+			if (toggle.active) {
+				this.toolbar.editor
+					.chain()
+					.focus()
+					.setColor(colorButton.dataset.color)
+					.run();
+			} else {
+				this.toolbar.editor.chain().focus().unsetColor().run();
+			}
+		});
+	}
+}
+
+export { ColorPicker as setColor };

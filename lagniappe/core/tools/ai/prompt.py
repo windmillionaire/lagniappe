@@ -31,7 +31,6 @@ PROMPT_OBSERVABILITY_CONTRACTS = {
     "autofill": ("autofill", "generation", "form-autofill", 3),
     "scheduling": ("scheduling", "generation", "schedule-generation", 1),
     "document text": ("documents", "generation", "document-text", 1),
-    "page generation": ("pages", "generation", "page-generation", 1),
     "project generation": ("projects", "generation", "project-generation", 1),
     "form generation": ("forms", "generation", "form-generation", 1),
     "create report": ("create", "planning", "create-report", 1),

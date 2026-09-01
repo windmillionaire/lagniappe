@@ -36,7 +36,6 @@ const WIDGETS = {
 	FileUpload: () => import("./uploadFile"),
 	Filters: () => import("./filters"),
 	FilterResults: () => import("./tables"),
-	GeneratePages: () => import("./category"),
 	GroupPermissions: () => import("./user"),
 	HomeActivityList: () => import("./home/activity"),
 	HomePageList: () => import("./home/lists"),

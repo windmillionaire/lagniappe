@@ -99,7 +99,6 @@ def test_registered_adapters_declare_required_ai_tiers():
         DeferredJobType.REPORT_CREATE: AI.CREATE,
         DeferredJobType.REPORT_EXECUTION: None,
         DeferredJobType.AUTOFILL: AI.CREATE,
-        DeferredJobType.PAGE_GENERATION: AI.CREATE,
         DeferredJobType.FILE_SUMMARIZE: AI.CREATE,
         DeferredJobType.FILE_EXTRACT: None,
         DeferredJobType.EMAIL_INGEST: None,

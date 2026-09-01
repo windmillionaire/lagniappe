@@ -1,2 +1,3575 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.2.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="01a9ba72-55b9-4beb-a6c3-eb0f804ba042",e._sentryDebugIdIdentifier="sentry-dbid-01a9ba72-55b9-4beb-a6c3-eb0f804ba042");}catch(e){}}();const ae={add:{glyph:"add",fill:1},addRow:{glyph:"add_circle",fill:0},alignCenter:{glyph:"format_align_center",fill:1},alignJustify:{glyph:"format_align_justify",fill:1},alignMenu:{glyph:"subject",fill:1},alignLeft:{glyph:"format_align_left",fill:1},alignRight:{glyph:"format_align_right",fill:1},analytics:{glyph:"graph_3",fill:1},ask:{glyph:"chat",fill:1},assignedBy:{glyph:"person_edit",fill:1},assignedTo:{glyph:"assignment_ind",fill:1},attribute:{remove:{glyph:"do_not_disturb_on",fill:1}},back:{glyph:"arrow_back",fill:1},billing:{glyph:"credit_card",fill:1},block:{glyph:"vertical_distribute",fill:1},bold:{glyph:"format_bold",fill:1},bookmark:{glyph:"bookmark",fill:1},builder:{saved:{glyph:"cloud_done",fill:1},unsaved:{glyph:"cloud_alert",fill:1}},cached:{glyph:"cloud_off",fill:1},category:{glyph:"stacks",fill:1},center:{glyph:"align_horizontal_center",fill:1},check:{glyph:"check",fill:1},checkbox:{glyph:"check_box",fill:1},checklist:{glyph:"checklist",fill:1},clear:{glyph:"do_not_disturb_on",fill:1},clearFormat:{glyph:"format_clear",fill:1},close:{glyph:"close",fill:1},cloudflare:{glyph:"cloud",fill:1},code:{glyph:"code",fill:1},column:{glyph:"view_column",fill:1},columns:{glyph:"dehaze",fill:1},completed:{glyph:"event_available",fill:1},completedBy:{glyph:"person_check",fill:1},configuration:{glyph:"tune",fill:1},contract:{glyph:"arrow_drop_down",fill:1},create:{glyph:"wb_iridescent",fill:1},csv:{glyph:"csv",fill:1},database:{glyph:"database",fill:1},date:{glyph:"event",fill:1},delete:{glyph:"delete_forever",fill:1},directory:{glyph:"signpost",fill:1},document:{glyph:"article",fill:1},down:{glyph:"keyboard_arrow_down",fill:1},download:{glyph:"cloud_download",fill:1},dropdown:{glyph:"keyboard_arrow_down",fill:1},dueDate:{glyph:"event",fill:1},edit:{glyph:"amend",fill:0},email:{glyph:"alternate_email",fill:1},error:{glyph:"error",fill:1},expand:{glyph:"arrow_right",fill:1},file:{glyph:"description",fill:1},fileText:{glyph:"description",fill:1},files:{glyph:"work",fill:1},filter:{active:{glyph:"filter_list",fill:1},inactive:{glyph:"filter_list_off",fill:0},list:{glyph:"action_key",fill:1}},flipper:{left:{glyph:"chevron_left",fill:1}},floatLeft:{glyph:"format_image_left",fill:1},floatRight:{glyph:"format_image_right",fill:1},fontStyle:{glyph:"brand_family",fill:1},form:{glyph:"dynamic_form",fill:1},generate:{glyph:"memory",fill:1},google:{glyph:"public",fill:1},group:{glyph:"group",fill:1},h1:{glyph:"format_h1",fill:1},h2:{glyph:"format_h2",fill:1},h3:{glyph:"format_h3",fill:1},help:{glyph:"question_mark",fill:1},history:{glyph:"history",fill:1},historyFill:{glyph:"settings_backup_restore",fill:1},home:{glyph:"home",fill:1},html:{glyph:"html",fill:1},image:{glyph:"image",fill:1},imageAlign:{left:{glyph:"format_image_break_left",fill:1},center:{glyph:"align_justify_center",fill:1},right:{glyph:"format_image_break_right",fill:1}},import:{glyph:"upload_file",fill:1},increase:{glyph:"add",fill:1},indexTools:{glyph:"build_circle",fill:1},insert:{glyph:"add",fill:1},in:{glyph:"open_in_new_down",fill:1},info:{glyph:"ballot",fill:1},input:{glyph:"keyboard_alt",fill:0},installation:{glyph:"download",fill:1},integration:{glyph:"extension",fill:1},italic:{glyph:"format_italic",fill:1},launch:{glyph:"rocket_launch",fill:1},left:{glyph:"arrow_back",fill:1},link:{glyph:"link_2",fill:1},listOl:{glyph:"format_list_numbered",fill:1},listUl:{glyph:"format_list_bulleted",fill:1},location:{glyph:"location_on",fill:1},login:{glyph:"login",fill:1},logout:{glyph:"logout",fill:1},manual:{glyph:"help",fill:1},map:{glyph:"map",fill:1},maximize:{glyph:"fullscreen",fill:1},menu:{glyph:"keyboard_arrow_down",fill:1},minimize:{glyph:"fullscreen_exit",fill:1},minus:{glyph:"remove",fill:1,weight:600},model:{glyph:"automation",fill:1},next:{glyph:"arrow_forward",fill:1},nextWeek:{glyph:"calendar_month",fill:1},notes:{glyph:"note_stack",fill:1},number:{glyph:"tag",fill:1},offline:{glyph:"cloud_off",fill:1},organize:{glyph:"folder",fill:1},out:{glyph:"open_in_new",fill:1},overview:{glyph:"collections_bookmark",fill:1},page:{glyph:"draft",fill:1},paragraph:{glyph:"format_paragraph",fill:1},paste:{glyph:"content_paste",fill:1},permissions:{glyph:"lock_open",fill:1},personalization:{glyph:"palette",fill:1},pin:{glyph:"keep",fill:1},plus:{glyph:"add_2",fill:1,weight:600},private:{glyph:"lock",fill:1},project:{glyph:"flowsheet",fill:0},prompt:{glyph:"terminal",fill:1},public:{glyph:"public",fill:1},question:{glyph:"help",fill:1},quoteRight:{glyph:"format_quote",fill:1},radio:{glyph:"radio_button_checked",fill:1},recurring:{glyph:"repeat",fill:1},redo:{glyph:"redo",fill:1},remove:{glyph:"cancel",fill:1},removeDueDate:{glyph:"event_busy",fill:1},replace:{glyph:"sync",fill:1},reset:{glyph:"restart_alt",fill:1},right:{glyph:"arrow_forward",fill:1},run:{active:{glyph:"play_arrow",fill:1},inactive:{glyph:"play_arrow",fill:0}},search:{glyph:"search",fill:1},security:{glyph:"key",fill:1},select:{glyph:"top_panel_open",fill:1},selected:{glyph:"check_box",fill:1},share:{glyph:"share",fill:1},settings:{page:{glyph:"settings",fill:1}},signature:{glyph:"draw",fill:1},sitemap:{glyph:"account_tree",fill:1},siteOwner:{glyph:"admin_panel_settings",fill:1},siteSettings:{glyph:"settings",fill:1},skipped:{glyph:"assignment_late",fill:1},snooze:{glyph:"snooze",fill:1},spinner:{glyph:"donut_large",fill:1,spin:!0},star:{home:{glyph:"star",fill:1},active:{glyph:"star",fill:1},inactive:{glyph:"star",fill:0,weight:300}},start:{glyph:"first_page",fill:1},status:{glyph:"sticky_note_2",fill:1},strikethrough:{glyph:"format_strikethrough",fill:1},subscript:{glyph:"subscript",fill:1},success:{glyph:"check_circle",fill:1},superscript:{glyph:"superscript",fill:1},table:{glyph:"table",fill:1},tableEdit:{glyph:"table_edit",fill:0},task:{glyph:"check_box",fill:1},tasks:{glyph:"check_box",fill:1},tel:{glyph:"phone",fill:1},text:{glyph:"keyboard_alt",fill:0},textColor:{glyph:"format_color_text",fill:1},textStyle:{glyph:"text_format",fill:1},textarea:{glyph:"subject",fill:1},time:{glyph:"schedule",fill:1},todo:{ok:{glyph:"calendar_today",fill:1},overdue:{glyph:"calendar_clock",fill:1},today:{glyph:"today",fill:1}},tomorrow:{glyph:"fast_forward",fill:1},trash:{active:{glyph:"delete_forever",fill:1},inactive:{glyph:"delete_forever",fill:0,weight:300}},underline:{glyph:"format_underlined",fill:1},undo:{glyph:"undo",fill:1},unselected:{glyph:"check_box_outline_blank",fill:0},up:{glyph:"keyboard_arrow_up",fill:1},upload:{glyph:"cloud_upload",fill:1},url:{glyph:"highlight_mouse_cursor",fill:1},user:{glyph:"person",fill:1},users:{glyph:"group",fill:1},weekend:{glyph:"date_range",fill:1},x:{glyph:"close",fill:1,weight:600},youtube:{glyph:"smart_display",fill:1}},se=e=>{let t=ae;for(const i of String(e||"").split(".")){if(!i||!t||typeof t!="object")return null;t=t[i]}return t?.glyph?t:null},oe=(e,t,i="")=>{const n=se(t);if(!n)return e.replaceChildren(),e.removeAttribute("data-icon"),e;const r=["icon"];n.spin&&r.push("icon-spin"),i&&r.push(...String(i).split(/\s+/).filter(Boolean)),e.className=r.join(" "),e.dataset.icon=t,e.dataset.fill=String(n.fill),e.setAttribute("aria-hidden","true"),n.weight?e.dataset.weight=String(n.weight):delete e.dataset.weight;const s=document.createElement("span");return s.className="icon-glyph",s.textContent=n.glyph,e.replaceChildren(s),e},le=(e,t="")=>oe(document.createElement("span"),e,t),ce=e=>{const t={};if(!(e instanceof Element))return t;t.element={tagName:e.tagName?.toLowerCase(),id:e.id||void 0,className:e.className||void 0,dataset:{...e.dataset}};const i=e.closest("[data-widget]");i&&i!==e&&(t.widget=i.dataset);const n=e.closest("[lp-component]");n&&n!==e&&(t.component=n.dataset);const r=e.closest("[lp-view]");return r&&r!==e&&(t.view=r.dataset),t.page={pathname:window.location.pathname},t},ue=e=>Object.fromEntries(Object.entries(e).filter(([,t])=>t!==void 0&&typeof t!="function"&&typeof t!="symbol")),de=e=>e===void 0||typeof e=="function"||typeof e=="symbol"?null:Array.isArray(e)?{values:e}:e&&typeof e=="object"?ue(e):{value:e},he=e=>e instanceof Object?Object.fromEntries(Object.entries(e).map(([t,i])=>[t,de(i)]).filter(([,t])=>t&&Object.keys(t).length>0)):{},fe=e=>e?typeof e=="string"?e:`${e.name||""} ${e.message||""} ${String(e)}`.trim():"",C=e=>{if(!e)return!1;if(e instanceof DOMException&&/transition/i.test(e.message))return!0;const t=fe(e);return t?/transition was (skipped|aborted)/i.test(t)||e.name==="InvalidStateError"&&/transition/i.test(t):!1},pe=e=>{if(!e)return!1;if(e.name==="AbortError")return!0;if(e instanceof TypeError){const t=e.message||"";return t==="Failed to fetch"||t==="Load failed"||/NetworkError when attempting to fetch resource/i.test(t)}return!1},p=(e,t,i)=>{if(C(e))return;if(i=he({...ce(t||e?.target),...i||{}}),typeof window<"u"&&window.Sentry){const r=Object.keys(i).length>0?{contexts:i}:void 0;e instanceof Error?window.Sentry.captureException(e,r):window.Sentry.captureMessage(String(e),{level:"error",...r})}const n=Object.keys(i).length>0;console.error("[ERROR]",e),n&&console.error("Context:",i)},N=(e,t,i={})=>{if(!i.forceReport&&pe(e))return;const n={network:{url:t,method:i.method||"GET",timestamp:new Date().toISOString(),online:navigator.onLine}};p(e,null,n)},me=(e,t="unknown")=>{p(e,null,{login:{operation:t,timestamp:new Date().toISOString(),userAgent:navigator.userAgent}})},ge="X-Lagniappe-Notification-State";let U=!1;const ye=e=>{const t=Number.isInteger(Number(e))?Number(e):0,i=document.querySelector("[data-role='notifications']"),n=document.querySelector("[data-role='notification-count']");return n&&(n.textContent=String(t)),i&&(i.dataset.visible="true",i.setAttribute("aria-hidden","false"),i.setAttribute("aria-busy","false"),i.setAttribute("aria-label",`Notifications: ${t}`),i.tabIndex=0),t},we=e=>{if(typeof e=="string")try{e=JSON.parse(e)}catch{return null}return!e||typeof e!="object"?null:e.generation===null&&e.revision===null&&e.count===null?{generation:null,revision:null,count:null,miss:!0}:typeof e.generation!="string"||!e.generation||!Number.isInteger(e.revision)||e.revision<0||!Number.isInteger(e.count)||e.count<0?null:{generation:e.generation,revision:e.revision,count:e.count,miss:!1}},Ee=e=>{const t=we(e);return t?(window.__NOTIFICATION_STATE__=t,t.miss||ye(t.count),window.dispatchEvent(new CustomEvent("notification-state",{detail:{...t}})),t):(e!=null&&!U&&(U=!0,p(new TypeError("Invalid notification state response."),null,{context:"notification-state-contract"})),null)},_e=e=>{const t=e?.get?.(ge);return t?Ee(t):null};var ve="lagniappe-browser",Se=4,ke={CONNECTIVITY:"connectivity-state",UPSTREAM_UNAVAILABLE:"upstream-unavailable"},I={id:ve,version:Se,messages:ke};const be=I.id,Te=I.version,Ae=Object.freeze({...I.messages}),T=new Set([500,502,503,504]),Pe="X-Lagniappe-Error",Re="X-Lagniappe-Upstream-Unavailable",Le="X-Lagniappe-Upstream-Status",Ce="X-Lagniappe-Stale-Cache",Ie=500,Oe=300*1e3,Be=128,D=new Set(["admin","analytics","categories","files","filters","forms","home","internal","manual","messages","pages","process","projects","public","reports","root","tasks","testing","users"]),M=new Map;let A=null,O=!1,F=!1;function j(e){return!!(e&&T.has(Number(e.status))&&["GET","POST","PUT","PATCH","DELETE"].includes(e.method)&&typeof e.route_class=="string"&&/^[a-z-]{1,32}$/.test(e.route_class)&&typeof e.server=="string"&&e.server.length<=128&&typeof e.trace_header_present=="boolean"&&typeof e.timestamp=="string"&&typeof e.online=="boolean"&&["controlled","uncontrolled"].includes(e.service_worker)&&typeof e.stale=="boolean"&&typeof e.outcome_uncertain=="boolean"&&["not_attempted","failed","recovered","service_worker"].includes(e.retry_outcome))}function qe(e){try{const t=window.location.href||`${window.location.origin}/`;return new URL(e,t).origin===window.location.origin}catch{return!1}}function xe(e){try{const t=window.location.href||`${window.location.origin}/`,i=new URL(e,t).pathname;if(i==="/")return"root";const n=i.split("/").filter(Boolean)[0]||"root";return n==="l"?"internal":D.has(n)?n:"other"}catch{return"other"}}function V(e,t){return e?.headers?.get(Re)==="true"?!0:!!(e&&qe(t)&&T.has(e.status)&&e.headers.get("content-type")?.includes("text/html")&&!e.headers.get(Pe))}async function Ne(e,{method:t,url:i,retryUpstream:n=!0,fetchResponse:r,retryCurrent:s,retryOriginal:a}){let l=V(e,i)?e:null,d="not_attempted";if(!l)return(e.ok||e.status===304)&&H(),{response:e};if(t==="GET"&&n){if(await new Promise(o=>setTimeout(o,Ie)),e=await r(),d=V(e,i)?"failed":"recovered",d==="recovered")return B(W(l,{method:t,url:i,retryOutcome:d})),(e.ok||e.status===304)&&H(),{response:e};l=e}const f=W(l,{method:t,url:i,retryOutcome:d}),h=t!=="GET";return B(f),X({stale:f.stale,outcomeUncertain:h},h?s:a),{result:{ok:!1,error:"The application server is temporarily unavailable.",code:"upstream_instance_unavailable",status:f.status,upstreamUnavailable:!0,stale:f.stale,retryable:t==="GET",outcomeUncertain:h,retryOutcome:d}}}function $(e){return String(e||"").replace(/[^\x20-\x7E]/g,"").slice(0,Be)}function z(){const e=document.querySelector("[data-role='upstream-unavailable']");return{build:String(e?.dataset.build||"").slice(0,64),release:String(e?.dataset.release||"").slice(0,64)}}function W(e,{method:t="GET",url:i="/",stale:n=null,retryOutcome:r="not_attempted"}={}){const s=Number(e.headers.get(Le)||e.status);return{status:T.has(s)?s:e.status,method:String(t).toUpperCase(),route_class:xe(i),server:$(e.headers.get("Server")),trace_header_present:!!(e.headers.get("X-Cloud-Trace-Context")||e.headers.get("Traceparent")),timestamp:new Date().toISOString(),online:navigator.onLine!==!1,service_worker:navigator.serviceWorker?.controller?"controlled":"uncontrolled",stale:n===null?e.headers.get(Ce)==="true":!!n,retry_outcome:r,...z()}}function B(e){const t={status:T.has(Number(e.status))?Number(e.status):503,method:["GET","POST","PUT","PATCH","DELETE"].includes(String(e.method).toUpperCase())?String(e.method).toUpperCase():"GET",route_class:D.has(e.route_class)?e.route_class:"other",server:$(e.server),trace_header_present:e.trace_header_present===!0,timestamp:String(e.timestamp||new Date().toISOString()).slice(0,40),online:e.online!==!1,service_worker:e.service_worker==="controlled"?"controlled":"uncontrolled",build:String(e.build||"").slice(0,64),release:String(e.release||"").slice(0,64),stale:e.stale===!0,retry_outcome:["not_attempted","failed","recovered","service_worker"].includes(e.retry_outcome)?e.retry_outcome:"not_attempted"},i=`${t.method}:${t.route_class}`,n=Date.now();return n-(M.get(i)||0)<Oe?!1:(M.set(i,n),window.Sentry?.captureMessage?.("Application server temporarily unavailable",{level:"warning",fingerprint:["upstream_instance_unavailable"],tags:{failure_code:"upstream_instance_unavailable",method:t.method,route_class:t.route_class},contexts:{upstream_instance_unavailable:t}}),!0)}function Ue(e){const t=document.querySelector("[data-role='upstream-unavailable']");if(!t)return;const i=t.querySelector("[data-role='upstream-unavailable-message']"),n=e.outcomeUncertain===!0,r=e.stale===!0;i&&(i.textContent=n?"The server is temporarily unavailable. We could not confirm whether your change was saved. Check the current state before trying it again.":r?"The server is temporarily unavailable. You are viewing saved content; your current work is still here.":"The server is temporarily unavailable. Your current page and unsaved work are unchanged."),t.dataset.visible="true",t.dataset.stale=r?"true":"false",t.dataset.outcomeUncertain=n?"true":"false",t.setAttribute("aria-hidden","false")}function X(e,t=null){A=typeof t=="function"?t:null,Ue(e)}function H(){const e=document.querySelector("[data-role='upstream-unavailable']");e&&(A=null,e.dataset.visible="false",e.dataset.stale="false",e.dataset.outcomeUncertain="false",e.setAttribute("aria-hidden","true"))}function De(e,t=null){return j(e)?(B({...e,...z()}),X({stale:e.stale,outcomeUncertain:e.outcome_uncertain},t),!0):!1}function Me(e){return j(e?.state)?De(e.state,async()=>{const{request:t}=await Promise.resolve().then(function(){return Z});return t.get(window.location.pathname,null,{replaceErrorPage:!1,retryUpstream:!1})}):!1}function Fe(){F||(F=!0,navigator.serviceWorker?.addEventListener?.("message",t=>{const i=t.data;i?.protocol===be&&Number(i.protocol_version)===Te&&i.type===Ae.UPSTREAM_UNAVAILABLE&&Me(i)}),window.__TESTING__&&(window.__TEST_UPSTREAM_UNAVAILABLE__=async()=>{const{request:t}=await Promise.resolve().then(function(){return Z});return t.get("/testing/upstream-unavailable")}));const e=document.querySelector("[data-role='upstream-unavailable-retry']");!e||e.dataset.initialized==="true"||(e.dataset.initialized="true",e.addEventListener("click",async()=>{if(!(O||!A)){O=!0,e.disabled=!0,e.textContent="Trying\u2026";try{await A()}finally{O=!1,e.disabled=!1,e.textContent="Try again"}}}))}const G=new DOMParser,je={credentials:"include",headers:{"X-Lagniappe-Request":"true"}},Ve="X-Lagniappe-Updated",$e="X-Lagniappe-Invalidate-Cache",ze="X-Lagniappe-Entity-Revisions",We="X-Lagniappe-CSRF",Xe="X-Lagniappe-Poll-Channel",He="X-Lagniappe-Poll-Revision",Y=new Set(["POST","PUT","PATCH","DELETE"]),Ge="Upload fewer files?",Ye=/upstream connect error|disconnect\/reset before headers|connection termination/i;let P=null;const J=e=>e.status===400&&e.headers.get(We)?.toLowerCase()==="invalid",Je=()=>document.getElementById("token")?.value,Ke=async(e,{acknowledgeEntities:t=!0}={})=>{if(_e(e.headers),e.status===304)return{ok:!0,unchanged:!0,etag:e.headers.get("ETag")};const i=e.headers.get("content-type");let n=null;if(i?.includes("application/json")){const a=await e.json()||{};n={ok:e.ok,...a}}else n={ok:e.ok,html:await e.text()||""};n.updated=e.headers.get(Ve)!=="false",n.etag=e.headers.get("ETag"),n.pollChannel=e.headers.get(Xe),n.pollRevision=e.headers.get(He),n.reload=!!n.reload||e.headers.has($e);const r=new Map,s=e.headers.get(ze);if(s)try{for(const a of JSON.parse(s))a?.key&&a?.fingerprint&&r.set(a.key,a)}catch{}if(n.entities=Array.from(r.values()),t)for(const a of n.entities)window.dispatchEvent(new CustomEvent("entity-updated",{detail:a}));return n.html?n.html=G.parseFromString(n.html,"text/html"):n.modal&&(n.modal=G.parseFromString(n.modal,"text/html")),n},Qe=e=>{if(!(e instanceof FormData))return!1;if(typeof e.has=="function"&&e.has("direct_uploads")||typeof e.has=="function"&&e.has("assets")||typeof e.entries!="function")return!0;for(const[,t]of e.entries())if(typeof File<"u"&&t instanceof File||typeof Blob<"u"&&t instanceof Blob)return!0;return!1},_=(e,{body:t=null}={})=>Qe(t)&&Ye.test(e||"")?Ge:e,K=async(e,{replaceErrorPage:t=!0,...i}={})=>{const n=e.headers.get("content-type");if(n?.includes("application/json")){const d=await e.text();try{const f=JSON.parse(d);return f.error&&(f.error=_(f.error,i)),{ok:!1,...f}}catch{return{ok:!1,error:_(d,i)}}}const r=await e.text(),s=e.headers.get("X-Lagniappe-Error"),a=r.trim()||s||e.statusText||"Network request failed",l=_(a,i);return n?.includes("text/html")?l!==a?{ok:!1,error:l}:t?(s?(document.querySelector("main").innerHTML=r,document.title=s):(document.documentElement.innerHTML=r,document.title=e.statusText),{ok:!1,error:_(s||e.statusText||a,i)}):{ok:!1,error:_(s||e.statusText||a,i)}:{ok:!1,error:l}},Ze=async()=>{try{const e=await fetch("/l/token",je);if(!e.ok)throw new Error(`Failed to refresh token: ${e.statusText}`);const t=(await e.text()).trim();if(!t)throw new Error("Failed to refresh token: empty response");const i=document.getElementById("token");return i&&(i.value=t),t}catch(e){return N(e,"/l/token",{}),null}},Q=async()=>(P||(P=Ze().finally(()=>{P=null})),P),et=async(e,t,{keepalive:i=!1,headers:n={},signal:r=void 0}={})=>w(e,{method:"POST",body:t,keepalive:i,requestHeaders:n,signal:r}),tt=async(e,t)=>w(e,{method:"PATCH",body:t}),it=async(e,t)=>w(e,{method:"DELETE",body:t}),nt=async(e,t=null,i={})=>(e=t?`${e}?${new URLSearchParams(t).toString()}`:e,w(e,{method:"GET",...i})),rt=async(e,t,i={})=>w(e,{method:"PUT",body:t,...i}),w=async(e,{method:t="POST",body:i=null,keepalive:n=!1,requestHeaders:r={},acknowledgeEntities:s=!0,replaceErrorPage:a=!0,signal:l=void 0,retryUpstream:d=!0}={})=>{t=t.toUpperCase();const h={"Content-Type":"application/json","X-CSRFToken":Je(),"X-Lagniappe-Request":"true",...r},o={method:t,headers:h,credentials:"include",...l?{signal:l}:{},...n?{keepalive:!0}:{}};i&&(i instanceof FormData?(delete h["Content-Type"],o.body=i):o.body=JSON.stringify(i)),Y.has(t)||delete h["X-CSRFToken"];const u=(c,m=d)=>Ne(c,{method:t,url:e,retryUpstream:m,fetchResponse:()=>fetch(e,o),retryCurrent:()=>w(window.location.pathname,{method:"GET",replaceErrorPage:!1,retryUpstream:!1}),retryOriginal:()=>w(e,{method:"GET",requestHeaders:r,acknowledgeEntities:!1,replaceErrorPage:!1,retryUpstream:!1})});try{let c=await fetch(e,o),m=await u(c);if(m.result)return m.result;if(c=m.response,Y.has(t)&&J(c)){const x=await Q();if(!x)return{ok:!1,error:"Failed to refresh authentication token"};if(o.headers["X-CSRFToken"]=x,c=await fetch(e,o),m=await u(c,!1),m.result)return m.result;c=m.response}if(c.status===422)return{...await K(c,{body:i,method:t,url:e,replaceErrorPage:!1}),status:c.status};if(c.redirected){window.location.href=c.url;return}return c.ok||c.status===304?Ke(c,{acknowledgeEntities:s}):K(c,{body:i,method:t,url:e,replaceErrorPage:a})}catch(c){return N(c,e,{method:t,...o}),{ok:!1,error:c.message||"Network request failed"}}},g={csrfFailed:J,token:Q,put:rt,post:et,patch:tt,delete:it,get:nt};var Z=Object.freeze({__proto__:null,request:g});const v=e=>document.querySelector(`meta[name="${e}"]`)?.getAttribute("content")||"",at=()=>document.getElementById("token")?.value||"",st=()=>v("analytics")==="true",ot=()=>performance.getEntriesByType?.("navigation")?.[0]?.type||"",lt=()=>v("analytics-title")||document.querySelector("[lp-view] [data-nav='view'] [data-role='title']")?.textContent?.trim()||document.title.trim(),ct=e=>{const t=document.querySelector("[lp-view]");return{action:e,path:window.location.pathname,query:window.location.search||"",page_title:lt(),view_kind:t?.dataset.kind||"",entity_key:t?.dataset.key||"",entity_hash:t?.dataset.hash||"",index:t?.dataset.index||"",public_id:v("analytics-public-id"),referrer:document.referrer||"",navigation_type:ot()}};class ut{get enabled(){return st()}get mode(){return v("mode")}async tag(t,i={}){if(!this.enabled)return;const n=i.path||window.location.pathname;if(!(["view","public_view"].includes(t)&&n.startsWith("/analytics")))try{const r=JSON.stringify({...i,action:t,path:n}),s=()=>fetch("/analytics/track",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":at(),"X-Lagniappe-Request":"true"},credentials:"include",keepalive:!0,body:r}),a=await s();g.csrfFailed(a)&&await g.token()&&await s()}catch{}}view(){const t=v("analytics-action")||"view";this.tag(t,ct(t))}}const dt=new ut;async function ht(e){return await(await fetch(`/users/check-user-status?email=${encodeURIComponent(e)}`)).json()}async function ft(e,t){try{const i=await ht(e);if(!i.success){t.showError(i.error);return}i.next==="first_time_setup"?document.dispatchEvent(new CustomEvent("login:show-first-time-setup",{detail:{email:e}})):document.dispatchEvent(new CustomEvent("login:show-signin",{detail:{email:e}}))}catch{t.showError("System error. Please try again.")}}async function R(e,t){const i=JSON.stringify({authResult:e.idToken,name:e.displayName,email:e.email,remember:t.remember()});let n=await g.token()||t.getToken();const r=()=>fetch("/users/login-identity",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":n},body:i});let s=await r();if(g.csrfFailed(s)&&(n=await g.token(),n&&(s=await r())),g.csrfFailed(s)){t.showError("Your sign-in session expired. Please try again.");return}const a=await s.json();if(a.success&&a.redirect)dt.tag("login",{page_title:"Login",path:window.location.pathname,user_email:e.email}),window.location.href=a.redirect;else if(a.requires_verification){try{await t.auth.sendEmailVerification(e,n)}catch{document.dispatchEvent(new CustomEvent("login:show-signin",{detail:{action:"verification-delivery-failed",email:e.email}}));return}localStorage.setItem("verificationEmail",e.email),t.showConfirmation(t.verificationSuccessMessage||`An email verification link has been sent to ${e.email}.`)}else t.showError(a.error||"Authentication failed. Please try again.")}function E(e){switch(e.code){case"auth/wrong-password":case"auth/invalid-credential":case"auth/user-not-found":return"Incorrect email or password.";case"auth/user-disabled":return"This account has been disabled.";case"auth/email-already-in-use":return"An account with this email already exists.";case"auth/invalid-email":return"Please enter a valid email address.";case"auth/weak-password":return"Password must be at least 6 characters long.";case"auth/operation-not-allowed":return"This sign-in method is not allowed.";case"auth/too-many-requests":return"Too many failed attempts. Please wait before trying again.";case"auth/requires-recent-login":return"Please sign in again to complete this action.";case"auth/user-token-expired":return"Your session has expired. Please sign in again.";case"auth/network-request-failed":return"Network error. Please check your connection.";case"auth/invalid-action-code":case"auth/expired-action-code":return"This link is invalid or expired. Please request a new one.";default:return"Authentication failed. Please try again."}}const S=(e,t,i=null)=>{if(!e)return;let n=e.querySelector("[data-role='text']");n||(n=document.createElement("span"),n.dataset.role="text",e.replaceChildren(n)),n.textContent=t;let r=e.querySelector("[data-role='icon']");r||(r=document.createElement("span"),r.dataset.role="icon",r.setAttribute("aria-hidden","true"),e.prepend(r)),i?(r.replaceChildren(le(i)),r.dataset.visible="true"):(r.replaceChildren(),r.dataset.visible="false")},ee=(e,t)=>e.code!=="auth/email-already-in-use"?!1:(document.dispatchEvent(new CustomEvent("login:show-signin",{detail:{email:t,action:"existing-account"}})),!0);class y{constructor(t,i){this.auth=t,this.form=i,this.data={},this.initialized=!1,this.actionButton=null,this.error=this.form.querySelector("[data-role='error']"),this.success=this.form.querySelector("[data-role='success']"),this.hideOnConfirmation=this.form.querySelectorAll("[data-hide-on-confirmation]")}show(){this.initialized||(this.init(),this.initialized=!0),this.reset(),this.sync(),this.form.classList.remove("hidden")}sync(){}hide(){this.form.classList.add("hidden"),this.reset()}setActionButton(t){this.reset(),this.actionButton=t,this.oldActionText=this.actionButton?.querySelector("[data-role='text']")?.textContent||this.actionButton?.textContent.trim()}remember(){return this.form.querySelector("input[name='remember-me']")?.checked}getEmailAndPassword(){if(this.email){const t=this.email.value.trim(),i=this.password.value.trim();if(!t||!i){this.showError("Please enter your email and password");return}return{email:t,password:i}}return null}showSuccess(t){this.reset(),this.success.textContent=t,this.success.classList.remove("hidden")}showConfirmation(t){this.showSuccess(t),this.form.querySelectorAll("input[type='password']").forEach(i=>{i.value=""}),this.hideOnConfirmation.forEach(i=>{i.classList.add("hidden")})}showError(t){this.reset(),this.error.textContent=t,this.error.classList.remove("hidden")}getToken(){return document.getElementById("token")?.value}setActionState(t){S(this.actionButton,t,"spinner")}reset(){S(this.actionButton,this.oldActionText),this.success&&(this.success.textContent="",this.success.classList.add("hidden")),this.error&&(this.error.textContent="",this.error.classList.add("hidden")),this.hideOnConfirmation.forEach(t=>{t.classList.remove("hidden")})}}class te extends y{init(){this.emailButton=this.form.querySelector("[data-role='show-email-check']"),this.emailButton.addEventListener("click",()=>{document.dispatchEvent(new CustomEvent("login:show-email-check"))})}sync(){this.data.error&&this.showError(this.data.error)}}class pt extends y{init(){this.error=this.form.querySelector("[data-role='error']"),this.email=this.form.querySelector("input[type='email']"),this.backButton=this.form.querySelector("[data-role='back-to-method']"),this.setActionButton(this.form.querySelector("[data-role='signin']")),this.email.focus(),this.actionButton.addEventListener("click",this.handleSignIn.bind(this)),this.backButton.addEventListener("click",()=>{document.dispatchEvent(new CustomEvent("login:show-auth-method"))})}sync(){this.email.focus()}handleSignIn(){const t=this.email.value.trim();if(!t||!this.email.validity.valid){this.showError("Please enter a valid email address");return}this.setActionState("Checking Email"),ft(t,this)}}class mt extends y{init(){this.googleSetup=this.form.querySelector("[data-role='owner-google-setup']"),this.passwordSetup=this.form.querySelector("[data-role='owner-password-setup']"),this.googleError=this.googleSetup.querySelector("[data-role='error']"),this.passwordError=this.passwordSetup.querySelector("[data-role='error']"),this.verificationSuccessMessage="We've sent a verification link to the application owner email on file.",this.password=this.passwordSetup.querySelector("input[type='password']"),this.showPasswordButton=this.form.querySelector("[data-role='show-owner-password']"),this.backToGoogleButton=this.form.querySelector("[data-role='back-to-owner-google']"),this.setActionButton(this.form.querySelector("[data-role='signin']")),this.showPasswordButton||(this.error=this.passwordError),this.showPasswordButton?.addEventListener("click",()=>{this.reset(),this.error=this.passwordError,this.googleSetup.classList.add("hidden"),this.passwordSetup.classList.remove("hidden"),this.password.focus()}),this.backToGoogleButton?.addEventListener("click",()=>{this.password.value="",this.reset(),this.error=this.googleError,this.passwordSetup.classList.add("hidden"),this.googleSetup.classList.remove("hidden")}),this.actionButton.addEventListener("click",this.handleSignIn.bind(this))}handleSignIn(){const t=String(this.data.email||"").trim(),i=this.password.value.trim();if(!t){this.showError("The application owner is not configured.");return}if(!i){this.showError("Please choose a password");return}this.setActionState("Creating Password"),this.auth.signUp(t,i).then(n=>{R(n,this)}).catch(n=>{ee(n,t)||this.showError(E(n))})}sync(){this.data.error&&this.showError(this.data.error)}}class gt extends y{init(){this.email=this.form.querySelector("input[name='email']"),this.selectedEmail=this.form.querySelector("[data-role='selected-email']"),this.password=this.form.querySelector("input[type='password']"),this.backButton=this.form.querySelector("[data-role='back-to-email']"),this.setActionButton(this.form.querySelector("[data-role='signin']")),this.actionButton.addEventListener("click",this.handleSignIn.bind(this)),this.backButton.addEventListener("click",()=>{document.dispatchEvent(new CustomEvent("login:show-email-check"))})}sync(){this.email.value=this.data.email||"",this.selectedEmail.textContent=this.data.email||"",this.password.value="",setTimeout(()=>this.password.focus(),100)}handleSignIn(){const t=this.password.value.trim();if(!t){this.showError("Please choose a password");return}this.setActionState("Setting Password"),this.auth.signUp(this.email.value,t).then(i=>{R(i,this)}).catch(i=>{ee(i,this.email.value)||this.showError(E(i))})}}class yt extends y{init(){this.email=this.form.querySelector("input[name='email']"),this.selectedEmail=this.form.querySelector("[data-role='selected-email']"),this.password=this.form.querySelector("input[type='password']"),this.rememberMe=this.form.querySelector("input[type='checkbox']"),this.signinButton=this.form.querySelector("[data-role='signin']"),this.backButton=this.form.querySelector("[data-role='back-to-email']"),this.setActionButton(this.signinButton),this.signinButton?.addEventListener("click",this.handleSignIn.bind(this)),this.forgotPasswordButton=this.form.querySelector("[data-role='show-forgot-form']"),this.forgotPasswordButton.addEventListener("click",()=>{const t=this.email.value.trim();document.dispatchEvent(new CustomEvent("login:show-forgot-form",{detail:{email:t}}))}),this.backButton.addEventListener("click",()=>{document.dispatchEvent(new CustomEvent("login:show-email-check"))})}sync(){this.email.value=this.data.email||"",this.selectedEmail.textContent=this.data.email||"",this.password.value="",this.data.action==="reset-password"?this.showSuccess("Password updated successfully. Please sign in with your new password."):this.data.action==="existing-account"?this.showSuccess("Your password is already set. Sign in to continue."):this.data.action==="verification-delivery-failed"&&this.showError("We couldn't send the verification email. Sign in again to retry delivery."),this.password.focus()}handleSignIn(){this.setActionState("Signing In");const{email:t,password:i}=this.getEmailAndPassword();!t||!i||this.auth.signInWithPassword(t,i).then(n=>{R(n,this)}).catch(n=>{this.showError(E(n))})}}class wt extends y{init(){this.email=this.form.querySelector("input[type='email']"),this.resetPasswordButton=this.form.querySelector("[data-role='reset-password-email']"),this.backToSigninButton=this.form.querySelector("[data-role='back-to-signin']"),this.setActionButton(this.resetPasswordButton),this.actionButton.addEventListener("click",this.handleResetPassword.bind(this)),this.backToSigninButton.addEventListener("click",()=>{document.dispatchEvent(new CustomEvent("login:show-signin",{detail:{email:this.data.email}}))})}sync(){this.email.value=this.data.email||"",this.data.email||this.email.focus()}handleResetPassword(){const t=this.email.value.trim();if(!t){this.showError("Please enter your email address");return}this.setActionState("Sending Reset Email"),this.auth.sendPasswordResetEmail(t,this.getToken()).then(()=>{this.showConfirmation("A password reset link has been sent to your email address.")}).catch(i=>{this.showError("We couldn't send the password reset email. Please try again later.")})}}class Et extends y{init(){this.linkValidated=!1,this.password=this.form.querySelector("input[type='password']"),this.controls=this.form.querySelector("[data-role='reset-password-controls']"),this.resetPasswordButton=this.form.querySelector("[data-role='reset-password']"),this.requestNewLinkButton=this.form.querySelector("[data-role='request-new-reset-link']"),this.resetPasswordButton.disabled=!0,this.setActionButton(this.resetPasswordButton),this.actionButton.addEventListener("click",this.handleResetPassword.bind(this)),this.requestNewLinkButton.addEventListener("click",()=>{document.dispatchEvent(new CustomEvent("login:show-forgot-form",{detail:{email:this.email||""}}))}),this.auth.verifyPasswordResetCode(this.data.code).then(t=>{this.email=t.email||"",this.linkValidated=!0,this.resetPasswordButton.disabled=!1,S(this.actionButton,this.oldActionText),this.password.focus()}).catch(t=>{this.linkValidated=!0,this.showError(E(t)),this.controls.classList.add("hidden")})}sync(){this.linkValidated||this.setActionState("Checking Link")}handleResetPassword(){const t=this.password.value.trim();if(!t){this.showError("Please enter a new password");return}this.setActionState("Updating Password"),this.auth.confirmPasswordReset(this.data.code,t).then(i=>{document.dispatchEvent(new CustomEvent("login:show-signin",{detail:{action:"reset-password",email:i.email}}))}).catch(i=>{this.showError(E(i))})}}class _t extends y{init(){this.password=this.form.querySelector("input[type='password']"),this.signinButton=this.form.querySelector("[data-role='signin']"),this.signinButton.disabled=!0,this.email=this.form.querySelector("input[type='email']"),this.email.value=localStorage.getItem("verificationEmail"),localStorage.removeItem("verificationEmail"),this.forgotPasswordButton=this.form.querySelector("[data-role='show-forgot-form']"),this.forgotPasswordButton.addEventListener("click",()=>{const t=this.email.value.trim();document.dispatchEvent(new CustomEvent("login:show-forgot-form",{detail:{email:t}}))}),this.auth.applyActionCode(this.data.code).then(()=>{this.signinButton.disabled=!1,this.setActionButton(this.signinButton),this.actionButton.addEventListener("click",this.handleSignIn.bind(this)),this.showSuccess("Email verified successfully")}).catch(t=>{me(t,"verify_email"),this.showError(E(t))})}handleSignIn(){this.setActionState("Signing In");const{email:t,password:i}=this.getEmailAndPassword();!t||!i||this.auth.signInWithPassword(t,i).then(n=>{R(n,this)}).catch(n=>{this.showError(E(n))})}}const vt="https://identitytoolkit.googleapis.com/v1",St=new Map([["EMAIL_EXISTS","auth/email-already-in-use"],["EMAIL_NOT_FOUND","auth/user-not-found"],["INVALID_PASSWORD","auth/wrong-password"],["INVALID_LOGIN_CREDENTIALS","auth/invalid-credential"],["USER_DISABLED","auth/user-disabled"],["INVALID_EMAIL","auth/invalid-email"],["WEAK_PASSWORD","auth/weak-password"],["OPERATION_NOT_ALLOWED","auth/operation-not-allowed"],["TOO_MANY_ATTEMPTS_TRY_LATER","auth/too-many-requests"],["TOKEN_EXPIRED","auth/user-token-expired"],["EXPIRED_OOB_CODE","auth/expired-action-code"],["INVALID_OOB_CODE","auth/invalid-action-code"]]);class k extends Error{constructor(t,i=0){const n=String(t||"").split(" : ",1)[0].trim();super(n||"IDENTITY_PLATFORM_REQUEST_FAILED"),this.name="IdentityPlatformError",this.providerCode=n,this.status=i,this.code=St.get(n)||(i===0?"auth/network-request-failed":"auth/identity-platform-request-failed")}}class kt{constructor(t){if(this.apiKey=String(t?.apiKey||"").trim(),this.projectId=String(t?.projectId||"").trim(),!this.apiKey||!this.projectId)throw new k("INVALID_CLIENT_CONFIG")}async request(t,i){let n;try{n=await fetch(`${vt}/${t}?key=${encodeURIComponent(this.apiKey)}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(i)})}catch{throw new k("",0)}let r={};try{r=await n.json()}catch{}if(!n.ok)throw new k(r?.error?.message,n.status);return r}async appRequest(t,i,n){let r;try{r=await fetch(t,{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":n||""},body:JSON.stringify(i)})}catch{throw new k("",0)}let s={};try{s=await r.json()}catch{}if(!r.ok||!s.success)throw new k(r.status===429?"TOO_MANY_ATTEMPTS_TRY_LATER":s?.error,r.status);return s}signUp(t,i){return this.request("accounts:signUp",{email:t,password:i,returnSecureToken:!0})}signInWithPassword(t,i){return this.request("accounts:signInWithPassword",{email:t,password:i,returnSecureToken:!0})}sendPasswordResetEmail(t,i){return this.appRequest("/users/send-password-reset-email",{email:t},i)}sendEmailVerification(t,i){return this.appRequest("/users/send-verification-email",{idToken:t.idToken},i)}confirmPasswordReset(t,i){return this.request("accounts:resetPassword",{oobCode:t,newPassword:i})}verifyPasswordResetCode(t){return this.request("accounts:resetPassword",{oobCode:t})}applyActionCode(t){return this.request("accounts:update",{oobCode:t})}}const bt="[data-action='logout'][data-route]";let ie=!1;const Tt=async(e,{submitter:t=null,state:i=null}={})=>{if(i=i||t,i?.dataset?.submitting==="true")return;i?.dataset&&(i.dataset.submitting="true"),t&&"disabled"in t&&(t.disabled=!0);const n=await g.post(e);n?.redirect?window.location.href=n.redirect:n?.ok?window.location.href="/users/login":(i?.dataset&&(i.dataset.submitting="false"),t&&"disabled"in t&&(t.disabled=!1))},At=(e=document)=>{ie||(ie=!0,e.addEventListener("click",async t=>{const i=t.target?.closest?.(bt);i&&(t.preventDefault(),await Tt(i.dataset.route,{submitter:i,state:i}))}))},Pt=async(e,t="unlabeled")=>{try{const i=e();return i?.then&&(p(new TypeError(`View transition commit "${t}" returned a promise. Prepare asynchronous work before committing DOM changes.`)),await i),!0}catch(i){return p(i),!1}};let ne=Promise.resolve(),L=0,b=null;const q=(e,t)=>{if(typeof performance>"u"||!performance.now||typeof __BUILD_ID__<"u")return;const i=performance.now()-t;i<=50||console.warn(`View transition commit "${e}" took ${i.toFixed(1)}ms.`)},Rt=(e,t)=>{const i=typeof performance<"u"&&performance.now?performance.now():null;try{const n=e();return n?.then?(p(new TypeError(`View transition commit "${t}" returned a promise. Prepare asynchronous work before committing DOM changes.`)),Promise.resolve(n).then(()=>!0).catch(r=>(p(r),!1)).finally(()=>{i!==null&&q(t,i)})):(i!==null&&q(t,i),!0)}catch(n){return p(n),i!==null&&q(t,i),!1}},Lt=e=>{const t=new Array(e.length).fill(!1),i=[];return L+=1,e.forEach(({callback:n,label:r},s)=>{const a=Rt(n,r);a?.then?i.push(a.then(l=>{t[s]=l})):t[s]=a}),i.length?{results:t,pending:Promise.all(i).finally(()=>{L-=1})}:(L-=1,{results:t,pending:null})},Ct=async e=>{let t=null,i=!1;const n=()=>(i=!0,t=Lt(e),t.pending||void 0);let r=null;if(document.startViewTransition)try{r=document.startViewTransition(n)}catch(l){C(l)||p(l)}if(!r){i||n(),t?.pending&&await t.pending,e.forEach((l,d)=>{l.resolve(t.results[d])});return}const s=l=>{C(l)||p(l)};r.ready?.catch(s);const a=r.updateCallbackDone||r.finished;r.finished!==a&&r.finished?.catch(s);try{await a}catch(l){s(l)}e.forEach((l,d)=>{l.resolve(t?.results[d]??!1)})},It=(e,{label:t="unlabeled"}={})=>L>0?Pt(e,t):new Promise(i=>{b||(b=[],queueMicrotask(()=>{const n=b;b=null,ne=ne.then(()=>Ct(n)).catch(r=>{p(r),n.forEach(s=>{s.resolve(!1)})})})),b.push({callback:e,label:t,resolve:i})});At(),Fe();const re="lagniappe_remember";function Ot(e=document){e.addEventListener("submit",async t=>{const i=t.target;if(!(i instanceof HTMLFormElement))return;const n=i.dataset.route||i.action;if(!n.endsWith("/users/agent-login")||(t.preventDefault(),i.dataset.submitting==="true"))return;i.dataset.submitting="true";const r=t.submitter,s=r?.querySelector("[data-role='text']")?.textContent||r?.textContent.trim(),a=i.querySelector("[data-role='error']");a?.classList.add("hidden"),r&&"disabled"in r&&(r.disabled=!0,S(r,"Signing In","spinner"));const l=await g.post(n,new FormData(i));if(l?.redirect){window.location.href=l.redirect;return}a&&(a.textContent=l?.error||"Authentication failed.",a.classList.remove("hidden")),i.dataset.submitting="false",r&&"disabled"in r&&(r.disabled=!1,S(r,s))})}Ot();async function Bt(){try{const t=await(await fetch("/l/identity-config")).json();return new kt(t)}catch(e){throw console.error("Failed to initialize Identity Platform:",e),e}}if(document.getElementById("emailCheck")){const e=await Bt(),t=document.body.hasAttribute("data-owner-setup"),i=document.body.getAttribute("data-owner-email"),n=document.body.getAttribute("data-auth-error"),r=document.body.getAttribute("data-mode"),s=document.body.getAttribute("data-code"),a={},l=()=>{const o=document.cookie.split("; ").find(u=>u.startsWith(`${re}=`));return o?o.split("=")[1]!=="0":!0},d=()=>{const o=l();document.querySelectorAll("input[name='remember-me']").forEach(u=>{u.checked=o})},f=o=>{const u=window.location.protocol==="https:"?"; Secure":"";document.cookie=`${re}=${o?"1":"0"}; Path=/; Max-Age=31536000; SameSite=Lax${u}`,d()},h=o=>{It(()=>{Object.values(a).forEach(u=>{u&&u.hide()}),o.show(),d()})};if(r==="resetPassword"){const o=document.getElementById("resetPassword");a.resetPassword=new Et(e,o),a.resetPassword.data.code=s,h(a.resetPassword)}else if(r==="verifyEmail"){const o=document.getElementById("verifyEmail");a.verifyEmail=new _t(e,o),a.verifyEmail.data.code=s,h(a.verifyEmail)}else if(t){const o=document.getElementById("ownerSetup");a.ownerSetup=new mt(e,o),a.ownerSetup.data={email:i,error:n},h(a.ownerSetup)}else{const o=document.getElementById("authMethod");a.authMethod=new te(e,o),a.authMethod.data={error:n},h(a.authMethod)}document.addEventListener("login:show-auth-method",()=>{if(!a.authMethod){const o=document.getElementById("authMethod");a.authMethod=new te(e,o)}a.authMethod.data={},h(a.authMethod)}),document.addEventListener("login:show-signin",o=>{if(!a.signIn){const u=document.getElementById("signIn");a.signIn=new yt(e,u)}a.signIn.data={...o.detail},h(a.signIn)}),document.addEventListener("login:show-email-check",()=>{if(!a.emailCheck){const o=document.getElementById("emailCheck");a.emailCheck=new pt(e,o)}h(a.emailCheck)}),document.addEventListener("login:show-first-time-setup",o=>{if(!a.firstTimeSetup){const c=document.getElementById("firstTimeSetup");a.firstTimeSetup=new gt(e,c)}const u=a.firstTimeSetup;u.data={...o.detail},h(u)}),document.addEventListener("login:show-forgot-form",o=>{if(!a.forgotPassword){const c=document.getElementById("forgotPassword");a.forgotPassword=new wt(e,c)}const u=a.forgotPassword;u.data={...o.detail},h(u)}),document.addEventListener("change",o=>{o.target.matches("input[name='remember-me']")&&f(o.target.checked)})}
 /*! Third-party licenses: /third-party-licenses.txt */
+const ICONS = {
+  "add": {
+    "glyph": "add",
+    "fill": 1
+  },
+  "addRow": {
+    "glyph": "add_circle",
+    "fill": 0
+  },
+  "alignCenter": {
+    "glyph": "format_align_center",
+    "fill": 1
+  },
+  "alignJustify": {
+    "glyph": "format_align_justify",
+    "fill": 1
+  },
+  "alignMenu": {
+    "glyph": "subject",
+    "fill": 1
+  },
+  "alignLeft": {
+    "glyph": "format_align_left",
+    "fill": 1
+  },
+  "alignRight": {
+    "glyph": "format_align_right",
+    "fill": 1
+  },
+  "analytics": {
+    "glyph": "graph_3",
+    "fill": 1
+  },
+  "ask": {
+    "glyph": "chat",
+    "fill": 1
+  },
+  "assignedBy": {
+    "glyph": "person_edit",
+    "fill": 1
+  },
+  "assignedTo": {
+    "glyph": "assignment_ind",
+    "fill": 1
+  },
+  "attribute": {
+    "remove": {
+      "glyph": "do_not_disturb_on",
+      "fill": 1
+    }
+  },
+  "back": {
+    "glyph": "arrow_back",
+    "fill": 1
+  },
+  "billing": {
+    "glyph": "credit_card",
+    "fill": 1
+  },
+  "block": {
+    "glyph": "vertical_distribute",
+    "fill": 1
+  },
+  "bold": {
+    "glyph": "format_bold",
+    "fill": 1
+  },
+  "bookmark": {
+    "glyph": "bookmark",
+    "fill": 1
+  },
+  "builder": {
+    "saved": {
+      "glyph": "cloud_done",
+      "fill": 1
+    },
+    "unsaved": {
+      "glyph": "cloud_alert",
+      "fill": 1
+    }
+  },
+  "cached": {
+    "glyph": "cloud_off",
+    "fill": 1
+  },
+  "category": {
+    "glyph": "stacks",
+    "fill": 1
+  },
+  "center": {
+    "glyph": "align_horizontal_center",
+    "fill": 1
+  },
+  "check": {
+    "glyph": "check",
+    "fill": 1
+  },
+  "checkbox": {
+    "glyph": "check_box",
+    "fill": 1
+  },
+  "checklist": {
+    "glyph": "checklist",
+    "fill": 1
+  },
+  "clear": {
+    "glyph": "do_not_disturb_on",
+    "fill": 1
+  },
+  "clearFormat": {
+    "glyph": "format_clear",
+    "fill": 1
+  },
+  "close": {
+    "glyph": "close",
+    "fill": 1
+  },
+  "cloudflare": {
+    "glyph": "cloud",
+    "fill": 1
+  },
+  "code": {
+    "glyph": "code",
+    "fill": 1
+  },
+  "column": {
+    "glyph": "view_column",
+    "fill": 1
+  },
+  "columns": {
+    "glyph": "dehaze",
+    "fill": 1
+  },
+  "completed": {
+    "glyph": "event_available",
+    "fill": 1
+  },
+  "completedBy": {
+    "glyph": "person_check",
+    "fill": 1
+  },
+  "configuration": {
+    "glyph": "tune",
+    "fill": 1
+  },
+  "contract": {
+    "glyph": "arrow_drop_down",
+    "fill": 1
+  },
+  "create": {
+    "glyph": "wb_iridescent",
+    "fill": 1
+  },
+  "csv": {
+    "glyph": "csv",
+    "fill": 1
+  },
+  "database": {
+    "glyph": "database",
+    "fill": 1
+  },
+  "date": {
+    "glyph": "event",
+    "fill": 1
+  },
+  "delete": {
+    "glyph": "delete_forever",
+    "fill": 1
+  },
+  "directory": {
+    "glyph": "signpost",
+    "fill": 1
+  },
+  "document": {
+    "glyph": "article",
+    "fill": 1
+  },
+  "down": {
+    "glyph": "keyboard_arrow_down",
+    "fill": 1
+  },
+  "download": {
+    "glyph": "cloud_download",
+    "fill": 1
+  },
+  "dropdown": {
+    "glyph": "keyboard_arrow_down",
+    "fill": 1
+  },
+  "dueDate": {
+    "glyph": "event",
+    "fill": 1
+  },
+  "edit": {
+    "glyph": "amend",
+    "fill": 0
+  },
+  "email": {
+    "glyph": "alternate_email",
+    "fill": 1
+  },
+  "error": {
+    "glyph": "error",
+    "fill": 1
+  },
+  "expand": {
+    "glyph": "arrow_right",
+    "fill": 1
+  },
+  "file": {
+    "glyph": "description",
+    "fill": 1
+  },
+  "fileText": {
+    "glyph": "description",
+    "fill": 1
+  },
+  "files": {
+    "glyph": "work",
+    "fill": 1
+  },
+  "filter": {
+    "active": {
+      "glyph": "filter_list",
+      "fill": 1
+    },
+    "inactive": {
+      "glyph": "filter_list_off",
+      "fill": 0
+    },
+    "list": {
+      "glyph": "action_key",
+      "fill": 1
+    }
+  },
+  "flipper": {
+    "left": {
+      "glyph": "chevron_left",
+      "fill": 1
+    }
+  },
+  "floatLeft": {
+    "glyph": "format_image_left",
+    "fill": 1
+  },
+  "floatRight": {
+    "glyph": "format_image_right",
+    "fill": 1
+  },
+  "fontStyle": {
+    "glyph": "brand_family",
+    "fill": 1
+  },
+  "form": {
+    "glyph": "dynamic_form",
+    "fill": 1
+  },
+  "generate": {
+    "glyph": "memory",
+    "fill": 1
+  },
+  "google": {
+    "glyph": "public",
+    "fill": 1
+  },
+  "group": {
+    "glyph": "group",
+    "fill": 1
+  },
+  "h1": {
+    "glyph": "format_h1",
+    "fill": 1
+  },
+  "h2": {
+    "glyph": "format_h2",
+    "fill": 1
+  },
+  "h3": {
+    "glyph": "format_h3",
+    "fill": 1
+  },
+  "help": {
+    "glyph": "question_mark",
+    "fill": 1
+  },
+  "history": {
+    "glyph": "history",
+    "fill": 1
+  },
+  "historyFill": {
+    "glyph": "settings_backup_restore",
+    "fill": 1
+  },
+  "home": {
+    "glyph": "home",
+    "fill": 1
+  },
+  "html": {
+    "glyph": "html",
+    "fill": 1
+  },
+  "image": {
+    "glyph": "image",
+    "fill": 1
+  },
+  "imageAlign": {
+    "left": {
+      "glyph": "format_image_break_left",
+      "fill": 1
+    },
+    "center": {
+      "glyph": "align_justify_center",
+      "fill": 1
+    },
+    "right": {
+      "glyph": "format_image_break_right",
+      "fill": 1
+    }
+  },
+  "import": {
+    "glyph": "upload_file",
+    "fill": 1
+  },
+  "increase": {
+    "glyph": "add",
+    "fill": 1
+  },
+  "indexTools": {
+    "glyph": "build_circle",
+    "fill": 1
+  },
+  "insert": {
+    "glyph": "add",
+    "fill": 1
+  },
+  "in": {
+    "glyph": "open_in_new_down",
+    "fill": 1
+  },
+  "info": {
+    "glyph": "ballot",
+    "fill": 1
+  },
+  "input": {
+    "glyph": "keyboard_alt",
+    "fill": 0
+  },
+  "installation": {
+    "glyph": "download",
+    "fill": 1
+  },
+  "integration": {
+    "glyph": "extension",
+    "fill": 1
+  },
+  "italic": {
+    "glyph": "format_italic",
+    "fill": 1
+  },
+  "launch": {
+    "glyph": "rocket_launch",
+    "fill": 1
+  },
+  "left": {
+    "glyph": "arrow_back",
+    "fill": 1
+  },
+  "link": {
+    "glyph": "link_2",
+    "fill": 1
+  },
+  "listOl": {
+    "glyph": "format_list_numbered",
+    "fill": 1
+  },
+  "listUl": {
+    "glyph": "format_list_bulleted",
+    "fill": 1
+  },
+  "location": {
+    "glyph": "location_on",
+    "fill": 1
+  },
+  "login": {
+    "glyph": "login",
+    "fill": 1
+  },
+  "logout": {
+    "glyph": "logout",
+    "fill": 1
+  },
+  "manual": {
+    "glyph": "help",
+    "fill": 1
+  },
+  "map": {
+    "glyph": "map",
+    "fill": 1
+  },
+  "maximize": {
+    "glyph": "fullscreen",
+    "fill": 1
+  },
+  "menu": {
+    "glyph": "keyboard_arrow_down",
+    "fill": 1
+  },
+  "minimize": {
+    "glyph": "fullscreen_exit",
+    "fill": 1
+  },
+  "minus": {
+    "glyph": "remove",
+    "fill": 1,
+    "weight": 600
+  },
+  "model": {
+    "glyph": "automation",
+    "fill": 1
+  },
+  "next": {
+    "glyph": "arrow_forward",
+    "fill": 1
+  },
+  "nextWeek": {
+    "glyph": "calendar_month",
+    "fill": 1
+  },
+  "notes": {
+    "glyph": "note_stack",
+    "fill": 1
+  },
+  "number": {
+    "glyph": "tag",
+    "fill": 1
+  },
+  "offline": {
+    "glyph": "cloud_off",
+    "fill": 1
+  },
+  "organize": {
+    "glyph": "folder",
+    "fill": 1
+  },
+  "out": {
+    "glyph": "open_in_new",
+    "fill": 1
+  },
+  "overview": {
+    "glyph": "collections_bookmark",
+    "fill": 1
+  },
+  "page": {
+    "glyph": "draft",
+    "fill": 1
+  },
+  "paragraph": {
+    "glyph": "format_paragraph",
+    "fill": 1
+  },
+  "paste": {
+    "glyph": "content_paste",
+    "fill": 1
+  },
+  "permissions": {
+    "glyph": "lock_open",
+    "fill": 1
+  },
+  "personalization": {
+    "glyph": "palette",
+    "fill": 1
+  },
+  "pin": {
+    "glyph": "keep",
+    "fill": 1
+  },
+  "plus": {
+    "glyph": "add_2",
+    "fill": 1,
+    "weight": 600
+  },
+  "private": {
+    "glyph": "lock",
+    "fill": 1
+  },
+  "project": {
+    "glyph": "flowsheet",
+    "fill": 0
+  },
+  "prompt": {
+    "glyph": "terminal",
+    "fill": 1
+  },
+  "public": {
+    "glyph": "public",
+    "fill": 1
+  },
+  "question": {
+    "glyph": "help",
+    "fill": 1
+  },
+  "quoteRight": {
+    "glyph": "format_quote",
+    "fill": 1
+  },
+  "radio": {
+    "glyph": "radio_button_checked",
+    "fill": 1
+  },
+  "recurring": {
+    "glyph": "repeat",
+    "fill": 1
+  },
+  "redo": {
+    "glyph": "redo",
+    "fill": 1
+  },
+  "remove": {
+    "glyph": "cancel",
+    "fill": 1
+  },
+  "removeDueDate": {
+    "glyph": "event_busy",
+    "fill": 1
+  },
+  "replace": {
+    "glyph": "sync",
+    "fill": 1
+  },
+  "reset": {
+    "glyph": "restart_alt",
+    "fill": 1
+  },
+  "right": {
+    "glyph": "arrow_forward",
+    "fill": 1
+  },
+  "run": {
+    "active": {
+      "glyph": "play_arrow",
+      "fill": 1
+    },
+    "inactive": {
+      "glyph": "play_arrow",
+      "fill": 0
+    }
+  },
+  "search": {
+    "glyph": "search",
+    "fill": 1
+  },
+  "security": {
+    "glyph": "key",
+    "fill": 1
+  },
+  "select": {
+    "glyph": "top_panel_open",
+    "fill": 1
+  },
+  "selected": {
+    "glyph": "check_box",
+    "fill": 1
+  },
+  "share": {
+    "glyph": "share",
+    "fill": 1
+  },
+  "settings": {
+    "page": {
+      "glyph": "settings",
+      "fill": 1
+    }
+  },
+  "signature": {
+    "glyph": "draw",
+    "fill": 1
+  },
+  "sitemap": {
+    "glyph": "account_tree",
+    "fill": 1
+  },
+  "siteOwner": {
+    "glyph": "admin_panel_settings",
+    "fill": 1
+  },
+  "siteSettings": {
+    "glyph": "settings",
+    "fill": 1
+  },
+  "skipped": {
+    "glyph": "assignment_late",
+    "fill": 1
+  },
+  "snooze": {
+    "glyph": "snooze",
+    "fill": 1
+  },
+  "spinner": {
+    "glyph": "donut_large",
+    "fill": 1,
+    "spin": true
+  },
+  "star": {
+    "home": {
+      "glyph": "star",
+      "fill": 1
+    },
+    "active": {
+      "glyph": "star",
+      "fill": 1
+    },
+    "inactive": {
+      "glyph": "star",
+      "fill": 0,
+      "weight": 300
+    }
+  },
+  "start": {
+    "glyph": "first_page",
+    "fill": 1
+  },
+  "status": {
+    "glyph": "sticky_note_2",
+    "fill": 1
+  },
+  "strikethrough": {
+    "glyph": "format_strikethrough",
+    "fill": 1
+  },
+  "subscript": {
+    "glyph": "subscript",
+    "fill": 1
+  },
+  "success": {
+    "glyph": "check_circle",
+    "fill": 1
+  },
+  "superscript": {
+    "glyph": "superscript",
+    "fill": 1
+  },
+  "table": {
+    "glyph": "table",
+    "fill": 1
+  },
+  "tableEdit": {
+    "glyph": "table_edit",
+    "fill": 0
+  },
+  "task": {
+    "glyph": "check_box",
+    "fill": 1
+  },
+  "tasks": {
+    "glyph": "check_box",
+    "fill": 1
+  },
+  "tel": {
+    "glyph": "phone",
+    "fill": 1
+  },
+  "text": {
+    "glyph": "keyboard_alt",
+    "fill": 0
+  },
+  "textColor": {
+    "glyph": "format_color_text",
+    "fill": 1
+  },
+  "textStyle": {
+    "glyph": "text_format",
+    "fill": 1
+  },
+  "textarea": {
+    "glyph": "subject",
+    "fill": 1
+  },
+  "time": {
+    "glyph": "schedule",
+    "fill": 1
+  },
+  "todo": {
+    "ok": {
+      "glyph": "calendar_today",
+      "fill": 1
+    },
+    "overdue": {
+      "glyph": "calendar_clock",
+      "fill": 1
+    },
+    "today": {
+      "glyph": "today",
+      "fill": 1
+    }
+  },
+  "tomorrow": {
+    "glyph": "fast_forward",
+    "fill": 1
+  },
+  "trash": {
+    "active": {
+      "glyph": "delete_forever",
+      "fill": 1
+    },
+    "inactive": {
+      "glyph": "delete_forever",
+      "fill": 0,
+      "weight": 300
+    }
+  },
+  "underline": {
+    "glyph": "format_underlined",
+    "fill": 1
+  },
+  "undo": {
+    "glyph": "undo",
+    "fill": 1
+  },
+  "unselected": {
+    "glyph": "check_box_outline_blank",
+    "fill": 0
+  },
+  "up": {
+    "glyph": "keyboard_arrow_up",
+    "fill": 1
+  },
+  "upload": {
+    "glyph": "cloud_upload",
+    "fill": 1
+  },
+  "url": {
+    "glyph": "highlight_mouse_cursor",
+    "fill": 1
+  },
+  "user": {
+    "glyph": "person",
+    "fill": 1
+  },
+  "users": {
+    "glyph": "group",
+    "fill": 1
+  },
+  "weekend": {
+    "glyph": "date_range",
+    "fill": 1
+  },
+  "x": {
+    "glyph": "close",
+    "fill": 1,
+    "weight": 600
+  },
+  "youtube": {
+    "glyph": "smart_display",
+    "fill": 1
+  }
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
+ * @matrix frontend-icons : lookup nested-ids registry
+ */
+const iconDefinition = (name) => {
+	let definition = ICONS;
+	for (const part of String(name || "").split(".")) {
+		if (!part || !definition || typeof definition !== "object") return null;
+		definition = definition[part];
+	}
+	return definition?.glyph ? definition : null;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
+ * @matrix frontend-icons : accessibility animation fill semantic-markup weight
+ */
+const setIcon = (element, name, classes = "") => {
+	const definition = iconDefinition(name);
+	if (!definition) {
+		element.replaceChildren();
+		element.removeAttribute("data-icon");
+		return element;
+	}
+
+	const classNames = ["icon"];
+	if (definition.spin) classNames.push("icon-spin");
+	if (classes) classNames.push(...String(classes).split(/\s+/).filter(Boolean));
+
+	element.className = classNames.join(" ");
+	element.dataset.icon = name;
+	element.dataset.fill = String(definition.fill);
+	element.setAttribute("aria-hidden", "true");
+	if (definition.weight) {
+		element.dataset.weight = String(definition.weight);
+	} else {
+		delete element.dataset.weight;
+	}
+	const glyph = document.createElement("span");
+	glyph.className = "icon-glyph";
+	glyph.textContent = definition.glyph;
+	element.replaceChildren(glyph);
+	return element;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
+ * @matrix frontend-icons : element-creation semantic-markup
+ */
+const createIcon = (name, classes = "") => {
+	return setIcon(document.createElement("span"), name, classes);
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/errors.mjs::captureError
+ * @reason context extraction is reported through the public error capture helper
+ */
+const getElementContext = (element) => {
+	const context = {};
+	if (!(element instanceof Element)) return context;
+
+	// Element's own info
+	context.element = {
+		tagName: element.tagName?.toLowerCase(),
+		id: element.id || undefined,
+		className: element.className || undefined,
+		dataset: { ...element.dataset },
+	};
+
+	// Closest widget
+	const widget = element.closest("[data-widget]");
+	if (widget && widget !== element) {
+		context.widget = widget.dataset;
+	}
+
+	// Closest lp-component
+	const component = element.closest("[lp-component]");
+	if (component && component !== element) {
+		context.component = component.dataset;
+	}
+
+	// Closest lp-view
+	const view = element.closest("[lp-view]");
+	if (view && view !== element) {
+		context.view = view.dataset;
+	}
+
+	// Current URL info
+	context.page = {
+		pathname: window.location.pathname,
+	};
+
+	return context;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/errors.mjs::captureError
+ * @reason context value normalization is reported through the public error capture helper
+ */
+const sanitizedObjectContext = (value) =>
+	Object.fromEntries(
+		Object.entries(value).filter(([, child]) => {
+			return (
+				child !== undefined &&
+				typeof child !== "function" &&
+				typeof child !== "symbol"
+			);
+		}),
+	);
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/errors.mjs::captureError
+ * @reason context value normalization is reported through the public error capture helper
+ */
+const normalizeContextValue = (value) => {
+	if (
+		value === undefined ||
+		typeof value === "function" ||
+		typeof value === "symbol"
+	) {
+		return null;
+	}
+	if (Array.isArray(value)) return { values: value };
+	if (value && typeof value === "object") return sanitizedObjectContext(value);
+	return { value };
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/errors.mjs::captureError
+ * @reason context normalization is reported through the public error capture helper
+ */
+const normalizeContext = (context) => {
+	if (!(context instanceof Object)) return {};
+
+	return Object.fromEntries(
+		Object.entries(context)
+			.map(([key, value]) => [key, normalizeContextValue(value)])
+			.filter(([, value]) => value && Object.keys(value).length > 0),
+	);
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/errors.mjs::isSkippedViewTransitionError
+ * @reason error text normalization only supports transition-noise filtering
+ */
+const getErrorText = (error) => {
+	if (!error) return "";
+	if (typeof error === "string") return error;
+	return `${error.name || ""} ${error.message || ""} ${String(error)}`.trim();
+};
+
+/**
+ * View transition skips/aborts are expected during fast navigation, concurrent
+ * transitions, and cross-document transitions. They should not be reported.
+ *
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason transition-noise predicate is exercised through the transition wrapper
+ */
+const isSkippedViewTransitionError = (error) => {
+	if (!error) return false;
+
+	if (error instanceof DOMException && /transition/i.test(error.message)) {
+		return true;
+	}
+
+	const text = getErrorText(error);
+	if (!text) return false;
+
+	return (
+		/transition was (skipped|aborted)/i.test(text) ||
+		(error.name === "InvalidStateError" && /transition/i.test(text))
+	);
+};
+
+/**
+ * Fetch threw before a response (offline, navigation abort, tab freeze, etc.).
+ * Not useful as a Sentry exception — noise on mobile especially.
+ *
+ * @testable false
+ * @covered-by src/script/shared/errors.mjs::captureNetworkError
+ * @reason transient-network predicate feeds network capture suppression
+ */
+const isTransientNetworkError = (error) => {
+	if (!error) return false;
+	if (error.name === "AbortError") return true;
+	if (error instanceof TypeError) {
+		const msg = error.message || "";
+		return (
+			msg === "Failed to fetch" ||
+			msg === "Load failed" ||
+			/NetworkError when attempting to fetch resource/i.test(msg)
+		);
+	}
+	return false;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_015_error_tracking_frontend.py::test_capture_error_normalizes_sentry_context_values
+ * @matrix error-tracking : normalization sentry-context
+ */
+const captureError = (error, element, context) => {
+	if (isSkippedViewTransitionError(error)) {
+		return;
+	}
+	context = normalizeContext({
+		...getElementContext(element || error?.target),
+		...(context || {}),
+	});
+
+	if (typeof window !== "undefined" && window.Sentry) {
+		const captureContext =
+			Object.keys(context).length > 0 ? { contexts: context } : undefined;
+
+		if (error instanceof Error) {
+			window.Sentry.captureException(error, captureContext);
+		} else {
+			window.Sentry.captureMessage(String(error), {
+				level: "error",
+				...captureContext,
+			});
+		}
+	}
+
+	const hasContext = Object.keys(context).length > 0;
+	console.error("[ERROR]", error);
+	if (hasContext) console.error("Context:", context);
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason network capture is reached through shared request failure handling
+ */
+const captureNetworkError = (error, url, options = {}) => {
+	if (!options.forceReport && isTransientNetworkError(error)) {
+		return;
+	}
+	const context = {
+		network: {
+			url,
+			method: options.method || "GET",
+			timestamp: new Date().toISOString(),
+			online: navigator.onLine,
+		},
+	};
+
+	captureError(error, null, context);
+};
+
+// @testable true
+// @tests tests_js/test_015_error_tracking_frontend.py::test_login_error_delegates_to_shared_capture
+// @matrix error-tracking login : login-context shared-capture
+const captureLoginError = (error, operation = "unknown") => {
+	captureError(error, null, {
+		login: {
+			operation,
+			timestamp: new Date().toISOString(),
+			userAgent: navigator.userAgent,
+		},
+	});
+};
+
+const NOTIFICATION_STATE_HEADER = "X-Lagniappe-Notification-State";
+
+let invalidStateReported = false;
+
+/**
+ * Publish the notification badge's count, visibility, and accessible state as
+ * one DOM commit.
+ *
+ * @testable true
+ * @tests tests_js/test_036_notification_state.py::test_notification_state_updates_badge_and_reports_cache_miss
+ * @matrix notifications : accessible-state badge
+ */
+const renderNotificationBadge = (count) => {
+	const normalized = Number.isInteger(Number(count)) ? Number(count) : 0;
+	const button = document.querySelector("[data-role='notifications']");
+	const countElement = document.querySelector(
+		"[data-role='notification-count']",
+	);
+	if (countElement) countElement.textContent = String(normalized);
+	if (!button) return normalized;
+
+	button.dataset.visible = "true";
+	button.setAttribute("aria-hidden", "false");
+	button.setAttribute("aria-busy", "false");
+	button.setAttribute("aria-label", `Notifications: ${normalized}`);
+	button.tabIndex = 0;
+	return normalized;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/notificationState.mjs::applyNotificationState
+ * @reason input normalization is exercised through the public state publisher
+ */
+const _normalized = (raw) => {
+	if (typeof raw === "string") {
+		try {
+			raw = JSON.parse(raw);
+		} catch {
+			return null;
+		}
+	}
+	if (!raw || typeof raw !== "object") return null;
+	if (raw.generation === null && raw.revision === null && raw.count === null) {
+		return { generation: null, revision: null, count: null, miss: true };
+	}
+	if (
+		typeof raw.generation !== "string" ||
+		!raw.generation ||
+		!Number.isInteger(raw.revision) ||
+		raw.revision < 0 ||
+		!Number.isInteger(raw.count) ||
+		raw.count < 0
+	) {
+		return null;
+	}
+	return {
+		generation: raw.generation,
+		revision: raw.revision,
+		count: raw.count,
+		miss: false,
+	};
+};
+
+/**
+ * Publish compact notification state before the lazy menu module is loaded.
+ *
+ * @testable true
+ * @tests tests_js/test_036_notification_state.py::test_notification_state_updates_badge_and_reports_cache_miss
+ * @matrix notifications : badge cold-seed redis-projection
+ */
+const applyNotificationState = (raw) => {
+	const state = _normalized(raw);
+	if (!state) {
+		if (raw !== null && raw !== undefined && !invalidStateReported) {
+			invalidStateReported = true;
+			captureError(
+				new TypeError("Invalid notification state response."),
+				null,
+				{
+					context: "notification-state-contract",
+				},
+			);
+		}
+		return null;
+	}
+	window.__NOTIFICATION_STATE__ = state;
+
+	if (!state.miss) {
+		renderNotificationBadge(state.count);
+	}
+
+	window.dispatchEvent(
+		new CustomEvent("notification-state", { detail: { ...state } }),
+	);
+	return state;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_036_notification_state.py::test_notification_state_updates_badge_and_reports_cache_miss
+ * @pair notifications:response-header
+ */
+const applyNotificationStateHeader = (headers) => {
+	const raw = headers?.get?.(NOTIFICATION_STATE_HEADER);
+	return raw ? applyNotificationState(raw) : null;
+};
+
+var id = "lagniappe-browser";
+var version = 4;
+var messages = {
+	CONNECTIVITY: "connectivity-state",
+	UPSTREAM_UNAVAILABLE: "upstream-unavailable"
+};
+var BROWSER_PROTOCOL = {
+	id: id,
+	version: version,
+	messages: messages};
+
+const BROWSER_PROTOCOL_ID = BROWSER_PROTOCOL.id;
+const BROWSER_PROTOCOL_VERSION = BROWSER_PROTOCOL.version;
+const WORKER_MESSAGES = Object.freeze({ ...BROWSER_PROTOCOL.messages });
+
+const UPSTREAM_STATUSES = new Set([500, 502, 503, 504]);
+const UPSTREAM_ERROR_HEADER = "X-Lagniappe-Error";
+const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
+const UPSTREAM_STATUS_HEADER = "X-Lagniappe-Upstream-Status";
+const STALE_CACHE_HEADER = "X-Lagniappe-Stale-Cache";
+const UPSTREAM_RETRY_DELAY_MS = 500;
+const REPORT_COOLDOWN_MS = 5 * 60 * 1000;
+const MAX_SERVER_LENGTH = 128;
+const ROUTE_CLASSES = new Set([
+	"admin",
+	"analytics",
+	"categories",
+	"files",
+	"filters",
+	"forms",
+	"home",
+	"internal",
+	"manual",
+	"messages",
+	"pages",
+	"process",
+	"projects",
+	"public",
+	"reports",
+	"root",
+	"tasks",
+	"testing",
+	"users",
+]);
+
+const _reported = new Map();
+let _retry = null;
+let _retrying = false;
+let _clientInstalled = false;
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/upstreamUnavailable.mjs::receiveUpstreamUnavailable
+ * @covered-by src/script/shared/upstreamUnavailable.mjs::receiveUpstreamUnavailableMessage
+ * @reason controlled-client state validation is exercised through the message receiver
+ */
+function _validWorkerDetails(details) {
+	return Boolean(
+		details &&
+			UPSTREAM_STATUSES.has(Number(details.status)) &&
+			["GET", "POST", "PUT", "PATCH", "DELETE"].includes(details.method) &&
+			typeof details.route_class === "string" &&
+			/^[a-z-]{1,32}$/.test(details.route_class) &&
+			typeof details.server === "string" &&
+			details.server.length <= 128 &&
+			typeof details.trace_header_present === "boolean" &&
+			typeof details.timestamp === "string" &&
+			typeof details.online === "boolean" &&
+			["controlled", "uncontrolled"].includes(details.service_worker) &&
+			typeof details.stale === "boolean" &&
+			typeof details.outcome_uncertain === "boolean" &&
+			["not_attempted", "failed", "recovered", "service_worker"].includes(
+				details.retry_outcome,
+			),
+	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/upstreamUnavailable.mjs::isUpstreamUnavailableResponse
+ * @reason origin resolution is exercised through the public response classifier
+ */
+function _sameOrigin(url) {
+	try {
+		const base = window.location.href || `${window.location.origin}/`;
+		return new URL(url, base).origin === window.location.origin;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_upstream_diagnostics_are_bounded_private_and_deduplicated
+ * @matrix error-tracking request-errors : privacy route-class upstream-unavailable
+ */
+function upstreamRouteClass(url) {
+	try {
+		const base = window.location.href || `${window.location.origin}/`;
+		const pathname = new URL(url, base).pathname;
+		if (pathname === "/") return "root";
+		const segment = pathname.split("/").filter(Boolean)[0] || "root";
+		if (segment === "l") return "internal";
+		return ROUTE_CLASSES.has(segment) ? segment : "other";
+	} catch {
+		return "other";
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement
+ * @tests tests_js/test_009_request_csrf.py::test_application_marked_html_error_keeps_existing_behavior
+ * @matrix request-errors : application-error-marker classification upstream-unavailable
+ */
+function isUpstreamUnavailableResponse(response, url) {
+	if (response?.headers?.get(UPSTREAM_UNAVAILABLE_HEADER) === "true") {
+		return true;
+	}
+	return Boolean(
+		response &&
+			_sameOrigin(url) &&
+			UPSTREAM_STATUSES.has(response.status) &&
+			response.headers.get("content-type")?.includes("text/html") &&
+			!response.headers.get(UPSTREAM_ERROR_HEADER),
+	);
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement
+ * @tests tests_js/test_009_request_csrf.py::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
+ * @tests tests_js/test_009_request_csrf.py::test_mutation_upstream_failure_is_uncertain_and_never_replayed
+ * @matrix request-errors : classification dom-preservation explicit-retry mutation no-replay outcome-uncertain upstream-unavailable
+ */
+async function handleUpstreamResponse(
+	response,
+	{
+		method,
+		url,
+		retryUpstream = true,
+		fetchResponse,
+		retryCurrent,
+		retryOriginal,
+	},
+) {
+	let upstreamFailure = isUpstreamUnavailableResponse(response, url)
+		? response
+		: null;
+	let retryOutcome = "not_attempted";
+	if (!upstreamFailure) {
+		if (response.ok || response.status === 304) noteFreshApplicationResponse();
+		return { response };
+	}
+
+	if (method === "GET" && retryUpstream) {
+		await new Promise((resolve) =>
+			setTimeout(resolve, UPSTREAM_RETRY_DELAY_MS),
+		);
+		response = await fetchResponse();
+		retryOutcome = isUpstreamUnavailableResponse(response, url)
+			? "failed"
+			: "recovered";
+		if (retryOutcome === "recovered") {
+			reportUpstreamUnavailable(
+				upstreamUnavailableDetails(upstreamFailure, {
+					method,
+					url,
+					retryOutcome,
+				}),
+			);
+			if (response.ok || response.status === 304)
+				noteFreshApplicationResponse();
+			return { response };
+		}
+		upstreamFailure = response;
+	}
+
+	const details = upstreamUnavailableDetails(upstreamFailure, {
+		method,
+		url,
+		retryOutcome,
+	});
+	const outcomeUncertain = method !== "GET";
+	reportUpstreamUnavailable(details);
+	showUpstreamUnavailable(
+		{ stale: details.stale, outcomeUncertain },
+		outcomeUncertain ? retryCurrent : retryOriginal,
+	);
+	return {
+		result: {
+			ok: false,
+			error: "The application server is temporarily unavailable.",
+			code: "upstream_instance_unavailable",
+			status: details.status,
+			upstreamUnavailable: true,
+			stale: details.stale,
+			retryable: method === "GET",
+			outcomeUncertain,
+			retryOutcome,
+		},
+	};
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/upstreamUnavailable.mjs::upstreamUnavailableDetails
+ * @covered-by src/script/shared/upstreamUnavailable.mjs::reportUpstreamUnavailable
+ * @reason server sanitization is asserted through bounded diagnostic payloads
+ */
+function _boundedServer(value) {
+	return String(value || "")
+		.replace(/[^\x20-\x7E]/g, "")
+		.slice(0, MAX_SERVER_LENGTH);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/upstreamUnavailable.mjs::upstreamUnavailableDetails
+ * @covered-by src/script/shared/upstreamUnavailable.mjs::receiveUpstreamUnavailable
+ * @reason release metadata is asserted through browser diagnostic events
+ */
+function _releaseMetadata() {
+	const banner = document.querySelector("[data-role='upstream-unavailable']");
+	return {
+		build: String(banner?.dataset.build || "").slice(0, 64),
+		release: String(banner?.dataset.release || "").slice(0, 64),
+	};
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_upstream_diagnostics_are_bounded_private_and_deduplicated
+ * @matrix error-tracking request-errors : privacy response-metadata upstream-unavailable
+ */
+function upstreamUnavailableDetails(
+	response,
+	{
+		method = "GET",
+		url = "/",
+		stale = null,
+		retryOutcome = "not_attempted",
+	} = {},
+) {
+	const originalStatus = Number(
+		response.headers.get(UPSTREAM_STATUS_HEADER) || response.status,
+	);
+	return {
+		status: UPSTREAM_STATUSES.has(originalStatus)
+			? originalStatus
+			: response.status,
+		method: String(method).toUpperCase(),
+		route_class: upstreamRouteClass(url),
+		server: _boundedServer(response.headers.get("Server")),
+		trace_header_present: Boolean(
+			response.headers.get("X-Cloud-Trace-Context") ||
+				response.headers.get("Traceparent"),
+		),
+		timestamp: new Date().toISOString(),
+		online: navigator.onLine !== false,
+		service_worker: navigator.serviceWorker?.controller
+			? "controlled"
+			: "uncontrolled",
+		stale:
+			stale === null
+				? response.headers.get(STALE_CACHE_HEADER) === "true"
+				: Boolean(stale),
+		retry_outcome: retryOutcome,
+		..._releaseMetadata(),
+	};
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_upstream_diagnostics_are_bounded_private_and_deduplicated
+ * @matrix error-tracking request-errors : cooldown fingerprint privacy upstream-unavailable warning
+ */
+function reportUpstreamUnavailable(details) {
+	const diagnostic = {
+		status: UPSTREAM_STATUSES.has(Number(details.status))
+			? Number(details.status)
+			: 503,
+		method: ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(
+			String(details.method).toUpperCase(),
+		)
+			? String(details.method).toUpperCase()
+			: "GET",
+		route_class: ROUTE_CLASSES.has(details.route_class)
+			? details.route_class
+			: "other",
+		server: _boundedServer(details.server),
+		trace_header_present: details.trace_header_present === true,
+		timestamp: String(details.timestamp || new Date().toISOString()).slice(
+			0,
+			40,
+		),
+		online: details.online !== false,
+		service_worker:
+			details.service_worker === "controlled" ? "controlled" : "uncontrolled",
+		build: String(details.build || "").slice(0, 64),
+		release: String(details.release || "").slice(0, 64),
+		stale: details.stale === true,
+		retry_outcome: [
+			"not_attempted",
+			"failed",
+			"recovered",
+			"service_worker",
+		].includes(details.retry_outcome)
+			? details.retry_outcome
+			: "not_attempted",
+	};
+	const key = `${diagnostic.method}:${diagnostic.route_class}`;
+	const now = Date.now();
+	if (now - (_reported.get(key) || 0) < REPORT_COOLDOWN_MS) return false;
+	_reported.set(key, now);
+
+	window.Sentry?.captureMessage?.(
+		"Application server temporarily unavailable",
+		{
+			level: "warning",
+			fingerprint: ["upstream_instance_unavailable"],
+			tags: {
+				failure_code: "upstream_instance_unavailable",
+				method: diagnostic.method,
+				route_class: diagnostic.route_class,
+			},
+			contexts: { upstream_instance_unavailable: diagnostic },
+		},
+	);
+	return true;
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/upstreamUnavailable.mjs::showUpstreamUnavailable
+ * @reason DOM state rendering is asserted through the public banner boundary
+ */
+function _renderBanner(details) {
+	const banner = document.querySelector("[data-role='upstream-unavailable']");
+	if (!banner) return;
+	const message = banner.querySelector(
+		"[data-role='upstream-unavailable-message']",
+	);
+	const uncertain = details.outcomeUncertain === true;
+	const stale = details.stale === true;
+	if (message) {
+		message.textContent = uncertain
+			? "The server is temporarily unavailable. We could not confirm whether your change was saved. Check the current state before trying it again."
+			: stale
+				? "The server is temporarily unavailable. You are viewing saved content; your current work is still here."
+				: "The server is temporarily unavailable. Your current page and unsaved work are unchanged.";
+	}
+	banner.dataset.visible = "true";
+	banner.dataset.stale = stale ? "true" : "false";
+	banner.dataset.outcomeUncertain = uncertain ? "true" : "false";
+	banner.setAttribute("aria-hidden", "false");
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
+ * @matrix request-errors : banner dom-preservation retry upstream-unavailable
+ */
+function showUpstreamUnavailable(details, retry = null) {
+	_retry = typeof retry === "function" ? retry : null;
+	_renderBanner(details);
+}
+
+/**
+ * Clear only at a fresh application-response boundary.
+ *
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
+ * @matrix request-errors : banner fresh-response upstream-unavailable
+ */
+function noteFreshApplicationResponse() {
+	const banner = document.querySelector("[data-role='upstream-unavailable']");
+	if (!banner) return;
+	_retry = null;
+	banner.dataset.visible = "false";
+	banner.dataset.stale = "false";
+	banner.dataset.outcomeUncertain = "false";
+	banner.setAttribute("aria-hidden", "true");
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_upstream_unavailable_worker_message_shows_retryable_banner
+ * @matrix browser-protocol request-errors service-worker : banner client-message upstream-unavailable
+ */
+function receiveUpstreamUnavailable(details, retry = null) {
+	if (!_validWorkerDetails(details)) return false;
+	reportUpstreamUnavailable({ ...details, ..._releaseMetadata() });
+	showUpstreamUnavailable(
+		{
+			stale: details.stale,
+			outcomeUncertain: details.outcome_uncertain,
+		},
+		retry,
+	);
+	return true;
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_upstream_unavailable_worker_message_shows_retryable_banner
+ * @matrix browser-protocol request-errors service-worker : banner client-message retry upstream-unavailable validation
+ */
+function receiveUpstreamUnavailableMessage(message) {
+	if (!_validWorkerDetails(message?.state)) return false;
+	return receiveUpstreamUnavailable(message.state, async () => {
+		const { request } = await Promise.resolve().then(function () { return request$1; });
+		return request.get(window.location.pathname, null, {
+			replaceErrorPage: false,
+			retryUpstream: false,
+		});
+	});
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
+ * @tests tests_js/test_009_request_csrf.py::test_mutation_upstream_failure_is_uncertain_and_never_replayed
+ * @matrix request-errors : banner explicit-retry no-replay upstream-unavailable
+ */
+function installUpstreamUnavailableBanner() {
+	if (!_clientInstalled) {
+		_clientInstalled = true;
+		navigator.serviceWorker?.addEventListener?.("message", (event) => {
+			const data = event.data;
+			if (
+				data?.protocol === BROWSER_PROTOCOL_ID &&
+				Number(data.protocol_version) === BROWSER_PROTOCOL_VERSION &&
+				data.type === WORKER_MESSAGES.UPSTREAM_UNAVAILABLE
+			) {
+				receiveUpstreamUnavailableMessage(data);
+			}
+		});
+		if (window.__TESTING__) {
+			window.__TEST_UPSTREAM_UNAVAILABLE__ = async () => {
+				const { request } = await Promise.resolve().then(function () { return request$1; });
+				return request.get("/testing/upstream-unavailable");
+			};
+		}
+	}
+	const button = document.querySelector(
+		"[data-role='upstream-unavailable-retry']",
+	);
+	if (!button || button.dataset.initialized === "true") return;
+	button.dataset.initialized = "true";
+	button.addEventListener("click", async () => {
+		if (_retrying || !_retry) return;
+		_retrying = true;
+		button.disabled = true;
+		button.textContent = "Trying…";
+		try {
+			await _retry();
+		} finally {
+			_retrying = false;
+			button.disabled = false;
+			button.textContent = "Try again";
+		}
+	});
+}
+
+const PARSER = new DOMParser();
+const TOKEN_REQUEST = {
+	credentials: "include",
+	headers: { "X-Lagniappe-Request": "true" },
+};
+const UPDATED_HEADER = "X-Lagniappe-Updated";
+const INVALIDATE_CACHE_HEADER = "X-Lagniappe-Invalidate-Cache";
+const ENTITY_REVISIONS_HEADER = "X-Lagniappe-Entity-Revisions";
+const CSRF_FAILURE_HEADER = "X-Lagniappe-CSRF";
+const POLL_CHANNEL_HEADER = "X-Lagniappe-Poll-Channel";
+const POLL_REVISION_HEADER = "X-Lagniappe-Poll-Revision";
+const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const UPSTREAM_UPLOAD_OVERLOAD_ERROR = "Upload fewer files?";
+const UPSTREAM_RESET_PATTERN =
+	/upstream connect error|disconnect\/reset before headers|connection termination/i;
+let _tokenRefresh = null;
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_non_csrf_bad_request_is_not_retried
+ * @matrix csrf request-errors : retry-classification
+ */
+const csrfFailed = (response) =>
+	response.status === 400 &&
+	response.headers.get(CSRF_FAILURE_HEADER)?.toLowerCase() === "invalid";
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason CSRF token lookup is part of the shared request envelope
+ */
+const _getToken = () => document.getElementById("token")?.value;
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_request_exposes_service_worker_updated_marker
+ * @tests tests_js/test_009_request_csrf.py::test_request_exposes_client_cache_invalidation_marker
+ * @tests tests_js/test_009_request_csrf.py::test_request_dispatches_entity_fingerprint_acknowledgement
+ * @tests tests_js/test_009_request_csrf.py::test_request_supports_conditional_post_not_modified
+ * @matrix cache : conditional-response dom-refresh etag invalidation reload
+ * @matrix deferred-jobs : conditional-response etag
+ * @matrix edited-entity-notice : acknowledgement multiple-entities response-headers
+ * @matrix request : acknowledgement conditional-response dom-refresh etag invalidation multiple-entities reload response-headers
+ */
+const _formatResponse = async (
+	response,
+	{ acknowledgeEntities = true } = {},
+) => {
+	applyNotificationStateHeader(response.headers);
+	if (response.status === 304) {
+		return {
+			ok: true,
+			unchanged: true,
+			etag: response.headers.get("ETag"),
+		};
+	}
+	const contentType = response.headers.get("content-type");
+	let result = null;
+	if (contentType?.includes("application/json")) {
+		const data = (await response.json()) || {};
+		result = {
+			ok: response.ok,
+			...data,
+		};
+	} else {
+		result = {
+			ok: response.ok,
+			html: (await response.text()) || "",
+		};
+	}
+	result.updated = response.headers.get(UPDATED_HEADER) !== "false";
+	result.etag = response.headers.get("ETag");
+	result.pollChannel = response.headers.get(POLL_CHANNEL_HEADER);
+	result.pollRevision = response.headers.get(POLL_REVISION_HEADER);
+	result.reload =
+		Boolean(result.reload) || response.headers.has(INVALIDATE_CACHE_HEADER);
+	const revisions = new Map();
+	const revisionHeader = response.headers.get(ENTITY_REVISIONS_HEADER);
+	if (revisionHeader) {
+		try {
+			for (const revision of JSON.parse(revisionHeader)) {
+				if (revision?.key && revision?.fingerprint) {
+					revisions.set(revision.key, revision);
+				}
+			}
+		} catch {
+			// Ignore a malformed optional acknowledgement header.
+		}
+	}
+	result.entities = Array.from(revisions.values());
+	if (acknowledgeEntities) {
+		for (const entity of result.entities) {
+			window.dispatchEvent(
+				new CustomEvent("entity-updated", { detail: entity }),
+			);
+		}
+	}
+	if (result.html) {
+		result.html = PARSER.parseFromString(result.html, "text/html");
+	} else if (result.modal) {
+		result.modal = PARSER.parseFromString(result.modal, "text/html");
+	}
+	return result;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason upload overload detection is part of the shared error envelope
+ */
+const _isUploadBody = (body) => {
+	if (!(body instanceof FormData)) return false;
+	if (typeof body.has === "function" && body.has("direct_uploads")) return true;
+	if (typeof body.has === "function" && body.has("assets")) return true;
+	if (typeof body.entries !== "function") return true;
+
+	for (const [, value] of body.entries()) {
+		if (typeof File !== "undefined" && value instanceof File) return true;
+		if (typeof Blob !== "undefined" && value instanceof Blob) return true;
+	}
+	return false;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason proxy reset wording is not useful in upload forms
+ */
+const _friendlyError = (message, { body = null } = {}) => {
+	if (_isUploadBody(body) && UPSTREAM_RESET_PATTERN.test(message || "")) {
+		return UPSTREAM_UPLOAD_OVERLOAD_ERROR;
+	}
+	return message;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_plain_text_upstream_error_stays_in_request_error_path
+ * @tests tests_js/test_009_request_csrf.py::test_request_can_return_html_error_without_replacing_page
+ * @tests tests_js/test_009_request_csrf.py::test_application_marked_html_error_keeps_existing_behavior
+ * @matrix edited-entity-notice : non-invasive-probe reload-fallback
+ * @matrix request-errors : ajax-upload non-invasive-probe proxy-text-error reload-fallback
+ * @matrix request-errors : application-error-marker dom-replacement
+ */
+const _formatError = async (
+	response,
+	{ replaceErrorPage = true, ...context } = {},
+) => {
+	const contentType = response.headers.get("content-type");
+	if (contentType?.includes("application/json")) {
+		const text = await response.text();
+		try {
+			const data = JSON.parse(text);
+			if (data.error) {
+				data.error = _friendlyError(data.error, context);
+			}
+			return { ok: false, ...data };
+		} catch {
+			return { ok: false, error: _friendlyError(text, context) };
+		}
+	}
+
+	const text = await response.text();
+	const title = response.headers.get("X-Lagniappe-Error");
+	const fallback =
+		text.trim() || title || response.statusText || "Network request failed";
+	const error = _friendlyError(fallback, context);
+
+	if (!contentType?.includes("text/html")) {
+		return {
+			ok: false,
+			error,
+		};
+	}
+
+	if (error !== fallback) {
+		return {
+			ok: false,
+			error,
+		};
+	}
+
+	if (!replaceErrorPage) {
+		return {
+			ok: false,
+			error: _friendlyError(title || response.statusText || fallback, context),
+		};
+	}
+
+	if (!title) {
+		document.documentElement.innerHTML = text;
+		document.title = response.statusText;
+	} else {
+		document.querySelector("main").innerHTML = text;
+		document.title = title;
+	}
+
+	return {
+		ok: false,
+		error: _friendlyError(title || response.statusText || fallback, context),
+	};
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason token refresh is the retry branch of the shared request wrapper
+ */
+const _refreshToken = async () => {
+	try {
+		const response = await fetch("/l/token", TOKEN_REQUEST);
+		if (!response.ok) {
+			throw new Error(`Failed to refresh token: ${response.statusText}`);
+		}
+		const newToken = (await response.text()).trim();
+		if (!newToken) {
+			throw new Error("Failed to refresh token: empty response");
+		}
+		const tokenElt = document.getElementById("token");
+		if (tokenElt) {
+			tokenElt.value = newToken;
+		}
+		return newToken;
+	} catch (error) {
+		captureNetworkError(error, "/l/token", {
+			});
+		return null;
+	}
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_concurrent_stale_writes_share_server_controlled_token_refresh
+ * @matrix csrf : concurrent-refresh stale-token
+ */
+const refreshToken = async () => {
+	if (!_tokenRefresh) {
+		_tokenRefresh = _refreshToken().finally(() => {
+			_tokenRefresh = null;
+		});
+	}
+	return _tokenRefresh;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason POST helper delegates to the shared request wrapper
+ */
+const postRequest = async (
+	url,
+	body,
+	{ keepalive = false, headers = {}, signal = undefined } = {},
+) => {
+	return _request(url, {
+		method: "POST",
+		body,
+		keepalive,
+		requestHeaders: headers,
+		signal,
+	});
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason PATCH helper delegates to the shared request wrapper
+ */
+const patchRequest = async (url, body) => {
+	return _request(url, { method: "PATCH", body });
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason DELETE helper delegates to the shared request wrapper
+ */
+const deleteRequest = async (url, body) => {
+	return _request(url, { method: "DELETE", body });
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason GET helper delegates to the shared request wrapper
+ */
+const getRequest = async (url, params = null, options = {}) => {
+	url = params ? `${url}?${new URLSearchParams(params).toString()}` : url;
+	return _request(url, { method: "GET", ...options });
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/request.mjs::_request
+ * @reason PUT helper delegates to the shared request wrapper
+ */
+const putRequest = async (url, body, options = {}) => {
+	return _request(url, { method: "PUT", body, ...options });
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_009_request_csrf.py::test_request_supports_conditional_post_not_modified
+ * @tests tests_js/test_009_request_csrf.py::test_request_preserves_structured_validation_error
+ * @tests tests_js/test_009_request_csrf.py::test_request_preserves_plain_validation_error
+ * @matrix deferred-jobs request : post-headers
+ * @matrix csrf : stale-token
+ * @matrix polling : diagnostics structured-validation
+ * @matrix request-errors : diagnostics dom-preservation no-replay outcome-uncertain plain-validation structured-validation upstream-unavailable
+ * @pair request:abort-signal
+ */
+const _request = async (
+	url,
+	{
+		method = "POST",
+		body = null,
+		keepalive = false,
+		requestHeaders = {},
+		acknowledgeEntities = true,
+		replaceErrorPage = true,
+		signal = undefined,
+		retryUpstream = true,
+	} = {},
+) => {
+	method = method.toUpperCase();
+	const token = _getToken();
+	const headers = {
+		"Content-Type": "application/json",
+		"X-CSRFToken": token,
+		"X-Lagniappe-Request": "true",
+		...requestHeaders,
+	};
+
+	const config = {
+		method,
+		headers,
+		credentials: "include",
+		...(signal ? { signal } : {}),
+		...(keepalive ? { keepalive: true } : {}),
+	};
+
+	if (body) {
+		if (body instanceof FormData) {
+			delete headers["Content-Type"];
+			config.body = body;
+		} else {
+			config.body = JSON.stringify(body);
+		}
+	}
+
+	if (!CSRF_METHODS.has(method)) {
+		delete headers["X-CSRFToken"];
+	}
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/request.mjs::_request
+	 * @reason both the initial response and the CSRF-refresh response share this classifier boundary
+	 */
+	const classifyUpstream = (response, allowRetry = retryUpstream) =>
+		handleUpstreamResponse(response, {
+			method,
+			url,
+			retryUpstream: allowRetry,
+			fetchResponse: () => fetch(url, config),
+			retryCurrent: () =>
+				_request(window.location.pathname, {
+					method: "GET",
+					replaceErrorPage: false,
+					retryUpstream: false,
+				}),
+			retryOriginal: () =>
+				_request(url, {
+					method: "GET",
+					requestHeaders,
+					acknowledgeEntities: false,
+					replaceErrorPage: false,
+					retryUpstream: false,
+				}),
+		});
+
+	try {
+		let response = await fetch(url, config);
+		let upstream = await classifyUpstream(response);
+		if (upstream.result) return upstream.result;
+		response = upstream.response;
+
+		if (CSRF_METHODS.has(method) && csrfFailed(response)) {
+			const newToken = await refreshToken();
+			if (!newToken) {
+				return {
+					ok: false,
+					error: "Failed to refresh authentication token",
+				};
+			}
+			config.headers["X-CSRFToken"] = newToken;
+			response = await fetch(url, config);
+			upstream = await classifyUpstream(response, false);
+			if (upstream.result) return upstream.result;
+			response = upstream.response;
+		}
+
+		if (response.status === 422) {
+			return {
+				...(await _formatError(response, {
+					body,
+					method,
+					url,
+					replaceErrorPage: false,
+				})),
+				status: response.status,
+			};
+		}
+
+		if (response.redirected) {
+			window.location.href = response.url;
+			return;
+		}
+
+		return response.ok || response.status === 304
+			? _formatResponse(response, { acknowledgeEntities })
+			: _formatError(response, { body, method, url, replaceErrorPage });
+	} catch (error) {
+		captureNetworkError(error, url, { method, ...config });
+		return {
+			ok: false,
+			error: error.message || "Network request failed",
+		};
+	}
+};
+
+const request = {
+	csrfFailed,
+	token: refreshToken,
+	put: putRequest,
+	post: postRequest,
+	patch: patchRequest,
+	delete: deleteRequest,
+	get: getRequest,
+};
+
+var request$1 = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  request: request
+});
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
+ * @reason metadata lookup is private analytics payload plumbing
+ */
+const meta = (name) =>
+	document.querySelector(`meta[name="${name}"]`)?.getAttribute("content") || "";
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
+ * @reason CSRF token lookup is private analytics request plumbing
+ */
+const token = () => document.getElementById("token")?.value || "";
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
+ * @reason analytics enablement is owned by the shared manager contract
+ */
+const analyticsEnabled = () => meta("analytics") === "true";
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
+ * @reason browser navigation metadata is private analytics payload plumbing
+ */
+const navigationType = () => {
+	const navigation = performance.getEntriesByType?.("navigation")?.[0];
+	return navigation?.type || "";
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
+ * @reason analytics title lookup prefers entity view headers without requiring every route to add metadata
+ */
+const pageTitle = () =>
+	meta("analytics-title") ||
+	document
+		.querySelector("[lp-view] [data-nav='view'] [data-role='title']")
+		?.textContent?.trim() ||
+	document.title.trim();
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
+ * @reason view payload construction is owned by the shared analytics manager
+ */
+const viewData = (action) => {
+	const view = document.querySelector("[lp-view]");
+	return {
+		action,
+		path: window.location.pathname,
+		query: window.location.search || "",
+		page_title: pageTitle(),
+		view_kind: view?.dataset.kind || "",
+		entity_key: view?.dataset.key || "",
+		entity_hash: view?.dataset.hash || "",
+		index: view?.dataset.index || "",
+		public_id: meta("analytics-public-id"),
+		referrer: document.referrer || "",
+		navigation_type: navigationType(),
+	};
+};
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
+ * @pair analytics:page-load
+ */
+class AnalyticsManager {
+	get enabled() {
+		return analyticsEnabled();
+	}
+
+	get mode() {
+		return meta("mode");
+	}
+
+	async tag(action, payload = {}) {
+		if (!this.enabled) return;
+
+		const path = payload.path || window.location.pathname;
+		if (
+			["view", "public_view"].includes(action) &&
+			path.startsWith("/analytics")
+		) {
+			return;
+		}
+
+		try {
+			const body = JSON.stringify({ ...payload, action, path });
+			const send = () =>
+				fetch("/analytics/track", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"X-CSRFToken": token(),
+						"X-Lagniappe-Request": "true",
+					},
+					credentials: "include",
+					keepalive: true,
+					body,
+				});
+			const response = await send();
+			if (request.csrfFailed(response) && (await request.token())) {
+				await send();
+			}
+		} catch {
+			// Analytics must never affect the page using it.
+		}
+	}
+
+	view() {
+		const action = meta("analytics-action") || "view";
+		this.tag(action, viewData(action));
+	}
+}
+
+const analytics = new AnalyticsManager();
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_does_not_enumerate_accounts
+ * @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_returns_first_time_setup
+ * @matrix login : account-enumeration endpoint first-time-setup
+ */
+async function getUserStatus(email) {
+	const response = await fetch(
+		`/users/check-user-status?email=${encodeURIComponent(email)}`,
+	);
+	return await response.json();
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_unknown_email_transitions_to_sign_in_without_leaking_existence
+ * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
+ * @matrix login : account-enumeration sign-in-transition
+ */
+async function checkUserStatus(email, form) {
+	try {
+		const userData = await getUserStatus(email);
+
+		if (!userData.success) {
+			form.showError(userData.error);
+			return;
+		}
+
+		if (userData.next === "first_time_setup") {
+			document.dispatchEvent(
+				new CustomEvent("login:show-first-time-setup", {
+					detail: { email },
+				}),
+			);
+		} else {
+			document.dispatchEvent(
+				new CustomEvent("login:show-signin", { detail: { email } }),
+			);
+		}
+	} catch (_error) {
+		form.showError("System error. Please try again.");
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_client_handoff_redirects_or_requires_verification
+ * @tests tests_e2e/001_site/test_001b_login.py::test_verification_delivery_failure_recovers_safely
+ * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
+ * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
+ * @tests tests_js/test_009_request_csrf.py::test_login_handoff_refreshes_csrf_before_submit_and_retries_once
+ * @tests tests_js/test_009_request_csrf.py::test_login_verification_email_reuses_refreshed_csrf
+ * @matrix login : csrf-refresh delivery-failure email-password hosted-e2e identity-platform owner-bootstrap recovery redirect remember-preference safe-error token-verification verify-email
+ */
+async function handleIdentityUser(user, form) {
+	const body = JSON.stringify({
+		authResult: user.idToken,
+		name: user.displayName,
+		email: user.email,
+		remember: form.remember(),
+	});
+	let csrfToken = (await request.token()) || form.getToken();
+	/**
+	 * @testable false
+	 * @covered-by src/script/login/tools.mjs::handleIdentityUser
+	 * @reason retryable login request helper is private to Identity Platform handoff
+	 */
+	const send = () =>
+		fetch("/users/login-identity", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-CSRFToken": csrfToken,
+			},
+			body,
+		});
+	let response = await send();
+	if (request.csrfFailed(response)) {
+		csrfToken = await request.token();
+		if (csrfToken) response = await send();
+	}
+	if (request.csrfFailed(response)) {
+		form.showError("Your sign-in session expired. Please try again.");
+		return;
+	}
+
+	const results = await response.json();
+
+	if (results.success && results.redirect) {
+		analytics.tag("login", {
+			page_title: "Login",
+			path: window.location.pathname,
+			user_email: user.email,
+		});
+		window.location.href = results.redirect;
+	} else if (results.requires_verification) {
+		try {
+			await form.auth.sendEmailVerification(user, csrfToken);
+		} catch (_error) {
+			document.dispatchEvent(
+				new CustomEvent("login:show-signin", {
+					detail: {
+						action: "verification-delivery-failed",
+						email: user.email,
+					},
+				}),
+			);
+			return;
+		}
+		localStorage.setItem("verificationEmail", user.email);
+		form.showConfirmation(
+			form.verificationSuccessMessage ||
+				`An email verification link has been sent to ${user.email}.`,
+		);
+	} else {
+		form.showError(results.error || "Authentication failed. Please try again.");
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
+ * @pair login:auth-errors
+ */
+function getAuthErrorMessage(error) {
+	switch (error.code) {
+		case "auth/wrong-password":
+		case "auth/invalid-credential":
+		case "auth/user-not-found":
+			return "Incorrect email or password.";
+		case "auth/user-disabled":
+			return "This account has been disabled.";
+		case "auth/email-already-in-use":
+			return "An account with this email already exists.";
+		case "auth/invalid-email":
+			return "Please enter a valid email address.";
+		case "auth/weak-password":
+			return "Password must be at least 6 characters long.";
+		case "auth/operation-not-allowed":
+			return "This sign-in method is not allowed.";
+		case "auth/too-many-requests":
+			return "Too many failed attempts. Please wait before trying again.";
+		case "auth/requires-recent-login":
+			return "Please sign in again to complete this action.";
+		case "auth/user-token-expired":
+			return "Your session has expired. Please sign in again.";
+		case "auth/network-request-failed":
+			return "Network error. Please check your connection.";
+		case "auth/invalid-action-code":
+		case "auth/expired-action-code":
+			return "This link is invalid or expired. Please request a new one.";
+		default:
+			return "Authentication failed. Please try again.";
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_034_login_buttons.py::test_login_action_button_uses_fixed_icon_and_text_slots
+ * @matrix login : loading-state submit-button
+ */
+const setLoginActionButton = (button, text, icon = null) => {
+	if (!button) return;
+
+	let textElement = button.querySelector("[data-role='text']");
+	if (!textElement) {
+		textElement = document.createElement("span");
+		textElement.dataset.role = "text";
+		button.replaceChildren(textElement);
+	}
+	textElement.textContent = text;
+
+	let iconWrapper = button.querySelector("[data-role='icon']");
+	if (!iconWrapper) {
+		iconWrapper = document.createElement("span");
+		iconWrapper.dataset.role = "icon";
+		iconWrapper.setAttribute("aria-hidden", "true");
+		button.prepend(iconWrapper);
+	}
+	if (icon) {
+		iconWrapper.replaceChildren(createIcon(icon));
+		iconWrapper.dataset.visible = "true";
+	} else {
+		iconWrapper.replaceChildren();
+		iconWrapper.dataset.visible = "false";
+	}
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/login/forms.mjs::FirstTimeSetupForm
+ * @covered-by src/script/login/forms.mjs::OwnerSetupForm
+ * @reason shared recovery transition for account-creation forms
+ */
+const recoverExistingAccount = (error, email) => {
+	if (error.code !== "auth/email-already-in-use") return false;
+	document.dispatchEvent(
+		new CustomEvent("login:show-signin", {
+			detail: { email, action: "existing-account" },
+		}),
+	);
+	return true;
+};
+
+/**
+ * @testable false
+ * @reason base form shell; concrete login forms own the tested workflows
+ */
+class LoginForms {
+	constructor(auth, form) {
+		this.auth = auth;
+		this.form = form;
+		this.data = {};
+		this.initialized = false;
+		this.actionButton = null;
+		this.error = this.form.querySelector("[data-role='error']");
+		this.success = this.form.querySelector("[data-role='success']");
+		this.hideOnConfirmation = this.form.querySelectorAll(
+			"[data-hide-on-confirmation]",
+		);
+	}
+
+	show() {
+		if (!this.initialized) {
+			this.init();
+			this.initialized = true;
+		}
+		this.reset();
+		this.sync();
+		this.form.classList.remove("hidden");
+	}
+
+	sync() {}
+
+	hide() {
+		this.form.classList.add("hidden");
+		this.reset();
+	}
+
+	setActionButton(button) {
+		this.reset();
+		this.actionButton = button;
+		this.oldActionText =
+			this.actionButton?.querySelector("[data-role='text']")?.textContent ||
+			this.actionButton?.textContent.trim();
+	}
+
+	remember() {
+		return this.form.querySelector("input[name='remember-me']")?.checked;
+	}
+
+	getEmailAndPassword() {
+		if (this.email) {
+			const email = this.email.value.trim();
+			const password = this.password.value.trim();
+			if (!email || !password) {
+				this.showError("Please enter your email and password");
+				return;
+			}
+			return { email, password };
+		}
+		return null;
+	}
+
+	showSuccess(message) {
+		this.reset();
+		this.success.textContent = message;
+		this.success.classList.remove("hidden");
+	}
+
+	showConfirmation(message) {
+		this.showSuccess(message);
+		this.form.querySelectorAll("input[type='password']").forEach((input) => {
+			input.value = "";
+		});
+		this.hideOnConfirmation.forEach((element) => {
+			element.classList.add("hidden");
+		});
+	}
+
+	showError(message) {
+		this.reset();
+		this.error.textContent = message;
+		this.error.classList.remove("hidden");
+	}
+
+	getToken() {
+		return document.getElementById("token")?.value;
+	}
+
+	setActionState(text) {
+		setLoginActionButton(this.actionButton, text, "spinner");
+	}
+
+	reset() {
+		setLoginActionButton(this.actionButton, this.oldActionText);
+		if (this.success) {
+			this.success.textContent = "";
+			this.success.classList.add("hidden");
+		}
+		if (this.error) {
+			this.error.textContent = "";
+			this.error.classList.add("hidden");
+		}
+		this.hideOnConfirmation.forEach((element) => {
+			element.classList.remove("hidden");
+		});
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_defaults_to_auth_method_form
+ * @tests tests_e2e/001_site/test_001b_login.py::test_unregistered_google_error_returns_to_method_chooser
+ * @matrix login : auth-method authorization-error email-signin google-oauth
+ */
+class AuthMethodForm extends LoginForms {
+	init() {
+		this.emailButton = this.form.querySelector(
+			"[data-role='show-email-check']",
+		);
+		this.emailButton.addEventListener("click", () => {
+			document.dispatchEvent(new CustomEvent("login:show-email-check"));
+		});
+	}
+
+	sync() {
+		if (this.data.error) this.showError(this.data.error);
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_defaults_to_auth_method_form
+ * @tests tests_e2e/001_site/test_001b_login.py::test_unknown_email_transitions_to_sign_in_without_leaking_existence
+ * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_responsive_design
+ * @matrix login : account-enumeration email-check responsive-layout sign-in-transition
+ * @pair login:auth-method
+ */
+class EmailCheckForm extends LoginForms {
+	init() {
+		this.error = this.form.querySelector("[data-role='error']");
+		this.email = this.form.querySelector("input[type='email']");
+		this.backButton = this.form.querySelector("[data-role='back-to-method']");
+		this.setActionButton(this.form.querySelector("[data-role='signin']"));
+
+		this.email.focus();
+
+		this.actionButton.addEventListener("click", this.handleSignIn.bind(this));
+		this.backButton.addEventListener("click", () => {
+			document.dispatchEvent(new CustomEvent("login:show-auth-method"));
+		});
+	}
+
+	sync() {
+		this.email.focus();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_unknown_email_transitions_to_sign_in_without_leaking_existence
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_email_input_validation
+	 * @matrix login : account-enumeration email-check email-validation sign-in-transition
+	 */
+	handleSignIn() {
+		const email = this.email.value.trim();
+		if (!email || !this.email.validity.valid) {
+			this.showError("Please enter a valid email address");
+			return;
+		}
+		this.setActionState("Checking Email");
+
+		checkUserStatus(email, this);
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
+ * @tests tests_js/test_034_login_buttons.py::test_owner_setup_supports_password_only_mode
+ * @matrix login : auth-errors disabled-provider owner-bootstrap password-validation verify-email
+ */
+class OwnerSetupForm extends LoginForms {
+	init() {
+		this.googleSetup = this.form.querySelector(
+			"[data-role='owner-google-setup']",
+		);
+		this.passwordSetup = this.form.querySelector(
+			"[data-role='owner-password-setup']",
+		);
+		this.googleError = this.googleSetup.querySelector("[data-role='error']");
+		this.passwordError = this.passwordSetup.querySelector(
+			"[data-role='error']",
+		);
+		this.verificationSuccessMessage =
+			"We've sent a verification link to the application owner email on file.";
+		this.password = this.passwordSetup.querySelector("input[type='password']");
+		this.showPasswordButton = this.form.querySelector(
+			"[data-role='show-owner-password']",
+		);
+		this.backToGoogleButton = this.form.querySelector(
+			"[data-role='back-to-owner-google']",
+		);
+
+		this.setActionButton(this.form.querySelector("[data-role='signin']"));
+		if (!this.showPasswordButton) this.error = this.passwordError;
+		this.showPasswordButton?.addEventListener("click", () => {
+			this.reset();
+			this.error = this.passwordError;
+			this.googleSetup.classList.add("hidden");
+			this.passwordSetup.classList.remove("hidden");
+			this.password.focus();
+		});
+		this.backToGoogleButton?.addEventListener("click", () => {
+			this.password.value = "";
+			this.reset();
+			this.error = this.googleError;
+			this.passwordSetup.classList.add("hidden");
+			this.googleSetup.classList.remove("hidden");
+		});
+		this.actionButton.addEventListener("click", this.handleSignIn.bind(this));
+	}
+
+	handleSignIn() {
+		const email = String(this.data.email || "").trim();
+		const password = this.password.value.trim();
+		if (!email) {
+			this.showError("The application owner is not configured.");
+			return;
+		}
+		if (!password) {
+			this.showError("Please choose a password");
+			return;
+		}
+
+		this.setActionState("Creating Password");
+		this.auth
+			.signUp(email, password)
+			.then((user) => {
+				handleIdentityUser(user, this);
+			})
+			.catch((error) => {
+				if (recoverExistingAccount(error, email)) return;
+				this.showError(getAuthErrorMessage(error));
+			});
+	}
+
+	sync() {
+		if (this.data.error) this.showError(this.data.error);
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_first_time_setup_form_creates_password_and_can_return_to_email_check
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
+ * @matrix login : account-create existing-account first-time-setup form-state recovery
+ */
+class FirstTimeSetupForm extends LoginForms {
+	init() {
+		this.email = this.form.querySelector("input[name='email']");
+		this.selectedEmail = this.form.querySelector(
+			"[data-role='selected-email']",
+		);
+		this.password = this.form.querySelector("input[type='password']");
+		this.backButton = this.form.querySelector("[data-role='back-to-email']");
+
+		this.setActionButton(this.form.querySelector("[data-role='signin']"));
+		this.actionButton.addEventListener("click", this.handleSignIn.bind(this));
+		this.backButton.addEventListener("click", () => {
+			document.dispatchEvent(new CustomEvent("login:show-email-check"));
+		});
+	}
+
+	sync() {
+		this.email.value = this.data.email || "";
+		this.selectedEmail.textContent = this.data.email || "";
+		this.password.value = "";
+		setTimeout(() => this.password.focus(), 100);
+	}
+
+	handleSignIn() {
+		const password = this.password.value.trim();
+		if (!password) {
+			this.showError("Please choose a password");
+			return;
+		}
+		this.setActionState("Setting Password");
+		this.auth
+			.signUp(this.email.value, password)
+			.then((user) => {
+				handleIdentityUser(user, this);
+			})
+			.catch((error) => {
+				if (recoverExistingAccount(error, this.email.value)) return;
+				this.showError(getAuthErrorMessage(error));
+			});
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
+ * @tests tests_e2e/001_site/test_001b_login.py::test_forgot_password_form_opens_from_sign_in
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
+ * @tests tests_e2e/001_site/test_001b_login.py::test_verification_delivery_failure_recovers_safely
+ * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
+ * @matrix login : delivery-failure existing-account forgot-password hosted-e2e identity-platform recovery safe-error sign-in-transition
+ */
+class SignInForm extends LoginForms {
+	init() {
+		this.email = this.form.querySelector("input[name='email']");
+		this.selectedEmail = this.form.querySelector(
+			"[data-role='selected-email']",
+		);
+		this.password = this.form.querySelector("input[type='password']");
+		this.rememberMe = this.form.querySelector("input[type='checkbox']");
+		this.signinButton = this.form.querySelector("[data-role='signin']");
+		this.backButton = this.form.querySelector("[data-role='back-to-email']");
+		this.setActionButton(this.signinButton);
+		this.signinButton?.addEventListener("click", this.handleSignIn.bind(this));
+
+		this.forgotPasswordButton = this.form.querySelector(
+			"[data-role='show-forgot-form']",
+		);
+		this.forgotPasswordButton.addEventListener("click", () => {
+			const email = this.email.value.trim();
+			document.dispatchEvent(
+				new CustomEvent("login:show-forgot-form", { detail: { email } }),
+			);
+		});
+		this.backButton.addEventListener("click", () => {
+			document.dispatchEvent(new CustomEvent("login:show-email-check"));
+		});
+	}
+
+	sync() {
+		this.email.value = this.data.email || "";
+		this.selectedEmail.textContent = this.data.email || "";
+		this.password.value = "";
+		if (this.data.action === "reset-password") {
+			this.showSuccess(
+				"Password updated successfully. Please sign in with your new password.",
+			);
+		} else if (this.data.action === "existing-account") {
+			this.showSuccess("Your password is already set. Sign in to continue.");
+		} else if (this.data.action === "verification-delivery-failed") {
+			this.showError(
+				"We couldn't send the verification email. Sign in again to retry delivery.",
+			);
+		}
+		this.password.focus();
+	}
+
+	handleSignIn() {
+		this.setActionState("Signing In");
+		const { email, password } = this.getEmailAndPassword();
+		if (!email || !password) return;
+
+		this.auth
+			.signInWithPassword(email, password)
+			.then((user) => {
+				handleIdentityUser(user, this);
+			})
+			.catch((error) => {
+				this.showError(getAuthErrorMessage(error));
+			});
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_forgot_password_form_opens_from_sign_in
+ * @tests tests_e2e/001_site/test_001b_login.py::test_password_reset_delivery_failure_recovers_safely
+ * @matrix login : delivery-failure forgot-password recovery safe-error
+ */
+class ForgotPasswordForm extends LoginForms {
+	init() {
+		this.email = this.form.querySelector("input[type='email']");
+		this.resetPasswordButton = this.form.querySelector(
+			"[data-role='reset-password-email']",
+		);
+		this.backToSigninButton = this.form.querySelector(
+			"[data-role='back-to-signin']",
+		);
+
+		this.setActionButton(this.resetPasswordButton);
+		this.actionButton.addEventListener(
+			"click",
+			this.handleResetPassword.bind(this),
+		);
+
+		this.backToSigninButton.addEventListener("click", () => {
+			document.dispatchEvent(
+				new CustomEvent("login:show-signin", {
+					detail: { email: this.data.email },
+				}),
+			);
+		});
+	}
+
+	sync() {
+		this.email.value = this.data.email || "";
+		if (!this.data.email) this.email.focus();
+	}
+
+	handleResetPassword() {
+		const email = this.email.value.trim();
+		if (!email) {
+			this.showError("Please enter your email address");
+			return;
+		}
+		this.setActionState("Sending Reset Email");
+		this.auth
+			.sendPasswordResetEmail(email, this.getToken())
+			.then(() => {
+				this.showConfirmation(
+					"A password reset link has been sent to your email address.",
+				);
+			})
+			.catch((_error) => {
+				this.showError(
+					"We couldn't send the password reset email. Please try again later.",
+				);
+			});
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_reset_password_mode
+ * @matrix login : action-code-validation expired-link query-mode reset-password
+ */
+class ResetPasswordForm extends LoginForms {
+	init() {
+		this.linkValidated = false;
+		this.password = this.form.querySelector("input[type='password']");
+		this.controls = this.form.querySelector(
+			"[data-role='reset-password-controls']",
+		);
+		this.resetPasswordButton = this.form.querySelector(
+			"[data-role='reset-password']",
+		);
+		this.requestNewLinkButton = this.form.querySelector(
+			"[data-role='request-new-reset-link']",
+		);
+		this.resetPasswordButton.disabled = true;
+		this.setActionButton(this.resetPasswordButton);
+		this.actionButton.addEventListener(
+			"click",
+			this.handleResetPassword.bind(this),
+		);
+		this.requestNewLinkButton.addEventListener("click", () => {
+			document.dispatchEvent(
+				new CustomEvent("login:show-forgot-form", {
+					detail: { email: this.email || "" },
+				}),
+			);
+		});
+		this.auth
+			.verifyPasswordResetCode(this.data.code)
+			.then((result) => {
+				this.email = result.email || "";
+				this.linkValidated = true;
+				this.resetPasswordButton.disabled = false;
+				setLoginActionButton(this.actionButton, this.oldActionText);
+				this.password.focus();
+			})
+			.catch((error) => {
+				this.linkValidated = true;
+				this.showError(getAuthErrorMessage(error));
+				this.controls.classList.add("hidden");
+			});
+	}
+
+	sync() {
+		if (!this.linkValidated) this.setActionState("Checking Link");
+	}
+
+	handleResetPassword() {
+		const password = this.password.value.trim();
+		if (!password) {
+			this.showError("Please enter a new password");
+			return;
+		}
+		this.setActionState("Updating Password");
+		this.auth
+			.confirmPasswordReset(this.data.code, password)
+			.then((result) => {
+				document.dispatchEvent(
+					new CustomEvent("login:show-signin", {
+						detail: { action: "reset-password", email: result.email },
+					}),
+				);
+			})
+			.catch((error) => {
+				this.showError(getAuthErrorMessage(error));
+			});
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_verify_email_mode
+ * @matrix login : query-mode verify-email
+ */
+class VerifyEmailForm extends LoginForms {
+	init() {
+		this.password = this.form.querySelector("input[type='password']");
+		this.signinButton = this.form.querySelector("[data-role='signin']");
+		this.signinButton.disabled = true;
+		this.email = this.form.querySelector("input[type='email']");
+		this.email.value = localStorage.getItem("verificationEmail");
+		localStorage.removeItem("verificationEmail");
+
+		this.forgotPasswordButton = this.form.querySelector(
+			"[data-role='show-forgot-form']",
+		);
+		this.forgotPasswordButton.addEventListener("click", () => {
+			const email = this.email.value.trim();
+			document.dispatchEvent(
+				new CustomEvent("login:show-forgot-form", { detail: { email } }),
+			);
+		});
+
+		this.auth
+			.applyActionCode(this.data.code)
+			.then(() => {
+				this.signinButton.disabled = false;
+				this.setActionButton(this.signinButton);
+				this.actionButton.addEventListener(
+					"click",
+					this.handleSignIn.bind(this),
+				);
+				this.showSuccess("Email verified successfully");
+			})
+			.catch((error) => {
+				captureLoginError(error, "verify_email");
+				this.showError(getAuthErrorMessage(error));
+			});
+	}
+
+	handleSignIn() {
+		this.setActionState("Signing In");
+		const { email, password } = this.getEmailAndPassword();
+		if (!email || !password) return;
+
+		this.auth
+			.signInWithPassword(email, password)
+			.then((user) => {
+				handleIdentityUser(user, this);
+			})
+			.catch((error) => {
+				this.showError(getAuthErrorMessage(error));
+			});
+	}
+}
+
+const IDENTITY_PLATFORM_API = "https://identitytoolkit.googleapis.com/v1";
+
+const ERROR_CODES = new Map([
+	["EMAIL_EXISTS", "auth/email-already-in-use"],
+	["EMAIL_NOT_FOUND", "auth/user-not-found"],
+	["INVALID_PASSWORD", "auth/wrong-password"],
+	["INVALID_LOGIN_CREDENTIALS", "auth/invalid-credential"],
+	["USER_DISABLED", "auth/user-disabled"],
+	["INVALID_EMAIL", "auth/invalid-email"],
+	["WEAK_PASSWORD", "auth/weak-password"],
+	["OPERATION_NOT_ALLOWED", "auth/operation-not-allowed"],
+	["TOO_MANY_ATTEMPTS_TRY_LATER", "auth/too-many-requests"],
+	["TOKEN_EXPIRED", "auth/user-token-expired"],
+	["EXPIRED_OOB_CODE", "auth/expired-action-code"],
+	["INVALID_OOB_CODE", "auth/invalid-action-code"],
+]);
+
+/**
+ * @testable true
+ * @tests tests_js/test_033_identity_platform.py::test_identity_platform_rest_client_contract
+ * @matrix login : auth-errors identity-platform
+ */
+class IdentityPlatformError extends Error {
+	constructor(providerMessage, status = 0) {
+		const providerCode = String(providerMessage || "")
+			.split(" : ", 1)[0]
+			.trim();
+		super(providerCode || "IDENTITY_PLATFORM_REQUEST_FAILED");
+		this.name = "IdentityPlatformError";
+		this.providerCode = providerCode;
+		this.status = status;
+		this.code =
+			ERROR_CODES.get(providerCode) ||
+			(status === 0
+				? "auth/network-request-failed"
+				: "auth/identity-platform-request-failed");
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_033_identity_platform.py::test_identity_platform_rest_client_contract
+ * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
+ * @matrix login : action-codes browser-fetch email-password hosted-e2e identity-platform
+ */
+class IdentityPlatformClient {
+	constructor(config) {
+		this.apiKey = String(config?.apiKey || "").trim();
+		this.projectId = String(config?.projectId || "").trim();
+		if (!this.apiKey || !this.projectId) {
+			throw new IdentityPlatformError("INVALID_CLIENT_CONFIG");
+		}
+	}
+
+	async request(method, payload) {
+		let response;
+		try {
+			response = await fetch(
+				`${IDENTITY_PLATFORM_API}/${method}?key=${encodeURIComponent(this.apiKey)}`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(payload),
+				},
+			);
+		} catch (_error) {
+			throw new IdentityPlatformError("", 0);
+		}
+
+		let data = {};
+		try {
+			data = await response.json();
+		} catch (_error) {
+			// An invalid provider response is handled like any other failed request.
+		}
+		if (!response.ok) {
+			throw new IdentityPlatformError(data?.error?.message, response.status);
+		}
+		return data;
+	}
+
+	async appRequest(path, payload, csrfToken) {
+		let response;
+		try {
+			response = await fetch(path, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"X-CSRFToken": csrfToken || "",
+				},
+				body: JSON.stringify(payload),
+			});
+		} catch (_error) {
+			throw new IdentityPlatformError("", 0);
+		}
+
+		let data = {};
+		try {
+			data = await response.json();
+		} catch (_error) {
+			// Invalid application responses are normalized below.
+		}
+		if (!response.ok || !data.success) {
+			throw new IdentityPlatformError(
+				response.status === 429 ? "TOO_MANY_ATTEMPTS_TRY_LATER" : data?.error,
+				response.status,
+			);
+		}
+		return data;
+	}
+
+	signUp(email, password) {
+		return this.request("accounts:signUp", {
+			email,
+			password,
+			returnSecureToken: true,
+		});
+	}
+
+	signInWithPassword(email, password) {
+		return this.request("accounts:signInWithPassword", {
+			email,
+			password,
+			returnSecureToken: true,
+		});
+	}
+
+	sendPasswordResetEmail(email, csrfToken) {
+		return this.appRequest(
+			"/users/send-password-reset-email",
+			{
+				email,
+			},
+			csrfToken,
+		);
+	}
+
+	sendEmailVerification(user, csrfToken) {
+		return this.appRequest(
+			"/users/send-verification-email",
+			{
+				idToken: user.idToken,
+			},
+			csrfToken,
+		);
+	}
+
+	confirmPasswordReset(oobCode, newPassword) {
+		return this.request("accounts:resetPassword", {
+			oobCode,
+			newPassword,
+		});
+	}
+
+	verifyPasswordResetCode(oobCode) {
+		return this.request("accounts:resetPassword", { oobCode });
+	}
+
+	applyActionCode(oobCode) {
+		return this.request("accounts:update", { oobCode });
+	}
+}
+
+const LOGOUT_BUTTON_SELECTOR = "[data-action='logout'][data-route]";
+
+let initialized = false;
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/logout.mjs::initializeLogoutForms
+ * @reason private logout request helper is exercised through logout controls
+ */
+const submitLogout = async (route, { submitter = null, state = null } = {}) => {
+	state = state || submitter;
+	if (state?.dataset?.submitting === "true") return;
+	if (state?.dataset) state.dataset.submitting = "true";
+	if (submitter && "disabled" in submitter) {
+		submitter.disabled = true;
+	}
+
+	const response = await request.post(route);
+	if (response?.redirect) {
+		window.location.href = response.redirect;
+	} else if (response?.ok) {
+		window.location.href = "/users/login";
+	} else {
+		if (state?.dataset) state.dataset.submitting = "false";
+		if (submitter && "disabled" in submitter) {
+			submitter.disabled = false;
+		}
+	}
+};
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_logout_clears_session_and_returns_login
+ * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+ * @tests tests_js/test_009_request_csrf.py::test_logout_button_posts_without_hidden_form
+ * @matrix login : button logout redirect
+ * @pair user-settings:personal-page
+ */
+const initializeLogoutForms = (root = document) => {
+	if (initialized) return;
+	initialized = true;
+
+	root.addEventListener("click", async (event) => {
+		const button = event.target?.closest?.(LOGOUT_BUTTON_SELECTOR);
+		if (!button) return;
+
+		event.preventDefault();
+		await submitLogout(button.dataset.route, {
+			submitter: button,
+			state: button,
+		});
+	});
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason no-transition fallback is part of the transition wrapper
+ */
+const runWithoutTransition = async (callback, label = "unlabeled") => {
+	try {
+		const result = callback();
+		if (result?.then) {
+			captureError(
+				new TypeError(
+					`View transition commit "${label}" returned a promise. Prepare asynchronous work before committing DOM changes.`,
+				),
+			);
+			await result;
+		}
+		return true;
+	} catch (error) {
+		captureError(error);
+		return false;
+	}
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason transition queue prevents concurrent View Transitions API aborts
+ */
+let transitionQueue = Promise.resolve();
+let transitionDepth = 0;
+let pendingTransitionBatch = null;
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason development-only timing diagnostic is part of the transition wrapper
+ */
+const reportSlowCommit = (label, started) => {
+	if (typeof performance === "undefined" || !performance.now) return;
+	if (typeof __BUILD_ID__ !== "undefined") return;
+
+	const duration = performance.now() - started;
+	if (duration <= 50) return;
+	console.warn(
+		`View transition commit "${label}" took ${duration.toFixed(1)}ms.`,
+	);
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason exact-once commit execution is exercised through the public transition wrapper
+ */
+const runCommit = (callback, label) => {
+	const started =
+		typeof performance !== "undefined" && performance.now
+			? performance.now()
+			: null;
+	try {
+		const result = callback();
+		if (!result?.then) {
+			if (started !== null) reportSlowCommit(label, started);
+			return true;
+		}
+
+		captureError(
+			new TypeError(
+				`View transition commit "${label}" returned a promise. Prepare asynchronous work before committing DOM changes.`,
+			),
+		);
+		return Promise.resolve(result)
+			.then(() => true)
+			.catch((error) => {
+				captureError(error);
+				return false;
+			})
+			.finally(() => {
+				if (started !== null) reportSlowCommit(label, started);
+			});
+	} catch (error) {
+		captureError(error);
+		if (started !== null) reportSlowCommit(label, started);
+		return false;
+	}
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason same-turn commit batching is exercised through the public transition wrapper
+ */
+const runTransitionBatch = (entries) => {
+	const results = new Array(entries.length).fill(false);
+	const pending = [];
+
+	transitionDepth += 1;
+	entries.forEach(({ callback, label }, index) => {
+		const result = runCommit(callback, label);
+		if (result?.then) {
+			pending.push(
+				result.then((successful) => {
+					results[index] = successful;
+				}),
+			);
+		} else {
+			results[index] = result;
+		}
+	});
+
+	if (!pending.length) {
+		transitionDepth -= 1;
+		return { results, pending: null };
+	}
+
+	return {
+		results,
+		pending: Promise.all(pending).finally(() => {
+			transitionDepth -= 1;
+		}),
+	};
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason single-transition runner is private to the queued wrapper
+ */
+const executeTransition = async (entries) => {
+	let batch = null;
+	let updateStarted = false;
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/utilities.mjs::withTransition
+	 * @reason browser update callback is private transition-wrapper plumbing
+	 */
+	const update = () => {
+		updateStarted = true;
+		batch = runTransitionBatch(entries);
+		return batch.pending || undefined;
+	};
+
+	let transition = null;
+	if (document.startViewTransition) {
+		try {
+			transition = document.startViewTransition(update);
+		} catch (error) {
+			if (!isSkippedViewTransitionError(error)) captureError(error);
+		}
+	}
+
+	if (!transition) {
+		if (!updateStarted) update();
+		if (batch?.pending) await batch.pending;
+		entries.forEach((entry, index) => {
+			entry.resolve(batch.results[index]);
+		});
+		return;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/utilities.mjs::withTransition
+	 * @reason transition promise observation is exercised through public error handling
+	 */
+	const observeTransitionError = (error) => {
+		if (!isSkippedViewTransitionError(error)) captureError(error);
+	};
+	void transition.ready?.catch(observeTransitionError);
+
+	const updateDone = transition.updateCallbackDone || transition.finished;
+	if (transition.finished !== updateDone) {
+		void transition.finished?.catch(observeTransitionError);
+	}
+	try {
+		await updateDone;
+	} catch (error) {
+		observeTransitionError(error);
+	}
+
+	entries.forEach((entry, index) => {
+		entry.resolve(batch?.results[index] ?? false);
+	});
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_011_view_transitions_frontend.py::test_nested_transition_joins_active_transition_without_error_report
+ * @tests tests_js/test_011_view_transitions_frontend.py::test_transition_resolves_after_update_without_waiting_for_animation
+ * @tests tests_js/test_011_view_transitions_frontend.py::test_same_turn_commits_share_one_transition_and_run_once
+ * @tests tests_js/test_011_view_transitions_frontend.py::test_ready_rejection_does_not_replay_commit
+ * @matrix view-transition : animation-lifecycle coalescing error-reporting exact-once nested-callback queueing ready-rejection update-completion
+ */
+const withTransition = (callback, { label = "unlabeled" } = {}) => {
+	if (transitionDepth > 0) {
+		// Nested callers are already inside the browser's transition update.
+		return runWithoutTransition(callback, label);
+	}
+
+	return new Promise((resolve) => {
+		if (!pendingTransitionBatch) {
+			pendingTransitionBatch = [];
+			queueMicrotask(() => {
+				const entries = pendingTransitionBatch;
+				pendingTransitionBatch = null;
+				transitionQueue = transitionQueue
+					.then(() => executeTransition(entries))
+					.catch((error) => {
+						captureError(error);
+						entries.forEach((entry) => {
+							entry.resolve(false);
+						});
+					});
+			});
+		}
+		pendingTransitionBatch.push({ callback, label, resolve });
+	});
+};
+
+initializeLogoutForms();
+installUpstreamUnavailableBanner();
+
+const REMEMBER_COOKIE_NAME = "lagniappe_remember";
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_agent_access_login_form_creates_session
+ * @pair login:agent-access
+ */
+function initializeAgentLoginForms(root = document) {
+	root.addEventListener("submit", async (event) => {
+		const form = event.target;
+		if (!(form instanceof HTMLFormElement)) return;
+		const route = form.dataset.route || form.action;
+		if (!route.endsWith("/users/agent-login")) return;
+
+		event.preventDefault();
+		if (form.dataset.submitting === "true") return;
+		form.dataset.submitting = "true";
+
+		const submitter = event.submitter;
+		const submitText =
+			submitter?.querySelector("[data-role='text']")?.textContent ||
+			submitter?.textContent.trim();
+		const error = form.querySelector("[data-role='error']");
+		error?.classList.add("hidden");
+		if (submitter && "disabled" in submitter) {
+			submitter.disabled = true;
+			setLoginActionButton(submitter, "Signing In", "spinner");
+		}
+
+		const response = await request.post(route, new FormData(form));
+		if (response?.redirect) {
+			window.location.href = response.redirect;
+			return;
+		}
+
+		if (error) {
+			error.textContent = response?.error || "Authentication failed.";
+			error.classList.remove("hidden");
+		}
+		form.dataset.submitting = "false";
+		if (submitter && "disabled" in submitter) {
+			submitter.disabled = false;
+			setLoginActionButton(submitter, submitText);
+		}
+	});
+}
+
+initializeAgentLoginForms();
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
+ * @pair login:page-load
+ */
+async function initializeIdentityPlatform() {
+	try {
+		const response = await fetch("/l/identity-config");
+		const config = await response.json();
+		return new IdentityPlatformClient(config);
+	} catch (error) {
+		console.error("Failed to initialize Identity Platform:", error);
+		throw error;
+	}
+}
+
+if (document.getElementById("emailCheck")) {
+	const auth = await initializeIdentityPlatform();
+
+	const ownerSetup = document.body.hasAttribute("data-owner-setup");
+	const ownerEmail = document.body.getAttribute("data-owner-email");
+	const authError = document.body.getAttribute("data-auth-error");
+	const mode = document.body.getAttribute("data-mode");
+	const code = document.body.getAttribute("data-code");
+
+	const forms = {};
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/login.mjs::setRememberPreference
+	 * @reason read helper is part of the remember-me preference sync contract
+	 */
+	const rememberPreference = () => {
+		const cookie = document.cookie
+			.split("; ")
+			.find((entry) => entry.startsWith(`${REMEMBER_COOKIE_NAME}=`));
+		if (!cookie) return true;
+		return cookie.split("=")[1] !== "0";
+	};
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/login.mjs::setRememberPreference
+	 * @reason DOM propagation helper is part of the remember-me preference sync contract
+	 */
+	const syncRememberInputs = () => {
+		const remember = rememberPreference();
+		document.querySelectorAll("input[name='remember-me']").forEach((input) => {
+			input.checked = remember;
+		});
+	};
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_login_remember_preference_syncs_across_forms
+	 * @pair login:remember-preference
+	 */
+	const setRememberPreference = (remember) => {
+		const secure = window.location.protocol === "https:" ? "; Secure" : "";
+		// biome-ignore lint/suspicious/noDocumentCookie: this stores a non-sensitive UI preference for Google redirect login.
+		document.cookie = `${REMEMBER_COOKIE_NAME}=${remember ? "1" : "0"}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+		syncRememberInputs();
+	};
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_login_defaults_to_auth_method_form
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_reset_password_mode
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_verify_email_mode
+	 * @matrix login : email-check owner-bootstrap query-mode sign-in-transition
+	 * @pair login:auth-method
+	 */
+	const showForm = (form) => {
+		withTransition(() => {
+			Object.values(forms).forEach((form) => {
+				if (form) form.hide();
+			});
+			form.show();
+			syncRememberInputs();
+		});
+	};
+
+	if (mode === "resetPassword") {
+		const resetPasswordForm = document.getElementById("resetPassword");
+		forms.resetPassword = new ResetPasswordForm(auth, resetPasswordForm);
+		forms.resetPassword.data.code = code;
+		showForm(forms.resetPassword);
+	} else if (mode === "verifyEmail") {
+		const verifyEmailForm = document.getElementById("verifyEmail");
+		forms.verifyEmail = new VerifyEmailForm(auth, verifyEmailForm);
+		forms.verifyEmail.data.code = code;
+		showForm(forms.verifyEmail);
+	} else if (ownerSetup) {
+		const ownerSetupForm = document.getElementById("ownerSetup");
+		forms.ownerSetup = new OwnerSetupForm(auth, ownerSetupForm);
+		forms.ownerSetup.data = { email: ownerEmail, error: authError };
+		showForm(forms.ownerSetup);
+	} else {
+		const authMethodForm = document.getElementById("authMethod");
+		forms.authMethod = new AuthMethodForm(auth, authMethodForm);
+		forms.authMethod.data = { error: authError };
+		showForm(forms.authMethod);
+	}
+
+	document.addEventListener("login:show-auth-method", () => {
+		if (!forms.authMethod) {
+			const formElt = document.getElementById("authMethod");
+			forms.authMethod = new AuthMethodForm(auth, formElt);
+		}
+		forms.authMethod.data = {};
+		showForm(forms.authMethod);
+	});
+
+	document.addEventListener("login:show-signin", (event) => {
+		if (!forms.signIn) {
+			const formElt = document.getElementById("signIn");
+			forms.signIn = new SignInForm(auth, formElt);
+		}
+		forms.signIn.data = { ...event.detail };
+		showForm(forms.signIn);
+	});
+
+	document.addEventListener("login:show-email-check", () => {
+		if (!forms.emailCheck) {
+			const formElt = document.getElementById("emailCheck");
+			forms.emailCheck = new EmailCheckForm(auth, formElt);
+		}
+		showForm(forms.emailCheck);
+	});
+
+	document.addEventListener("login:show-first-time-setup", (event) => {
+		if (!forms.firstTimeSetup) {
+			const formElt = document.getElementById("firstTimeSetup");
+			forms.firstTimeSetup = new FirstTimeSetupForm(auth, formElt);
+		}
+		const form = forms.firstTimeSetup;
+		form.data = { ...event.detail };
+		showForm(form);
+	});
+
+	document.addEventListener("login:show-forgot-form", (event) => {
+		if (!forms.forgotPassword) {
+			const formElt = document.getElementById("forgotPassword");
+			forms.forgotPassword = new ForgotPasswordForm(auth, formElt);
+		}
+		const form = forms.forgotPassword;
+		form.data = { ...event.detail };
+		showForm(form);
+	});
+
+	document.addEventListener("change", (event) => {
+		if (event.target.matches("input[name='remember-me']")) {
+			setRememberPreference(event.target.checked);
+		}
+	});
+}

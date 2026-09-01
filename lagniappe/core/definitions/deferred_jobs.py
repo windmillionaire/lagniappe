@@ -29,7 +29,6 @@ class DeferredJobType(Enum):
     EMAIL_INGEST = "email-ingest"
     REPORT_EXECUTION = "report-execution"
     AUTOFILL = "autofill"
-    PAGE_GENERATION = "page-generation"
     FILE_EXTRACT = "file-extract"
     FILE_SUMMARIZE = "file-summarize"
 

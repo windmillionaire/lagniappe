@@ -53,7 +53,6 @@ def test_category_create_scoped_to_one_category(get_user):
     tools_allowed.open()
 
     expect(tools_allowed.locate(Category.CREATE_PAGE_TOGGLE)).to_be_visible()
-    expect(tools_allowed.locate(Category.GENERATE_PAGES_TOGGLE)).to_be_visible()
     expect(tools_allowed.locate(Category.CATEGORY_INFO_TOGGLE)).to_be_visible()
     expect(tools_allowed.locate(Category.CATEGORY_FILTERS_TOGGLE)).to_be_visible()
 
@@ -62,7 +61,6 @@ def test_category_create_scoped_to_one_category(get_user):
     tools_denied.open()
 
     expect(tools_denied.locate(Category.CREATE_PAGE_TOGGLE)).not_to_be_attached()
-    expect(tools_denied.locate(Category.GENERATE_PAGES_TOGGLE)).not_to_be_attached()
     expect(tools_denied.locate(Category.CATEGORY_INFO_TOGGLE)).to_be_visible()
     expect(tools_denied.locate(Category.CATEGORY_FILTERS_TOGGLE)).to_be_visible()
 
@@ -106,7 +104,6 @@ def test_category_viewer_opens_readonly_settings(get_user):
     expect(settings.locator("button[type='submit']")).not_to_be_attached()
 
     expect(tools.locate(Category.CREATE_PAGE_TOGGLE)).not_to_be_attached()
-    expect(tools.locate(Category.GENERATE_PAGES_TOGGLE)).not_to_be_attached()
     expect(tools.locate(Category.CATEGORY_INFO_TOGGLE)).to_be_visible()
     expect(tools.locate(Category.CATEGORY_FILTERS_TOGGLE)).to_be_visible()
 

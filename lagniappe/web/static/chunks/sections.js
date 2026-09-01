@@ -1,2 +1,471 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.2.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="b73a48fa-ae84-471d-906d-55cae902c0c3",e._sentryDebugIdIdentifier="sentry-dbid-b73a48fa-ae84-471d-906d-55cae902c0c3");}catch(e){}}();import{w as d}from"./foundation.js?v=b10d8a3a";import"./connectivity.js?v=b10d8a3a";import{s as v}from"./icons.js?v=b10d8a3a";import{B as b,u as y,U as w}from"./baseUpload.js?v=b10d8a3a";import{b as h}from"./buttons.js?v=b10d8a3a";import{p as g}from"./primitives.js?v=b10d8a3a";const S="Click or drop to add a related image or a pdf";class q extends b{constructor(t){super(t),this.parent=t.parent,this.target=t.target,this.name="autofill",this.icon="generate",this.uploadType="file",this.deferred=!0,this.messages={submit:"Autofill Form",submitting:"Starting...",submitted:"Autofill queued"},this.context=y.contextUpload({text:S}),this.inputName="autofill-file",this.dropzone=this.context.dropzone,this.menuOptions=["remove","replace","paste"],this.uploadMenu=new w(this),this._initialized=!1,this._click=this._click.bind(this)}init(){this.parent.target.addEventListener("click",this._click)}get submitGroup(){return this.target.querySelector("[data-role='autofill-submit-group']")}get submitButton(){return this.submitGroup?.querySelector("button[type='submit']")??null}_canFallbackToMultipart(){return!1}async _click(t){const a=t.target.closest("button")?.dataset?.role;["cancel-autofill","show-autofill"].includes(a)&&(t.preventDefault(),t.stopPropagation(),this._initialized||(await super.init(),this.target.append(this.submitGroup),this._initialized=!0),await d(()=>{a==="show-autofill"?(this.target.dataset.visible="true",this.parent.form.toggleSubForm(this),this.target.querySelector("textarea").focus()):a==="cancel-autofill"&&(this.target.dataset.visible="false",this.parent.form.toggleSubForm(),this.reset(),this.target.querySelector("textarea").value="")},{label:`autofill:${a}`}))}get html(){return[this.context.element]}}const x=e=>{const t=e.target.querySelector('[data-role="autofill"]');if(!t)return null;const a=new q({target:t,parent:e});return a.init(),e.destroyables.push(a),t},E=e=>{const t=e.target.querySelector('div[data-role="generate"]');if(!t)return null;const a=t.querySelector('button[data-role="manual"]'),o=t.querySelector('button[data-role="ai"]'),i=t.querySelector('[name="generate"]'),r=e.target.querySelector('[data-role="explain"]'),n=t.querySelector('[name="user_description"]'),c=t.querySelectorAll('[data-role="ai"]:not(button)'),s=l=>{e.target.dataset.mode=l,c.forEach(u=>{u.dataset.visible=l==="ai"?"true":"false"}),e.target.querySelectorAll('[data-role="manual"]').forEach(u=>{t.contains(u)||(u.dataset.visible=l==="manual"?"true":"false")})};return s(e.target.dataset.mode||"manual"),r&&n&&n.addEventListener("input",()=>{r.dataset.visible="true"}),o.addEventListener("click",()=>{d(()=>{const l=!i.checked;s("ai"),a.dataset.active="false",o.dataset.active="true",i.checked=!0,l&&i.dispatchEvent(new Event("change",{bubbles:!0})),n.focus(),r&&n?.value&&(r.dataset.visible="true")})}),a.addEventListener("click",()=>{d(()=>{const l=i.checked;s("manual"),a.dataset.active="true",o.dataset.active="false",i.checked=!1,l&&i.dispatchEvent(new Event("change",{bubbles:!0})),r&&(r.dataset.visible="false")})}),t},m=(e,t)=>{e.dataset.busy=t?"true":"false",e.querySelectorAll("button").forEach(a=>{a.disabled=t})},p=(e,t)=>{const a=e?.querySelector("[data-icon]");a&&v(a,t)},f=(e,t)=>{const a=e.querySelector("[data-role='photo-prompt-error']");a&&(a.textContent=t||"",a.dataset.visible=t?"true":"false")},k=e=>e.querySelector("[data-role='photo-mobile-toggle-template']")?.content?.firstElementChild?.cloneNode(!0)??null,P=(e,t)=>{const a=e.target.querySelector("[data-role='photo-prompt']");a&&(a.dataset.visible="false")},L=(e,t)=>{const a=e.view.elt.querySelector("[lp-nav][data-nav='mobile'] nav[data-nav='mobile']");if(a&&!a.querySelector("[lp-show='photo:active']")){const o=k(t);o&&(a.prepend(o),e.view._mobileNav=null)}else a?.querySelector("[lp-show='photo:active']")?.setAttribute("data-visible","true")},_=async(e,t,a=null)=>{const o=e.view.elt.querySelector("#photo");if(!o)return null;let i=null;const r=async({transition:n=!1,deferCommit:c=!1}={})=>{const s=e.view.getComponent(o);await s.activate("PagePhoto"),i=s.active,await s.prepareRender?.(!0);const l=()=>{L(e,t),P(e),i&&a&&a(i,{transition:n})};if(c)return l;l()};return typeof e.view.updateLayout=="function"?(await e.view.updateLayout({secondary:o,secondaryActive:!0,activeTabId:e.view.mobile?"photo":null,mutate:()=>r({transition:!1,deferCommit:!0})}),i):(e.view.elt.dataset.secondary="true",e.view.elt.classList.remove("max-w-5xl"),e.view.elt.classList.add("max-w-7xl"),o.dataset.visible="true",o.dataset.persistent="true",e.view.mobile&&localStorage.setItem(`${e.view.hash}-active`,"photo"),await r({transition:!0}),typeof e.view._renderLayout=="function"?await e.view._renderLayout():await e.view.getComponent(o).render(!0),i)},C=e=>{const t=e.target.querySelector("[data-role='photo-prompt']");if(!t)return null;const a=new AbortController,o=a.signal,i=t.querySelector("[data-role='photo-upload']"),r=t.querySelector("[data-role='photo-generate']"),n=async(c,s)=>{f(t,""),p(c,"spinner"),m(t,!0);try{await _(e,t,s)}catch(l){f(t,l.message||"Unable to show image tools.")}finally{m(t,!1),p(i,"upload"),p(r,"generate")}};return i?.addEventListener("click",async()=>{await n(i,(c,s)=>{c.hideGenerateForm(s)})},{signal:o}),r?.addEventListener("click",async()=>{await n(r,(c,s)=>c.showGenerateForm(s))},{signal:o}),e.destroyables.push({destroy:()=>a.abort()}),t},T=()=>{const e=document.createElement("div");e.dataset.role="generate-image",e.className="flex flex-col gap-4",e.dataset.visible="false";const t=g.checkbox({label:"Use page info",name:"info",checked:!0,kind:"page"}),a=g.textarea({name:"prompt",placeholder:"or describe the image you wish to create",rows:3,kind:"page"}),o=document.createElement("div");return o.dataset.role="submit-group",o.className="flex flex-wrap gap-2 w-full",o.appendChild(h.default({role:"cancel",text:"Cancel",kind:"default",type:"button"})),o.appendChild(h.default({role:"generate",text:"Generate",kind:"page",type:"submit",icon:"generate"})),e.append(t,a,o),{element:e,submitGroup:o,reset:()=>{t.checked=!1,a.value=""},visible:()=>e.dataset.visible==="true",hide:()=>{e.dataset.visible="false"},show:()=>{e.dataset.visible="true",a.focus()}}},A={generateEntityForm:E,photoPrompt:C,generateImageForm:T,autofill:x};export{A as s};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { w as withTransition } from './foundation.js?v=b8995073';
+import './connectivity.js?v=b8995073';
+import { s as setIcon } from './icons.js?v=b8995073';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b8995073';
+import { b as buttons } from './buttons.js?v=b8995073';
+import { p as primitives } from './primitives.js?v=b8995073';
+
+const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or a pdf";
+
+/**
+ * @testable infrastructure
+ */
+class AutofillUpload extends BaseUpload {
+	constructor(attributes) {
+		super(attributes);
+		this.parent = attributes.parent;
+		this.target = attributes.target;
+		this.name = "autofill";
+		this.icon = "generate";
+		this.uploadType = "file";
+		this.deferred = true;
+
+		this.messages = {
+			submit: "Autofill Form",
+			submitting: "Starting...",
+			submitted: "Autofill queued",
+		};
+
+		this.context = uploadElement.contextUpload({
+			text: AUTOFILL_DROPZONE_TEXT,
+		});
+		this.inputName = "autofill-file";
+		this.dropzone = this.context.dropzone;
+		this.menuOptions = ["remove", "replace", "paste"];
+		this.uploadMenu = new UploadMenu(this);
+
+		this._initialized = false;
+		this._click = this._click.bind(this);
+	}
+
+	init() {
+		this.parent.target.addEventListener("click", this._click);
+	}
+
+	get submitGroup() {
+		return this.target.querySelector("[data-role='autofill-submit-group']");
+	}
+
+	get submitButton() {
+		return this.submitGroup?.querySelector("button[type='submit']") ?? null;
+	}
+
+	_canFallbackToMultipart() {
+		return false;
+	}
+
+	async _click(e) {
+		const role = e.target.closest("button")?.dataset?.role;
+		if (!["cancel-autofill", "show-autofill"].includes(role)) return;
+
+		e.preventDefault();
+		e.stopPropagation();
+
+		if (!this._initialized) {
+			await super.init();
+			this.target.append(this.submitGroup);
+			this._initialized = true;
+		}
+
+		await withTransition(
+			() => {
+				if (role === "show-autofill") {
+					this.target.dataset.visible = "true";
+					this.parent.form.toggleSubForm(this);
+					this.target.querySelector("textarea").focus();
+				} else if (role === "cancel-autofill") {
+					this.target.dataset.visible = "false";
+					this.parent.form.toggleSubForm();
+					this.reset();
+					this.target.querySelector("textarea").value = "";
+				}
+			},
+			{ label: `autofill:${role}` },
+		);
+	}
+
+	get html() {
+		return [this.context.element];
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+const autofill = (form) => {
+	const section = form.target.querySelector('[data-role="autofill"]');
+	if (!section) return null;
+
+	const autofill = new AutofillUpload({
+		target: section,
+		parent: form,
+	});
+	autofill.init();
+	form.destroyables.push(autofill);
+	return section;
+};
+
+/**
+ * @testable infrastructure
+ */
+const generateEntityForm = (form) => {
+	const section = form.target.querySelector('div[data-role="generate"]');
+	if (!section) return null;
+
+	const manualButton = section.querySelector('button[data-role="manual"]');
+	const aiButton = section.querySelector('button[data-role="ai"]');
+	const generate = section.querySelector('[name="generate"]');
+	const explain = form.target.querySelector('[data-role="explain"]');
+	const description = section.querySelector('[name="user_description"]');
+	const aiFields = section.querySelectorAll('[data-role="ai"]:not(button)');
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/elements/sections.mjs::generateEntityForm
+	 * @reason mode toggling is private generate-form UI plumbing
+	 */
+	const setMode = (mode) => {
+		form.target.dataset.mode = mode;
+		aiFields.forEach((element) => {
+			element.dataset.visible = mode === "ai" ? "true" : "false";
+		});
+		form.target.querySelectorAll('[data-role="manual"]').forEach((element) => {
+			if (!section.contains(element)) {
+				element.dataset.visible = mode === "manual" ? "true" : "false";
+			}
+		});
+	};
+
+	setMode(form.target.dataset.mode || "manual");
+
+	if (explain && description) {
+		description.addEventListener("input", () => {
+			explain.dataset.visible = "true";
+		});
+	}
+
+	aiButton.addEventListener("click", () => {
+		withTransition(() => {
+			const changed = !generate.checked;
+			setMode("ai");
+			manualButton.dataset.active = "false";
+			aiButton.dataset.active = "true";
+			generate.checked = true;
+			if (changed)
+				generate.dispatchEvent(new Event("change", { bubbles: true }));
+			description.focus();
+			if (explain && description?.value) {
+				explain.dataset.visible = "true";
+			}
+		});
+	});
+
+	manualButton.addEventListener("click", () => {
+		withTransition(() => {
+			const changed = generate.checked;
+			setMode("manual");
+			manualButton.dataset.active = "true";
+			aiButton.dataset.active = "false";
+			generate.checked = false;
+			if (changed)
+				generate.dispatchEvent(new Event("change", { bubbles: true }));
+			if (explain) {
+				explain.dataset.visible = "false";
+			}
+		});
+	});
+
+	return section;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/sections.mjs::photoPrompt
+ * @reason private compact photo prompt UI state helper
+ */
+const setPhotoPromptBusy = (section, busy) => {
+	section.dataset.busy = busy ? "true" : "false";
+	section.querySelectorAll("button").forEach((button) => {
+		button.disabled = busy;
+	});
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/sections.mjs::photoPrompt
+ * @reason private compact photo prompt UI state helper
+ */
+const setPhotoPromptButtonIcon = (button, icon) => {
+	const iconElement = button?.querySelector("[data-icon]");
+	if (iconElement) setIcon(iconElement, icon);
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/sections.mjs::photoPrompt
+ * @reason private compact photo prompt error helper
+ */
+const showPhotoPromptError = (section, message) => {
+	const error = section.querySelector("[data-role='photo-prompt-error']");
+	if (!error) return;
+
+	error.textContent = message || "";
+	error.dataset.visible = message ? "true" : "false";
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/sections.mjs::photoPrompt
+ * @reason private compact photo prompt template helper
+ */
+const photoMobileToggleTemplate = (section) => {
+	const template = section.querySelector(
+		"[data-role='photo-mobile-toggle-template']",
+	);
+	return template?.content?.firstElementChild?.cloneNode(true) ?? null;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/sections.mjs::photoPrompt
+ * @reason private compact photo prompt visibility helper
+ */
+const syncPhotoPrompt = (form, visible) => {
+	const prompt = form.target.querySelector("[data-role='photo-prompt']");
+	if (!prompt) return;
+	prompt.dataset.visible = "false";
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/sections.mjs::photoPrompt
+ * @reason private compact photo prompt mobile-nav helper
+ */
+const ensurePhotoMobileToggle = (form, section) => {
+	const mobileToggles = form.view.elt.querySelector(
+		"[lp-nav][data-nav='mobile'] nav[data-nav='mobile']",
+	);
+	if (
+		mobileToggles &&
+		!mobileToggles.querySelector("[lp-show='photo:active']")
+	) {
+		const toggle = photoMobileToggleTemplate(section);
+		if (toggle) {
+			mobileToggles.prepend(toggle);
+			form.view._mobileNav = null;
+		}
+	} else {
+		mobileToggles
+			?.querySelector("[lp-show='photo:active']")
+			?.setAttribute("data-visible", "true");
+	}
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/sections.mjs::photoPrompt
+ * @reason private compact photo prompt layout handoff helper
+ */
+const showPhotoLayout = async (form, section, callback = null) => {
+	const photo = form.view.elt.querySelector("#photo");
+	if (!photo) return null;
+
+	let widget = null;
+	/**
+	 * @testable false
+	 * @covered-by src/script/elements/sections.mjs::photoPrompt
+	 * @reason private photo prompt activation runs inside the entity layout transition
+	 */
+	const activatePhoto = async ({
+		transition = false,
+		deferCommit = false,
+	} = {}) => {
+		const photoComponent = form.view.getComponent(photo);
+		await photoComponent.activate("PagePhoto");
+		widget = photoComponent.active;
+		await photoComponent.prepareRender?.(true);
+		/**
+		 * @testable false
+		 * @covered-by src/script/elements/sections.mjs::photoPrompt
+		 * @reason private synchronous commit is exercised through photo prompt activation
+		 */
+		const commit = () => {
+			ensurePhotoMobileToggle(form, section);
+			syncPhotoPrompt(form);
+			if (widget && callback) callback(widget, { transition });
+		};
+		if (deferCommit) return commit;
+		commit();
+	};
+
+	if (typeof form.view.updateLayout === "function") {
+		await form.view.updateLayout({
+			secondary: photo,
+			secondaryActive: true,
+			activeTabId: form.view.mobile ? "photo" : null,
+			mutate: () => activatePhoto({ transition: false, deferCommit: true }),
+		});
+		return widget;
+	}
+
+	form.view.elt.dataset.secondary = "true";
+	form.view.elt.classList.remove("max-w-5xl");
+	form.view.elt.classList.add("max-w-7xl");
+	photo.dataset.visible = "true";
+	photo.dataset.persistent = "true";
+	if (form.view.mobile) {
+		localStorage.setItem(`${form.view.hash}-active`, "photo");
+	}
+	await activatePhoto({ transition: true });
+	if (typeof form.view._renderLayout === "function") {
+		await form.view._renderLayout();
+	} else {
+		await form.view.getComponent(photo).render(true);
+	}
+	return widget;
+};
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
+ * @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
+ * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop
+ * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
+ * @matrix pages : desktop-tabs image-add image-generate mobile-photo-tab photo-prompt
+ */
+const photoPrompt = (form) => {
+	const section = form.target.querySelector("[data-role='photo-prompt']");
+	if (!section) return null;
+
+	const controller = new AbortController();
+	const signal = controller.signal;
+	const upload = section.querySelector("[data-role='photo-upload']");
+	const generate = section.querySelector("[data-role='photo-generate']");
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/elements/sections.mjs::photoPrompt
+	 * @reason private shared reveal handler for compact photo prompt actions
+	 */
+	const reveal = async (button, callback) => {
+		showPhotoPromptError(section, "");
+		setPhotoPromptButtonIcon(button, "spinner");
+		setPhotoPromptBusy(section, true);
+
+		try {
+			await showPhotoLayout(form, section, callback);
+		} catch (error) {
+			showPhotoPromptError(
+				section,
+				error.message || "Unable to show image tools.",
+			);
+		} finally {
+			setPhotoPromptBusy(section, false);
+			setPhotoPromptButtonIcon(upload, "upload");
+			setPhotoPromptButtonIcon(generate, "generate");
+		}
+	};
+
+	upload?.addEventListener(
+		"click",
+		async () => {
+			await reveal(upload, (widget, options) => {
+				widget.hideGenerateForm(options);
+			});
+		},
+		{ signal },
+	);
+
+	generate?.addEventListener(
+		"click",
+		async () => {
+			await reveal(generate, (widget, options) =>
+				widget.showGenerateForm(options),
+			);
+		},
+		{ signal },
+	);
+
+	form.destroyables.push({
+		destroy: () => controller.abort(),
+	});
+
+	return section;
+};
+
+/**
+ * @testable infrastructure
+ */
+const generateImageForm = () => {
+	const container = document.createElement("div");
+	container.dataset.role = "generate-image";
+	container.className = "flex flex-col gap-4";
+	container.dataset.visible = "false";
+
+	const usePageInfo = primitives.checkbox({
+		label: "Use page info",
+		name: "info",
+		checked: true,
+		kind: "page",
+	});
+
+	const prompt = primitives.textarea({
+		name: "prompt",
+		placeholder: "or describe the image you wish to create",
+		rows: 3,
+		kind: "page",
+	});
+
+	const submitGroup = document.createElement("div");
+	submitGroup.dataset.role = "submit-group";
+	submitGroup.className = "flex flex-wrap gap-2 w-full";
+
+	submitGroup.appendChild(
+		buttons.default({
+			role: "cancel",
+			text: "Cancel",
+			kind: "default",
+			type: "button",
+		}),
+	);
+
+	submitGroup.appendChild(
+		buttons.default({
+			role: "generate",
+			text: "Generate",
+			kind: "page",
+			type: "submit",
+			icon: "generate",
+		}),
+	);
+
+	container.append(usePageInfo, prompt, submitGroup);
+
+	return {
+		element: container,
+		submitGroup: submitGroup,
+		reset: () => {
+			usePageInfo.checked = false;
+			prompt.value = "";
+		},
+		visible: () => {
+			return container.dataset.visible === "true";
+		},
+		hide: () => {
+			container.dataset.visible = "false";
+		},
+		show: () => {
+			container.dataset.visible = "true";
+			prompt.focus();
+		},
+	};
+};
+
+const sections = {
+	generateEntityForm,
+	photoPrompt,
+	generateImageForm,
+	autofill,
+};
+
+export { sections as s };

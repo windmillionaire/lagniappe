@@ -101,7 +101,6 @@ workflow, report schema, screenshot guidance, and coverage-review rules are in
 Use the managed server for selected provider flows that need real Cloud Tasks
 or callbacks and are not stable ordinary E2E stories, including:
 
-- deferred Page generation and notification/list refresh;
 - file extract/summary callbacks and authoritative status replacement; and
 - a remote Ingress stop/restart run.
 
