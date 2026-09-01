@@ -143,7 +143,9 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_filter_actions_by_user_permissions
+    # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_always_allow_tasks_on_the_personal_page
     # @matrix ai-report : action-capabilities permissions
+    # @pair permissions:own-page
     @property
     def ai_action_capabilities(self):
         return self._ai_action_capabilities()
@@ -324,6 +326,7 @@ class Restrictions(Property):
         can_edit_pages = (
             can_edit_models
             or can_edit_categories
+            or self.entity.has_permission(self.entity.page, Action.EDIT)
             or self._has_permission_kind(self._permission_details, "page", Action.EDIT)
         )
         can_edit_projects = can_edit_models or self._has_permission_kind(
@@ -344,7 +347,6 @@ class Restrictions(Property):
             "can_create_projects": can_create_models,
             "can_create_pages": can_create_pages,
             "can_create_model_tasks": can_create_models or can_edit_projects,
-            "can_create_tasks": can_edit_pages or can_create_pages,
             "can_attach_files_to_pages": can_edit_pages or can_create_pages,
             "can_attach_files_to_tasks": can_edit_tasks or can_edit_pages,
             "can_move_pages": can_edit_pages and can_edit_categories,

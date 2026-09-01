@@ -334,6 +334,55 @@ def test_generate_organize_report_repairs_invalid_action_references_once(monkeyp
     )
 
 
+# @pairs ai-report:reference-kind permissions:personal-page
+@pytest.mark.unit
+def test_validate_proposal_accepts_virtual_user_kind_as_personal_page(monkeypatch):
+    personal_hash = "abc123def456"
+    monkeypatch.setattr(
+        ai_references.cache,
+        "get_details_by_hash",
+        lambda hashes: {
+            personal_hash: {
+                "id": "personal-page-key",
+                "kind": "user",
+                "name": "Personal Page",
+            }
+        },
+    )
+    proposal = {
+        "summary": "Add the requested personal task.",
+        "confidence": 1,
+        "issues": [],
+        "actions": [
+            {
+                "id": "personal-task",
+                "type": "create_task",
+                "data": {
+                    "name": "Review API access",
+                    "page": f"hash:{personal_hash}",
+                },
+            }
+        ],
+    }
+
+    validated = proposal_validation.validate_proposal(
+        proposal,
+        allowed_actions=("create_task",),
+        validate_reference_kinds=True,
+    )
+
+    assert validated["actions"][0]["data"]["page"] == "personal-page-key"
+
+    wrong_field = copy.deepcopy(proposal)
+    wrong_field["actions"][0]["data"]["project"] = f"hash:{personal_hash}"
+    with pytest.raises(exceptions.AIException, match="uses user .* as its project"):
+        proposal_validation.validate_proposal(
+            wrong_field,
+            allowed_actions=("create_task",),
+            validate_reference_kinds=True,
+        )
+
+
 
 
 # @matrix ai-report : references repair

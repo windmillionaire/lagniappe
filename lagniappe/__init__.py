@@ -47,7 +47,7 @@ def _sample_rate(value, name):
 # @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
 # @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
 # @tests tests_unit/test_016_config.py::test_config_normalizes_and_validates_sentry_sample_rates
-# @matrix config : ai-email build-id constants error-reporting external-agent-api google-signin observability-setting optional-providers public-projection secrets source-link stale-settings
+# @matrix config : ai-email build-id constants error-reporting google-signin observability-setting optional-providers public-projection secrets source-link stale-settings
 # @pairs ai:observability error-reporting:sampling
 class Config:
     """Application configuration."""
@@ -185,17 +185,6 @@ class Config:
             self,
             "AI_OBSERVABILITY",
             getattr(constants, "DEFAULT_AI_OBSERVABILITY_ENABLED", False),
-        )
-        external_agent_api_enabled = getattr(
-            self,
-            "EXTERNAL_AGENT_API_ENABLED",
-            getattr(constants, "DEFAULT_EXTERNAL_AGENT_API_ENABLED", False),
-        )
-        self.EXTERNAL_AGENT_API_ENABLED = (
-            external_agent_api_enabled
-            if isinstance(external_agent_api_enabled, bool)
-            else str(external_agent_api_enabled).strip().casefold()
-            in {"1", "true", "yes", "on"}
         )
         from config.ai_email import ai_email_public_config, normalize_ai_email_config
 

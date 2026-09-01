@@ -11,7 +11,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.cache.core import cache as redis_cache
 from lagniappe.core.tools.cache.keys import Keys
-from ..references import hash_reference
+from ..references import hash_reference, personal_page_reference
 
 
 RESOURCE_CACHE_TTL = int(timedelta(minutes=5).total_seconds())
@@ -24,7 +24,11 @@ LIST_WORKSPACE_RESOURCES = types.FunctionDeclaration(
         "Use this before narrower searches when you need to understand available "
         "categories, projects, model tasks, and reusable forms. Returns category "
         "names with attached form names, project names with model task/form names, "
-        "and forms that are not attached to a category or model task. Model-task "
+        "the current user's personal Page, and forms that are not attached to a "
+        "category or model task. Personal Pages intentionally do not appear in "
+        "ordinary workspace search; use the returned reference for the user's own "
+        "notes and Tasks even though its public hash is shared with the User. "
+        "Model-task "
         "forms include a schema_ref handle for get_schema without inlining schemas."
     ),
     parameters={
@@ -88,6 +92,7 @@ def build_workspace_resource_inventory(user):
     ]
 
     return {
+        "personal_page": personal_page_reference(user),
         "categories": category_items,
         "projects": project_items,
         "standalone_forms": standalone_forms,

@@ -932,8 +932,18 @@ def test_ai_function_call_dispatch_caps_file_parts_per_turn(monkeypatch):
 
 
 # @matrix ai : categories forms projects redis-cache resource-inventory
+# @pair permissions:personal-page
 @pytest.mark.unit
 def test_list_workspace_resources_caches_inventory(monkeypatch):
+    class FakePage:
+        def __init__(self):
+            self.hash = "page-personal"
+            self.name = "Personal Page"
+            self.url = "/pages/personal-page"
+
+        def allowed(self, action, user=None):
+            return True
+
     class FakeForm:
         entity_kind = "form"
         active = True
@@ -1095,13 +1105,21 @@ def test_list_workspace_resources_caches_inventory(monkeypatch):
     fake_cache = FakeCache()
     monkeypatch.setattr(ai_list_resources, "redis_cache", fake_cache)
 
-    user = SimpleNamespace(hash="owner-hash")
+    user = SimpleNamespace(hash="owner-hash", page=FakePage())
     first = ai_list_resources.execute_list_workspace_resources({}, user)
     second = ai_list_resources.execute_list_workspace_resources({}, user)
 
     assert loads == [("raw-model-row",), ("form-contact",), ("form-review",)]
     assert second == first
     assert len(fake_cache.redis.writes) == 1
+    assert first["personal_page"] == {
+        "kind": "page",
+        "hash": "hash:page-personal",
+        "name": "Personal Page",
+        "url": "/pages/personal-page",
+        "can_view": True,
+        "can_edit": True,
+    }
     assert first["categories"] == [
         {
             "hash": "hash:cat-contacts",

@@ -5,11 +5,13 @@ from .actions import ACTION_ORDER
 
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_filter_actions_by_user_permissions
+# @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_always_allow_tasks_on_the_personal_page
 # @matrix ai-report : action-capabilities permissions
+# @pair permissions:own-page
 def allowed_report_actions(user):
     """Return report action types this user may ask the runner to execute."""
     capabilities = user.properties.restrictions.ai_action_capabilities
-    allowed = {"skip", "needs_review"}
+    allowed = {"create_task", "skip", "needs_review"}
 
     if capabilities["can_create_forms"]:
         allowed.add("create_form")
@@ -21,8 +23,6 @@ def allowed_report_actions(user):
         allowed.add("create_model_task")
     if capabilities["can_create_pages"]:
         allowed.add("create_page")
-    if capabilities["can_create_tasks"]:
-        allowed.add("create_task")
     if capabilities["can_attach_files_to_pages"]:
         allowed.add("add_form_to_page")
         allowed.add("attach_file_to_page")
@@ -72,9 +72,6 @@ def report_action_permission_context(user, allowed_actions=None):
         "can_create_model_tasks": (
             user_capabilities["can_create_model_tasks"]
             and "create_model_task" in allowed_set
-        ),
-        "can_create_tasks": (
-            user_capabilities["can_create_tasks"] and "create_task" in allowed_set
         ),
         "can_attach_files_to_pages": (
             user_capabilities["can_attach_files_to_pages"]

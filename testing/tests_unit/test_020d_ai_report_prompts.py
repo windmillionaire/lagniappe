@@ -815,6 +815,12 @@ def test_report_prompts_attach_provider_json_schema():
     assert update_schema["required"] == ["schema_id", "new_value"]
     assert update_schema["properties"]["page"] == {"type": "string"}
     assert update_schema["properties"]["task"] == {"type": "string"}
+    assert "earlier action in this proposal" in update_schema["properties"][
+        "page_action"
+    ]["description"]
+    assert "not a workspace hash" in update_schema["properties"]["task_action"][
+        "description"
+    ]
     assert update_schema["properties"]["schema_id"] == {"type": "string"}
     assert update_schema["properties"]["new_value"] == {}
     assert "anyOf" not in update_schema
@@ -840,6 +846,15 @@ def test_report_prompts_attach_provider_json_schema():
     assert "anyOf" not in add_category_data
     assert "completed" not in add_category_data["properties"]
     assert "updates" not in add_category_data["properties"]
+    assert "exact id of an earlier action" in add_category_data["properties"][
+        "page_action"
+    ]["description"].casefold()
+    create_page_data = full_actions["create_page"]["properties"]["data"]
+    submission_description = create_page_data["properties"]["submission"][
+        "description"
+    ]
+    assert "creates a new submission" in submission_description
+    assert "not a reference to an existing submission" in submission_description
     assert organize_action_data["propertyOrdering"][:2] == [
         "name",
         "form_type",
@@ -995,7 +1010,6 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "can_create_projects": False,
         "can_create_model_tasks": False,
         "can_create_pages": True,
-        "can_create_tasks": True,
         "can_attach_files_to_pages": True,
         "can_add_forms_to_pages": True,
         "can_attach_files_to_tasks": True,
@@ -1005,3 +1019,30 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "can_delete_pages": False,
     }
     assert permissions["allowed_actions"] == list(organize_prompt.allowed_actions)
+
+
+# @pairs ai-report:action-capabilities permissions:own-page
+@pytest.mark.unit
+def test_report_prompts_always_allow_tasks_on_the_personal_page():
+    user = _permissioned_user("personal-page-only", {})
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Personal task report",
+            "hash": "personal-task-report",
+            "parent": user,
+            "user": user,
+            "instructions": "Add a task to my personal page.",
+            "input_files": [],
+        },
+    )
+
+    with MockRestrictions().patch_cache():
+        prompt = create.create_prompt(report, user)
+
+    assert prompt.allowed_actions == ("create_task", "needs_review")
+    permissions = _prompt_context_json(prompt, "Report Action Permissions")
+    assert "can_create_tasks" not in permissions["capabilities"]
+    assert any(
+        "editable target" in rule for rule in permissions["rules"]
+    )

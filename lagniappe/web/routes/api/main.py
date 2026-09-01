@@ -33,16 +33,6 @@ PLAN_TOOL_RATE_WINDOW = 31 * 24 * 60 * 60
 UPLOAD_INPUT_NAME = "agent-api-files"
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::authenticate_request
-# @reason fail-closed feature normalization is exercised at the API boundary
-def _feature_enabled():
-    value = getattr(CONFIG, "EXTERNAL_AGENT_API_ENABLED", False)
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().casefold() in {"1", "true", "yes", "on"}
-
-
 # @testable infrastructure
 class APIProblem(Exception):
     """Expected client-facing API failure."""
@@ -122,14 +112,14 @@ def _rate_limit(scope, identifier, limit, window_seconds):
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : bearer-only error-envelope
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_rechecks_actor_and_plan_authority
+# @matrix agent-api : bearer-only error-envelope public-user request-recheck
+# @matrix ai-access : downgrade request-recheck
 @api.before_request
 def authenticate_request():
     """Authenticate only a bearer token; browser sessions are never a fallback."""
     g.NO_CACHE = True
     g.agent_api_request_id = _request_id()
-    if not _feature_enabled():
-        return _error("not_found", "API resource not found.", 404)
     if request.content_length and request.content_length > MAX_JSON_BODY_BYTES:
         return _error("request_too_large", "Request body is too large.", 413)
 
@@ -343,9 +333,11 @@ def _plan_payload(report, *, include_proposal=True):
     return _json_safe(payload)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::get_plan
-# @reason creator-bound lookup is owned by the public plan resource
+# @testable true
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_rechecks_actor_and_plan_authority
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_resources_hide_other_users_plans
+# @matrix agent-api : creator-bound downgrade generic-not-found plan-isolation stale-plan
+# @matrix ai-access : downgrade stale-plan
 def _load_plan(plan_id):
     report = Entities.fetch_one(plan_id, request=Fetch.direct())
     actor = g.agent_api_user
@@ -410,6 +402,10 @@ def _discovery_payload():
         "actor_url": url_for("agent_api.me", _external=True),
         "tools_url": url_for("agent_api.tools", _external=True),
         "plans_url": url_for("agent_api.create_plan", _external=True),
+        "client_skill_url": url_for(
+            "agent_api.client_skill",
+            _external=True,
+        ),
         "authentication": "Authorization: Bearer <user API key>",
         "instructions": (
             "Read openapi_url before using or guessing resource paths, then call "
@@ -441,6 +437,23 @@ def api_family_index():
 def api_index():
     """Point an authenticated client directly to API discovery resources."""
     return _discovery_payload()
+
+
+# @testable true
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
+# @matrix agent-api : bootstrap bearer-only discovery
+@api.get("/client-skill.md")
+@_route
+def client_skill():
+    """Return a copyable, discovery-first client skill without API schemas."""
+    response = make_response(
+        external_api.client_skill_markdown(
+            url_for("agent_api.api_index", _external=True).rstrip("/")
+        )
+    )
+    response.headers["Content-Type"] = "text/markdown; charset=utf-8"
+    response.headers["Content-Disposition"] = 'inline; filename="SKILL.md"'
+    return response
 
 
 # @testable true
@@ -497,13 +510,37 @@ def openapi_document():
                 },
             }
         },
+        "/api/v1/client-skill.md": {
+            "get": {
+                "operationId": "downloadClientSkill",
+                "summary": "Download the minimal client skill",
+                "description": (
+                    "Returns a short, copyable SKILL.md that teaches a client to "
+                    "start with live discovery, verify the actor, and follow the "
+                    "authoritative OpenAPI and plan contracts. It intentionally "
+                    "does not duplicate action schemas or permission rules."
+                ),
+                "tags": ["Discovery"],
+                "responses": {
+                    "200": {
+                        "description": "Canonical minimal client skill.",
+                        "content": {
+                            "text/markdown": {"schema": {"type": "string"}}
+                        },
+                    },
+                    "default": error_response,
+                },
+            }
+        },
         "/api/v1/me": {
             "get": {
                 "operationId": "getCurrentActor",
                 "summary": "Describe the API actor",
                 "description": (
                     "Call first to verify the bearer key, its user identity, and "
-                    "its permission-bounded Ask, Create, and Organize capabilities."
+                    "its permission-bounded Ask, Create, and Organize capabilities. "
+                    "The user object also identifies the actor's editable personal "
+                    "Page, which intentionally may not appear in workspace search."
                 ),
                 "tags": ["Discovery"],
                 "responses": {
@@ -974,6 +1011,7 @@ def me():
             "hash": actor.hash,
             "ai_access": actor.ai_access,
             "timezone": external_api.user_timezone_name(actor),
+            "personal_page": external_api.personal_page_reference(actor),
         },
         "credential": g.agent_api_credential,
         "capabilities": {

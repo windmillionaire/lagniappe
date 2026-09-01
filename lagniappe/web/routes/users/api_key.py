@@ -3,7 +3,6 @@
 from flask import abort, g, request
 from flask_login import current_user
 
-from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import AI
 from lagniappe.core.tools.auth import agent_api
@@ -16,20 +15,8 @@ from . import users
 
 # @testable false
 # @covered-by lagniappe/web/routes/users/api_key.py::api_key
-# @reason fail-closed feature normalization is exercised at the route boundary
-def _feature_enabled():
-    value = getattr(CONFIG, "EXTERNAL_AGENT_API_ENABLED", False)
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().casefold() in {"1", "true", "yes", "on"}
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/users/api_key.py::api_key
 # @reason user eligibility is owned by the public key-management route
 def _enabled_actor():
-    if not _feature_enabled():
-        abort(404)
     if getattr(current_user, "is_public", False):
         abort(403)
     g.NO_CACHE = True

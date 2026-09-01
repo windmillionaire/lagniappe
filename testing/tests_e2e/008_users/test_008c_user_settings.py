@@ -244,6 +244,70 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(controls.locator(Buttons.LP_CLOSE)).to_be_visible()
 
 
+# @matrix agent-api user-settings : confirmation-modal revoke rotate shown-once
+# @template pages/info.html::user_settings
+def test_ask_only_user_can_manage_external_agent_api_key(get_user):
+    owner = get_user(Users.OWNER)
+    user = get_user(Users.admin_ask, creator=owner)
+    user.go(SitePages.HOME)
+
+    go_to_my_page(user)
+    user_page = Page(user=user, definition=user.definition)
+    settings_panel = open_user_settings(user, user_page)
+
+    expect(settings_panel).to_have_attribute(
+        "data-api-key-route",
+        re.compile(r"/users/me/api-key$"),
+    )
+    api_key_settings = settings_panel.locator("[data-role='api-key-settings']")
+    expect(api_key_settings).to_be_visible()
+    expect(api_key_settings.locator("[data-role='api-key-status']")).not_to_have_text(
+        "Loading API key status..."
+    )
+
+    issue = api_key_settings.locator("[data-action='issue-api-key']")
+    revoke = api_key_settings.locator("[data-action='revoke-api-key']")
+    secret = api_key_settings.locator("[data-role='api-key-secret']")
+    value = api_key_settings.locator("[data-role='api-key-value']")
+
+    with user.page.expect_response("**/users/me/api-key") as issued_response:
+        issue.click()
+    assert issued_response.value.ok
+    expect(issue).to_have_text("Regenerate API key")
+    expect(secret).to_be_visible()
+    expect(value).not_to_be_empty()
+    first_token = value.text_content()
+
+    modal = Modal(user.page).open(issue)
+    expect(
+        modal.element.get_by_role("heading", name="Regenerate API key")
+    ).to_be_visible()
+    expect(modal.element).to_contain_text("The current key will stop working immediately.")
+    modal.click("Cancel")
+    expect(issue).to_have_text("Regenerate API key")
+
+    modal.open(issue)
+    with user.page.expect_response("**/users/me/api-key") as rotated_response:
+        modal.click("Regenerate API key")
+    assert rotated_response.value.ok
+    expect(value).not_to_have_text(first_token)
+
+    modal.open(revoke)
+    expect(modal.element.get_by_role("heading", name="Revoke API key")).to_be_visible()
+    expect(modal.element).to_contain_text("This key will stop working immediately.")
+    modal.click("Cancel")
+    expect(revoke).to_be_visible()
+
+    modal.open(revoke)
+    with user.page.expect_response("**/users/me/api-key") as revoked_response:
+        modal.click("Revoke API key")
+    assert revoked_response.value.ok
+    expect(api_key_settings.locator("[data-role='api-key-status']")).to_have_text(
+        "No active API key."
+    )
+    expect(revoke).to_be_hidden()
+
+
 # @matrix ai : access-gate batch-summary provider-boundary
 def test_page_editor_without_ai_create_is_rejected_before_batch_summary(
     get_user,

@@ -8,11 +8,11 @@ leave approval and application to the existing authenticated website controls.
 External plans never call Lagniappe's configured model, and the external API
 has no operation that applies a proposal to the workspace.
 
-The feature is included and enabled in generated deployment settings through
-`EXTERNAL_AGENT_API_ENABLED: true`. An operator can set it to `false` as an
-emergency or policy shutoff. Eligible users need at least `ASK` AI access and
-must not be public users. `CREATE` AI access is additionally required for
-Create and Organize.
+The API is part of the application rather than a deployment-wide optional
+feature. Eligibility is user-scoped: users must be non-public and have at least
+`ASK` AI access to manage a key or use Ask. `CREATE` AI access is additionally
+required for Create and Organize. Revoking a user's key or AI access provides
+the operational shutoff without maintaining a second configuration gate.
 
 ## Security model
 
@@ -26,6 +26,14 @@ Create and Organize.
   CSRF-exempt for that reason.
 - API calls run as the key's user. Existing read-tool handlers enforce that
   user's normal entity permissions. Plan access is also bound to its creator.
+- Every user has an editable personal Page. `/me`, each plan contract, and
+  `list_workspace_resources` identify it explicitly because personal Pages do
+  not appear in ordinary workspace search. A User and personal Page
+  intentionally share one public hash; the returned object identifies the
+  reference as `kind: "page"`, and proposal normalization maps it to the Page's
+  executable key. This grants no additional access: read tools remain
+  permission-filtered and deterministic execution still uses normal Page
+  permissions.
 - The bearer key can inspect permitted data and draft, validate, save, and
   revise reports. It cannot apply Create or Organize proposals. The agent must
   present `preview_url` and direct the user to the authenticated browser report,
@@ -59,21 +67,53 @@ changes.
 
 1. `GET /` points a client given only the versioned base URL to the authoritative
    discovery resources.
-2. `GET /me` verifies the actor, reports the actor's persisted timezone, and
-   reports separate Ask, Create, and Organize capabilities.
-3. `GET /tools` returns permission-bounded read tools as plain JSON Schema.
-4. `POST /plans` creates a provider-free draft with `tool` set to `ask`,
+2. `GET /client-skill.md` returns the optional canonical minimal `SKILL.md` for
+   clients that support local skills. It points back to live discovery and does
+   not duplicate schemas or permissions.
+3. `GET /me` verifies the actor, reports the actor's persisted timezone and
+   personal Page reference, and reports separate Ask, Create, and Organize
+   capabilities.
+4. `GET /tools` returns permission-bounded read tools as plain JSON Schema.
+   `list_workspace_resources` includes the personal Page alongside the
+   permission-filtered workspace inventory.
+5. `POST /plans` creates a provider-free draft with `tool` set to `ask`,
    `create`, or `organize`.
-5. Run permitted reads with `POST /plans/{id}/tools/{tool_name}` while the plan
+6. Run permitted reads with `POST /plans/{id}/tools/{tool_name}` while the plan
    is a draft. Reads remain available after a saved Ask answer and while a
    Create or Organize proposal remains ready for browser review.
-6. `GET /plans/{id}/contract` returns the selected tool's authoritative output
+7. `GET /plans/{id}/contract` returns the selected tool's authoritative output
    schema, submission wrapper, workflow rules, reference rules, permissions,
-   limits, actor timezone, and timezone-aware `current_date`.
-7. `POST /plans/{id}/submit` validates and publishes the final result. It never
+   limits, actor timezone, personal Page reference, and timezone-aware
+   `current_date`.
+8. `POST /plans/{id}/submit` validates and publishes the final result. It never
    calls a provider or applies workspace actions. Repeating this call with a
    valid complete result replaces the prior result while the report remains
    reusable.
+
+### Minimal client skill
+
+The authenticated discovery response includes `client_skill_url`. Its Markdown
+response is the canonical short bootstrap for clients that support local
+skills. For Pi, install or refresh it with:
+
+```bash
+mkdir -p ~/.pi/agent/skills/lagniappe
+curl --fail --silent --show-error \
+  -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
+  https://lagniappe.site/api/v1/client-skill.md \
+  -o ~/.pi/agent/skills/lagniappe/SKILL.md
+```
+
+The skill deliberately contains no action schemas, permission lists, or
+mode-specific proposal instructions. Those remain live in discovery, OpenAPI,
+and each plan contract so installed copies stay useful as the API evolves.
+
+Within Create and Organize proposals, a `data.submission` object contains the
+Form values to create with that new Page or Task, keyed by exact Form schema
+IDs; it is not an existing submission reference. Fields ending in `*_action`
+contain the exact ID of an earlier proposal action that creates the referenced
+entity. Existing workspace entities instead use their documented
+`hash:<12-character-hash>` references.
 
 ### Ask
 
@@ -113,6 +153,13 @@ structure before proposing new forms, categories, projects, model tasks, pages,
 or tasks. It uses the same permission-filtered action schema and on-demand
 guidelines as internal Create. The proposal must contain at least one allowed
 action or `needs_review`. Create does not accept plan uploads.
+
+`create_task` is always part of the Create and Organize action contracts because
+every user has an editable personal Page. The coarse capability projection does
+not expose a redundant `can_create_tasks` flag. A Task proposal must still name
+an editable target; use `personal_page.hash` for a request concerning the
+authenticated user's own Page. Proposals and the deterministic runner do not
+gain permission to write to any other Page.
 
 Optional page rich text is model-facing `document_markdown`. Proposal
 validation renders it through the same sanitized Markdown pipeline used by the

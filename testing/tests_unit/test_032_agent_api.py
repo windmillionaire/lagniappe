@@ -16,6 +16,32 @@ from lagniappe.core.tools.database import agent_api as credential_store
 from testing.utility.ai_report_fakes import _patch_fake_keys, _test_user
 
 
+def _contract_actor():
+    page = SimpleNamespace(
+        hash="personalpage",
+        name="Personal Page",
+        url="/pages/personal-page",
+        allowed=lambda action, user=None: True,
+    )
+    return SimpleNamespace(page=page)
+
+
+# @matrix agent-api : bootstrap discovery secret-handling tool-envelope
+@pytest.mark.unit
+def test_client_skill_markdown_is_minimal_and_discovery_first():
+    skill = external_api.client_skill_markdown("https://lagniappe.test/api/v1/")
+
+    assert skill.startswith("---\nname: lagniappe\n")
+    assert "https://lagniappe.test/api/v1`" in skill
+    assert "$LAGNIAPPE_API_KEY" in skill
+    assert "`openapi_url`" in skill
+    assert "`actor_url`" in skill
+    assert '{"arguments": {...}}' in skill
+    assert "authenticated website" in skill
+    assert "create_page" not in skill
+    assert "Bearer <" not in skill
+
+
 # @matrix agent-api ai-report : draft report-session status
 # @pair agent-api:origin
 @pytest.mark.unit
@@ -45,7 +71,7 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch):
 # @matrix agent-api ai-report : file-placement file-summary permissions proposal-contract
 @pytest.mark.unit
 def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
-    actor = object()
+    actor = _contract_actor()
     report = SimpleNamespace(
         tool="organize",
         input_files=[SimpleNamespace(hash="aaaaaaaaaaaa")],
@@ -76,6 +102,17 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     assert contract["version"] == external_api.CONTRACT_VERSION
     assert contract["current_date"] == "2026-08-31"
     assert contract["timezone"] == "UTC"
+    assert contract["personal_page"] == {
+        "kind": "page",
+        "hash": "hash:personalpage",
+        "name": "Personal Page",
+        "url": "/pages/personal-page",
+        "can_view": True,
+        "can_edit": True,
+    }
+    assert contract["workflow_rules"][0].startswith(
+        "personal_page is the authenticated user's guaranteed editable Page"
+    )
     assert contract["submission_format"] == {
         "contract_version": external_api.CONTRACT_VERSION,
         "body": {
@@ -115,13 +152,23 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         "ready Organize proposal remains conversationally revisable" in rule
         for rule in contract["workflow_rules"]
     )
+    assert any(
+        "exact id of an earlier action" in rule
+        and "never takes a workspace hash" in rule
+        for rule in contract["reference_rules"]
+    )
+    assert any(
+        "data.submission is the Form field-value object" in rule
+        and "not an existing submission reference" in rule
+        for rule in contract["reference_rules"]
+    )
     assert contract["limits"]["max_tool_calls"] == external_api.MAX_PLAN_TOOL_CALLS
 
 
 # @pairs agent-api:create-revision agent-api:organize-revision agent-api:proposal-contract ai-report:proposal-contract
 @pytest.mark.unit
 def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
-    actor = object()
+    actor = _contract_actor()
     monkeypatch.setattr(
         external_api.dates,
         "user_today",
@@ -643,6 +690,19 @@ def test_issue_authenticate_expire_and_revoke_credential(monkeypatch):
     with pytest.raises(agent_auth.AgentAPICredentialError):
         agent_auth.authenticate_credential(token, now=now)
 
+    replacement_token, replacement = agent_auth.issue_credential(user, now=now)
+    assert replacement["active"] is True
+    assert replacement["generation"] == revoked["generation"] + 1
+    assert replacement_token != token
+    with pytest.raises(agent_auth.AgentAPICredentialError):
+        agent_auth.authenticate_credential(token, now=now)
+    authenticated, metadata = agent_auth.authenticate_credential(
+        replacement_token,
+        now=now,
+    )
+    assert authenticated is user
+    assert metadata == replacement
+
 
 # @matrix agent-api : authentication tamper user-binding
 @pytest.mark.unit
@@ -724,13 +784,24 @@ def test_credential_rotation_and_revocation_are_transactional(monkeypatch):
         "user-key",
         revoked_at=now,
     )
+    replacement = credential_store.rotate_credential(
+        "credential",
+        "user-key",
+        token_digest="replacement",
+        display_prefix="lgn_replacement",
+        issued_at=now,
+        expires_at=now + timedelta(days=30),
+    )
 
     assert first["generation"] == 1
     assert second_generation == 2
     assert revoked["generation"] == 3
     assert revoked["active"] is False
     assert "token_digest" not in revoked
-    assert len(transactions) == 3
+    assert replacement["generation"] == 4
+    assert replacement["active"] is True
+    assert replacement["token_digest"] == "replacement"
+    assert len(transactions) == 4
 
 
 # @matrix agent-api ai-report : upload-finalization temporary-view-ownership

@@ -73,7 +73,6 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
         SETTINGS=types.SimpleNamespace(app_config=app_settings),
         constants=types.SimpleNamespace(
             BUILD_ID="tracked-build",
-            DEFAULT_EXTERNAL_AGENT_API_ENABLED=True,
             DEFAULT_SOURCE_URL="https://example.test/default-source",
             UNSUPPORTED_SETTING_KEYS=frozenset(),
         ),
@@ -100,7 +99,6 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
         == "runtime@project-1.iam.gserviceaccount.com"
     )
     assert module.CONFIG.AI_OBSERVABILITY is False
-    assert module.CONFIG.EXTERNAL_AGENT_API_ENABLED is True
     assert module.CONFIG.GOOGLE_SIGNIN_ENABLED is True
     assert module.CONFIG.GOOGLE_CLIENT_ID == ""
     assert module.CONFIG.CUSTOM_DOMAIN == ""
@@ -178,14 +176,13 @@ def test_config_requires_hosted_build_id_to_match_built_source(monkeypatch):
         mismatch_spec.loader.exec_module(mismatch_module)
 
 
-# @matrix config : external-agent-api google-signin observability-setting
+# @matrix config : google-signin observability-setting
 # @pair ai:observability
 def test_config_honors_ai_observability_setting(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
         "CONFIG_SCHEMA_VERSION": 3,
         "AI_OBSERVABILITY": True,
-        "EXTERNAL_AGENT_API_ENABLED": True,
         "GOOGLE_SIGNIN_ENABLED": False,
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
             "runtime@project-1.iam.gserviceaccount.com"
@@ -222,7 +219,6 @@ def test_config_honors_ai_observability_setting(monkeypatch):
     spec.loader.exec_module(module)
 
     assert module.CONFIG.AI_OBSERVABILITY is True
-    assert module.CONFIG.EXTERNAL_AGENT_API_ENABLED is True
     assert module.CONFIG.GOOGLE_SIGNIN_ENABLED is False
     assert module.CONFIG.GOOGLE_CLIENT_ID == ""
     assert module.CONFIG.ANALYTICS is False

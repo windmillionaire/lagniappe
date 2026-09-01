@@ -11,7 +11,12 @@ from lagniappe.core.tools import cache, dates
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.files.html import render_markdown, strip_tags
 
-from .references import HASH_PREFIXED_ID_REGEX, HASH_REFERENCE_REGEX, hash_reference
+from .references import (
+    HASH_PREFIXED_ID_REGEX,
+    HASH_REFERENCE_REGEX,
+    hash_reference,
+    personal_page_reference,
+)
 from .ask import ask_report_name, ask_response_schema, validate_ask_response
 from .create import CREATE_ACTION_TYPES
 from .reporting.uploads import (
@@ -52,6 +57,32 @@ REFERENCE_FIELDS = frozenset(
         "to_task",
     }
 )
+
+
+# @testable true
+# @tests tests_unit/test_032_agent_api.py::test_client_skill_markdown_is_minimal_and_discovery_first
+# @matrix agent-api : bootstrap discovery secret-handling tool-envelope
+def client_skill_markdown(base_url):
+    """Return the canonical minimal client skill for this API deployment."""
+    base_url = str(base_url or "").rstrip("/")
+    return f"""---
+name: lagniappe
+description: Use the user's personal Lagniappe workspace to answer questions, organize files, or create pages, projects, and tasks.
+---
+
+# Lagniappe API
+
+Use `{base_url}` when a request needs the user's personal workspace context,
+file organization, or workspace creation.
+
+Read the bearer key from `$LAGNIAPPE_API_KEY`. Never print it, store it in a
+file, or put it in a URL. Start with the API discovery endpoint, read its
+`openapi_url`, and then call its `actor_url` to verify the user and capabilities.
+
+Tool calls wrap inputs as `{{"arguments": {{...}}}}`. Treat live discovery,
+OpenAPI, and plan contracts as authoritative. Create and Organize only prepare
+proposals; the user approves workspace changes on the authenticated website.
+"""
 
 
 # @testable false
@@ -243,8 +274,13 @@ def plan_contract(report, user):
             ]
             reference_rules = [
                 "Use hash:<12-character-hash> for every existing entity.",
-                "Use *_action fields to reference entities created by earlier actions.",
+                "A field ending in *_action takes the exact id of an earlier action "
+                "in this proposal that creates the referenced entity; it never takes "
+                "a workspace hash or entity id.",
                 "Do not submit URL-safe Datastore keys.",
+                "data.submission is the Form field-value object to create with a new "
+                "Page or Task, keyed by exact Form schema ids; it is not an existing "
+                "submission reference.",
                 "Submission values must be final; server-side model repair is unavailable.",
             ]
         else:
@@ -277,18 +313,32 @@ def plan_contract(report, user):
             ]
             reference_rules = [
                 "Use hash:<12-character-hash> for every existing entity.",
-                "Use *_action fields to reference entities created by earlier actions.",
+                "A field ending in *_action takes the exact id of an earlier action "
+                "in this proposal that creates the referenced entity; it never takes "
+                "a workspace hash or entity id.",
                 "Do not submit URL-safe Datastore keys.",
+                "data.submission is the Form field-value object to create with a new "
+                "Page or Task, keyed by exact Form schema ids; it is not an existing "
+                "submission reference.",
                 "Every uploaded file must be attached to at least one page or task.",
                 "Each uploaded file must also have exactly one summarize_file action "
                 "using its report file reference.",
                 "Submission values must be final; server-side model repair is unavailable.",
             ]
+    personal_page = personal_page_reference(user)
+    workflow_rules.insert(
+        0,
+        "personal_page is the authenticated user's guaranteed editable Page. "
+        "It intentionally does not appear in workspace search and shares its "
+        "public hash with the user; use personal_page.hash as a Page reference "
+        "when the user asks about or requests Tasks on their own Page.",
+    )
     return {
         "version": CONTRACT_VERSION,
         "tool": tool,
         "current_date": dates.user_today(user).date().isoformat(),
         "timezone": user_timezone_name(user),
+        "personal_page": personal_page,
         "submission_format": {
             "contract_version": CONTRACT_VERSION,
             "body": {
@@ -574,6 +624,7 @@ __all__ = [
     "MAX_PLAN_TOOL_CALLS",
     "MAX_TOTAL_FILE_BYTES",
     "SUPPORTED_PLAN_TOOLS",
+    "client_skill_markdown",
     "create_plan",
     "finalize_uploads",
     "plan_contract",

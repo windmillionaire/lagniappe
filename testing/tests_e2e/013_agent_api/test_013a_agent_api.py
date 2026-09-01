@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from lagniappe import CONFIG
 from lagniappe.core.definitions import AI
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.web import app
@@ -18,6 +17,15 @@ from lagniappe.web.routes.tools import preview as tool_preview_routes
 pytestmark = pytest.mark.e2e
 
 
+class PersonalPage:
+    hash = "personalpage"
+    name = "External Planner"
+    url = "/pages/actor-page"
+
+    def allowed(self, action, user=None):
+        return True
+
+
 class Actor:
     name = "External Planner"
     hash = "actorhash123"
@@ -27,6 +35,7 @@ class Actor:
     db = {"timezone": "America/Los_Angeles"}
     is_public = False
     is_authenticated = True
+    page = PersonalPage()
 
     def access(self, required):
         return required in {AI.ASK, AI.CREATE}
@@ -58,13 +67,12 @@ def _report(actor, tool="organize"):
     )
 
 
-# @matrix agent-api : bearer-only contract create-revision organize-revision discovery error-envelope plan-session proposal-contract routing submission tool-catalog tool-dispatch uploads
+# @matrix agent-api : bearer-only bootstrap contract create-revision organize-revision discovery error-envelope plan-session proposal-contract routing submission tool-catalog tool-dispatch uploads
 # @pairs agent-api:create-revision agent-api:organize-revision agent-api:plan-capability
 def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeypatch):
     actor = Actor()
     report = _report(actor)
     seen = {}
-    monkeypatch.setattr(CONFIG, "EXTERNAL_AGENT_API_ENABLED", True)
     monkeypatch.setattr(
         api_routes,
         "check_limit",
@@ -115,6 +123,14 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "hash": actor.hash,
         "ai_access": "CREATE",
         "timezone": "America/Los_Angeles",
+        "personal_page": {
+            "kind": "page",
+            "hash": "hash:personalpage",
+            "name": "External Planner",
+            "url": "/pages/actor-page",
+            "can_view": True,
+            "can_edit": True,
+        },
     }
     assert authorized.json["capabilities"] == {
         "ask": True,
@@ -140,6 +156,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert index.json["version"] == "v1"
     assert index.json["openapi_url"].endswith("/api/v1/openapi.json")
     assert index.json["actor_url"].endswith("/api/v1/me")
+    assert index.json["client_skill_url"].endswith("/api/v1/client-skill.md")
     assert "before using or guessing resource paths" in index.json["instructions"]
     trailing_index = client.get(
         "/api/v1/",
@@ -148,6 +165,17 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert trailing_index.status_code == 200
     assert trailing_index.json == index.json
 
+    client_skill = client.get(
+        "/api/v1/client-skill.md",
+        headers={"Authorization": "Bearer valid-key"},
+    )
+    assert client_skill.status_code == 200
+    assert client_skill.mimetype == "text/markdown"
+    assert client_skill.headers["Content-Disposition"] == 'inline; filename="SKILL.md"'
+    assert client_skill.headers["Cache-Control"] == "no-store"
+    assert "name: lagniappe" in client_skill.get_data(as_text=True)
+    assert "$LAGNIAPPE_API_KEY" in client_skill.get_data(as_text=True)
+
     openapi = client.get(
         "/api/v1/openapi.json",
         headers={"Authorization": "Bearer valid-key"},
@@ -155,6 +183,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert openapi.status_code == 200
     assert openapi.json["openapi"] == "3.1.0"
     assert "/api/v1" in openapi.json["paths"]
+    assert "/api/v1/client-skill.md" in openapi.json["paths"]
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
     assert "/api/v1/plans/{plan_id}/execute" not in openapi.json["paths"]
     assert "external API never applies those proposals" in openapi.json["info"][
@@ -519,19 +548,109 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "plan_state_conflict"
     )
 
-    monkeypatch.setattr(CONFIG, "EXTERNAL_AGENT_API_ENABLED", False)
-    disabled = client.get(
-        "/api/v1/me",
-        headers={"Authorization": "Bearer valid-key"},
+
+# @matrix agent-api ai-access : downgrade public-user request-recheck stale-plan
+def test_external_api_rechecks_actor_and_plan_authority(monkeypatch):
+    actor = Actor()
+    report = _report(actor, tool="create")
+    monkeypatch.setattr(
+        api_routes,
+        "check_limit",
+        lambda *args: {
+            "allowed": True,
+            "count": 1,
+            "remaining": 59,
+            "retry_after": 60,
+        },
     )
-    assert disabled.status_code == 404
-    assert disabled.json["error"]["code"] == "not_found"
-    disabled_family = client.get(
-        "/api",
-        headers={"Authorization": "Bearer valid-key"},
+    monkeypatch.setattr(
+        agent_auth,
+        "authenticate_credential",
+        lambda token: (actor, {"active": True, "generation": 1}),
     )
-    assert disabled_family.status_code == 404
-    assert disabled_family.json["error"]["code"] == "not_found"
+    monkeypatch.setattr(api_routes.Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(
+        api_routes.Entities,
+        "fetch_one",
+        lambda plan_id, request: report,
+    )
+
+    client = app.test_client()
+    headers = {"Authorization": "Bearer valid-key"}
+    assert client.get("/api/v1/plans/report-key", headers=headers).status_code == 200
+
+    actor.access = lambda required: required is AI.ASK
+    downgraded = client.get("/api/v1/plans/report-key", headers=headers)
+    assert downgraded.status_code == 403
+    assert downgraded.json["error"]["code"] == "forbidden"
+    assert "can no longer use Create plans" in downgraded.json["error"]["message"]
+
+    actor.access = lambda required: False
+    disabled = client.get("/api/v1/me", headers=headers)
+    assert disabled.status_code == 403
+    assert disabled.json["error"] == {
+        "code": "forbidden",
+        "message": "This user cannot use external AI plans.",
+    }
+
+    actor.access = lambda required: True
+    actor.is_public = True
+    public = client.get("/api/v1/me", headers=headers)
+    assert public.status_code == 403
+    assert public.json["error"] == disabled.json["error"]
+
+
+# @matrix agent-api : creator-bound generic-not-found plan-isolation
+def test_external_plan_resources_hide_other_users_plans(monkeypatch):
+    owner = Actor()
+    intruder = Actor()
+    intruder.key = "other-user-key"
+    intruder.urlsafe_key = "other-user-url-key"
+    report = _report(owner)
+    monkeypatch.setattr(
+        api_routes,
+        "check_limit",
+        lambda *args: {
+            "allowed": True,
+            "count": 1,
+            "remaining": 59,
+            "retry_after": 60,
+        },
+    )
+
+    def authenticate(token):
+        actor = owner if token == "owner-key" else intruder
+        return actor, {"active": True, "generation": 1}
+
+    monkeypatch.setattr(agent_auth, "authenticate_credential", authenticate)
+    monkeypatch.setattr(api_routes.Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(
+        api_routes.Entities,
+        "fetch_one",
+        lambda plan_id, request: report if plan_id == "report-key" else None,
+    )
+
+    client = app.test_client()
+    foreign = client.get(
+        "/api/v1/plans/report-key",
+        headers={"Authorization": "Bearer intruder-key"},
+    )
+    missing = client.get(
+        "/api/v1/plans/missing-key",
+        headers={"Authorization": "Bearer intruder-key"},
+    )
+    assert foreign.status_code == missing.status_code == 404
+    assert foreign.json["error"] == missing.json["error"] == {
+        "code": "not_found",
+        "message": "Plan not found.",
+    }
+
+    owned = client.get(
+        "/api/v1/plans/report-key",
+        headers={"Authorization": "Bearer owner-key"},
+    )
+    assert owned.status_code == 200
+    assert owned.json["id"] == "report-key"
 
 
 # @source lagniappe/core/tools/ai/external_api.py::required_ai_access
@@ -550,7 +669,6 @@ def test_external_ask_plan_is_available_without_create_access(monkeypatch):
     actor = AskActor()
     report = _report(actor, tool="ask")
     report.instructions = "Which pages have open tasks?"
-    monkeypatch.setattr(CONFIG, "EXTERNAL_AGENT_API_ENABLED", True)
     monkeypatch.setattr(
         api_routes,
         "check_limit",
@@ -759,7 +877,6 @@ def test_user_can_rotate_and_revoke_external_agent_api_key(monkeypatch):
         "generation": 1,
     }
     revoked = {**issued, "active": False, "generation": 2}
-    monkeypatch.setattr(CONFIG, "EXTERNAL_AGENT_API_ENABLED", True)
     monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
     monkeypatch.setattr(web_auth, "_load_request_context", lambda key=None: (actor, None))
     monkeypatch.setattr(web_auth, "require_ai_access", lambda required: None)

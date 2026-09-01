@@ -129,13 +129,20 @@ def _report_schema_operation_response_schema():
 # @reason nested update contract is asserted through the public response schema
 def _report_submission_update_response_schema():
     """Return the provider schema for one exact submission field update."""
+    action_reference = {
+        "type": "string",
+        "description": (
+            "Exact id of an earlier action in this proposal that creates the "
+            "referenced entity; not a workspace hash or entity id."
+        ),
+    }
     return {
         "type": "object",
         "properties": {
             "page": {"type": "string"},
-            "page_action": {"type": "string"},
+            "page_action": action_reference,
             "task": {"type": "string"},
-            "task_action": {"type": "string"},
+            "task_action": action_reference,
             "schema_id": {"type": "string"},
             "field_id": {"type": "string"},
             # Form fields accept heterogeneous JSON values. Declaring the key
@@ -162,6 +169,20 @@ def _report_submission_update_response_schema():
 # @reason action data variants are asserted through the public response schema
 def _report_action_data_properties():
     """Return the complete field vocabulary used by typed action variants."""
+    action_reference = {
+        "type": "string",
+        "description": (
+            "Exact id of an earlier action in this proposal that creates the "
+            "referenced entity; not a workspace hash or entity id."
+        ),
+    }
+    submission = submission_response_schema()
+    submission["description"] = (
+        "Form field values to submit on the Page or Task created by this action, "
+        "keyed by the exact ids from the referenced Form schema. This creates a "
+        "new submission with the entity; it is not a reference to an existing "
+        "submission."
+    )
     return {
         "name": {"type": "string"},
         "description": {"type": "string"},
@@ -172,36 +193,36 @@ def _report_action_data_properties():
             "minItems": 1,
         },
         "category": {"type": "string"},
-        "category_action": {"type": "string"},
+        "category_action": action_reference,
         "category_name": {"type": "string"},
         "form": {"type": "string"},
-        "form_action": {"type": "string"},
+        "form_action": action_reference,
         "form_name": {"type": "string"},
         "page": {"type": "string"},
-        "page_action": {"type": "string"},
+        "page_action": action_reference,
         "page_name": {"type": "string"},
         "entity": {"type": "string"},
-        "entity_action": {"type": "string"},
+        "entity_action": action_reference,
         "entity_name": {"type": "string"},
         "task": {"type": "string"},
-        "task_action": {"type": "string"},
+        "task_action": action_reference,
         "task_name": {"type": "string"},
         "project": {"type": "string"},
-        "project_action": {"type": "string"},
+        "project_action": action_reference,
         "project_name": {"type": "string"},
         "model": {"type": "string"},
-        "model_action": {"type": "string"},
+        "model_action": action_reference,
         "model_name": {"type": "string"},
         "file": {"type": "string"},
         "display_name": {"type": "string"},
         "from_page": {"type": "string"},
-        "from_page_action": {"type": "string"},
+        "from_page_action": action_reference,
         "from_task": {"type": "string"},
-        "from_task_action": {"type": "string"},
+        "from_task_action": action_reference,
         "to_page": {"type": "string"},
-        "to_page_action": {"type": "string"},
+        "to_page_action": action_reference,
         "to_task": {"type": "string"},
-        "to_task_action": {"type": "string"},
+        "to_task_action": action_reference,
         "operations": {
             "type": "array",
             "items": _report_schema_operation_response_schema(),
@@ -212,8 +233,14 @@ def _report_action_data_properties():
             "items": _report_submission_update_response_schema(),
             "minItems": 1,
         },
-        "submission": submission_response_schema(),
-        "submission_empty_reason": {"type": "string"},
+        "submission": submission,
+        "submission_empty_reason": {
+            "type": "string",
+            "description": (
+                "Why no Form values can be grounded when this action still needs "
+                "to create an intentionally empty submission."
+            ),
+        },
         "document_markdown": {"type": "string"},
         "due_date": {"type": "string"},
         "schedule": task_schedule_response_schema(),

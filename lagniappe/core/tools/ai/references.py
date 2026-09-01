@@ -2,6 +2,7 @@
 
 import re
 
+from lagniappe.core.definitions import Action
 from lagniappe.core.tools import cache
 from lagniappe.core.tools.files.html import render_markdown
 
@@ -27,6 +28,22 @@ def hash_reference(entity):
     """Return the explicit AI reference token for an entity hash."""
     entity_hash = getattr(entity, "hash", None)
     return f"hash:{entity_hash}" if entity_hash else None
+
+
+# @testable true
+# @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
+# @pairs ai:resource-inventory permissions:personal-page
+def personal_page_reference(user):
+    """Return the authenticated user's guaranteed editable Page reference."""
+    page = user.page
+    return {
+        "kind": "page",
+        "hash": hash_reference(page),
+        "name": page.name,
+        "url": page.url,
+        "can_view": page.allowed(Action.VIEW, user=user),
+        "can_edit": page.allowed(Action.EDIT, user=user),
+    }
 
 
 # @testable true

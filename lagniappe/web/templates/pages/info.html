@@ -50,7 +50,7 @@
         data-can-edit-ai="{{ can_manage_user|yesno }}"
         data-ai-access="{{ page.user.ai_access }}"
         data-notification-email-mode="{{ page.user.notification_email_mode }}"
-        {% if CONFIG.EXTERNAL_AGENT_API_ENABLED and is_own_page and not page.user.is_public and current_user.access(AI.CREATE) %}
+        {% if is_own_page and not page.user.is_public and current_user.access(AI.ASK) %}
           data-api-key-route="{{ url_for('users.api_key') }}"
         {% endif %}
         data-can-edit-notification-email="{{ (is_own_page and not page.user.is_public)|yesno }}"
@@ -89,7 +89,7 @@
             </div>
           </div>
           {% if is_own_page and not page.user.is_public %}<div data-role="notification-email"></div>{% endif %}
-          {% if CONFIG.EXTERNAL_AGENT_API_ENABLED and is_own_page and not page.user.is_public and current_user.access(AI.ASK) %}
+          {% if is_own_page and not page.user.is_public and current_user.access(AI.ASK) %}
             <fieldset data-role="api-key-settings"
                       data-kind="user"
                       class="rounded-md border border-user-default p-3">
@@ -132,6 +132,42 @@
                           data-visible="false"
                           class="{{ styles.button.submit }} sm:basis-1/2">Revoke API key</button>
                 </div>
+                <template data-role="api-key-confirmation-template">
+                  <div id="modal"
+                       data-kind="user"
+                       role="dialog"
+                       aria-modal="true"
+                       aria-labelledby="api-key-confirmation-title"
+                       class="{{ styles.modal.wrapper }}">
+                    <div id="modal-content" class="{{ styles.modal.content }} max-w-sm">
+                      <div class="{{ styles.modal.header }}">
+                        <h2 id="api-key-confirmation-title"
+                            class="text-xl font-bold text-base-dark">
+                          {{ render_icon("error", "mr-2 text-delete-default") }}
+                          <span data-role="confirmation-title"></span>
+                        </h2>
+                        <button type="button"
+                                lp-control="close"
+                                data-controls="close"
+                                class="{{ styles.button.close }}">Cancel</button>
+                      </div>
+                      <div class="space-y-6 p-6">
+                        <div class="rounded-lg border border-delete-light bg-delete-bg p-4">
+                          <p data-role="confirmation-description"
+                             class="text-sm text-delete-default"></p>
+                        </div>
+                        <div class="{{ styles.modal.actions }}">
+                          <button type="button"
+                                  data-role="confirmation-confirm"
+                                  data-kind="delete"
+                                  class="{{ styles.button.submit }}">
+                            <span data-role="text"></span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
               </div>
             </fieldset>
           {% endif %}

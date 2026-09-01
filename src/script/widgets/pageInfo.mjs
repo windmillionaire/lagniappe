@@ -4,7 +4,7 @@ import { RadioElement } from "../elements/radio";
 import { sections } from "../elements/sections";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
-import { captureError, request, withTransition } from "../shared";
+import { captureError, Modal, request, withTransition } from "../shared";
 import { PagePermissions } from "./pagePermissions";
 
 /**
@@ -454,7 +454,8 @@ export class UserSettings extends PagePermissions {
 				? `${credential.display_prefix || "API key"} — expires ${expires}`
 				: "No active API key.";
 		}
-		if (issue) issue.textContent = active ? "Regenerate API key" : "Generate API key";
+		if (issue)
+			issue.textContent = active ? "Regenerate API key" : "Generate API key";
 		if (revoke) revoke.dataset.visible = active.toString();
 		if (secret) secret.dataset.visible = Boolean(token).toString();
 		if (value) value.textContent = token || "";
@@ -468,12 +469,81 @@ export class UserSettings extends PagePermissions {
 		target.dataset.visible = Boolean(message).toString();
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_ask_only_user_can_manage_external_agent_api_key
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_confirmation_uses_app_modal
+	 * @matrix agent-api user-settings : confirmation-modal revoke rotate
+	 */
+	async _confirmApiKeyAction(section, trigger, options) {
+		const template = section.querySelector(
+			"template[data-role='api-key-confirmation-template']",
+		);
+		const modalElement = template?.content
+			?.querySelector("#modal")
+			?.cloneNode(true);
+		if (!modalElement) {
+			captureError(
+				new Error("API key confirmation template is missing."),
+				trigger,
+				this.view?.dataset,
+			);
+			return false;
+		}
+
+		modalElement.querySelector("[data-role='confirmation-title']").textContent =
+			options.title;
+		modalElement.querySelector(
+			"[data-role='confirmation-description']",
+		).textContent = options.description;
+		const confirm = modalElement.querySelector(
+			"[data-role='confirmation-confirm']",
+		);
+		confirm.querySelector("[data-role='text']").textContent = options.label;
+
+		const modal = new Modal(this.view, trigger);
+		let settled = false;
+		let settle;
+		const confirmation = new Promise((resolve) => {
+			settle = (value) => {
+				if (settled) return;
+				settled = true;
+				resolve(value);
+			};
+		});
+		const remove = modal.remove.bind(modal);
+		modal.remove = async () => {
+			const result = await remove();
+			settle(false);
+			return result;
+		};
+		confirm.addEventListener(
+			"click",
+			async () => {
+				confirm.disabled = true;
+				await remove();
+				settle(true);
+			},
+			{ once: true },
+		);
+
+		const attached = await modal.attach(modalElement);
+		if (!attached) settle(false);
+		else confirm.focus();
+		return confirmation;
+	}
+
 	async _issueApiKey(section, route) {
 		const issue = section.querySelector("[data-action='issue-api-key']");
 		const isRotation = issue?.textContent?.includes("Regenerate");
 		if (
 			isRotation &&
-			!window.confirm("Regenerate this API key? The current key will stop working.")
+			!(await this._confirmApiKeyAction(section, issue, {
+				title: "Regenerate API key",
+				description:
+					"The current key will stop working immediately. Any client using it must be updated with the new key.",
+				label: "Regenerate API key",
+			}))
 		) {
 			return;
 		}
@@ -485,10 +555,17 @@ export class UserSettings extends PagePermissions {
 	}
 
 	async _revokeApiKey(section, route) {
-		if (!window.confirm("Revoke this API key? Any client using it will stop working.")) {
+		const revoke = section.querySelector("[data-action='revoke-api-key']");
+		if (
+			!(await this._confirmApiKeyAction(section, revoke, {
+				title: "Revoke API key",
+				description:
+					"This key will stop working immediately. Any client using it will lose access until a new key is generated.",
+				label: "Revoke API key",
+			}))
+		) {
 			return;
 		}
-		const revoke = section.querySelector("[data-action='revoke-api-key']");
 		if (revoke) revoke.disabled = true;
 		const response = await request.delete(route);
 		if (revoke) revoke.disabled = false;

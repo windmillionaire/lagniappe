@@ -65,7 +65,9 @@ def normalize_report_markdown(proposal):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_external_file_summaries
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_treats_action_like_submission_fields_as_content
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_future_completed_dates
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
 # @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission validation
+# @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
     proposal,
     allowed_actions=None,
@@ -306,6 +308,10 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
         details = resolved_details.get(match.group(1)) or {}
         actual_kind = details.get("kind")
         if not actual_kind or actual_kind in expected_kinds:
+            continue
+        if actual_kind == "user" and "page" in expected_kinds:
+            # User-owned Pages use the virtual search kind ``user`` while the
+            # cached executable id remains the underlying Page key.
             continue
         expected = " or ".join(sorted(expected_kinds))
         name = details.get("name")

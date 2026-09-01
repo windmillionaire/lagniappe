@@ -412,7 +412,6 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
 
         assert SETTINGS.test_config["BASE_URL"].startswith("http://")
         assert SETTINGS.test_config["AGENT_ACCESS_ENABLED"] is True
-        assert SETTINGS.test_config["EXTERNAL_AGENT_API_ENABLED"] is True
         assert SETTINGS.test_config["ANALYTICS"] is True
         assert SETTINGS.test_config["AI_OBSERVABILITY"] is True
         assert SETTINGS.test_config["PUBLIC_MANUAL"] is True
@@ -437,7 +436,6 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
         SETTINGS.TEST_CONFIG.update(
             {
                 "AGENT_ACCESS_ENABLED": False,
-                "EXTERNAL_AGENT_API_ENABLED": False,
                 "AGENT_ACCESS_CODE": "custom-test-code",
                 "AI_OBSERVABILITY": False,
             }
@@ -445,7 +443,6 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
         SETTINGS._TEST_SETTINGS = None
 
         assert SETTINGS.test_config["AGENT_ACCESS_ENABLED"] is False
-        assert SETTINGS.test_config["EXTERNAL_AGENT_API_ENABLED"] is False
         assert SETTINGS.test_config["AGENT_ACCESS_CODE"] == "custom-test-code"
         assert SETTINGS.test_config["AI_OBSERVABILITY"] is False
 
