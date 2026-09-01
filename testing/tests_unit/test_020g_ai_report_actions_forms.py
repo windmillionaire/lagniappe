@@ -63,7 +63,11 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
             {
                 "id": "page",
                 "type": "create_page",
-                "data": {"name": "July Receipt", "category_action": "category"},
+                "data": {
+                    "name": "July Receipt",
+                    "category_action": "category",
+                    "document_markdown": "# Receipt notes\n\n- Review the total",
+                },
             },
             {
                 "id": "attachment",
@@ -141,6 +145,18 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
             "CATEGORY", {"name": "Uncategorized Pages", "hash": "uncategorized"}
         ),
     )
+    create_page = report_runner.Entities.PAGE.create
+
+    def create_page_with_in_memory_assets(data):
+        page = create_page(data)
+        page.save_asset = lambda content, *_args, **_kwargs: content
+        return page
+
+    monkeypatch.setattr(
+        report_runner.Entities.PAGE,
+        "create",
+        create_page_with_in_memory_assets,
+    )
 
     result = report_runner.run_report(report, user)
 
@@ -173,6 +189,16 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     assert result["actions"][9]["entity"]["parent"]["name"] == "House Admin"
     assert result["actions"][3]["target"]["kind"] == "page"
     assert result["actions"][3]["target"]["name"] == "July Receipt"
+    july_page = next(
+        entity
+        for entity in saved_entities
+        if getattr(entity, "entity_kind", None) == "page"
+        and entity.name == "July Receipt"
+    )
+    assert july_page.properties.document.html == (
+        "<h1>Receipt notes</h1><ul><li>Review the total</li></ul>"
+    )
+    assert "document_markdown" not in report.proposal["actions"][2]["data"]
     assert result["actions"][4]["type"] == "summarize_file"
     assert result["actions"][4]["entity"]["kind"] == "file"
     assert result["actions"][4]["file_summary"] == {

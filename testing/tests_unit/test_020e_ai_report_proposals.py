@@ -33,6 +33,37 @@ def test_generate_organize_report_validates_ai_output(monkeypatch):
     assert organize.generate_organize_plan(object()) == proposal
 
 
+# @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
+@pytest.mark.unit
+def test_validate_proposal_renders_page_document_markdown():
+    proposal = {
+        "summary": "Create a reference page.",
+        "confidence": 0.9,
+        "issues": [],
+        "actions": [
+            {
+                "id": "create-reference",
+                "type": "create_page",
+                "data": {
+                    "name": "Reference",
+                    "document_markdown": (
+                        "# Heading\n\n| Name | Value |\n| --- | --- |\n"
+                        "| Safe | <script>alert('no')</script>Yes |"
+                    ),
+                },
+            }
+        ],
+    }
+
+    validated = proposal_validation.validate_proposal(proposal)
+    data = validated["actions"][0]["data"]
+
+    assert "document_markdown" not in data
+    assert "<h1>Heading</h1>" in data["document"]
+    assert "<table>" in data["document"]
+    assert "<script" not in data["document"]
+
+
 
 
 # @matrix ai-report : generate repair validate
@@ -1546,7 +1577,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         fake_get_details_by_hash,
     )
 
-    with pytest.raises(exceptions.AIException, match="Unknown organize action"):
+    with pytest.raises(exceptions.AIException, match="Unknown report action"):
         organize.validate_proposal(
             {"summary": "Nope", "confidence": 0.1, "actions": [{"type": "dance"}]}
         )

@@ -298,7 +298,7 @@ guideline reads:
   before writing a new form schema, matching the create_form form_type.
 - You MUST call get_guidelines("schema_evolution") before proposing additive
   changes to an existing form schema.
-- get_guidelines("page_document") before adding optional document HTML.
+- get_guidelines("page_document") before adding optional document Markdown.
 
 It is fine to read multiple guideline bundles when the proposal crosses several
 areas. Keep using the organize action shape in the final answer even after

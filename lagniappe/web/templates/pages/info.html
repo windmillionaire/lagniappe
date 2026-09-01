@@ -89,14 +89,14 @@
             </div>
           </div>
           {% if is_own_page and not page.user.is_public %}<div data-role="notification-email"></div>{% endif %}
-          {% if CONFIG.EXTERNAL_AGENT_API_ENABLED and is_own_page and not page.user.is_public and current_user.access(AI.CREATE) %}
+          {% if CONFIG.EXTERNAL_AGENT_API_ENABLED and is_own_page and not page.user.is_public and current_user.access(AI.ASK) %}
             <fieldset data-role="api-key-settings"
                       data-kind="user"
                       class="rounded-md border border-user-default p-3">
               <legend class="{{ styles.label.default }} px-1">External agent API</legend>
               <div class="space-y-3">
                 <p class="text-sm text-base-medium">
-                  Use another AI client to inspect your permitted workspace data and prepare an Organize plan for review. API plans never run automatically.
+                  Use another AI client to Ask questions or prepare Create and Organize plans within your workspace permissions. API plans never run automatically.
                 </p>
                 <p data-role="api-key-status" class="text-sm font-semibold text-base-dark">
                   Loading API key status...

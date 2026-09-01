@@ -81,6 +81,25 @@ DOCUMENT_GUIDELINES = (
     + TASK_LIST_HTML_RULES
 )
 
+
+REPORT_DOCUMENT_GUIDELINES = """
+### Report Page Document Guidelines
+
+- A page's name and description are always canonical. When a form is attached,
+  its structured submission is the primary additional content.
+- Only include `document_markdown` when freeform text adds meaningful value
+  beyond the name, description, and form fields.
+- Write ordinary Markdown. Trusted application code converts it through the
+  shared sanitized, editor-compatible renderer before execution.
+- Use headings, paragraphs, emphasis, links, block quotes, tables, fenced code,
+  and Markdown task lists when they improve the document. Do not hand-author
+  HTML.
+- When a read tool returns both a related entity's `url` and `name`, Markdown
+  links may use those exact values.
+- Keep documents concise and complementary; do not duplicate structured form
+  values merely to make the document longer.
+"""
+
 PAGE_GENERATION_OUTPUT_REQUIREMENTS = """
 ### Page Generation Output Requirements
 

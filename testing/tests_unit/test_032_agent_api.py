@@ -46,6 +46,7 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch):
 def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     actor = object()
     report = SimpleNamespace(
+        tool="organize",
         input_files=[SimpleNamespace(hash="aaaaaaaaaaaa")],
     )
     monkeypatch.setattr(
@@ -100,6 +101,76 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     assert contract["limits"]["max_tool_calls"] == external_api.MAX_PLAN_TOOL_CALLS
 
 
+# @pairs agent-api:proposal-contract ai-report:proposal-contract
+@pytest.mark.unit
+def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
+    actor = object()
+    monkeypatch.setattr(
+        external_api.dates,
+        "user_today",
+        lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
+    )
+
+    ask_contract = external_api.plan_contract(
+        SimpleNamespace(tool="ask", input_files=[]),
+        actor,
+    )
+
+    assert ask_contract["tool"] == "ask"
+    assert ask_contract["uploads_supported"] is False
+    assert ask_contract["execution_supported"] is False
+    assert ask_contract["required_file_refs"] == []
+    assert "answer_markdown" in ask_contract["proposal_schema"]["properties"]
+    assert ask_contract["proposal_schema"]["properties"]["actions"]["maxItems"] == 0
+    assert any("separate Create or Organize plan" in rule for rule in ask_contract["workflow_rules"])
+
+    monkeypatch.setattr(
+        external_api,
+        "allowed_report_actions",
+        lambda user: ("create_page", "move_page", "needs_review"),
+    )
+    monkeypatch.setattr(
+        external_api,
+        "report_action_permission_context",
+        lambda user, allowed: {"allowed_actions": list(allowed)},
+    )
+    create_contract = external_api.plan_contract(
+        SimpleNamespace(tool="create", input_files=[]),
+        actor,
+    )
+
+    assert create_contract["tool"] == "create"
+    assert create_contract["uploads_supported"] is False
+    assert create_contract["execution_supported"] is True
+    assert create_contract["permissions"]["allowed_actions"] == [
+        "create_page",
+        "needs_review",
+    ]
+    action_variants = create_contract["proposal_schema"]["properties"]["actions"][
+        "items"
+    ]["anyOf"]
+    assert {
+        variant["properties"]["type"]["enum"][0] for variant in action_variants
+    } == {"create_page", "needs_review"}
+    create_page = next(
+        variant
+        for variant in action_variants
+        if variant["properties"]["type"]["enum"] == ["create_page"]
+    )
+    assert "document_markdown" in create_page["properties"]["data"]["properties"]
+
+
+# @matrix agent-api ai-access : ask create organize tool-selection
+@pytest.mark.unit
+def test_external_plan_tools_follow_ai_access_tiers():
+    assert external_api.required_ai_access("ask").name == "ASK"
+    assert external_api.required_ai_access("create").name == "CREATE"
+    assert external_api.required_ai_access("organize").name == "CREATE"
+    assert external_api.normalize_plan_tool(" Ask ") == "ask"
+    with pytest.raises(exceptions.ValidationError, match="ask, create, or organize"):
+        external_api.normalize_plan_tool("email")
+
+
 # @matrix agent-api ai : permission-context provider-neutral-dispatch provider-neutral-schema tool-catalog tool-registry
 @pytest.mark.unit
 def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
@@ -151,6 +222,7 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
 ):
     actor = object()
     report = SimpleNamespace(
+        tool="organize",
         input_files=[SimpleNamespace(hash="aaaaaaaaaaaa")],
     )
     captured = {}
@@ -221,6 +293,7 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
     }
     saved = []
     report = SimpleNamespace(
+        tool="organize",
         status="draft",
         pending=False,
         proposal=None,
@@ -229,7 +302,7 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
         result=None,
         upload_manifest=None,
         input_files=[object()],
-        agent_manifest={"contract_version": 1},
+        agent_manifest={"contract_version": external_api.CONTRACT_VERSION},
     )
 
     class Process:
@@ -250,13 +323,13 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
         report,
         object(),
         proposal,
-        contract_version=1,
+        contract_version=external_api.CONTRACT_VERSION,
     )
     repeated = external_api.submit_plan(
         report,
         object(),
         proposal,
-        contract_version=1,
+        contract_version=external_api.CONTRACT_VERSION,
     )
 
     assert submitted is report
@@ -265,6 +338,120 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
     assert report.proposal == proposal
     assert report.agent_manifest["proposal_fingerprint"]
     assert len(saved) == 1
+
+
+# @pairs agent-api:ask ai-report:answer-only
+@pytest.mark.unit
+def test_external_ask_submission_completes_without_files_or_execution(monkeypatch):
+    proposal = {
+        "summary": "The page has two open tasks.",
+        "answer_markdown": "## Result\n\nThere are **two** open tasks.",
+        "confidence": 0.95,
+        "actions": [],
+    }
+    report = SimpleNamespace(
+        tool="ask",
+        status="draft",
+        pending=False,
+        proposal=None,
+        summary=None,
+        error=None,
+        result=None,
+        upload_manifest=None,
+        input_files=[],
+        agent_manifest={"contract_version": external_api.CONTRACT_VERSION},
+    )
+
+    class Process:
+        def set_proposal(self, value, status="ready"):
+            report.proposal = value
+            report.summary = value["summary"]
+            report.status = status
+
+    report.properties = SimpleNamespace(process=Process())
+    saved = []
+    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+
+    submitted = external_api.submit_plan(
+        report,
+        object(),
+        proposal,
+        contract_version=external_api.CONTRACT_VERSION,
+    )
+    repeated = external_api.submit_plan(
+        report,
+        object(),
+        proposal,
+        contract_version=external_api.CONTRACT_VERSION,
+    )
+
+    assert submitted is repeated is report
+    assert report.status == "complete"
+    assert "answer_markdown" not in report.proposal
+    assert "<h2>Result</h2>" in report.proposal["answer_html"]
+    assert external_api.plan_supports_execution(report) is False
+    assert saved == [report]
+
+
+# @pairs agent-api:create ai-report:proposal-publication
+@pytest.mark.unit
+def test_external_create_submission_renders_markdown_without_files(monkeypatch):
+    actor = object()
+    proposal = {
+        "summary": "Create a field guide page.",
+        "confidence": 0.9,
+        "issues": [],
+        "actions": [
+            {
+                "id": "field-guide",
+                "type": "create_page",
+                "data": {
+                    "name": "Field Guide",
+                    "document_markdown": "# Field Guide\n\n- First item",
+                },
+            }
+        ],
+    }
+    report = SimpleNamespace(
+        tool="create",
+        status="draft",
+        pending=False,
+        proposal=None,
+        summary=None,
+        error=None,
+        result=None,
+        upload_manifest=None,
+        input_files=[],
+        agent_manifest={"contract_version": external_api.CONTRACT_VERSION},
+    )
+
+    class Process:
+        def set_proposal(self, value, status="ready"):
+            report.proposal = value
+            report.summary = value["summary"]
+            report.status = status
+
+    report.properties = SimpleNamespace(process=Process())
+    monkeypatch.setattr(
+        external_api,
+        "allowed_report_actions",
+        lambda user: ("create_page", "needs_review"),
+    )
+    monkeypatch.setattr(external_api.Entities, "save", lambda *items: None)
+
+    submitted = external_api.submit_plan(
+        report,
+        actor,
+        proposal,
+        contract_version=external_api.CONTRACT_VERSION,
+    )
+
+    assert submitted.status == "ready"
+    assert submitted.input_files == []
+    data = submitted.proposal["actions"][0]["data"]
+    assert "document_markdown" not in data
+    assert data["document"].startswith("<h1>Field Guide</h1>")
+    assert external_api.plan_supports_execution(submitted) is True
 
 
 # @matrix agent-api ai-report : execution capability expiry idempotency proposal-binding user-binding
@@ -279,6 +466,7 @@ def test_execution_key_is_scoped_expiring_and_shown_once(monkeypatch):
         "actions": [],
     }
     report = SimpleNamespace(
+        tool="organize",
         hash="reporthash12",
         status="ready",
         proposal=proposal,

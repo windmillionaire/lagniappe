@@ -45,8 +45,10 @@ target determines whether that outcome succeeded.
 
 External clients can enter the report pipeline without invoking the configured
 provider. The external-agent API creates a draft report, exposes the shared
-read-tool registry, validates the same Organize proposal contract, and
-publishes the report at the normal ready-for-review boundary.
+read-tool registry, and validates a tool-specific Ask, Create, or Organize
+contract. Ask publishes a completed read-only answer. Create and Organize
+publish at the normal ready-for-review boundary and can enter the same
+deterministic execution adapter through a proposal-scoped execution key.
 
 ## Safety boundaries
 

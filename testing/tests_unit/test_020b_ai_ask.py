@@ -84,12 +84,12 @@ def test_ask_prompt_prioritizes_answers_and_exposes_read_tools():
         "confidence",
         "actions",
     ]
-    assert prompt.response_schema["properties"]["answer_html"] == {
+    assert prompt.response_schema["properties"]["answer_markdown"] == {
         "type": "string"
     }
     assert set(prompt.response_schema["properties"]) == {
         "summary",
-        "answer_html",
+        "answer_markdown",
         "confidence",
         "actions",
     }
@@ -105,7 +105,7 @@ def test_ask_prompt_prioritizes_answers_and_exposes_read_tools():
     )
     assert prompt.audit()["duplicate_headings"] == []
     assert prompt.files == []
-    assert "Never\n  display them in `summary` or `answer_html`" in prompt.build()
+    assert "Never\n  display them in `summary` or `answer_markdown`" in prompt.build()
     assert "Create handles new work" in prompt.build()
 
 
@@ -144,9 +144,10 @@ def test_revise_ask_prompt_preserves_question_and_adds_review_context():
     [
         ({"summary": ""}, "non-empty summary"),
         ({"confidence": 1.5}, "number from 0 to 1"),
+        ({"answer_markdown": ["not markdown"]}, "must be a string"),
         ({"answer_html": ["not html"]}, "must be a string"),
     ],
-    ids=("summary", "confidence", "answer-html"),
+    ids=("summary", "confidence", "answer-markdown", "answer-html"),
 )
 def test_validate_ask_response_requires_a_usable_answer(updates, message):
     response = {
@@ -158,6 +159,27 @@ def test_validate_ask_response_requires_a_usable_answer(updates, message):
 
     with pytest.raises(exceptions.AIException, match=message):
         ask.validate_ask_response(response)
+
+
+# @pairs ai-report:validation editor:html-sanitization markdown:html-sanitization
+@pytest.mark.unit
+def test_validate_ask_response_renders_answer_markdown():
+    response = ask.validate_ask_response(
+        {
+            "summary": "Two records matched.",
+            "answer_markdown": (
+                "## Matches\n\n- [Record](https://example.com)\n"
+                "- <script>alert('no')</script>Safe"
+            ),
+            "confidence": 0.9,
+            "actions": [],
+        }
+    )
+
+    assert "answer_markdown" not in response
+    assert "<h2>Matches</h2>" in response["answer_html"]
+    assert 'href="https://example.com"' in response["answer_html"]
+    assert "<script" not in response["answer_html"]
 
 
 # @matrix ai-report : ask generate repair usable-answer validate

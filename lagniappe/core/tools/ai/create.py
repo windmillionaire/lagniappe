@@ -4,7 +4,6 @@ from lagniappe.core import exceptions
 
 from .guidelines import (
     CONTEXT_USAGE_GUIDELINES,
-    HTML_GENERATION_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
     REPORT_PREFLIGHT_CHECKS,
     REPORT_TASK_SCHEDULING_GUIDELINES,
@@ -69,7 +68,8 @@ Create rules:
   and form submissions.
 - Use existing workspace structure only when read-only tools show it is a close
   fit for the user's request.
-- Create page document HTML when durable written content is useful.
+- Create page document Markdown when durable written content is useful. Trusted
+  application code renders it into sanitized editor-compatible HTML.
 - Use form schemas and submission objects only when structured fields add
   meaningful domain data beyond entity names, descriptions, and relationships.
 - Category default forms are exceptional: include one only when the request or
@@ -110,7 +110,7 @@ Common data shapes:
 - create_category: {"name": string, "description": string, "form": entity_or_action_ref}
 - create_project: {"name": string, "description": string}
 - create_model_task: {"name": string, "project": entity_or_action_ref, "form": entity_or_action_ref}
-- create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document": html_string}
+- create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document_markdown": markdown_string}
 - create_task: {"name": string, "description": string, "page": entity_or_action_ref, "project": entity_or_action_ref, "model": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "due_date": "YYYY-MM-DD", "schedule": canonical_schedule_object}
 - needs_review: {"note": string, "questions": [string]}
 """
@@ -163,7 +163,6 @@ def _create_prompt_base(report, user, intro, extra_contexts=()):
         role="action_permissions",
         unique=True,
     )
-    prompt.add_instructions(HTML_GENERATION_RULES)
     prompt.add_instructions(
         """
 Use read-only tools to understand existing workspace structure before proposing

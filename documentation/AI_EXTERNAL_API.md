@@ -1,16 +1,17 @@
 # External Agent API
 
 Lagniappe exposes a versioned, REST-first API that lets a user run the same
-permission-bounded read tools as the built-in AI workflows and submit an
-Organize proposal for browser review. If the user's request explicitly includes
-execution, the client can use a second, plan-scoped capability to run that exact
-validated proposal through the normal deterministic report runner. External
-clients do not call Lagniappe's configured model.
+permission-bounded read tools as the built-in AI workflows. An external client
+chooses `ask`, `create`, or `organize` for each durable plan. Ask publishes a
+read-only answer; Create and Organize publish proposals for browser review and
+can execute that exact validated proposal only after an explicit user request.
+External plans never call Lagniappe's configured model.
 
 The feature is included and enabled in generated deployment settings through
 `EXTERNAL_AGENT_API_ENABLED: true`. An operator can set it to `false` as an
-emergency or policy shutoff. Eligible users need `CREATE` AI access and must
-not be public users.
+emergency or policy shutoff. Eligible users need at least `ASK` AI access and
+must not be public users. `CREATE` AI access is additionally required for
+Create, Organize, and deterministic execution.
 
 ## Security model
 
@@ -24,11 +25,12 @@ not be public users.
   that reason.
 - API calls run as the key's user. Existing read-tool handlers enforce that
   user's normal entity permissions. Plan access is also bound to its creator.
-- Successful proposal submission returns a one-hour execution key exactly in
-  that response. Only its SHA-256 digest is stored. The key is bound to the
-  plan, proposal fingerprint, creator, and current bearer-key generation, and
-  is consumed when execution is first requested. Submitting the identical
-  proposal again rotates the execution key.
+- Successful Create or Organize submission returns a one-hour execution key
+  exactly in that response. Only its SHA-256 digest is stored. The key is bound
+  to the plan, proposal fingerprint, creator, and current bearer-key
+  generation, and is consumed when execution is first requested. Submitting
+  the identical proposal again rotates the execution key. Ask is read-only and
+  never issues an execution key.
 - Proposal validation and key issuance do not authorize execution. An agent
   may call the distinct `/execute` operation only when the user's request
   explicitly includes it. Lagniappe cannot prove what a user said to an
@@ -39,78 +41,92 @@ not be public users.
 - API responses are `no-store`; no CORS policy is added. Original-file URLs,
   when explicitly requested through `get_file`, are signed for five minutes.
 - Limits are 60 general requests per minute per user/IP, 10 new plans per hour,
-  100 tool calls per plan, 20 files per plan, 30 MiB per file, 50 MiB total,
-  and 100 proposal actions.
+  100 tool calls per plan, and 100 proposal actions. Organize additionally
+  allows 20 files per plan, 30 MiB per file, and 50 MiB total.
 
 ## Workflow
 
 All endpoints are under `/api/v1` and require the bearer key, including the
 OpenAPI document. The OpenAPI `info.description` and operation descriptions
-carry this lifecycle, request preconditions, and the boundary between proposal
-submission and explicitly requested execution so a generic client does not
-need separate prompt instructions. Every plan response
-returns its opaque identifier as the top-level `id`; it is not nested inside
-the proposal schema.
+carry the tool-selection rules, lifecycle, and boundary between submission and
+explicit execution. Every plan response returns its opaque identifier as the
+top-level `id`. A plan's tool is immutable for auditability, but a conversational
+client may create another plan with a different tool whenever the user's intent
+changes.
 
-1. `GET /me` verifies the actor and capability.
-2. `POST /plans` creates a durable, provider-free Organize draft.
-3. `POST /plans/{id}/uploads` creates resumable Cloud Storage sessions.
-4. Upload bytes to each returned `session_url`, then call
-   `POST /plans/{id}/uploads/finalize`.
-5. `GET /tools` returns plain JSON Schema tool definitions. Before analyzing
-   files, call `get_guidelines` with `task: organize`. Its first phase uses the
-   same structural planning policy as the internal Gemini Organize prompt; do
-   not submit that intermediate structure. Run tools with
-   `POST /plans/{id}/tools/{tool_name}` and an `arguments` object.
-6. Call other read tools and the specialized guideline bundles required by the
-   shared workflow while the plan remains a draft. In the second phase, use
-   `form_autofill` and each exact form schema to add final submissions or
-   updates to the structural actions. API drafts do not receive the internal
-   prompt's optional prefetched `workspace_searches`; use
-   `list_workspace_resources` when those candidates are absent, then fetch only
-   the specialized bundles required by the actions being proposed.
-7. `GET /plans/{id}/contract` returns the final proposal schema, workflow and
-   reference rules, allowed actions, permission context, file references,
-   limits, and the actor-timezone `current_date`. Fetch it after uploads and
-   immediately before constructing the proposal.
-8. Include one `summarize_file` action for each uploaded file, using the same
-   source understanding the client already used to organize it. Each action
-   carries a concise grounded summary, exactly two broad retrieval terms, and
-   `search: true`; reading a local upload source again through `get_file` is not
-   required. Internal Organize creates the equivalent summary in its provider
-   prepass, so this action is advertised only to external plans.
-9. `POST /plans/{id}/submit` validates and saves the proposal as a ready report.
-   The response includes the full `review_url`, a shorter creator-session
-   `preview_url`, and a shown-once `execution_key`. Submission itself never
-   executes the proposal.
-10. Stop for review unless the user's request explicitly includes execution.
-    When it does, send the plan-scoped key to
-    `POST /plans/{id}/execute`. This invokes the existing deterministic deferred
-    runner without a model call. Poll the returned `status_url` or
-    `GET /plans/{id}` for bounded operation state and action counts.
+1. `GET /me` verifies the actor and reports separate Ask, Create, Organize, and
+   execution capabilities.
+2. `GET /tools` returns permission-bounded read tools as plain JSON Schema.
+3. `POST /plans` creates a provider-free draft with `tool` set to `ask`,
+   `create`, or `organize`.
+4. Run permitted reads with `POST /plans/{id}/tools/{tool_name}` while the plan
+   remains a draft.
+5. `GET /plans/{id}/contract` returns the selected tool's authoritative output
+   schema, workflow rules, reference rules, permissions, limits, and the
+   actor-timezone `current_date`.
+6. `POST /plans/{id}/submit` validates and publishes the final result. It never
+   calls a provider or executes workspace actions.
 
-Submitting the same normalized proposal again is accepted and leaves that
-proposal unchanged, but rotates the shown-once execution key so a client can
-recover from a lost or expired response. A different proposal cannot replace
-an already-ready report. Pending uploads,
-unknown/inaccessible references, disallowed actions, missing required
-submission objects, and files that are not placed by the plan all fail
-proposal validation without model repair. Exact form fields are validated and
-normalized by the same `SubmitterMixin` path used by ordinary deterministic
-report execution after browser review; `/submit` does not create temporary
-entities merely to duplicate that validation. At least one finalized uploaded
-file is required before submission; the plan contract repeats that precondition
-in `workflow_rules`. The external client must complete both planning phases:
-the server does not call a model to fill or repair form values before review or
-execution. It also does not invoke a model to create external file summaries.
-The proposed summaries and retrieval terms become durable, searchable file
-metadata only if the reviewed plan is executed; a rejected or unexecuted
-proposal does not change the files. Execution is capability-bounded, but it
-still performs the proposal's workspace mutations, so clients must not infer
-consent from successful validation or possession of the key. A completed-task
-date later than the
-submitting user's current date is rejected deterministically; future work must
-remain open.
+### Ask
+
+Ask requires `ASK` access and is read-only. The client answers the specific
+question from permitted workspace tools and outside research when useful. Its
+final object contains a direct plain-text `summary`, optional
+`answer_markdown`, a confidence value, and an empty `actions` array. Trusted
+application code renders `answer_markdown` through the shared sanitized,
+editor-compatible Markdown pipeline and stores the resulting `answer_html` for
+the report view. Submission moves the report directly to `complete`; it returns
+preview and review URLs but no execution key. Ask rejects uploads and execution.
+
+If the conversation changes from investigation to requested work, the client
+creates a separate Create or Organize plan rather than placing mutations in an
+Ask response.
+
+### Create
+
+Create requires `CREATE` access. The client inspects existing workspace
+structure before proposing new forms, categories, projects, model tasks, pages,
+or tasks. It uses the same permission-filtered action schema and on-demand
+guidelines as internal Create. The proposal must contain at least one allowed
+action or `needs_review`. Create does not accept plan uploads.
+
+Optional page rich text is model-facing `document_markdown`. Proposal
+validation renders it through the same sanitized Markdown pipeline used by the
+frontend document editor and stores legacy executable `document` HTML. This
+keeps new internal and external model contracts aligned while allowing already
+ready HTML proposals to execute unchanged.
+
+### Organize
+
+Organize requires `CREATE` access and at least one finalized upload. Use
+`POST /plans/{id}/uploads` to create resumable Cloud Storage sessions, upload
+the declared bytes to each returned `session_url`, and call
+`POST /plans/{id}/uploads/finalize`. Ask and Create reject these endpoints.
+
+Before analyzing files, call `get_guidelines` with `task: organize`. Settle
+structure and file placement first, then use the specialized form bundles and
+exact schemas to add final submission values. Fetch the contract after uploads
+and immediately before constructing the proposal. Include exactly one
+`summarize_file` action per uploaded file with a grounded summary, two distinct
+retrieval terms, and normally `search: true`. The server does not call a model
+to repair form values or create file summaries.
+
+### Publication and execution
+
+Create and Organize submission saves a `ready` report and returns the full
+`review_url`, shorter creator-session `preview_url`, and a shown-once one-hour
+`execution_key`. Stop unless the user's request explicitly includes execution.
+When it does, send that key to `POST /plans/{id}/execute`; the existing deferred
+runner applies the exact validated proposal without a model call. Poll
+`status_url` or `GET /plans/{id}` for bounded progress and result counts.
+
+Submitting the same normalized result again is idempotent. For Create and
+Organize it rotates the execution key; a different result cannot replace an
+already published report. Pending uploads, unknown or inaccessible references,
+disallowed actions, malformed final submissions, and missing Organize file
+placements fail without model repair. Exact form fields remain authoritative at
+the normal `SubmitterMixin` execution boundary. A completed-task date later
+than the submitting user's current date is rejected; future work remains open.
 
 The browser review projects proposed submission values beneath each action,
 using the referenced form's human field, option, and table-column labels when
@@ -122,7 +138,7 @@ Failures under `/api/v1`, including routing-level `404` and `405` responses,
 use the same JSON error envelope and request ID. A `405` preserves the HTTP
 `Allow` header.
 
-## cURL example
+## Organize cURL example
 
 Keep the key in an environment variable rather than putting it directly in
 shell history:
@@ -183,9 +199,9 @@ curl --fail --silent --show-error \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/submit"
 ```
 
-The submit response carries `execution_key` and `execution_key_expires_at`.
-Only if the user's request explicitly includes execution, make the distinct
-write call and then poll the top-level plan state:
+The Create and Organize submit response carries `execution_key` and
+`execution_key_expires_at`. Only if the user's request explicitly includes
+execution, make the distinct write call and then poll the top-level plan state:
 
 ```bash
 curl --fail --silent --show-error \
@@ -210,7 +226,7 @@ access.
 
 ```json
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "proposal": {
     "summary": "Organize the records into a new page.",
     "confidence": 0.94,
@@ -283,14 +299,3 @@ contract = session.get(f"{base}/plans/{plan['id']}/contract").json()
 # contract. Run requested reads; settle structure first; then apply form_autofill
 # and exact schemas to add final values before POSTing to /submit.
 ```
-
-## REST versus MCP
-
-REST is the canonical interface because it is easy to inspect, automate, test,
-and use from any language. MCP would not replace this authorization or domain
-logic; it would advertise the tool catalog and adapt MCP tool calls to these
-same operations. An MCP adapter becomes useful when a client already speaks
-MCP and can discover tools automatically, but it is optional interoperability,
-not a more capable backend. An adapter must preserve the explicit-consent rule
-for the execution write; merely exposing the write as an MCP tool must not make
-submission trigger it automatically.

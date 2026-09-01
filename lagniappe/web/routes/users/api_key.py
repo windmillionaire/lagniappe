@@ -70,7 +70,7 @@ def _rotation_limit(actor):
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_user_can_rotate_and_revoke_external_agent_api_key
 # @matrix agent-api user-settings : expiry revoke rotate shown-once
 @users.route("/me/api-key", methods=["GET", "POST", "DELETE"])
-@ai_access(AI.CREATE)
+@ai_access(AI.ASK)
 def api_key():
     """Inspect, rotate, or revoke the current user's single API credential."""
     actor = _enabled_actor()

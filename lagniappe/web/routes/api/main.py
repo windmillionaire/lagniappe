@@ -1,4 +1,4 @@
-"""REST resources for provider-free external organize plans."""
+"""REST resources for provider-free external Ask, Create, and Organize plans."""
 
 from functools import wraps
 import json
@@ -149,10 +149,10 @@ def authenticate_request():
     except agent_auth.AgentAPICredentialError:
         return _error("unauthorized", "The API key is invalid or expired.", 401)
 
-    if getattr(actor, "is_public", False) or not actor.access(AI.CREATE):
+    if getattr(actor, "is_public", False) or not actor.access(AI.ASK):
         return _error(
             "forbidden",
-            "This user cannot create external plans.",
+            "This user cannot use external AI plans.",
             403,
         )
     g.agent_api_user = actor
@@ -333,6 +333,13 @@ def _execution_result_payload(report):
 # @covered-by lagniappe/web/routes/api/main.py::execute_plan
 # @reason execution progress is asserted through the public plan and execute resources
 def _execution_payload(report):
+    if not external_api.plan_supports_execution(report):
+        return {
+            "state": "not_available",
+            "requires_explicit_user_request": False,
+            "operation": None,
+            "result": None,
+        }
     state = {
         "draft": "not_available",
         "ready": "awaiting_explicit_request",
@@ -392,10 +399,14 @@ def _plan_payload(report, *, include_proposal=True):
             plan_id=report.urlsafe_key,
             _external=True,
         ),
-        "execute_url": url_for(
-            "agent_api.execute_plan",
-            plan_id=report.urlsafe_key,
-            _external=True,
+        "execute_url": (
+            url_for(
+                "agent_api.execute_plan",
+                plan_id=report.urlsafe_key,
+                _external=True,
+            )
+            if external_api.plan_supports_execution(report)
+            else None
         ),
         "preview_url": url_for(
             "tools.api_plan_preview",
@@ -427,6 +438,12 @@ def _load_plan(plan_id):
         or owner_key != actor.key
     ):
         raise APIProblem("not_found", "Plan not found.", 404)
+    if not actor.access(external_api.required_ai_access(report.tool)):
+        raise APIProblem(
+            "forbidden",
+            f"This user can no longer use {report.tool.title()} plans.",
+            403,
+        )
     return report
 
 
@@ -484,8 +501,8 @@ def openapi_document():
                 "summary": "Describe the API actor",
                 "description": (
                     "Call first to verify the bearer key, its user identity, and "
-                    "the permission-bounded Organize and explicit-execution "
-                    "capabilities."
+                    "its permission-bounded Ask, Create, Organize, and explicit-"
+                    "execution capabilities."
                 ),
                 "tags": ["Discovery"],
                 "responses": {
@@ -504,9 +521,10 @@ def openapi_document():
                 "description": (
                     "Returns every available tool with its JSON input schema. Tool "
                     "calls run as the bearer-key user and may only inspect data that "
-                    "user can access. An external Organize client should fetch the "
-                    "get_guidelines task=organize bundle before analyzing files. Use "
-                    "returned hash: references in later calls and in the proposal."
+                    "user can access. Select Ask, Create, or Organize when creating a "
+                    "plan; Organize clients should fetch get_guidelines task=organize "
+                    "before analyzing files. Use returned hash: references only as "
+                    "allowed by the selected plan contract."
                 ),
                 "tags": ["Discovery"],
                 "responses": {
@@ -521,11 +539,13 @@ def openapi_document():
         "/api/v1/plans": {
             "post": {
                 "operationId": "createPlan",
-                "summary": "Create an Organize plan draft",
+                "summary": "Create an Ask, Create, or Organize plan draft",
                 "description": (
                     "Starts a durable provider-free workspace. Creation does not run "
-                    "a model or change workspace data. Keep the returned opaque ID "
-                    "for every upload, tool, contract, and submission call."
+                    "a model or change workspace data. The client chooses one fixed "
+                    "tool for this plan and may create another plan if the conversation "
+                    "later changes modes. Keep the returned opaque ID for every tool, "
+                    "contract, upload when supported, and submission call."
                 ),
                 "tags": ["Plans"],
                 "requestBody": {
@@ -538,7 +558,7 @@ def openapi_document():
                             "properties": {
                                 "tool": {
                                     "type": "string",
-                                    "const": "organize",
+                                    "enum": list(external_api.SUPPORTED_PLAN_TOOLS),
                                     "default": "organize",
                                 },
                                 "name": {
@@ -550,7 +570,7 @@ def openapi_document():
                                     "type": "string",
                                     "minLength": 1,
                                     "description": (
-                                        "The organization goal, limited to 65,536 "
+                                        "The question or requested work, limited to 65,536 "
                                         "UTF-8 bytes."
                                     ),
                                 },
@@ -593,12 +613,11 @@ def openapi_document():
                 "operationId": "getPlanContract",
                 "summary": "Get the final proposal contract",
                 "description": (
-                    "Fetch after all uploads are finalized and immediately before "
-                    "constructing the proposal. The response is plan-, user-, file-, "
-                    "and permission-specific; its proposal_schema, workflow_rules, "
-                    "reference_rules, and required_file_refs are authoritative. It "
-                    "requires one model-authored summary per uploaded file without "
-                    "a server-side model call."
+                    "Fetch immediately before constructing the final response. For "
+                    "Organize, fetch after all uploads are finalized. The response is "
+                    "tool-, plan-, user-, file-, and permission-specific; its "
+                    "proposal_schema, workflow_rules, reference_rules, and "
+                    "required_file_refs are authoritative."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -616,7 +635,8 @@ def openapi_document():
                 "operationId": "createUploadSessions",
                 "summary": "Create resumable file upload sessions",
                 "description": (
-                    "Declare one or more local files while the plan is a draft. For "
+                    "For an Organize draft, declare one or more local files. Ask and "
+                    "Create plans reject uploads. For "
                     "each response entry, PUT exactly the declared bytes and content "
                     "type to session_url, treating that URL as a short-lived secret "
                     "and not forwarding the Lagniappe bearer key. Then call "
@@ -723,13 +743,13 @@ def openapi_document():
                 "operationId": "submitPlan",
                 "summary": "Validate and publish the final proposal",
                 "description": (
-                    "Requires at least one finalized file, no pending uploads, and "
-                    "the current contract version. A valid proposal becomes a ready "
-                    "report for human browser review; submission never executes "
-                    "actions. The response shows one short-lived, plan-scoped "
-                    "execution_key. Treat it as a secret. Repeating the identical "
-                    "normalized proposal is accepted and rotates that key, while a "
-                    "different proposal after readiness returns a conflict."
+                    "Requires the current tool-specific contract and no pending "
+                    "uploads; Organize also requires at least one finalized file. A "
+                    "valid Ask response becomes a completed read-only report. A valid "
+                    "Create or Organize proposal becomes ready for review and returns "
+                    "one short-lived, plan-scoped execution_key. Submission itself "
+                    "never executes actions. Repeating the identical normalized result "
+                    "is accepted; a different result after publication conflicts."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -759,12 +779,11 @@ def openapi_document():
                 "responses": {
                     "200": {
                         "description": (
-                            "Ready plan, short browser preview URL, and a shown-once "
-                            "execution key that expires after one hour."
+                            "Published plan. Present preview_url to the user for browser "
+                            "review; retain review_url as the canonical full URL. Create "
+                            "and Organize also return a shown-once execution key."
                         ),
-                        **json_content(
-                            {"$ref": "#/components/schemas/SubmittedPlan"}
-                        ),
+                        **json_content({"$ref": "#/components/schemas/Plan"}),
                     },
                     "default": error_response,
                 },
@@ -825,21 +844,18 @@ def openapi_document():
             "title": f"{CONFIG.APP_NAME} External Agent API",
             "version": "1.0.0",
             "description": (
-                "Use this API as a permission-bounded Organize backend for an "
-                "external model. Workflow: (1) verify the actor with getCurrentActor; "
-                "(2) create a draft; (3) upload and finalize at least one file; "
-                "(4) discover the read tools and fetch get_guidelines with "
-                "task=organize for the shared two-phase workflow; (5) settle structure "
-                "and file assignments, then use required specialized bundles, exact "
-                "schemas, and form_autofill to add final form values while the plan "
-                "is a draft; (6) fetch the plan-specific contract after uploads and "
-                "construct a conforming proposal, including one summary and two "
-                "retrieval terms for every uploaded file; (7) submit it for human "
-                "browser review and retain the returned preview_url and execution_key; "
-                "(8) stop unless the user's request explicitly includes execution, "
-                "in which case call executePlan once and poll status_url. Validation "
-                "success alone is never execution consent. The server does not call "
-                "a model to complete, repair, summarize, or execute the proposal."
+                "Use this API as a permission-bounded Ask, Create, and Organize backend "
+                "for an external model. The client selects the appropriate tool per "
+                "plan and may create a different plan as the conversation changes. "
+                "Verify the actor, create a draft, use permitted read tools, fetch the "
+                "tool-specific plan contract, and submit a conforming final result. "
+                "Organize additionally uploads files and follows the get_guidelines "
+                "task=organize two-phase workflow, including one summary and two "
+                "retrieval terms per file. Ask publishes a read-only answer. Create "
+                "and Organize publish reviewed proposals; stop unless the user "
+                "explicitly requests execution. Validation success alone is never "
+                "execution consent. The server does not call a model to choose the "
+                "tool, complete, repair, summarize, or execute the result."
             ),
         },
         "servers": [{"url": request.url_root.rstrip("/")}],
@@ -847,7 +863,7 @@ def openapi_document():
         "tags": [
             {"name": "Discovery", "description": "Actor and tool discovery."},
             {"name": "Plans", "description": "Draft and review lifecycle."},
-            {"name": "Uploads", "description": "Required plan-file staging."},
+            {"name": "Uploads", "description": "Organize-only plan-file staging."},
             {"name": "Tools", "description": "Permission-bounded reads."},
         ],
         "components": {
@@ -921,7 +937,10 @@ def openapi_document():
                                 "undo_failed",
                             ],
                         },
-                        "tool": {"type": "string", "const": "organize"},
+                        "tool": {
+                            "type": "string",
+                            "enum": list(external_api.SUPPORTED_PLAN_TOOLS),
+                        },
                         "name": {"type": "string"},
                         "instructions": {"type": "string"},
                         "files": {
@@ -935,16 +954,25 @@ def openapi_document():
                         },
                         "contract_url": {"type": "string", "format": "uri"},
                         "status_url": {"type": "string", "format": "uri"},
-                        "execute_url": {"type": "string", "format": "uri"},
+                        "execute_url": {
+                            "oneOf": [
+                                {"type": "string", "format": "uri"},
+                                {"type": "null"},
+                            ]
+                        },
                         "preview_url": {
                             "type": "string",
                             "format": "uri",
                             "description": (
-                                "Short browser-session URL for the plan creator; it "
-                                "redirects to the full review report."
+                                "Preferred human-facing browser-session URL for the "
+                                "plan creator; it redirects to the full review report."
                             ),
                         },
-                        "review_url": {"type": "string", "format": "uri"},
+                        "review_url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "Canonical full browser report URL.",
+                        },
                         "execution": {"$ref": "#/components/schemas/Execution"},
                         "execution_key": {
                             "type": "string",
@@ -982,7 +1010,6 @@ def openapi_document():
                         },
                         "requires_explicit_user_request": {
                             "type": "boolean",
-                            "const": True,
                         },
                         "operation": {
                             "oneOf": [{"type": "object"}, {"type": "null"}]
@@ -992,18 +1019,6 @@ def openapi_document():
                         },
                         "error": {"type": "string", "maxLength": 500},
                     },
-                },
-                "SubmittedPlan": {
-                    "allOf": [
-                        {"$ref": "#/components/schemas/Plan"},
-                        {
-                            "type": "object",
-                            "required": [
-                                "execution_key",
-                                "execution_key_expires_at",
-                            ],
-                        },
-                    ]
                 },
                 "UploadFile": {
                     "type": "object",
@@ -1043,7 +1058,12 @@ def me():
             "ai_access": actor.ai_access,
         },
         "credential": g.agent_api_credential,
-        "capabilities": {"organize": True, "execute": True},
+        "capabilities": {
+            "ask": actor.access(AI.ASK),
+            "create": actor.access(AI.CREATE),
+            "organize": actor.access(AI.CREATE),
+            "execute": actor.access(AI.CREATE),
+        },
     }
 
 
@@ -1073,15 +1093,22 @@ def create_plan():
     )
     data = _json_body()
     tool = str(data.get("tool") or "organize").strip().casefold()
-    if tool != "organize":
+    if tool not in external_api.SUPPORTED_PLAN_TOOLS:
         raise APIProblem(
             "unsupported_tool",
-            "Only organize plans are supported by this API version.",
+            "Plan tool must be ask, create, or organize.",
             422,
+        )
+    if not actor.access(external_api.required_ai_access(tool)):
+        raise APIProblem(
+            "forbidden",
+            f"This user cannot start {tool.title()} plans.",
+            403,
         )
     report = external_api.create_plan(
         actor,
         instructions=data.get("instructions"),
+        tool=tool,
         name=data.get("name"),
     )
     return _plan_payload(report), 201
@@ -1134,6 +1161,12 @@ def _upload_sizes(report, requested):
 def create_uploads(plan_id):
     report = _load_plan(plan_id)
     _require_draft(report)
+    if report.tool != "organize":
+        raise APIProblem(
+            "uploads_not_supported",
+            "File uploads are supported only for Organize plans.",
+            409,
+        )
     if report.upload_manifest:
         raise APIProblem(
             "uploads_pending",
@@ -1220,6 +1253,12 @@ def create_uploads(plan_id):
 def finalize_uploads(plan_id):
     report = _load_plan(plan_id)
     _require_draft(report)
+    if report.tool != "organize":
+        raise APIProblem(
+            "uploads_not_supported",
+            "File uploads are supported only for Organize plans.",
+            409,
+        )
     if report.upload_manifest:
         external_api.finalize_uploads(report, g.agent_api_user)
     return _plan_payload(report)
@@ -1340,7 +1379,8 @@ def execute_tool(plan_id, tool_name):
 @_route
 def submit_plan(plan_id):
     report = _load_plan(plan_id)
-    if report.status not in {"draft", "ready"}:
+    reusable_status = "complete" if report.tool == "ask" else "ready"
+    if report.status not in {"draft", reusable_status}:
         raise APIProblem(
             "plan_state_conflict",
             "This plan cannot accept a proposal in its current state.",
@@ -1355,20 +1395,21 @@ def submit_plan(plan_id):
             contract_version=data.get("contract_version"),
         )
     except exceptions.ValidationError as error:
-        if report.status == "ready":
+        if report.status == reusable_status:
             raise APIProblem("plan_state_conflict", str(error), 409) from error
         raise
-    try:
-        execution_key, expires_at = external_api.issue_execution_key(
-            submitted,
-            g.agent_api_user,
-            g.agent_api_credential,
-        )
-    except external_api.AgentAPIExecutionKeyError as error:
-        raise APIProblem("execution_key_unavailable", str(error), 409) from error
     payload = _plan_payload(submitted)
-    payload["execution_key"] = execution_key
-    payload["execution_key_expires_at"] = expires_at
+    if external_api.plan_supports_execution(submitted):
+        try:
+            execution_key, expires_at = external_api.issue_execution_key(
+                submitted,
+                g.agent_api_user,
+                g.agent_api_credential,
+            )
+        except external_api.AgentAPIExecutionKeyError as error:
+            raise APIProblem("execution_key_unavailable", str(error), 409) from error
+        payload["execution_key"] = execution_key
+        payload["execution_key_expires_at"] = expires_at
     return payload
 
 
@@ -1380,6 +1421,12 @@ def submit_plan(plan_id):
 def execute_plan(plan_id):
     """Start or poll the exact deterministic run authorized by an execution key."""
     report = _load_plan(plan_id)
+    if not external_api.plan_supports_execution(report):
+        raise APIProblem(
+            "execution_not_supported",
+            "Ask plans are read-only and cannot be executed.",
+            409,
+        )
     if report.status not in {"ready", "running", "complete"}:
         raise APIProblem(
             "plan_state_conflict",

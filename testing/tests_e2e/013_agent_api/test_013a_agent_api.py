@@ -28,18 +28,18 @@ class Actor:
     is_authenticated = True
 
     def access(self, required):
-        return required is AI.CREATE
+        return required in {AI.ASK, AI.CREATE}
 
     def _get_current_object(self):
         return self
 
 
-def _report(actor):
+def _report(actor, tool="organize"):
     return SimpleNamespace(
         urlsafe_key="report-key",
         hash="reporthash12",
         status="draft",
-        tool="organize",
+        tool=tool,
         name="External plan",
         instructions="Organize these files.",
         input_files=[],
@@ -48,7 +48,9 @@ def _report(actor):
         result=None,
         error=None,
         deferred_job=None,
-        agent_manifest={"contract_version": 1},
+        agent_manifest={
+            "contract_version": api_routes.external_api.CONTRACT_VERSION
+        },
         origin="api",
         properties=SimpleNamespace(user=SimpleNamespace(key=actor.key)),
         allowed=lambda action, user=None: user is actor,
@@ -108,7 +110,12 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "hash": actor.hash,
         "ai_access": "CREATE",
     }
-    assert authorized.json["capabilities"] == {"organize": True, "execute": True}
+    assert authorized.json["capabilities"] == {
+        "ask": True,
+        "create": True,
+        "organize": True,
+        "execute": True,
+    }
 
     openapi = client.get(
         "/api/v1/openapi.json",
@@ -122,7 +129,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "info"
     ]["description"]
     assert "task=organize" in openapi.json["info"]["description"]
-    assert "shared two-phase workflow" in openapi.json["info"]["description"]
+    assert "two-phase workflow" in openapi.json["info"]["description"]
     assert "does not call a model" in openapi.json["info"]["description"]
     assert "one summary and two retrieval terms" in openapi.json["info"]["description"]
     operations = [
@@ -137,13 +144,20 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "content"
     ]["application/json"]["schema"]
     assert create_schema["required"] == ["instructions"]
+    assert create_schema["properties"]["tool"]["enum"] == [
+        "ask",
+        "create",
+        "organize",
+    ]
     upload_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/uploads"]["post"]
     assert upload_operation["requestBody"]["required"] is True
     tools_operation = openapi.json["paths"]["/api/v1/tools"]["get"]
     assert "task=organize" in tools_operation["description"]
     submit_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/submit"]["post"]
-    assert "Requires at least one finalized file" in submit_operation["description"]
-    assert "submission never executes" in submit_operation["description"]
+    assert "Organize also requires at least one finalized file" in submit_operation[
+        "description"
+    ]
+    assert "never executes actions" in submit_operation["description"]
     submit_schema = submit_operation["requestBody"]["content"]["application/json"][
         "schema"
     ]
@@ -381,7 +395,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
 
     def submit(current, user, proposal, *, contract_version):
         assert user is actor
-        assert contract_version == 1
+        assert contract_version == api_routes.external_api.CONTRACT_VERSION
         current.status = "ready"
         current.proposal = proposal
         return current
@@ -404,7 +418,10 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     submitted = client.post(
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
-        json={"contract_version": 1, "proposal": proposal},
+        json={
+            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "proposal": proposal,
+        },
     )
     assert submitted.status_code == 200
     assert submitted.json["status"] == "ready"
@@ -525,6 +542,146 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert disabled.status_code == 404
     assert disabled.json["error"]["code"] == "not_found"
+
+
+# @source lagniappe/core/tools/ai/external_api.py::required_ai_access
+# @source lagniappe/web/routes/api/main.py::create_plan
+# @source lagniappe/web/routes/api/main.py::create_uploads
+# @source lagniappe/web/routes/api/main.py::submit_plan
+# @source lagniappe/web/routes/api/main.py::execute_plan
+# @pairs agent-api:tool-selection agent-api:plan-session agent-api:uploads agent-api:submission agent-api:plan-capability
+def test_external_ask_plan_is_available_without_create_access(monkeypatch):
+    class AskActor(Actor):
+        ai_access = "ASK"
+
+        def access(self, required):
+            return required is AI.ASK
+
+    actor = AskActor()
+    report = _report(actor, tool="ask")
+    report.instructions = "Which pages have open tasks?"
+    monkeypatch.setattr(CONFIG, "EXTERNAL_AGENT_API_ENABLED", True)
+    monkeypatch.setattr(
+        api_routes,
+        "check_limit",
+        lambda *args: {
+            "allowed": True,
+            "count": 1,
+            "remaining": 59,
+            "retry_after": 60,
+        },
+    )
+    monkeypatch.setattr(
+        agent_auth,
+        "authenticate_credential",
+        lambda token: (
+            actor,
+            {
+                "active": True,
+                "expires_at": "2026-09-30T00:00:00+00:00",
+                "generation": 1,
+            },
+        ),
+    )
+    created_tools = []
+
+    def create(current, *, instructions, tool, name=None):
+        assert current is actor
+        created_tools.append(tool)
+        return report
+
+    monkeypatch.setattr(api_routes.external_api, "create_plan", create)
+    monkeypatch.setattr(api_routes, "_load_plan", lambda plan_id: report)
+    monkeypatch.setattr(
+        api_routes.external_api,
+        "issue_execution_key",
+        lambda *args, **kwargs: pytest.fail("Ask submission issued an execution key"),
+    )
+
+    client = app.test_client()
+    headers = {"Authorization": "Bearer ask-key"}
+    capabilities = client.get("/api/v1/me", headers=headers)
+    assert capabilities.status_code == 200
+    assert capabilities.json["capabilities"] == {
+        "ask": True,
+        "create": False,
+        "organize": False,
+        "execute": False,
+    }
+
+    forbidden = client.post(
+        "/api/v1/plans",
+        headers=headers,
+        json={"tool": "create", "instructions": "Make a project."},
+    )
+    assert forbidden.status_code == 403
+    assert created_tools == []
+
+    created = client.post(
+        "/api/v1/plans",
+        headers=headers,
+        json={"tool": "ask", "instructions": report.instructions},
+    )
+    assert created.status_code == 201
+    assert created.json["tool"] == "ask"
+    assert created.json["execute_url"] is None
+    assert created.json["execution"] == {
+        "state": "not_available",
+        "requires_explicit_user_request": False,
+        "operation": None,
+        "result": None,
+    }
+    assert created_tools == ["ask"]
+
+    upload = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers=headers,
+        json={"files": [{"filename": "notes.txt", "size": 5}]},
+    )
+    assert upload.status_code == 409
+    assert upload.json["error"]["code"] == "uploads_not_supported"
+
+    proposal = {
+        "summary": "Two pages have open tasks.",
+        "answer_markdown": "## Open tasks\n\nTwo pages have open tasks.",
+        "confidence": 0.9,
+        "actions": [],
+    }
+
+    def submit(current, user, value, *, contract_version):
+        assert current is report
+        assert user is actor
+        assert value is not None
+        assert contract_version == api_routes.external_api.CONTRACT_VERSION
+        current.status = "complete"
+        current.proposal = {
+            **value,
+            "answer_html": "<h2>Open tasks</h2><p>Two pages have open tasks.</p>",
+        }
+        current.proposal.pop("answer_markdown", None)
+        return current
+
+    monkeypatch.setattr(api_routes.external_api, "submit_plan", submit)
+    submitted = client.post(
+        "/api/v1/plans/report-key/submit",
+        headers=headers,
+        json={
+            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "proposal": proposal,
+        },
+    )
+    assert submitted.status_code == 200
+    assert submitted.json["status"] == "complete"
+    assert "execution_key" not in submitted.json
+    assert submitted.json["proposal"]["answer_html"].startswith("<h2>")
+
+    execution = client.post(
+        "/api/v1/plans/report-key/execute",
+        headers=headers,
+        json={"execution_key": "lgn_exec_" + "a" * 43},
+    )
+    assert execution.status_code == 409
+    assert execution.json["error"]["code"] == "execution_not_supported"
 
 
 # @matrix agent-api ai-report : browser-review creator-bound short-link

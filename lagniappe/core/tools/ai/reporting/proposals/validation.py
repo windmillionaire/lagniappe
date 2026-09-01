@@ -5,6 +5,7 @@ import re
 from lagniappe.core import exceptions
 from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools import dates
+from lagniappe.core.tools.files.html import render_markdown
 
 from ...debug import ai_debug
 from ...references import normalize_hash_references
@@ -26,6 +27,32 @@ ENTITY_PAIR_ACTION_REFERENCES = {
     "move_page": ("page", ("category", "model")),
     "move_task": ("task", ("to_page", "page")),
 }
+
+
+# @testable true
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_renders_page_document_markdown
+# @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
+def normalize_report_markdown(proposal):
+    """Render new model-facing Markdown fields into legacy executable HTML."""
+    if not isinstance(proposal, dict):
+        return proposal
+    actions = proposal.get("actions")
+    if not isinstance(actions, list):
+        return proposal
+    for action in actions:
+        if not isinstance(action, dict) or action.get("type") != "create_page":
+            continue
+        data = action.get("data")
+        if not isinstance(data, dict) or "document_markdown" not in data:
+            continue
+        source = data.get("document_markdown")
+        if not isinstance(source, str):
+            raise exceptions.AIException(
+                "Create page document_markdown must be a string."
+            )
+        data["document"] = render_markdown(source)
+        data.pop("document_markdown", None)
+    return proposal
 
 
 # @testable true
@@ -66,7 +93,8 @@ def validate_proposal(
     proposal = normalized["proposal"]
     required_file_refs = normalized["required_file_refs"]
     if not isinstance(proposal, dict):
-        raise exceptions.AIException("Organize proposal must be a JSON object.")
+        raise exceptions.AIException("Report proposal must be a JSON object.")
+    proposal = normalize_report_markdown(proposal)
 
     issues = proposal.get("issues")
     if issues is None:
@@ -75,34 +103,34 @@ def validate_proposal(
         not isinstance(issue, str) for issue in issues
     ):
         raise exceptions.AIException(
-            "Organize proposal issues must be a list of strings."
+            "Report proposal issues must be a list of strings."
         )
 
     actions = proposal.get("actions")
     if not isinstance(actions, list):
-        raise exceptions.AIException("Organize proposal must include actions.")
+        raise exceptions.AIException("Report proposal must include actions.")
 
     seen_ids = set()
     seen_actions = {}
     for index, action in enumerate(actions):
         if not isinstance(action, dict):
-            raise exceptions.AIException("Each organize action must be an object.")
+            raise exceptions.AIException("Each report action must be an object.")
 
         action_type = action.get("type")
         if action_type not in ALLOWED_ACTIONS:
-            raise exceptions.AIException(f"Unknown organize action: {action_type}")
+            raise exceptions.AIException(f"Unknown report action: {action_type}")
         if action_type not in allowed:
             raise exceptions.AIException(
-                f"Organize action not allowed for this user: {action_type}"
+                f"Report action not allowed for this user: {action_type}"
             )
 
         action_id = action.get("id")
         if action_id:
             if not isinstance(action_id, str):
-                raise exceptions.AIException("Organize action ids must be strings.")
+                raise exceptions.AIException("Report action ids must be strings.")
             if action_id in seen_ids:
                 raise exceptions.AIException(
-                    f"Duplicate organize action id: {action_id}"
+                    f"Duplicate report action id: {action_id}"
                 )
 
         action_label = f"{action_id or index + 1} ({action_type})"

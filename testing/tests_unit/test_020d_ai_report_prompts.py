@@ -866,7 +866,8 @@ def test_report_prompts_attach_provider_json_schema():
     }
 
     ask_schema = ask_prompt.response_schema
-    assert "answer_html" in ask_schema["properties"]
+    assert "answer_markdown" in ask_schema["properties"]
+    assert "answer_html" not in ask_schema["properties"]
     assert "issues" not in ask_schema["required"]
     assert ask_prompt.allowed_actions == ()
     assert ask_schema["properties"]["actions"] == {
@@ -874,6 +875,10 @@ def test_report_prompts_attach_provider_json_schema():
         "items": {"type": "object"},
         "maxItems": 0,
     }
+
+    create_page_data = create_actions["create_page"]["properties"]["data"]
+    assert "document_markdown" in create_page_data["properties"]
+    assert "document" not in create_page_data["properties"]
 
     assert "move_page" not in create_actions
     assert tuple(create_actions) == create_prompt.allowed_actions

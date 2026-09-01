@@ -290,7 +290,7 @@ Common data shapes:
 - create_category: {"name": string, "description": string, "form": entity_or_action_ref}
 - create_project: {"name": string, "description": string}
 - create_model_task: {"name": string, "project": entity_or_action_ref, "form": entity_or_action_ref}
-- create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document": html_string}
+- create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document_markdown": markdown_string}
 - create_task: {"name": string, "description": string, "page": entity_or_action_ref, "task": existing_task_ref_for_completed_occurrence, "task_action": root_new_task_action_for_completed_occurrence, "project": entity_or_action_ref, "model": entity_or_action_ref, "form": task_form_ref_only, "submission": object, "due_date": "YYYY-MM-DD", "completed": true, "completed_on": "YYYY-MM-DD"}
 - add_form_to_page: {"page": entity_ref, "form": entity_or_action_ref}
 - add_category: {"page": entity_ref, "category": entity_ref}

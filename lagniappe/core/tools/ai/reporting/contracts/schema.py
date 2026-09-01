@@ -214,7 +214,7 @@ def _report_action_data_properties():
         },
         "submission": submission_response_schema(),
         "submission_empty_reason": {"type": "string"},
-        "document": {"type": "string"},
+        "document_markdown": {"type": "string"},
         "due_date": {"type": "string"},
         "schedule": task_schedule_response_schema(),
         "completed": {"type": "boolean"},

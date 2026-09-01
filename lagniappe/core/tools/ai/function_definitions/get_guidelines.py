@@ -5,7 +5,7 @@ from google.genai import types
 from lagniappe.core.tools.ai.debug import ai_debug
 from lagniappe.core.tools.ai.guidelines import (
     CATEGORY_GENERATION_GUIDELINES,
-    DOCUMENT_GUIDELINES,
+    REPORT_DOCUMENT_GUIDELINES,
     FORM_AUTOFILL_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
     ORGANIZE_ACTION_GUIDELINES,
@@ -112,8 +112,8 @@ GUIDELINE_BUNDLES = {
         ),
     },
     "page_document": {
-        "description": "Rules for optional page document HTML.",
-        "sections": (DOCUMENT_GUIDELINES,),
+        "description": "Rules for optional report page document Markdown.",
+        "sections": (REPORT_DOCUMENT_GUIDELINES,),
     },
     "file_summary": {
         "description": "Rules for deciding when and how a file summary should support search.",

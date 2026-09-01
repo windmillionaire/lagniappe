@@ -58,7 +58,7 @@ REPORT_ACTION_DATA_CONTRACTS = {
             "form",
             "form_action",
             "form_name",
-            "document",
+            "document_markdown",
             "submission",
             "submission_empty_reason",
         ),
