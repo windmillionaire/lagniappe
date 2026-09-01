@@ -9,10 +9,11 @@ External plans never call Lagniappe's configured model, and the external API
 has no operation that applies a proposal to the workspace.
 
 The API is part of the application rather than a deployment-wide optional
-feature. Eligibility is user-scoped: users must be non-public and have at least
-`ASK` AI access to manage a key or use Ask. `CREATE` AI access is additionally
-required for Create and Organize. Revoking a user's key or AI access provides
-the operational shutoff without maintaining a second configuration gate.
+feature. Every authenticated non-public user may manage a key and use Ask,
+Create, and Organize, regardless of the user's site AI-access setting. That
+setting controls Lagniappe-funded model-provider calls; an external client uses
+its own model and tokens. Revoking the user's API key is the external-agent
+operational shutoff.
 
 ## Security model
 
@@ -26,6 +27,9 @@ the operational shutoff without maintaining a second configuration gate.
   CSRF-exempt for that reason.
 - API calls run as the key's user. Existing read-tool handlers enforce that
   user's normal entity permissions. Plan access is also bound to its creator.
+- External-plan capability never adds workspace permission. Proposal validation
+  and browser execution use the same live resource checks as ordinary UI work,
+  so a permission removed after validation is honored at execution time.
 - Every user has an editable personal Page. `/me`, each plan contract, and
   `list_workspace_resources` identify it explicitly because personal Pages do
   not appear in ordinary workspace search. A User and personal Page
@@ -71,8 +75,9 @@ changes.
    clients that support local skills. It points back to live discovery and does
    not duplicate schemas or permissions.
 3. `GET /me` verifies the actor, reports the actor's persisted timezone and
-   personal Page reference, and reports separate Ask, Create, and Organize
-   capabilities.
+   personal Page reference, and reports the provider-free external-plan
+   capabilities. It intentionally does not expose or consult the unrelated
+   site-funded model-provider entitlement.
 4. `GET /tools` returns permission-bounded read tools as plain JSON Schema.
    `list_workspace_resources` includes the personal Page alongside the
    permission-filtered workspace inventory.
@@ -117,7 +122,7 @@ entity. Existing workspace entities instead use their documented
 
 ### Ask
 
-Ask requires `ASK` access and is read-only. The client answers the specific
+Ask is read-only. The client answers the specific
 question from permitted workspace tools and outside research when useful. Its
 final object contains a direct plain-text `summary`, optional
 `answer_markdown`, a confidence value, and an empty `actions` array. Trusted
@@ -148,7 +153,7 @@ Ask response.
 
 ### Create
 
-Create requires `CREATE` access. The client inspects existing workspace
+Create is available to every eligible external-agent user. The client inspects existing workspace
 structure before proposing new forms, categories, projects, model tasks, pages,
 or tasks. It uses the same permission-filtered action schema and on-demand
 guidelines as internal Create. The proposal must contain at least one allowed
@@ -169,7 +174,8 @@ HTML input expected by the existing browser-approved deterministic runner.
 
 ### Organize
 
-Organize requires `CREATE` access and at least one finalized upload. Use
+Organize is available to every eligible external-agent user and requires at
+least one finalized upload. Use
 `POST /plans/{id}/uploads` to create resumable Cloud Storage sessions, upload
 the declared bytes to each returned `session_url`, and call
 `POST /plans/{id}/uploads/finalize`. Ask and Create reject these endpoints.
@@ -190,6 +196,14 @@ direct the user to review and approve it on the authenticated website. The
 external API deliberately has no `/execute` operation. The existing browser
 Execute control starts the normal deterministic runner and applies the exact
 validated proposal without a model call.
+
+Opening, changing, executing, retrying, undoing, or deleting a saved report is
+provider-free and therefore does not require site AI access. Those browser
+operations still require the report owner's authenticated session, CSRF where
+applicable, a valid report state, and current permission for every affected
+resource. Internal report revision is different: it calls Lagniappe's configured
+provider and still requires the corresponding site AI-access level. External
+reports cannot invoke that provider-backed revision route.
 
 Submitting the same normalized result again is idempotent. A later valid Ask
 result replaces the saved read-only answer. A ready Create plan also

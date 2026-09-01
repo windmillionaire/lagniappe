@@ -29,15 +29,22 @@
   {% call card() %}
     <p class="text-base-medium mb-3">
       An Administrator chooses a separate AI level for each ordinary user;
-      only the primary Owner edits another Administrator's account. None disables
-      AI features, Ask allows workspace questions and saved answers, and Create
-      also enables generation, autofill, summarization, Organize, Create, and
-      proposal execution. Create includes Ask.
+      only the primary Owner edits another Administrator's account. This level
+      controls features that call Lagniappe's configured model provider: None
+      disables those calls, Ask allows workspace questions and saved answers,
+      and Create also enables generation, autofill, summarization, Organize, and
+      Create. Create includes Ask.
     </p>
     <p class="text-base-medium">
       This setting is independent from user groups and permissions, so a user
       can have broad workspace permissions without AI access, or AI access that
       still operates only within a narrow set of permitted records.
+    </p>
+    <p class="text-base-medium mt-3">
+      External-agent API plans use the user's own AI client and tokens, so they
+      are not controlled by this provider entitlement. Working with an already
+      saved report is also provider-free. API plans and report execution still
+      use the signed-in user's normal workspace permissions.
     </p>
   {% endcall %}
   {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}

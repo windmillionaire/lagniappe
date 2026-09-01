@@ -126,6 +126,12 @@ Create and Organize proposals may include reviewed create, move, rename,
 attach, schema, and submission actions. `reporting/execution/` owns deterministic
 application; the model is not called during execution.
 
+Because execution is provider-free, viewing, skipping actions, running,
+retrying, undoing, and deleting a saved report do not require `User.ai_access`.
+They remain creator-bound browser operations, and every action rechecks current
+resource permissions. Generating or revising an internal report still calls the
+configured provider and therefore retains its Ask or Create entitlement.
+
 Supported action families include:
 
 - creating Pages, Tasks, Forms, Projects, and Categories;

@@ -43,11 +43,16 @@ def test_client_skill_markdown_is_minimal_and_discovery_first():
 
 
 # @matrix agent-api ai-report : draft report-session status
+# @pair agent-api:entitlement-independent
 # @pair agent-api:origin
 @pytest.mark.unit
 def test_api_report_draft_preserves_agent_manifest(monkeypatch):
     _patch_fake_keys(monkeypatch)
     user = _test_user("agent-api-owner")
+    user.ai_access = "NONE"
+    user.access = lambda required: pytest.fail(
+        "External plan creation consulted provider entitlement"
+    )
     saved = []
     monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
 
@@ -240,12 +245,9 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     )
 
 
-# @matrix agent-api ai-access : ask create organize tool-selection
+# @matrix agent-api : ask create organize tool-selection
 @pytest.mark.unit
-def test_external_plan_tools_follow_ai_access_tiers():
-    assert external_api.required_ai_access("ask").name == "ASK"
-    assert external_api.required_ai_access("create").name == "CREATE"
-    assert external_api.required_ai_access("organize").name == "CREATE"
+def test_external_plan_tool_selection_is_provider_independent():
     assert external_api.normalize_plan_tool(" Ask ") == "ask"
     with pytest.raises(exceptions.ValidationError, match="ask, create, or organize"):
         external_api.normalize_plan_tool("email")

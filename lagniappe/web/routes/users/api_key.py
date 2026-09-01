@@ -4,11 +4,10 @@ from flask import abort, g, request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import AI
 from lagniappe.core.tools.auth import agent_api
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.web import responses
-from lagniappe.web.auth import ai_access
+from lagniappe.web.auth import logged_in
 
 from . import users
 
@@ -55,9 +54,10 @@ def _rotation_limit(actor):
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_user_can_rotate_and_revoke_external_agent_api_key
-# @matrix agent-api user-settings : expiry revoke rotate shown-once
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_without_provider_access_can_manage_external_agent_api_key
+# @matrix agent-api user-settings : entitlement-independent expiry revoke rotate shown-once
 @users.route("/me/api-key", methods=["GET", "POST", "DELETE"])
-@ai_access(AI.ASK)
+@logged_in
 def api_key():
     """Inspect, rotate, or revoke the current user's single API credential."""
     actor = _enabled_actor()

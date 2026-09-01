@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import json
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import AI, Action, Fetch
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools import cache, dates
@@ -114,17 +114,8 @@ def _plan_name(tool, instructions, requested=None):
 
 
 # @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_plan_tools_follow_ai_access_tiers
-# @matrix agent-api ai-access : ask create organize tool-selection
-def required_ai_access(tool):
-    """Return the entitlement required for one immutable plan tool."""
-    return AI.ASK if tool == "ask" else AI.CREATE
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external_api.py::create_plan
-# @covered-by lagniappe/core/tools/ai/external_api.py::plan_contract
-# @reason normalization is exercised through public plan creation and contracts
+# @tests tests_unit/test_032_agent_api.py::test_external_plan_tool_selection_is_provider_independent
+# @matrix agent-api : ask create organize tool-selection
 def normalize_plan_tool(tool):
     value = str(tool or "organize").strip().casefold()
     if value not in SUPPORTED_PLAN_TOOLS:
@@ -137,6 +128,7 @@ def normalize_plan_tool(tool):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
 # @matrix agent-api ai-report : draft report-session
+# @pair agent-api:entitlement-independent
 def create_plan(user, *, instructions, tool="organize", name=None):
     """Create a durable draft report without dispatching a provider job."""
     instructions = str(instructions or "").strip()
@@ -145,10 +137,6 @@ def create_plan(user, *, instructions, tool="organize", name=None):
     if _text_bytes(instructions) > MAX_INSTRUCTIONS_BYTES:
         raise exceptions.ValidationError("Instructions are too large.")
     tool = normalize_plan_tool(tool)
-    if not user.access(required_ai_access(tool)):
-        raise exceptions.ValidationError(
-            f"This user cannot start {tool.title()} plans."
-        )
 
     report = Entities.REPORT.create(
         {
@@ -630,7 +618,6 @@ __all__ = [
     "plan_contract",
     "prepare_upload_manifest",
     "report_file_references",
-    "required_ai_access",
     "submit_plan",
     "user_timezone_name",
     "validate_external_proposal",

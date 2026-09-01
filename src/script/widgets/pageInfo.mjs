@@ -471,7 +471,7 @@ export class UserSettings extends PagePermissions {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_ask_only_user_can_manage_external_agent_api_key
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_without_provider_access_can_manage_external_agent_api_key
 	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_confirmation_uses_app_modal
 	 * @matrix agent-api user-settings : confirmation-modal revoke rotate
 	 */

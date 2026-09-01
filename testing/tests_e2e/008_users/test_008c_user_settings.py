@@ -145,6 +145,7 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
         "name",
         "user-email",
         "notification-email",
+        "api-key-settings",
     ]
 
     settings_panel.locator(
@@ -244,11 +245,20 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(controls.locator(Buttons.LP_CLOSE)).to_be_visible()
 
 
-# @matrix agent-api user-settings : confirmation-modal revoke rotate shown-once
+# @matrix agent-api user-settings : confirmation-modal entitlement-independent revoke rotate shown-once
 # @template pages/info.html::user_settings
-def test_ask_only_user_can_manage_external_agent_api_key(get_user):
+def test_user_without_provider_access_can_manage_external_agent_api_key(get_user):
     owner = get_user(Users.OWNER)
-    user = get_user(Users.admin_ask, creator=owner)
+    suffix = uuid4().hex
+    user = get_user(
+        UserDefinition(
+            name=f"External Agent None {suffix}",
+            email=f"external-agent-none-{suffix}@example.test",
+            ai_access=AI.NONE,
+        ),
+        creator=owner,
+    )
+    assert user.entity.ai_access == AI.NONE.name
     user.go(SitePages.HOME)
 
     go_to_my_page(user)

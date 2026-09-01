@@ -12,7 +12,7 @@ from werkzeug.exceptions import HTTPException
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import AI, Action, Fetch
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import functions as ai_functions
@@ -112,9 +112,8 @@ def _rate_limit(scope, identifier, limit, window_seconds):
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_rechecks_actor_and_plan_authority
-# @matrix agent-api : bearer-only error-envelope public-user request-recheck
-# @matrix ai-access : downgrade request-recheck
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
+# @matrix agent-api : bearer-only entitlement-independent error-envelope public-user request-recheck
 @api.before_request
 def authenticate_request():
     """Authenticate only a bearer token; browser sessions are never a fallback."""
@@ -132,10 +131,10 @@ def authenticate_request():
     except agent_auth.AgentAPICredentialError:
         return _error("unauthorized", "The API key is invalid or expired.", 401)
 
-    if getattr(actor, "is_public", False) or not actor.access(AI.ASK):
+    if getattr(actor, "is_public", False):
         return _error(
             "forbidden",
-            "This user cannot use external AI plans.",
+            "This user cannot use external agent plans.",
             403,
         )
     g.agent_api_user = actor
@@ -334,10 +333,9 @@ def _plan_payload(report, *, include_proposal=True):
 
 
 # @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_rechecks_actor_and_plan_authority
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_resources_hide_other_users_plans
-# @matrix agent-api : creator-bound downgrade generic-not-found plan-isolation stale-plan
-# @matrix ai-access : downgrade stale-plan
+# @matrix agent-api : creator-bound entitlement-independent generic-not-found plan-isolation stale-plan
 def _load_plan(plan_id):
     report = Entities.fetch_one(plan_id, request=Fetch.direct())
     actor = g.agent_api_user
@@ -348,12 +346,6 @@ def _load_plan(plan_id):
         or owner_key != actor.key
     ):
         raise APIProblem("not_found", "Plan not found.", 404)
-    if not actor.access(external_api.required_ai_access(report.tool)):
-        raise APIProblem(
-            "forbidden",
-            f"This user can no longer use {report.tool.title()} plans.",
-            403,
-        )
     return report
 
 
@@ -538,7 +530,8 @@ def openapi_document():
                 "summary": "Describe the API actor",
                 "description": (
                     "Call first to verify the bearer key, its user identity, and "
-                    "its permission-bounded Ask, Create, and Organize capabilities. "
+                    "its external-plan capabilities. These provider-free capabilities "
+                    "are independent of the site's model-provider access setting. "
                     "The user object also identifies the actor's editable personal "
                     "Page, which intentionally may not appear in workspace search."
                 ),
@@ -1000,7 +993,8 @@ def openapi_document():
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : bearer-only plan-capability
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
+# @matrix agent-api : bearer-only entitlement-independent plan-capability
 @api.get("/me")
 @_route
 def me():
@@ -1009,15 +1003,14 @@ def me():
         "user": {
             "name": actor.name,
             "hash": actor.hash,
-            "ai_access": actor.ai_access,
             "timezone": external_api.user_timezone_name(actor),
             "personal_page": external_api.personal_page_reference(actor),
         },
         "credential": g.agent_api_credential,
         "capabilities": {
-            "ask": actor.access(AI.ASK),
-            "create": actor.access(AI.CREATE),
-            "organize": actor.access(AI.CREATE),
+            "ask": True,
+            "create": True,
+            "organize": True,
         },
     }
 
@@ -1036,7 +1029,8 @@ def tools():
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : plan-session
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
+# @matrix agent-api : entitlement-independent plan-session tool-selection
 @api.post("/plans")
 @_route
 def create_plan():
@@ -1053,12 +1047,6 @@ def create_plan():
             "unsupported_tool",
             "Plan tool must be ask, create, or organize.",
             422,
-        )
-    if not actor.access(external_api.required_ai_access(tool)):
-        raise APIProblem(
-            "forbidden",
-            f"This user cannot start {tool.title()} plans.",
-            403,
         )
     report = external_api.create_plan(
         actor,
@@ -1276,7 +1264,7 @@ def _original_file_download(tool_name, arguments, result):
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_ask_plan_is_available_without_create_access
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
 # @matrix agent-api : tool-dispatch
 # @pairs agent-api:ask-refinement agent-api:create-revision agent-api:organize-revision agent-api:envelope-validation
 @api.post("/plans/<plan_id>/tools/<tool_name>")

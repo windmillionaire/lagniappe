@@ -121,7 +121,6 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert authorized.json["user"] == {
         "name": actor.name,
         "hash": actor.hash,
-        "ai_access": "CREATE",
         "timezone": "America/Los_Angeles",
         "personal_page": {
             "kind": "page",
@@ -549,8 +548,10 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
 
 
-# @matrix agent-api ai-access : downgrade public-user request-recheck stale-plan
-def test_external_api_rechecks_actor_and_plan_authority(monkeypatch):
+# @matrix agent-api : entitlement-independent public-user request-recheck stale-plan
+def test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility(
+    monkeypatch,
+):
     actor = Actor()
     report = _report(actor, tool="create")
     monkeypatch.setattr(
@@ -579,25 +580,26 @@ def test_external_api_rechecks_actor_and_plan_authority(monkeypatch):
     headers = {"Authorization": "Bearer valid-key"}
     assert client.get("/api/v1/plans/report-key", headers=headers).status_code == 200
 
-    actor.access = lambda required: required is AI.ASK
-    downgraded = client.get("/api/v1/plans/report-key", headers=headers)
-    assert downgraded.status_code == 403
-    assert downgraded.json["error"]["code"] == "forbidden"
-    assert "can no longer use Create plans" in downgraded.json["error"]["message"]
-
     actor.access = lambda required: False
-    disabled = client.get("/api/v1/me", headers=headers)
-    assert disabled.status_code == 403
-    assert disabled.json["error"] == {
-        "code": "forbidden",
-        "message": "This user cannot use external AI plans.",
+    plan_without_provider_access = client.get(
+        "/api/v1/plans/report-key", headers=headers
+    )
+    assert plan_without_provider_access.status_code == 200
+    actor_without_provider_access = client.get("/api/v1/me", headers=headers)
+    assert actor_without_provider_access.status_code == 200
+    assert actor_without_provider_access.json["capabilities"] == {
+        "ask": True,
+        "create": True,
+        "organize": True,
     }
 
-    actor.access = lambda required: True
     actor.is_public = True
     public = client.get("/api/v1/me", headers=headers)
     assert public.status_code == 403
-    assert public.json["error"] == disabled.json["error"]
+    assert public.json["error"] == {
+        "code": "forbidden",
+        "message": "This user cannot use external agent plans.",
+    }
 
 
 # @matrix agent-api : creator-bound generic-not-found plan-isolation
@@ -653,20 +655,17 @@ def test_external_plan_resources_hide_other_users_plans(monkeypatch):
     assert owned.json["id"] == "report-key"
 
 
-# @source lagniappe/core/tools/ai/external_api.py::required_ai_access
-# @source lagniappe/web/routes/api/main.py::create_plan
 # @source lagniappe/web/routes/api/main.py::create_uploads
-# @source lagniappe/web/routes/api/main.py::me
 # @source lagniappe/web/routes/api/main.py::submit_plan
-# @pairs agent-api:ask-refinement agent-api:envelope-validation agent-api:tool-selection agent-api:plan-session agent-api:uploads agent-api:submission agent-api:plan-capability
-def test_external_ask_plan_is_available_without_create_access(monkeypatch):
-    class AskActor(Actor):
-        ai_access = "ASK"
+# @pairs agent-api:ask-refinement agent-api:entitlement-independent agent-api:envelope-validation agent-api:tool-selection agent-api:plan-session agent-api:uploads agent-api:submission agent-api:plan-capability
+def test_external_plan_types_are_available_without_provider_access(monkeypatch):
+    class ProviderDisabledActor(Actor):
+        ai_access = "NONE"
 
         def access(self, required):
-            return required is AI.ASK
+            return False
 
-    actor = AskActor()
+    actor = ProviderDisabledActor()
     report = _report(actor, tool="ask")
     report.instructions = "Which pages have open tasks?"
     monkeypatch.setattr(
@@ -696,6 +695,8 @@ def test_external_ask_plan_is_available_without_create_access(monkeypatch):
     def create(current, *, instructions, tool, name=None):
         assert current is actor
         created_tools.append(tool)
+        report.tool = tool
+        report.instructions = instructions
         return report
 
     monkeypatch.setattr(api_routes.external_api, "create_plan", create)
@@ -715,17 +716,23 @@ def test_external_ask_plan_is_available_without_create_access(monkeypatch):
     assert capabilities.status_code == 200
     assert capabilities.json["capabilities"] == {
         "ask": True,
-        "create": False,
-        "organize": False,
+        "create": True,
+        "organize": True,
     }
 
-    forbidden = client.post(
+    create_draft = client.post(
         "/api/v1/plans",
         headers=headers,
         json={"tool": "create", "instructions": "Make a project."},
     )
-    assert forbidden.status_code == 403
-    assert created_tools == []
+    assert create_draft.status_code == 201
+
+    organize_draft = client.post(
+        "/api/v1/plans",
+        headers=headers,
+        json={"tool": "organize", "instructions": "Organize these files."},
+    )
+    assert organize_draft.status_code == 201
 
     created = client.post(
         "/api/v1/plans",
@@ -736,7 +743,7 @@ def test_external_ask_plan_is_available_without_create_access(monkeypatch):
     assert created.json["tool"] == "ask"
     assert "execute_url" not in created.json
     assert "execution" not in created.json
-    assert created_tools == ["ask"]
+    assert created_tools == ["create", "organize", "ask"]
 
     malformed_tool = client.post(
         "/api/v1/plans/report-key/tools/search_entities",
@@ -824,10 +831,10 @@ def test_external_ask_plan_is_available_without_create_access(monkeypatch):
 # @matrix agent-api ai-report : browser-review creator-bound short-link
 def test_api_plan_preview_redirect_is_session_and_creator_bound(monkeypatch):
     actor = Actor()
+    actor.access = lambda required: False
     report = _report(actor)
     looked_up = []
     monkeypatch.setattr(web_auth, "_load_request_context", lambda key=None: (actor, None))
-    monkeypatch.setattr(web_auth, "require_ai_access", lambda required: None)
     monkeypatch.setattr(tool_preview_routes, "current_user", actor)
     monkeypatch.setattr(tool_preview_routes.Entities, "REPORT", SimpleNamespace)
     monkeypatch.setattr(
@@ -870,6 +877,7 @@ def test_api_plan_preview_redirect_is_session_and_creator_bound(monkeypatch):
 # @matrix agent-api user-settings : expiry revoke rotate shown-once
 def test_user_can_rotate_and_revoke_external_agent_api_key(monkeypatch):
     actor = Actor()
+    actor.access = lambda required: False
     issued = {
         "active": True,
         "display_prefix": "lgn_actor…",
@@ -879,7 +887,6 @@ def test_user_can_rotate_and_revoke_external_agent_api_key(monkeypatch):
     revoked = {**issued, "active": False, "generation": 2}
     monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
     monkeypatch.setattr(web_auth, "_load_request_context", lambda key=None: (actor, None))
-    monkeypatch.setattr(web_auth, "require_ai_access", lambda required: None)
     monkeypatch.setattr(api_key_routes, "current_user", actor)
     monkeypatch.setattr(api_key_routes, "_rotation_limit", lambda current: None)
     monkeypatch.setattr(

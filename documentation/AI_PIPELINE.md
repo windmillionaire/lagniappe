@@ -48,14 +48,19 @@ provider. The external-agent API creates a draft report, exposes the shared
 read-tool registry, and validates a tool-specific Ask, Create, or Organize
 contract. Ask publishes a completed read-only answer. Create and Organize
 publish at the normal ready-for-review boundary and can enter the same
-deterministic execution adapter through a proposal-scoped execution key.
+deterministic execution adapter only after the creator approves the saved
+report in an authenticated browser session.
 
 ## Safety boundaries
 
 - Workspace function tools are read-only and enforce the requesting User's
   view permissions.
-- The route and worker both enforce ordinary resource permissions and the
-  required `AI.ASK` or `AI.CREATE` entitlement.
+- Provider-backed routes and workers enforce the required `AI.ASK` or
+  `AI.CREATE` entitlement. Provider-free external plans and saved-report
+  controls do not consult that billing entitlement.
+- Every report read and mutation remains bound to its authenticated owner;
+  deterministic execution rechecks current resource permissions action by
+  action.
 - Report output uses typed action contracts, deterministic normalization,
   repair, and review-only fallback for unsafe actions.
 - Report application is a separate user-approved operation with its own
@@ -103,9 +108,11 @@ destination. Repeating the same request is idempotent; reusing the UUID for
 different work is rejected.
 
 The worker reloads the actor and inputs at claim time and again before apply.
-Adapters declare their required AI tier. Ask needs `AI.ASK`; generation,
-organization, execution, autofill, and file summary need `AI.CREATE`. Domain
-authorization—such as edit access to an Autofill target—is checked separately.
+Provider-backed adapters declare their required AI tier. Ask needs `AI.ASK`;
+generation, organization, autofill, and file summary need `AI.CREATE`.
+Reviewed report execution has no provider entitlement because it calls no
+model; its deterministic action handlers enforce current domain authorization
+instead.
 
 ## Preparation and application
 
@@ -139,7 +146,8 @@ See [FRONTEND_VIEWS_RECONCILIATION.md](FRONTEND_VIEWS_RECONCILIATION.md) and
 
 ## Before changing an AI path
 
-1. Identify the route permission, required AI tier, and durable input owner.
+1. Identify the route permission and durable input owner; require an AI tier
+   only if the operation calls the configured provider.
 2. Keep tools read-only and permission-filtered.
 3. Put dynamic response validation in application code, not only a provider
    schema or prompt instruction.

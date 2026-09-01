@@ -33,13 +33,13 @@
     {{ subheading("Access Levels") }}
     <div class="space-y-3">
       {% call feature("Ask Access", icon="ask", kind="user") %}
-        Shows the Ask tool and allows saved questions and answers. Existing Organize or Create reports remain readable after a user is reduced from Create to Ask, but their higher-level actions stay unavailable.
+        Shows the built-in Ask tool and allows Lagniappe's configured provider to create saved questions and answers.
       {% endcall %}
       {% call feature("Create Access", icon="create", kind="user") %}
-        Includes Ask and adds Organize, Create, generation, autofill, summarization, revision of creation proposals, and proposal execution.
+        Includes Ask and adds provider-backed Organize, Create, generation, autofill, summarization, and revision of creation proposals.
       {% endcall %}
       {% call feature("Normal Permissions Still Apply", icon="permissions", kind="user") %}
-        AI access is per user and separate from groups. A user needs both the required AI level and permission to the records involved.
+        AI access is per user and separate from groups. Provider-free external plans and saved-report controls do not require it, but every path still enforces the user's current resource permissions.
       {% endcall %}
     </div>
   </section>
@@ -50,7 +50,7 @@
         Drop files, paste screenshots, or add instructions when you want Lagniappe to decide how something should be saved. Organize can propose pages, tasks, forms, categories, projects, model tasks, file attachments, and evidence-backed updates to existing page or task submissions.
       {% endcall %}
       {% call feature("Ask", icon="ask", kind="default") %}
-        Ask a question about your workspace. Ask can search permitted pages, tasks, projects, categories, forms, and files, then answer with links and cite the workspace context it used. If the answer naturally implies follow-up work, it can also propose actions.
+        Ask a question about your workspace. Ask can search permitted pages, tasks, projects, categories, forms, and files, then answer with links and cite the workspace context it used. If the conversation turns into follow-up work, continue it with Create or Organize so the changes receive a separate proposal and approval.
       {% endcall %}
       {% call feature("Create", icon="create", kind="default") %}
         Describe what you want Lagniappe to create. Create can draft workspace structure, one-time reminders, and recurring tasks as a saved proposal that you can revise, skip, or run manually.

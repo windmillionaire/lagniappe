@@ -196,8 +196,9 @@ whose permissions remain group-managed in the owner interface.
 ## External-agent API keys
 
 External-agent API authentication is independent of browser sessions. An
-eligible non-public user with `ASK` or `CREATE` AI access can generate one
-30-day bearer key from their own Settings panel. Only a digest is persisted,
-rotation invalidates the previous key, and `/api/v1` never falls back to a
-login cookie. The API has no separate deployment-wide feature gate. See
-[External Agent API](AI_EXTERNAL_API.md).
+authenticated non-public user can generate one 30-day bearer key from their own
+Settings panel, regardless of the site-funded AI-access level. Only a digest is
+persisted, rotation invalidates the previous key, and `/api/v1` never falls back
+to a login cookie. The API has no separate deployment-wide feature gate;
+normal entity permissions remain authoritative. See [External Agent
+API](AI_EXTERNAL_API.md).

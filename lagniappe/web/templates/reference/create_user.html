@@ -28,12 +28,12 @@
       New users default to None.
     </p>
     <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
-      <li><strong>None</strong> hides AI tools and prevents AI-backed actions.</li>
+      <li><strong>None</strong> hides tools that call Lagniappe's configured AI provider and prevents those provider-backed actions.</li>
       <li><strong>Ask</strong> allows workspace questions and saved Ask reports.</li>
-      <li><strong>Create</strong> also allows generation, autofill, summarization, Organize, Create, and proposal execution.</li>
+      <li><strong>Create</strong> also allows generation, autofill, summarization, Organize, and Create.</li>
     </ul>
     {% call callout("tip") %}
-      AI access does not add permission to any page, category, project, form, or file. The user must have both the required AI level and the normal resource permission.
+      AI access does not add permission to any page, category, project, form, or file. It controls site-funded provider calls only. Non-public users may use their own external AI client and operate saved reports at any level; normal resource permissions still apply.
     {% endcall %}
   </section>
   <section>

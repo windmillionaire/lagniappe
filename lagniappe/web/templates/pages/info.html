@@ -50,7 +50,7 @@
         data-can-edit-ai="{{ can_manage_user|yesno }}"
         data-ai-access="{{ page.user.ai_access }}"
         data-notification-email-mode="{{ page.user.notification_email_mode }}"
-        {% if is_own_page and not page.user.is_public and current_user.access(AI.ASK) %}
+        {% if is_own_page and not page.user.is_public %}
           data-api-key-route="{{ url_for('users.api_key') }}"
         {% endif %}
         data-can-edit-notification-email="{{ (is_own_page and not page.user.is_public)|yesno }}"
@@ -89,7 +89,7 @@
             </div>
           </div>
           {% if is_own_page and not page.user.is_public %}<div data-role="notification-email"></div>{% endif %}
-          {% if is_own_page and not page.user.is_public and current_user.access(AI.ASK) %}
+          {% if is_own_page and not page.user.is_public %}
             <fieldset data-role="api-key-settings"
                       data-kind="user"
                       class="rounded-md border border-user-default p-3">
