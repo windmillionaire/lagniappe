@@ -10,6 +10,7 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import functions as ai_functions
+from lagniappe.core.tools.ai import references as ai_references
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.database import agent_api as credential_store
 from testing.utility.ai_report_fakes import _patch_fake_keys, _test_user
@@ -74,6 +75,18 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
 
     assert contract["version"] == external_api.CONTRACT_VERSION
     assert contract["current_date"] == "2026-08-31"
+    assert contract["timezone"] == "UTC"
+    assert contract["submission_format"] == {
+        "contract_version": external_api.CONTRACT_VERSION,
+        "body": {
+            "contract_version": external_api.CONTRACT_VERSION,
+            "proposal": "<object matching proposal_schema>",
+        },
+        "rule": (
+            "POST this wrapper object to submit_url; do not post the proposal "
+            "object as the top-level request body."
+        ),
+    }
     assert contract["proposal_schema"] == {
         "allowed": ("create_page", "summarize_file")
     }
@@ -97,11 +110,15 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         "exactly one summarize_file" in rule
         for rule in contract["workflow_rules"]
     )
-    assert any("never executes" in rule for rule in contract["workflow_rules"])
+    assert any("never applies" in rule for rule in contract["workflow_rules"])
+    assert any(
+        "ready Organize proposal remains conversationally revisable" in rule
+        for rule in contract["workflow_rules"]
+    )
     assert contract["limits"]["max_tool_calls"] == external_api.MAX_PLAN_TOOL_CALLS
 
 
-# @pairs agent-api:proposal-contract ai-report:proposal-contract
+# @pairs agent-api:create-revision agent-api:organize-revision agent-api:proposal-contract ai-report:proposal-contract
 @pytest.mark.unit
 def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     actor = object()
@@ -118,11 +135,19 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
 
     assert ask_contract["tool"] == "ask"
     assert ask_contract["uploads_supported"] is False
-    assert ask_contract["execution_supported"] is False
+    assert "execution_supported" not in ask_contract
     assert ask_contract["required_file_refs"] == []
     assert "answer_markdown" in ask_contract["proposal_schema"]["properties"]
     assert ask_contract["proposal_schema"]["properties"]["actions"]["maxItems"] == 0
     assert any("separate Create or Organize plan" in rule for rule in ask_contract["workflow_rules"])
+    assert any(
+        "without waiting for separate save confirmation" in rule
+        for rule in ask_contract["workflow_rules"]
+    )
+    assert any(
+        "remain available after an Ask submission" in rule
+        for rule in ask_contract["workflow_rules"]
+    )
 
     monkeypatch.setattr(
         external_api,
@@ -141,7 +166,7 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
 
     assert create_contract["tool"] == "create"
     assert create_contract["uploads_supported"] is False
-    assert create_contract["execution_supported"] is True
+    assert "execution_supported" not in create_contract
     assert create_contract["permissions"]["allowed_actions"] == [
         "create_page",
         "needs_review",
@@ -158,6 +183,14 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
         if variant["properties"]["type"]["enum"] == ["create_page"]
     )
     assert "document_markdown" in create_page["properties"]["data"]["properties"]
+    assert any(
+        "ready Create proposal remains conversationally revisable" in rule
+        for rule in create_contract["workflow_rules"]
+    )
+    assert any(
+        "authenticated website" in rule and "no execution operation" in rule
+        for rule in create_contract["workflow_rules"]
+    )
 
 
 # @matrix agent-api ai-access : ask create organize tool-selection
@@ -283,6 +316,7 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
 
 
 # @matrix agent-api ai-report : idempotency proposal-publication ready-state
+# @pair agent-api:organize-revision
 @pytest.mark.unit
 def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatch):
     proposal = {
@@ -331,16 +365,21 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
         proposal,
         contract_version=external_api.CONTRACT_VERSION,
     )
+    revised = external_api.submit_plan(
+        report,
+        object(),
+        {**proposal, "summary": "Create a different page."},
+        contract_version=external_api.CONTRACT_VERSION,
+    )
 
-    assert submitted is report
-    assert repeated is report
+    assert submitted is repeated is revised is report
     assert report.status == "ready"
-    assert report.proposal == proposal
+    assert report.proposal["summary"] == "Create a different page."
     assert report.agent_manifest["proposal_fingerprint"]
-    assert len(saved) == 1
+    assert saved == [report, report]
 
 
-# @pairs agent-api:ask ai-report:answer-only
+# @pairs agent-api:ask agent-api:ask-revision ai-report:answer-only
 @pytest.mark.unit
 def test_external_ask_submission_completes_without_files_or_execution(monkeypatch):
     proposal = {
@@ -384,18 +423,37 @@ def test_external_ask_submission_completes_without_files_or_execution(monkeypatc
         proposal,
         contract_version=external_api.CONTRACT_VERSION,
     )
+    revised = external_api.submit_plan(
+        report,
+        object(),
+        {
+            **proposal,
+            "summary": "The page now has one open task.",
+            "answer_markdown": "## Updated result\n\nThere is **one** open task.",
+        },
+        contract_version=external_api.CONTRACT_VERSION,
+    )
 
-    assert submitted is repeated is report
+    assert submitted is repeated is revised is report
     assert report.status == "complete"
     assert "answer_markdown" not in report.proposal
-    assert "<h2>Result</h2>" in report.proposal["answer_html"]
-    assert external_api.plan_supports_execution(report) is False
-    assert saved == [report]
+    assert report.summary == "The page now has one open task."
+    assert "<h2>Updated result</h2>" in report.proposal["answer_html"]
+    assert saved == [report, report]
 
 
 # @pairs agent-api:ask ai-report:answer-only
 @pytest.mark.unit
-def test_external_ask_submission_allows_hash_token_in_named_link_destination():
+def test_external_ask_submission_allows_hash_token_in_named_link_destination(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        ai_references.cache,
+        "get_details_by_hash",
+        lambda hashes: {
+            "8328b23bef92": {"id": "canonical-cypress-page-key"}
+        },
+    )
     report = SimpleNamespace(tool="ask")
     proposal = {
         "summary": "Cypress Hive has an open follow-up task.",
@@ -413,8 +471,9 @@ def test_external_ask_submission_allows_hash_token_in_named_link_destination():
     )
 
     assert "answer_markdown" not in normalized
-    assert 'href="/pages/hash:8328b23bef92"' in normalized["answer_html"]
+    assert 'href="/pages/canonical-cypress-page-key"' in normalized["answer_html"]
     assert ">Cypress Hive</a>" in normalized["answer_html"]
+    assert "hash:8328b23bef92" not in normalized["answer_html"]
 
     proposal["answer_markdown"] = "The internal reference is hash:8328b23bef92."
     with pytest.raises(exceptions.AIException, match="human names and URLs"):
@@ -427,6 +486,7 @@ def test_external_ask_submission_allows_hash_token_in_named_link_destination():
 
 
 # @pairs agent-api:create ai-report:proposal-publication
+# @pair agent-api:create-revision
 @pytest.mark.unit
 def test_external_create_submission_renders_markdown_without_files(monkeypatch):
     actor = object()
@@ -440,7 +500,11 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
                 "type": "create_page",
                 "data": {
                     "name": "Field Guide",
-                    "document_markdown": "# Field Guide\n\n- First item",
+                    "document_markdown": (
+                        "# Field Guide\n\n- First item\n\n"
+                        "[Source](https://example.com/reference) "
+                        "[Unsafe](javascript:alert('no'))"
+                    ),
                 },
             }
         ],
@@ -470,7 +534,8 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
         "allowed_report_actions",
         lambda user: ("create_page", "needs_review"),
     )
-    monkeypatch.setattr(external_api.Entities, "save", lambda *items: None)
+    saved = []
+    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
 
     submitted = external_api.submit_plan(
         report,
@@ -478,160 +543,38 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
         proposal,
         contract_version=external_api.CONTRACT_VERSION,
     )
+    initial_document = report.proposal["actions"][0]["data"]["document"]
+    assert 'href="https://example.com/reference"' in initial_document
+    assert 'rel="noopener noreferrer"' in initial_document
+    assert "javascript:" not in initial_document
 
-    assert submitted.status == "ready"
+    revised = external_api.submit_plan(
+        report,
+        actor,
+        {
+            **proposal,
+            "summary": "Create a field guide page with a revised introduction.",
+            "actions": [
+                {
+                    **proposal["actions"][0],
+                    "data": {
+                        **proposal["actions"][0]["data"],
+                        "document_markdown": "# Field Guide\n\nA revised introduction.",
+                    },
+                }
+            ],
+        },
+        contract_version=external_api.CONTRACT_VERSION,
+    )
+
+    assert submitted is revised is report
+    assert report.status == "ready"
     assert submitted.input_files == []
-    data = submitted.proposal["actions"][0]["data"]
+    data = report.proposal["actions"][0]["data"]
     assert "document_markdown" not in data
     assert data["document"].startswith("<h1>Field Guide</h1>")
-    assert external_api.plan_supports_execution(submitted) is True
-
-
-# @matrix agent-api ai-report : execution capability expiry idempotency proposal-binding user-binding
-@pytest.mark.unit
-def test_execution_key_is_scoped_expiring_and_shown_once(monkeypatch):
-    now = datetime(2026, 8, 31, 12, tzinfo=timezone.utc)
-    owner = SimpleNamespace(key="owner-key")
-    proposal = {
-        "summary": "Create one page.",
-        "confidence": 1,
-        "issues": [],
-        "actions": [],
-    }
-    report = SimpleNamespace(
-        tool="organize",
-        hash="reporthash12",
-        status="ready",
-        proposal=proposal,
-        result=None,
-        deferred_job=None,
-        agent_manifest={"proposal_fingerprint": "submitted"},
-        properties=SimpleNamespace(user=SimpleNamespace(key=owner.key)),
-    )
-    credential = {"generation": 7}
-    saved = []
-    monkeypatch.setattr(
-        external_api.secrets,
-        "token_urlsafe",
-        lambda length: "a" * 43,
-    )
-    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
-
-    key, expires_at = external_api.issue_execution_key(
-        report,
-        owner,
-        credential,
-        now=now,
-    )
-    capability = report.agent_manifest["execution_capability"]
-
-    assert key == f"{external_api.EXECUTION_KEY_PREFIX}{'a' * 43}"
-    assert expires_at == (now + external_api.EXECUTION_KEY_LIFETIME).isoformat()
-    assert key not in repr(report.agent_manifest)
-    assert capability["credential_generation"] == 7
-    assert capability["proposal_fingerprint"]
-    assert capability["operation_id"].startswith(
-        "agent-api-report-execution:reporthash12:"
-    )
-
-    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
-        external_api.consume_execution_key(
-            report,
-            owner,
-            credential,
-            f"{external_api.EXECUTION_KEY_PREFIX}{'b' * 43}",
-            now=now,
-        )
-    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
-        external_api.consume_execution_key(
-            report,
-            owner,
-            {"generation": 8},
-            key,
-            now=now,
-        )
-    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
-        external_api.consume_execution_key(
-            report,
-            SimpleNamespace(key="another-owner"),
-            credential,
-            key,
-            now=now,
-        )
-    report.proposal = {**proposal, "summary": "A changed proposal."}
-    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
-        external_api.consume_execution_key(
-            report,
-            owner,
-            credential,
-            key,
-            now=now,
-        )
-    report.proposal = proposal
-
-    operation_id = external_api.consume_execution_key(
-        report,
-        owner,
-        credential,
-        key,
-        now=now,
-    )
-    assert operation_id == capability["operation_id"]
-    assert report.agent_manifest["execution_capability"]["consumed_at"]
-
-    report.status = "running"
-    report.deferred_job = {"idempotency_key": operation_id}
-    assert (
-        external_api.consume_execution_key(
-            report,
-            owner,
-            credential,
-            key,
-            now=now,
-        )
-        == operation_id
-    )
-
-    report.status = "ready"
-    report.deferred_job = None
-    report.result = {"status": "undone"}
-    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="consumed"):
-        external_api.consume_execution_key(
-            report,
-            owner,
-            credential,
-            key,
-            now=now,
-        )
-
-    monkeypatch.setattr(
-        external_api.secrets,
-        "token_urlsafe",
-        lambda length: "c" * 43,
-    )
-    rotated_key, _expires_at = external_api.issue_execution_key(
-        report,
-        owner,
-        credential,
-        now=now,
-    )
-    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="invalid"):
-        external_api.consume_execution_key(
-            report,
-            owner,
-            credential,
-            key,
-            now=now,
-        )
-    with pytest.raises(external_api.AgentAPIExecutionKeyError, match="expired"):
-        external_api.consume_execution_key(
-            report,
-            owner,
-            credential,
-            rotated_key,
-            now=now + external_api.EXECUTION_KEY_LIFETIME,
-        )
-    assert saved == [report, report, report]
+    assert "A revised introduction." in data["document"]
+    assert saved == [report, report]
 
 
 # @matrix agent-api : authentication expiry issue revoke shown-once

@@ -5,10 +5,9 @@ import re
 from lagniappe.core import exceptions
 from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools import dates
-from lagniappe.core.tools.files.html import render_markdown
 
 from ...debug import ai_debug
-from ...references import normalize_hash_references
+from ...references import normalize_hash_references, render_ai_markdown
 from ..contracts.actions import ALLOWED_ACTIONS
 from ..schedules import validate_task_schedule
 from .references import (
@@ -50,7 +49,7 @@ def normalize_report_markdown(proposal):
             raise exceptions.AIException(
                 "Create page document_markdown must be a string."
             )
-        data["document"] = render_markdown(source)
+        data["document"] = render_ai_markdown(source)
         data.pop("document_markdown", None)
     return proposal
 

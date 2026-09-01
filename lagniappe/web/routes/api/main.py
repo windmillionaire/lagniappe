@@ -12,13 +12,7 @@ from werkzeug.exceptions import HTTPException
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import (
-    AI,
-    Action,
-    DeferredJobSpec,
-    DeferredJobType,
-    Fetch,
-)
+from lagniappe.core.definitions import AI, Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import functions as ai_functions
@@ -26,9 +20,8 @@ from lagniappe.core.tools.ai.references import hash_reference, normalize_hash_re
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.core.tools.database import assets as storage_assets
-from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
-from . import api
+from . import api, api_family
 
 
 LOGGER = logging.getLogger(__name__)
@@ -173,6 +166,9 @@ def authenticate_request():
     return None
 
 
+api_family.before_request(authenticate_request)
+
+
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @matrix agent-api : error-envelope
@@ -185,6 +181,9 @@ def annotate_response(response):
     )
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+api_family.after_request(annotate_response)
 
 
 # @testable true
@@ -306,77 +305,6 @@ def _file_payload(file):
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/api/main.py::_execution_payload
-# @reason bounded ledger aggregation is asserted through the public plan projection
-def _execution_result_payload(report):
-    result = report.result if isinstance(getattr(report, "result", None), dict) else {}
-    actions = [
-        action
-        for action in (result.get("actions") or [])
-        if isinstance(action, dict)
-    ]
-    if not actions and not result:
-        return None
-    counts = {
-        status: sum(1 for action in actions if action.get("status") == status)
-        for status in ("pending", "applying", "complete", "skipped", "failed")
-    }
-    return {
-        "status": result.get("status"),
-        "actions_total": len(actions),
-        "action_counts": counts,
-    }
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::get_plan
-# @covered-by lagniappe/web/routes/api/main.py::execute_plan
-# @reason execution progress is asserted through the public plan and execute resources
-def _execution_payload(report):
-    if not external_api.plan_supports_execution(report):
-        return {
-            "state": "not_available",
-            "requires_explicit_user_request": False,
-            "operation": None,
-            "result": None,
-        }
-    state = {
-        "draft": "not_available",
-        "ready": "awaiting_explicit_request",
-        "running": "running",
-        "complete": "complete",
-        "failed": "failed",
-        "undoing": "undoing",
-        "undo_failed": "failed",
-    }.get(report.status, "not_available")
-    payload = {
-        "state": state,
-        "requires_explicit_user_request": True,
-        "operation": None,
-        "result": _execution_result_payload(report),
-    }
-    active_job = getattr(report, "deferred_job", None) or {}
-    if active_job.get("key"):
-        statuses = DeferredJobs.statuses(
-            [active_job["key"]],
-            g.agent_api_user,
-        )
-        if statuses:
-            operation = dict(statuses[0])
-            for internal_field in (
-                "key",
-                "source_widget",
-                "destination",
-                "entity_key",
-            ):
-                operation.pop(internal_field, None)
-            payload["operation"] = operation
-    if report.status in {"failed", "undo_failed"} and getattr(report, "error", None):
-        payload["error"] = str(report.error)[:500]
-    return payload
-
-
-# @testable false
 # @covered-by lagniappe/web/routes/api/main.py::get_plan
 # @reason plan projection is asserted through the public plan resource
 def _plan_payload(report, *, include_proposal=True):
@@ -399,15 +327,6 @@ def _plan_payload(report, *, include_proposal=True):
             plan_id=report.urlsafe_key,
             _external=True,
         ),
-        "execute_url": (
-            url_for(
-                "agent_api.execute_plan",
-                plan_id=report.urlsafe_key,
-                _external=True,
-            )
-            if external_api.plan_supports_execution(report)
-            else None
-        ),
         "preview_url": url_for(
             "tools.api_plan_preview",
             plan_hash=report.hash,
@@ -418,7 +337,6 @@ def _plan_payload(report, *, include_proposal=True):
             key=report.urlsafe_key,
             _external=True,
         ),
-        "execution": _execution_payload(report),
     }
     if include_proposal:
         payload["proposal"] = report.proposal
@@ -459,6 +377,72 @@ def _require_draft(report):
         )
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/api/main.py::execute_tool
+# @reason availability is exercised through the public plan-scoped tool resource
+def _require_tools_available(report):
+    if report.status == "draft":
+        return
+    if report.tool == "ask" and report.status == "complete":
+        return
+    if report.tool in {"create", "organize"} and report.status == "ready":
+        return
+    raise APIProblem(
+        "plan_tools_unavailable",
+        "Read tools are available only for draft plans, completed Ask plans, and "
+        "ready Create or Organize plans.",
+        409,
+    )
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/api/main.py::api_index
+# @reason shared URL assembly is exercised by both authenticated discovery resources
+def _discovery_payload():
+    return {
+        "name": "Lagniappe External Agent API",
+        "version": "v1",
+        "base_url": url_for("agent_api.api_index", _external=True).rstrip("/"),
+        "openapi_url": url_for(
+            "agent_api.openapi_document",
+            _external=True,
+        ),
+        "actor_url": url_for("agent_api.me", _external=True),
+        "tools_url": url_for("agent_api.tools", _external=True),
+        "plans_url": url_for("agent_api.create_plan", _external=True),
+        "authentication": "Authorization: Bearer <user API key>",
+        "instructions": (
+            "Read openapi_url before using or guessing resource paths, then call "
+            "actor_url to verify the user and capabilities."
+        ),
+    }
+
+
+# @testable true
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
+# @matrix agent-api : discovery bearer-only
+@api_family.get("/", strict_slashes=False)
+@_route
+def api_family_index():
+    """Identify the current version without duplicating its contract."""
+    current = _discovery_payload()
+    return {
+        "name": current["name"],
+        "current_version": current["version"],
+        "versions": [current],
+    }
+
+
+# @testable true
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
+# @matrix agent-api : discovery bearer-only
+@api.get("/", strict_slashes=False)
+@_route
+def api_index():
+    """Point an authenticated client directly to API discovery resources."""
+    return _discovery_payload()
+
+
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @matrix agent-api : contract
@@ -495,14 +479,31 @@ def openapi_document():
         **json_content({"$ref": "#/components/schemas/Error"}),
     }
     paths = {
+        "/api/v1": {
+            "get": {
+                "operationId": "discoverApi",
+                "summary": "Discover the external-agent API",
+                "description": (
+                    "Start here when given only the versioned API base URL. Returns "
+                    "the authenticated OpenAPI, actor, tool-catalog, and plan URLs."
+                ),
+                "tags": ["Discovery"],
+                "responses": {
+                    "200": {
+                        "description": "Current version discovery links.",
+                        **json_content({"type": "object"}),
+                    },
+                    "default": error_response,
+                },
+            }
+        },
         "/api/v1/me": {
             "get": {
                 "operationId": "getCurrentActor",
                 "summary": "Describe the API actor",
                 "description": (
                     "Call first to verify the bearer key, its user identity, and "
-                    "its permission-bounded Ask, Create, Organize, and explicit-"
-                    "execution capabilities."
+                    "its permission-bounded Ask, Create, and Organize capabilities."
                 ),
                 "tags": ["Discovery"],
                 "responses": {
@@ -593,9 +594,8 @@ def openapi_document():
                 "summary": "Get plan state",
                 "description": (
                     "Checks draft/ready state, finalized files, pending uploads, "
-                    "contract and browser-review URLs, any submitted proposal, and "
-                    "bounded deterministic execution progress. The plan ID is the "
-                    "top-level id field in every plan response."
+                    "contract and browser-review URLs, and any submitted proposal. "
+                    "The plan ID is the top-level id field in every plan response."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -708,9 +708,13 @@ def openapi_document():
                 "operationId": "executeTool",
                 "summary": "Run one permission-bounded read tool",
                 "description": (
-                    "Runs one listTools definition while the plan remains a draft. "
-                    "Put that definition's input in arguments. Calls read permitted "
-                    "workspace data only; independent calls may be made in parallel."
+                    "Runs one listTools definition during interactive planning. "
+                    "Completed Ask plans and ready Create or Organize plans may "
+                    "continue reading for conversational refinement. Put that "
+                    "definition's complete input in the "
+                    "top-level arguments object. Other top-level fields are rejected. "
+                    "Calls read permitted workspace data only; independent calls may "
+                    "be made in parallel."
                 ),
                 "tags": ["Tools"],
                 "parameters": [plan_parameter, tool_parameter],
@@ -745,11 +749,17 @@ def openapi_document():
                 "description": (
                     "Requires the current tool-specific contract and no pending "
                     "uploads; Organize also requires at least one finalized file. A "
-                    "valid Ask response becomes a completed read-only report. A valid "
+                    "valid Ask response becomes a completed read-only report and "
+                    "should be submitted without separate save confirmation. A valid "
                     "Create or Organize proposal becomes ready for review and returns "
-                    "one short-lived, plan-scoped execution_key. Submission itself "
-                    "never executes actions. Repeating the identical normalized result "
-                    "is accepted; a different result after publication conflicts."
+                    "preview_url. Submission itself never executes actions. Repeating "
+                    "the identical normalized result is accepted. While the report "
+                    "remains reusable, a later valid Ask answer or Create/Organize "
+                    "proposal replaces the saved result: revise the complete result, "
+                    "then submit it again. Present each Create or Organize preview_url "
+                    "and direct the user to the authenticated website to review and "
+                    "approve it. This API has no operation that applies proposals to "
+                    "the workspace."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -781,56 +791,9 @@ def openapi_document():
                         "description": (
                             "Published plan. Present preview_url to the user for browser "
                             "review; retain review_url as the canonical full URL. Create "
-                            "and Organize also return a shown-once execution key."
+                            "and Organize can only be applied with the existing Execute "
+                            "control on that authenticated browser page."
                         ),
-                        **json_content({"$ref": "#/components/schemas/Plan"}),
-                    },
-                    "default": error_response,
-                },
-            }
-        },
-        "/api/v1/plans/{plan_id}/execute": {
-            "post": {
-                "operationId": "executePlan",
-                "summary": "Execute one validated proposal",
-                "description": (
-                    "Run the ready proposal through Lagniappe's existing deterministic "
-                    "deferred runner. Call this operation only when the user's request "
-                    "explicitly includes execution (including a clear follow-up such "
-                    "as 'execute that'). Successful validation, a high-confidence "
-                    "proposal, or receipt of execution_key is never consent. This "
-                    "operation makes no model call. Poll status_url for bounded "
-                    "progress and result counts."
-                ),
-                "tags": ["Plans"],
-                "parameters": [plan_parameter],
-                "requestBody": {
-                    "required": True,
-                    **json_content(
-                        {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": ["execution_key"],
-                            "properties": {
-                                "execution_key": {
-                                    "type": "string",
-                                    "pattern": "^lgn_exec_[A-Za-z0-9_-]{40,50}$",
-                                    "description": (
-                                        "The shown-once key returned by submitPlan "
-                                        "for this exact proposal."
-                                    ),
-                                }
-                            },
-                        }
-                    ),
-                },
-                "responses": {
-                    "200": {
-                        "description": "Execution reached a terminal state.",
-                        **json_content({"$ref": "#/components/schemas/Plan"}),
-                    },
-                    "202": {
-                        "description": "Execution is queued or running.",
                         **json_content({"$ref": "#/components/schemas/Plan"}),
                     },
                     "default": error_response,
@@ -852,10 +815,16 @@ def openapi_document():
                 "Organize additionally uploads files and follows the get_guidelines "
                 "task=organize two-phase workflow, including one summary and two "
                 "retrieval terms per file. Ask publishes a read-only answer. Create "
-                "and Organize publish reviewed proposals; stop unless the user "
-                "explicitly requests execution. Validation success alone is never "
-                "execution consent. The server does not call a model to choose the "
-                "tool, complete, repair, summarize, or execute the result."
+                "and Organize publish proposals for authenticated browser review. "
+                "The external API never applies those proposals; direct the user to "
+                "preview_url, where the existing website Execute control is the only "
+                "approval and application path. The server does not call a model to "
+                "choose the tool, complete, repair, or summarize the result. When an "
+                "Ask answer is ready, submit it without separate save confirmation, "
+                "then answer the user with the returned preview_url; Ask submission "
+                "is read-only and later valid answers may replace it. Ready Create and "
+                "Organize proposals may likewise be revised and submitted again until "
+                "browser execution starts."
             ),
         },
         "servers": [{"url": request.url_root.rstrip("/")}],
@@ -918,10 +887,8 @@ def openapi_document():
                         "contract_version",
                         "contract_url",
                         "status_url",
-                        "execute_url",
                         "preview_url",
                         "review_url",
-                        "execution",
                     ],
                     "properties": {
                         "id": {"type": "string"},
@@ -954,12 +921,6 @@ def openapi_document():
                         },
                         "contract_url": {"type": "string", "format": "uri"},
                         "status_url": {"type": "string", "format": "uri"},
-                        "execute_url": {
-                            "oneOf": [
-                                {"type": "string", "format": "uri"},
-                                {"type": "null"},
-                            ]
-                        },
                         "preview_url": {
                             "type": "string",
                             "format": "uri",
@@ -973,51 +934,7 @@ def openapi_document():
                             "format": "uri",
                             "description": "Canonical full browser report URL.",
                         },
-                        "execution": {"$ref": "#/components/schemas/Execution"},
-                        "execution_key": {
-                            "type": "string",
-                            "description": (
-                                "Shown only by submitPlan. It is scoped to this plan, "
-                                "proposal, user credential generation, and expiry."
-                            ),
-                        },
-                        "execution_key_expires_at": {
-                            "type": "string",
-                            "format": "date-time",
-                        },
                         "proposal": {"oneOf": [{"type": "object"}, {"type": "null"}]},
-                    },
-                },
-                "Execution": {
-                    "type": "object",
-                    "required": [
-                        "state",
-                        "requires_explicit_user_request",
-                        "operation",
-                        "result",
-                    ],
-                    "properties": {
-                        "state": {
-                            "type": "string",
-                            "enum": [
-                                "not_available",
-                                "awaiting_explicit_request",
-                                "running",
-                                "complete",
-                                "failed",
-                                "undoing",
-                            ],
-                        },
-                        "requires_explicit_user_request": {
-                            "type": "boolean",
-                        },
-                        "operation": {
-                            "oneOf": [{"type": "object"}, {"type": "null"}]
-                        },
-                        "result": {
-                            "oneOf": [{"type": "object"}, {"type": "null"}]
-                        },
-                        "error": {"type": "string", "maxLength": 500},
                     },
                 },
                 "UploadFile": {
@@ -1046,7 +963,7 @@ def openapi_document():
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : bearer-only
+# @matrix agent-api : bearer-only plan-capability
 @api.get("/me")
 @_route
 def me():
@@ -1056,13 +973,13 @@ def me():
             "name": actor.name,
             "hash": actor.hash,
             "ai_access": actor.ai_access,
+            "timezone": external_api.user_timezone_name(actor),
         },
         "credential": g.agent_api_credential,
         "capabilities": {
             "ask": actor.access(AI.ASK),
             "create": actor.access(AI.CREATE),
             "organize": actor.access(AI.CREATE),
-            "execute": actor.access(AI.CREATE),
         },
     }
 
@@ -1321,12 +1238,14 @@ def _original_file_download(tool_name, arguments, result):
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_ask_plan_is_available_without_create_access
 # @matrix agent-api : tool-dispatch
+# @pairs agent-api:ask-refinement agent-api:create-revision agent-api:organize-revision agent-api:envelope-validation
 @api.post("/plans/<plan_id>/tools/<tool_name>")
 @_route
 def execute_tool(plan_id, tool_name):
     report = _load_plan(plan_id)
-    _require_draft(report)
+    _require_tools_available(report)
     if tool_name not in ai_functions.TOOL_DEFINITIONS:
         raise APIProblem("tool_not_found", "Tool not found.", 404)
     _rate_limit(
@@ -1336,6 +1255,14 @@ def execute_tool(plan_id, tool_name):
         PLAN_TOOL_RATE_WINDOW,
     )
     data = _json_body()
+    unsupported = sorted(set(data) - {"arguments"})
+    if unsupported:
+        raise APIProblem(
+            "invalid_arguments",
+            "Put tool inputs inside the top-level arguments object; unsupported "
+            f"top-level fields: {', '.join(unsupported)}.",
+            422,
+        )
     arguments = data.get("arguments", {})
     if not isinstance(arguments, dict):
         raise APIProblem(
@@ -1398,94 +1325,4 @@ def submit_plan(plan_id):
         if report.status == reusable_status:
             raise APIProblem("plan_state_conflict", str(error), 409) from error
         raise
-    payload = _plan_payload(submitted)
-    if external_api.plan_supports_execution(submitted):
-        try:
-            execution_key, expires_at = external_api.issue_execution_key(
-                submitted,
-                g.agent_api_user,
-                g.agent_api_credential,
-            )
-        except external_api.AgentAPIExecutionKeyError as error:
-            raise APIProblem("execution_key_unavailable", str(error), 409) from error
-        payload["execution_key"] = execution_key
-        payload["execution_key_expires_at"] = expires_at
-    return payload
-
-
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api ai-report : deterministic-execution explicit-consent polling plan-capability
-@api.post("/plans/<plan_id>/execute")
-@_route
-def execute_plan(plan_id):
-    """Start or poll the exact deterministic run authorized by an execution key."""
-    report = _load_plan(plan_id)
-    if not external_api.plan_supports_execution(report):
-        raise APIProblem(
-            "execution_not_supported",
-            "Ask plans are read-only and cannot be executed.",
-            409,
-        )
-    if report.status not in {"ready", "running", "complete"}:
-        raise APIProblem(
-            "plan_state_conflict",
-            "This plan cannot be executed in its current state.",
-            409,
-        )
-    data = _json_body()
-    if set(data) != {"execution_key"} or not isinstance(
-        data.get("execution_key"), str
-    ):
-        raise APIProblem(
-            "invalid_execution_request",
-            "Request body must contain only execution_key.",
-            422,
-        )
-    try:
-        operation_id = external_api.consume_execution_key(
-            report,
-            g.agent_api_user,
-            g.agent_api_credential,
-            data["execution_key"],
-        )
-    except external_api.AgentAPIExecutionKeyError as error:
-        raise APIProblem("invalid_execution_key", str(error), 403) from error
-
-    if report.status == "ready":
-        try:
-            DeferredJobs.start(
-                DeferredJobSpec(
-                    job_type=DeferredJobType.REPORT_EXECUTION,
-                    actor=g.agent_api_user,
-                    idempotency_key=operation_id,
-                    inputs={"report": report},
-                    notification_body="Saving report changes...",
-                    notification_target=report,
-                    client={},
-                )
-            )
-        except exceptions.ValidationError as error:
-            raise APIProblem("execution_conflict", str(error), 409) from error
-        except Exception as error:
-            exceptions.capture(
-                error,
-                context={
-                    "agent_api": {
-                        "request_id": g.agent_api_request_id,
-                        "phase": "execution_start",
-                        "plan_hash": report.hash,
-                    }
-                },
-            )
-            raise APIProblem(
-                "service_unavailable",
-                "Plan execution could not be started. Submit the same proposal "
-                "again to obtain a new execution key before retrying.",
-                503,
-                retry_after=30,
-            ) from error
-
-    current = _load_plan(plan_id)
-    status = 202 if current.status == "running" else 200
-    return _plan_payload(current), status
+    return _plan_payload(submitted)

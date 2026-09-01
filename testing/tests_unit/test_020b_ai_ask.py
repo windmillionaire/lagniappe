@@ -5,7 +5,7 @@ import json
 import pytest
 
 from lagniappe.core import exceptions
-from lagniappe.core.tools.ai import ask, organize
+from lagniappe.core.tools.ai import ask, organize, references as ai_references
 from testing.utility.test_entities import TestEntities
 
 
@@ -163,12 +163,20 @@ def test_validate_ask_response_requires_a_usable_answer(updates, message):
 
 # @pairs ai-report:validation editor:html-sanitization markdown:html-sanitization
 @pytest.mark.unit
-def test_validate_ask_response_renders_answer_markdown():
+def test_validate_ask_response_renders_answer_markdown(monkeypatch):
+    monkeypatch.setattr(
+        ai_references.cache,
+        "get_details_by_hash",
+        lambda hashes: {
+            "abc123def456": {"id": "canonical-page-key"}
+        },
+    )
     response = ask.validate_ask_response(
         {
             "summary": "Two records matched.",
             "answer_markdown": (
                 "## Matches\n\n- [Record](https://example.com)\n"
+                "- [Workspace record](/pages/hash:abc123def456)\n"
                 "- <script>alert('no')</script>Safe"
             ),
             "confidence": 0.9,
@@ -179,6 +187,8 @@ def test_validate_ask_response_renders_answer_markdown():
     assert "answer_markdown" not in response
     assert "<h2>Matches</h2>" in response["answer_html"]
     assert 'href="https://example.com"' in response["answer_html"]
+    assert 'href="/pages/canonical-page-key"' in response["answer_html"]
+    assert "hash:abc123def456" not in response["answer_html"]
     assert "<script" not in response["answer_html"]
 
 

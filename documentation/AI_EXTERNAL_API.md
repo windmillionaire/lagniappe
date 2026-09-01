@@ -4,14 +4,15 @@ Lagniappe exposes a versioned, REST-first API that lets a user run the same
 permission-bounded read tools as the built-in AI workflows. An external client
 chooses `ask`, `create`, or `organize` for each durable plan. Ask publishes a
 read-only answer; Create and Organize publish proposals for browser review and
-can execute that exact validated proposal only after an explicit user request.
-External plans never call Lagniappe's configured model.
+leave approval and application to the existing authenticated website controls.
+External plans never call Lagniappe's configured model, and the external API
+has no operation that applies a proposal to the workspace.
 
 The feature is included and enabled in generated deployment settings through
 `EXTERNAL_AGENT_API_ENABLED: true`. An operator can set it to `false` as an
 emergency or policy shutoff. Eligible users need at least `ASK` AI access and
 must not be public users. `CREATE` AI access is additionally required for
-Create, Organize, and deterministic execution.
+Create and Organize.
 
 ## Security model
 
@@ -20,22 +21,21 @@ Create, Organize, and deterministic execution.
 - Keys expire after 30 days and can be revoked from the user's own Settings
   panel. The full secret is shown only when generated; Datastore stores only a
   SHA-256 digest.
-- `/api/v1` accepts `Authorization: Bearer ...` only. A browser login cookie is
-  not an authentication fallback, and the API blueprint is CSRF-exempt for
-  that reason.
+- `/api` and `/api/v1` accept `Authorization: Bearer ...` only. A browser login
+  cookie is not an authentication fallback, and the API blueprints are
+  CSRF-exempt for that reason.
 - API calls run as the key's user. Existing read-tool handlers enforce that
   user's normal entity permissions. Plan access is also bound to its creator.
-- Successful Create or Organize submission returns a one-hour execution key
-  exactly in that response. Only its SHA-256 digest is stored. The key is bound
-  to the plan, proposal fingerprint, creator, and current bearer-key
-  generation, and is consumed when execution is first requested. Submitting
-  the identical proposal again rotates the execution key. Ask is read-only and
-  never issues an execution key.
-- Proposal validation and key issuance do not authorize execution. An agent
-  may call the distinct `/execute` operation only when the user's request
-  explicitly includes it. Lagniappe cannot prove what a user said to an
-  external client, so the OpenAPI contract makes this client obligation
-  explicit while the server limits the capability to the reviewed proposal.
+- The bearer key can inspect permitted data and draft, validate, save, and
+  revise reports. It cannot apply Create or Organize proposals. The agent must
+  present `preview_url` and direct the user to the authenticated browser report,
+  where the existing Execute control is the only approval and application path.
+- Ask submission only validates and saves a read-only answer. It has no
+  execution lifecycle or execution-shaped response fields.
+- Ready Create and Organize reports remain open to read tools and repeated
+  submission. Each valid resubmission replaces the complete saved proposal.
+  Once browser execution starts, the report status changes and the API rejects
+  further reads or submissions for that plan.
 - Existing entities are represented as `hash:<12-character-hash>` references.
   URL-safe Datastore keys are rejected in submitted proposals.
 - API responses are `no-store`; no CORS policy is added. Original-file URLs,
@@ -46,26 +46,34 @@ Create, Organize, and deterministic execution.
 
 ## Workflow
 
-All endpoints are under `/api/v1` and require the bearer key, including the
-OpenAPI document. The OpenAPI `info.description` and operation descriptions
-carry the tool-selection rules, lifecycle, and boundary between submission and
-explicit execution. Every plan response returns its opaque identifier as the
-top-level `id`. A plan's tool is immutable for auditability, but a conversational
-client may create another plan with a different tool whenever the user's intent
+All working endpoints are under `/api/v1` and require the bearer key, including
+the API index and OpenAPI document. `GET /api` identifies the current version;
+`GET /api/v1` returns direct links to the OpenAPI document, actor, tool catalog,
+and plan collection. These small discovery responses do not duplicate the
+contract. The OpenAPI `info.description` and operation descriptions carry the
+tool-selection rules, lifecycle, and browser-approval boundary. Every plan
+response returns its opaque identifier as the top-level
+`id`. A plan's tool is immutable for auditability, but a conversational client
+may create another plan with a different tool whenever the user's intent
 changes.
 
-1. `GET /me` verifies the actor and reports separate Ask, Create, Organize, and
-   execution capabilities.
-2. `GET /tools` returns permission-bounded read tools as plain JSON Schema.
-3. `POST /plans` creates a provider-free draft with `tool` set to `ask`,
+1. `GET /` points a client given only the versioned base URL to the authoritative
+   discovery resources.
+2. `GET /me` verifies the actor, reports the actor's persisted timezone, and
+   reports separate Ask, Create, and Organize capabilities.
+3. `GET /tools` returns permission-bounded read tools as plain JSON Schema.
+4. `POST /plans` creates a provider-free draft with `tool` set to `ask`,
    `create`, or `organize`.
-4. Run permitted reads with `POST /plans/{id}/tools/{tool_name}` while the plan
-   remains a draft.
-5. `GET /plans/{id}/contract` returns the selected tool's authoritative output
-   schema, workflow rules, reference rules, permissions, limits, and the
-   actor-timezone `current_date`.
-6. `POST /plans/{id}/submit` validates and publishes the final result. It never
-   calls a provider or executes workspace actions.
+5. Run permitted reads with `POST /plans/{id}/tools/{tool_name}` while the plan
+   is a draft. Reads remain available after a saved Ask answer and while a
+   Create or Organize proposal remains ready for browser review.
+6. `GET /plans/{id}/contract` returns the selected tool's authoritative output
+   schema, submission wrapper, workflow rules, reference rules, permissions,
+   limits, actor timezone, and timezone-aware `current_date`.
+7. `POST /plans/{id}/submit` validates and publishes the final result. It never
+   calls a provider or applies workspace actions. Repeating this call with a
+   valid complete result replaces the prior result while the report remains
+   reusable.
 
 ### Ask
 
@@ -76,13 +84,23 @@ final object contains a direct plain-text `summary`, optional
 application code renders `answer_markdown` through the shared sanitized,
 editor-compatible Markdown pipeline and stores the resulting `answer_html` for
 the report view. Submission moves the report directly to `complete`; it returns
-preview and review URLs but no execution key. Ask rejects uploads and execution.
+preview and review URLs. Ask rejects uploads and has no execution lifecycle.
 Internal hash tokens remain tool-call references and may not appear as visible
 answer text. When a read tool returns a URL containing such a token, clients may
 use that exact URL as a Markdown link destination with the entity's human name
-as its link label. The external submission accepts the advertised Ask fields
-only; clients cannot submit pre-rendered `answer_html` or bypass the shared
-Markdown sanitizer.
+as its link label. The shared AI Markdown conversion resolves known hash
+destinations to canonical browser URLs after validation, so tool-only notation
+is not stored in the human-facing link. The external submission accepts the
+advertised Ask fields only; clients cannot submit pre-rendered `answer_html` or
+bypass the shared Markdown sanitizer.
+
+When an Ask answer is ready, the client fetches the latest contract and submits
+it without asking for separate save permission, then returns the answer and
+`preview_url` to the user. Saving this report does not modify workspace records.
+The same completed Ask plan remains available for permission-bounded reads, and
+a later valid submission replaces its saved answer so conversational
+clarifications can refine the report. A ready Create proposal is also revisable
+for conversational follow-ups, as is a ready Organize proposal.
 
 If the conversation changes from investigation to requested work, the client
 creates a separate Create or Organize plan rather than placing mutations in an
@@ -99,8 +117,8 @@ action or `needs_review`. Create does not accept plan uploads.
 Optional page rich text is model-facing `document_markdown`. Proposal
 validation renders it through the same sanitized Markdown pipeline used by the
 frontend document editor and stores legacy executable `document` HTML. This
-keeps new internal and external model contracts aligned while allowing already
-ready HTML proposals to execute unchanged.
+keeps new internal and external model contracts aligned while preserving the
+HTML input expected by the existing browser-approved deterministic runner.
 
 ### Organize
 
@@ -117,22 +135,28 @@ and immediately before constructing the proposal. Include exactly one
 retrieval terms, and normally `search: true`. The server does not call a model
 to repair form values or create file summaries.
 
-### Publication and execution
+### Publication and browser approval
 
 Create and Organize submission saves a `ready` report and returns the full
-`review_url`, shorter creator-session `preview_url`, and a shown-once one-hour
-`execution_key`. Stop unless the user's request explicitly includes execution.
-When it does, send that key to `POST /plans/{id}/execute`; the existing deferred
-runner applies the exact validated proposal without a model call. Poll
-`status_url` or `GET /plans/{id}` for bounded progress and result counts.
+`review_url` and shorter creator-session `preview_url`. Present the preview and
+direct the user to review and approve it on the authenticated website. The
+external API deliberately has no `/execute` operation. The existing browser
+Execute control starts the normal deterministic runner and applies the exact
+validated proposal without a model call.
 
-Submitting the same normalized result again is idempotent. For Create and
-Organize it rotates the execution key; a different result cannot replace an
-already published report. Pending uploads, unknown or inaccessible references,
-disallowed actions, malformed final submissions, and missing Organize file
-placements fail without model repair. Exact form fields remain authoritative at
-the normal `SubmitterMixin` execution boundary. A completed-task date later
-than the submitting user's current date is rejected; future work remains open.
+Submitting the same normalized result again is idempotent. A later valid Ask
+result replaces the saved read-only answer. A ready Create plan also
+remains open to permission-bounded reads and a complete replacement proposal so
+an interactive chat can incorporate follow-up requests. Ready Organize plans
+have the same revision behavior: revise the complete proposal, then submit it
+again. Browser execution changes the report out of its reusable state and locks
+further API revision. These interactive revision rules do not change the
+delayed UI or email workflows.
+Pending uploads, unknown or inaccessible references, disallowed actions,
+malformed final submissions, and missing Organize file placements fail without
+model repair. Exact form fields remain authoritative at the normal
+`SubmitterMixin` execution boundary. A completed-task date later than the
+submitting user's current date is rejected; future work remains open.
 
 The browser review projects proposed submission values beneath each action,
 using the referenced form's human field, option, and table-column labels when
@@ -205,17 +229,11 @@ curl --fail --silent --show-error \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/submit"
 ```
 
-The Create and Organize submit response carries `execution_key` and
-`execution_key_expires_at`. Only if the user's request explicitly includes
-execution, make the distinct write call and then poll the top-level plan state:
+Present the returned `preview_url` and direct the user to the authenticated
+website to review and approve the proposal there. The API performs no further
+write step. A client may fetch the plan later to observe its top-level state:
 
 ```bash
-curl --fail --silent --show-error \
-  -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
-  -H 'Content-Type: application/json' \
-  -d "{\"execution_key\":\"$EXECUTION_KEY\"}" \
-  "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/execute"
-
 curl --fail --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID"
@@ -232,7 +250,7 @@ access.
 
 ```json
 {
-  "contract_version": 2,
+  "contract_version": 4,
   "proposal": {
     "summary": "Organize the records into a new page.",
     "confidence": 0.94,

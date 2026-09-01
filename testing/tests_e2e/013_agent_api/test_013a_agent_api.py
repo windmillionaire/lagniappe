@@ -24,6 +24,7 @@ class Actor:
     urlsafe_key = "actor-key"
     key = "actor-datastore-key"
     ai_access = "CREATE"
+    db = {"timezone": "America/Los_Angeles"}
     is_public = False
     is_authenticated = True
 
@@ -57,8 +58,8 @@ def _report(actor, tool="organize"):
     )
 
 
-# @matrix agent-api : bearer-only contract error-envelope plan-session proposal-contract routing submission tool-catalog tool-dispatch uploads
-# @matrix agent-api ai-report : deterministic-execution explicit-consent polling plan-capability
+# @matrix agent-api : bearer-only contract create-revision organize-revision discovery error-envelope plan-session proposal-contract routing submission tool-catalog tool-dispatch uploads
+# @pairs agent-api:create-revision agent-api:organize-revision agent-api:plan-capability
 def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeypatch):
     actor = Actor()
     report = _report(actor)
@@ -94,6 +95,10 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
 
     client = app.test_client()
+    family_unauthorized = client.get("/api")
+    assert family_unauthorized.status_code == 401
+    assert family_unauthorized.json["error"]["code"] == "unauthorized"
+
     unauthorized = client.get("/api/v1/me")
     assert unauthorized.status_code == 401
     assert unauthorized.json["error"]["code"] == "unauthorized"
@@ -109,13 +114,39 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "name": actor.name,
         "hash": actor.hash,
         "ai_access": "CREATE",
+        "timezone": "America/Los_Angeles",
     }
     assert authorized.json["capabilities"] == {
         "ask": True,
         "create": True,
         "organize": True,
-        "execute": True,
     }
+
+    family = client.get(
+        "/api",
+        headers={"Authorization": "Bearer valid-key"},
+    )
+    assert family.status_code == 200
+    assert family.json["current_version"] == "v1"
+    assert family.json["versions"][0]["openapi_url"].endswith(
+        "/api/v1/openapi.json"
+    )
+
+    index = client.get(
+        "/api/v1",
+        headers={"Authorization": "Bearer valid-key"},
+    )
+    assert index.status_code == 200
+    assert index.json["version"] == "v1"
+    assert index.json["openapi_url"].endswith("/api/v1/openapi.json")
+    assert index.json["actor_url"].endswith("/api/v1/me")
+    assert "before using or guessing resource paths" in index.json["instructions"]
+    trailing_index = client.get(
+        "/api/v1/",
+        headers={"Authorization": "Bearer valid-key"},
+    )
+    assert trailing_index.status_code == 200
+    assert trailing_index.json == index.json
 
     openapi = client.get(
         "/api/v1/openapi.json",
@@ -123,11 +154,15 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert openapi.status_code == 200
     assert openapi.json["openapi"] == "3.1.0"
+    assert "/api/v1" in openapi.json["paths"]
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
-    assert "/api/v1/plans/{plan_id}/execute" in openapi.json["paths"]
-    assert "Validation success alone is never execution consent" in openapi.json[
-        "info"
-    ]["description"]
+    assert "/api/v1/plans/{plan_id}/execute" not in openapi.json["paths"]
+    assert "external API never applies those proposals" in openapi.json["info"][
+        "description"
+    ]
+    assert "website Execute control is the only" in openapi.json["info"][
+        "description"
+    ]
     assert "task=organize" in openapi.json["info"]["description"]
     assert "two-phase workflow" in openapi.json["info"]["description"]
     assert "does not call a model" in openapi.json["info"]["description"]
@@ -153,23 +188,28 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert upload_operation["requestBody"]["required"] is True
     tools_operation = openapi.json["paths"]["/api/v1/tools"]["get"]
     assert "task=organize" in tools_operation["description"]
+    execute_tool_operation = openapi.json["paths"][
+        "/api/v1/plans/{plan_id}/tools/{tool_name}"
+    ]["post"]
+    assert "ready Create or Organize plans" in execute_tool_operation["description"]
+    assert "top-level arguments object" in execute_tool_operation["description"]
     submit_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/submit"]["post"]
     assert "Organize also requires at least one finalized file" in submit_operation[
         "description"
     ]
     assert "never executes actions" in submit_operation["description"]
+    assert "without separate save confirmation" in submit_operation["description"]
+    assert "Create/Organize proposal replaces" in submit_operation["description"]
+    assert "submit it again" in submit_operation["description"]
+    assert "authenticated website" in submit_operation["description"]
     submit_schema = submit_operation["requestBody"]["content"]["application/json"][
         "schema"
     ]
     assert submit_schema["required"] == ["contract_version", "proposal"]
-    execute_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/execute"][
-        "post"
-    ]
-    assert "explicitly includes execution" in execute_operation["description"]
-    execute_schema = execute_operation["requestBody"]["content"]["application/json"][
-        "schema"
-    ]
-    assert execute_schema["required"] == ["execution_key"]
+    plan_schema = openapi.json["components"]["schemas"]["Plan"]
+    assert "execute_url" not in plan_schema["properties"]
+    assert "execution" not in plan_schema["properties"]
+    assert "Execution" not in openapi.json["components"]["schemas"]
 
     unknown = client.get(
         "/api/v1/not-a-resource",
@@ -218,9 +258,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert created.json["id"] == report.urlsafe_key
     assert created.json["status"] == "draft"
     assert created.json["status_url"].endswith("/api/v1/plans/report-key")
-    assert created.json["execute_url"].endswith(
-        "/api/v1/plans/report-key/execute"
-    )
+    assert "execute_url" not in created.json
+    assert "execution" not in created.json
     assert created.json["preview_url"].endswith("/tools/api-plan/reporthash12")
 
     monkeypatch.setattr(api_routes, "_load_plan", lambda plan_id: report)
@@ -401,14 +440,6 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         return current
 
     monkeypatch.setattr(api_routes.external_api, "submit_plan", submit)
-    monkeypatch.setattr(
-        api_routes.external_api,
-        "issue_execution_key",
-        lambda current, user, credential: (
-            "lgn_exec_" + "a" * 43,
-            "2026-08-31T13:00:00+00:00",
-        ),
-    )
     proposal = {
         "summary": "Ready for review.",
         "confidence": 1,
@@ -426,114 +457,67 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert submitted.status_code == 200
     assert submitted.json["status"] == "ready"
     assert submitted.json["proposal"] == proposal
-    assert submitted.json["execution_key"] == "lgn_exec_" + "a" * 43
-    assert submitted.json["execution_key_expires_at"] == (
-        "2026-08-31T13:00:00+00:00"
+    assert "execute_url" not in submitted.json
+    assert "execution" not in submitted.json
+
+    ready_read = client.post(
+        "/api/v1/plans/report-key/tools/search_entities",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"arguments": {"query": "additional category"}},
     )
-    assert submitted.json["execution"]["state"] == "awaiting_explicit_request"
-
-    operation_id = "agent-api-report-execution:reporthash12:test"
-
-    def consume(current, user, credential, key):
-        assert current is report
-        assert user is actor
-        assert credential["generation"] == 4
-        if key != "lgn_exec_" + "a" * 43:
-            raise api_routes.external_api.AgentAPIExecutionKeyError(
-                "The execution key is invalid or expired."
-            )
-        assert key == "lgn_exec_" + "a" * 43
-        return operation_id
-
-    started = []
-
-    def start(spec):
-        started.append(spec)
-        report.status = "running"
-        report.deferred_job = {
-            "key": "execution-job-key",
-            "idempotency_key": operation_id,
-        }
-        return SimpleNamespace(urlsafe_key="execution-job-key"), None
-
-    monkeypatch.setattr(api_routes.external_api, "consume_execution_key", consume)
-    monkeypatch.setattr(api_routes.DeferredJobs, "start", start)
-    monkeypatch.setattr(
-        api_routes.DeferredJobs,
-        "statuses",
-        lambda keys, user: [
-            {
-                "key": keys[0],
-                "type": "report-execution",
-                "status": "running",
-                "phase": "applying",
-                "terminal": False,
-            }
-        ],
-    )
-    malformed_execution = client.post(
-        "/api/v1/plans/report-key/execute",
+    assert ready_read.status_code == 200
+    revised_proposal = {**proposal, "summary": "Revised organization for review."}
+    revised_submission = client.post(
+        "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
         json={
-            "execution_key": "lgn_exec_" + "a" * 43,
+            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "proposal": revised_proposal,
+        },
+    )
+    assert revised_submission.status_code == 200
+    assert revised_submission.json["proposal"] == revised_proposal
+
+    report.tool = "create"
+    create_ready_read = client.post(
+        "/api/v1/plans/report-key/tools/search_entities",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"arguments": {"query": "additional form"}},
+    )
+    assert create_ready_read.status_code == 200
+    create_revision = {**proposal, "summary": "Ready with a form for review."}
+    create_revised_submission = client.post(
+        "/api/v1/plans/report-key/submit",
+        headers={"Authorization": "Bearer valid-key"},
+        json={
+            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "proposal": create_revision,
+        },
+    )
+    assert create_revised_submission.status_code == 200
+    assert create_revised_submission.json["proposal"] == create_revision
+
+    missing_execution = client.post(
+        "/api/v1/plans/report-key/execute",
+        headers={"Authorization": "Bearer valid-key"},
+        json={},
+    )
+    assert missing_execution.status_code == 405
+    assert missing_execution.json["error"]["code"] == "method_not_allowed"
+
+    report.status = "running"
+    browser_execution_locked_revision = client.post(
+        "/api/v1/plans/report-key/submit",
+        headers={"Authorization": "Bearer valid-key"},
+        json={
+            "contract_version": api_routes.external_api.CONTRACT_VERSION,
             "proposal": proposal,
         },
     )
-    assert malformed_execution.status_code == 422
-    assert malformed_execution.json["error"]["code"] == (
-        "invalid_execution_request"
+    assert browser_execution_locked_revision.status_code == 409
+    assert browser_execution_locked_revision.json["error"]["code"] == (
+        "plan_state_conflict"
     )
-    rejected_execution = client.post(
-        "/api/v1/plans/report-key/execute",
-        headers={"Authorization": "Bearer valid-key"},
-        json={"execution_key": "lgn_exec_" + "b" * 43},
-    )
-    assert rejected_execution.status_code == 403
-    assert rejected_execution.json["error"]["code"] == "invalid_execution_key"
-    assert started == []
-
-    executing = client.post(
-        "/api/v1/plans/report-key/execute",
-        headers={"Authorization": "Bearer valid-key"},
-        json={"execution_key": "lgn_exec_" + "a" * 43},
-    )
-    assert executing.status_code == 202
-    assert executing.json["status"] == "running"
-    assert executing.json["execution"]["state"] == "running"
-    assert executing.json["execution"]["operation"]["phase"] == "applying"
-    assert len(started) == 1
-    assert started[0].actor is actor
-    assert started[0].idempotency_key == operation_id
-    assert started[0].inputs == {"report": report}
-
-    report.status = "complete"
-    report.deferred_job = None
-    report.result = {
-        "status": "complete",
-        "actions": [
-            {"status": "complete"},
-            {"status": "skipped"},
-        ],
-    }
-    completed = client.post(
-        "/api/v1/plans/report-key/execute",
-        headers={"Authorization": "Bearer valid-key"},
-        json={"execution_key": "lgn_exec_" + "a" * 43},
-    )
-    assert completed.status_code == 200
-    assert completed.json["execution"]["state"] == "complete"
-    assert completed.json["execution"]["result"] == {
-        "status": "complete",
-        "actions_total": 2,
-        "action_counts": {
-            "pending": 0,
-            "applying": 0,
-            "complete": 1,
-            "skipped": 1,
-            "failed": 0,
-        },
-    }
-    assert len(started) == 1
 
     monkeypatch.setattr(CONFIG, "EXTERNAL_AGENT_API_ENABLED", False)
     disabled = client.get(
@@ -542,14 +526,20 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert disabled.status_code == 404
     assert disabled.json["error"]["code"] == "not_found"
+    disabled_family = client.get(
+        "/api",
+        headers={"Authorization": "Bearer valid-key"},
+    )
+    assert disabled_family.status_code == 404
+    assert disabled_family.json["error"]["code"] == "not_found"
 
 
 # @source lagniappe/core/tools/ai/external_api.py::required_ai_access
 # @source lagniappe/web/routes/api/main.py::create_plan
 # @source lagniappe/web/routes/api/main.py::create_uploads
+# @source lagniappe/web/routes/api/main.py::me
 # @source lagniappe/web/routes/api/main.py::submit_plan
-# @source lagniappe/web/routes/api/main.py::execute_plan
-# @pairs agent-api:tool-selection agent-api:plan-session agent-api:uploads agent-api:submission agent-api:plan-capability
+# @pairs agent-api:ask-refinement agent-api:envelope-validation agent-api:tool-selection agent-api:plan-session agent-api:uploads agent-api:submission agent-api:plan-capability
 def test_external_ask_plan_is_available_without_create_access(monkeypatch):
     class AskActor(Actor):
         ai_access = "ASK"
@@ -593,9 +583,12 @@ def test_external_ask_plan_is_available_without_create_access(monkeypatch):
     monkeypatch.setattr(api_routes.external_api, "create_plan", create)
     monkeypatch.setattr(api_routes, "_load_plan", lambda plan_id: report)
     monkeypatch.setattr(
-        api_routes.external_api,
-        "issue_execution_key",
-        lambda *args, **kwargs: pytest.fail("Ask submission issued an execution key"),
+        api_routes.ai_functions,
+        "execute_registered_tool",
+        lambda tool_name, arguments, user: (
+            {"tool": tool_name, "query": arguments.get("query")},
+            [],
+        ),
     )
 
     client = app.test_client()
@@ -606,7 +599,6 @@ def test_external_ask_plan_is_available_without_create_access(monkeypatch):
         "ask": True,
         "create": False,
         "organize": False,
-        "execute": False,
     }
 
     forbidden = client.post(
@@ -624,14 +616,18 @@ def test_external_ask_plan_is_available_without_create_access(monkeypatch):
     )
     assert created.status_code == 201
     assert created.json["tool"] == "ask"
-    assert created.json["execute_url"] is None
-    assert created.json["execution"] == {
-        "state": "not_available",
-        "requires_explicit_user_request": False,
-        "operation": None,
-        "result": None,
-    }
+    assert "execute_url" not in created.json
+    assert "execution" not in created.json
     assert created_tools == ["ask"]
+
+    malformed_tool = client.post(
+        "/api/v1/plans/report-key/tools/search_entities",
+        headers=headers,
+        json={"query": "Avery"},
+    )
+    assert malformed_tool.status_code == 422
+    assert malformed_tool.json["error"]["code"] == "invalid_arguments"
+    assert "top-level arguments object" in malformed_tool.json["error"]["message"]
 
     upload = client.post(
         "/api/v1/plans/report-key/uploads",
@@ -672,16 +668,39 @@ def test_external_ask_plan_is_available_without_create_access(monkeypatch):
     )
     assert submitted.status_code == 200
     assert submitted.json["status"] == "complete"
-    assert "execution_key" not in submitted.json
+    assert "execute_url" not in submitted.json
+    assert "execution" not in submitted.json
     assert submitted.json["proposal"]["answer_html"].startswith("<h2>")
 
-    execution = client.post(
+    follow_up_read = client.post(
+        "/api/v1/plans/report-key/tools/search_entities",
+        headers=headers,
+        json={"arguments": {"query": "Avery Rowan"}},
+    )
+    assert follow_up_read.status_code == 200
+    assert follow_up_read.json["result"] == {
+        "tool": "search_entities",
+        "query": "Avery Rowan",
+    }
+
+    revised = client.post(
+        "/api/v1/plans/report-key/submit",
+        headers=headers,
+        json={
+            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "proposal": {**proposal, "summary": "One page has an open task."},
+        },
+    )
+    assert revised.status_code == 200
+    assert revised.json["proposal"]["summary"] == "One page has an open task."
+
+    missing_execution = client.post(
         "/api/v1/plans/report-key/execute",
         headers=headers,
-        json={"execution_key": "lgn_exec_" + "a" * 43},
+        json={},
     )
-    assert execution.status_code == 409
-    assert execution.json["error"]["code"] == "execution_not_supported"
+    assert missing_execution.status_code == 405
+    assert missing_execution.json["error"]["code"] == "method_not_allowed"
 
 
 # @matrix agent-api ai-report : browser-review creator-bound short-link

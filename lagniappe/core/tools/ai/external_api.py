@@ -1,11 +1,7 @@
 """Provider-free plan workspaces for the external agent REST API."""
 
-from datetime import datetime, timedelta, timezone
-import hashlib
-import hmac
+from datetime import datetime, timezone
 import json
-import re
-import secrets
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import AI, Action, Fetch
@@ -30,11 +26,8 @@ from .reporting.contracts.schema import report_proposal_response_schema
 from .reporting.proposals.validation import validate_proposal
 
 
-CONTRACT_VERSION = 2
+CONTRACT_VERSION = 4
 SUPPORTED_PLAN_TOOLS = ("ask", "create", "organize")
-EXECUTION_KEY_PREFIX = "lgn_exec_"
-EXECUTION_KEY_LIFETIME = timedelta(hours=1)
-EXECUTION_KEY_PATTERN = re.compile(r"^lgn_exec_[A-Za-z0-9_-]{40,50}$")
 MAX_INSTRUCTIONS_BYTES = 65536
 MAX_PROPOSAL_BYTES = 1024 * 1024
 MAX_PROPOSAL_ACTIONS = 100
@@ -62,37 +55,10 @@ REFERENCE_FIELDS = frozenset(
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/external_api.py::issue_execution_key
-# @covered-by lagniappe/core/tools/ai/external_api.py::consume_execution_key
-# @reason domain marker is exercised through execution-key issue and rejection
-class AgentAPIExecutionKeyError(ValueError):
-    """Raised when a plan-scoped execution capability cannot be used."""
-
-
-# @testable false
 # @covered-by lagniappe/core/tools/ai/external_api.py::create_plan
 # @reason timestamp helper is exercised through draft creation and submission
 def _utcnow():
     return datetime.now(timezone.utc)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external_api.py::issue_execution_key
-# @covered-by lagniappe/core/tools/ai/external_api.py::consume_execution_key
-# @reason timestamp normalization is exercised through capability issue and expiry
-def _utc(value=None):
-    value = value or _utcnow()
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external_api.py::issue_execution_key
-# @covered-by lagniappe/core/tools/ai/external_api.py::consume_execution_key
-# @reason execution keys are compared only through this one-way digest
-def _execution_key_digest(value):
-    return hashlib.sha256(str(value or "").encode("utf-8")).hexdigest()
 
 
 # @testable false
@@ -135,15 +101,6 @@ def normalize_plan_tool(tool):
             "Plan tool must be ask, create, or organize."
         )
     return value
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external_api.py::submit_plan
-# @covered-by lagniappe/core/tools/ai/external_api.py::issue_execution_key
-# @reason execution capability is asserted through tool-specific submission tests
-def plan_supports_execution(report):
-    """Return whether this report tool can produce workspace mutations."""
-    return (getattr(report, "tool", None) or "organize") in {"create", "organize"}
 
 
 # @testable true
@@ -192,6 +149,14 @@ def report_file_references(report):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/external_api.py::plan_contract
+# @reason persisted timezone projection is asserted through the public contract
+def user_timezone_name(user):
+    data = getattr(user, "db", None)
+    return str(data.get("timezone") or "UTC") if isinstance(data, dict) else "UTC"
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/external_api.py::plan_contract
 # @covered-by lagniappe/core/tools/ai/external_api.py::validate_external_proposal
 # @reason external plans preserve already-read file context without changing internal prompt actions
 def _external_allowed_report_actions(user, tool="organize"):
@@ -209,6 +174,7 @@ def _external_allowed_report_actions(user, tool="organize"):
 # @tests tests_unit/test_032_agent_api.py::test_external_plan_contract_is_permission_and_file_scoped
 # @tests tests_unit/test_032_agent_api.py::test_external_plan_contracts_distinguish_ask_and_create
 # @matrix agent-api ai-report : file-placement file-summary permissions proposal-contract
+# @pairs agent-api:create-revision agent-api:organize-revision
 def plan_contract(report, user):
     tool = normalize_plan_tool(getattr(report, "tool", None))
     allowed = _external_allowed_report_actions(user, tool)
@@ -223,7 +189,9 @@ def plan_contract(report, user):
             ],
         }
         workflow_rules = [
-            "Use permission-bounded read tools while the plan remains a draft.",
+            "Use permission-bounded read tools while investigating. They remain "
+            "available after an Ask submission so a conversational follow-up can "
+            "refine the saved answer.",
             "Answer the specific user question from workspace evidence and outside "
             "research only when useful.",
             "Put the direct plain-text answer in summary. Add answer_markdown when "
@@ -232,15 +200,20 @@ def plan_contract(report, user):
             "outside-world information.",
             "Return an empty actions array. If the conversation turns into a request "
             "for changes, create a separate Create or Organize plan.",
-            "Submission saves a completed answer report. Ask plans never issue or "
-            "accept execution keys.",
+            "When an answer is ready, fetch the latest contract and submit it without "
+            "waiting for separate save confirmation. Submission only saves the "
+            "read-only answer report; it does not modify workspace records. Then give "
+            "the user the answer and preview_url.",
+            "A later valid Ask submission replaces that plan's saved answer.",
         ]
         reference_rules = [
             "Hash tokens are tool-call references only; never display them in "
             "summary or answer_markdown.",
             "Use a human name and URL from a tool result when linking an internal "
             "entity in answer_markdown. The tool-provided URL may contain a hash "
-            "token in its link destination; use a human name as the link label.",
+            "token in its link destination; use a human name as the link label. "
+            "Trusted server rendering resolves known hash destinations to ordinary "
+            "browser URLs.",
         ]
     else:
         proposal_schema = report_proposal_response_schema(
@@ -250,7 +223,7 @@ def plan_contract(report, user):
         permissions = report_action_permission_context(user, allowed)
         if tool == "create":
             workflow_rules = [
-                "Use permission-bounded read tools while the plan remains a draft.",
+                "Use permission-bounded read tools while the plan is draft or ready.",
                 "Call list_workspace_resources early and inspect likely existing "
                 "structure before proposing new entities.",
                 "Use get_guidelines for category, project, page_form, task_form, "
@@ -259,9 +232,14 @@ def plan_contract(report, user):
                 "Create does not attach or organize uploaded files.",
                 "Write optional page rich text in document_markdown; trusted server "
                 "code renders sanitized editor-compatible HTML.",
-                "Submission saves a ready report for browser review and never "
-                "executes its actions. Call execute only when the user's request "
-                "explicitly includes execution.",
+                "Submission validates and saves a ready report for browser review; "
+                "it never applies the proposal to the workspace. Present preview_url "
+                "and direct the user to review and approve it on the authenticated "
+                "website. The external API has no execution operation.",
+                "A ready Create proposal remains conversationally revisable. For "
+                "follow-up changes, continue reading as needed, revise the complete "
+                "proposal, and submit it again. Each valid resubmission replaces the "
+                "previous proposal until browser execution starts.",
             ]
             reference_rules = [
                 "Use hash:<12-character-hash> for every existing entity.",
@@ -272,7 +250,8 @@ def plan_contract(report, user):
         else:
             workflow_rules = [
                 "Upload and finalize at least one file before submitting a proposal.",
-                "Read tools are available only while the plan remains a draft.",
+                "Read tools remain available while the plan is draft or ready so a "
+                "conversational follow-up can refine the proposal.",
                 "Before analyzing files, call get_guidelines with task=organize and "
                 "follow that shared end-to-end workflow; retrieve the specialized "
                 "guideline bundles it requires.",
@@ -287,10 +266,14 @@ def plan_contract(report, user):
                 "already inspected; the server will not call another model.",
                 "Write optional page rich text in document_markdown; trusted server "
                 "code renders sanitized editor-compatible HTML.",
-                "Submission saves a ready report for browser review and never executes "
-                "its actions. Call the separate execute operation only when the user's "
-                "request explicitly includes execution; successful validation alone is "
-                "never consent.",
+                "Submission validates and saves a ready report for browser review; "
+                "it never applies the proposal to the workspace. Present preview_url "
+                "and direct the user to review and approve it on the authenticated "
+                "website. The external API has no execution operation.",
+                "A ready Organize proposal remains conversationally revisable. For "
+                "follow-up changes, continue reading as needed, revise the complete "
+                "proposal, and submit it again. Each valid resubmission replaces the "
+                "previous proposal until browser execution starts.",
             ]
             reference_rules = [
                 "Use hash:<12-character-hash> for every existing entity.",
@@ -305,11 +288,22 @@ def plan_contract(report, user):
         "version": CONTRACT_VERSION,
         "tool": tool,
         "current_date": dates.user_today(user).date().isoformat(),
+        "timezone": user_timezone_name(user),
+        "submission_format": {
+            "contract_version": CONTRACT_VERSION,
+            "body": {
+                "contract_version": CONTRACT_VERSION,
+                "proposal": "<object matching proposal_schema>",
+            },
+            "rule": (
+                "POST this wrapper object to submit_url; do not post the proposal "
+                "object as the top-level request body."
+            ),
+        },
         "proposal_schema": proposal_schema,
         "permissions": permissions,
         "required_file_refs": report_file_references(report) if tool == "organize" else [],
         "uploads_supported": tool == "organize",
-        "execution_supported": tool != "ask",
         "workflow_rules": workflow_rules,
         "reference_rules": reference_rules,
         "limits": {
@@ -512,6 +506,7 @@ def validate_external_proposal(proposal, report, user):
 # @tests tests_unit/test_032_agent_api.py::test_external_create_submission_renders_markdown_without_files
 # @matrix agent-api ai-report : idempotency proposal-publication ready-state
 # @pairs agent-api:ask agent-api:create ai-report:answer-only
+# @pairs agent-api:ask-revision agent-api:create-revision agent-api:organize-revision
 def submit_plan(report, user, proposal, *, contract_version):
     try:
         submitted_contract_version = int(contract_version or 0)
@@ -527,9 +522,10 @@ def submit_plan(report, user, proposal, *, contract_version):
     if report.status == target_status:
         if proposal_fingerprint(normalized) == proposal_fingerprint(report.proposal):
             return report
-        raise exceptions.ValidationError("This plan already has a different proposal.")
-    if report.status != "draft":
-        raise exceptions.ValidationError("Only draft plans can accept a proposal.")
+    elif report.status != "draft":
+        raise exceptions.ValidationError(
+            "Only draft or browser-review-ready plans can accept a proposal."
+        )
     if report.upload_manifest:
         raise exceptions.ValidationError("Finalize pending uploads before submission.")
     if tool == "organize" and not report.input_files:
@@ -542,115 +538,6 @@ def submit_plan(report, user, proposal, *, contract_version):
     report.agent_manifest = manifest
     Entities.save(report)
     return report
-
-
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_execution_key_is_scoped_expiring_and_shown_once
-# @matrix agent-api ai-report : execution capability expiry proposal-binding user-binding
-def issue_execution_key(report, user, credential, *, now=None):
-    """Rotate and return a short-lived capability for one ready proposal."""
-    if (
-        not plan_supports_execution(report)
-        or report.status != "ready"
-        or not isinstance(report.proposal, dict)
-    ):
-        raise AgentAPIExecutionKeyError(
-            "Execution keys are available only for ready plans."
-        )
-    owner_key = getattr(getattr(report.properties, "user", None), "key", None)
-    if owner_key != getattr(user, "key", None):
-        raise AgentAPIExecutionKeyError("The execution key is invalid or expired.")
-    generation = int((credential or {}).get("generation") or 0)
-    if generation <= 0:
-        raise AgentAPIExecutionKeyError("The execution key is invalid or expired.")
-
-    now = _utc(now)
-    expires_at = now + EXECUTION_KEY_LIFETIME
-    key = f"{EXECUTION_KEY_PREFIX}{secrets.token_urlsafe(32)}"
-    digest = _execution_key_digest(key)
-    fingerprint = proposal_fingerprint(report.proposal)
-    operation_id = f"agent-api-report-execution:{report.hash}:{digest[:32]}"
-    manifest = dict(report.agent_manifest or {})
-    manifest["execution_capability"] = {
-        "version": 1,
-        "token_digest": digest,
-        "credential_generation": generation,
-        "proposal_fingerprint": fingerprint,
-        "operation_id": operation_id,
-        "issued_at": now.isoformat(),
-        "expires_at": expires_at.isoformat(),
-        "consumed_at": None,
-    }
-    report.agent_manifest = manifest
-    Entities.save(report)
-    return key, expires_at.isoformat()
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external_api.py::consume_execution_key
-# @reason persisted capability timestamps are validated through public consumption
-def _execution_expiry(value):
-    try:
-        parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return _utc(parsed)
-
-
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_execution_key_is_scoped_expiring_and_shown_once
-# @matrix agent-api ai-report : execution capability expiry idempotency proposal-binding user-binding
-def consume_execution_key(report, user, credential, key, *, now=None):
-    """Consume a valid capability and return its deterministic operation ID."""
-    now = _utc(now)
-    key = str(key or "").strip()
-    manifest = dict(report.agent_manifest or {})
-    capability = dict(manifest.get("execution_capability") or {})
-    supplied_digest = _execution_key_digest(key)
-    stored_digest = str(capability.get("token_digest") or "")
-    owner_key = getattr(getattr(report.properties, "user", None), "key", None)
-    expires_at = _execution_expiry(capability.get("expires_at"))
-    generation = int((credential or {}).get("generation") or 0)
-    expected_fingerprint = proposal_fingerprint(report.proposal)
-    valid = all(
-        (
-            EXECUTION_KEY_PATTERN.fullmatch(key),
-            stored_digest,
-            hmac.compare_digest(stored_digest, supplied_digest),
-            owner_key == getattr(user, "key", None),
-            int(capability.get("credential_generation") or 0) == generation,
-            generation > 0,
-            capability.get("proposal_fingerprint") == expected_fingerprint,
-            expires_at is not None and expires_at > now,
-            capability.get("operation_id"),
-        )
-    )
-    if not valid:
-        raise AgentAPIExecutionKeyError("The execution key is invalid or expired.")
-
-    operation_id = capability["operation_id"]
-    if capability.get("consumed_at"):
-        active_job = report.deferred_job or {}
-        same_running_operation = (
-            report.status == "running"
-            and active_job.get("idempotency_key") == operation_id
-        )
-        completed_operation = report.status == "complete"
-        if not same_running_operation and not completed_operation:
-            raise AgentAPIExecutionKeyError(
-                "The execution key has already been consumed."
-            )
-        return operation_id
-
-    if report.status != "ready":
-        raise AgentAPIExecutionKeyError(
-            "The plan is not ready for this execution key."
-        )
-    capability["consumed_at"] = now.isoformat()
-    manifest["execution_capability"] = capability
-    report.agent_manifest = manifest
-    Entities.save(report)
-    return operation_id
 
 
 # @testable false
@@ -681,24 +568,19 @@ def finalize_uploads(report, user):
 
 
 __all__ = [
-    "AgentAPIExecutionKeyError",
     "CONTRACT_VERSION",
-    "EXECUTION_KEY_LIFETIME",
-    "EXECUTION_KEY_PREFIX",
     "MAX_FILE_BYTES",
     "MAX_PLAN_FILES",
     "MAX_PLAN_TOOL_CALLS",
     "MAX_TOTAL_FILE_BYTES",
     "SUPPORTED_PLAN_TOOLS",
     "create_plan",
-    "consume_execution_key",
     "finalize_uploads",
-    "issue_execution_key",
     "plan_contract",
-    "plan_supports_execution",
     "prepare_upload_manifest",
     "report_file_references",
     "required_ai_access",
     "submit_plan",
+    "user_timezone_name",
     "validate_external_proposal",
 ]

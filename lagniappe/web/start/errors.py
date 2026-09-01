@@ -31,7 +31,7 @@ def handle_http_error(error):
     """Handle HTTP exceptions (4xx and 5xx errors)."""
     code = error.code if hasattr(error, "code") else 500
 
-    if request.path == "/api/v1" or request.path.startswith("/api/v1/"):
+    if request.path == "/api" or request.path.startswith("/api/"):
         from lagniappe.web.routes.api.main import handle_api_http_error
 
         return handle_api_http_error(error)

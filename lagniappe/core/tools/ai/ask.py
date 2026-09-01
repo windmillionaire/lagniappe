@@ -5,7 +5,7 @@ from lagniappe.core import exceptions
 from .guidelines import (
     LAGNIAPPE_WORKSPACE_CONCEPTS,
 )
-from lagniappe.core.tools.files.html import render_markdown
+from .references import render_ai_markdown
 from .reporting.contracts.actions import (
     READ_ONLY_CONTEXT_TOOLS,
 )
@@ -302,7 +302,7 @@ def validate_ask_response(
             "Ask response answer_markdown must be a string when present."
         )
     if answer_markdown is not None:
-        response["answer_html"] = render_markdown(answer_markdown)
+        response["answer_html"] = render_ai_markdown(answer_markdown)
         response.pop("answer_markdown", None)
     else:
         answer_html = response.get("answer_html")
