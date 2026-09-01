@@ -1407,9 +1407,9 @@ def test_get_guidelines_returns_named_bundle():
     )
 
     assert page_document["task"] == "page_document"
-    assert 'data-type="taskList"' in page_document["guidelines"]
-    assert 'data-type="taskItem"' in page_document["guidelines"]
-    assert 'data-checked="false"' in page_document["guidelines"]
+    assert "Write ordinary Markdown" in page_document["guidelines"]
+    assert "Markdown task lists" in page_document["guidelines"]
+    assert "Do not hand-author" in page_document["guidelines"]
 
     unknown = ai_get_guidelines.execute_get_guidelines(
         {"task": "not-a-task"},

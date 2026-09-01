@@ -62,6 +62,14 @@ strings for transport. Shared helpers `base64ToUint8Array` and
 
 Used for standalone rich text fields (e.g. HTML form elements). No collaboration, no Yjs -- just TipTap with history (undo/redo).
 
+Static Form HTML is an executable `innerHTML` boundary. New editor writes are
+cleaned by the Form-content server policy before storage, and every GET/JSON
+projection is cleaned again so legacy stored values remain safe without a
+global migration. Only images owned by that Form field survive; their URLs and
+bounded width/float/alignment layout are canonicalized. External images,
+active markup, event attributes, arbitrary classes, and arbitrary CSS are
+removed.
+
 The editor remains inert until its GET returns `ok`. A failed initial load does
 not publish blank content or set `loaded`; it shows an inline Retry action. The
 authoritative response becomes `acknowledgedContent` only after successful
@@ -200,6 +208,16 @@ backend owns parsing and sanitization; the frontend only detects candidate text
 and manages the explicit decision and range-safe replacement. If the source
 changes during an active conversion, the request is discarded and the user can
 convert the updated text again.
+
+AI document text is model-authored Markdown. The server normalizes returned
+workspace references, renders it through this same Markdown pipeline, and
+returns sanitized editor-compatible HTML; models do not author editor HTML.
+
+Anonymous public Pages use a separate, narrower presentation policy. They keep
+the semantic document subset and page-owned images but omit private-editor
+features such as arbitrary styling, external images, mentions as identity
+nodes, controls, YouTube embeds, and other active content. Private Yjs content
+is not migrated by public rendering.
 
 ## Toolbar (`toolbar.mjs`)
 

@@ -349,7 +349,7 @@
               <h2 class="text-base font-semibold text-base-dark">Answer</h2>
               {% if report.properties.proposal.answer_html %}
                 <div data-role="ask-answer-html"
-                     class="html-content text-base-dark">{{ report.properties.proposal.answer_html|safe }}</div>
+                     class="html-content text-base-dark">{{ report.properties.proposal.answer_html|safe_html }}</div>
               {% else %}
                 <p data-role="ask-answer-summary" class="text-base-dark">{{ report.proposal.summary or report.summary or report.note }}</p>
               {% endif %}

@@ -1,29 +1,29 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=b8995073';
-import { InputElement } from './input.js?v=b8995073';
-import { s as sections } from './sections.js?v=b8995073';
-import { S as SectionToggle } from './sectionToggle.js?v=b8995073';
-import { TextareaElement } from './textarea.js?v=b8995073';
-import './foundation.js?v=b8995073';
-import './upstreamUnavailable.js?v=b8995073';
-import './connectivity.js?v=b8995073';
-import './baseForm.js?v=b8995073';
-import './icons.js?v=b8995073';
-import './primitives.js?v=b8995073';
-import './styles.js?v=b8995073';
-import './loader.js?v=b8995073';
-import './baseElement.js?v=b8995073';
-import './formatting.js?v=b8995073';
-import './baseUpload.js?v=b8995073';
-import './buttons.js?v=b8995073';
-import './dropdown.js?v=b8995073';
-import './combobox.js?v=b8995073';
-import './facets.js?v=b8995073';
-import './remote.js?v=b8995073';
-import './queryLifecycle.js?v=b8995073';
-import './results.js?v=b8995073';
-import './storage.js?v=b8995073';
-import './submitter.js?v=b8995073';
+import { F as FormElement } from './form2.js?v=b506293e';
+import { InputElement } from './input.js?v=b506293e';
+import { s as sections } from './sections.js?v=b506293e';
+import { S as SectionToggle } from './sectionToggle.js?v=b506293e';
+import { TextareaElement } from './textarea.js?v=b506293e';
+import './foundation.js?v=b506293e';
+import './upstreamUnavailable.js?v=b506293e';
+import './connectivity.js?v=b506293e';
+import './baseForm.js?v=b506293e';
+import './icons.js?v=b506293e';
+import './primitives.js?v=b506293e';
+import './styles.js?v=b506293e';
+import './loader.js?v=b506293e';
+import './baseElement.js?v=b506293e';
+import './formatting.js?v=b506293e';
+import './baseUpload.js?v=b506293e';
+import './buttons.js?v=b506293e';
+import './dropdown.js?v=b506293e';
+import './combobox.js?v=b506293e';
+import './facets.js?v=b506293e';
+import './remote.js?v=b506293e';
+import './queryLifecycle.js?v=b506293e';
+import './results.js?v=b506293e';
+import './storage.js?v=b506293e';
+import './submitter.js?v=b506293e';
 
 /**
  * @testable infrastructure

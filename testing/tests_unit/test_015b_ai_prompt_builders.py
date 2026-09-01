@@ -314,7 +314,8 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
         "get_page_tasks",
         "get_file",
     ]
-    assert text_prompt.output_format["type"] == "HTML"
+    assert text_prompt.output_format["type"] == "MARKDOWN"
+    assert "never return HTML" in text_prompt.output_format["requirements"]
     assert text_prompt.model_tier == "primary"
     assert _context_text(text_prompt, "User Request") == "Rewrite this"
     assert _context_json(text_prompt, "Page Info") == {"name": "Ada"}

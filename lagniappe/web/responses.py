@@ -22,6 +22,7 @@ from lagniappe.core.definitions import (
     Resource,
     SearchFacets,
 )
+from lagniappe.core.definitions.manual import VALID_MANUAL_SECTIONS
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import assets as database_assets
 from lagniappe.core.tools.database import get as database_get
@@ -338,13 +339,22 @@ def task_combine_delta(main, removed, page):
 # --- Form Responses ---
 
 
+# @testable true
+# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
+# @matrix html-field : html-fields
+# @matrix security : html-sanitization inner-html
 def form_submission(entity):
+    from lagniappe.core.tools.files.html import sanitize_form_content_html
+
     form = entity.form
 
     schema = form.schema if form else None
     submission = entity.properties.submission.form_value if form else None
     html = (
-        {p.id: p.value for p in form.html_fields}
+        {
+            p.id: sanitize_form_content_html(p.asset or "", form, p.id)
+            for p in form.html_fields
+        }
         if form and isinstance(entity, Entities.TASK)
         else None
     )
@@ -1062,7 +1072,9 @@ def delete_entity(entity=None, key=None):
 def manual_index(section, index):
     from lagniappe.core.tools.site import public_pages
 
-    page_content = smartypants(render_template(f"manual/content/{section}.html"))
+    if section not in VALID_MANUAL_SECTIONS:
+        raise ValueError("Unknown manual section")
+    content_template = f"manual/content/{section}.html"
     public_page = bool(CONFIG.PUBLIC_MANUAL and not current_user.is_authenticated)
     indexing = bool(
         CONFIG.PUBLIC_MANUAL
@@ -1089,7 +1101,7 @@ def manual_index(section, index):
         search_metadata = None
 
     context = {
-        "content": page_content,
+        "content_template": content_template,
         "sections": sections,
         "search_metadata": search_metadata,
         "public_page": public_page,
@@ -1097,7 +1109,9 @@ def manual_index(section, index):
     if public_page:
         context.update(page_mode="public")
 
-    response = make_response(render_template("manual/index.html", **context))
+    response = make_response(
+        smartypants(render_template("manual/index.html", **context))
+    )
     if search_metadata:
         response.headers["X-Robots-Tag"] = search_metadata["robots"]
     return response

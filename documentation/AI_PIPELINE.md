@@ -63,6 +63,10 @@ report in an authenticated browser session.
   action.
 - Report output uses typed action contracts, deterministic normalization,
   repair, and review-only fallback for unsafe actions.
+- Model-authored prose uses Markdown contracts. Interactive editor text,
+  static task-form content, Ask answers, and created Page documents are
+  converted and sanitized by application-owned policies before executable HTML
+  is returned or stored; raw model HTML is rejected.
 - Report application is a separate user-approved operation with its own
   resumable per-action ledger and undo checkpoints.
 - Autofill and other direct mutations checkpoint generated values, reload

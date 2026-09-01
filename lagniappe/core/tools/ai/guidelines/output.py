@@ -1,6 +1,4 @@
-"""
-Output format guidelines for JSON, HTML, and text generation.
-"""
+"""Output format guidelines for JSON, Markdown, and plain text generation."""
 
 JSON_OUTPUT_RULES = """
 ### JSON Output Requirements
@@ -14,49 +12,19 @@ JSON_OUTPUT_RULES = """
 """
 
 
-TASK_LIST_HTML_RULES = """
-### Editable Document Checklists
+MARKDOWN_GENERATION_RULES = """
+### Markdown Output Requirements
 
-- When the user asks for a checklist, shopping list, packing list, todo list,
-  or similar checkable document list, use editor task-list HTML instead of a
-  plain `<ul>`
-- Use this exact structure so the editor can display checkboxes and preserve
-  checked state:
-  `<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p>Item text</p></div></li></ul>`
-- For checked/completed items, set `data-checked="true"` on the `<li>` and add
-  `checked="checked"` to the checkbox input
-- Keep each checklist item text inside the nested `<div><p>...</p></div>`
-- Use ordinary `<ul>` or `<ol>` for lists that should not be checkable
+- Return ordinary Markdown only; never return HTML or wrap the response in an
+  outer code fence
+- Use headings, paragraphs, emphasis, block quotes, fenced code blocks,
+  tables, and ordinary ordered or unordered lists when they improve clarity
+- Use `- [ ]` and `- [x]` for checkable task-list items; use ordinary `-`
+  bullets for lists that should not be checkable
+- Keep list items non-empty and use a logical heading hierarchy
+- When tools return an entity `url` and `name`, create an internal link with
+  `[name](url)` using those returned values exactly; do not invent links
 """
-
-
-HTML_GENERATION_RULES = (
-    """
-### HTML Structure and Semantics
-
-- Generate clean, semantic HTML without CSS classes or inline styles
-- Use appropriate HTML elements: `<p>`, `<h1>` through `<h6>`, `<ul>`, `<ol>`, `<li>`, `<strong>`, `<em>`, `<br>`
-- Structure content logically with proper headings hierarchy
-- Use `<strong>` for emphasis, `<em>` for slight emphasis
-- Use `<code>` for inline code or technical terms
-- Use `<blockquote>` for quotes or highlighted information
-
-### HTML Quality Standards
-
-- **Lists**: Never create empty list items (`<li></li>` or `<li> </li>`) - every `<li>` must contain actual text content
-- **Spacing**: Remove extra whitespace and empty lines between HTML elements
-- **Clean Output**: Do not add unnecessary `<br>` tags or empty paragraphs
-- **Structure**: Ensure all tags are properly opened and closed
-- **Minimal Formatting**: Generate clean, minimal HTML without extra spacing or line breaks at start/end
-- **Organization**: Keep content concise and well-organized
-
-### Internal Links
-
-- When tools are available and results have been returned, you can create links to internal entities using the `url` and `name` fields from tool results (search_entities, get_entity, get_category_pages, etc.)
-- Format: `<a href="{{url}}">{{name}}</a>` where `url` and `name` come from the tool result dictionaries
-"""
-    + TASK_LIST_HTML_RULES
-)
 
 
 SAFETY_RULES = """

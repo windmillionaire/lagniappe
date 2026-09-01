@@ -56,7 +56,7 @@
          data-init="initManual">
       <div class="hidden sm:block sm:w-64 shrink-0">{{ nav_column(sections) }}</div>
       <div class="flex-1 min-w-0 sm:ml-6">
-        <div data-role="manual-content" class="{{ styles.manual.content }}">{{ content|safe }}</div>
+        <div data-role="manual-content" class="{{ styles.manual.content }}">{% include content_template %}</div>
       </div>
     </div>
   </div>

@@ -245,11 +245,18 @@ class Schema(AIMixin, DBProperty):
     # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_table_filters_bad_columns
     # @matrix form-schema form-table : ai-value columns validation
     def validate_ai(self, value):
+        from ..tools.ai.form_content import prepare_static_form_element
+
         candidates = deepcopy(value)
         valid = []
+        static_content = {}
         for element in candidates if isinstance(candidates, list) else []:
             if not isinstance(element, dict) or not _valid_schema_id(element.get("id")):
                 continue
+            element, rendered_content = prepare_static_form_element(
+                element,
+                form_type=getattr(self.entity, "form_type", None),
+            )
             if not SchemaFields.validate_type(element):
                 continue
             if element.get("type") == "table":
@@ -263,10 +270,8 @@ class Schema(AIMixin, DBProperty):
                     and _valid_schema_id(column.get("id"))
                     and TableColumnFields.validate_type(column)
                 ]
-            if element.get("type") == "html" and _valid_schema_id(element.get("id")):
-                html = element.pop("html", None)
-                if html is not None:
-                    self.entity.set_html_field(element["id"], html)
+            if rendered_content is not None:
+                static_content.setdefault(element["id"], rendered_content)
             valid.append(element)
 
         elements = canonicalize_schema(
@@ -275,6 +280,10 @@ class Schema(AIMixin, DBProperty):
             discard_invalid=True,
         )
         self.value = elements
+        valid_ids = {element["id"] for element in elements}
+        for field_id, rendered_content in static_content.items():
+            if field_id in valid_ids:
+                self.entity.set_html_field(field_id, rendered_content)
 
     # @testable true
     # @tests tests_unit/test_004b_schema_core.py::test_schema_previous_and_fields_cache

@@ -777,6 +777,8 @@ def test_report_prompts_attach_provider_json_schema():
     field_schema = organize_action_data["properties"]["schema"]["items"]
     assert field_schema["required"] == ["id", "type", "title"]
     assert field_schema["additionalProperties"] is False
+    assert "content_markdown" in field_schema["properties"]
+    assert "html" not in field_schema["properties"]
     assert field_schema["properties"]["options"]["items"]["required"] == [
         "value",
         "label",

@@ -42,13 +42,8 @@ def _create_form(action, _report, user, _created):
         raise exceptions.ValidationError(
             "Create form actions require at least one schema field."
         )
-    form = Entities.FORM.create(
-        {
-            "name": name,
-            "form-type": form_type,
-            "schema": schema,
-        }
-    )
+    form = Entities.FORM.create({"name": name, "form-type": form_type})
+    form.properties.schema.validate_ai(schema)
     form.ai_generated = True
     return form, [form]
 

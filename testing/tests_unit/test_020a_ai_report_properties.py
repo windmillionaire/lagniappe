@@ -370,6 +370,7 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
                                     "id": "html-document",
                                     "type": "html",
                                     "title": "Document",
+                                    "content_markdown": "## Required reading",
                                 },
                                 {
                                     "id": "link-source",

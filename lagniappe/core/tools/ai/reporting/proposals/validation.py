@@ -65,6 +65,7 @@ def normalize_report_markdown(proposal):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_external_file_summaries
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_treats_action_like_submission_fields_as_content
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_future_completed_dates
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_invalid_static_form_content
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
 # @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission validation
 # @pairs ai-report:reference-kind permissions:personal-page
@@ -499,6 +500,20 @@ def _validate_create_form_action_data(data, action_label):
             f"data.schema[{index}]",
             used_ids,
         )
+        field_type = field.get("type") if isinstance(field, dict) else None
+        if field_type == "html":
+            if form_type != "task":
+                raise exceptions.AIException(
+                    f"Action {action_label} static HTML fields require a task form."
+                )
+            if "html" in field:
+                raise exceptions.AIException(
+                    f"Action {action_label} static HTML fields must use content_markdown."
+                )
+            if not _proposal_string(field.get("content_markdown")):
+                raise exceptions.AIException(
+                    f"Action {action_label} static HTML fields require content_markdown."
+                )
 
 
 # @testable true
@@ -529,6 +544,11 @@ def _validate_update_form_schema_action_data(data, action_label):
                 f"{operation_label}.field",
                 added_ids,
             )
+            field = operation.get("field")
+            if isinstance(field, dict) and field.get("type") == "html":
+                raise exceptions.AIException(
+                    f"Action {action_label} {operation_label} cannot add static HTML fields."
+                )
             continue
         if operation_type == "add_select_option":
             if not _proposal_string(

@@ -10,6 +10,7 @@ from .text import (
     generate_ai_text,
     text_generation_prompt,
 )
+from .references import render_ai_markdown
 from .category import generate_category, category_creation_prompt
 from .summarize import summarize_file, generate_summary
 from .schema import form_generation_prompt, generate_schema
@@ -79,6 +80,7 @@ __all__ = [
     "generate_ai_text",
     "document_generation_context",
     "text_generation_prompt",
+    "render_ai_markdown",
     "page_image_generation_prompt",
     "generate_category",
     "category_creation_prompt",

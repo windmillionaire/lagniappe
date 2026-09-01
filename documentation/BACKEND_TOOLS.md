@@ -63,9 +63,24 @@ Keep these rules intact:
 | `extract.py` | Stored-text extraction and Document AI OCR. |
 | `ooxml.py` | `.docx` and `.xlsx` text extraction. |
 | `downloads.py` | Bounded external image download. |
-| `html.py` | HTML sanitization, extraction, and plain-text conversion. |
+| `html.py` | Named HTML safety policies, Markdown rendering, extraction, and plain-text conversion. |
 | `utility.py` | Encoding and MIME detection. |
 | `constants.py` | MIME families and supported processing modes. |
+
+### Executable HTML policies
+
+`files/html.py` uses `nh3` for reusable tag, attribute, URL-scheme, comment,
+and active-content filtering. `sanitize_html()` is the narrow semantic policy
+for Markdown and file/report previews. Static Form content and anonymous public
+documents use separate named policies so their page-owned images cannot widen
+the narrow policy.
+
+Policy producers return `SafeHTML`, an ephemeral runtime provenance marker.
+Storage, JSON, formatting, concatenation, and parser round-trips are ordinary
+strings and must pass the correct named policy again before an executable
+server-template sink. BeautifulSoup passes in this module perform only
+structural transformations such as task-list reconstruction and owned-image
+canonicalization; they are not the security allowlist.
 
 Any code that materializes file bytes must choose a `FileConsumer` from
 `core/definitions/file_consumers.py`. The consumer declares the size limit and

@@ -126,7 +126,14 @@ def create():
                 )
             )
             if model_task.get("form_data"):
-                form = Entities.FORM.create(model_task.get("form_data"))
+                form_data = model_task.get("form_data")
+                form = Entities.FORM.create(
+                    {
+                        "name": form_data.get("name"),
+                        "form-type": form_data.get("form-type"),
+                    }
+                )
+                form.properties.schema.validate_ai(form_data.get("schema"))
                 new_model_task.form = form
                 new_project.add_mutation_intents(
                     MutationIntent.standard(

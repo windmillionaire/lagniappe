@@ -9,6 +9,8 @@ import copy
 
 import pytest
 
+from lagniappe.core import exceptions
+from lagniappe.core.entities import Entities
 from lagniappe.core.properties.form_inputs import TextInput
 from lagniappe.core.properties.schema import (
     SchemaFields,
@@ -31,12 +33,50 @@ def test_schema_validate_ai_filters_invalid_top_level(get_test_entities):
 def test_schema_validate_ai_html_calls_set_html_field(get_test_entities):
     for entity in get_test_entities():
         calls = []
+        entity.form_type = "task"
         entity.set_html_field = lambda fid, html: calls.append([fid, html])
         schema = entity.properties.schema
         schema.validate_ai(copy.deepcopy(entity.test_spec["ai_payload"]))
         assert calls == entity.test_spec["expected_set_html_calls"]
         assert [e["id"] for e in schema.value] == entity.test_spec["expected_ids"]
         assert "html" not in schema.value[0]
+
+
+# @matrix form-schema html-field : ai-value markdown validation
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "form_type,field",
+    [
+        (
+            "task",
+            {"id": "intro", "type": "html", "title": "Intro", "html": "<b>raw</b>"},
+        ),
+        (
+            "task",
+            {
+                "id": "intro",
+                "type": "html",
+                "title": "Intro",
+                "content_markdown": 42,
+            },
+        ),
+        (
+            "page",
+            {
+                "id": "intro",
+                "type": "html",
+                "title": "Intro",
+                "content_markdown": "Intro",
+            },
+        ),
+    ],
+)
+def test_schema_validate_ai_rejects_raw_or_invalid_static_content(form_type, field):
+    form = Entities.FORM(testing=True)
+    form.form_type = form_type
+
+    with pytest.raises(exceptions.ValidationError):
+        form.properties.schema.validate_ai([field])
 
 
 # @matrix form-schema form-table : ai-value columns validation

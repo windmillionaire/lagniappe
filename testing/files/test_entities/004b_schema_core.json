@@ -36,15 +36,16 @@
 				{
 					"name": "AI schema html",
 					"hash": "form_ai_html",
+					"form_type": "task",
 					"ai_payload": [
 						{
 							"id": "intro",
 							"type": "html",
 							"title": "Intro",
-							"html": "<p>Hello</p>"
+							"content_markdown": "**Hello**"
 						}
 					],
-					"expected_set_html_calls": [["intro", "<p>Hello</p>"]],
+					"expected_set_html_calls": [["intro", "<p><strong>Hello</strong></p>"]],
 					"expected_ids": ["intro"]
 				}
 			]

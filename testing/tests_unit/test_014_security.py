@@ -1,7 +1,11 @@
 """Unit tests for security hardening changes."""
 
+import json
+from types import SimpleNamespace
+
 import pytest
 from bs4 import BeautifulSoup
+from markupsafe import Markup
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.files import constants as file_constants
@@ -210,6 +214,216 @@ def test_sanitize_html_restricts_task_controls():
     assert controls[0].attrs == {"type": "checkbox", "disabled": "", "checked": ""}
     assert soup.find("span").attrs == {}
     assert "onclick" not in html
+
+
+# @matrix files security : active-content comments html-sanitization malformed-markup unknown-wrapper
+@pytest.mark.unit
+def test_sanitize_html_drops_active_content_and_unwraps_unknown_markup():
+    content = """<!-- hidden -->
+    <custom><strong>Keep</strong></custom>
+    <script>script text</script><style>style text</style>
+    <iframe src='https://example.test'>frame text</iframe>
+    <svg><script>svg script</script><text>svg text</text></svg>
+    <math><mi>math text</mi></math><form><button>submit</button></form>
+    <video src='/track'>video text</video><object>object text</object>
+    <p onclick='alert(1)' style='position:fixed'>Safe paragraph</p>
+    """
+
+    html = file_html.sanitize_html(content)
+
+    assert "<strong>Keep</strong>" in html
+    assert "Safe paragraph" in html
+    assert not any(
+        value in html
+        for value in (
+            "hidden",
+            "script text",
+            "style text",
+            "frame text",
+            "svg text",
+            "math text",
+            "submit",
+            "video text",
+            "object text",
+            "onclick",
+            "position:fixed",
+        )
+    )
+
+
+# @matrix files security : html-sanitization links url-scheme
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "unsafe_url",
+    [
+        "javascript:alert(1)",
+        "java&#x73;cript:alert(1)",
+        "jav&#x09;ascript:alert(1)",
+        "data:text/html,alert(1)",
+        "vbscript:msgbox(1)",
+    ],
+)
+def test_sanitize_html_rejects_obfuscated_active_link_schemes(unsafe_url):
+    html = file_html.sanitize_html(f'<a href="{unsafe_url}">bad</a>')
+    assert BeautifulSoup(html, "html.parser").find("a").get("href") is None
+
+
+# @matrix files security : html-sanitization links relative-url url-scheme
+@pytest.mark.unit
+def test_sanitize_html_keeps_reviewed_link_schemes_and_fixed_attributes():
+    html = file_html.sanitize_html(
+        '<a href="/relative" title="R" rel="opener" target="frame">R</a>'
+        '<a href="http://example.test">H</a>'
+        '<a href="https://example.test">S</a>'
+        '<a href="mailto:test@example.test">M</a>'
+        '<a href="ftp://example.test">F</a>'
+    )
+    links = BeautifulSoup(html, "html.parser").find_all("a")
+
+    assert [link.get("href") for link in links] == [
+        "/relative",
+        "http://example.test",
+        "https://example.test",
+        "mailto:test@example.test",
+        None,
+    ]
+    assert all(link.get("target") == "_blank" for link in links[:4])
+    assert all(link.get("rel") == ["noopener", "noreferrer"] for link in links[:4])
+    assert links[4].get("target") is None
+    assert links[4].get("rel") is None
+
+
+# @matrix files security : html-sanitization table
+@pytest.mark.unit
+def test_sanitize_html_bounds_table_spans():
+    html = file_html.sanitize_html(
+        '<table><tr><td colspan="1" rowspan="2">a</td>'
+        '<th colspan="100" rowspan="101">b</th>'
+        '<td colspan="2x" rowspan="-2">c</td></tr></table>'
+    )
+    cells = BeautifulSoup(html, "html.parser").find_all(["td", "th"])
+
+    assert cells[0].attrs == {"rowspan": "2"}
+    assert cells[1].attrs == {"colspan": "100"}
+    assert cells[2].attrs == {}
+
+
+# @matrix files security : html-sanitization task-list
+@pytest.mark.unit
+def test_sanitize_html_strips_task_attributes_outside_exact_ancestry():
+    html = file_html.sanitize_html(
+        '<li data-type="taskItem" data-checked="true"><input>Loose</li>'
+        '<ul data-type="taskList"><li>Ordinary</li></ul>'
+        '<ul data-type="taskList"><li data-type="taskItem" data-checked="true">'
+        '<p>Task</p><input type="checkbox" onclick="bad()"></li></ul>'
+    )
+    soup = BeautifulSoup(html, "html.parser")
+
+    assert soup.find_all("input") == [
+        soup.find("ul", attrs={"data-type": "taskList"}).find("input")
+    ]
+    assert soup.find("li", string="Loose").attrs == {}
+    assert soup.find("ul", string="Ordinary").attrs == {}
+    checkbox = soup.find("ul", attrs={"data-type": "taskList"}).find("input")
+    assert checkbox.attrs == {"type": "checkbox", "disabled": "", "checked": ""}
+
+
+# @matrix security : nominal-type serialization trust-loss
+@pytest.mark.unit
+def test_safe_html_policy_is_typed_idempotent_and_ephemeral():
+    assert isinstance(file_html.sanitize_html(None), file_html.SafeHTML)
+    assert file_html.sanitize_html(None) == ""
+    assert isinstance(file_html.render_markdown(42), file_html.SafeHTML)
+
+    once = file_html.sanitize_html('<p title="drop">Safe</p>')
+    twice = file_html.sanitize_html(once)
+    assert once == twice
+    assert type(once + "") is str
+    assert type(f"{once}") is str
+    assert type(Markup(once)) is Markup
+    assert json.loads(json.dumps({"html": once}))["html"] == str(once)
+
+
+# @matrix files security : code html-sanitization mimetype plain-text
+@pytest.mark.unit
+def test_htmlize_escapes_code_plain_text_and_mimetype_attributes(monkeypatch):
+    mimetype = 'text/x" onmouseover="bad'
+    monkeypatch.setattr(file_html, "CODE_MIMETYPES", {mimetype})
+    code = file_html.htmlize('<script>bad</script>', mimetype)
+    plain = file_html.htmlize('<img src=x onerror=bad> & text', 'unknown/type')
+
+    assert isinstance(code, file_html.SafeHTML)
+    assert "<script>" not in code
+    assert "&lt;script&gt;bad&lt;/script&gt;" in code
+    assert 'onmouseover="bad"' not in code
+    assert "<img" not in plain
+    assert "&lt;img src=x onerror=bad&gt; &amp; text" in plain
+
+
+def _image_owner(url):
+    asset = SimpleNamespace(url=url)
+    owner = SimpleNamespace(
+        assets={"image_intro_owned": {"type": "image"}},
+        get_asset=lambda name: asset if name == "image_intro_owned" else None,
+    )
+    return owner
+
+
+# @matrix form-html security : html-sanitization owned-image
+@pytest.mark.unit
+def test_form_content_policy_keeps_only_owned_images():
+    owned = "https://assets.test/form/image_intro_owned.png?signature=current"
+    content = (
+        '<p onclick="bad()">Text</p>'
+        '<img src="https://assets.test/form/image_intro_owned.png?signature=old" '
+        'alt="Diagram" onerror="bad()" '
+        'style="width: 55%; float: left; position: fixed; background: url(javascript:bad)">'
+        '<img src="https://external.test/tracker.png">'
+        '<script>alert(1)</script>'
+    )
+
+    html = file_html.sanitize_form_content_html(
+        content,
+        _image_owner(owned),
+        "intro",
+    )
+    soup = BeautifulSoup(html, "html.parser")
+    images = soup.find_all("img")
+
+    assert len(images) == 1
+    assert images[0]["src"] == owned
+    assert images[0]["alt"] == "Diagram"
+    assert images[0]["style"] == (
+        "width:55%;display:block;float:left;margin:0 1em 1em 0"
+    )
+    assert "onclick" not in html
+    assert "onerror" not in html
+    assert "javascript" not in html
+    assert "script" not in html
+    assert file_html.sanitize_form_content_html(None, None, "intro") == ""
+    assert isinstance(
+        file_html.sanitize_form_content_html(None, None, "intro"),
+        file_html.SafeHTML,
+    )
+
+
+# @matrix public-pages security : html-sanitization owned-image
+@pytest.mark.unit
+def test_public_document_policy_keeps_only_rewritten_owned_images():
+    source = "https://private.test/page/image_first.png?signature=old"
+    rewritten = "https://site.test/pages/public/id/images/image_first.png"
+    html = file_html.sanitize_public_document_html(
+        '<h2>Public</h2><img src="https://private.test/page/image_first.png">'
+        '<img src="data:image/png;base64,AAAA"><iframe>embed</iframe>',
+        [(source, rewritten)],
+    )
+    soup = BeautifulSoup(html, "html.parser")
+
+    assert soup.find("img")["src"] == rewritten
+    assert len(soup.find_all("img")) == 1
+    assert "iframe" not in html
+    assert "embed" not in html
+    assert file_html.sanitize_public_document_html(None, []) == ""
 
 
 # @matrix files security : mimetype preview svg

@@ -64,6 +64,57 @@ def test_validate_proposal_renders_page_document_markdown():
     assert "<script" not in data["document"]
 
 
+# @matrix ai-report : proposal validation
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "form_type,field",
+    [
+        (
+            "task",
+            {"id": "notice", "type": "html", "title": "Notice", "html": "<b>raw</b>"},
+        ),
+        (
+            "task",
+            {
+                "id": "notice",
+                "type": "html",
+                "title": "Notice",
+                "content_markdown": 3,
+            },
+        ),
+        (
+            "page",
+            {
+                "id": "notice",
+                "type": "html",
+                "title": "Notice",
+                "content_markdown": "Notice",
+            },
+        ),
+    ],
+)
+def test_validate_proposal_rejects_invalid_static_form_content(form_type, field):
+    proposal = {
+        "summary": "Create a form.",
+        "confidence": 0.9,
+        "issues": [],
+        "actions": [
+            {
+                "id": "form",
+                "type": "create_form",
+                "data": {
+                    "name": "Form",
+                    "form_type": form_type,
+                    "schema": [field],
+                },
+            }
+        ],
+    }
+
+    with pytest.raises(exceptions.AIException):
+        proposal_validation.validate_proposal(proposal)
+
+
 
 
 # @matrix ai-report : generate repair validate

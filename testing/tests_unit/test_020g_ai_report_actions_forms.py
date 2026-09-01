@@ -110,6 +110,15 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
                             "id": "textarea-notes",
                             "type": "textarea",
                             "title": "Notes",
+                        },
+                        {
+                            "id": "html-warning",
+                            "type": "html",
+                            "title": "Warning",
+                            "content_markdown": (
+                                "**Review carefully.**"
+                                "<script>unsafe()</script>"
+                            ),
                         }
                     ],
                 },
@@ -157,6 +166,21 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
         "create",
         create_page_with_in_memory_assets,
     )
+    create_form = report_runner.Entities.FORM.create
+
+    def create_form_with_in_memory_assets(data):
+        form = create_form(data)
+        form.generated_static_content = {}
+        form.set_html_field = lambda field_id, content: (
+            form.generated_static_content.__setitem__(field_id, content)
+        )
+        return form
+
+    monkeypatch.setattr(
+        report_runner.Entities.FORM,
+        "create",
+        create_form_with_in_memory_assets,
+    )
 
     result = report_runner.run_report(report, user)
 
@@ -199,6 +223,16 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
         "<h1>Receipt notes</h1><ul><li>Review the total</li></ul>"
     )
     assert "document_markdown" not in report.proposal["actions"][2]["data"]
+    task_form = next(
+        entity
+        for entity in saved_entities
+        if getattr(entity, "entity_kind", None) == "form"
+        and entity.name == "Follow-up Form"
+    )
+    assert task_form.generated_static_content == {
+        "html-warning": "<p><strong>Review carefully.</strong></p>"
+    }
+    assert "content_markdown" not in task_form.schema[1]
     assert result["actions"][4]["type"] == "summarize_file"
     assert result["actions"][4]["entity"]["kind"] == "file"
     assert result["actions"][4]["file_summary"] == {

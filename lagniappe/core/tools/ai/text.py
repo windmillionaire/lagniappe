@@ -1,4 +1,4 @@
-"""AI-powered HTML content generation from user requests."""
+"""AI-powered Markdown content generation from user requests."""
 
 from ... import exceptions
 from .core import ai_model
@@ -16,7 +16,7 @@ GENERIC_MESSAGE = "Generation failed. Please try again. "
 # @covered-by lagniappe/core/tools/ai/text.py::text_generation_prompt
 # @reason provider-call wrapper; editor text-generation E2E story is still an explicit source gap
 def generate_ai_text(prompt):
-    """Generate HTML text content from a Prompt."""
+    """Generate Markdown text content from a Prompt."""
     try:
         return ai_model.generate_content(prompt)
     except exceptions.AIException as e:
@@ -65,7 +65,7 @@ def text_generation_prompt(user_prompt, context_data):
         context_data: Dict with user_request, page_info, project_info,
             existing_document, related_tasks, selected_text, and user.
     """
-    intro = "You are a content generation AI. Generate clean, well-formatted HTML content based on the user's request."
+    intro = "You are a content generation AI. Generate clear, well-formatted Markdown based on the user's request."
 
     user = context_data.get("user")
     prompt = Prompt(intro, user=user, type="document text")
@@ -91,6 +91,6 @@ def text_generation_prompt(user_prompt, context_data):
         prompt.add_context("selected_text", context_data.get("selected_text"))
         prompt.add_instructions(SELECTED_TEXT_HANDLING)
 
-    prompt.set_output_format("HTML")
+    prompt.set_output_format("MARKDOWN")
 
     return prompt

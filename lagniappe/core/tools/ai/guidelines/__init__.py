@@ -13,7 +13,7 @@ from .forms import (
 
 from .output import (
     JSON_OUTPUT_RULES,
-    HTML_GENERATION_RULES,
+    MARKDOWN_GENERATION_RULES,
     TEXT_OUTPUT_RULES,
     SAFETY_RULES,
 )
@@ -89,7 +89,7 @@ __all__ = [
     "SCHEMA_TYPE_GUIDELINES",
     # Output
     "JSON_OUTPUT_RULES",
-    "HTML_GENERATION_RULES",
+    "MARKDOWN_GENERATION_RULES",
     "TEXT_OUTPUT_RULES",
     "SAFETY_RULES",
     # Images

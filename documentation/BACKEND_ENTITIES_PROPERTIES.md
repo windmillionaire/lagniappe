@@ -110,6 +110,14 @@ All durable assignment flows converge on `Schema.value` and should prefer
 category/report operations, and direct updates. Browser builder defaults are a
 presentation convenience, not a persistence contract.
 
+AI-generated static task-form fields use `content_markdown` only at the model
+boundary. `Schema.validate_ai()` removes that model-only field, renders it
+through the shared AI Markdown policy, and stores the resulting HTML sidecar
+after the Form object has been created. Raw model `html`, non-string Markdown,
+static content on generated Page forms, and static fields in additive report
+schema updates are rejected. Existing stored sidecars are not migrated; Form
+read projections apply the Form-content policy before browser `innerHTML` use.
+
 `schema_format` records the storage format independently from the form's
 user-facing version. During a data update, readable rows remain projectable so
 the Administrator workflow can report malformed values instead of silently

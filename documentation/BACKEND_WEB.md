@@ -96,6 +96,14 @@ Embedded private images are rewritten to the anonymous, revocable
 assets still referenced by a currently public document. Unpublishing the page
 or removing the image reference makes the URL return 404.
 
+Anonymous document rendering is deliberately narrower than the private TipTap
+schema. It keeps semantic text, headings, emphasis, quotes, code, links, task
+lists, tables, and page-owned images with canonical bounded layout. Mentions
+become inert display text. External/data/blob images, arbitrary styles and
+classes, controls, SVG/MathML, scripts, embeds, frames, and media are removed.
+The policy runs on presentation; existing collaborative storage and history
+are not rewritten.
+
 `/robots.txt` always blocks the private application and explicitly allows the
 public directory, public page, and static asset families. When live site discovery is enabled it
 also advertises `/sitemap.xml`; the sitemap otherwise returns 404. Public page
@@ -123,6 +131,14 @@ Formatting filters:
 - `format_datetime`, `format_date`, and `format_time`
 - `format_phone` and `format_number`
 - `format_date_as_input_string`
+
+Executable dynamic HTML uses the strict `safe_html` filter. It accepts only a
+runtime `SafeHTML` value returned by a named final policy and rejects plain
+strings, `Markup`, null, and undefined values without logging their content.
+The built-in permissive `safe` filter is removed from the application Jinja
+environment. Repository-authored manual fragments are included directly from
+the validated manual-section catalog rather than rendered to strings and
+reinserted.
 
 Important globals include `VERSION`, `BUILD_ID`, `CAPTURE_ERRORS`, `TESTING`,
 `render_icon`, `styles`, `is_starred`, `current_user`, `Action`, and `Resource`.

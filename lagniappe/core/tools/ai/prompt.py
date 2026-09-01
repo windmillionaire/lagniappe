@@ -7,8 +7,8 @@ from lagniappe.core.definitions import FileConsumer, enforce_file_consumer
 
 from .constants import GEMINI_MIMETYPES
 from .guidelines import (
-    HTML_GENERATION_RULES,
     JSON_OUTPUT_RULES,
+    MARKDOWN_GENERATION_RULES,
     TEXT_OUTPUT_RULES,
 )
 
@@ -210,7 +210,7 @@ class Prompt:
         )
 
     def set_output_format(self, format_type, description=None, include_requirements=True):
-        """Set the expected output format (JSON, HTML, IMAGE, or TEXT)."""
+        """Set the expected output format (JSON, MARKDOWN, IMAGE, or TEXT)."""
         self.output_format = {
             "type": format_type,
             "description": description,
@@ -222,8 +222,8 @@ class Prompt:
 
         if format_type == "JSON":
             self.output_format["requirements"] = JSON_OUTPUT_RULES
-        elif format_type == "HTML":
-            self.output_format["requirements"] = HTML_GENERATION_RULES
+        elif format_type == "MARKDOWN":
+            self.output_format["requirements"] = MARKDOWN_GENERATION_RULES
         elif format_type == "TEXT":
             self.output_format["requirements"] = TEXT_OUTPUT_RULES
 

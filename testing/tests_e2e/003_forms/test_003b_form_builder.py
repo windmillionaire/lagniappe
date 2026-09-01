@@ -399,7 +399,8 @@ def test_signature_field_builder_unique_component(get_user):
     expect(builder.model.locator(f"[id='{signature.id}']")).to_be_visible()
 
 
-# @matrix html-field : asset-lifecycle builder-html-field form-asset image-upload render-fetch submitter-key unsaved-schema
+# @matrix html-field : asset-lifecycle builder-html-field form-asset html-fields image-upload render-fetch submitter-key unsaved-schema
+# @matrix security : html-sanitization inner-html
 def test_html_field(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_html_field.get(user)
@@ -444,6 +445,15 @@ def test_html_field(get_user):
     assert assets[image_assets[0]]["type"] == "image"
     assert image_assets[0] in saved_form.get_html_field(html.id)
 
+    saved_form.set_html_field(
+        html.id,
+        saved_form.get_html_field(html.id)
+        + '<script>document.body.dataset.hostileHtml = "script"</script>'
+        + '<img src="https://external.test/tracker.png" '
+        + 'onerror="document.body.dataset.hostileHtml = \'handler\'">',
+    )
+    saved_form.save()
+
     user.page.reload()
     builder = Builder(user)
     builder.select_field(html)
@@ -474,6 +484,9 @@ def test_html_field(get_user):
     html_content = task_form.locator(".html-content")
     expect(html_content).to_contain_text(text)
     expect(html_content.locator("img")).to_be_visible()
+    expect(html_content.locator("img")).to_have_count(1)
+    expect(html_content.locator("script")).to_have_count(0)
+    assert user.page.locator("body").get_attribute("data-hostile-html") is None
 
 
 # @matrix editor : authoritative-content error-reporting initial-load intentional-clear retry server-acknowledgement

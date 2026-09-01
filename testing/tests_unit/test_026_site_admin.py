@@ -102,12 +102,22 @@ def test_public_document_rewrites_only_embedded_page_images():
 
     html, candidates = public_pages.public_document_html(
         page,
-        lambda image: f"/pages/public/id/images/{image.name}.png",
+        lambda image: f"/pages/public/public-id/images/{image.name}.png",
     )
 
-    assert "/pages/public/id/images/image_first.png" in html
-    assert "https://example.com/external.jpg" in html
+    assert "/pages/public/public-id/images/image_first.png" in html
+    assert "https://example.com/external.jpg" not in html
     assert [image.name for image in candidates] == ["image_first"]
+
+    forged, _ = public_pages.public_document_html(
+        page,
+        lambda image: (
+            f"https://attacker.test/pages/public/public-id/images/{image.name}.png"
+        ),
+        public_origin="https://site.test/pages/public/public-id",
+    )
+
+    assert "<img" not in forged
 
 
 # @matrix public-pages : metadata privacy social-preview
@@ -130,14 +140,18 @@ def test_public_metadata_uses_safe_fallbacks_and_selected_document_image(monkeyp
         page,
         canonical_url="https://site.test/pages/public/id",
         site_image_url="https://site.test/images/logo.png",
-        public_image_url=lambda image: f"https://site.test/public/{image.name}.png",
+        public_image_url=lambda image: (
+            f"https://site.test/pages/public/public-id/images/{image.name}.png"
+        ),
         indexing=True,
     )
 
     assert result["title"] == "Internal Name"
     assert result["description"] == "A document-only description."
     assert "Must not leak" not in result.values()
-    assert result["image"] == "https://site.test/public/image_first.png"
+    assert result["image"] == (
+        "https://site.test/pages/public/public-id/images/image_first.png"
+    )
     assert result["image_alt"] == "Diagram"
     assert result["robots"] == "index, follow"
 

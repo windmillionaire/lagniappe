@@ -121,7 +121,7 @@ A form schema is an **array of element objects**. Each element object contains:
 
 ##### HTML Element Additional Properties
 
-- `html`: Properly formatted HTML content
+- `content_markdown`: Non-empty Markdown content. Never return an `html` field
 - HTML elements should only be used for specific essential information without which the form would have no meaning — legal disclaimers, regulatory notices, compliance text, safety warnings, or critical procedural instructions
 - Do not use HTML elements for generic filler instructions like "fill in the fields below" or "please complete this form"
 
@@ -183,13 +183,14 @@ TASK_FORM_CONTENT_GUIDELINES = """
 - Use `location` for any address-related fields
 - Use `signature` for consent/approval requirements
 
-### HTML Content Standards
+### Static Content Standards
 
-- Generate clean, semantic HTML without CSS classes or inline styles
-- Use appropriate elements: `<p>`, `<h1>` through `<h6>`, `<ul>`, `<ol>`, `<li>`, `<strong>`, `<em>`
-- Structure content logically with proper hierarchy
+- Put static content in `content_markdown`; never generate raw HTML
+- Use Markdown paragraphs, headings, ordinary lists, emphasis, links, tables,
+  block quotes, fenced code, and `- [ ]`/`- [x]` task lists as appropriate
+- Structure content with a logical heading hierarchy
 - Never create empty list items
-- Remove extra whitespace and ensure proper tag closure
+- Keep the content concise and avoid generic filler instructions
 """
 
 
