@@ -559,12 +559,22 @@ def test_tools_create_form_has_expected_controls(get_user):
 
 
 # @matrix ai-access : authentication route-gate
+# @pair ai-report:provider-independent-history
 # @pair cache:invalidation-acknowledgement
 # @template home/home.html::main
 # @template home/tools.html::create_report
+# @template home/tools.html::report_list
 def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    user = get_user(Users.ai_access_tiers, creator=owner)
+    suffix = _suffix()
+    user = get_user(
+        UserDefinition(
+            name=f"AI Access Tiers {suffix}",
+            email=f"ai-access-tiers-{suffix}@example.test",
+            ai_access=AI.NONE,
+        ),
+        creator=owner,
+    )
 
     for tier, expected_statuses, visible_tools in (
         (AI.NONE, (403, 403, 403), ()),
@@ -594,9 +604,20 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
         else:
             home = user.go(SitePages.HOME)
 
+        report_toggle = user.locate(home.TOOL_REPORT_LIST_TOGGLE)
+        expect(report_toggle).to_be_visible()
+        expect(report_toggle).to_contain_text("AI Reports")
+
         toggle = user.locate(home.CREATE_TOOL_REPORT_TOGGLE)
         if tier is AI.NONE:
             expect(toggle).to_have_count(0)
+            expect(user.locate(home.CREATE_TOOL_REPORT_FORM)).to_have_count(0)
+            report_toggle.click()
+            report_list = user.locate(home.TOOL_REPORT_LIST)
+            expect(report_list).to_be_visible()
+            expect(report_list.locator("[data-role='empty']")).to_have_text(
+                "No AI reports generated yet."
+            )
         else:
             expect(toggle).to_be_visible()
             toggle.click()
@@ -627,7 +648,10 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
 
 
 # @matrix ai-report : delete deterministic-run deterministic-undo entitlement-independent skip-action
+# @pair ai-report:provider-independent-history
 # @pair ai-access:provider-boundary
+# @template home/home.html::main
+# @template home/tools.html::report_list
 # @template tools/report.html::proposal_action_item
 def test_saved_report_controls_do_not_require_provider_access(get_user):
     owner = get_user(Users.OWNER)
@@ -642,6 +666,12 @@ def test_saved_report_controls_do_not_require_provider_access(get_user):
     )
     assert user.entity.ai_access == AI.NONE.name
     report, task_name = _personal_task_report(user)
+
+    home = user.go(SitePages.HOME)
+    expect(user.locate(home.CREATE_TOOL_REPORT_TOGGLE)).to_have_count(0)
+    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+    report_list = user.locate(home.TOOL_REPORT_LIST)
+    expect(report_list.get_by_role("link", name=report.name)).to_be_visible()
 
     report_page = user.go(Report.for_entity(user, report))
 

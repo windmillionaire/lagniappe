@@ -271,10 +271,13 @@ class IngressList(HomeProperty):
 
 # @testable true
 # @tests tests_unit/test_002i_home_properties.py::test_home_note_ingress_and_tool_lists_load_database_entities
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
 # @matrix ai-report home : list tools
+# @pair ai-report:provider-independent-history
 class ToolsList(HomeProperty):
     _id = "tools"
-    _label = "Tools"
+    _label = "AI Reports"
 
     @property
     def list(self):
