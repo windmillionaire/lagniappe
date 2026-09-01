@@ -3,6 +3,7 @@ import "../style/main.css";
 import { connectivity } from "./shared/connectivity";
 import { applyNotificationStateHeader } from "./shared/notificationState";
 import { connectivityMessage } from "./shared/protocol";
+import { installUpstreamUnavailableBanner } from "./shared/upstreamUnavailable";
 import { loadView } from "./viewRegistry";
 
 /**
@@ -424,8 +425,10 @@ function startErrorHandling() {
  * @testable true
  * @tests tests_js/test_017_main_lifecycle.py::test_service_worker_registration_starts_immediately
  * @tests tests_js/test_017_main_lifecycle.py::test_controller_replacement_receives_current_versioned_connectivity_state
+ * @tests tests_js/test_017_main_lifecycle.py::test_upstream_unavailable_worker_message_shows_retryable_banner
  * @tests tests_js/test_017_main_lifecycle.py::test_public_page_skips_authenticated_lifecycle
  * @matrix connectivity service-worker : controller-replacement state-publication version
+ * @matrix request-errors service-worker : upstream-unavailable validation
  * @pairs service-worker:registration startup:interaction-ready
  */
 function startServiceWorker() {
@@ -493,6 +496,7 @@ function initialize() {
 	if (window.__INITIALIZED__) return;
 	window.__INITIALIZED__ = true;
 	setTestMode();
+	installUpstreamUnavailableBanner();
 	const mode = pageMode();
 	// Registration is fire-and-forget, but the controller/cache boundary is
 	// foundational infrastructure. Establish it before view startup instead of

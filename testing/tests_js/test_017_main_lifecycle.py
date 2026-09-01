@@ -28,6 +28,7 @@ const windowListeners = new Map();
 const analyticsCalls = [];
 const authenticatedCalls = [];
 const capturedErrors = [];
+const upstreamMessages = [];
 let viewElement = null;
 let focused = true;
 let pageMode = "production";
@@ -56,10 +57,18 @@ const connectivity = {{
 }};
 const connectivityMessage = (state) => ({{
   protocol: "lagniappe-browser",
-  protocol_version: 3,
+  protocol_version: 4,
   type: "connectivity-state",
   state: {{ ...state }},
 }});
+const BROWSER_PROTOCOL_ID = "lagniappe-browser";
+const BROWSER_PROTOCOL_VERSION = 4;
+const WORKER_MESSAGES = {{
+  CONNECTIVITY: "connectivity-state",
+  UPSTREAM_UNAVAILABLE: "upstream-unavailable",
+}};
+const validateUpstreamUnavailableState = (state) =>
+  state?.status === 503 && state?.method === "GET";
 const parseServiceWorkerMessage = (data) => data;
 
 const serviceWorker = {{
@@ -85,6 +94,8 @@ const context = {{
   clearTimeout,
   connectivity,
   connectivityMessage,
+  BROWSER_PROTOCOL_ID,
+  BROWSER_PROTOCOL_VERSION,
   configureSentry() {{}},
   CustomEvent: class {{
     constructor(type, options = {{}}) {{
@@ -110,6 +121,17 @@ const context = {{
   }},
   fetchCalls,
   initializeLogoutForms() {{ authenticatedCalls.push("logout"); }},
+  installUpstreamUnavailableBanner() {{
+    serviceWorker.addEventListener("message", (event) => {{
+      const data = event.data;
+      if (data?.protocol === BROWSER_PROTOCOL_ID &&
+          Number(data.protocol_version) === BROWSER_PROTOCOL_VERSION &&
+          data.type === WORKER_MESSAGES.UPSTREAM_UNAVAILABLE &&
+          validateUpstreamUnavailableState(data.state)) {{
+        context.receiveUpstreamUnavailableMessage(data);
+      }}
+    }});
+  }},
   isSkippedViewTransitionError() {{ return false; }},
   isTransientNetworkError(error) {{ return error?.message === "Failed to fetch"; }},
   navigator: {{
@@ -117,12 +139,21 @@ const context = {{
     serviceWorker,
   }},
   parseServiceWorkerMessage,
+  receiveUpstreamUnavailable(state, options) {{
+    upstreamMessages.push({{ state, options }});
+  }},
+  receiveUpstreamUnavailableMessage(data) {{
+    upstreamMessages.push({{ data }});
+  }},
   requestAnimationFrame(callback) {{ return setTimeout(callback, 0); }},
   setTimeout,
   syncCalls,
   documentListeners,
   serviceWorkerListeners,
   serviceWorkerRegistrations,
+  upstreamMessages,
+  validateUpstreamUnavailableState,
+  WORKER_MESSAGES,
   capturedErrors,
   updateUserData() {{ authenticatedCalls.push("user"); }},
   window: {{
@@ -183,6 +214,28 @@ source = source.replaceAll(
     captureNetworkError: globalThis.captureNetworkError,
     isSkippedViewTransitionError: globalThis.isSkippedViewTransitionError,
     isTransientNetworkError: globalThis.isTransientNetworkError,
+  }})`,
+);
+source = source.replaceAll(
+  'import("./shared/request")',
+  "Promise.resolve({{ request: {{ get: async () => ({{ ok: true }}) }} }})",
+);
+source = source.replaceAll(
+  'import("./shared/upstreamUnavailable")',
+  `Promise.resolve({{
+    installUpstreamUnavailableBanner: globalThis.installUpstreamUnavailableBanner,
+    receiveUpstreamUnavailable: globalThis.receiveUpstreamUnavailable,
+    receiveUpstreamUnavailableMessage: globalThis.receiveUpstreamUnavailableMessage,
+  }})`,
+);
+source = source.replace(
+  `import(
+\t\t\t"./shared/upstreamUnavailable"
+\t\t)`,
+  `Promise.resolve({{
+    installUpstreamUnavailableBanner: globalThis.installUpstreamUnavailableBanner,
+    receiveUpstreamUnavailable: globalThis.receiveUpstreamUnavailable,
+    receiveUpstreamUnavailableMessage: globalThis.receiveUpstreamUnavailableMessage,
   }})`,
 );
 
@@ -546,11 +599,56 @@ const replacement = controllerMessages.find(({ owner }) => owner === "second");
 if (!replacement) throw new Error("Replacement controller did not receive state");
 const { message } = replacement;
 if (message.protocol !== "lagniappe-browser" ||
-    message.protocol_version !== 3 ||
+    message.protocol_version !== 4 ||
     message.type !== "connectivity-state" ||
     message.state.controller !== "controlled" ||
     message.state.visibility !== "visible") {
   throw new Error(`Replacement state was malformed: ${JSON.stringify(message)}`);
+}
+""",
+    )
+
+
+# @matrix browser-protocol request-errors service-worker : banner client-message upstream-unavailable validation retry
+def test_upstream_unavailable_worker_message_shows_retryable_banner(run_node):
+    run_main_check(
+        run_node,
+        """
+initialize();
+await flushPaint();
+const receive = serviceWorkerListeners.get("message");
+if (!receive) throw new Error("Service-worker message listener was not registered");
+const state = {
+  status: 503,
+  method: "GET",
+  route_class: "pages",
+  server: "Google Frontend",
+  trace_header_present: true,
+  timestamp: "2026-09-01T12:00:00.000Z",
+  online: true,
+  service_worker: "controlled",
+  stale: false,
+  outcome_uncertain: false,
+  retry_outcome: "service_worker",
+};
+await receive({ data: {
+  protocol: "lagniappe-browser",
+  protocol_version: 4,
+  type: "upstream-unavailable",
+  state,
+} });
+if (upstreamMessages.length !== 1 ||
+    upstreamMessages[0].data.state !== state) {
+  throw new Error(`Valid upstream message was not surfaced: ${JSON.stringify(upstreamMessages)}`);
+}
+await receive({ data: {
+  protocol: "lagniappe-browser",
+  protocol_version: 3,
+  type: "upstream-unavailable",
+  state,
+} });
+if (upstreamMessages.length !== 1) {
+  throw new Error("An obsolete upstream message was accepted");
 }
 """,
     )
@@ -617,7 +715,7 @@ if (
 }
 if (
   serviceWorkerRegistrations.join(",") !== "/sw.js" ||
-  [...serviceWorkerListeners.keys()].join(",") !== "controllerchange"
+  [...serviceWorkerListeners.keys()].sort().join(",") !== "controllerchange,message"
 ) {
   throw new Error("Public startup did not install foundational service-worker infrastructure");
 }

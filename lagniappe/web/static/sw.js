@@ -1,143 +1,149 @@
 // biome-ignore lint/correctness/noUnusedVariables: build input replaced with the release build ID
-const SW_VERSION = "bc5f66ff";
+const SW_VERSION = "b10d8a3a";
 const CACHE = `static-cache`;
 const RESPONSE_CACHE = `response-cache`;
 const PRECACHE_URLS = [
-	"/chunks/activity.js?v=bc5f66ff",
-	"/chunks/addImage.js?v=bc5f66ff",
-	"/chunks/addLink.js?v=bc5f66ff",
-	"/chunks/addYouTube.js?v=bc5f66ff",
-	"/chunks/administrators.js?v=bc5f66ff",
-	"/chunks/aiModels.js?v=bc5f66ff",
-	"/chunks/analytics.js?v=bc5f66ff",
-	"/chunks/base.js?v=bc5f66ff",
-	"/chunks/base2.js?v=bc5f66ff",
-	"/chunks/baseElement.js?v=bc5f66ff",
-	"/chunks/baseForm.js?v=bc5f66ff",
-	"/chunks/baseList.js?v=bc5f66ff",
-	"/chunks/baseUpload.js?v=bc5f66ff",
-	"/chunks/bookmark.js?v=bc5f66ff",
-	"/chunks/builder.js?v=bc5f66ff",
-	"/chunks/buttons.js?v=bc5f66ff",
-	"/chunks/category.js?v=bc5f66ff",
-	"/chunks/checkbox.js?v=bc5f66ff",
-	"/chunks/collaborative.js?v=bc5f66ff",
-	"/chunks/columns.js?v=bc5f66ff",
-	"/chunks/combobox.js?v=bc5f66ff",
-	"/chunks/connectivity.js?v=bc5f66ff",
-	"/chunks/core-foundation.js?v=bc5f66ff",
-	"/chunks/deferredOperations.js?v=bc5f66ff",
-	"/chunks/deployment.js?v=bc5f66ff",
-	"/chunks/documentHistory.js?v=bc5f66ff",
-	"/chunks/documentSettings.js?v=bc5f66ff",
-	"/chunks/dropdown.js?v=bc5f66ff",
-	"/chunks/editWatcher.js?v=bc5f66ff",
-	"/chunks/entity-foundation.js?v=bc5f66ff",
-	"/chunks/entityMenu.js?v=bc5f66ff",
-	"/chunks/facets.js?v=bc5f66ff",
-	"/chunks/fileInfo.js?v=bc5f66ff",
-	"/chunks/filePdfPreview.js?v=bc5f66ff",
-	"/chunks/filters.js?v=bc5f66ff",
-	"/chunks/form.js?v=bc5f66ff",
-	"/chunks/form2.js?v=bc5f66ff",
-	"/chunks/formatting.js?v=bc5f66ff",
-	"/chunks/foundation.js?v=bc5f66ff",
-	"/chunks/generateText.js?v=bc5f66ff",
-	"/chunks/html.js?v=bc5f66ff",
-	"/chunks/html2.js?v=bc5f66ff",
-	"/chunks/icons.js?v=bc5f66ff",
-	"/chunks/image.js?v=bc5f66ff",
-	"/chunks/index-foundation.js?v=bc5f66ff",
-	"/chunks/ingress.js?v=bc5f66ff",
-	"/chunks/ingressUpload.js?v=bc5f66ff",
-	"/chunks/input.js?v=bc5f66ff",
-	"/chunks/installationAccess.js?v=bc5f66ff",
-	"/chunks/link.js?v=bc5f66ff",
-	"/chunks/lists.js?v=bc5f66ff",
-	"/chunks/loader.js?v=bc5f66ff",
-	"/chunks/location.js?v=bc5f66ff",
-	"/chunks/logout.js?v=bc5f66ff",
-	"/chunks/maintenance.js?v=bc5f66ff",
-	"/chunks/menuItems.js?v=bc5f66ff",
-	"/chunks/messageComposer.js?v=bc5f66ff",
-	"/chunks/mobileTableControls.js?v=bc5f66ff",
-	"/chunks/modal.js?v=bc5f66ff",
-	"/chunks/modelTasks.js?v=bc5f66ff",
-	"/chunks/note.js?v=bc5f66ff",
-	"/chunks/notifications.js?v=bc5f66ff",
-	"/chunks/offline.js?v=bc5f66ff",
-	"/chunks/offlineQueue.js?v=bc5f66ff",
-	"/chunks/offlineReplay.js?v=bc5f66ff",
-	"/chunks/offlineWork.js?v=bc5f66ff",
-	"/chunks/options.js?v=bc5f66ff",
-	"/chunks/pageInfo.js?v=bc5f66ff",
-	"/chunks/pagePermissions.js?v=bc5f66ff",
-	"/chunks/pagePhoto.js?v=bc5f66ff",
-	"/chunks/pageTaskList.js?v=bc5f66ff",
-	"/chunks/pinVersion.js?v=bc5f66ff",
-	"/chunks/polling.js?v=bc5f66ff",
-	"/chunks/primitives.js?v=bc5f66ff",
-	"/chunks/projectInfo.js?v=bc5f66ff",
-	"/chunks/providers.js?v=bc5f66ff",
-	"/chunks/queryLifecycle.js?v=bc5f66ff",
-	"/chunks/radio.js?v=bc5f66ff",
-	"/chunks/remote.js?v=bc5f66ff",
-	"/chunks/results.js?v=bc5f66ff",
-	"/chunks/search.js?v=bc5f66ff",
-	"/chunks/sectionToggle.js?v=bc5f66ff",
-	"/chunks/sections.js?v=bc5f66ff",
-	"/chunks/select.js?v=bc5f66ff",
-	"/chunks/select2.js?v=bc5f66ff",
-	"/chunks/setColor.js?v=bc5f66ff",
-	"/chunks/setFontFamily.js?v=bc5f66ff",
-	"/chunks/setImage.js?v=bc5f66ff",
-	"/chunks/signature.js?v=bc5f66ff",
-	"/chunks/siteSettings.js?v=bc5f66ff",
-	"/chunks/status.js?v=bc5f66ff",
-	"/chunks/status2.js?v=bc5f66ff",
-	"/chunks/storage.js?v=bc5f66ff",
-	"/chunks/styles.js?v=bc5f66ff",
-	"/chunks/submission.js?v=bc5f66ff",
-	"/chunks/submitter.js?v=bc5f66ff",
-	"/chunks/sync.js?v=bc5f66ff",
-	"/chunks/table.js?v=bc5f66ff",
-	"/chunks/tableEditor.js?v=bc5f66ff",
-	"/chunks/tableSorting.js?v=bc5f66ff",
-	"/chunks/tableVisibility.js?v=bc5f66ff",
-	"/chunks/tables.js?v=bc5f66ff",
-	"/chunks/taskForm.js?v=bc5f66ff",
-	"/chunks/taskSettings.js?v=bc5f66ff",
-	"/chunks/tasks.js?v=bc5f66ff",
-	"/chunks/textarea.js?v=bc5f66ff",
-	"/chunks/todo.js?v=bc5f66ff",
-	"/chunks/toolbar.js?v=bc5f66ff",
-	"/chunks/toolbarButtons.js?v=bc5f66ff",
-	"/chunks/tools.js?v=bc5f66ff",
-	"/chunks/uploadFile.js?v=bc5f66ff",
-	"/chunks/user.js?v=bc5f66ff",
-	"/chunks/user2.js?v=bc5f66ff",
-	"/chunks/views/admin.js?v=bc5f66ff",
-	"/chunks/views/analytics.js?v=bc5f66ff",
-	"/chunks/views/builder.js?v=bc5f66ff",
-	"/chunks/views/file.js?v=bc5f66ff",
-	"/chunks/views/home.js?v=bc5f66ff",
-	"/chunks/views/index.js?v=bc5f66ff",
-	"/chunks/views/manual.js?v=bc5f66ff",
-	"/chunks/views/messages.js?v=bc5f66ff",
-	"/chunks/views/page.js?v=bc5f66ff",
-	"/chunks/views/project.js?v=bc5f66ff",
-	"/chunks/views/public.js?v=bc5f66ff",
-	"/chunks/views/report.js?v=bc5f66ff",
-	"/chunks/views/results.js?v=bc5f66ff",
-	"/chunks/views/user.js?v=bc5f66ff",
-	"/chunks/visibility.js?v=bc5f66ff"
+	"/chunks/activity.js?v=b10d8a3a",
+	"/chunks/addImage.js?v=b10d8a3a",
+	"/chunks/addLink.js?v=b10d8a3a",
+	"/chunks/addYouTube.js?v=b10d8a3a",
+	"/chunks/administrators.js?v=b10d8a3a",
+	"/chunks/aiModels.js?v=b10d8a3a",
+	"/chunks/analytics.js?v=b10d8a3a",
+	"/chunks/base.js?v=b10d8a3a",
+	"/chunks/base2.js?v=b10d8a3a",
+	"/chunks/baseElement.js?v=b10d8a3a",
+	"/chunks/baseForm.js?v=b10d8a3a",
+	"/chunks/baseList.js?v=b10d8a3a",
+	"/chunks/baseUpload.js?v=b10d8a3a",
+	"/chunks/bookmark.js?v=b10d8a3a",
+	"/chunks/builder.js?v=b10d8a3a",
+	"/chunks/buttons.js?v=b10d8a3a",
+	"/chunks/category.js?v=b10d8a3a",
+	"/chunks/checkbox.js?v=b10d8a3a",
+	"/chunks/collaborative.js?v=b10d8a3a",
+	"/chunks/columns.js?v=b10d8a3a",
+	"/chunks/combobox.js?v=b10d8a3a",
+	"/chunks/connectivity.js?v=b10d8a3a",
+	"/chunks/core-foundation.js?v=b10d8a3a",
+	"/chunks/deferredOperations.js?v=b10d8a3a",
+	"/chunks/deployment.js?v=b10d8a3a",
+	"/chunks/documentHistory.js?v=b10d8a3a",
+	"/chunks/documentSettings.js?v=b10d8a3a",
+	"/chunks/dropdown.js?v=b10d8a3a",
+	"/chunks/editWatcher.js?v=b10d8a3a",
+	"/chunks/entity-foundation.js?v=b10d8a3a",
+	"/chunks/entityMenu.js?v=b10d8a3a",
+	"/chunks/facets.js?v=b10d8a3a",
+	"/chunks/fileInfo.js?v=b10d8a3a",
+	"/chunks/filePdfPreview.js?v=b10d8a3a",
+	"/chunks/filters.js?v=b10d8a3a",
+	"/chunks/form.js?v=b10d8a3a",
+	"/chunks/form2.js?v=b10d8a3a",
+	"/chunks/formatting.js?v=b10d8a3a",
+	"/chunks/foundation.js?v=b10d8a3a",
+	"/chunks/generateText.js?v=b10d8a3a",
+	"/chunks/html.js?v=b10d8a3a",
+	"/chunks/html2.js?v=b10d8a3a",
+	"/chunks/icons.js?v=b10d8a3a",
+	"/chunks/image.js?v=b10d8a3a",
+	"/chunks/index-foundation.js?v=b10d8a3a",
+	"/chunks/ingress.js?v=b10d8a3a",
+	"/chunks/ingressUpload.js?v=b10d8a3a",
+	"/chunks/input.js?v=b10d8a3a",
+	"/chunks/installationAccess.js?v=b10d8a3a",
+	"/chunks/link.js?v=b10d8a3a",
+	"/chunks/lists.js?v=b10d8a3a",
+	"/chunks/loader.js?v=b10d8a3a",
+	"/chunks/location.js?v=b10d8a3a",
+	"/chunks/logout.js?v=b10d8a3a",
+	"/chunks/maintenance.js?v=b10d8a3a",
+	"/chunks/menuItems.js?v=b10d8a3a",
+	"/chunks/messageComposer.js?v=b10d8a3a",
+	"/chunks/mobileTableControls.js?v=b10d8a3a",
+	"/chunks/modal.js?v=b10d8a3a",
+	"/chunks/modelTasks.js?v=b10d8a3a",
+	"/chunks/note.js?v=b10d8a3a",
+	"/chunks/notifications.js?v=b10d8a3a",
+	"/chunks/offline.js?v=b10d8a3a",
+	"/chunks/offlineQueue.js?v=b10d8a3a",
+	"/chunks/offlineReplay.js?v=b10d8a3a",
+	"/chunks/offlineWork.js?v=b10d8a3a",
+	"/chunks/options.js?v=b10d8a3a",
+	"/chunks/pageInfo.js?v=b10d8a3a",
+	"/chunks/pagePermissions.js?v=b10d8a3a",
+	"/chunks/pagePhoto.js?v=b10d8a3a",
+	"/chunks/pageTaskList.js?v=b10d8a3a",
+	"/chunks/pinVersion.js?v=b10d8a3a",
+	"/chunks/polling.js?v=b10d8a3a",
+	"/chunks/primitives.js?v=b10d8a3a",
+	"/chunks/projectInfo.js?v=b10d8a3a",
+	"/chunks/providers.js?v=b10d8a3a",
+	"/chunks/queryLifecycle.js?v=b10d8a3a",
+	"/chunks/radio.js?v=b10d8a3a",
+	"/chunks/remote.js?v=b10d8a3a",
+	"/chunks/results.js?v=b10d8a3a",
+	"/chunks/search.js?v=b10d8a3a",
+	"/chunks/sectionToggle.js?v=b10d8a3a",
+	"/chunks/sections.js?v=b10d8a3a",
+	"/chunks/select.js?v=b10d8a3a",
+	"/chunks/select2.js?v=b10d8a3a",
+	"/chunks/setColor.js?v=b10d8a3a",
+	"/chunks/setFontFamily.js?v=b10d8a3a",
+	"/chunks/setImage.js?v=b10d8a3a",
+	"/chunks/signature.js?v=b10d8a3a",
+	"/chunks/siteSettings.js?v=b10d8a3a",
+	"/chunks/status.js?v=b10d8a3a",
+	"/chunks/status2.js?v=b10d8a3a",
+	"/chunks/storage.js?v=b10d8a3a",
+	"/chunks/styles.js?v=b10d8a3a",
+	"/chunks/submission.js?v=b10d8a3a",
+	"/chunks/submitter.js?v=b10d8a3a",
+	"/chunks/sync.js?v=b10d8a3a",
+	"/chunks/table.js?v=b10d8a3a",
+	"/chunks/tableEditor.js?v=b10d8a3a",
+	"/chunks/tableSorting.js?v=b10d8a3a",
+	"/chunks/tableVisibility.js?v=b10d8a3a",
+	"/chunks/tables.js?v=b10d8a3a",
+	"/chunks/taskForm.js?v=b10d8a3a",
+	"/chunks/taskSettings.js?v=b10d8a3a",
+	"/chunks/tasks.js?v=b10d8a3a",
+	"/chunks/textarea.js?v=b10d8a3a",
+	"/chunks/todo.js?v=b10d8a3a",
+	"/chunks/toolbar.js?v=b10d8a3a",
+	"/chunks/toolbarButtons.js?v=b10d8a3a",
+	"/chunks/tools.js?v=b10d8a3a",
+	"/chunks/uploadFile.js?v=b10d8a3a",
+	"/chunks/upstreamUnavailable.js?v=b10d8a3a",
+	"/chunks/user.js?v=b10d8a3a",
+	"/chunks/user2.js?v=b10d8a3a",
+	"/chunks/views/admin.js?v=b10d8a3a",
+	"/chunks/views/analytics.js?v=b10d8a3a",
+	"/chunks/views/builder.js?v=b10d8a3a",
+	"/chunks/views/file.js?v=b10d8a3a",
+	"/chunks/views/home.js?v=b10d8a3a",
+	"/chunks/views/index.js?v=b10d8a3a",
+	"/chunks/views/manual.js?v=b10d8a3a",
+	"/chunks/views/messages.js?v=b10d8a3a",
+	"/chunks/views/page.js?v=b10d8a3a",
+	"/chunks/views/project.js?v=b10d8a3a",
+	"/chunks/views/public.js?v=b10d8a3a",
+	"/chunks/views/report.js?v=b10d8a3a",
+	"/chunks/views/results.js?v=b10d8a3a",
+	"/chunks/views/user.js?v=b10d8a3a",
+	"/chunks/visibility.js?v=b10d8a3a"
 ];
 const UPDATED_HEADER = "X-Lagniappe-Updated";
+const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
+const UPSTREAM_STATUS_HEADER = "X-Lagniappe-Upstream-Status";
+const STALE_CACHE_HEADER = "X-Lagniappe-Stale-Cache";
+const UPSTREAM_STATUSES = new Set([500, 502, 503, 504]);
 const BROWSER_PROTOCOL = {
 	"id": "lagniappe-browser",
-	"version": 3,
+	"version": 4,
 	"messages": {
-		"CONNECTIVITY": "connectivity-state"
+		"CONNECTIVITY": "connectivity-state",
+		"UPSTREAM_UNAVAILABLE": "upstream-unavailable"
 	},
 	"events": {},
 	"connectivity": {
@@ -503,6 +509,204 @@ function receiveConnectivityMessage(data) {
 	return true;
 }
 
+/**
+ * @testable true
+ * @tests tests_js/test_008_service_worker.py::test_worker_classifies_only_unmarked_upstream_html_failures
+ * @matrix request-errors service-worker : application-error-marker classification upstream-unavailable
+ */
+function isUpstreamUnavailableResponse(response) {
+	return Boolean(
+		response &&
+			UPSTREAM_STATUSES.has(response.status) &&
+			response.headers.get("content-type")?.includes("text/html") &&
+			!response.headers.get("X-Lagniappe-Error"),
+	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::notifyUpstreamUnavailable
+ * @reason route privacy is asserted through the controlled-client message
+ */
+function upstreamRouteClass(pathname) {
+	if (pathname === "/") return "root";
+	const segment = pathname.split("/").filter(Boolean)[0] || "root";
+	if (segment === "l") return "internal";
+	const allowed = new Set([
+		"admin",
+		"analytics",
+		"categories",
+		"files",
+		"filters",
+		"forms",
+		"home",
+		"manual",
+		"messages",
+		"pages",
+		"process",
+		"projects",
+		"public",
+		"reports",
+		"tasks",
+		"testing",
+		"users",
+	]);
+	return allowed.has(segment) ? segment : "other";
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::notifyUpstreamUnavailable
+ * @covered-by src/script/sw.template.mjs::upstreamHeaders
+ * @reason server sanitization is asserted through client messages and internal headers
+ */
+function boundedServer(response) {
+	return String(response.headers.get("Server") || "")
+		.replace(/[^\x20-\x7E]/g, "")
+		.slice(0, 128);
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_008_service_worker.py::test_upstream_failure_notifies_controlled_clients_with_bounded_state
+ * @matrix browser-protocol request-errors service-worker : client-message privacy upstream-unavailable
+ */
+async function notifyUpstreamUnavailable(
+	request,
+	response,
+	{ stale = false } = {},
+) {
+	const pathname = new URL(request.url).pathname;
+	const method = String(request.method || "GET").toUpperCase();
+	const message = {
+		protocol: BROWSER_PROTOCOL.id,
+		protocol_version: BROWSER_PROTOCOL.version,
+		type: BROWSER_PROTOCOL.messages.UPSTREAM_UNAVAILABLE,
+		state: {
+			status: response.status,
+			method,
+			route_class: upstreamRouteClass(pathname),
+			server: boundedServer(response),
+			trace_header_present: Boolean(
+				response.headers.get("X-Cloud-Trace-Context") ||
+					response.headers.get("Traceparent"),
+			),
+			timestamp: new Date().toISOString(),
+			online: _connectivity.browser !== "offline",
+			service_worker: "controlled",
+			stale: Boolean(stale),
+			outcome_uncertain: method !== "GET",
+			retry_outcome: "service_worker",
+		},
+	};
+	const clients = await self.clients.matchAll({
+		type: "window",
+		includeUncontrolled: false,
+	});
+	for (const client of clients) client.postMessage?.(message);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::markedStaleResponse
+ * @covered-by src/script/sw.template.mjs::brandedUpstreamResponse
+ * @reason internal markers are asserted through stale and branded response owners
+ */
+function upstreamHeaders(
+	response,
+	{ stale = false, originalResponse = response } = {},
+) {
+	const headers = new Headers(response?.headers || {});
+	headers.set(UPSTREAM_UNAVAILABLE_HEADER, "true");
+	headers.set(
+		UPSTREAM_STATUS_HEADER,
+		String(originalResponse?.status || response?.status || 503),
+	);
+	const server = boundedServer(originalResponse);
+	if (server) headers.set("Server", server);
+	headers.set(STALE_CACHE_HEADER, stale ? "true" : "false");
+	headers.set("Cache-Control", "no-store");
+	headers.set("Retry-After", "5");
+	return headers;
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_008_service_worker.py::test_upstream_failure_uses_marked_stale_cache_without_caching_5xx
+ * @matrix cache request-errors service-worker : stale-cache upstream-unavailable
+ */
+function markedStaleResponse(cached, upstream) {
+	return new Response(cached.body, {
+		status: cached.status,
+		statusText: cached.statusText,
+		headers: upstreamHeaders(cached, {
+			stale: true,
+			originalResponse: upstream,
+		}),
+	});
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_008_service_worker.py::test_upstream_failure_without_cache_returns_branded_retryable_503
+ * @tests tests_js/test_008_service_worker.py::test_mutation_upstream_failure_returns_uncertain_json_without_replay
+ * @matrix request-errors service-worker : branded-response mutation no-replay retry upstream-unavailable
+ */
+function brandedUpstreamResponse(request, upstream) {
+	const headers = upstreamHeaders(upstream);
+	if (request.mode === "navigate") {
+		headers.set("Content-Type", "text/html; charset=utf-8");
+		return new Response(
+			`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lagniappe temporarily unavailable</title><style>body{font:16px system-ui,sans-serif;margin:0;background:#f8fafc;color:#0f172a}main{max-width:42rem;margin:12vh auto;padding:2rem}section{background:white;border:1px solid #cbd5e1;border-radius:.75rem;padding:2rem;box-shadow:0 8px 24px #0f172a14}a{display:inline-block;margin-top:1rem;padding:.65rem 1rem;border-radius:.4rem;background:#334155;color:white;text-decoration:none;font-weight:650}</style><main><section><h1>Lagniappe is temporarily unavailable</h1><p>The application server could not complete this request. Your saved work remains safe. Wait a moment, then try again.</p><a href="">Try again</a></section></main></html>`,
+			{ status: 503, statusText: "Service Unavailable", headers },
+		);
+	}
+
+	const applicationRequest =
+		request.headers.get("X-Lagniappe-Request") === "true" ||
+		request.method !== "GET";
+	if (applicationRequest) {
+		headers.set("Content-Type", "application/json");
+		return new Response(
+			JSON.stringify({
+				ok: false,
+				error: "The application server is temporarily unavailable.",
+				code: "upstream_instance_unavailable",
+				upstreamUnavailable: true,
+				stale: false,
+				retryable: request.method === "GET",
+				outcomeUncertain: request.method !== "GET",
+			}),
+			{ status: 503, statusText: "Service Unavailable", headers },
+		);
+	}
+
+	headers.set("Content-Type", "text/plain; charset=utf-8");
+	return new Response(
+		"Lagniappe is temporarily unavailable. Try again shortly.",
+		{
+			status: 503,
+			statusText: "Service Unavailable",
+			headers,
+		},
+	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::handleCacheable
+ * @covered-by src/script/sw.template.mjs::handleRequest
+ * @reason response selection and notification are exercised through fetch strategy owners
+ */
+function handleUpstreamUnavailable(event, request, response, cached = null) {
+	event.waitUntil(
+		notifyUpstreamUnavailable(request, response, { stale: Boolean(cached) }),
+	);
+	return cached
+		? markedStaleResponse(cached, response)
+		: brandedUpstreamResponse(request, response);
+}
+
 self.addEventListener("message", (event) => {
 	receiveConnectivityMessage(event.data);
 });
@@ -577,6 +781,9 @@ async function handleStatic(event) {
 
 	try {
 		const response = await fetch(event.request);
+		if (isUpstreamUnavailableResponse(response)) {
+			return handleUpstreamUnavailable(event, event.request, response);
+		}
 		if (responsePreventsStorage(response)) {
 			event.waitUntil(cache.delete(event.request, { ignoreVary: true }));
 		} else if (response.ok) {
@@ -615,7 +822,12 @@ async function unavailableResponse(request) {
 
 	if (request.headers.get("X-Lagniappe-Request") === "true") {
 		return new Response(
-			JSON.stringify({ ok: false, error: "You are offline" }),
+			JSON.stringify({
+				ok: false,
+				error: "You are offline",
+				retryable: false,
+				outcomeUncertain: true,
+			}),
 			{
 				status: 503,
 				headers: { "Content-Type": "application/json" },
@@ -678,6 +890,9 @@ async function handleNetworkOnlyGet(event) {
 	const cache = await caches.open(RESPONSE_CACHE);
 	try {
 		const response = await fetch(request);
+		if (isUpstreamUnavailableResponse(response)) {
+			return handleUpstreamUnavailable(event, request, response);
+		}
 		await discardCachedResponse(cache, request);
 		event.waitUntil(checkForCacheInvalidation(response));
 		return response;
@@ -723,6 +938,14 @@ async function handleCacheable(event, pathname) {
 	const networkPromise = (async () => {
 		try {
 			let response = await fetch(fetchRequest);
+			if (isUpstreamUnavailableResponse(response)) {
+				return handleUpstreamUnavailable(
+					event,
+					request,
+					response,
+					cachedResponse,
+				);
+			}
 			let invalidationResult = { invalidated: false };
 			let uncacheableResponse = await handleUncacheableResponse(
 				event,
@@ -751,6 +974,14 @@ async function handleCacheable(event, pathname) {
 				}
 				if (shouldFetchFresh) {
 					response = await fetch(networkRequest(request, { cache: "reload" }));
+					if (isUpstreamUnavailableResponse(response)) {
+						return handleUpstreamUnavailable(
+							event,
+							request,
+							response,
+							cachedResponse,
+						);
+					}
 					uncacheableResponse = await handleUncacheableResponse(
 						event,
 						cache,
@@ -810,6 +1041,9 @@ async function handleRequest(event, pathname) {
 	const request = event.request;
 	try {
 		const response = await fetch(request);
+		if (isUpstreamUnavailableResponse(response)) {
+			return handleUpstreamUnavailable(event, request, response);
+		}
 
 		if (pathname !== "/l/validate-user" && responseInvalidatesCache(response)) {
 			event.waitUntil(checkForCacheInvalidation(response));

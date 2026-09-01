@@ -58,6 +58,20 @@
   <body class="{{ styles.layout.body }}">
     <input id="token" type="hidden" value="{{ csrf_token() }}" />
     {{ navbar(public=public_page|default(false)) }}
+    <section data-role="upstream-unavailable"
+             data-visible="false"
+             data-stale="false"
+             data-outcome-uncertain="false"
+             data-build="{{ CONFIG.BUILD_ID }}"
+             data-release="{{ CONFIG.VERSION }}"
+             aria-hidden="true"
+             aria-live="polite"
+             class="mx-auto mt-3 flex max-w-7xl flex-col gap-2 rounded-md border border-note-dark bg-note-bg px-4 py-3 text-sm text-slate-900 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <span data-role="upstream-unavailable-message">The server is temporarily unavailable. Your current page and unsaved work are unchanged.</span>
+      <button type="button"
+              data-role="upstream-unavailable-retry"
+              class="shrink-0 rounded-md border border-note-dark bg-white px-3 py-1.5 font-semibold text-slate-900 disabled:opacity-50">Try again</button>
+    </section>
     <main class="{{ styles.layout.main }}">
 
       {% block content %}

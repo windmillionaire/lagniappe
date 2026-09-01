@@ -95,8 +95,7 @@ def test_setup_error_classification_and_retry_contract():
     )
     assert isinstance(maps_terms, ProviderTermsNotAccepted)
     assert str(maps_terms) == (
-        "Google Maps Platform terms have not been accepted for "
-        "'installer@example.com'."
+        "Google Maps Platform terms have not been accepted for 'installer@example.com'."
     )
     assert "https://console.developers.google.com/terms/maps" in (
         maps_terms.repair_action
@@ -116,13 +115,16 @@ def test_setup_error_classification_and_retry_contract():
             raise StatusError(503)
         return "ready"
 
-    assert retry_provider_call(
-        eventually_available,
-        description="probe",
-        attempts=3,
-        delays=(1, 2),
-        sleep=delays.append,
-    ) == "ready"
+    assert (
+        retry_provider_call(
+            eventually_available,
+            description="probe",
+            attempts=3,
+            delays=(1, 2),
+            sleep=delays.append,
+        )
+        == "ready"
+    )
     assert delays == [1, 2]
 
     with pytest.raises(ProviderPermissionDenied):
@@ -363,9 +365,7 @@ def test_security_cli_configures_and_optionally_deploys_redis_tls(monkeypatch):
     monkeypatch.setattr(
         redis_setup, "_enable_redis_tls", lambda: events.append("enable") or True
     )
-    monkeypatch.setattr(
-        utils, "deploy_to_app_engine", lambda: events.append("deploy")
-    )
+    monkeypatch.setattr(utils, "deploy_to_app_engine", lambda: events.append("deploy"))
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
     assert security.configure_security() == 0
@@ -518,7 +518,11 @@ def test_development_setup_directs_native_windows_to_wsl(monkeypatch, capsys):
 
 # @matrix setup : development node-version
 def test_development_setup_validates_node_range():
-    from installer.development import APP_ROOT, NODE_ENGINE_RANGE, node_version_supported
+    from installer.development import (
+        APP_ROOT,
+        NODE_ENGINE_RANGE,
+        node_version_supported,
+    )
 
     for supported in ("v22.18.0", "22.20.1", "24.11.0", "v26.5.0"):
         assert node_version_supported(supported)
@@ -538,9 +542,7 @@ def test_development_setup_validates_node_range():
 
 
 # @matrix setup : privacy-consent rerun sentry-destination
-def test_error_monitoring_supports_maintainer_or_operator_sentry(
-    monkeypatch, capsys
-):
+def test_error_monitoring_supports_maintainer_or_operator_sentry(monkeypatch, capsys):
     import config
     from installer import optional
 
@@ -666,9 +668,7 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     assert any("token totals," in line for line in output_lines)
     assert "<info>Optional AI Generation Observability</info>" in first_output
     assert "<success>AI generation observability enabled.</success>" in first_output
-    assert prompts == [
-        "\n<info>Enable AI generation observability? [y/N]: </info>"
-    ]
+    assert prompts == ["\n<info>Enable AI generation observability? [y/N]: </info>"]
 
     prompts.clear()
     monkeypatch.setattr(
@@ -685,9 +685,7 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     assert "<success>Existing AI observability choice preserved.</success>" in (
         preserved_output
     )
-    assert prompts == [
-        "<info>Keep this AI observability choice? [Y/n]: </info>"
-    ]
+    assert prompts == ["<info>Keep this AI observability choice? [Y/n]: </info>"]
 
 
 # @matrix setup : google-oauth optional rerun settings-save
@@ -741,9 +739,7 @@ def test_ai_setup_mode_configures_observability(monkeypatch):
             "'redis://default:p%40ss%3Aword@"
             "redis-11826.c238.us-central1-2.gce.redns.redis-cloud.com:11826'",
             {
-                "host": (
-                    "redis-11826.c238.us-central1-2.gce.redns.redis-cloud.com"
-                ),
+                "host": ("redis-11826.c238.us-central1-2.gce.redns.redis-cloud.com"),
                 "port": 11826,
                 "password": "p@ss:word",
             },
@@ -808,10 +804,7 @@ def test_redis_cli_command_uses_visible_standard_input(monkeypatch, capsys):
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     prompts = []
-    command = (
-        "redis-cli -u "
-        "redis://default:redis-secret@redis-123.redislabs.com:12345"
-    )
+    command = "redis-cli -u redis://default:redis-secret@redis-123.redislabs.com:12345"
     answers = iter(["not a Redis connection", command])
     monkeypatch.setattr(
         "builtins.input",
@@ -1011,9 +1004,7 @@ def test_development_monitoring_rejects_maintainer_sentry(monkeypatch, capsys):
     }
     assert "That is the maintainer DSN" in capsys.readouterr().out
 
-    settings.APP.update(
-        {"CAPTURE_ERRORS": "True", "SENTRY_DSN": constants.SENTRY_DSN}
-    )
+    settings.APP.update({"CAPTURE_ERRORS": "True", "SENTRY_DSN": constants.SENTRY_DSN})
     monkeypatch.setattr("builtins.input", lambda prompt: "")
 
     assert optional.configure_development_error_monitoring()
@@ -1339,9 +1330,7 @@ def test_managed_certificate_reports_permanent_provider_failure(monkeypatch):
     monkeypatch.setitem(
         sys.modules,
         "config",
-        types.SimpleNamespace(
-            SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})
-        ),
+        types.SimpleNamespace(SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})),
     )
     monkeypatch.setattr(
         domain_gcp,
@@ -1359,7 +1348,7 @@ def test_managed_certificate_reports_permanent_provider_failure(monkeypatch):
         lambda project, domain, account=None: {
             "id": domain,
             "name": f"apps/{project}/domainMappings/{domain}",
-            "sslSettings": {"pendingManagedCertificateId": "cert-failed"}
+            "sslSettings": {"pendingManagedCertificateId": "cert-failed"},
         },
     )
     monkeypatch.setattr(
@@ -1387,9 +1376,7 @@ def test_managed_certificate_timeout_keeps_deployment_incomplete(monkeypatch):
     monkeypatch.setitem(
         sys.modules,
         "config",
-        types.SimpleNamespace(
-            SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})
-        ),
+        types.SimpleNamespace(SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})),
     )
     monkeypatch.setattr(
         domain_gcp,
@@ -1407,7 +1394,7 @@ def test_managed_certificate_timeout_keeps_deployment_incomplete(monkeypatch):
         lambda project, domain, account=None: {
             "id": domain,
             "name": f"apps/{project}/domainMappings/{domain}",
-            "sslSettings": {"pendingManagedCertificateId": "cert-pending"}
+            "sslSettings": {"pendingManagedCertificateId": "cert-pending"},
         },
     )
     monkeypatch.setattr(
@@ -1438,9 +1425,7 @@ def test_managed_certificate_reports_missing_domain_mapping(monkeypatch):
     monkeypatch.setitem(
         sys.modules,
         "config",
-        types.SimpleNamespace(
-            SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})
-        ),
+        types.SimpleNamespace(SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})),
     )
     monkeypatch.setattr(
         domain_gcp,
@@ -1573,8 +1558,7 @@ def test_existing_domain_mapping_enables_managed_tls(monkeypatch):
     )
 
     assert (
-        domain_gcp.create_gcp_domain_mapping("app.example.com", sp)
-        == managed_mapping
+        domain_gcp.create_gcp_domain_mapping("app.example.com", sp) == managed_mapping
     )
     assert calls[2][:4] == ["app", "domain-mappings", "update", "app.example.com"]
     assert "--certificate-management=automatic" in calls[2]
@@ -1630,10 +1614,7 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
         types.SimpleNamespace(SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})),
     )
 
-    assert (
-        domain_gcp.create_gcp_domain_mapping("app.example.com", sp)
-        == mapping
-    )
+    assert domain_gcp.create_gcp_domain_mapping("app.example.com", sp) == mapping
     assert domain_calls[0][:4] == [
         "/usr/bin/gcloud",
         "app",
@@ -1660,10 +1641,7 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
         "describe",
     ]
     first_run_call_count = len(domain_calls)
-    assert (
-        domain_gcp.create_gcp_domain_mapping("app.example.com", sp)
-        == mapping
-    )
+    assert domain_gcp.create_gcp_domain_mapping("app.example.com", sp) == mapping
     assert len(domain_calls) == first_run_call_count + 4
     assert not any(
         "create" in command for command in domain_calls[first_run_call_count:]
@@ -1734,8 +1712,7 @@ def test_domain_ownership_instructions_name_selected_gcloud_account(
     assert "signed in to that exact account" in output
     assert "confirm that account is an Owner" in output
     assert prompts == [
-        "Has Google confirmed that installer@example.com owns "
-        "app.example.com? [y/N]: "
+        "Has Google confirmed that installer@example.com owns app.example.com? [y/N]: "
     ]
 
 
@@ -1752,9 +1729,7 @@ def test_cloudflare_token_prompt_explains_dashboard_steps_and_scope(
         lambda prompt: prompts.append(prompt) or "scoped-token-" + ("a" * 20),
     )
 
-    assert cloudflare.get_cloudflare_api_token() == (
-        "scoped-token-" + ("a" * 20)
-    )
+    assert cloudflare.get_cloudflare_api_token() == ("scoped-token-" + ("a" * 20))
 
     output = " ".join(capsys.readouterr().out.split())
     assert cloudflare.CLOUDFLARE_API_TOKEN_URL in output
@@ -1836,8 +1811,7 @@ def test_custom_domain_uses_provider_records_and_dns_only_cloudflare(monkeypatch
         domain,
         "reconcile_cloudflare_dns_records",
         lambda value, selected_zone, token, records: (
-            reconciled.append((value, selected_zone, token, records))
-            or ["record-1"]
+            reconciled.append((value, selected_zone, token, records)) or ["record-1"]
         ),
     )
     oauth_domains = []
@@ -1929,9 +1903,7 @@ def test_custom_domain_supports_manual_dns(monkeypatch, capsys):
     monkeypatch.setattr(
         domain,
         "update_oauth_redirect_uris",
-        lambda value: pytest.fail(
-            "Fresh installation must defer OAuth configuration"
-        ),
+        lambda value: pytest.fail("Fresh installation must defer OAuth configuration"),
     )
     identity_urls = []
     monkeypatch.setattr(
@@ -2049,10 +2021,7 @@ def test_upgrade_repository_handles_clean_status_and_status_failure(monkeypatch)
 
     assert not upgrade._update_repository(failure_spinner)
     assert failure_spinner.fails == ["[X]"]
-    assert any(
-        "Git status failed" in message
-        for message in failure_spinner.messages
-    )
+    assert any("Git status failed" in message for message in failure_spinner.messages)
 
 
 # @matrix setup : branch git-upgrade version-validation
@@ -2318,8 +2287,8 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     utils_module = types.ModuleType("installer.utils")
     deploy_module = types.ModuleType("runner.deploy")
 
-    create_config_module.update_config = (
-        lambda: events.append("update_config") or "2.0.0"
+    create_config_module.update_config = lambda: (
+        events.append("update_config") or "2.0.0"
     )
     create_config_module.verify_application_config = lambda upgrade=False: (
         events.append(("verify_application_config", upgrade))
@@ -2328,15 +2297,9 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
         "deferred-job-reconciler"
     )
     gcloud_module.enable_gcloud_apis = lambda: events.append("provider-apis")
-    gcloud_module.setup_app_engine = lambda: events.append(
-        "app-engine-and-runtime-iam"
-    )
-    gcloud_module.configure_storage_buckets = lambda: events.append(
-        "storage-buckets"
-    )
-    gcloud_module.configure_data_protection = lambda: events.append(
-        "data-protection"
-    )
+    gcloud_module.setup_app_engine = lambda: events.append("app-engine-and-runtime-iam")
+    gcloud_module.configure_storage_buckets = lambda: events.append("storage-buckets")
+    gcloud_module.configure_data_protection = lambda: events.append("data-protection")
     utils_module.deploy_to_app_engine = lambda **kwargs: events.append("deploy")
     deploy_module.verify_runtime_deploy_surface = lambda: events.append(
         "verify-runtime-deploy-surface"
@@ -2529,8 +2492,7 @@ def test_image_restore_uses_loaded_metadata_and_timeouts(monkeypatch, tmp_path):
         "nested/splash.png",
     ]
     assert all(
-        download["timeout"] == image.IMAGE_DOWNLOAD_TIMEOUT
-        for download in downloads
+        download["timeout"] == image.IMAGE_DOWNLOAD_TIMEOUT for download in downloads
     )
     assert site_images_dir.joinpath("logo.png").read_bytes() == (
         b"image:stored/logo.png"
@@ -2674,7 +2636,9 @@ def test_upgrade_restore_images_continues_when_no_remote_image_is_available(
     settings = _fake_settings(app={"SITE_IMAGE_VERSION": 7})
 
     monkeypatch.setattr(upgrade, "ensure_datastore_dependency", lambda: None)
-    monkeypatch.setattr(upgrade, "get_images", lambda: {"version": 11, "logo.png": "logo.png"})
+    monkeypatch.setattr(
+        upgrade, "get_images", lambda: {"version": 11, "logo.png": "logo.png"}
+    )
     monkeypatch.setattr(upgrade, "ensure_storage_dependency", lambda: None)
     monkeypatch.setattr(upgrade, "save_images", lambda sp, images: False)
     monkeypatch.setitem(
@@ -2690,6 +2654,13 @@ def test_upgrade_restore_images_continues_when_no_remote_image_is_available(
     assert spinner.oks == ["[OK]", "[OK]"]
 
 
+# @source config/deployment.py::normalize_deployment_settings
+# @matrix config : app-yaml deployment-settings memory-pressure
+def test_default_deployment_uses_three_memory_safe_workers():
+    constants = _load_config_constants()
+    assert constants.DEFAULT_DEPLOYMENT_SETTINGS["DEPLOY_WORKER_COUNT"] == "3"
+
+
 # @matrix config user-settings : app-yaml deployment-settings validation
 def test_deployment_settings_normalize_validation(monkeypatch):
     class DeploymentSettingsError(Exception):
@@ -2700,7 +2671,7 @@ def test_deployment_settings_normalize_validation(monkeypatch):
             "DEPLOY_SCALING_TYPE": "basic",
             "DEPLOY_MAX_INSTANCES": "1",
             "DEPLOY_IDLE_TIMEOUT": "15m",
-            "DEPLOY_WORKER_COUNT": "4",
+            "DEPLOY_WORKER_COUNT": "3",
             "DEPLOY_INSTANCE_CLASS": "B2",
             "DEPLOY_MIN_IDLE_INSTANCES": "1",
         },
@@ -2720,14 +2691,14 @@ def test_deployment_settings_normalize_validation(monkeypatch):
     assert normalize_deployment_settings(
         {
             "DEPLOY_SCALING_TYPE": "automatic",
-            "DEPLOY_WORKER_COUNT": "4",
+            "DEPLOY_WORKER_COUNT": "3",
             "DEPLOY_INSTANCE_CLASS": "F2",
             "DEPLOY_MAX_INSTANCES": "2",
             "DEPLOY_MIN_IDLE_INSTANCES": "2",
         }
     ) == {
         "DEPLOY_SCALING_TYPE": "automatic",
-        "DEPLOY_WORKER_COUNT": "4",
+        "DEPLOY_WORKER_COUNT": "3",
         "DEPLOY_INSTANCE_CLASS": "F2",
         "DEPLOY_MAX_INSTANCES": "2",
         "DEPLOY_MIN_IDLE_INSTANCES": "2",
@@ -2744,6 +2715,44 @@ def test_deployment_settings_normalize_validation(monkeypatch):
 
     with pytest.raises(DeploymentSettingsError):
         normalize_deployment_settings({"DEPLOY_WORKER_COUNT": "0"})
+
+    for instance_class in ("F2", "B2"):
+        with pytest.raises(DeploymentSettingsError, match="at most 3 .*workers"):
+            normalize_deployment_settings(
+                {
+                    "DEPLOY_SCALING_TYPE": (
+                        "automatic" if instance_class.startswith("F") else "basic"
+                    ),
+                    "DEPLOY_INSTANCE_CLASS": instance_class,
+                    "DEPLOY_WORKER_COUNT": "4",
+                }
+            )
+
+        assert (
+            normalize_deployment_settings(
+                {
+                    "DEPLOY_SCALING_TYPE": (
+                        "automatic" if instance_class.startswith("F") else "basic"
+                    ),
+                    "DEPLOY_INSTANCE_CLASS": instance_class,
+                    "DEPLOY_WORKER_COUNT": "4",
+                },
+                enforce_worker_limit=False,
+            )["DEPLOY_WORKER_COUNT"]
+            == "4"
+        )
+
+    for scaling_type, instance_class in (("automatic", "F4"), ("basic", "B4")):
+        assert (
+            normalize_deployment_settings(
+                {
+                    "DEPLOY_SCALING_TYPE": scaling_type,
+                    "DEPLOY_INSTANCE_CLASS": instance_class,
+                    "DEPLOY_WORKER_COUNT": "20",
+                }
+            )["DEPLOY_WORKER_COUNT"]
+            == "20"
+        )
 
     with pytest.raises(DeploymentSettingsError):
         normalize_deployment_settings({"DEPLOY_MAX_INSTANCES": "0"})
@@ -2771,7 +2780,7 @@ def test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_confi
             "DEPLOY_SCALING_TYPE": "basic",
             "DEPLOY_MAX_INSTANCES": "1",
             "DEPLOY_IDLE_TIMEOUT": "15m",
-            "DEPLOY_WORKER_COUNT": "4",
+            "DEPLOY_WORKER_COUNT": "3",
             "DEPLOY_INSTANCE_CLASS": "B2",
             "DEPLOY_MIN_IDLE_INSTANCES": "1",
         },
@@ -2852,7 +2861,7 @@ def test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config(
             "DEPLOY_SCALING_TYPE": "basic",
             "DEPLOY_MAX_INSTANCES": "1",
             "DEPLOY_IDLE_TIMEOUT": "15m",
-            "DEPLOY_WORKER_COUNT": "4",
+            "DEPLOY_WORKER_COUNT": "3",
             "DEPLOY_INSTANCE_CLASS": "B2",
             "DEPLOY_MIN_IDLE_INSTANCES": "1",
         },
@@ -2987,8 +2996,8 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
     deployment_settings = {
         "version": 4,
         "DEPLOY_SCALING_TYPE": "automatic",
-        "DEPLOY_WORKER_COUNT": "5",
-        "DEPLOY_INSTANCE_CLASS": "F4",
+        "DEPLOY_WORKER_COUNT": "4",
+        "DEPLOY_INSTANCE_CLASS": "F2",
         "DEPLOY_MAX_INSTANCES": "2",
         "DEPLOY_MIN_IDLE_INSTANCES": "2",
     }
@@ -3036,7 +3045,7 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
             "DEPLOY_SCALING_TYPE": "basic",
             "DEPLOY_MAX_INSTANCES": "1",
             "DEPLOY_IDLE_TIMEOUT": "15m",
-            "DEPLOY_WORKER_COUNT": "4",
+            "DEPLOY_WORKER_COUNT": "3",
             "DEPLOY_INSTANCE_CLASS": "B2",
             "DEPLOY_MIN_IDLE_INSTANCES": "1",
         },
@@ -3058,8 +3067,8 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
         ("spinner", "Checking for deployment settings"),
         ("spinner", "Applying deployment settings"),
     ]
-    assert settings.DEPLOY["entrypoint"] == "gunicorn -t 3600 -w 5 -b :$PORT main:app"
-    assert settings.DEPLOY["instance_class"] == "F4"
+    assert settings.DEPLOY["entrypoint"] == "gunicorn -t 3600 -w 4 -b :$PORT main:app"
+    assert settings.DEPLOY["instance_class"] == "F2"
     assert settings.DEPLOY["automatic_scaling"] == {
         "min_idle_instances": "2",
         "max_instances": "2",
@@ -3299,18 +3308,25 @@ def test_setup_third_party_imports_are_bootstrapped_or_jit_guarded():
             target = node.func
             if not (
                 (isinstance(target, ast.Name) and target.id == "install_if_missing")
-                or (isinstance(target, ast.Attribute) and target.attr == "install_if_missing")
+                or (
+                    isinstance(target, ast.Attribute)
+                    and target.attr == "install_if_missing"
+                )
             ):
                 continue
             if not node.args or not isinstance(node.args[0], ast.Constant):
-                violations.append(f"{path.relative_to(repository_root)}:{node.lineno}: dynamic JIT import")
+                violations.append(
+                    f"{path.relative_to(repository_root)}:{node.lineno}: dynamic JIT import"
+                )
                 continue
             import_name = node.args[0].value
             package_name = import_name
             if len(node.args) >= 3 and isinstance(node.args[2], ast.Constant):
                 package_name = node.args[2].value
             for keyword in node.keywords:
-                if keyword.arg == "package_name" and isinstance(keyword.value, ast.Constant):
+                if keyword.arg == "package_name" and isinstance(
+                    keyword.value, ast.Constant
+                ):
                     package_name = keyword.value.value
             try:
                 package_install._pinned_requirement(package_name)
@@ -3339,7 +3355,9 @@ def test_setup_third_party_imports_are_bootstrapped_or_jit_guarded():
             root = imported_name.split(".", 1)[0]
             if root in sys.stdlib_module_names or root in local_roots:
                 continue
-            if any(covers(imported_name, dependency) for dependency in baseline_imports):
+            if any(
+                covers(imported_name, dependency) for dependency in baseline_imports
+            ):
                 continue
             if any(
                 covers(imported_name, dependency)
@@ -3544,8 +3562,9 @@ def test_setup_dependency_transaction_validates_versions_and_pip_check(monkeypat
     monkeypatch.setattr(
         package_install.subprocess,
         "run",
-        lambda command, **kwargs: run_calls.append(command)
-        or completed_process(command),
+        lambda command, **kwargs: (
+            run_calls.append(command) or completed_process(command)
+        ),
     )
     monkeypatch.setattr(
         package_install.importlib,
@@ -3708,9 +3727,7 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
         sys.modules,
         "yaspin",
         types.SimpleNamespace(
-            yaspin=lambda **kwargs: (
-                spinner_calls.append(kwargs) or SpinnerContext()
-            )
+            yaspin=lambda **kwargs: spinner_calls.append(kwargs) or SpinnerContext()
         ),
     )
     monkeypatch.setattr(
@@ -3806,9 +3823,7 @@ def test_install_if_missing_pauses_active_spinner_for_prompt(monkeypatch):
     monkeypatch.delenv("LAGNIAPPE_NONINTERACTIVE", raising=False)
     monkeypatch.setattr(package_install.sys, "stdin", Tty())
     monkeypatch.setattr(package_install.importlib, "import_module", missing_import)
-    monkeypatch.setattr(
-        builtins, "input", lambda: events.append("input") or "y"
-    )
+    monkeypatch.setattr(builtins, "input", lambda: events.append("input") or "y")
     monkeypatch.setattr(
         package_install,
         "_install",
@@ -3939,9 +3954,7 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
     ]
     assert propagation_delays == [2]
     assert mutations[-1][1]["identifier"] == missing
-    assert any(
-        "may take up to 5 minutes" in message for message in spinner.messages
-    )
+    assert any("may take up to 5 minutes" in message for message in spinner.messages)
 
     del settings._SETUP_ENABLED_GOOGLE_CLOUD_APIS
     calls.clear()
@@ -3983,7 +3996,7 @@ def test_enable_gcloud_apis_guides_maps_terms_then_retries_activation(
         gcloud={
             "ACCOUNT": "installer@business.example",
             "PROJECT": "project-1",
-        }
+        },
     )
     settings._SETUP_ENABLED_GOOGLE_CLOUD_APIS = set(
         constants.REQUIRED_GOOGLE_CLOUD_APIS
@@ -4168,8 +4181,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     deployment_progress = []
     initialized_formatter = _fake_formatter(deployment_spinner).initialize()
     initialized_formatter.yaspin = lambda **kwargs: (
-        deployment_progress.append(kwargs["text"])
-        or nullcontext(deployment_spinner)
+        deployment_progress.append(kwargs["text"]) or nullcontext(deployment_spinner)
     )
     monkeypatch.setattr(
         setup_pkg,
@@ -4187,9 +4199,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
         lambda domain: deploy_commands.append(("certificate", domain)),
     )
     deploy_module = types.ModuleType("runner.deploy")
-    deploy_module.deploy = lambda **kwargs: deploy_commands.append(
-        ("deploy", kwargs)
-    )
+    deploy_module.deploy = lambda **kwargs: deploy_commands.append(("deploy", kwargs))
     monkeypatch.setitem(sys.modules, "runner.deploy", deploy_module)
 
     capsys.readouterr()
@@ -4385,8 +4395,7 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
     assert "--headers=Content-Type=application/json" in scheduler
     assert '--message-body={"reconcile":true}' in scheduler
     assert (
-        "--oidc-service-account-email="
-        "app-runtime@project-1.iam.gserviceaccount.com"
+        "--oidc-service-account-email=app-runtime@project-1.iam.gserviceaccount.com"
     ) in scheduler
     assert not any(
         "roles/cloudscheduler.admin" in part
@@ -4512,9 +4521,7 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     constants = _load_config_constants()
     settings = _fake_settings(
         app={
-            "GOOGLE_LOGIN_URI": (
-                "https://project-1.appspot.com/users/google-signin"
-            ),
+            "GOOGLE_LOGIN_URI": ("https://project-1.appspot.com/users/google-signin"),
         }
     )
     _install_config_package(monkeypatch, constants, settings=settings)
@@ -4541,28 +4548,23 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     monkeypatch.setattr(
         identity,
         "setup_google_provider",
-        lambda client_id, client_secret=None: provider_calls.append(
-            (client_id, client_secret)
-        )
-        or True,
+        lambda client_id, client_secret=None: (
+            provider_calls.append((client_id, client_secret)) or True
+        ),
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: "")
 
     admin.setup_admin_and_oauth()
 
     assert settings.APP == {
-        "GOOGLE_LOGIN_URI": (
-            "https://project-1.appspot.com/users/google-signin"
-        ),
+        "GOOGLE_LOGIN_URI": ("https://project-1.appspot.com/users/google-signin"),
         "ADMIN_NAME": "Owner",
         "ADMIN_EMAIL": "owner@example.com",
         "GOOGLE_SIGNIN_ENABLED": True,
         "GOOGLE_CLIENT_ID": "1234-demo.apps.googleusercontent.com",
     }
     assert len(settings._saves) == 2
-    assert provider_calls == [
-        ("1234-demo.apps.googleusercontent.com", "oauth-secret")
-    ]
+    assert provider_calls == [("1234-demo.apps.googleusercontent.com", "oauth-secret")]
     admin_output = " ".join(capsys.readouterr().out.split())
     assert "Lagniappe runtime does" in admin_output
     assert "not need" in admin_output
@@ -4582,9 +4584,7 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     )
     monkeypatch.setattr(redis_setup, "redis_cloud_instructions", lambda: None)
     monkeypatch.setattr(redis_setup, "eviction_policy_instructions", lambda: None)
-    monkeypatch.setattr(
-        redis_setup, "_offer_redis_tls_for_fresh_install", lambda: None
-    )
+    monkeypatch.setattr(redis_setup, "_offer_redis_tls_for_fresh_install", lambda: None)
     monkeypatch.setattr(redis_setup, "test_redis_connection", lambda: True)
 
     redis_setup.setup_redis()
@@ -4730,9 +4730,7 @@ def test_oauth_instructions_open_current_project_clients_page(
             "APP_NAME": "Demo Lagniappe",
             "APP_URL": "https://demo.uc.r.appspot.com",
             "CUSTOM_DOMAIN": "app.example.com",
-            "GOOGLE_LOGIN_URI": (
-                "https://app.example.com/users/google-signin"
-            ),
+            "GOOGLE_LOGIN_URI": ("https://app.example.com/users/google-signin"),
         },
         gcloud={
             "PROJECT": "demo-project",
@@ -4770,8 +4768,7 @@ def test_oauth_instructions_open_current_project_clients_page(
     assert "For secret rotation" in output
     assert "Authorized JavaScript origin: https://app.example.com" in output
     assert (
-        "Authorized redirect URI: "
-        "https://app.example.com/users/google-signin"
+        "Authorized redirect URI: https://app.example.com/users/google-signin"
     ) in output
     assert "client type must" in output
     assert "say 'Web application'; a 'Desktop app' client will not" in output
@@ -4922,9 +4919,7 @@ def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
     settings = _fake_settings(
         app={
             "APP_URL": "https://project-1.appspot.com",
-            "GOOGLE_LOGIN_URI": (
-                "https://project-1.appspot.com/users/google-signin"
-            ),
+            "GOOGLE_LOGIN_URI": ("https://project-1.appspot.com/users/google-signin"),
         },
         gcloud={
             "PROJECT": "project-1",
@@ -4974,10 +4969,13 @@ def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
 
     monkeypatch.setattr("builtins.input", answer)
 
-    assert admin._get_verified_oauth_credentials(
-        settings,
-        credential_path,
-    ) == second_credentials
+    assert (
+        admin._get_verified_oauth_credentials(
+            settings,
+            credential_path,
+        )
+        == second_credentials
+    )
     assert len(load_calls) == 3
     assert all(call[0] == credential_path for call in load_calls)
     assert load_calls[-1][1] == {
@@ -5012,9 +5010,7 @@ def test_admin_oauth_rejection_precedes_provider_update(monkeypatch):
             "ADMIN_NAME": "Owner",
             "ADMIN_EMAIL": "owner@example.com",
             "GOOGLE_SIGNIN_ENABLED": True,
-            "GOOGLE_LOGIN_URI": (
-                "https://project-1.appspot.com/users/google-signin"
-            ),
+            "GOOGLE_LOGIN_URI": ("https://project-1.appspot.com/users/google-signin"),
         }
     )
     _install_config_package(monkeypatch, constants, settings=settings)
@@ -5051,9 +5047,7 @@ def test_existing_admin_oauth_can_replace_rejected_saved_client(monkeypatch):
         app={
             "ADMIN_NAME": "Owner",
             "ADMIN_EMAIL": "owner@example.com",
-            "GOOGLE_LOGIN_URI": (
-                "https://project-1.appspot.com/users/google-signin"
-            ),
+            "GOOGLE_LOGIN_URI": ("https://project-1.appspot.com/users/google-signin"),
             "GOOGLE_CLIENT_ID": "1234-old.apps.googleusercontent.com",
         }
     )
@@ -5088,9 +5082,7 @@ def test_existing_admin_oauth_can_replace_rejected_saved_client(monkeypatch):
         ("1234-old.apps.googleusercontent.com", None),
         ("1234-new.apps.googleusercontent.com", "new-secret"),
     ]
-    assert settings.APP["GOOGLE_CLIENT_ID"] == (
-        "1234-new.apps.googleusercontent.com"
-    )
+    assert settings.APP["GOOGLE_CLIENT_ID"] == ("1234-new.apps.googleusercontent.com")
     assert settings.APP["GOOGLE_SIGNIN_ENABLED"] is True
     assert settings._saves == [True, True]
 
@@ -5105,9 +5097,7 @@ def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
         app={
             "APP_NAME": "Demo Lagniappe",
             "APP_URL": "https://project-1.appspot.com",
-            "GOOGLE_LOGIN_URI": (
-                "https://project-1.appspot.com/users/google-signin"
-            ),
+            "GOOGLE_LOGIN_URI": ("https://project-1.appspot.com/users/google-signin"),
             "GOOGLE_CLIENT_ID": "1234-old.apps.googleusercontent.com",
         },
         gcloud={"PROJECT": "project-1"},
@@ -5134,10 +5124,9 @@ def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
     monkeypatch.setattr(
         identity,
         "setup_google_provider",
-        lambda client_id, secret: events.append(
-            ("provider", client_id, secret)
-        )
-        or True,
+        lambda client_id, secret: (
+            events.append(("provider", client_id, secret)) or True
+        ),
     )
     monkeypatch.setattr(
         utils,
@@ -5147,9 +5136,7 @@ def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
     monkeypatch.setattr("builtins.input", lambda _prompt: "")
 
     assert admin.configure_oauth() == 0
-    assert settings.APP["GOOGLE_CLIENT_ID"] == (
-        "1234-web.apps.googleusercontent.com"
-    )
+    assert settings.APP["GOOGLE_CLIENT_ID"] == ("1234-web.apps.googleusercontent.com")
     assert settings.APP["GOOGLE_SIGNIN_ENABLED"] is True
     assert settings._saves == [True]
     assert events == [
@@ -5168,9 +5155,10 @@ def test_iam_principal_member_classifies_google_identities():
     from installer import iam
 
     assert iam.principal_member("deployer@example.com") == "user:deployer@example.com"
-    assert iam.principal_member(
-        "runtime@project-1.iam.gserviceaccount.com"
-    ) == "serviceAccount:runtime@project-1.iam.gserviceaccount.com"
+    assert (
+        iam.principal_member("runtime@project-1.iam.gserviceaccount.com")
+        == "serviceAccount:runtime@project-1.iam.gserviceaccount.com"
+    )
 
 
 # @matrix iam setup : conditions etag idempotence unrelated-members
@@ -5239,8 +5227,7 @@ def test_iam_reconciliation_is_idempotent_and_preserves_conditions_and_etag():
         if not binding.get("condition")
     }["roles/legacy"] == {"user:other@example.com"}
     assert any(
-        binding.get("condition") is conditional
-        and runtime in binding["members"]
+        binding.get("condition") is conditional and runtime in binding["members"]
         for binding in policy.bindings
     )
     assert any(
@@ -5332,9 +5319,7 @@ def test_operator_permission_preflight_reports_missing_boundaries(monkeypatch):
         return types.SimpleNamespace(permissions=[])
 
     client = types.SimpleNamespace(test_iam_permissions=project_permissions)
-    billing_client = types.SimpleNamespace(
-        test_iam_permissions=billing_permissions
-    )
+    billing_client = types.SimpleNamespace(test_iam_permissions=billing_permissions)
 
     monkeypatch.setattr(iam, "constants", constants)
     monkeypatch.setattr(iam, "install_if_missing", lambda *args, **kwargs: None)
@@ -5473,21 +5458,15 @@ def test_runtime_role_plan_limits_administration_to_owned_scheduler_lifecycle():
         "cloudtasks.tasks.fullView",
         "cloudtasks.tasks.list",
     }.issubset(constants.INSTALLER_PROJECT_PERMISSIONS)
-    assert "appengine.services.update" not in (
-        constants.DEPLOYER_PROJECT_PERMISSIONS
-    )
+    assert "appengine.services.update" not in (constants.DEPLOYER_PROJECT_PERMISSIONS)
     assert "appengine.services.updateTraffic" not in (
         constants.DEPLOYER_PROJECT_PERMISSIONS
     )
-    assert "serviceusage.services.use" in (
-        constants.INSTALLER_PROJECT_PERMISSIONS
-    )
+    assert "serviceusage.services.use" in (constants.INSTALLER_PROJECT_PERMISSIONS)
     assert "iam.serviceAccountKeys.create" not in (
         constants.INSTALLER_PROJECT_PERMISSIONS
     )
-    assert "iamcredentials.googleapis.com" in (
-        constants.REQUIRED_GOOGLE_CLOUD_APIS
-    )
+    assert "iamcredentials.googleapis.com" in (constants.REQUIRED_GOOGLE_CLOUD_APIS)
     runtime_roles = set(constants.RUNTIME_PROJECT_ROLES)
     assert runtime_roles.isdisjoint(constants.REMOVED_RUNTIME_PROJECT_ROLES)
     assert {
@@ -5826,9 +5805,7 @@ def test_service_account_waits_for_newly_enabled_iam(monkeypatch):
         lambda *args: None,
     )
 
-    assert gcloud.configure_service_account() == {
-        "client_email": runtime_email
-    }
+    assert gcloud.configure_service_account() == {"client_email": runtime_email}
     assert delays == [2, 4]
     assert any(
         "Google IAM is still becoming available" in message
@@ -5889,9 +5866,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
         "reconcile_runtime_service_account_policy",
         lambda *args: iam_calls.append(("service-account", args)),
     )
-    assert gcloud.configure_service_account() == {
-        "client_email": runtime_email
-    }
+    assert gcloud.configure_service_account() == {"client_email": runtime_email}
     assert iam_calls == [
         (
             "project",
@@ -5970,6 +5945,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
             assert timeout == gcloud.APP_ENGINE_RPC_TIMEOUT
             app_engine_events.append(("create", request))
             app_requests.append(request)
+
             def result(timeout):
                 app_engine_events.append(("result", timeout))
                 return types.SimpleNamespace(
@@ -6229,8 +6205,7 @@ def test_app_engine_creation_prompt_and_bounded_failures(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "may take up to 5 minutes" in output
     assert any(
-        "Google may still be completing it" in message
-        for message in spinner.messages
+        "Google may still be completing it" in message for message in spinner.messages
     )
 
 
@@ -6256,9 +6231,9 @@ def test_handoff_policy_helpers_remove_only_the_target_member():
         "roles/owner",
         "roles/viewer",
     }
-    assert iam.policy_member_roles(
-        policy, installer, include_conditions=False
-    ) == {"roles/owner"}
+    assert iam.policy_member_roles(policy, installer, include_conditions=False) == {
+        "roles/owner"
+    }
     assert iam.remove_member_bindings(policy, installer)
     assert iam.policy_member_roles(policy, installer) == set()
     assert iam.policy_member_roles(policy, other) == {
@@ -6301,16 +6276,13 @@ class _HandoffPolicyClient:
 def _handoff_policy(*bindings):
     return types.SimpleNamespace(
         bindings=[
-            {"role": role, "members": list(members)}
-            for role, members in bindings
+            {"role": role, "members": list(members)} for role, members in bindings
         ]
     )
 
 
 # @matrix handoff : active-account adc gcloud installer operator owner preconditions
-def test_handoff_operator_preparation_accepts_installer_or_owner(
-    monkeypatch, capsys
-):
+def test_handoff_operator_preparation_accepts_installer_or_owner(monkeypatch, capsys):
     import config
     from installer import handoff as handoff_module
     from runner import gcloud as runner_gcloud
@@ -6336,10 +6308,9 @@ def test_handoff_operator_preparation_accepts_installer_or_owner(
     monkeypatch.setattr(
         runner_gcloud,
         "activate_repository_gcloud",
-        lambda **kwargs: activations.append(
-            (settings.GCLOUD_CONFIG["ACCOUNT"], kwargs)
-        )
-        or True,
+        lambda **kwargs: (
+            activations.append((settings.GCLOUD_CONFIG["ACCOUNT"], kwargs)) or True
+        ),
     )
 
     assert handoff_module.prepare_handoff_operator() == installer
@@ -6502,12 +6473,15 @@ def test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_i
     }
 
     events.clear()
-    assert handoff_module.handoff(
-        context=context,
-        deploy=deploy,
-        confirm=lambda prompt: "yes",
-        permission_check=lambda project: None,
-    ) == 0
+    assert (
+        handoff_module.handoff(
+            context=context,
+            deploy=deploy,
+            confirm=lambda prompt: "yes",
+            permission_check=lambda project: None,
+        )
+        == 0
+    )
     assert "project" not in events
     assert "service-account" not in events
     assert not any(event.startswith("bucket:") for event in events)
@@ -6559,9 +6533,7 @@ def test_delegated_handoff_rejects_owner_lockout_and_default_no_confirmation(
             _handoff_policy(), events, "service-account"
         ),
         "projects": _HandoffPolicyClient(
-            _handoff_policy(
-                ("roles/owner", [iam.principal_member(installer)])
-            ),
+            _handoff_policy(("roles/owner", [iam.principal_member(installer)])),
             events,
             "project",
         ),
@@ -6578,12 +6550,15 @@ def test_delegated_handoff_rejects_owner_lockout_and_default_no_confirmation(
     context["projects"].policy.bindings[0]["members"].append(
         iam.principal_member(owner)
     )
-    assert handoff_module.handoff(
-        context=context,
-        deploy=lambda **kwargs: pytest.fail("must not deploy"),
-        confirm=lambda prompt: "",
-        permission_check=lambda project: None,
-    ) == 1
+    assert (
+        handoff_module.handoff(
+            context=context,
+            deploy=lambda **kwargs: pytest.fail("must not deploy"),
+            confirm=lambda prompt: "",
+            permission_check=lambda project: None,
+        )
+        == 1
+    )
     assert settings._saves == []
     assert events == []
 

@@ -45,20 +45,24 @@ PROTOCOL_EXPORTS = [
     "BROWSER_PROTOCOL_VERSION",
     "WORKER_MESSAGES",
     "connectivityMessage",
+    "upstreamUnavailableMessage",
     "validateConnectivityState",
+    "validateUpstreamUnavailableState",
 ]
 
 
-# @matrix browser-protocol : connectivity-only envelope version
-def test_browser_protocol_contains_only_connectivity_messages(run_node):
+# @source src/script/shared/protocol.mjs::upstreamUnavailableMessage
+# @matrix browser-protocol : connectivity upstream-unavailable envelope version
+def test_browser_protocol_contains_versioned_worker_messages(run_node):
     run_shared_module_check(
         run_node,
         "src/script/shared/protocol.mjs",
         PROTOCOL_EXPORTS,
         """
-if (Object.keys(context.WORKER_MESSAGES).length !== 1 ||
-    context.WORKER_MESSAGES.CONNECTIVITY !== "connectivity-state") {
-  throw new Error("The worker protocol contains a non-connectivity message");
+if (Object.keys(context.WORKER_MESSAGES).length !== 2 ||
+    context.WORKER_MESSAGES.CONNECTIVITY !== "connectivity-state" ||
+    context.WORKER_MESSAGES.UPSTREAM_UNAVAILABLE !== "upstream-unavailable") {
+  throw new Error(`Unexpected worker protocol: ${JSON.stringify(context.WORKER_MESSAGES)}`);
 }
 """,
     )
@@ -82,7 +86,7 @@ if (!context.validateConnectivityState(state)) {
 }
 const message = context.connectivityMessage(state);
 if (message.protocol !== "lagniappe-browser" ||
-    message.protocol_version !== 3 ||
+    message.protocol_version !== 4 ||
     message.type !== "connectivity-state" ||
     message.state === state) {
   throw new Error(`Connectivity message was not versioned: ${JSON.stringify(message)}`);
@@ -104,6 +108,56 @@ try {
   threw = error?.name === "TypeError";
 }
 if (!threw) throw new Error("Invalid connectivity producer state was not rejected");
+""",
+    )
+
+
+# @matrix browser-protocol request-errors : envelope privacy producer upstream-unavailable validation version
+def test_upstream_unavailable_messages_are_versioned_and_privacy_bounded(run_node):
+    run_shared_module_check(
+        run_node,
+        "src/script/shared/protocol.mjs",
+        PROTOCOL_EXPORTS,
+        """
+const state = {
+  status: 503,
+  method: "GET",
+  route_class: "pages",
+  server: "Google Frontend",
+  trace_header_present: true,
+  timestamp: "2026-09-01T12:00:00.000Z",
+  online: true,
+  service_worker: "controlled",
+  stale: false,
+  outcome_uncertain: false,
+  retry_outcome: "failed",
+};
+if (!context.validateUpstreamUnavailableState(state)) {
+  throw new Error("Bounded upstream-unavailable state was rejected");
+}
+const message = context.upstreamUnavailableMessage(state);
+if (message.protocol !== "lagniappe-browser" ||
+    message.protocol_version !== 4 ||
+    message.type !== "upstream-unavailable" ||
+    message.state === state) {
+  throw new Error(`Upstream message was not versioned: ${JSON.stringify(message)}`);
+}
+
+for (const invalid of [
+  { ...state, status: 501 },
+  { ...state, method: "OPTIONS" },
+  { ...state, route_class: "pages/secret-id" },
+  { ...state, server: "x".repeat(129) },
+]) {
+  if (context.validateUpstreamUnavailableState(invalid)) {
+    throw new Error(`Invalid upstream state was accepted: ${JSON.stringify(invalid)}`);
+  }
+}
+const extra = { ...state, query: "private=yes" };
+const produced = context.upstreamUnavailableMessage(extra);
+if ("query" in produced.state) {
+  throw new Error("Producer retained an unexpected diagnostic field");
+}
 """,
     )
 

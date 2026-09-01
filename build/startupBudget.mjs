@@ -1,7 +1,8 @@
 const KIB = 1024;
 
 export const STARTUP_BUDGETS = Object.freeze({
-	main: 32 * KIB,
+	// Includes the application-owned upstream failure and recovery boundary.
+	main: 40 * KIB,
 	shell: 64 * KIB,
 	core: 120 * KIB,
 	builder: 224 * KIB,

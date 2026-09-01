@@ -1,5 +1,6 @@
 import { captureNetworkError } from "./errors.mjs";
 import { applyNotificationStateHeader } from "./notificationState.mjs";
+import { handleUpstreamResponse } from "./upstreamUnavailable.mjs";
 
 const PARSER = new DOMParser();
 const TOKEN_REQUEST = {
@@ -140,8 +141,10 @@ const _friendlyError = (message, { body = null } = {}) => {
  * @testable true
  * @tests tests_js/test_009_request_csrf.py::test_plain_text_upstream_error_stays_in_request_error_path
  * @tests tests_js/test_009_request_csrf.py::test_request_can_return_html_error_without_replacing_page
+ * @tests tests_js/test_009_request_csrf.py::test_application_marked_html_error_keeps_existing_behavior
  * @matrix edited-entity-notice : non-invasive-probe reload-fallback
  * @matrix request-errors : ajax-upload non-invasive-probe proxy-text-error reload-fallback
+ * @matrix request-errors : application-error-marker dom-replacement
  */
 const _formatError = async (
 	response,
@@ -306,8 +309,9 @@ const putRequest = async (url, body, options = {}) => {
  * @tests tests_js/test_009_request_csrf.py::test_request_preserves_structured_validation_error
  * @tests tests_js/test_009_request_csrf.py::test_request_preserves_plain_validation_error
  * @matrix deferred-jobs request : post-headers
+ * @matrix csrf : stale-token
  * @matrix polling : diagnostics structured-validation
- * @matrix request-errors : diagnostics plain-validation structured-validation
+ * @matrix request-errors : diagnostics dom-preservation no-replay outcome-uncertain plain-validation structured-validation upstream-unavailable
  * @pair request:abort-signal
  */
 const _request = async (
@@ -320,6 +324,7 @@ const _request = async (
 		acknowledgeEntities = true,
 		replaceErrorPage = true,
 		signal = undefined,
+		retryUpstream = true,
 	} = {},
 ) => {
 	method = method.toUpperCase();
@@ -351,9 +356,38 @@ const _request = async (
 	if (!CSRF_METHODS.has(method)) {
 		delete headers["X-CSRFToken"];
 	}
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/request.mjs::_request
+	 * @reason both the initial response and the CSRF-refresh response share this classifier boundary
+	 */
+	const classifyUpstream = (response, allowRetry = retryUpstream) =>
+		handleUpstreamResponse(response, {
+			method,
+			url,
+			retryUpstream: allowRetry,
+			fetchResponse: () => fetch(url, config),
+			retryCurrent: () =>
+				_request(window.location.pathname, {
+					method: "GET",
+					replaceErrorPage: false,
+					retryUpstream: false,
+				}),
+			retryOriginal: () =>
+				_request(url, {
+					method: "GET",
+					requestHeaders,
+					acknowledgeEntities: false,
+					replaceErrorPage: false,
+					retryUpstream: false,
+				}),
+		});
 
 	try {
 		let response = await fetch(url, config);
+		let upstream = await classifyUpstream(response);
+		if (upstream.result) return upstream.result;
+		response = upstream.response;
 
 		if (CSRF_METHODS.has(method) && csrfFailed(response)) {
 			const newToken = await refreshToken();
@@ -365,6 +399,9 @@ const _request = async (
 			}
 			config.headers["X-CSRFToken"] = newToken;
 			response = await fetch(url, config);
+			upstream = await classifyUpstream(response, false);
+			if (upstream.result) return upstream.result;
+			response = upstream.response;
 		}
 
 		if (response.status === 422) {

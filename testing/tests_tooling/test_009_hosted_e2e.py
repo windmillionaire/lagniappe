@@ -1897,7 +1897,7 @@ def test_hosted_descriptor_preserves_native_static_handlers():
         "secure": "always",
         "redirect_http_response_code": 301,
     }
-    assert descriptor["entrypoint"] == "gunicorn -t 3600 -w 4 -b :$PORT main:app"
+    assert descriptor["entrypoint"] == "gunicorn -t 3600 -w 3 -b :$PORT main:app"
     assert descriptor["instance_class"] == "B2"
     assert descriptor["basic_scaling"] == {
         "max_instances": 1,

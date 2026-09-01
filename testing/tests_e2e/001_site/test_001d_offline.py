@@ -259,3 +259,54 @@ def test_testing_mode_navigation_resets_offline_state(get_user, browser_failures
     user.go(Projects.test_toolbar_loads)
     indicator = user.locate(OFFLINE_INDICATOR)
     expect(indicator).to_be_hidden()
+
+
+# @source src/script/shared/upstreamUnavailable.mjs::showUpstreamUnavailable
+# @matrix e2e : server-failure upstream-unavailable
+# @matrix request-errors : banner dom-preservation server-failure upstream-unavailable
+def test_upstream_unavailable_preserves_current_form_state(
+    get_user,
+    browser_failures,
+):
+    """A provider-shaped 503 stays outside the mounted application DOM."""
+    user = get_user(Users.OWNER)
+    user.go(SitePages.HOME)
+
+    search = user.locate("[lp-search] input[name='q']")
+    main = user.locate("main")
+    pages_button = main.get_by_role("button", name="Pages", exact=True)
+    banner = user.locate("[data-role='upstream-unavailable']")
+    retry = banner.locator("[data-role='upstream-unavailable-retry']")
+    entered = "unfinished search state"
+    search.fill(entered)
+
+    with browser_failures.expect_http_error(
+        user,
+        status=503,
+        path="/testing/upstream-unavailable",
+        count=1,
+        max_count=2,
+    ):
+        result = user.page.evaluate("() => window.__TEST_UPSTREAM_UNAVAILABLE__()")
+
+    assert result == {
+        "ok": False,
+        "error": "The application server is temporarily unavailable.",
+        "code": "upstream_instance_unavailable",
+        "status": 503,
+        "upstreamUnavailable": True,
+        "stale": False,
+        "retryable": True,
+        "outcomeUncertain": False,
+        "retryOutcome": "failed",
+    }
+    expect(banner).to_be_visible()
+    expect(banner).to_contain_text("current page and unsaved work are unchanged")
+    expect(retry).to_be_enabled()
+    expect(search).to_have_value(entered)
+    expect(pages_button).to_be_visible()
+    expect(pages_button).to_be_enabled()
+
+    # The current form remains live after the unavailable result.
+    search.fill(f"{entered} still editable")
+    expect(search).to_have_value(f"{entered} still editable")

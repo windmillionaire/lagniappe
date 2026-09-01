@@ -167,6 +167,36 @@ setup-owned job's operational pause/enable lifecycle.
 Run `./setup.sh jobs` after a manual application deployment. Setup-managed
 deployments invoke this step automatically after the new route exists.
 
+## App Engine memory monitoring
+
+Every installer-managed deployment also reconciles one warning-class Cloud
+Monitoring policy for the App Engine default service. It divides
+`system/memory/usage` by `system/instance_count` per revision and zone so
+additional instances do not inflate the per-instance signal, then warns after
+two one-minute samples above 80% of the configured instance-class memory
+envelope. The policy documentation records the class, worker count, threshold,
+remediation, and a Monitoring chart link.
+
+The envelopes come from Google's [App Engine instance-class limits](https://docs.cloud.google.com/appengine/docs/standard/overview#instance_classes).
+Both [App Engine system metrics](https://docs.cloud.google.com/monitoring/api/metrics_gcp_a_b#appengine)
+use the `gae_app` monitored resource and are sampled once per minute.
+
+The reconciler enables `monitoring.googleapis.com`, reuses an enabled Owner
+email channel when present, and otherwise creates a channel labeled
+`managed_by=lagniappe` and `purpose=app_engine_memory`. Operator-added policy
+channels are preserved. Obsolete Lagniappe-managed Owner channels are detached,
+not deleted.
+
+Monitoring failure does not roll back a successful application deployment. A
+prominent warning prints the focused retry command:
+
+```bash
+./setup.sh monitoring
+```
+
+The focused command returns nonzero when reconciliation fails. `doctor` is
+read-only and reports a missing or drifted managed policy.
+
 ## Identity Platform and authentication email
 
 `installer/identity.py` initializes standalone Identity Platform, enables

@@ -11,6 +11,8 @@ const DEFAULT_INSTANCE_CLASS = {
 	automatic: "F2",
 	basic: "B2",
 };
+const MEMORY_SAFE_WORKER_CLASSES = new Set(["F2", "B2"]);
+const MEMORY_SAFE_WORKER_LIMIT = 3;
 
 /**
  * @testable true
@@ -54,7 +56,12 @@ export class SiteDeployment extends SiteSetting {
 			?.addEventListener("change", () => {
 				this._syncInstanceClassOptions();
 				this._syncInstanceControls();
+				this._syncWorkerLimit();
 			});
+		this.deploymentForm
+			.querySelector("[name='DEPLOY_INSTANCE_CLASS']")
+			?.addEventListener("change", () => this._syncWorkerLimit());
+		this._syncWorkerLimit();
 	}
 
 	updated(response) {
@@ -82,6 +89,7 @@ export class SiteDeployment extends SiteSetting {
 
 		this._syncInstanceClassOptions({ preserveCurrent: true });
 		this._syncInstanceControls();
+		this._syncWorkerLimit();
 		this._updateDeploymentSummary(data);
 	}
 
@@ -186,6 +194,36 @@ export class SiteDeployment extends SiteSetting {
 		automaticGroup.querySelectorAll("input").forEach((input) => {
 			input.disabled = !automatic;
 		});
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_deployment_caps_workers_only_for_f2_and_b2
+	 * @matrix admin : deployment-settings memory-pressure scaling-controls
+	 */
+	_syncWorkerLimit() {
+		if (!this.deploymentForm) return;
+		const instanceClass = this.deploymentForm.querySelector(
+			"[name='DEPLOY_INSTANCE_CLASS']",
+		)?.value;
+		const workerInput = this.deploymentForm.querySelector(
+			"[name='DEPLOY_WORKER_COUNT']",
+		);
+		if (!workerInput) return;
+
+		const memoryLimited = MEMORY_SAFE_WORKER_CLASSES.has(instanceClass);
+		workerInput.max = memoryLimited ? String(MEMORY_SAFE_WORKER_LIMIT) : "20";
+		if (memoryLimited && Number(workerInput.value) > MEMORY_SAFE_WORKER_LIMIT) {
+			workerInput.value = String(MEMORY_SAFE_WORKER_LIMIT);
+		}
+		const guidance = this.deploymentForm.querySelector(
+			"[data-role='deployment-worker-guidance']",
+		);
+		if (guidance) {
+			guidance.textContent = memoryLimited
+				? `${instanceClass} supports at most three workers; each worker adds application memory use.`
+				: "Workers multiply application memory use; monitor memory after increasing them.";
+		}
 	}
 
 	_showDeploymentError(message) {

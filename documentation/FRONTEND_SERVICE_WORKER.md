@@ -76,6 +76,9 @@ cache.
 - Strategy: **network-only**
 - Passed straight to the network
 - On network error: return 503 with error context sent to Sentry
+- Unmarked upstream HTML 500/502/503/504 responses are never cached or passed
+  to application rendering. Mutations receive the application JSON error
+  envelope and are never replayed automatically.
 
 ### ETag Management
 
@@ -178,10 +181,12 @@ network path.
 
 ## Connectivity Messages
 
-The service worker receives only the versioned `connectivity-state` message
-from the active page. It uses that state to make cache/network decisions. It
-does not receive push data or relay server state to tabs; application updates
-are owned by the visible view's polling coordinator.
+The service worker receives the versioned `connectivity-state` message from the
+active page. It uses that state to make cache/network decisions. When App
+Engine or another upstream returns an unmarked HTML 5xx, the worker emits the
+versioned `upstream-unavailable` message to controlled pages. The message
+contains only bounded status, method, route class, server/trace presence, and
+connectivity state; it contains no URL, query, response body, or entity data.
 
 ## Error Handling
 
@@ -194,6 +199,13 @@ available. AJAX GETs and mutation failures return a JSON 503 payload
 (`{"ok": false, "error": "You are offline"}`); other non-navigation requests
 receive a plain-text 503. This prevents token, fragment, script, or image
 requests from treating the HTML offline page as a successful response.
+
+An upstream 500/502/503/504 is distinct from offline state. If a dynamic GET
+has a cached response, the worker returns it with explicit
+`X-Lagniappe-Upstream-Unavailable` and `X-Lagniappe-Stale-Cache` markers. With
+no cache it returns an application-owned 503 with `Retry-After: 5`. The shared
+request wrapper retries safe GETs once after 500 ms, never injects raw upstream
+HTML, and leaves mutation results visibly uncertain without replaying them.
 
 ## Template Variables
 

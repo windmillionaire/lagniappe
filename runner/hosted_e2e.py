@@ -1043,7 +1043,7 @@ def _hosted_app_descriptor(
         "runtime": "python314",
         "service": SERVICE,
         "service_account": infrastructure.runtime_email,
-        "entrypoint": "gunicorn -t 3600 -w 4 -b :$PORT main:app",
+        "entrypoint": "gunicorn -t 3600 -w 3 -b :$PORT main:app",
         "instance_class": "B2",
         "basic_scaling": {"max_instances": 1, "idle_timeout": "15m"},
         # Static build artifacts contain no application or test data. Keep them

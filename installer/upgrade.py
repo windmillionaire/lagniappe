@@ -46,7 +46,9 @@ def upgrade(branch=None):
         SETTINGS.APP.get("VERSION") or SETTINGS.NODE.get("version") or ""
     ).strip()
 
-    with formatter.yaspin(text=formatter.success("Inspecting upgrade target")) as spinner:
+    with formatter.yaspin(
+        text=formatter.success("Inspecting upgrade target")
+    ) as spinner:
         target = _fetch_upgrade_target(spinner, branch=branch)
     if target is None:
         return 1
@@ -82,7 +84,9 @@ def upgrade(branch=None):
         print(formatter.success("Upgrade cancelled."))
         return 1
 
-    with formatter.yaspin(text=formatter.success("Replacing tracked source")) as spinner:
+    with formatter.yaspin(
+        text=formatter.success("Replacing tracked source")
+    ) as spinner:
         if not _update_repository(
             spinner,
             branch=branch,
@@ -183,10 +187,7 @@ def _apply_update(
         recovery_ready = _configure_deferred_job_recovery(f, gcloud)
         print(f"\n{f.success('Deployment complete!')}")
         if SETTINGS.APP.get("CUSTOM_DOMAIN"):
-            print(
-                f"Your app is available at: "
-                f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}"
-            )
+            print(f"Your app is available at: https://{SETTINGS.APP['CUSTOM_DOMAIN']}")
         else:
             print(
                 "Your app is available at: "
@@ -198,6 +199,7 @@ def _apply_update(
 
     print(f.success(f"Remember to deploy when ready: {setup_command()}"))
     print(f"After deployment, run: {setup_command('jobs')}")
+    print(f"Then reconcile memory monitoring: {setup_command('monitoring')}")
     if maintenance_required:
         print("The currently deployed application was not changed.")
         print_post_upgrade_maintenance_steps(f)
@@ -330,12 +332,16 @@ def _update_deployment_settings(f):
 
     with f.yaspin(text=f.success("Applying deployment settings")) as spinner:
         try:
-            apply_deployment_settings(deployment_entity)
+            # Preserve the operator's saved deployment settings during an
+            # update. The worker ceiling applies only when settings are newly
+            # submitted through the application or generated for an install.
+            apply_deployment_settings(
+                deployment_entity,
+                enforce_worker_limit=False,
+            )
             spinner.ok(f.ok_glyph)
         except Exception as error:
-            spinner.write(
-                f.warning(f"Could not apply deployment settings: {error}")
-            )
+            spinner.write(f.warning(f"Could not apply deployment settings: {error}"))
             spinner.fail(f.fail_glyph)
 
 
@@ -407,9 +413,7 @@ def _update_public_page_settings(f):
             apply_public_page_settings(entity)
             spinner.ok(f.ok_glyph)
         except Exception as error:
-            spinner.write(
-                f.warning(f"Could not apply public-page settings: {error}")
-            )
+            spinner.write(f.warning(f"Could not apply public-page settings: {error}"))
             spinner.fail(f.fail_glyph)
 
 

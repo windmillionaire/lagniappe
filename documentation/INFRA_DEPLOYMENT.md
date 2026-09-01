@@ -85,6 +85,14 @@ constants-owned warmup service; basic scaling removes only that managed entry.
 The generated Gunicorn timeout is one hour; deferred Cloud Tasks retain their
 shorter delivery deadline.
 
+Gunicorn workers multiply application memory because each worker is a separate
+process. Lagniappe therefore defaults to three workers and enforces a
+three-worker ceiling for the 768 MB F2 and B2 classes. Other instance classes
+retain the configurable 1-20 range; review App Engine memory after increasing
+their worker count. Installation prints this memory warning, but updates do not
+rewrite an existing saved worker count; the ceiling is enforced when an
+operator submits new Site Settings deployment values.
+
 `config/ai_settings.py` and `ai_models.py` similarly normalize live model
 settings used by setup and Site Settings. Provider discovery is cached and
 falls back to the curated catalog on failure.
@@ -162,7 +170,13 @@ the route exists. For a manual deployment, run:
 
 ```bash
 ./setup.sh jobs
+./setup.sh monitoring
 ```
+
+The monitoring command reconciles the managed per-instance App Engine memory
+warning. Installer-managed deployments run it automatically; a monitoring
+failure is reported with this retry command but does not invalidate a
+successful application deployment.
 
 ## Change checklist
 

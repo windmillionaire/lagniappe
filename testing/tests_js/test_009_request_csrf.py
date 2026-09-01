@@ -11,7 +11,30 @@ const tokenElt = {{ value: "stale-token" }};
 const entityEvents = [];
 const networkErrors = [];
 const fetchCalls = [];
+const sentryEvents = [];
 const listeners = {{}};
+const mainElt = {{ innerHTML: "mounted main" }};
+const bannerMessage = {{ textContent: "" }};
+const bannerButton = {{
+  dataset: {{}},
+  disabled: false,
+  textContent: "Try again",
+  addEventListener(type, listener) {{ listeners[`banner-${{type}}`] = listener; }},
+}};
+const banner = {{
+  dataset: {{
+    build: "test-build",
+    release: "1.2.0",
+    visible: "false",
+    stale: "false",
+    outcomeUncertain: "false",
+  }},
+  setAttribute(name, value) {{ this[name] = value; }},
+  querySelector(selector) {{
+    if (selector === "[data-role='upstream-unavailable-message']") return bannerMessage;
+    return null;
+  }},
+}};
 
 class FakeFormData {{
   constructor() {{
@@ -53,19 +76,26 @@ const context = {{
       listeners[type] = handler;
     }},
     listeners,
-    querySelector() {{
-      return {{ innerHTML: "" }};
+    querySelector(selector) {{
+      if (selector === "main") return mainElt;
+      if (selector === "[data-role='upstream-unavailable']") return banner;
+      if (selector === "[data-role='upstream-unavailable-retry']") return bannerButton;
+      return null;
     }},
     title: "",
   }},
   fetchCalls,
+  banner,
+  bannerButton,
   entityEvents,
   FormData: FakeFormData,
   Headers,
   networkErrors,
+  navigator: {{ onLine: true, serviceWorker: {{ controller: {{}} }} }},
   Response,
-  setTimeout,
+  setTimeout(callback, delay) {{ return setTimeout(callback, Math.min(delay, 5)); }},
   tokenElt,
+  URL,
   URLSearchParams,
   CustomEvent: class {{
     constructor(type, options = {{}}) {{
@@ -75,8 +105,14 @@ const context = {{
   }},
   window: {{
     dispatchEvent(event) {{ entityEvents.push(event); }},
-    location: {{ href: "" }},
+    location: {{
+      href: "https://example.test/home",
+      origin: "https://example.test",
+      pathname: "/home",
+    }},
+    Sentry: {{ captureMessage(message, options) {{ sentryEvents.push({{ message, options }}); }} }},
   }},
+  sentryEvents,
 }};
 
 context.fetch = async (url, config = {{}}) => {{
@@ -135,7 +171,38 @@ context.fetch = async (url, config = {{}}) => {{
     return new Response("<main>replacement error page</main>", {{
       status: 500,
       statusText: "Internal Server Error",
-      headers: {{ "Content-Type": "text/html" }},
+      headers: {{
+        "Content-Type": "text/html",
+        "X-Lagniappe-Error": "Internal Server Error",
+      }},
+    }});
+  }}
+
+  const rawMatch = requestUrl.match(/^[/]raw-upstream[/](500|502|503|504)$/);
+  if (rawMatch) {{
+    return new Response("<html>raw upstream error with private body</html>", {{
+      status: Number(rawMatch[1]),
+      statusText: "Service Unavailable",
+      headers: {{
+        "Content-Type": "text/html",
+        "Server": "x".repeat(200),
+        "X-Cloud-Trace-Context": "private-trace-value",
+      }},
+    }});
+  }}
+
+  if (requestUrl === "/retry-upstream") {{
+    const attempts = fetchCalls.filter((call) => call.url === requestUrl).length;
+    if (attempts === 1 || !context.retrySucceeds) {{
+      return new Response("<html>raw upstream error</html>", {{
+        status: 503,
+        statusText: "Service Unavailable",
+        headers: {{ "Content-Type": "text/html" }},
+      }});
+    }}
+    return new Response(JSON.stringify({{ recovered: true }}), {{
+      status: 200,
+      headers: {{ "Content-Type": "application/json" }},
     }});
   }}
 
@@ -184,6 +251,15 @@ context.fetch = async (url, config = {{}}) => {{
     return new Response("fresh-token", {{ status: 200 }});
   }}
 
+  if (requestUrl === "/csrf-then-upstream" &&
+      config.headers?.["X-CSRFToken"] === "fresh-token") {{
+    return new Response("<html>raw upstream error after csrf refresh</html>", {{
+      status: 503,
+      statusText: "Service Unavailable",
+      headers: {{ "Content-Type": "text/html" }},
+    }});
+  }}
+
   if (config.headers?.["X-CSRFToken"] === "fresh-token") {{
     const data = requestUrl.endsWith("/users/logout")
       ? {{ success: true, redirect: "/users/login" }}
@@ -202,6 +278,30 @@ context.fetch = async (url, config = {{}}) => {{
 }};
 
 vm.createContext(context);
+let upstreamSource = fs.readFileSync(
+  "src/script/shared/upstreamUnavailable.mjs",
+  "utf8",
+);
+upstreamSource = upstreamSource.replace(
+  /^import[\\s\\S]*?from "[.][/]protocol[.]mjs";$/m,
+  `const BROWSER_PROTOCOL_ID = "lagniappe-browser";
+const BROWSER_PROTOCOL_VERSION = 4;
+const WORKER_MESSAGES = {{ UPSTREAM_UNAVAILABLE: "upstream-unavailable" }};`,
+);
+upstreamSource = upstreamSource.replace(/\\bexport\\s+/g, "");
+upstreamSource = `(function () {{
+${{upstreamSource}}
+Object.assign(globalThis, {{
+  handleUpstreamResponse,
+  installUpstreamUnavailableBanner,
+  isUpstreamUnavailableResponse,
+  noteFreshApplicationResponse,
+  reportUpstreamUnavailable,
+  showUpstreamUnavailable,
+  upstreamUnavailableDetails,
+}});
+}}).call(globalThis);`;
+vm.runInContext(upstreamSource, context);
 let source = fs.readFileSync("src/script/shared/request.mjs", "utf8");
 source = source.replace(
   'import {{ captureNetworkError }} from "./errors.mjs";',
@@ -210,6 +310,10 @@ source = source.replace(
 source = source.replace(
   'import {{ applyNotificationStateHeader }} from "./notificationState.mjs";',
   "const applyNotificationStateHeader = () => null;",
+);
+source = source.replace(
+  'import {{ handleUpstreamResponse }} from "./upstreamUnavailable.mjs";',
+  "",
 );
 source = source.replace("export const request = {{", "const request = {{");
 source += "\\nglobalThis.request = request;";
@@ -377,6 +481,210 @@ if (response.ok || response.error !== "Internal Server Error") {
 }
 if (document.documentElement.innerHTML !== "mounted page") {
   throw new Error("HTML error response replaced the mounted page");
+}
+""",
+    )
+
+
+# @matrix request-errors : application-error-marker classification dom-replacement
+def test_application_marked_html_error_keeps_existing_behavior(run_node):
+    run_request_check(
+        run_node,
+        """
+mainElt.innerHTML = "current application main";
+const response = await request.get("/html-error");
+if (response.ok || response.error !== "Internal Server Error") {
+  throw new Error(`Unexpected marked error: ${JSON.stringify(response)}`);
+}
+if (mainElt.innerHTML !== "<main>replacement error page</main>" ||
+    document.title !== "Internal Server Error" ||
+    banner.dataset.visible !== "false") {
+  throw new Error("Application-marked error behavior changed");
+}
+""",
+    )
+
+
+# @matrix request-errors : classification dom-preservation upstream-unavailable
+def test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement(
+    run_node,
+):
+    run_request_check(
+        run_node,
+        """
+document.documentElement.innerHTML = "current document";
+mainElt.innerHTML = "current main";
+for (const status of [500, 502, 503, 504]) {
+  const result = await request.get(`/raw-upstream/${status}`);
+  if (result.ok || result.code !== "upstream_instance_unavailable" ||
+      result.status !== status || !result.upstreamUnavailable ||
+      result.retryOutcome !== "failed") {
+    throw new Error(`Raw upstream HTML ${status} was not classified: ${JSON.stringify(result)}`);
+  }
+}
+if (document.documentElement.innerHTML !== "current document" ||
+    mainElt.innerHTML !== "current main") {
+  throw new Error("Raw upstream HTML replaced mounted application state");
+}
+const markedByWorker = new Response(JSON.stringify({ ok: false }), {
+  status: 503,
+  headers: {
+    "Content-Type": "application/json",
+    "X-Lagniappe-Upstream-Unavailable": "true",
+  },
+});
+if (!context.isUpstreamUnavailableResponse(markedByWorker, "/pages/example")) {
+  throw new Error("Service-worker upstream marker was not recognized");
+}
+""",
+    )
+
+
+# @matrix request-errors : banner dom-preservation explicit-retry fresh-response retry upstream-unavailable
+def test_failed_get_preserves_dom_and_exposes_safe_banner_retry(run_node):
+    run_request_check(
+        run_node,
+        """
+context.installUpstreamUnavailableBanner();
+document.documentElement.innerHTML = "current document with entered form";
+mainElt.innerHTML = "current main";
+tokenElt.value = "entered-form-state";
+context.retrySucceeds = false;
+const result = await request.get("/retry-upstream");
+if (result.ok || !result.retryable || result.outcomeUncertain ||
+    result.retryOutcome !== "failed") {
+  throw new Error(`GET failure did not expose safe retry state: ${JSON.stringify(result)}`);
+}
+if (fetchCalls.filter((call) => call.url === "/retry-upstream").length !== 2) {
+  throw new Error("GET did not retry exactly once automatically");
+}
+if (document.documentElement.innerHTML !== "current document with entered form" ||
+    mainElt.innerHTML !== "current main" || tokenElt.value !== "entered-form-state" ||
+    banner.dataset.visible !== "true" || !bannerMessage.textContent.includes("unchanged")) {
+  throw new Error("Unavailable state replaced the page or failed to show its banner");
+}
+
+context.retrySucceeds = true;
+await listeners["banner-click"]();
+if (fetchCalls.filter((call) => call.url === "/retry-upstream").length !== 3) {
+  throw new Error("Explicit retry did not perform exactly one safe GET");
+}
+if (banner.dataset.visible !== "false" || tokenElt.value !== "entered-form-state") {
+  throw new Error("Fresh GET did not clear the banner while preserving form state");
+}
+""",
+    )
+
+
+# @matrix request-errors : mutation no-replay outcome-uncertain upstream-unavailable
+def test_mutation_upstream_failure_is_uncertain_and_never_replayed(run_node):
+    run_request_check(
+        run_node,
+        """
+context.installUpstreamUnavailableBanner();
+const result = await request.patch("/raw-upstream/503", {
+  private: "entered form data",
+});
+if (result.ok || result.retryable || !result.outcomeUncertain ||
+    result.code !== "upstream_instance_unavailable") {
+  throw new Error(`Mutation uncertainty was not exposed: ${JSON.stringify(result)}`);
+}
+if (fetchCalls.filter((call) => call.url === "/raw-upstream/503").length !== 1 ||
+    !bannerMessage.textContent.includes("could not confirm")) {
+  throw new Error("Mutation was replayed or uncertainty was not shown");
+}
+await listeners["banner-click"]();
+const mutationCalls = fetchCalls.filter((call) =>
+  call.url === "/raw-upstream/503" && call.method === "PATCH");
+if (mutationCalls.length !== 1) {
+  throw new Error("Banner retry replayed the uncertain mutation");
+}
+if (!fetchCalls.some((call) => call.url === "/home" && call.method === "GET")) {
+  throw new Error("Mutation banner did not limit retry to a safe current-page GET");
+}
+""",
+    )
+
+
+# @source src/script/shared/request.mjs::_request
+# @matrix csrf : stale-token
+# @matrix request-errors : dom-preservation no-replay outcome-uncertain upstream-unavailable
+def test_mutation_upstream_failure_after_csrf_refresh_is_classified_without_replay(
+    run_node,
+):
+    run_request_check(
+        run_node,
+        """
+document.documentElement.innerHTML = "current document";
+const result = await request.post("/csrf-then-upstream", { private: "form data" });
+if (result.ok || result.retryable || !result.outcomeUncertain ||
+    result.code !== "upstream_instance_unavailable") {
+  throw new Error(`Post-refresh upstream failure was not classified: ${JSON.stringify(result)}`);
+}
+const mutationCalls = fetchCalls.filter((call) =>
+  call.url === "/csrf-then-upstream" && call.method === "POST");
+if (mutationCalls.length !== 2) {
+  throw new Error(`Mutation was replayed beyond the CSRF refresh: ${mutationCalls.length}`);
+}
+if (document.documentElement.innerHTML !== "current document") {
+  throw new Error("Post-refresh upstream HTML replaced the current document");
+}
+""",
+    )
+
+
+# @matrix error-tracking request-errors : cooldown fingerprint privacy response-metadata route-class upstream-unavailable warning
+def test_upstream_diagnostics_are_bounded_private_and_deduplicated(run_node):
+    run_request_check(
+        run_node,
+        """
+const upstream = new Response("<html>private response body</html>", {
+  status: 503,
+  headers: {
+    "Content-Type": "text/html",
+    "Server": "x".repeat(200),
+    "Traceparent": "private-trace-value",
+  },
+});
+const details = context.upstreamUnavailableDetails(upstream, {
+  method: "GET",
+  url: "/pages/private-entity-id?secret=query",
+  retryOutcome: "failed",
+});
+context.reportUpstreamUnavailable({
+  ...details,
+  query: "secret=query",
+  body: "entered form data",
+  response_html: "private response body",
+  cookie: "private cookie",
+});
+context.reportUpstreamUnavailable(details);
+if (sentryEvents.length !== 1) {
+  throw new Error(`Expected one cooldown event, got ${sentryEvents.length}`);
+}
+const event = sentryEvents[0];
+const diagnostic = event.options.contexts.upstream_instance_unavailable;
+if (event.options.level !== "warning" ||
+    event.options.fingerprint.join() !== "upstream_instance_unavailable" ||
+    diagnostic.route_class !== "pages" || diagnostic.server.length !== 128 ||
+    diagnostic.trace_header_present !== true ||
+    diagnostic.build !== "test-build" || diagnostic.release !== "1.2.0") {
+  throw new Error(`Diagnostic metadata was incomplete: ${JSON.stringify(event)}`);
+}
+const allowed = [
+  "build", "method", "online", "release", "retry_outcome", "route_class",
+  "server", "service_worker", "stale", "status", "timestamp",
+  "trace_header_present",
+];
+if (Object.keys(diagnostic).sort().join(",") !== allowed.sort().join(",")) {
+  throw new Error(`Diagnostic contained non-allowlisted fields: ${JSON.stringify(diagnostic)}`);
+}
+const serialized = JSON.stringify(event);
+for (const secret of [
+  "private-entity-id", "secret=query", "entered form data",
+  "private response body", "private cookie", "private-trace-value",
+]) {
+  if (serialized.includes(secret)) throw new Error(`Diagnostic exposed ${secret}`);
 }
 """,
     )

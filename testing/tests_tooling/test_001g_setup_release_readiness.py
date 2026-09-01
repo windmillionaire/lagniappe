@@ -385,6 +385,10 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
         calls.append(("permissions", project))
         return {"installer": [], "billing": [], "deployer": []}
 
+    def inspect_memory(settings, project):
+        calls.append(("memory-alert", settings, project))
+        return {"state": "AVAILABLE", "details": {"policy": "current"}}
+
     monkeypatch.setattr("installer.utils.run_gcloud_command", gcloud)
     monkeypatch.setattr(
         "installer.recovery.verify_recovery_resources",
@@ -394,6 +398,7 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
         "installer.iam.inspect_operator_permissions",
         inspect_permissions,
     )
+    monkeypatch.setattr("installer.monitoring.inspect_memory_alert", inspect_memory)
 
     settings = {"APP_NAME": "Demo"}
     assert doctor._default_provider_checker(settings, "demo-project") == {
@@ -407,6 +412,10 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
             "state": "AVAILABLE",
             "details": {"missing": []},
             "error": None,
+        },
+        "app-engine-memory-alert": {
+            "state": "AVAILABLE",
+            "details": {"policy": "current"},
         },
     }
     assert calls == [
@@ -431,6 +440,7 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
             ],
             False,
         ),
+        ("memory-alert", settings, "demo-project"),
     ]
 
 

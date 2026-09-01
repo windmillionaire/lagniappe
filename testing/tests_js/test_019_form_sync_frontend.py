@@ -1,6 +1,66 @@
 """Node-backed checks for form rendering and administrative widgets."""
 
 
+# @matrix admin : deployment-settings memory-pressure scaling-controls
+def test_site_deployment_caps_workers_only_for_f2_and_b2(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = {
+  SiteSetting: class {},
+  SelectBox: class {},
+  buttons: {},
+  request: {},
+};
+vm.createContext(context);
+let source = fs.readFileSync(
+  "src/script/widgets/siteSettings/deployment.mjs",
+  "utf8",
+);
+source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
+source = source.replace("export class SiteDeployment", "class SiteDeployment");
+source += "\nglobalThis.SiteDeployment = SiteDeployment;";
+vm.runInContext(source, context);
+
+const instanceClass = { value: "B2" };
+const workerInput = { value: "8", max: "20" };
+const guidance = { textContent: "" };
+const form = {
+  querySelector(selector) {
+    if (selector === "[name='DEPLOY_INSTANCE_CLASS']") return instanceClass;
+    if (selector === "[name='DEPLOY_WORKER_COUNT']") return workerInput;
+    if (selector === "[data-role='deployment-worker-guidance']") return guidance;
+    return null;
+  },
+};
+const deployment = Object.create(context.SiteDeployment.prototype);
+deployment.deploymentForm = form;
+
+for (const limited of ["B2", "F2"]) {
+  instanceClass.value = limited;
+  workerInput.value = "8";
+  deployment._syncWorkerLimit();
+  if (workerInput.max !== "3" || workerInput.value !== "3" ||
+      !guidance.textContent.includes("at most three workers")) {
+    throw new Error(`${limited} did not enforce the memory-safe worker limit`);
+  }
+}
+
+for (const configurable of ["B1", "B4", "B8", "F1", "F4", "F4_1G"]) {
+  instanceClass.value = configurable;
+  workerInput.value = "8";
+  deployment._syncWorkerLimit();
+  if (workerInput.max !== "20" || workerInput.value !== "8" ||
+      !guidance.textContent.includes("multiply application memory")) {
+    throw new Error(`${configurable} was incorrectly capped at three workers`);
+  }
+}
+"""
+    )
+
+
 # @matrix admin : composite-widgets persistence sections site-settings
 def test_site_settings_coordinates_section_widgets(run_node):
     run_node(

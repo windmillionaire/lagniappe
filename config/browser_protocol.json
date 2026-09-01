@@ -1,8 +1,9 @@
 {
   "id": "lagniappe-browser",
-  "version": 3,
+  "version": 4,
   "messages": {
-    "CONNECTIVITY": "connectivity-state"
+    "CONNECTIVITY": "connectivity-state",
+    "UPSTREAM_UNAVAILABLE": "upstream-unavailable"
   },
   "events": {},
   "connectivity": {

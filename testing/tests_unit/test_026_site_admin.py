@@ -228,7 +228,9 @@ def test_sitemap_xml_is_sorted_deduped_and_fails_closed_at_limit(monkeypatch):
 
 
 # @matrix public-pages public-directory : active category description opt-out public-url sorting
-def test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents(monkeypatch):
+def test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents(
+    monkeypatch,
+):
     alpha = SimpleNamespace(urlsafe_key="alpha-key", name="Alpha")
     fetch_requests = []
     pages = [
@@ -378,12 +380,18 @@ def test_deployment_settings_merge_live_values_over_runtime_defaults(monkeypatch
         "deployment",
         lambda: {"DEPLOY_WORKER_COUNT": "7", "version": 2},
     )
-    monkeypatch.setattr(site_admin, "normalize_deployment_settings", dict)
+    normalization = []
+    monkeypatch.setattr(
+        site_admin,
+        "normalize_deployment_settings",
+        lambda values, **kwargs: normalization.append(kwargs) or dict(values),
+    )
 
     settings = site_admin.load_deployment_settings(config=config)
 
     assert settings["DEPLOY_WORKER_COUNT"] == "7"
     assert "version" not in settings
+    assert normalization == [{"enforce_worker_limit": False}]
 
 
 # @matrix admin : ai-settings config metadata
@@ -459,7 +467,9 @@ def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
         "get_migration_status",
         lambda: report,
     )
-    monkeypatch.setattr(cache_rebuild.cache, "delete_cache", lambda: deleted.append(True))
+    monkeypatch.setattr(
+        cache_rebuild.cache, "delete_cache", lambda: deleted.append(True)
+    )
     monkeypatch.setattr(
         cache_rebuild.database_get, "all_models", lambda: iter(["one", "two"])
     )
@@ -553,7 +563,9 @@ def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
     )
     monkeypatch.setattr(cache_rebuild.cache, "delete_cache", lambda: None)
     monkeypatch.setattr(cache_rebuild.database_get, "all_models", lambda: iter([group]))
-    monkeypatch.setattr(cache_rebuild.database_get, "all_instances", lambda: iter([page]))
+    monkeypatch.setattr(
+        cache_rebuild.database_get, "all_instances", lambda: iter([page])
+    )
     monkeypatch.setattr(cache_rebuild.database_get, "all_files", lambda: iter(()))
     monkeypatch.setattr(cache_rebuild.database_get, "all_users", lambda: iter([user]))
     monkeypatch.setattr(
