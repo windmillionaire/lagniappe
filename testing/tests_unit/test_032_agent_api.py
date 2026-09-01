@@ -393,6 +393,39 @@ def test_external_ask_submission_completes_without_files_or_execution(monkeypatc
     assert saved == [report]
 
 
+# @pairs agent-api:ask ai-report:answer-only
+@pytest.mark.unit
+def test_external_ask_submission_allows_hash_token_in_named_link_destination():
+    report = SimpleNamespace(tool="ask")
+    proposal = {
+        "summary": "Cypress Hive has an open follow-up task.",
+        "answer_markdown": (
+            "Review [Cypress Hive](/pages/hash:8328b23bef92) for details."
+        ),
+        "confidence": 0.95,
+        "actions": [],
+    }
+
+    normalized = external_api.validate_external_proposal(
+        proposal,
+        report,
+        object(),
+    )
+
+    assert "answer_markdown" not in normalized
+    assert 'href="/pages/hash:8328b23bef92"' in normalized["answer_html"]
+    assert ">Cypress Hive</a>" in normalized["answer_html"]
+
+    proposal["answer_markdown"] = "The internal reference is hash:8328b23bef92."
+    with pytest.raises(exceptions.AIException, match="human names and URLs"):
+        external_api.validate_external_proposal(proposal, report, object())
+
+    proposal.pop("answer_markdown")
+    proposal["answer_html"] = "<script>alert('unsafe')</script><p>Result</p>"
+    with pytest.raises(exceptions.AIException, match="unsupported fields: answer_html"):
+        external_api.validate_external_proposal(proposal, report, object())
+
+
 # @pairs agent-api:create ai-report:proposal-publication
 @pytest.mark.unit
 def test_external_create_submission_renders_markdown_without_files(monkeypatch):

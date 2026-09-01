@@ -713,6 +713,19 @@ def test_current_user_prefers_flask_user_over_config(monkeypatch):
         assert user_context.current_context_user() is request_user
 
 
+# @matrix agent-api users : bearer-user current-user resolver
+def test_current_user_prefers_agent_api_user_over_flask_user(monkeypatch):
+    app = Flask(__name__)
+    bearer_user = _TestUser(owner=True)
+    browser_user = _TestUser(owner=False)
+    monkeypatch.setattr(user_context, "current_user", browser_user)
+
+    with app.test_request_context("/api/v1/demo", method="GET"):
+        g.agent_api_user = bearer_user
+
+        assert user_context.current_context_user() is bearer_user
+
+
 # @matrix property : current-user propagation
 def test_property_defaults_to_config_test_user():
     configured = _TestUser(owner=False)

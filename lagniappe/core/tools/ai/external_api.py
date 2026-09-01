@@ -13,6 +13,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools import cache, dates
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.files.html import render_markdown, strip_tags
 
 from .references import HASH_PREFIXED_ID_REGEX, HASH_REFERENCE_REGEX, hash_reference
 from .ask import ask_report_name, ask_response_schema, validate_ask_response
@@ -238,7 +239,8 @@ def plan_contract(report, user):
             "Hash tokens are tool-call references only; never display them in "
             "summary or answer_markdown.",
             "Use a human name and URL from a tool result when linking an internal "
-            "entity in answer_markdown.",
+            "entity in answer_markdown. The tool-provided URL may contain a hash "
+            "token in its link destination; use a human name as the link label.",
         ]
     else:
         proposal_schema = report_proposal_response_schema(
@@ -435,21 +437,48 @@ def _validate_top_level(proposal):
         raise exceptions.AIException("Proposal contains too many actions.")
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai/external_api.py::validate_external_proposal
+# @reason Ask hash-token checks distinguish rendered labels from link destinations
+def _ask_visible_text(field, value):
+    if field == "answer_markdown":
+        return strip_tags(render_markdown(value))
+    return value
+
+
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_proposal_validation_enforces_permissions_files_and_shape
+# @tests tests_unit/test_032_agent_api.py::test_external_ask_submission_allows_hash_token_in_named_link_destination
 # @matrix agent-api ai-report : file-placement file-summary permissions proposal-validation references
+# @pairs agent-api:ask ai-report:answer-only
 def validate_external_proposal(proposal, report, user):
     """Validate an external final proposal without provider repair."""
     _validate_top_level(proposal)
     tool = normalize_plan_tool(getattr(report, "tool", None))
     if tool == "ask":
+        unexpected = set(proposal) - {
+            "summary",
+            "answer_markdown",
+            "confidence",
+            "actions",
+        }
+        if unexpected:
+            raise exceptions.AIException(
+                "Ask proposal contains unsupported fields: "
+                f"{', '.join(sorted(unexpected))}."
+            )
         if proposal.get("actions"):
             raise exceptions.AIException(
                 "Ask plans are read-only and require an empty actions array."
             )
-        for field in ("summary", "answer_markdown", "answer_html"):
+        for field in ("summary", "answer_markdown"):
             value = proposal.get(field)
-            if isinstance(value, str) and HASH_REFERENCE_REGEX.search(value):
+            visible_text = (
+                _ask_visible_text(field, value) if isinstance(value, str) else value
+            )
+            if isinstance(visible_text, str) and HASH_REFERENCE_REGEX.search(
+                visible_text
+            ):
                 raise exceptions.AIException(
                     "Ask answers must use human names and URLs instead of hash tokens."
                 )

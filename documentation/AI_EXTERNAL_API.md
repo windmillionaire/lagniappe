@@ -77,6 +77,12 @@ application code renders `answer_markdown` through the shared sanitized,
 editor-compatible Markdown pipeline and stores the resulting `answer_html` for
 the report view. Submission moves the report directly to `complete`; it returns
 preview and review URLs but no execution key. Ask rejects uploads and execution.
+Internal hash tokens remain tool-call references and may not appear as visible
+answer text. When a read tool returns a URL containing such a token, clients may
+use that exact URL as a Markdown link destination with the entity's human name
+as its link label. The external submission accepts the advertised Ask fields
+only; clients cannot submit pre-rendered `answer_html` or bypass the shared
+Markdown sanitizer.
 
 If the conversation changes from investigation to requested work, the client
 creates a separate Create or Organize plan rather than placing mutations in an
