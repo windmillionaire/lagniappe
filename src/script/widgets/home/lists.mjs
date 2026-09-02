@@ -18,9 +18,7 @@ function _listToggle(component, widgetName) {
  * @reason shared zero-count presentation is exercised through home list E2E flows
  */
 function _syncEmptyCount(toggle, widgetName, empty) {
-	const indicator = toggle?.querySelector(
-		`[data-indicator='${widgetName}']`,
-	);
+	const indicator = toggle?.querySelector(`[data-indicator='${widgetName}']`);
 	if (!indicator) return;
 
 	const wasEmpty = indicator.dataset.empty === "true";
