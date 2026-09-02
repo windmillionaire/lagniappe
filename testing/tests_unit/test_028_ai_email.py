@@ -57,7 +57,12 @@ def _config():
     )
 
 
-def _signed_headers(raw_body, *, event_id="event-1", timestamp=1_700_000_000):
+def _signed_headers(raw_body, *, event_id="event-1", timestamp=None):
+    timestamp = (
+        int(datetime.now(timezone.utc).timestamp())
+        if timestamp is None
+        else timestamp
+    )
     signed = f"{event_id}.{timestamp}.".encode() + raw_body
     signature = base64.b64encode(
         hmac.new(b"test-secret", signed, hashlib.sha256).digest()
@@ -69,38 +74,93 @@ def _signed_headers(raw_body, *, event_id="event-1", timestamp=1_700_000_000):
     }
 
 
-# @matrix ai-email webhook : raw-body rotation signature timestamp webhook
-def test_svix_signature_verification_uses_raw_body_timestamp_and_any_v1_signature():
+# @matrix ai-email webhook : event-id headers raw-body rotation signature
+def test_svix_signature_verification_accepts_raw_body_case_insensitive_headers_and_any_v1_signature():
     raw_body = b'{"type":"email.received","data":{"email_id":"one"}}'
+    headers = {
+        key.title(): value for key, value in _signed_headers(raw_body).items()
+    }
+    headers["Svix-Signature"] = (
+        f"v1,{base64.b64encode(b'wrong').decode()} "
+        f"{headers['Svix-Signature']} v2,ignored"
+    )
+
     assert (
         verify_svix_signature(
             raw_body,
-            _signed_headers(raw_body),
+            headers,
             "whsec_dGVzdC1zZWNyZXQ=",
-            now=1_700_000_200,
         )
         == "event-1"
     )
 
 
-# @matrix ai-email webhook : invalid raw-body rotation signature stale timestamp webhook
-def test_svix_signature_verification_rejects_invalid_or_stale_requests():
+# @matrix ai-email webhook : invalid raw-body signature
+def test_svix_signature_verification_rejects_changed_or_non_bytes_body():
     raw_body = b"{}"
     headers = _signed_headers(raw_body)
-    with pytest.raises(AIEmailWebhookError, match="outside"):
-        verify_svix_signature(
-            raw_body,
-            headers,
-            "whsec_dGVzdC1zZWNyZXQ=",
-            now=1_700_000_301,
+    with pytest.raises(AIEmailWebhookError) as changed:
+        verify_svix_signature(b"{ }", headers, "whsec_dGVzdC1zZWNyZXQ=")
+    assert str(changed.value) == ""
+
+    for not_raw_bytes in ("{}", bytearray(b"{}")):
+        with pytest.raises(
+            AIEmailWebhookError,
+            match=r"^Webhook body must be raw bytes\.$",
+        ):
+            verify_svix_signature(
+                not_raw_bytes,
+                headers,
+                "whsec_dGVzdC1zZWNyZXQ=",
+            )
+
+
+# @matrix ai-email webhook : headers invalid secret signature
+def test_svix_signature_verification_rejects_missing_or_malformed_authentication_inputs():
+    raw_body = b"{}"
+    signed_headers = _signed_headers(raw_body)
+    invalid_inputs = []
+    for missing_header in signed_headers:
+        invalid_inputs.append(
+            (
+                {
+                    key: value
+                    for key, value in signed_headers.items()
+                    if key != missing_header
+                },
+                "whsec_dGVzdC1zZWNyZXQ=",
+            )
         )
-    with pytest.raises(AIEmailWebhookError, match="invalid"):
-        verify_svix_signature(
-            b"{ }",
-            headers,
-            "whsec_dGVzdC1zZWNyZXQ=",
-            now=1_700_000_000,
+    invalid_inputs.extend(
+        (
+            (
+                {**signed_headers, "svix-signature": malformed},
+                "whsec_dGVzdC1zZWNyZXQ=",
+            )
+            for malformed in ("malformed", "v1,not-base64!", "v1,too,many")
         )
+    )
+    invalid_inputs.append((signed_headers, "whsec_a"))
+
+    for headers, secret in invalid_inputs:
+        with pytest.raises(AIEmailWebhookError) as invalid:
+            verify_svix_signature(raw_body, headers, secret)
+        assert str(invalid.value) == ""
+
+
+# @matrix ai-email webhook : future replay timestamp
+def test_svix_signature_verification_rejects_replayed_or_future_events():
+    raw_body = b"{}"
+    now = int(datetime.now(timezone.utc).timestamp())
+
+    for timestamp in (now - 301, now + 301):
+        with pytest.raises(AIEmailWebhookError) as invalid:
+            verify_svix_signature(
+                raw_body,
+                _signed_headers(raw_body, timestamp=timestamp),
+                "whsec_dGVzdC1zZWNyZXQ=",
+            )
+        assert str(invalid.value) == ""
 
 
 # @matrix ai-email webhook : event-shape json malformed webhook

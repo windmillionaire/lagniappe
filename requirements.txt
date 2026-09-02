@@ -28,5 +28,6 @@ nh3==0.3.7
 pymdown-extensions==11.0.2
 sentry_sdk==2.68.1
 smartypants==2.0.2
+svix==2.2.0
 thefuzz==0.22.1
 phonenumbers==9.0.38

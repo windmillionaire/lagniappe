@@ -110,7 +110,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     unauthorized = client.get("/api/v1/me")
     assert unauthorized.status_code == 401
     assert unauthorized.json["error"]["code"] == "unauthorized"
-    assert unauthorized.headers["WWW-Authenticate"].startswith("Bearer")
+    # The focused security-wiring module owns the complete API header matrix;
+    # this workflow retains one representative cache-boundary assertion.
     assert unauthorized.headers["Cache-Control"] == "no-store"
 
     authorized = client.get(
@@ -246,8 +247,6 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert unknown.status_code == 404
     assert unknown.is_json
     assert unknown.json["error"]["code"] == "not_found"
-    assert unknown.headers["Cache-Control"] == "no-store"
-    assert unknown.headers["X-Request-ID"] == unknown.json["request_id"]
 
     unsupported_method = client.post(
         "/api/v1/me",
@@ -257,7 +256,6 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert unsupported_method.status_code == 405
     assert unsupported_method.is_json
     assert unsupported_method.json["error"]["code"] == "method_not_allowed"
-    assert unsupported_method.headers["Cache-Control"] == "no-store"
     assert "GET" in unsupported_method.headers["Allow"]
 
     catalog = client.get(

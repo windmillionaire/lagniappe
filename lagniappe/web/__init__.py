@@ -40,25 +40,32 @@ if CONFIG.capture_errors:
     SENTRY_LOADED = True
 
 
+# @testable true
+# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_flask_security_configuration_and_session_cookie_attributes
+# @matrix login session : cookie-hardening lifetime
+# @pair web-headers:security
+def configure_flask_security(flask_app, runtime_config=CONFIG):
+    """Apply the stable Flask session, cookie, and runtime-mode contract."""
+    flask_app.config.update(
+        USE_SESSION_FOR_NEXT=True,
+        SECRET_KEY=runtime_config.SECRET_KEY,
+        SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_HTTPONLY=True,
+        REMEMBER_COOKIE_SECURE=True,
+        REMEMBER_COOKIE_SAMESITE="Lax",
+        REMEMBER_COOKIE_HTTPONLY=True,
+        REMEMBER_COOKIE_DURATION=timedelta(days=30),
+        PERMANENT_SESSION_LIFETIME=timedelta(days=1),
+    )
+    flask_app.debug = runtime_config.development
+    flask_app.testing = runtime_config.testing
+
+
 app = Flask(
     __name__, static_url_path="", static_folder="static", template_folder="templates"
 )
-
-app.config.update(
-    USE_SESSION_FOR_NEXT=True,
-    SECRET_KEY=CONFIG.SECRET_KEY,
-    SESSION_COOKIE_SECURE=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_HTTPONLY=True,
-    REMEMBER_COOKIE_SECURE=True,
-    REMEMBER_COOKIE_SAMESITE="Lax",
-    REMEMBER_COOKIE_HTTPONLY=True,
-    REMEMBER_COOKIE_DURATION=timedelta(days=30),
-    PERMANENT_SESSION_LIFETIME=timedelta(days=1),
-)
-
-app.debug = CONFIG.development
-app.testing = CONFIG.testing
+configure_flask_security(app)
 
 csrf = CSRFProtect()
 csrf.init_app(app)
@@ -133,6 +140,7 @@ def record_authenticated_site_activity(response):
 
 
 # @testable true
+# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_common_security_headers
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools

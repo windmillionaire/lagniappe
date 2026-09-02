@@ -20,6 +20,7 @@ def initialize(app):
 
 
 # @testable true
+# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_csrf_exempt_surfaces_reach_replacement_authentication_gates
 # @tests tests_e2e/001_site/test_001a_environment.py::test_error_handling
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
 # @tests tests_e2e/001_site/test_001b_login.py::test_csrf_failure_is_identified_for_targeted_retry

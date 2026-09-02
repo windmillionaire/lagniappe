@@ -541,27 +541,39 @@ def test_app_engine_dynamic_handler_allowlist_covers_registered_routes():
     blueprint_tree = ast.parse(
         (repository_root / "lagniappe/web/start/blueprints.py").read_text()
     )
+    registration_assignment = next(
+        node
+        for node in blueprint_tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name)
+            and target.id == "BLUEPRINT_REGISTRATIONS"
+            for target in node.targets
+        )
+    )
+    registration_calls = registration_assignment.value.elts
+    registrations = {
+        call.args[0].value: (
+            call.args[1].value
+            if len(call.args) > 1 and isinstance(call.args[1], ast.Constant)
+            else None
+        )
+        for call in registration_calls
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id == "BlueprintRegistration"
+        and call.args
+        and isinstance(call.args[0], ast.Constant)
+    }
+    assert len(registrations) == len(registration_calls)
     blueprint_prefixes = {
-        keyword.value.value.removeprefix("/").split("/", 1)[0]
-        for node in ast.walk(blueprint_tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "register_blueprint"
-        for keyword in node.keywords
-        if keyword.arg == "url_prefix"
-        and isinstance(keyword.value, ast.Constant)
-        and isinstance(keyword.value.value, str)
+        prefix.removeprefix("/").split("/", 1)[0]
+        for prefix in registrations.values()
+        if prefix is not None
     }
     assert blueprint_prefixes == set(constants.APP_BLUEPRINT_ROUTE_PREFIXES)
     unprefixed_blueprints = {
-        node.args[0].id
-        for node in ast.walk(blueprint_tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "register_blueprint"
-        and node.args
-        and isinstance(node.args[0], ast.Name)
-        and not any(keyword.arg == "url_prefix" for keyword in node.keywords)
+        binding for binding, prefix in registrations.items() if prefix is None
     }
     assert unprefixed_blueprints == {"home"}
 

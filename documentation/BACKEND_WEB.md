@@ -24,7 +24,8 @@ data; see [the privacy contract](../ERROR_REPORTING_PRIVACY.md).
 
 Global application behavior includes:
 
-- Flask-WTF CSRF protection, except for authenticated process callbacks;
+- Flask-WTF CSRF protection with an explicit, rationale-bearing allowlist for
+  non-cookie-authenticated callbacks and APIs;
 - Secure, HttpOnly, SameSite=Lax session cookies;
 - HSTS, frame, content-type, referrer, and CSP headers;
 - ETag emission when a route sets `g.fingerprint`;
@@ -43,6 +44,7 @@ Blueprint registration lives in `web/start/blueprints.py`.
 | Blueprint | Prefix | Responsibility |
 | --- | --- | --- |
 | `home` | `/` | Home, site settings, search, sync, and shared activity. |
+| `internal` | `/l` | Private browser support endpoints. |
 | `projects` | `/projects` | Projects and model tasks. |
 | `files` | `/files` | Files, uploads, and ingress. |
 | `categories` | `/categories` | Category index and management. |
@@ -50,12 +52,32 @@ Blueprint registration lives in `web/start/blueprints.py`.
 | `users` | `/users` | Login, users, groups, and permissions. |
 | `pages` | `/pages` | Page views and notes. |
 | `tasks` | `/tasks` | Task index and task operations. |
+| `tools` | `/tools` | AI tools, reports, and review surfaces. |
 | `process` | `/process` | Authenticated background callbacks. |
 | `manual` | `/manual` | User manual. |
 | `reference` | `/reference` | Help fragments loaded into modals. |
 | `filters` | `/filters` | Filter management. |
 | `assets` | `/assets` | Documents, images, and form submissions. |
 | `testing` | `/testing` | Test-environment routes. |
+| `messages` | `/messages` | User-facing message views. |
+| `message_internal` | `/l/messages` | Private message update endpoints. |
+| `webhooks` | `/webhooks` | Signed external provider callbacks. |
+| `api_family` | `/api` | Bearer-authenticated API discovery. |
+| `api` | `/api/v1` | Versioned bearer-authenticated API resources. |
+| `analytics` | `/analytics` | Conditional analytics and AI-observability views. |
+
+Blueprint registration and CSRF policy are executable data in
+`web/start/blueprints.py`. Registrations default to CSRF-protected. Exactly five
+whole blueprints are exempt because they replace cookie trust with another
+boundary: `process` uses Google service-account OIDC, `testing` uses the hosted
+E2E OIDC/session gate, `webhooks` verifies provider signatures, and
+`api_family` plus `api` require bearer credentials.
+
+The `users` blueprint remains protected. Startup exempts only its
+`users.login_google` view because Google Identity Services posts its own
+cookie/body double-submit token; that route must call `verify_google_csrf`
+before provider authentication. Adding an exemption requires an explicit
+human-readable rationale in the startup policy.
 
 Private asset responses support one `Range: bytes=...` request and return `206
 Partial Content`, allowing PDF preview code to stream data through Flask.

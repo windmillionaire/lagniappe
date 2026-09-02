@@ -107,6 +107,12 @@ The GIS credential is posted to `POST /users/google-signin`. The server:
 
 Lagniappe does not store Google provider refresh tokens.
 
+Flask-WTF exemption ownership is centralized in
+`lagniappe/web/start/blueprints.py`. It exempts only the
+`users.login_google` view, not the whole `users` blueprint. The route therefore
+must retain `verify_google_csrf` as its separate cookie/body double-submit
+boundary before reading or verifying a provider credential.
+
 ## Application accounts and roles
 
 Provider identity, Lagniappe roles, and Google Cloud IAM are independent.

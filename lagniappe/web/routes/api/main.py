@@ -111,9 +111,10 @@ def _rate_limit(scope, identifier, limit, window_seconds):
 
 
 # @testable true
+# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_authentication_and_header_contract
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
-# @matrix agent-api : bearer-only entitlement-independent error-envelope public-user request-recheck
+# @matrix agent-api : bearer-only entitlement-independent error-envelope public-user request-correlation request-recheck session-independent
 @api.before_request
 def authenticate_request():
     """Authenticate only a bearer token; browser sessions are never a fallback."""
@@ -159,8 +160,8 @@ api_family.before_request(authenticate_request)
 
 
 # @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : error-envelope
+# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_authentication_and_header_contract
+# @matrix agent-api : error-envelope no-store request-correlation
 @api.after_request
 def annotate_response(response):
     response.headers["X-Request-ID"] = getattr(
@@ -176,6 +177,7 @@ api_family.after_request(annotate_response)
 
 
 # @testable true
+# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_csrf_exempt_surfaces_reach_replacement_authentication_gates
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @matrix agent-api : error-envelope routing
 def handle_api_http_error(error):
