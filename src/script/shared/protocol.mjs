@@ -32,7 +32,7 @@ export function validateConnectivityState(state) {
  * @testable true
  * @tests tests_js/test_021_browser_protocol.py::test_browser_protocol_contains_versioned_worker_messages
  * @tests tests_js/test_021_browser_protocol.py::test_connectivity_messages_are_versioned_and_validated
- * @matrix browser-protocol : connectivity connectivity-only envelope producer version
+ * @matrix browser-protocol : connectivity envelope producer version
  */
 export function connectivityMessage(state) {
 	if (!validateConnectivityState(state)) {
