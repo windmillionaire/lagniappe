@@ -134,3 +134,65 @@ def test_skipped_scheduled(get_test_entities):
                     f"Failed for '{task_name}': due={due_date_user_tz}, today={mock_today}, "
                     f"expected {expected['skipped']}, got {skipped}"
                 )
+
+
+# @matrix task-scheduling : scheduled skipped
+@pytest.mark.unit
+def test_skipped_scheduled_calendar_boundaries():
+    """Skipped counts retain their endpoint rules while sparse dates are skipped."""
+    from datetime import datetime
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from zoneinfo import ZoneInfo
+
+    from lagniappe.core.tools.tasks import scheduling
+
+    tz = ZoneInfo("America/Chicago")
+
+    def task_due(year, month, day):
+        return SimpleNamespace(
+            due_date=datetime(year, month, day, tzinfo=tz),
+            postponed_from=None,
+        )
+
+    with (
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
+        ),
+        patch("lagniappe.core.tools.tasks.scheduling.user_today") as user_today,
+    ):
+        # Daily counting includes the occurrence on today.
+        user_today.return_value = datetime(2025, 6, 18, tzinfo=tz)
+        assert scheduling.calculate_skipped_scheduled_tasks(
+            task_due(2025, 6, 15), {"mode": "daily"}
+        ) == 3
+
+        # Weekly counting excludes the selected weekday on today.
+        assert scheduling.calculate_skipped_scheduled_tasks(
+            task_due(2025, 6, 11), {"mode": "weekly", "days": [2]}
+        ) == 0
+
+        # A day-31 rule has no February occurrence but does occur in March.
+        user_today.return_value = datetime(2025, 4, 1, tzinfo=tz)
+        assert scheduling.calculate_skipped_scheduled_tasks(
+            task_due(2025, 1, 31),
+            {"mode": "monthly", "type": "specific_day", "day": 31},
+        ) == 1
+
+        # February 29 occurs once between 2020 and March 2025.
+        user_today.return_value = datetime(2025, 3, 1, tzinfo=tz)
+        assert scheduling.calculate_skipped_scheduled_tasks(
+            task_due(2020, 2, 29),
+            {
+                "mode": "yearly",
+                "type": "specific_day",
+                "month": 2,
+                "day": 29,
+            },
+        ) == 1
+
+        assert scheduling.calculate_skipped_scheduled_tasks(
+            task_due(2020, 1, 1),
+            {"mode": "weekly", "days": []},
+        ) == 0

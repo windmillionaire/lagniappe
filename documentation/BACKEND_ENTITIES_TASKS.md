@@ -23,6 +23,13 @@ Dates are stored in UTC and projected in the user's timezone. `Completed`,
 `CompletedOn`, and `DueDate` remain separate values so a recurring task can
 stay active while temporarily completed.
 
+Calendar schedules select valid calendar positions rather than clamping dates.
+A monthly schedule for day 31 skips months without a 31st, and a yearly
+February 29 schedule advances to the next leap year. Recurring and periodic
+month/year intervals instead retain interval semantics, including end-of-month
+clamping. Daily, weekly, and monthly calendar occurrences retain the prior due
+date's local wall-clock time; yearly calendar occurrences use local midnight.
+
 ## Completion and scheduled uncompletion
 
 Completing a scheduled task:
