@@ -101,15 +101,7 @@
   <ul data-widget="ToolReportList"
       data-visible="false"
       class="{{ styles.home.ingress.list }}">
-    {% for report in reports.list %}
-      {{ report_item(report) }}
-    {% else %}
-      <li data-role="empty" class="{{ styles.home.ingress.item }}">
-        <div class="{{ styles.home.ingress.details }}">
-          <p>No AI reports generated yet.</p>
-        </div>
-      </li>
-    {% endfor %}
+    {% for report in reports.list %}{{ report_item(report) }}{% endfor %}
   </ul>
 {% endmacro %}
 

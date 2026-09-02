@@ -96,6 +96,14 @@ image, and output policy until relevant. Treat its result as model guidance,
 not proof that a required rule was followed; the application validator remains
 the contract.
 
+`get_category_pages` returns at most ten Pages per call. Its response separates
+the caller's `requested_limit`, the enforced `effective_limit`, and
+`returned_count`; `page_count` remains as a compatibility alias for the returned
+count. When `has_more` is true, pass the opaque `next_cursor` back with the same
+Category/Form filter rather than treating the first page as a complete count.
+The declared range is one through ten; the handler clamps older out-of-range
+integer calls and exposes that choice through `effective_limit`.
+
 ## Files
 
 Initial attachments and tool-returned files use the `FileConsumer` boundary.

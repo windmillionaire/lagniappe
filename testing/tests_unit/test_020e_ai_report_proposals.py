@@ -434,6 +434,33 @@ def test_validate_proposal_accepts_virtual_user_kind_as_personal_page(monkeypatc
         )
 
 
+# @matrix ai-report : task-page validation
+@pytest.mark.unit
+def test_validate_proposal_requires_create_task_page_reference():
+    proposal = {
+        "summary": "Create a task without a destination Page.",
+        "confidence": 0.9,
+        "issues": [],
+        "actions": [
+            {
+                "id": "orphan-task",
+                "type": "create_task",
+                "data": {
+                    "name": "Review AI Reports empty state",
+                    "page_name": "Lagniappe",
+                },
+            }
+        ],
+    }
+
+    with pytest.raises(
+        exceptions.AIException,
+        match=(
+            r"Action orphan-task \(create_task\) requires data\.page "
+            r"or data\.page_action\."
+        ),
+    ):
+        proposal_validation.validate_proposal(proposal)
 
 
 # @matrix ai-report : references repair
@@ -1717,7 +1744,10 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                             "Remaining $2,250.00 balance due by Feb 26, 2021."
                         ),
                     ],
-                    "data": {"name": "Sousa Doors Final Invoice"},
+                    "data": {
+                        "name": "Sousa Doors Final Invoice",
+                        "page_action": "page",
+                    },
                 },
             ],
         }

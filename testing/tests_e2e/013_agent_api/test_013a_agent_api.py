@@ -234,11 +234,16 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert upload_operation["requestBody"]["required"] is True
     tools_operation = openapi.json["paths"]["/api/v1/tools"]["get"]
     assert "task=organize" in tools_operation["description"]
+    assert "exact input_schema" in tools_operation["description"]
     execute_tool_operation = openapi.json["paths"][
         "/api/v1/plans/{plan_id}/tools/{tool_name}"
     ]["post"]
     assert "ready Create or Organize plans" in execute_tool_operation["description"]
     assert "top-level arguments object" in execute_tool_operation["description"]
+    assert "error.code=tool_error" in execute_tool_operation["description"]
+    assert execute_tool_operation["responses"]["422"]["content"][
+        "application/json"
+    ]["schema"] == {"$ref": "#/components/schemas/Error"}
     submit_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/submit"]["post"]
     assert "Organize also requires at least one finalized file" in submit_operation[
         "description"
@@ -252,10 +257,16 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "schema"
     ]
     assert submit_schema["required"] == ["contract_version", "proposal"]
+    assert submit_operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/SubmissionReceipt"}
     plan_schema = openapi.json["components"]["schemas"]["Plan"]
     assert "execute_url" not in plan_schema["properties"]
     assert "execution" not in plan_schema["properties"]
     assert "Execution" not in openapi.json["components"]["schemas"]
+    receipt_schema = openapi.json["components"]["schemas"]["SubmissionReceipt"]
+    assert "proposal" not in receipt_schema["properties"]
+    assert "proposal_fingerprint" in receipt_schema["required"]
 
     unknown = client.get(
         "/api/v1/not-a-resource",
@@ -408,6 +419,34 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "user": actor,
     }
 
+    monkeypatch.setattr(
+        ai_functions,
+        "execute_registered_tool",
+        lambda name, arguments, user: (
+            {
+                "error": "id is required",
+                "required": ["id"],
+                "received": sorted(arguments),
+            },
+            [],
+        ),
+    )
+    rejected_tool = client.post(
+        "/api/v1/plans/report-key/tools/get_schema",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"arguments": {"hash": "pagehash1234"}},
+    )
+    assert rejected_tool.status_code == 422
+    assert rejected_tool.json["error"] == {
+        "code": "tool_error",
+        "message": "id is required",
+        "details": {
+            "tool": "get_schema",
+            "required": ["id"],
+            "received": ["hash"],
+        },
+    }
+
     class DownloadableFile:
         properties = SimpleNamespace(
             file=SimpleNamespace(value=SimpleNamespace(path="private/person.vcf"))
@@ -487,6 +526,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         assert contract_version == external_api.CONTRACT_VERSION
         current.status = "ready"
         current.proposal = proposal
+        current.agent_manifest["proposal_fingerprint"] = "normalized-proposal"
         return current
 
     monkeypatch.setattr(external_api, "submit_plan", submit)
@@ -506,9 +546,17 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert submitted.status_code == 200
     assert submitted.json["status"] == "ready"
-    assert submitted.json["proposal"] == proposal
+    assert submitted.json["proposal_fingerprint"] == "normalized-proposal"
+    assert "proposal" not in submitted.json
     assert "execute_url" not in submitted.json
     assert "execution" not in submitted.json
+
+    detailed_plan = client.get(
+        "/api/v1/plans/report-key",
+        headers={"Authorization": "Bearer valid-key"},
+    )
+    assert detailed_plan.status_code == 200
+    assert detailed_plan.json["proposal"] == proposal
 
     ready_read = client.post(
         "/api/v1/plans/report-key/tools/search_entities",
@@ -526,7 +574,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         },
     )
     assert revised_submission.status_code == 200
-    assert revised_submission.json["proposal"] == revised_proposal
+    assert revised_submission.json["status"] == "ready"
+    assert "proposal" not in revised_submission.json
 
     report.tool = "create"
     create_ready_read = client.post(
@@ -545,7 +594,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         },
     )
     assert create_revised_submission.status_code == 200
-    assert create_revised_submission.json["proposal"] == create_revision
+    assert create_revised_submission.json["status"] == "ready"
+    assert "proposal" not in create_revised_submission.json
 
     missing_execution = client.post(
         "/api/v1/plans/report-key/execute",
@@ -776,6 +826,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
             "answer_html": "<h2>Open tasks</h2><p>Two pages have open tasks.</p>",
         }
         current.proposal.pop("answer_markdown", None)
+        current.agent_manifest["proposal_fingerprint"] = "normalized-answer"
         return current
 
     monkeypatch.setattr(external_api, "submit_plan", submit)
@@ -791,7 +842,8 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     assert submitted.json["status"] == "complete"
     assert "execute_url" not in submitted.json
     assert "execution" not in submitted.json
-    assert submitted.json["proposal"]["answer_html"].startswith("<h2>")
+    assert submitted.json["proposal_fingerprint"] == "normalized-answer"
+    assert "proposal" not in submitted.json
 
     follow_up_read = client.post(
         "/api/v1/plans/report-key/tools/search_entities",
@@ -813,7 +865,8 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         },
     )
     assert revised.status_code == 200
-    assert revised.json["proposal"]["summary"] == "One page has an open task."
+    assert revised.json["status"] == "complete"
+    assert "proposal" not in revised.json
 
     missing_execution = client.post(
         "/api/v1/plans/report-key/execute",

@@ -39,6 +39,10 @@ Projects, Forms, and Tasks. Its output is always a proposal. It may use Search
 for public facts and workspace tools for existing structure, then passes the
 shared proposal contract and repair boundary.
 
+The in-app Create prompt includes the authenticated user's guaranteed editable
+personal Page reference directly, matching the external Create plan contract.
+The same reference also remains available from `list_workspace_resources`.
+
 Create Page proposals distinguish top-level Page metadata from attached form
 submissions. Without a form, `name` and `description` live directly on the
 Page action. With a form, canonical top-level values win and the corresponding

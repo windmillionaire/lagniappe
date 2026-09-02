@@ -1619,8 +1619,12 @@ def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
         {"id": "category-ai", "compact": True},
         user,
     )
-
     assert result["category"] == "Appliances"
+    assert result["requested_limit"] == ai_get_pages.CATEGORY_PAGES_LIMIT
+    assert result["effective_limit"] == ai_get_pages.CATEGORY_PAGES_LIMIT
+    assert result["returned_count"] == 1
+    assert result["has_more"] is False
+    assert result["next_cursor"] is None
     assert result["page_count"] == 1
     assert result["pages"] == [
         {
@@ -1648,6 +1652,84 @@ def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
             },
         }
     ]
+
+
+# @matrix ai category-pages : pagination tool-context
+@pytest.mark.unit
+def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
+    category = TestEntities.get(
+        "CATEGORY",
+        {"name": "People", "hash": "people-category-ai"},
+    )
+    page = SimpleNamespace(to_ai=lambda user: {"name": "Avery Rowan"})
+    user = SimpleNamespace(
+        properties=SimpleNamespace(
+            restrictions=SimpleNamespace(
+                unrestricted_pages=lambda current: [],
+            )
+        )
+    )
+    calls = []
+
+    def fake_load(*identifiers, request):
+        if identifiers == ("people-category-ai", None):
+            return [category]
+        if identifiers == ("page-key",):
+            return [page]
+        return []
+
+    def fake_pages(*args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace(
+            results=["page-key"],
+            next_cursor="next-page-token",
+        )
+
+    monkeypatch.setattr(ai_get_pages.Entities, "fetch", fake_load)
+    monkeypatch.setattr(ai_get_pages.database_get, "pages", fake_pages)
+
+    result = ai_get_pages.execute_get_category_pages(
+        {
+            "id": "people-category-ai",
+            "limit": 25,
+            "cursor": "current-page-token",
+        },
+        user,
+    )
+    invalid_limit = ai_get_pages.execute_get_category_pages(
+        {"id": "people-category-ai", "limit": "10"},
+        user,
+    )
+
+    limit_schema = ai_get_pages.GET_CATEGORY_PAGES.parameters.properties["limit"]
+    assert limit_schema.minimum == 1
+    assert limit_schema.maximum == ai_get_pages.SEARCH_LIMIT
+    assert calls == [
+        (
+            (category.key,),
+            {
+                "form": None,
+                "start_cursor": "current-page-token",
+                "limit": ai_get_pages.SEARCH_LIMIT,
+                "hashes": [],
+            },
+        )
+    ]
+    assert invalid_limit == {
+        "error": "limit must be an integer from 1 to 10",
+        "minimum": 1,
+        "maximum": 10,
+    }
+    assert result == {
+        "category": "People",
+        "requested_limit": 25,
+        "effective_limit": ai_get_pages.SEARCH_LIMIT,
+        "returned_count": 1,
+        "has_more": True,
+        "next_cursor": "next-page-token",
+        "page_count": 1,
+        "pages": [{"name": "Avery Rowan"}],
+    }
 
 
 # @matrix ai form-schema : form model-task page task tool-context

@@ -647,6 +647,9 @@ def test_create_prompt_builds_creation_proposal_without_file_actions():
     assert "summarize_file" not in prompt.allowed_actions
     assert prompt.audit()["duplicate_headings"] == []
     assert "Category default forms are exceptional" in prompt.preview()
+    assert "Every create_task action requires its editable destination Page" in (
+        prompt.preview()
+    )
 
 
 
@@ -1043,6 +1046,13 @@ def test_report_prompts_always_allow_tasks_on_the_personal_page():
         prompt = create.create_prompt(report, user)
 
     assert prompt.allowed_actions == ("create_task", "needs_review")
+    personal_page = _prompt_context_json(prompt, "Personal Page")
+    assert personal_page["kind"] == "page"
+    assert personal_page["hash"] == "hash:personal-page-only-page"
+    assert personal_page["name"] == "Permissioned Page"
+    assert personal_page["url"] == "/test/page/personal-page-only-page"
+    assert isinstance(personal_page["can_view"], bool)
+    assert isinstance(personal_page["can_edit"], bool)
     permissions = _prompt_context_json(prompt, "Report Action Permissions")
     assert "can_create_tasks" not in permissions["capabilities"]
     assert any(

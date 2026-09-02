@@ -67,7 +67,10 @@ tool-selection rules, lifecycle, and browser-approval boundary. Every plan
 response returns its opaque identifier as the top-level
 `id`. A plan's tool is immutable for auditability, but a conversational client
 may create another plan with a different tool whenever the user's intent
-changes.
+changes. Fetch discovery, OpenAPI, and the tool catalog once per client run and
+reuse the parsed values in memory. This is run-local reuse, not persistent HTTP
+caching: API responses remain `no-store`, and the current plan contract must
+still be fetched after uploads and immediately before submission.
 
 1. `GET /` points a client given only the versioned base URL to the authoritative
    discovery resources.
@@ -79,6 +82,8 @@ changes.
    capabilities. It intentionally does not expose or consult the unrelated
    site-funded model-provider entitlement.
 4. `GET /tools` returns permission-bounded read tools as plain JSON Schema.
+   Inspect the selected tool's exact `input_schema` rather than guessing field
+   names such as `id`, `hash`, or `ref`.
    `list_workspace_resources` includes the personal Page alongside the
    permission-filtered workspace inventory.
 5. `POST /plans` creates a provider-free draft with `tool` set to `ask`,
@@ -90,10 +95,12 @@ changes.
    schema, submission wrapper, workflow rules, reference rules, permissions,
    limits, actor timezone, personal Page reference, and timezone-aware
    `current_date`.
-8. `POST /plans/{id}/submit` validates and publishes the final result. It never
-   calls a provider or applies workspace actions. Repeating this call with a
-   valid complete result replaces the prior result while the report remains
-   reusable.
+8. `POST /plans/{id}/submit` validates and publishes the final result. It returns
+   a compact receipt containing status, review URLs, and the normalized proposal
+   fingerprint rather than echoing the proposal. It never calls a provider or
+   applies workspace actions. Repeating this call with a valid complete result
+   replaces the prior result while the report remains reusable; `status_url`
+   retrieves the detailed Plan resource.
 
 ### Minimal client skill
 
@@ -103,15 +110,16 @@ skills. For Pi, install or refresh it with:
 
 ```bash
 mkdir -p ~/.pi/agent/skills/lagniappe
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   https://lagniappe.site/api/v1/client-skill.md \
   -o ~/.pi/agent/skills/lagniappe/SKILL.md
 ```
 
 The skill deliberately contains no action schemas, permission lists, or
-mode-specific proposal instructions. Those remain live in discovery, OpenAPI,
-and each plan contract so installed copies stay useful as the API evolves.
+use-case-specific proposal instructions. It defines the general Ask/Create/
+Organize boundary, early uploaded-file safety, and run-local discovery reuse;
+the live OpenAPI and each plan contract remain authoritative as the API evolves.
 
 Within Create and Organize proposals, a `data.submission` object contains the
 Form values to create with that new Page or Task, keyed by exact Form schema
@@ -162,8 +170,11 @@ action or `needs_review`. Create does not accept plan uploads.
 `create_task` is always part of the Create and Organize action contracts because
 every user has an editable personal Page. The coarse capability projection does
 not expose a redundant `can_create_tasks` flag. A Task proposal must still name
-an editable target; use `personal_page.hash` for a request concerning the
-authenticated user's own Page. Proposals and the deterministic runner do not
+an editable target in `data.page`, or use `data.page_action` when an earlier
+proposal action creates the target Page. `page_name` is display context only and
+does not satisfy this requirement. Use `personal_page.hash` for a request
+concerning the authenticated user's own Page. Proposal submission rejects a
+Task without an executable Page reference, and the deterministic runner does not
 gain permission to write to any other Page.
 
 Optional page rich text is model-facing `document_markdown`. Proposal
@@ -188,14 +199,30 @@ and immediately before constructing the proposal. Include exactly one
 retrieval terms, and normally `search: true`. The server does not call a model
 to repair form values or create file summaries.
 
+The external Organize contract remains permission-scoped and adds the
+external-only `summarize_file` action without inferring a narrower action set
+from the request. Its proposal schema uses standard JSON Schema `$defs` and
+`oneOf` references, plus an OpenAPI-compatible `type` discriminator mapping and
+explicit reference-group constraints. This is an external serialization
+adapter; Gemini's provider-compatible structured-output schema remains
+unchanged.
+
 ### Publication and browser approval
 
-Create and Organize submission saves a `ready` report and returns the full
-`review_url` and shorter creator-session `preview_url`. Present the preview and
-direct the user to review and approve it on the authenticated website. The
+Create and Organize submission saves a `ready` report and returns a compact
+receipt with the full `review_url`, shorter creator-session `preview_url`,
+`status_url`, and `proposal_fingerprint`. Present the preview and direct the
+user to review and approve it on the authenticated website. The
 external API deliberately has no `/execute` operation. The existing browser
 Execute control starts the normal deterministic runner and applies the exact
 validated proposal without a model call.
+
+The compact receipt is a response-shape change for clients that previously read
+`proposal` directly from the submit response. Such clients should retain the
+public `hash:` proposal they sent for later revisions. `status_url` returns the
+detailed Plan, but its saved proposal is the execution-normalized inspection
+state and is not a round-trippable submission source. A proper public projection
+remains a separate compatibility improvement.
 
 Opening, changing, executing, retrying, undoing, or deleting a saved report is
 provider-free and therefore does not require site AI access. Those browser
@@ -227,7 +254,11 @@ deterministic execution path remains authoritative.
 
 Failures under `/api/v1`, including routing-level `404` and `405` responses,
 use the same JSON error envelope and request ID. A `405` preserves the HTTP
-`Allow` header.
+`Allow` header. Read-tool handler failures use HTTP `422` with
+`error.code: "tool_error"`; any corrective fields supplied by the shared
+handler are preserved under `error.details` with the selected tool name.
+When diagnosing a cURL failure, use `--fail-with-body` so the JSON envelope is
+not discarded by cURL's nonzero exit behavior.
 
 ## Organize cURL example
 
@@ -238,11 +269,11 @@ shell history:
 export LAGNIAPPE_API_KEY='lgn_...'
 export LAGNIAPPE_URL='https://your-app.example'
 
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   "$LAGNIAPPE_URL/api/v1/me"
 
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"tool":"organize","instructions":"Organize the uploaded records into pages."}' \
@@ -252,17 +283,17 @@ curl --fail --silent --show-error \
 Use the returned plan `id` to start an upload:
 
 ```bash
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"files":[{"filename":"records.pdf","content_type":"application/pdf","size":12345}]}' \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/uploads"
 
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -X PUT -H 'Content-Type: application/pdf' \
   --upload-file records.pdf "$UPLOAD_SESSION_URL"
 
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   -H 'Content-Type: application/json' -d '{}' \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/uploads/finalize"
@@ -273,17 +304,17 @@ tools and specialized bundles, then fetch the contract and submit the external
 model's final JSON proposal:
 
 ```bash
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"arguments":{"task":"organize"}}' \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/tools/get_guidelines"
 
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/contract"
 
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   -H 'Content-Type: application/json' \
   --data-binary @submission.json \
@@ -295,7 +326,7 @@ website to review and approve the proposal there. The API performs no further
 write step. A client may fetch the plan later to observe its top-level state:
 
 ```bash
-curl --fail --silent --show-error \
+curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID"
 ```
@@ -311,7 +342,7 @@ access.
 
 ```json
 {
-  "contract_version": 4,
+  "contract_version": 5,
   "proposal": {
     "summary": "Organize the records into a new page.",
     "confidence": 0.94,
@@ -325,7 +356,9 @@ The contract's `required_file_refs` means a real file-bearing proposal cannot
 normally use an empty action list; it must place every uploaded file through an
 allowed action and include exactly one `summarize_file` action for each file.
 The summary action's `data` contains `file`, `summary`, `retrieval_terms` (two
-distinct strings), and normally `search: true`.
+distinct strings), and normally `search: true`. The external schema requires
+the two terms and marks them unique; validation also rejects case-only
+duplicates.
 
 When `get_file` is called with `include_original: true`, the REST adapter
 returns a five-minute `original_file.download_url` when the source is
@@ -374,6 +407,7 @@ with path.open("rb") as source:
     ).raise_for_status()
 
 session.post(f"{base}/plans/{plan['id']}/uploads/finalize", json={}).raise_for_status()
+# Reuse this catalog for the rest of the run. Do not persist it as an HTTP cache.
 tools = session.get(f"{base}/tools").json()
 organize_guidelines = session.post(
     f"{base}/plans/{plan['id']}/tools/get_guidelines",

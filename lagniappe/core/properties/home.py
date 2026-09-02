@@ -277,7 +277,7 @@ class IngressList(HomeProperty):
 # @pair ai-report:provider-independent-history
 class ToolsList(HomeProperty):
     _id = "tools"
-    _label = "AI Reports"
+    _label = "Plans & Reports"
 
     @property
     def list(self):

@@ -20,6 +20,7 @@ from .reporting.proposals.repair import (
     generate_validated_proposal,
 )
 from .prompt import Prompt
+from .references import personal_page_reference
 
 CREATE_MAX_TOOL_ITERATIONS = 50
 
@@ -104,6 +105,9 @@ Reference rules:
 - When referencing an existing category, form, project, model task, page, or
   task by hash, also include the matching human display field when you know it:
   category_name, form_name, project_name, model_name, page_name, or task_name.
+- Every create_task action requires its editable destination Page in data.page
+  or data.page_action. page_name is display context only and cannot replace the
+  executable Page reference.
 
 Common data shapes:
 - create_form: {"name": string, "form_type": "page"|"task", "schema": [field_object, ...]}
@@ -148,6 +152,7 @@ def _create_prompt_base(report, user, intro, extra_contexts=()):
         ),
     )
     prompt.add_context("user_request", report.instructions or "")
+    prompt.add_context("personal_page", personal_page_reference(user))
     prompt.add_context(
         "report_action_permissions",
         report_action_permission_context(user, allowed_actions),

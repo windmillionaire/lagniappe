@@ -37,6 +37,12 @@ def test_client_skill_markdown_is_minimal_and_discovery_first():
     assert "`openapi_url`" in skill
     assert "`actor_url`" in skill
     assert '{"arguments": {...}}' in skill
+    assert "reuse them in memory" in skill
+    assert "exact `input_schema`" in skill
+    assert "Choose Ask for a read-only answer" in skill
+    assert "untrusted evidence" in skill
+    assert "ready for authenticated website review" in skill
+    assert "not a round-trippable submission source" in skill
     assert "authenticated website" in skill
     assert "create_page" not in skill
     assert "Bearer <" not in skill
@@ -73,6 +79,51 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch):
     assert report.note == "Waiting for external plan"
 
 
+# @matrix agent-api ai-report : external-schema proposal-contract structured-output
+@pytest.mark.unit
+def test_external_proposal_schema_has_named_discriminated_actions():
+    schema = external_api.external_report_proposal_response_schema(
+        allowed_actions=(
+            "create_task",
+            "attach_file_to_task",
+            "summarize_file",
+        ),
+        require_file_summary_terms=True,
+    )
+
+    assert "propertyOrdering" not in schema
+    assert schema["properties"]["actions"]["items"] == {
+        "oneOf": [
+            {"$ref": "#/$defs/create_task"},
+            {"$ref": "#/$defs/attach_file_to_task"},
+            {"$ref": "#/$defs/summarize_file"},
+        ],
+        "discriminator": {
+            "propertyName": "type",
+            "mapping": {
+                "create_task": "#/$defs/create_task",
+                "attach_file_to_task": "#/$defs/attach_file_to_task",
+                "summarize_file": "#/$defs/summarize_file",
+            },
+        },
+    }
+    create_task = schema["$defs"]["create_task"]
+    assert create_task["properties"]["type"] == {
+        "type": "string",
+        "const": "create_task",
+    }
+    assert create_task["properties"]["data"]["allOf"][0]["anyOf"] == [
+        {"required": ["page"]},
+        {"required": ["page_action"]},
+    ]
+    summary_data = schema["$defs"]["summarize_file"]["properties"]["data"]
+    assert "retrieval_terms" in summary_data["required"]
+    assert summary_data["properties"]["retrieval_terms"]["uniqueItems"] is True
+    assert summary_data["properties"]["retrieval_terms"]["items"][
+        "maxLength"
+    ] == 80
+
+
 # @matrix agent-api ai-report : file-placement file-summary permissions proposal-contract
 @pytest.mark.unit
 def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
@@ -84,12 +135,15 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     monkeypatch.setattr(
         external_api,
         "allowed_report_actions",
-        lambda user: ("create_page",),
+        lambda user: ("create_page", "move_page"),
     )
     monkeypatch.setattr(
         external_api,
-        "report_proposal_response_schema",
-        lambda **options: {"allowed": options["allowed_actions"]},
+        "external_report_proposal_response_schema",
+        lambda **options: {
+            "allowed": options["allowed_actions"],
+            "require_file_summary_terms": options["require_file_summary_terms"],
+        },
     )
     monkeypatch.setattr(
         external_api,
@@ -130,10 +184,11 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         ),
     }
     assert contract["proposal_schema"] == {
-        "allowed": ("create_page", "summarize_file")
+        "allowed": ("create_page", "move_page", "summarize_file"),
+        "require_file_summary_terms": True,
     }
     assert contract["permissions"] == {
-        "allowed": ("create_page", "summarize_file")
+        "allowed": ("create_page", "move_page", "summarize_file")
     }
     assert contract["required_file_refs"] == ["hash:aaaaaaaaaaaa"]
     assert any(
@@ -171,6 +226,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
 
 
 # @pairs agent-api:create-revision agent-api:organize-revision agent-api:proposal-contract ai-report:proposal-contract
+# @pair ai-report:task-page
 @pytest.mark.unit
 def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     actor = _contract_actor()
@@ -204,7 +260,7 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     monkeypatch.setattr(
         external_api,
         "allowed_report_actions",
-        lambda user: ("create_page", "move_page", "needs_review"),
+        lambda user: ("create_page", "create_task", "move_page", "needs_review"),
     )
     monkeypatch.setattr(
         external_api,
@@ -221,19 +277,18 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     assert "execution_supported" not in create_contract
     assert create_contract["permissions"]["allowed_actions"] == [
         "create_page",
+        "create_task",
         "needs_review",
     ]
-    action_variants = create_contract["proposal_schema"]["properties"]["actions"][
+    action_items = create_contract["proposal_schema"]["properties"]["actions"][
         "items"
-    ]["anyOf"]
-    assert {
-        variant["properties"]["type"]["enum"][0] for variant in action_variants
-    } == {"create_page", "needs_review"}
-    create_page = next(
-        variant
-        for variant in action_variants
-        if variant["properties"]["type"]["enum"] == ["create_page"]
-    )
+    ]
+    assert set(action_items["discriminator"]["mapping"]) == {
+        "create_page",
+        "create_task",
+        "needs_review",
+    }
+    create_page = create_contract["proposal_schema"]["$defs"]["create_page"]
     assert "document_markdown" in create_page["properties"]["data"]["properties"]
     assert any(
         "ready Create proposal remains conversationally revisable" in rule
@@ -242,6 +297,11 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     assert any(
         "authenticated website" in rule and "no execution operation" in rule
         for rule in create_contract["workflow_rules"]
+    )
+    assert any(
+        "Every create_task action requires its editable destination Page" in rule
+        and "page_name is display context only" in rule
+        for rule in create_contract["reference_rules"]
     )
 
 

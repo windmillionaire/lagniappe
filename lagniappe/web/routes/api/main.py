@@ -334,6 +334,28 @@ def _plan_payload(report, *, include_proposal=True):
     return _json_safe(payload)
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/api/main.py::submit_plan
+# @reason compact publication fields are asserted through the public submit resource
+def _submission_receipt(report):
+    """Return a compact receipt without echoing the normalized proposal."""
+    plan = _plan_payload(report, include_proposal=False)
+    manifest = (
+        report.agent_manifest
+        if isinstance(getattr(report, "agent_manifest", None), dict)
+        else {}
+    )
+    return {
+        "id": plan["id"],
+        "status": plan["status"],
+        "preview_url": plan["preview_url"],
+        "review_url": plan["review_url"],
+        "status_url": plan["status_url"],
+        "contract_version": plan["contract_version"],
+        "proposal_fingerprint": manifest.get("proposal_fingerprint"),
+    }
+
+
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_resources_hide_other_users_plans
@@ -554,10 +576,11 @@ def openapi_document():
                 "description": (
                     "Returns every available tool with its JSON input schema. Tool "
                     "calls run as the bearer-key user and may only inspect data that "
-                    "user can access. Select Ask, Create, or Organize when creating a "
-                    "plan; Organize clients should fetch get_guidelines task=organize "
-                    "before analyzing files. Use returned hash: references only as "
-                    "allowed by the selected plan contract."
+                    "user can access. Inspect the selected tool's exact input_schema "
+                    "instead of guessing argument names. Select Ask, Create, or "
+                    "Organize when creating a plan; Organize clients should fetch "
+                    "get_guidelines task=organize before analyzing files. Use returned "
+                    "hash: references only as allowed by the selected plan contract."
                 ),
                 "tags": ["Discovery"],
                 "responses": {
@@ -626,8 +649,11 @@ def openapi_document():
                 "summary": "Get plan state",
                 "description": (
                     "Checks draft/ready state, finalized files, pending uploads, "
-                    "contract and browser-review URLs, and any submitted proposal. "
-                    "The plan ID is the top-level id field in every plan response."
+                    "contract and browser-review URLs, and any submitted execution-"
+                    "normalized proposal. The stored proposal is inspection state, "
+                    "not a round-trippable submission source; retain the public hash: "
+                    "proposal sent by the client for revisions. The plan ID is the "
+                    "top-level id field in every plan response."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -746,7 +772,9 @@ def openapi_document():
                     "definition's complete input in the "
                     "top-level arguments object. Other top-level fields are rejected. "
                     "Calls read permitted workspace data only; independent calls may "
-                    "be made in parallel."
+                    "be made in parallel. A handler-level failure returns HTTP 422 "
+                    "with error.code=tool_error and corrective details rather than a "
+                    "success-shaped result."
                 ),
                 "tags": ["Tools"],
                 "parameters": [plan_parameter, tool_parameter],
@@ -769,6 +797,13 @@ def openapi_document():
                     "200": {
                         "description": "The tool result in the result field.",
                         **json_content({"type": "object"}),
+                    },
+                    "422": {
+                        "description": (
+                            "The selected tool rejected its arguments or could not "
+                            "produce a result. Inspect error.message and error.details."
+                        ),
+                        **json_content({"$ref": "#/components/schemas/Error"}),
                     },
                     "default": error_response,
                 },
@@ -821,12 +856,15 @@ def openapi_document():
                 "responses": {
                     "200": {
                         "description": (
-                            "Published plan. Present preview_url to the user for browser "
-                            "review; retain review_url as the canonical full URL. Create "
-                            "and Organize can only be applied with the existing Execute "
+                            "Compact publication receipt. Present preview_url to the user "
+                            "for browser review; retain review_url as the canonical full "
+                            "URL. Fetch status_url for detailed plan state. Create and "
+                            "Organize can only be applied with the existing Execute "
                             "control on that authenticated browser page."
                         ),
-                        **json_content({"$ref": "#/components/schemas/Plan"}),
+                        **json_content(
+                            {"$ref": "#/components/schemas/SubmissionReceipt"}
+                        ),
                     },
                     "default": error_response,
                 },
@@ -967,6 +1005,43 @@ def openapi_document():
                             "description": "Canonical full browser report URL.",
                         },
                         "proposal": {"oneOf": [{"type": "object"}, {"type": "null"}]},
+                    },
+                },
+                "SubmissionReceipt": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "id",
+                        "status",
+                        "preview_url",
+                        "review_url",
+                        "status_url",
+                        "contract_version",
+                        "proposal_fingerprint",
+                    ],
+                    "properties": {
+                        "id": {"type": "string"},
+                        "status": {
+                            "type": "string",
+                            "enum": ["ready", "complete"],
+                        },
+                        "preview_url": {"type": "string", "format": "uri"},
+                        "review_url": {"type": "string", "format": "uri"},
+                        "status_url": {"type": "string", "format": "uri"},
+                        "contract_version": {
+                            "type": "integer",
+                            "const": external_api.CONTRACT_VERSION,
+                        },
+                        "proposal_fingerprint": {
+                            "oneOf": [
+                                {"type": "string", "minLength": 1},
+                                {"type": "null"},
+                            ],
+                            "description": (
+                                "Digest of the validated normalized proposal. It may "
+                                "differ from a digest of the raw request body."
+                            ),
+                        },
                     },
                 },
                 "UploadFile": {
@@ -1310,7 +1385,25 @@ def execute_tool(plan_id, tool_name):
         result = _original_file_download(tool_name, arguments, result)
         if isinstance(result, dict) and result.get("error"):
             outcome = "tool_error"
+            details = {
+                "tool": tool_name,
+                **{
+                    key: _json_safe(value)
+                    for key, value in result.items()
+                    if key != "error"
+                },
+            }
+            raise APIProblem(
+                "tool_error",
+                str(result["error"]),
+                422,
+                details=details,
+            )
         return {"result": _json_safe(result)}
+    except APIProblem:
+        if outcome != "tool_error":
+            outcome = "api_error"
+        raise
     except Exception:
         outcome = "exception"
         raise
@@ -1353,4 +1446,4 @@ def submit_plan(plan_id):
         if report.status == reusable_status:
             raise APIProblem("plan_state_conflict", str(error), 409) from error
         raise
-    return _plan_payload(submitted)
+    return _submission_receipt(submitted)

@@ -67,7 +67,8 @@ def normalize_report_markdown(proposal):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_future_completed_dates
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_invalid_static_form_content
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
-# @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission validation
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_create_task_page_reference
+# @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission task-page validation
 # @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
     proposal,
@@ -612,6 +613,11 @@ def _validate_schema_field_definition(field, action_label, field_label, used_ids
 # @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
 # @reason action-shape errors are exercised through proposal validation tests
 def _validate_create_task_action_data(data, action_label, user=None):
+    if not _first_data_reference(data, "page"):
+        raise exceptions.AIException(
+            f"Action {action_label} requires data.page or data.page_action."
+        )
+
     if _proposal_file_refs(data):
         raise exceptions.AIException(
             f"Action {action_label} should attach task files with "

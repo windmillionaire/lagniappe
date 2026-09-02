@@ -375,3 +375,120 @@ def report_proposal_response_schema(
         "propertyOrdering": property_ordering,
         "additionalProperties": False,
     }
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
+# @reason external required-group composition is asserted through the public transport schema
+def _external_required_group_schema(fields):
+    """Require at least one field from an external action reference group."""
+    fields = tuple(fields)
+    return {
+        "description": f"At least one of {', '.join(fields)} is required.",
+        "anyOf": [{"required": [field]} for field in fields],
+    }
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
+# @reason external action variants are asserted through the public transport schema
+def _external_report_action_response_schema(
+    action_type,
+    include_submission_fields,
+    require_file_summary_terms,
+):
+    """Return a standard JSON Schema action variant for external clients."""
+    schema = _report_action_response_schema(
+        action_type,
+        include_submission_fields,
+    )
+    schema["properties"]["type"] = {
+        "type": "string",
+        "const": action_type,
+    }
+    data_schema = schema["properties"]["data"]
+    required_groups = REPORT_ACTION_DATA_CONTRACTS[action_type].get(
+        "required_groups",
+        (),
+    )
+    if required_groups:
+        data_schema["allOf"] = [
+            _external_required_group_schema(group)
+            for group in required_groups
+        ]
+
+    if action_type == "summarize_file":
+        terms_schema = data_schema["properties"]["retrieval_terms"]
+        terms_schema["uniqueItems"] = True
+        terms_schema["items"]["maxLength"] = 80
+        if require_file_summary_terms:
+            required = list(data_schema.get("required", ()))
+            if "retrieval_terms" not in required:
+                required.append("retrieval_terms")
+            data_schema["required"] = required
+    return schema
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
+# @reason provider-only ordering hints are removed through the public external serializer
+def _standard_json_schema(value):
+    """Remove provider-only annotations from an ordinary JSON Schema tree."""
+    if isinstance(value, dict):
+        return {
+            key: _standard_json_schema(child)
+            for key, child in value.items()
+            if key != "propertyOrdering"
+        }
+    if isinstance(value, list):
+        return [_standard_json_schema(child) for child in value]
+    return value
+
+
+# @testable true
+# @tests tests_unit/test_032_agent_api.py::test_external_proposal_schema_has_named_discriminated_actions
+# @matrix agent-api ai-report : external-schema proposal-contract structured-output
+def external_report_proposal_response_schema(
+    allowed_actions=None,
+    *,
+    require_issues=False,
+    include_submission_fields=True,
+    require_file_summary_terms=False,
+):
+    """Return a named, machine-readable proposal schema for external clients.
+
+    The internal Gemini schema intentionally keeps its provider-compatible
+    inline ``anyOf`` representation. This transport adapter can use standard
+    JSON Schema composition to expose named action variants and executable
+    reference-group requirements without changing internal model prompts.
+    """
+    action_types = tuple(allowed_actions or ACTION_ORDER)
+    provider_schema = report_proposal_response_schema(
+        allowed_actions=action_types,
+        require_issues=require_issues,
+        include_submission_fields=include_submission_fields,
+    )
+    schema = _standard_json_schema(provider_schema)
+    definitions = {
+        action_type: _standard_json_schema(
+            _external_report_action_response_schema(
+                action_type,
+                include_submission_fields,
+                require_file_summary_terms,
+            )
+        )
+        for action_type in action_types
+    }
+    mapping = {
+        action_type: f"#/$defs/{action_type}"
+        for action_type in action_types
+    }
+    schema["$defs"] = definitions
+    schema["properties"]["actions"]["items"] = {
+        "oneOf": [{"$ref": reference} for reference in mapping.values()],
+        "discriminator": {
+            "propertyName": "type",
+            "mapping": mapping,
+        },
+    }
+    return schema

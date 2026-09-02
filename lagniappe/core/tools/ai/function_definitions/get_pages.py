@@ -33,9 +33,19 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
             },
             "limit": {
                 "type": "integer",
+                "minimum": 1,
+                "maximum": SEARCH_LIMIT,
                 "description": (
                     f"Maximum number of pages to return (default {CATEGORY_PAGES_LIMIT}). "
-                    "Use fewer for a quick overview, more for thorough analysis."
+                    f"The hard maximum is {SEARCH_LIMIT}; follow next_cursor when "
+                    "has_more is true for a more thorough scan."
+                ),
+            },
+            "cursor": {
+                "type": "string",
+                "description": (
+                    "Opaque next_cursor from a previous get_category_pages result "
+                    "for the same category and form filter."
                 ),
             },
             "compact": {
@@ -55,7 +65,8 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_category_pages_compact_returns_lightweight_page_refs
-# @matrix ai category-pages : compact tool-context
+# @tests tests_unit/test_015_ai_tools.py::test_get_category_pages_reports_effective_limit_and_pagination
+# @matrix ai category-pages : compact pagination tool-context
 def execute_get_category_pages(args, user):
     identifier = args.get("id")
     form_identifier = args.get("form_id")
@@ -69,14 +80,40 @@ def execute_get_category_pages(args, user):
     if not category:
         return {"error": "Category not found"}
 
-    limit = min(args.get("limit", CATEGORY_PAGES_LIMIT), SEARCH_LIMIT)
+    raw_limit = args.get("limit", CATEGORY_PAGES_LIMIT)
+    if isinstance(raw_limit, bool) or not isinstance(raw_limit, int):
+        return {
+            "error": f"limit must be an integer from 1 to {SEARCH_LIMIT}",
+            "minimum": 1,
+            "maximum": SEARCH_LIMIT,
+        }
+    requested_limit = raw_limit
+    # Preserve older integer callers while making the clamp visible in output.
+    effective_limit = min(max(requested_limit, 1), SEARCH_LIMIT)
+    cursor = args.get("cursor")
+    if cursor is not None and not isinstance(cursor, str):
+        return {"error": "cursor must be a string"}
+    cursor = cursor.strip() if cursor else None
     restrictions = user.properties.restrictions.unrestricted_pages(category)
-    db = database_get.pages(category.key, form=form, limit=limit, hashes=restrictions)
+    db = database_get.pages(
+        category.key,
+        form=form,
+        start_cursor=cursor,
+        limit=effective_limit,
+        hashes=restrictions,
+    )
 
     pages = Entities.fetch(*db.results, request=Fetch.direct())
+    next_cursor = getattr(db, "next_cursor", None)
 
     return {
         "category": category.name,
+        "requested_limit": requested_limit,
+        "effective_limit": effective_limit,
+        "returned_count": len(pages),
+        "has_more": bool(next_cursor),
+        "next_cursor": next_cursor,
+        # Retained for older callers; returned_count is the unambiguous name.
         "page_count": len(pages),
         "pages": [
             _compact_page_reference(p, user) if compact else p.to_ai(user)
