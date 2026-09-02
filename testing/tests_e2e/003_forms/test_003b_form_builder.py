@@ -1,3 +1,4 @@
+import re
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -486,7 +487,10 @@ def test_html_field(get_user):
     expect(html_content.locator("img")).to_be_visible()
     expect(html_content.locator("img")).to_have_count(1)
     expect(html_content.locator("script")).to_have_count(0)
-    assert user.page.locator("body").get_attribute("data-hostile-html") is None
+    expect(user.page.locator("body")).not_to_have_attribute(
+        "data-hostile-html",
+        re.compile(r".+"),
+    )
 
 
 # @matrix editor : authoritative-content error-reporting initial-load intentional-clear retry server-acknowledgement

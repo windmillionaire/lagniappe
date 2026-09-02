@@ -1,17 +1,19 @@
 """HTTP contract coverage for external-agent API and key management."""
 
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
 from lagniappe.core.definitions import AI
+from lagniappe.core.entities import Entities
+from lagniappe.core.tools.ai import external_api
+from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.auth import agent_api as agent_auth
+from lagniappe.core.tools.database import assets as storage_assets
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import app
-from lagniappe.web import auth as web_auth
-from lagniappe.web.routes.api import main as api_routes
-from lagniappe.web.routes.users import api_key as api_key_routes
-from lagniappe.web.routes.tools import main as tool_routes
-from lagniappe.web.routes.tools import preview as tool_preview_routes
 
 
 pytestmark = pytest.mark.e2e
@@ -21,6 +23,7 @@ class PersonalPage:
     hash = "personalpage"
     name = "External Planner"
     url = "/pages/actor-page"
+    urlsafe_key = "actor-page-key"
 
     def allowed(self, action, user=None):
         return True
@@ -37,11 +40,32 @@ class Actor:
     is_authenticated = True
     page = PersonalPage()
 
+    def __init__(self):
+        identifier = uuid4().hex
+        self.urlsafe_key = f"actor-{identifier}"
+        self.key = f"actor-key-{identifier}"
+
     def access(self, required):
         return required in {AI.ASK, AI.CREATE}
 
     def _get_current_object(self):
         return self
+
+    def get_id(self):
+        return self.urlsafe_key
+
+
+def _authenticated_client(monkeypatch, actor):
+    client = app.test_client()
+    monkeypatch.setattr(
+        app.login_manager,
+        "_user_callback",
+        lambda _identifier: actor,
+    )
+    with client.session_transaction() as client_session:
+        client_session["_user_id"] = actor.get_id()
+        client_session["_fresh"] = True
+    return client
 
 
 def _report(actor, tool="organize"):
@@ -59,10 +83,13 @@ def _report(actor, tool="organize"):
         error=None,
         deferred_job=None,
         agent_manifest={
-            "contract_version": api_routes.external_api.CONTRACT_VERSION
+            "contract_version": external_api.CONTRACT_VERSION
         },
         origin="api",
-        properties=SimpleNamespace(user=SimpleNamespace(key=actor.key)),
+        properties=SimpleNamespace(
+            user=SimpleNamespace(key=actor.key),
+            parent=SimpleNamespace(key=actor.key),
+        ),
         allowed=lambda action, user=None: user is actor,
     )
 
@@ -73,16 +100,6 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     actor = Actor()
     report = _report(actor)
     seen = {}
-    monkeypatch.setattr(
-        api_routes,
-        "check_limit",
-        lambda *args: {
-            "allowed": True,
-            "count": 1,
-            "remaining": 59,
-            "retry_after": 60,
-        },
-    )
     monkeypatch.setattr(
         agent_auth,
         "authenticate_credential",
@@ -264,7 +281,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert catalog.status_code == 200
     assert {tool["name"] for tool in catalog.json["tools"]} == set(
-        api_routes.ai_functions.DECLARATIONS
+        ai_functions.DECLARATIONS
     )
     get_file = next(
         tool for tool in catalog.json["tools"] if tool["name"] == "get_file"
@@ -274,7 +291,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert "temporary credential" in get_file["description"]
     assert "provider file part" not in get_file["description"]
 
-    monkeypatch.setattr(api_routes.external_api, "create_plan", lambda *args, **kwargs: report)
+    monkeypatch.setattr(external_api, "create_plan", lambda *args, **kwargs: report)
     created = client.post(
         "/api/v1/plans",
         headers={"Authorization": "Bearer valid-key"},
@@ -288,7 +305,12 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert "execution" not in created.json
     assert created.json["preview_url"].endswith("/tools/api-plan/reporthash12")
 
-    monkeypatch.setattr(api_routes, "_load_plan", lambda plan_id: report)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(
+        Entities,
+        "fetch_one",
+        lambda identifier, request: report,
+    )
     fetched = client.get(
         "/api/v1/plans/report-key",
         headers={"Authorization": "Bearer valid-key"},
@@ -297,7 +319,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert fetched.json["id"] == "report-key"
 
     monkeypatch.setattr(
-        api_routes.external_api,
+        external_api,
         "plan_contract",
         lambda current, user: {
             "version": 1,
@@ -317,7 +339,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     }
 
     monkeypatch.setattr(
-        api_routes.storage_assets,
+        storage_assets,
         "create_direct_upload_session",
         lambda *args, **kwargs: {
             "token": "signed-upload-token",
@@ -326,11 +348,11 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         },
     )
     monkeypatch.setattr(
-        api_routes.external_api,
+        external_api,
         "prepare_upload_manifest",
         lambda records: records,
     )
-    monkeypatch.setattr(api_routes.Entities, "save", lambda *entities: None)
+    monkeypatch.setattr(Entities, "save", lambda *entities: None)
     upload = client.post(
         "/api/v1/plans/report-key/uploads",
         headers={"Authorization": "Bearer valid-key"},
@@ -359,7 +381,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         assert user is actor
         current.upload_manifest = None
 
-    monkeypatch.setattr(api_routes.external_api, "finalize_uploads", finalize)
+    monkeypatch.setattr(external_api, "finalize_uploads", finalize)
     finalized = client.post(
         "/api/v1/plans/report-key/uploads/finalize",
         headers={"Authorization": "Bearer valid-key"},
@@ -372,7 +394,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         seen.update(name=name, arguments=arguments, user=user)
         return {"items": [{"hash": "pagehash1234"}]}, []
 
-    monkeypatch.setattr(api_routes.ai_functions, "execute_registered_tool", execute)
+    monkeypatch.setattr(ai_functions, "execute_registered_tool", execute)
     tool = client.post(
         "/api/v1/plans/report-key/tools/search_entities",
         headers={"Authorization": "Bearer valid-key"},
@@ -394,14 +416,16 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         def allowed(self, action, user=None):
             return user is actor
 
-    monkeypatch.setattr(api_routes.Entities, "FILE", DownloadableFile)
+    monkeypatch.setattr(Entities, "FILE", DownloadableFile)
     monkeypatch.setattr(
-        api_routes.Entities,
+        Entities,
         "fetch_one",
-        lambda identifier, request: DownloadableFile(),
+        lambda identifier, request: (
+            report if identifier == "report-key" else DownloadableFile()
+        ),
     )
     monkeypatch.setattr(
-        api_routes.ai_functions,
+        ai_functions,
         "execute_registered_tool",
         lambda name, arguments, user: (
             {
@@ -417,7 +441,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     signed = []
     monkeypatch.setattr(
-        api_routes.storage_assets,
+        storage_assets,
         "get_signed_url",
         lambda path, expires_in: signed.append((path, expires_in))
         or "https://storage.example/download",
@@ -460,12 +484,12 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
 
     def submit(current, user, proposal, *, contract_version):
         assert user is actor
-        assert contract_version == api_routes.external_api.CONTRACT_VERSION
+        assert contract_version == external_api.CONTRACT_VERSION
         current.status = "ready"
         current.proposal = proposal
         return current
 
-    monkeypatch.setattr(api_routes.external_api, "submit_plan", submit)
+    monkeypatch.setattr(external_api, "submit_plan", submit)
     proposal = {
         "summary": "Ready for review.",
         "confidence": 1,
@@ -476,7 +500,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
         json={
-            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "contract_version": external_api.CONTRACT_VERSION,
             "proposal": proposal,
         },
     )
@@ -497,7 +521,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
         json={
-            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "contract_version": external_api.CONTRACT_VERSION,
             "proposal": revised_proposal,
         },
     )
@@ -516,7 +540,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
         json={
-            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "contract_version": external_api.CONTRACT_VERSION,
             "proposal": create_revision,
         },
     )
@@ -536,7 +560,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
         json={
-            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "contract_version": external_api.CONTRACT_VERSION,
             "proposal": proposal,
         },
     )
@@ -553,23 +577,13 @@ def test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibili
     actor = Actor()
     report = _report(actor, tool="create")
     monkeypatch.setattr(
-        api_routes,
-        "check_limit",
-        lambda *args: {
-            "allowed": True,
-            "count": 1,
-            "remaining": 59,
-            "retry_after": 60,
-        },
-    )
-    monkeypatch.setattr(
         agent_auth,
         "authenticate_credential",
         lambda token: (actor, {"active": True, "generation": 1}),
     )
-    monkeypatch.setattr(api_routes.Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
     monkeypatch.setattr(
-        api_routes.Entities,
+        Entities,
         "fetch_one",
         lambda plan_id, request: report,
     )
@@ -607,25 +621,14 @@ def test_external_plan_resources_hide_other_users_plans(monkeypatch):
     intruder.key = "other-user-key"
     intruder.urlsafe_key = "other-user-url-key"
     report = _report(owner)
-    monkeypatch.setattr(
-        api_routes,
-        "check_limit",
-        lambda *args: {
-            "allowed": True,
-            "count": 1,
-            "remaining": 59,
-            "retry_after": 60,
-        },
-    )
-
     def authenticate(token):
         actor = owner if token == "owner-key" else intruder
         return actor, {"active": True, "generation": 1}
 
     monkeypatch.setattr(agent_auth, "authenticate_credential", authenticate)
-    monkeypatch.setattr(api_routes.Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
     monkeypatch.setattr(
-        api_routes.Entities,
+        Entities,
         "fetch_one",
         lambda plan_id, request: report if plan_id == "report-key" else None,
     )
@@ -667,16 +670,6 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     report = _report(actor, tool="ask")
     report.instructions = "Which pages have open tasks?"
     monkeypatch.setattr(
-        api_routes,
-        "check_limit",
-        lambda *args: {
-            "allowed": True,
-            "count": 1,
-            "remaining": 59,
-            "retry_after": 60,
-        },
-    )
-    monkeypatch.setattr(
         agent_auth,
         "authenticate_credential",
         lambda token: (
@@ -697,10 +690,15 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         report.instructions = instructions
         return report
 
-    monkeypatch.setattr(api_routes.external_api, "create_plan", create)
-    monkeypatch.setattr(api_routes, "_load_plan", lambda plan_id: report)
+    monkeypatch.setattr(external_api, "create_plan", create)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
     monkeypatch.setattr(
-        api_routes.ai_functions,
+        Entities,
+        "fetch_one",
+        lambda identifier, request: report,
+    )
+    monkeypatch.setattr(
+        ai_functions,
         "execute_registered_tool",
         lambda tool_name, arguments, user: (
             {"tool": tool_name, "query": arguments.get("query")},
@@ -771,7 +769,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         assert current is report
         assert user is actor
         assert value is not None
-        assert contract_version == api_routes.external_api.CONTRACT_VERSION
+        assert contract_version == external_api.CONTRACT_VERSION
         current.status = "complete"
         current.proposal = {
             **value,
@@ -780,12 +778,12 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         current.proposal.pop("answer_markdown", None)
         return current
 
-    monkeypatch.setattr(api_routes.external_api, "submit_plan", submit)
+    monkeypatch.setattr(external_api, "submit_plan", submit)
     submitted = client.post(
         "/api/v1/plans/report-key/submit",
         headers=headers,
         json={
-            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "contract_version": external_api.CONTRACT_VERSION,
             "proposal": proposal,
         },
     )
@@ -810,7 +808,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         "/api/v1/plans/report-key/submit",
         headers=headers,
         json={
-            "contract_version": api_routes.external_api.CONTRACT_VERSION,
+            "contract_version": external_api.CONTRACT_VERSION,
             "proposal": {**proposal, "summary": "One page has an open task."},
         },
     )
@@ -832,24 +830,22 @@ def test_api_plan_preview_redirect_is_session_and_creator_bound(monkeypatch):
     actor.access = lambda required: False
     report = _report(actor)
     looked_up = []
-    monkeypatch.setattr(web_auth, "_load_request_context", lambda key=None: (actor, None))
-    monkeypatch.setattr(tool_preview_routes, "current_user", actor)
-    monkeypatch.setattr(tool_preview_routes.Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
     monkeypatch.setattr(
-        tool_preview_routes.database_get,
+        database_get,
         "ai_report_by_hash",
         lambda user_key, report_hash: looked_up.append((user_key, report_hash))
         or "raw-report",
     )
     monkeypatch.setattr(
-        tool_preview_routes.Entities,
+        Entities,
         "fetch_one",
         lambda record, request: report,
     )
 
-    client = app.test_client()
+    client = _authenticated_client(monkeypatch, actor)
     redirected = client.get("/tools/api-plan/reporthash12")
-    assert redirected.status_code == 302
+    assert redirected.status_code == 302, redirected.get_data(as_text=True)
     assert redirected.headers["Location"].endswith("/tools/reports/report-key")
     assert looked_up == [(actor.key, report.hash)]
 
@@ -861,12 +857,8 @@ def test_api_plan_preview_redirect_is_session_and_creator_bound(monkeypatch):
     denied = client.get("/tools/api-plan/reporthash12")
     assert denied.status_code == 404
 
-    anonymous = SimpleNamespace(is_authenticated=False)
-    monkeypatch.setattr(
-        web_auth,
-        "_load_request_context",
-        lambda key=None: (anonymous, None),
-    )
+    with client.session_transaction() as client_session:
+        client_session.clear()
     logged_out = client.get("/tools/api-plan/reporthash12")
     assert logged_out.status_code in {302, 401}
     assert "/tools/reports/report-key" not in logged_out.headers.get("Location", "")
@@ -884,28 +876,25 @@ def test_user_can_rotate_and_revoke_external_agent_api_key(monkeypatch):
     }
     revoked = {**issued, "active": False, "generation": 2}
     monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
-    monkeypatch.setattr(web_auth, "_load_request_context", lambda key=None: (actor, None))
-    monkeypatch.setattr(api_key_routes, "current_user", actor)
-    monkeypatch.setattr(api_key_routes, "_rotation_limit", lambda current: None)
     monkeypatch.setattr(
-        api_key_routes.agent_api,
+        agent_auth,
         "credential_status",
         lambda current: {"active": False, "generation": 0},
     )
     monkeypatch.setattr(
-        api_key_routes.agent_api,
+        agent_auth,
         "issue_credential",
         lambda current: ("lgn_shown-once", issued),
     )
     monkeypatch.setattr(
-        api_key_routes.agent_api,
+        agent_auth,
         "revoke_credential",
         lambda current: revoked,
     )
 
-    client = app.test_client()
+    client = _authenticated_client(monkeypatch, actor)
     status = client.get("/users/me/api-key")
-    assert status.status_code == 200
+    assert status.status_code == 200, status.get_data(as_text=True)
     assert status.json == {"credential": {"active": False, "generation": 0}}
 
     rotated = client.post("/users/me/api-key", json={})
@@ -927,19 +916,22 @@ def test_api_report_revision_is_provider_blocked(monkeypatch):
     report.status = "ready"
     report.proposal = {"summary": "Ready", "actions": []}
     monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
-    monkeypatch.setattr(web_auth, "_load_request_context", lambda key=None: (actor, None))
-    monkeypatch.setattr(web_auth, "require_ai_access", lambda required: None)
-    monkeypatch.setattr(tool_routes, "_get_report", lambda key: report)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
     monkeypatch.setattr(
-        tool_routes.DeferredJobs,
+        Entities,
+        "fetch_one",
+        lambda identifier, request: report,
+    )
+    monkeypatch.setattr(
+        DeferredJobs,
         "start",
         lambda *args, **kwargs: pytest.fail("API report revision called the provider"),
     )
 
-    response = app.test_client().post(
+    response = _authenticated_client(monkeypatch, actor).post(
         "/tools/reports/report-key/revise",
         data={"feedback": "Change it"},
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 422, response.get_data(as_text=True)
     assert "cannot be revised with the AI provider" in response.get_data(as_text=True)

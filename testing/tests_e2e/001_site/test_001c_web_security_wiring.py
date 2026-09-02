@@ -10,9 +10,8 @@ from flask import Flask, session
 
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.web import CSP, app, configure_flask_security
-from lagniappe.web.routes.api import main as api_routes
-from lagniappe.web.routes.users import login as user_login_routes
 from lagniappe.web.start import blueprints as blueprint_start
 from lagniappe.web.start import login as login_start
 
@@ -239,12 +238,6 @@ def test_csrf_exempt_surfaces_reach_replacement_authentication_gates(
     monkeypatch.setattr(CONFIG, "HOSTED_E2E", False, raising=False)
     monkeypatch.setattr(CONFIG, "AI_EMAIL_CONFIG", None)
     monkeypatch.setattr(CONFIG, "GOOGLE_SIGNIN_ENABLED", True)
-    monkeypatch.setattr(
-        user_login_routes,
-        "_enforce_auth_rate_limit",
-        lambda *args, **kwargs: None,
-    )
-
     route_owned_responses = (
         ("/process/jobs", 401, "Unauthorized"),
         ("/testing/session", 404, None),
@@ -367,27 +360,16 @@ def test_common_security_headers():
 def test_external_api_authentication_and_header_contract(monkeypatch, path):
     actor = SimpleNamespace(is_public=False, urlsafe_key="security-wiring-actor")
     monkeypatch.setattr(
-        api_routes.agent_auth,
+        agent_auth,
         "authenticate_credential",
         lambda token: (
             (actor, {"active": True})
             if token == "valid-key"
             else (_ for _ in ()).throw(
-                api_routes.agent_auth.AgentAPICredentialError("invalid")
+                agent_auth.AgentAPICredentialError("invalid")
             )
         ),
     )
-    monkeypatch.setattr(
-        api_routes,
-        "check_limit",
-        lambda *args: {
-            "allowed": True,
-            "count": 1,
-            "remaining": 59,
-            "retry_after": 60,
-        },
-    )
-
     unauthorized = _open_request(
         "GET",
         path,
