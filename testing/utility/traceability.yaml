@@ -153,6 +153,7 @@ exclude:
   - "**/*.map"
   - "**/config/**"
   - "**/runner/**"
+  - "lagniappe/web/static/**"
   - "lagniappe/web/start/styles/**"
 
 python_extensions:

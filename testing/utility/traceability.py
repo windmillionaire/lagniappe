@@ -3484,6 +3484,7 @@ def build_report(
             for path in changed_path_list
             if path.startswith(scan_prefixes)
             and (repo_root / path).is_file()
+            and not is_excluded(repo_root / path, repo_root, config["exclude"])
             and (repo_root / path).suffix
             in set(config["python_extensions"]) | set(config["javascript_extensions"])
         ]
