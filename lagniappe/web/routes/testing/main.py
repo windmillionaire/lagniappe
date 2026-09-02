@@ -162,6 +162,23 @@ def health():
     return response
 
 
+# @testable true
+# @tests tests_e2e/001_site/test_001d_offline.py::test_upstream_unavailable_preserves_current_form_state
+# @matrix e2e request-errors : server-failure upstream-unavailable
+@testing.route("/upstream-unavailable", methods=["GET"])
+def upstream_unavailable():
+    """Return provider-shaped unmarked HTML for the browser failure story."""
+    if not CONFIG.testing:
+        return _hidden()
+    response = make_response(
+        "<!doctype html><title>upstream failure</title><h1>unavailable</h1>",
+        503,
+    )
+    response.headers["Content-Type"] = "text/html; charset=utf-8"
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 # @testable infrastructure
 # @matrix hosted-e2e : authentication bootstrap cookie replay
 @testing.route("/session", methods=["POST"])

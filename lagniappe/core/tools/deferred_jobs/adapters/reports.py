@@ -343,13 +343,14 @@ class CreateReportAdapter(ReportAdapter):
 # @testable true
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_adapter_runs_the_reviewed_proposal
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_failure_preserves_a_retryable_ledger
-# @matrix ai-report : deterministic-run recovery
-# @matrix deferred-jobs : cancellation report-execution
+# @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+# @matrix ai-report : deterministic-run entitlement-independent recovery
+# @matrix deferred-jobs : cancellation provider-boundary report-execution tier-declaration
 class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 
     job_type = DeferredJobType.REPORT_EXECUTION
-    required_ai_access = AI.CREATE
     synchronous_testing = True
     queued_message = "Saving report changes..."
     retry_message = "Saving is taking longer than expected; retrying safely..."

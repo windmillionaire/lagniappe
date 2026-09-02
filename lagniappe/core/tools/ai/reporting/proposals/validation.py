@@ -4,9 +4,10 @@ import re
 
 from lagniappe.core import exceptions
 from lagniappe.core.properties.schema import SchemaFields
+from lagniappe.core.tools import dates
 
 from ...debug import ai_debug
-from ...references import normalize_hash_references
+from ...references import normalize_hash_references, render_ai_markdown
 from ..contracts.actions import ALLOWED_ACTIONS
 from ..schedules import validate_task_schedule
 from .references import (
@@ -28,6 +29,32 @@ ENTITY_PAIR_ACTION_REFERENCES = {
 
 
 # @testable true
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_renders_page_document_markdown
+# @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
+def normalize_report_markdown(proposal):
+    """Render new model-facing Markdown fields into legacy executable HTML."""
+    if not isinstance(proposal, dict):
+        return proposal
+    actions = proposal.get("actions")
+    if not isinstance(actions, list):
+        return proposal
+    for action in actions:
+        if not isinstance(action, dict) or action.get("type") != "create_page":
+            continue
+        data = action.get("data")
+        if not isinstance(data, dict) or "document_markdown" not in data:
+            continue
+        source = data.get("document_markdown")
+        if not isinstance(source, str):
+            raise exceptions.AIException(
+                "Create page document_markdown must be a string."
+            )
+        data["document"] = render_ai_markdown(source)
+        data.pop("document_markdown", None)
+    return proposal
+
+
+# @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unknown_actions_and_bad_dependencies
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unsafe_schema_update_operations
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_completed_root_task_targets
@@ -35,8 +62,14 @@ ENTITY_PAIR_ACTION_REFERENCES = {
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_move_entity_references*
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_rename_and_move_task_target_aliases
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_every_report_file_attachment
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_external_file_summaries
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_treats_action_like_submission_fields_as_content
-# @matrix ai-report : action-reference-namespace canonical-target dependencies explicit-task-identity file-placement legacy-target move-references no-category page-form proposal rename schema-update submission validation
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_future_completed_dates
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_invalid_static_form_content
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_create_task_page_reference
+# @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission task-page validation
+# @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
     proposal,
     allowed_actions=None,
@@ -44,23 +77,27 @@ def validate_proposal(
     require_pending_submission_target=False,
     allow_pending_submissions=False,
     required_file_refs=None,
+    require_file_summaries=False,
     validate_reference_kinds=False,
+    user=None,
 ):
     """Validate the JSON action proposal returned by the organize prompt."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
     raw_proposal = proposal
+    submitted_required_file_refs = list(required_file_refs or ())
     resolved_reference_details = {}
     normalized = normalize_hash_references(
         {
             "proposal": proposal,
-            "required_file_refs": list(required_file_refs or ()),
+            "required_file_refs": submitted_required_file_refs,
         },
         resolved_details=resolved_reference_details,
     )
     proposal = normalized["proposal"]
     required_file_refs = normalized["required_file_refs"]
     if not isinstance(proposal, dict):
-        raise exceptions.AIException("Organize proposal must be a JSON object.")
+        raise exceptions.AIException("Report proposal must be a JSON object.")
+    proposal = normalize_report_markdown(proposal)
 
     issues = proposal.get("issues")
     if issues is None:
@@ -69,34 +106,34 @@ def validate_proposal(
         not isinstance(issue, str) for issue in issues
     ):
         raise exceptions.AIException(
-            "Organize proposal issues must be a list of strings."
+            "Report proposal issues must be a list of strings."
         )
 
     actions = proposal.get("actions")
     if not isinstance(actions, list):
-        raise exceptions.AIException("Organize proposal must include actions.")
+        raise exceptions.AIException("Report proposal must include actions.")
 
     seen_ids = set()
     seen_actions = {}
     for index, action in enumerate(actions):
         if not isinstance(action, dict):
-            raise exceptions.AIException("Each organize action must be an object.")
+            raise exceptions.AIException("Each report action must be an object.")
 
         action_type = action.get("type")
         if action_type not in ALLOWED_ACTIONS:
-            raise exceptions.AIException(f"Unknown organize action: {action_type}")
+            raise exceptions.AIException(f"Unknown report action: {action_type}")
         if action_type not in allowed:
             raise exceptions.AIException(
-                f"Organize action not allowed for this user: {action_type}"
+                f"Report action not allowed for this user: {action_type}"
             )
 
         action_id = action.get("id")
         if action_id:
             if not isinstance(action_id, str):
-                raise exceptions.AIException("Organize action ids must be strings.")
+                raise exceptions.AIException("Report action ids must be strings.")
             if action_id in seen_ids:
                 raise exceptions.AIException(
-                    f"Duplicate organize action id: {action_id}"
+                    f"Duplicate report action id: {action_id}"
                 )
 
         action_label = f"{action_id or index + 1} ({action_type})"
@@ -106,6 +143,8 @@ def validate_proposal(
             allow_empty_submission_updates=allow_empty_submission_updates,
             require_pending_submission_target=require_pending_submission_target,
             allow_pending_submissions=allow_pending_submissions,
+            require_file_summary_terms=require_file_summaries,
+            user=user,
         )
         _validate_completed_task_target_action(
             action,
@@ -155,8 +194,12 @@ def validate_proposal(
             )
         }
         missing_file_refs = [
-            file_ref
-            for file_ref in required_file_refs
+            submitted_file_ref
+            for file_ref, submitted_file_ref in zip(
+                required_file_refs,
+                submitted_required_file_refs,
+                strict=True,
+            )
             if file_ref not in attached_file_refs
         ]
         if missing_file_refs:
@@ -165,6 +208,50 @@ def validate_proposal(
                 "or task. Missing report_file_ref values: "
                 f"{', '.join(str(file_ref) for file_ref in missing_file_refs)}"
             )
+
+        if require_file_summaries:
+            summary_counts = {}
+            for action in actions:
+                if (
+                    not isinstance(action, dict)
+                    or action.get("type") != "summarize_file"
+                    or action.get("skip") is True
+                    or not isinstance(action.get("data"), dict)
+                ):
+                    continue
+                file_ref = action["data"].get("file")
+                summary_counts[file_ref] = summary_counts.get(file_ref, 0) + 1
+
+            required_file_ref_set = set(required_file_refs)
+            if any(file_ref not in required_file_ref_set for file_ref in summary_counts):
+                raise exceptions.AIException(
+                    "Organize summarize_file actions must target report input files."
+                )
+
+            missing_summary_refs = []
+            duplicate_summary_refs = []
+            for file_ref, submitted_file_ref in zip(
+                required_file_refs,
+                submitted_required_file_refs,
+                strict=True,
+            ):
+                count = summary_counts.get(file_ref, 0)
+                if count == 0:
+                    missing_summary_refs.append(submitted_file_ref)
+                elif count > 1:
+                    duplicate_summary_refs.append(submitted_file_ref)
+            if missing_summary_refs:
+                raise exceptions.AIException(
+                    "Organize proposal must summarize every report input file. "
+                    "Missing report_file_ref values: "
+                    f"{', '.join(str(file_ref) for file_ref in missing_summary_refs)}"
+                )
+            if duplicate_summary_refs:
+                raise exceptions.AIException(
+                    "Organize proposal must include exactly one summary per report "
+                    "input file. Duplicate report_file_ref values: "
+                    f"{', '.join(str(file_ref) for file_ref in duplicate_summary_refs)}"
+                )
 
     return proposal
 
@@ -204,6 +291,7 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
         ),
         "attach_file_to_page": (("page", {"page"}),),
         "attach_file_to_task": (("task", {"task", "task_history"}),),
+        "summarize_file": (("file", {"file"}),),
         "update_submission_fields": (
             ("page", {"page"}),
             ("task", {"task"}),
@@ -222,6 +310,10 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
         details = resolved_details.get(match.group(1)) or {}
         actual_kind = details.get("kind")
         if not actual_kind or actual_kind in expected_kinds:
+            continue
+        if actual_kind == "user" and "page" in expected_kinds:
+            # User-owned Pages use the virtual search kind ``user`` while the
+            # cached executable id remains the underlying Page key.
             continue
         expected = " or ".join(sorted(expected_kinds))
         name = details.get("name")
@@ -296,6 +388,8 @@ def _validate_action_data_shape(
     allow_empty_submission_updates=False,
     require_pending_submission_target=False,
     allow_pending_submissions=True,
+    require_file_summary_terms=False,
+    user=None,
 ):
     action_type = action.get("type")
     data = action.get("data") or {}
@@ -315,7 +409,7 @@ def _validate_action_data_shape(
             allow_pending=allow_pending_submissions,
         )
     if action_type == "create_task":
-        _validate_create_task_action_data(data, action_label)
+        _validate_create_task_action_data(data, action_label, user=user)
     entity_pair = ENTITY_PAIR_ACTION_REFERENCES.get(action_type)
     if entity_pair:
         source_root, target_roots = entity_pair
@@ -329,12 +423,46 @@ def _validate_action_data_shape(
         _validate_move_file_action_data(data, action_label)
     if action_type == "rename_entity":
         _validate_rename_entity_action_data(data, action_label)
+    if action_type == "summarize_file":
+        _validate_file_summary_action_data(
+            data,
+            action_label,
+            require_retrieval_terms=require_file_summary_terms,
+        )
     if action_type == "update_submission_fields":
         _validate_submission_update_action_data(
             data,
             action_label,
             allow_empty=allow_empty_submission_updates,
             require_pending_target=require_pending_submission_target,
+        )
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
+# @reason summary shape errors are exercised through proposal validation tests
+def _validate_file_summary_action_data(
+    data,
+    action_label,
+    *,
+    require_retrieval_terms=False,
+):
+    if not _proposal_string(data.get("file")):
+        raise exceptions.AIException(f"Action {action_label} requires data.file.")
+    if not _proposal_string(data.get("summary")):
+        raise exceptions.AIException(f"Action {action_label} requires data.summary.")
+
+    terms = data.get("retrieval_terms")
+    if terms is None and not require_retrieval_terms:
+        return
+    if (
+        not isinstance(terms, list)
+        or len(terms) != 2
+        or any(not _proposal_string(term) or len(term.strip()) > 80 for term in terms)
+        or len({term.strip().casefold() for term in terms}) != 2
+    ):
+        raise exceptions.AIException(
+            f"Action {action_label} requires exactly two distinct retrieval terms."
         )
 
 
@@ -373,6 +501,20 @@ def _validate_create_form_action_data(data, action_label):
             f"data.schema[{index}]",
             used_ids,
         )
+        field_type = field.get("type") if isinstance(field, dict) else None
+        if field_type == "html":
+            if form_type != "task":
+                raise exceptions.AIException(
+                    f"Action {action_label} static HTML fields require a task form."
+                )
+            if "html" in field:
+                raise exceptions.AIException(
+                    f"Action {action_label} static HTML fields must use content_markdown."
+                )
+            if not _proposal_string(field.get("content_markdown")):
+                raise exceptions.AIException(
+                    f"Action {action_label} static HTML fields require content_markdown."
+                )
 
 
 # @testable true
@@ -403,6 +545,11 @@ def _validate_update_form_schema_action_data(data, action_label):
                 f"{operation_label}.field",
                 added_ids,
             )
+            field = operation.get("field")
+            if isinstance(field, dict) and field.get("type") == "html":
+                raise exceptions.AIException(
+                    f"Action {action_label} {operation_label} cannot add static HTML fields."
+                )
             continue
         if operation_type == "add_select_option":
             if not _proposal_string(
@@ -465,7 +612,12 @@ def _validate_schema_field_definition(field, action_label, field_label, used_ids
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
 # @reason action-shape errors are exercised through proposal validation tests
-def _validate_create_task_action_data(data, action_label):
+def _validate_create_task_action_data(data, action_label, user=None):
+    if not _first_data_reference(data, "page"):
+        raise exceptions.AIException(
+            f"Action {action_label} requires data.page or data.page_action."
+        )
+
     if _proposal_file_refs(data):
         raise exceptions.AIException(
             f"Action {action_label} should attach task files with "
@@ -484,6 +636,15 @@ def _validate_create_task_action_data(data, action_label):
             f"Action {action_label} may target an existing task only for a "
             "completed occurrence."
         )
+    raw_completed_on = data.get("completed_on") or data.get("completed-on")
+    if not raw_completed_on and isinstance(data.get("completed"), str):
+        raw_completed_on = data["completed"]
+    if raw_completed_on:
+        completed_on = dates.parse_imported_date_as_utc(raw_completed_on)
+        if completed_on and completed_on > dates.user_today(user):
+            raise exceptions.AIException(
+                f"Action {action_label} completion date cannot be in the future."
+            )
     if data.get("schedule") is not None:
         if _is_completed_task_action_data(data):
             raise exceptions.AIException(

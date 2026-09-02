@@ -17,7 +17,9 @@ export {
 	BROWSER_PROTOCOL_ID,
 	BROWSER_PROTOCOL_VERSION,
 	connectivityMessage,
+	upstreamUnavailableMessage,
 	validateConnectivityState,
+	validateUpstreamUnavailableState,
 	WORKER_MESSAGES,
 } from "./protocol";
 export { QueryLifecycle } from "./queryLifecycle";

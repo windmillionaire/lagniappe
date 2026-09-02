@@ -65,6 +65,7 @@ class KINDS(Enum):
     messages = f"{PREFIX}messages"
     mention_markers = f"{PREFIX}mention_markers"
     email_deliveries = f"{PREFIX}email_deliveries"
+    agent_api_credentials = f"{PREFIX}agent_api_credentials"
 
     page = instances
     group = models
@@ -90,6 +91,7 @@ class KINDS(Enum):
     message = messages
     mention_marker = mention_markers
     email_delivery = email_deliveries
+    agent_api_credential = agent_api_credentials
 
 
 # @testable true

@@ -113,6 +113,11 @@ def main():
         "create_deferred_job_reconciler",
         create_deferred_job_reconciler,
     )
+    _install_module(
+        "monitoring",
+        "reconcile_memory_alert",
+        _entry_point("monitoring", behavior, status),
+    )
     package_install_module = types.ModuleType("installer.package_install")
     package_install_module.ensure_pip_is_available = lambda: None
     package_install_module.ensure_setup_dependencies = lambda: None

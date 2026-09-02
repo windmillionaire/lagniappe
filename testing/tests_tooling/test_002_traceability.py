@@ -2801,6 +2801,43 @@ def test_changed_tests_are_limited_to_edited_function_ranges():
     assert [source.qualname for source in focused_sources] == ["second"]
 
 
+def test_changed_report_does_not_inventory_excluded_annotation_scan_paths(
+    tmp_path, monkeypatch
+):
+    config = tmp_path / "traceability.yaml"
+    config.write_text(
+        """
+source_roots:
+  - src
+test_roots: []
+annotated_source_roots: []
+annotation_scan_roots:
+  - src
+  - generated
+exclude:
+  - "generated/**"
+""".lstrip()
+    )
+    source = tmp_path / "src" / "source.py"
+    source.parent.mkdir()
+    source.write_text("def authored():\n    pass\n")
+    generated = tmp_path / "generated" / "vendor.py"
+    generated.parent.mkdir()
+    generated.write_text("def vendor():\n    pass\n")
+    monkeypatch.setattr(traceability, "collect_tests", lambda repo_root, roots=(): {})
+
+    report = traceability.build_report(
+        tmp_path,
+        Path("traceability.yaml"),
+        changed_paths=["src/source.py", "generated/vendor.py"],
+        changed_line_ranges={"src/source.py": None, "generated/vendor.py": None},
+    )
+
+    assert {symbol.source_id for symbol in report.missing_testable} == {
+        "src/source.py::authored"
+    }
+
+
 def test_traceability_check_includes_template_contract_findings():
     report = traceability.classify([], {})
     report.template_contract_findings = [

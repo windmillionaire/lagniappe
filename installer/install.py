@@ -19,10 +19,9 @@ def _recovery_file_present(app_dir=None):
     """Detect the canonical recovery-file shape without importing config."""
     app_dir = Path(app_dir) if app_dir else REPOSITORY_ROOT
     config_dir = app_dir / "config" / "files"
-    return (
-        (config_dir / "lagniappe_settings.yaml").is_file()
-        and not (config_dir / "lagniappe_dev.yaml").exists()
-    )
+    return (config_dir / "lagniappe_settings.yaml").is_file() and not (
+        config_dir / "lagniappe_dev.yaml"
+    ).exists()
 
 
 # @testable true
@@ -104,6 +103,13 @@ def install():
         record_step(step_name)
         operation()
 
+    print(
+        f.warning(
+            "Deployment memory note: every Gunicorn worker adds application "
+            "memory use; Lagniappe limits F2 and B2 to three workers."
+        )
+    )
+
     ai_email_config = None
     if getattr(SETTINGS, "RECOVERY_MODE", False):
         print(
@@ -165,6 +171,7 @@ def install():
         print(f"3. Run: {format_command(index_command)}")
         print(f"4. Run: {format_command(app_command)}")
         print(f"After deployment, run: {setup_command('jobs')}")
+        print(f"Then reconcile memory monitoring: {setup_command('monitoring')}")
         if ai_email_config:
             print(
                 "Then activate the saved AI email configuration with: "

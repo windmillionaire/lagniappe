@@ -58,7 +58,7 @@ REPORT_ACTION_DATA_CONTRACTS = {
             "form",
             "form_action",
             "form_name",
-            "document",
+            "document_markdown",
             "submission",
             "submission_empty_reason",
         ),
@@ -205,7 +205,7 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "required": ("note", "questions"),
     },
     "summarize_file": {
-        "fields": ("file", "summary", "search"),
+        "fields": ("file", "summary", "retrieval_terms", "search"),
         "required": ("file", "summary"),
     },
 }

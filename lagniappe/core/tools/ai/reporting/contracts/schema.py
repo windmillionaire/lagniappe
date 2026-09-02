@@ -57,7 +57,7 @@ def _report_schema_field_response_schema():
             "location": {"type": "string"},
             "options": {"type": "array", "items": option_schema},
             "columns": {"type": "array", "items": column_schema},
-            "html": {"type": "string"},
+            "content_markdown": {"type": "string"},
             "address": {"type": "string"},
             "icon": {"type": "string"},
             "kind": {"type": "string"},
@@ -75,7 +75,7 @@ def _report_schema_field_response_schema():
             "location",
             "options",
             "columns",
-            "html",
+            "content_markdown",
             "address",
             "icon",
             "kind",
@@ -129,13 +129,20 @@ def _report_schema_operation_response_schema():
 # @reason nested update contract is asserted through the public response schema
 def _report_submission_update_response_schema():
     """Return the provider schema for one exact submission field update."""
+    action_reference = {
+        "type": "string",
+        "description": (
+            "Exact id of an earlier action in this proposal that creates the "
+            "referenced entity; not a workspace hash or entity id."
+        ),
+    }
     return {
         "type": "object",
         "properties": {
             "page": {"type": "string"},
-            "page_action": {"type": "string"},
+            "page_action": action_reference,
             "task": {"type": "string"},
-            "task_action": {"type": "string"},
+            "task_action": action_reference,
             "schema_id": {"type": "string"},
             "field_id": {"type": "string"},
             # Form fields accept heterogeneous JSON values. Declaring the key
@@ -162,6 +169,20 @@ def _report_submission_update_response_schema():
 # @reason action data variants are asserted through the public response schema
 def _report_action_data_properties():
     """Return the complete field vocabulary used by typed action variants."""
+    action_reference = {
+        "type": "string",
+        "description": (
+            "Exact id of an earlier action in this proposal that creates the "
+            "referenced entity; not a workspace hash or entity id."
+        ),
+    }
+    submission = submission_response_schema()
+    submission["description"] = (
+        "Form field values to submit on the Page or Task created by this action, "
+        "keyed by the exact ids from the referenced Form schema. This creates a "
+        "new submission with the entity; it is not a reference to an existing "
+        "submission."
+    )
     return {
         "name": {"type": "string"},
         "description": {"type": "string"},
@@ -172,36 +193,36 @@ def _report_action_data_properties():
             "minItems": 1,
         },
         "category": {"type": "string"},
-        "category_action": {"type": "string"},
+        "category_action": action_reference,
         "category_name": {"type": "string"},
         "form": {"type": "string"},
-        "form_action": {"type": "string"},
+        "form_action": action_reference,
         "form_name": {"type": "string"},
         "page": {"type": "string"},
-        "page_action": {"type": "string"},
+        "page_action": action_reference,
         "page_name": {"type": "string"},
         "entity": {"type": "string"},
-        "entity_action": {"type": "string"},
+        "entity_action": action_reference,
         "entity_name": {"type": "string"},
         "task": {"type": "string"},
-        "task_action": {"type": "string"},
+        "task_action": action_reference,
         "task_name": {"type": "string"},
         "project": {"type": "string"},
-        "project_action": {"type": "string"},
+        "project_action": action_reference,
         "project_name": {"type": "string"},
         "model": {"type": "string"},
-        "model_action": {"type": "string"},
+        "model_action": action_reference,
         "model_name": {"type": "string"},
         "file": {"type": "string"},
         "display_name": {"type": "string"},
         "from_page": {"type": "string"},
-        "from_page_action": {"type": "string"},
+        "from_page_action": action_reference,
         "from_task": {"type": "string"},
-        "from_task_action": {"type": "string"},
+        "from_task_action": action_reference,
         "to_page": {"type": "string"},
-        "to_page_action": {"type": "string"},
+        "to_page_action": action_reference,
         "to_task": {"type": "string"},
-        "to_task_action": {"type": "string"},
+        "to_task_action": action_reference,
         "operations": {
             "type": "array",
             "items": _report_schema_operation_response_schema(),
@@ -212,9 +233,15 @@ def _report_action_data_properties():
             "items": _report_submission_update_response_schema(),
             "minItems": 1,
         },
-        "submission": submission_response_schema(),
-        "submission_empty_reason": {"type": "string"},
-        "document": {"type": "string"},
+        "submission": submission,
+        "submission_empty_reason": {
+            "type": "string",
+            "description": (
+                "Why no Form values can be grounded when this action still needs "
+                "to create an intentionally empty submission."
+            ),
+        },
+        "document_markdown": {"type": "string"},
         "due_date": {"type": "string"},
         "schedule": task_schedule_response_schema(),
         "completed": {"type": "boolean"},
@@ -222,6 +249,12 @@ def _report_action_data_properties():
         "note": {"type": "string"},
         "questions": {"type": "array", "items": {"type": "string"}},
         "summary": {"type": "string"},
+        "retrieval_terms": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 2,
+            "maxItems": 2,
+        },
         "search": {"type": "boolean"},
     }
 
@@ -342,3 +375,120 @@ def report_proposal_response_schema(
         "propertyOrdering": property_ordering,
         "additionalProperties": False,
     }
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
+# @reason external required-group composition is asserted through the public transport schema
+def _external_required_group_schema(fields):
+    """Require at least one field from an external action reference group."""
+    fields = tuple(fields)
+    return {
+        "description": f"At least one of {', '.join(fields)} is required.",
+        "anyOf": [{"required": [field]} for field in fields],
+    }
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
+# @reason external action variants are asserted through the public transport schema
+def _external_report_action_response_schema(
+    action_type,
+    include_submission_fields,
+    require_file_summary_terms,
+):
+    """Return a standard JSON Schema action variant for external clients."""
+    schema = _report_action_response_schema(
+        action_type,
+        include_submission_fields,
+    )
+    schema["properties"]["type"] = {
+        "type": "string",
+        "const": action_type,
+    }
+    data_schema = schema["properties"]["data"]
+    required_groups = REPORT_ACTION_DATA_CONTRACTS[action_type].get(
+        "required_groups",
+        (),
+    )
+    if required_groups:
+        data_schema["allOf"] = [
+            _external_required_group_schema(group)
+            for group in required_groups
+        ]
+
+    if action_type == "summarize_file":
+        terms_schema = data_schema["properties"]["retrieval_terms"]
+        terms_schema["uniqueItems"] = True
+        terms_schema["items"]["maxLength"] = 80
+        if require_file_summary_terms:
+            required = list(data_schema.get("required", ()))
+            if "retrieval_terms" not in required:
+                required.append("retrieval_terms")
+            data_schema["required"] = required
+    return schema
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
+# @reason provider-only ordering hints are removed through the public external serializer
+def _standard_json_schema(value):
+    """Remove provider-only annotations from an ordinary JSON Schema tree."""
+    if isinstance(value, dict):
+        return {
+            key: _standard_json_schema(child)
+            for key, child in value.items()
+            if key != "propertyOrdering"
+        }
+    if isinstance(value, list):
+        return [_standard_json_schema(child) for child in value]
+    return value
+
+
+# @testable true
+# @tests tests_unit/test_032_agent_api.py::test_external_proposal_schema_has_named_discriminated_actions
+# @matrix agent-api ai-report : external-schema proposal-contract structured-output
+def external_report_proposal_response_schema(
+    allowed_actions=None,
+    *,
+    require_issues=False,
+    include_submission_fields=True,
+    require_file_summary_terms=False,
+):
+    """Return a named, machine-readable proposal schema for external clients.
+
+    The internal Gemini schema intentionally keeps its provider-compatible
+    inline ``anyOf`` representation. This transport adapter can use standard
+    JSON Schema composition to expose named action variants and executable
+    reference-group requirements without changing internal model prompts.
+    """
+    action_types = tuple(allowed_actions or ACTION_ORDER)
+    provider_schema = report_proposal_response_schema(
+        allowed_actions=action_types,
+        require_issues=require_issues,
+        include_submission_fields=include_submission_fields,
+    )
+    schema = _standard_json_schema(provider_schema)
+    definitions = {
+        action_type: _standard_json_schema(
+            _external_report_action_response_schema(
+                action_type,
+                include_submission_fields,
+                require_file_summary_terms,
+            )
+        )
+        for action_type in action_types
+    }
+    mapping = {
+        action_type: f"#/$defs/{action_type}"
+        for action_type in action_types
+    }
+    schema["$defs"] = definitions
+    schema["properties"]["actions"]["items"] = {
+        "oneOf": [{"$ref": reference} for reference in mapping.values()],
+        "discriminator": {
+            "propertyName": "type",
+            "mapping": mapping,
+        },
+    }
+    return schema

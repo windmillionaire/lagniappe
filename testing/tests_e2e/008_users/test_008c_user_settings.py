@@ -145,6 +145,7 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
         "name",
         "user-email",
         "notification-email",
+        "api-key-settings",
     ]
 
     settings_panel.locator(
@@ -179,6 +180,7 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     )
 
 
+# @matrix agent-api : copy-control
 # @matrix user-settings : field-order group-selector-hidden owner-own-page readonly-email sign-out
 # @pair notification-email:default-daily
 # @template pages/info.html::user_settings
@@ -209,11 +211,31 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(
         settings_panel.locator("input[name='notification_email_mode'][value='DAILY']")
     ).to_be_checked()
+    api_key_settings = settings_panel.locator("[data-role='api-key-settings']")
+    expect(api_key_settings).to_be_visible()
+    expect(api_key_settings.locator("[data-role='api-key-status']")).to_have_text(
+        "No active API key."
+    )
+    expect(
+        api_key_settings.locator("[data-role='manual-command-shell']")
+    ).to_have_count(1)
+    expect(
+        api_key_settings.locator("[data-role='manual-command-copy']")
+    ).to_have_attribute("aria-label", "Copy API key")
+    api_key_actions = api_key_settings.locator("[data-role='api-key-actions']")
+    expect(api_key_actions).to_have_class(re.compile(r"\bflex-col\b"))
+    expect(api_key_actions).to_have_class(re.compile(r"\bsm:flex-row\b"))
+    issue_button = api_key_actions.locator("[data-action='issue-api-key']")
+    revoke_button = api_key_actions.locator("[data-action='revoke-api-key']")
+    expect(issue_button).to_have_class(re.compile(r"\baction-button\b"))
+    expect(revoke_button).to_have_class(re.compile(r"\baction-button\b"))
+    expect(revoke_button).to_have_attribute("data-kind", "delete")
     assert user_settings_field_order(settings_panel) == [
         "name",
         "user-email",
         "ai-access",
         "notification-email",
+        "api-key-settings",
         "owner-inbound",
     ]
 
@@ -221,6 +243,79 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     controls = _tabs_controls(owner)
     expect(controls.locator("button[lp-help='user_settings']")).to_be_visible()
     expect(controls.locator(Buttons.LP_CLOSE)).to_be_visible()
+
+
+# @matrix agent-api user-settings : confirmation-modal entitlement-independent revoke rotate shown-once
+# @template pages/info.html::user_settings
+def test_user_without_provider_access_can_manage_external_agent_api_key(get_user):
+    owner = get_user(Users.OWNER)
+    suffix = uuid4().hex
+    user = get_user(
+        UserDefinition(
+            name=f"External Agent None {suffix}",
+            email=f"external-agent-none-{suffix}@example.test",
+            ai_access=AI.NONE,
+        ),
+        creator=owner,
+    )
+    assert user.entity.ai_access == AI.NONE.name
+    user.go(SitePages.HOME)
+
+    go_to_my_page(user)
+    user_page = Page(user=user, definition=user.definition)
+    settings_panel = open_user_settings(user, user_page)
+
+    expect(settings_panel).to_have_attribute(
+        "data-api-key-route",
+        re.compile(r"/users/me/api-key$"),
+    )
+    api_key_settings = settings_panel.locator("[data-role='api-key-settings']")
+    expect(api_key_settings).to_be_visible()
+    expect(api_key_settings.locator("[data-role='api-key-status']")).not_to_have_text(
+        "Loading API key status..."
+    )
+
+    issue = api_key_settings.locator("[data-action='issue-api-key']")
+    revoke = api_key_settings.locator("[data-action='revoke-api-key']")
+    secret = api_key_settings.locator("[data-role='api-key-secret']")
+    value = api_key_settings.locator("[data-role='api-key-value']")
+
+    with user.page.expect_response("**/users/me/api-key") as issued_response:
+        issue.click()
+    assert issued_response.value.ok
+    expect(issue).to_have_text("Regenerate API key")
+    expect(secret).to_be_visible()
+    expect(value).not_to_be_empty()
+    first_token = value.text_content()
+
+    modal = Modal(user.page).open(issue)
+    expect(
+        modal.element.get_by_role("heading", name="Regenerate API key")
+    ).to_be_visible()
+    expect(modal.element).to_contain_text("The current key will stop working immediately.")
+    modal.click("Cancel")
+    expect(issue).to_have_text("Regenerate API key")
+
+    modal.open(issue)
+    with user.page.expect_response("**/users/me/api-key") as rotated_response:
+        modal.click("Regenerate API key")
+    assert rotated_response.value.ok
+    expect(value).not_to_have_text(first_token)
+
+    modal.open(revoke)
+    expect(modal.element.get_by_role("heading", name="Revoke API key")).to_be_visible()
+    expect(modal.element).to_contain_text("This key will stop working immediately.")
+    modal.click("Cancel")
+    expect(revoke).to_be_visible()
+
+    modal.open(revoke)
+    with user.page.expect_response("**/users/me/api-key") as revoked_response:
+        modal.click("Revoke API key")
+    assert revoked_response.value.ok
+    expect(api_key_settings.locator("[data-role='api-key-status']")).to_have_text(
+        "No active API key."
+    )
+    expect(revoke).to_be_hidden()
 
 
 # @matrix ai : access-gate batch-summary provider-boundary

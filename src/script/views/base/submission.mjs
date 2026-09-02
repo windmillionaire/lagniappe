@@ -213,10 +213,9 @@ export class SubmissionManager {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-	 * @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_submit_marks_form_successful
 	 * @tests tests_js/test_015_core_submit_frontend.py::test_deferred_background_create_does_not_decorate_source_form
 	 * @matrix deferred-jobs submit : background deferred-create destination-row
-	 * @pairs deferred-jobs:hosted-e2e pages:deferred-submit
+	 * @pair deferred-jobs:hosted-e2e
 	 */
 	async _deferredCreated(response, component) {
 		const [operations, notifications] = await Promise.all([

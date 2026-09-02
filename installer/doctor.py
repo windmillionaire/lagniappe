@@ -161,9 +161,8 @@ def _read_adc_identity(
                 "openid",
             ]
         )
-        principal = (
-            getattr(credentials, "service_account_email", None)
-            or getattr(credentials, "signer_email", None)
+        principal = getattr(credentials, "service_account_email", None) or getattr(
+            credentials, "signer_email", None
         )
         if not principal:
             if request_factory is None:
@@ -224,11 +223,7 @@ def _default_provider_checker(settings, project):
     )
     missing_permissions = inspect_operator_permissions(project)
     report["operator-permissions"] = {
-        "state": (
-            "UNAVAILABLE"
-            if any(missing_permissions.values())
-            else "AVAILABLE"
-        ),
+        "state": ("UNAVAILABLE" if any(missing_permissions.values()) else "AVAILABLE"),
         "details": missing_permissions,
         "error": None,
     }
@@ -249,14 +244,15 @@ def _default_provider_checker(settings, project):
         for value in str(services.stdout or "").splitlines()
         if value.strip()
     }
-    missing_apis = sorted(
-        set(constants.REQUIRED_GOOGLE_CLOUD_APIS) - enabled_apis
-    )
+    missing_apis = sorted(set(constants.REQUIRED_GOOGLE_CLOUD_APIS) - enabled_apis)
     report["required-apis"] = {
         "state": "ABSENT" if missing_apis else "AVAILABLE",
         "details": {"missing": missing_apis},
         "error": None,
     }
+    from installer.monitoring import inspect_memory_alert
+
+    report["app-engine-memory-alert"] = inspect_memory_alert(settings, project)
     return report
 
 
@@ -284,12 +280,14 @@ def _identity_issues(saved, active):
 # @matrix setup : adc doctor keyless-config project-identity
 def _keyless_identity_issues(settings, deploy):
     """Return local keyless identity and deployment attachment drift."""
-    runtime_email = str(
-        settings.get("RUNTIME_SERVICE_ACCOUNT_EMAIL") or ""
-    ).strip().casefold()
-    internal_caller_email = str(
-        settings.get("INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL") or ""
-    ).strip().casefold()
+    runtime_email = (
+        str(settings.get("RUNTIME_SERVICE_ACCOUNT_EMAIL") or "").strip().casefold()
+    )
+    internal_caller_email = (
+        str(settings.get("INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL") or "")
+        .strip()
+        .casefold()
+    )
     issues = []
     if settings.get("CONFIG_KIND") != "lagniappe-settings":
         issues.append("CONFIG_KIND is missing or unsupported")
@@ -363,12 +361,9 @@ def run_doctor(
                 identity_issues.append("ADC principal is unavailable")
             elif (
                 saved_gcloud.get("ACCOUNT")
-                and adc["principal"].casefold()
-                != saved_gcloud["ACCOUNT"].casefold()
+                and adc["principal"].casefold() != saved_gcloud["ACCOUNT"].casefold()
             ):
-                identity_issues.append(
-                    "ADC principal differs from the saved deployer"
-                )
+                identity_issues.append("ADC principal differs from the saved deployer")
             if saved_gcloud.get("PROJECT") and (
                 adc.get("project") != saved_gcloud["PROJECT"]
             ):
@@ -390,22 +385,12 @@ def run_doctor(
         print(f"Active gcloud project: {active.get('project') or '(unavailable)'}")
         print(f"ADC principal: {adc.get('principal') or '(unavailable)'}")
         print(f"ADC project: {adc.get('project') or '(unavailable)'}")
+        print(f"ADC quota project: {adc.get('quota_project') or '(unavailable)'}")
         print(
-            "ADC quota project: "
-            f"{adc.get('quota_project') or '(unavailable)'}"
+            f"Saved installer: {settings.get('INSTALLER_EMAIL') or '(not configured)'}"
         )
-        print(
-            "Saved installer: "
-            f"{settings.get('INSTALLER_EMAIL') or '(not configured)'}"
-        )
-        print(
-            "Saved deployer: "
-            f"{settings.get('DEPLOYER_EMAIL') or '(not configured)'}"
-        )
-        print(
-            "Saved owner: "
-            f"{settings.get('ADMIN_EMAIL') or '(not configured)'}"
-        )
+        print(f"Saved deployer: {settings.get('DEPLOYER_EMAIL') or '(not configured)'}")
+        print(f"Saved owner: {settings.get('ADMIN_EMAIL') or '(not configured)'}")
         if identity_issues:
             print("Identity state: DRIFT")
             for issue in identity_issues:

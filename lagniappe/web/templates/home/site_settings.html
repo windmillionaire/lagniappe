@@ -296,7 +296,8 @@
                      max="20"
                      step="1"
                      class="{{ styles.input }}">
-              <span class="text-xs font-normal text-base-medium">Reduce workers if App Engine reports memory pressure.</span>
+              <span data-role="deployment-worker-guidance"
+                    class="text-xs font-normal text-base-medium">Workers multiply application memory use; F2 and B2 support at most three workers.</span>
             </label>
             <div class="{{ styles.label.column }}">
               <span>Instances</span>

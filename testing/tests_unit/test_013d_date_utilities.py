@@ -9,6 +9,109 @@ from lagniappe.core.tools import dates as generic_dates
 from lagniappe.core.tools.tasks import scheduling as dates
 
 
+# @matrix task-scheduling : recurring periodic interval-semantics
+@pytest.mark.unit
+def test_calculate_next_recurring_due_date_preserves_interval_semantics():
+    """Fixed intervals keep relativedelta clamping and datetime precision."""
+    tz = ZoneInfo("America/Los_Angeles")
+    monthly_start = datetime(2025, 1, 31, 9, 30, 45, 123456, tzinfo=tz)
+    yearly_start = datetime(2024, 2, 29, 9, 30, 45, 123456, tzinfo=tz)
+
+    assert dates.calculate_next_recurring_due_date(
+        monthly_start, {"interval": 1, "unit": "month"}
+    ) == datetime(2025, 2, 28, 9, 30, 45, 123456, tzinfo=tz)
+    assert dates.calculate_next_recurring_due_date(
+        yearly_start, {"interval": 1, "unit": "year"}
+    ) == datetime(2025, 2, 28, 9, 30, 45, 123456, tzinfo=tz)
+
+
+# @matrix task-scheduling : scheduled exact-boundary timezone
+@pytest.mark.unit
+def test_calculate_next_scheduled_due_date():
+    """Calendar rules are strict and preserve mode-specific wall-clock behavior."""
+    from unittest.mock import patch
+
+    tz = ZoneInfo("America/Los_Angeles")
+    dst_due = datetime(2025, 3, 8, 9, 30, 45, 123456, tzinfo=tz)
+
+    assert dates.calculate_next_scheduled_due_date(
+        dst_due, {"mode": "daily"}
+    ) == datetime(2025, 3, 9, 9, 30, 45, 123456, tzinfo=tz)
+    assert dates.calculate_next_scheduled_due_date(
+        dst_due, {"mode": "weekly", "days": [5]}
+    ) == datetime(2025, 3, 15, 9, 30, 45, 123456, tzinfo=tz)
+
+    day_31_due = datetime(2025, 1, 31, 9, 30, 45, 123456, tzinfo=tz)
+    assert dates.calculate_next_scheduled_due_date(
+        day_31_due,
+        {"mode": "monthly", "type": "specific_day", "day": 31},
+    ) == datetime(2025, 3, 31, 9, 30, 45, 123456, tzinfo=tz)
+
+    leap_day_due = datetime(2024, 2, 29, 9, 30, 45, 123456, tzinfo=tz)
+    with patch("lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz):
+        assert dates.calculate_next_scheduled_due_date(
+            leap_day_due,
+            {
+                "mode": "yearly",
+                "type": "specific_day",
+                "month": 2,
+                "day": 29,
+            },
+        ) == datetime(2028, 2, 29, tzinfo=tz)
+
+
+# @matrix task-scheduling : scheduled calendar-validation
+@pytest.mark.unit
+def test_calculate_next_scheduled_due_date_rejects_invalid_rules():
+    """Malformed and impossible stored calendar rules do not create recurrences."""
+    due_date = datetime(2025, 6, 18, tzinfo=ZoneInfo("UTC"))
+    invalid_rules = (
+        None,
+        {},
+        {"mode": "unsupported"},
+        {"mode": "weekly"},
+        {"mode": "weekly", "days": []},
+        {"mode": "weekly", "days": (0, 2)},
+        {"mode": "weekly", "days": [True]},
+        {"mode": "weekly", "days": [7]},
+        {"mode": "monthly"},
+        {"mode": "monthly", "type": "specific_day", "day": True},
+        {"mode": "monthly", "type": "specific_day", "day": 0},
+        {"mode": "monthly", "type": "specific_day", "day": 32},
+        {
+            "mode": "monthly",
+            "type": "ordinal_weekday",
+            "ordinal": 5,
+            "weekday": 0,
+        },
+        {
+            "mode": "monthly",
+            "type": "ordinal_weekday",
+            "ordinal": 1,
+            "weekday": True,
+        },
+        {"mode": "yearly", "type": "first_day"},
+        {"mode": "yearly", "type": "first_day", "month": True},
+        {"mode": "yearly", "type": "first_day", "month": 13},
+        {
+            "mode": "yearly",
+            "type": "specific_day",
+            "month": 4,
+            "day": 31,
+        },
+        {
+            "mode": "yearly",
+            "type": "specific_day",
+            "month": 2,
+            "day": 30,
+        },
+    )
+
+    assert dates.calculate_next_scheduled_due_date(None, {"mode": "daily"}) is None
+    for rule in invalid_rules:
+        assert dates.calculate_next_scheduled_due_date(due_date, rule) is None
+
+
 # @pair dates:ordinal-weekday
 @pytest.mark.unit
 def test_find_ordinal_weekday_in_month():
@@ -83,6 +186,13 @@ def test_calculate_next_monthly_occurrence():
         2025, 7, 21
     )
 
+    # Day 31 skips a month that does not contain that calendar position.
+    day_31_due = datetime(2025, 1, 31, 8, 15, 30, 654321)
+    sched = {"type": "specific_day", "day": 31}
+    assert dates.calculate_next_monthly_occurrence(day_31_due, sched) == datetime(
+        2025, 3, 31, 8, 15, 30, 654321
+    )
+
 
 # @pair dates:yearly-occurrence
 @pytest.mark.unit
@@ -106,12 +216,29 @@ def test_calculate_next_yearly_occurrence():
             2026, 1, 10, tzinfo=tz
         )
 
+        # First Monday in August 2025
+        sched = {"type": "ordinal_weekday", "month": 8, "ordinal": 1, "weekday": 0}
+        assert dates.calculate_next_yearly_occurrence(due_date, sched) == datetime(
+            2025, 8, 4, tzinfo=tz
+        )
+
         # Last day of February 2028 (leap year)
         leap_due = datetime(2028, 2, 1, tzinfo=tz)
         sched = {"type": "last_day", "month": 2}
         assert dates.calculate_next_yearly_occurrence(leap_due, sched) == datetime(
             2028, 2, 29, tzinfo=tz
         )
+
+        # February 29 skips directly to the next leap year.
+        leap_day = datetime(2024, 2, 29, 18, 45, 1, 123456, tzinfo=tz)
+        sched = {"type": "specific_day", "month": 2, "day": 29}
+        assert dates.calculate_next_yearly_occurrence(leap_day, sched) == datetime(
+            2028, 2, 29, tzinfo=tz
+        )
+
+        # Fixed month/day combinations that can never occur are invalid.
+        sched = {"type": "specific_day", "month": 4, "day": 31}
+        assert dates.calculate_next_yearly_occurrence(due_date, sched) is None
 
 
 # @pair dates:postponement

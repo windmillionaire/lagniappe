@@ -49,3 +49,11 @@ body {
 		transition-duration: 0.01ms !important;
 	}
 }
+
+/* Keep proposal review cards intact when reports are printed or saved as PDF. */
+@media print {
+	[data-role="proposal-action"] {
+		break-inside: avoid-page;
+		page-break-inside: avoid;
+	}
+}

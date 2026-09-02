@@ -713,6 +713,19 @@ def test_current_user_prefers_flask_user_over_config(monkeypatch):
         assert user_context.current_context_user() is request_user
 
 
+# @matrix agent-api users : bearer-user current-user resolver
+def test_current_user_prefers_agent_api_user_over_flask_user(monkeypatch):
+    app = Flask(__name__)
+    bearer_user = _TestUser(owner=True)
+    browser_user = _TestUser(owner=False)
+    monkeypatch.setattr(user_context, "current_user", browser_user)
+
+    with app.test_request_context("/api/v1/demo", method="GET"):
+        g.agent_api_user = bearer_user
+
+        assert user_context.current_context_user() is bearer_user
+
+
 # @matrix property : current-user propagation
 def test_property_defaults_to_config_test_user():
     configured = _TestUser(owner=False)
@@ -1742,34 +1755,6 @@ def test_timed_prints_request_label_without_entity_trace(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "[timing] GET /categories/demo?cursor=abc route-timer:" in output
     assert "[entity-loads]" not in output
-
-
-# @pair utility:html-cleaning
-def test_clean_html():
-    """Test html_tools.clean_html removes code blocks and empty tags."""
-    assert html_tools.clean_html(None) == ""
-    assert html_tools.clean_html("") == ""
-    assert html_tools.clean_html(123) == 123  # Non-string input returned as is
-
-    # Removes markdown code blocks
-    assert html_tools.clean_html("```html\n<p>test</p>\n```") == "<p>test</p>"
-    assert html_tools.clean_html("```\n<p>test</p>\n```") == "<p>test</p>"
-
-    # Removes empty tags
-    assert (
-        html_tools.clean_html("<p></p><div><span>  </span></div><p>Keep</p>")
-        == "<p>Keep</p>"
-    )
-
-    # Keeps tags with content or certain elements
-    assert (
-        html_tools.clean_html("<p><img src='test.png'></p>")
-        == '<p><img src="test.png"/></p>'
-    )
-    assert html_tools.clean_html("<hr>") == "<hr/>"
-
-    # Removes whitespace between tags
-    assert html_tools.clean_html("<p>A</p> \n  <p>B</p>") == "<p>A</p><p>B</p>"
 
 
 # @pair utility:hashing

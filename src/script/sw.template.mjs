@@ -4,6 +4,10 @@ const CACHE = `static-cache`;
 const RESPONSE_CACHE = `response-cache`;
 const PRECACHE_URLS = /* __PRECACHE_URLS__ */ [];
 const UPDATED_HEADER = "X-Lagniappe-Updated";
+const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
+const UPSTREAM_STATUS_HEADER = "X-Lagniappe-Upstream-Status";
+const STALE_CACHE_HEADER = "X-Lagniappe-Stale-Cache";
+const UPSTREAM_STATUSES = new Set([500, 502, 503, 504]);
 const BROWSER_PROTOCOL = /* __BROWSER_PROTOCOL__ */ null;
 const TOKEN_REQUEST = {
 	credentials: "include",
@@ -348,6 +352,204 @@ function receiveConnectivityMessage(data) {
 	return true;
 }
 
+/**
+ * @testable true
+ * @tests tests_js/test_008_service_worker.py::test_worker_classifies_only_unmarked_upstream_html_failures
+ * @matrix request-errors service-worker : application-error-marker classification upstream-unavailable
+ */
+function isUpstreamUnavailableResponse(response) {
+	return Boolean(
+		response &&
+			UPSTREAM_STATUSES.has(response.status) &&
+			response.headers.get("content-type")?.includes("text/html") &&
+			!response.headers.get("X-Lagniappe-Error"),
+	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::notifyUpstreamUnavailable
+ * @reason route privacy is asserted through the controlled-client message
+ */
+function upstreamRouteClass(pathname) {
+	if (pathname === "/") return "root";
+	const segment = pathname.split("/").filter(Boolean)[0] || "root";
+	if (segment === "l") return "internal";
+	const allowed = new Set([
+		"admin",
+		"analytics",
+		"categories",
+		"files",
+		"filters",
+		"forms",
+		"home",
+		"manual",
+		"messages",
+		"pages",
+		"process",
+		"projects",
+		"public",
+		"reports",
+		"tasks",
+		"testing",
+		"users",
+	]);
+	return allowed.has(segment) ? segment : "other";
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::notifyUpstreamUnavailable
+ * @covered-by src/script/sw.template.mjs::upstreamHeaders
+ * @reason server sanitization is asserted through client messages and internal headers
+ */
+function boundedServer(response) {
+	return String(response.headers.get("Server") || "")
+		.replace(/[^\x20-\x7E]/g, "")
+		.slice(0, 128);
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_008_service_worker.py::test_upstream_failure_notifies_controlled_clients_with_bounded_state
+ * @matrix browser-protocol request-errors service-worker : client-message privacy upstream-unavailable
+ */
+async function notifyUpstreamUnavailable(
+	request,
+	response,
+	{ stale = false } = {},
+) {
+	const pathname = new URL(request.url).pathname;
+	const method = String(request.method || "GET").toUpperCase();
+	const message = {
+		protocol: BROWSER_PROTOCOL.id,
+		protocol_version: BROWSER_PROTOCOL.version,
+		type: BROWSER_PROTOCOL.messages.UPSTREAM_UNAVAILABLE,
+		state: {
+			status: response.status,
+			method,
+			route_class: upstreamRouteClass(pathname),
+			server: boundedServer(response),
+			trace_header_present: Boolean(
+				response.headers.get("X-Cloud-Trace-Context") ||
+					response.headers.get("Traceparent"),
+			),
+			timestamp: new Date().toISOString(),
+			online: _connectivity.browser !== "offline",
+			service_worker: "controlled",
+			stale: Boolean(stale),
+			outcome_uncertain: method !== "GET",
+			retry_outcome: "service_worker",
+		},
+	};
+	const clients = await self.clients.matchAll({
+		type: "window",
+		includeUncontrolled: false,
+	});
+	for (const client of clients) client.postMessage?.(message);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::markedStaleResponse
+ * @covered-by src/script/sw.template.mjs::brandedUpstreamResponse
+ * @reason internal markers are asserted through stale and branded response owners
+ */
+function upstreamHeaders(
+	response,
+	{ stale = false, originalResponse = response } = {},
+) {
+	const headers = new Headers(response?.headers || {});
+	headers.set(UPSTREAM_UNAVAILABLE_HEADER, "true");
+	headers.set(
+		UPSTREAM_STATUS_HEADER,
+		String(originalResponse?.status || response?.status || 503),
+	);
+	const server = boundedServer(originalResponse);
+	if (server) headers.set("Server", server);
+	headers.set(STALE_CACHE_HEADER, stale ? "true" : "false");
+	headers.set("Cache-Control", "no-store");
+	headers.set("Retry-After", "5");
+	return headers;
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_008_service_worker.py::test_upstream_failure_uses_marked_stale_cache_without_caching_5xx
+ * @matrix cache request-errors service-worker : stale-cache upstream-unavailable
+ */
+function markedStaleResponse(cached, upstream) {
+	return new Response(cached.body, {
+		status: cached.status,
+		statusText: cached.statusText,
+		headers: upstreamHeaders(cached, {
+			stale: true,
+			originalResponse: upstream,
+		}),
+	});
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_008_service_worker.py::test_upstream_failure_without_cache_returns_branded_retryable_503
+ * @tests tests_js/test_008_service_worker.py::test_mutation_upstream_failure_returns_uncertain_json_without_replay
+ * @matrix request-errors service-worker : branded-response mutation no-replay retry upstream-unavailable
+ */
+function brandedUpstreamResponse(request, upstream) {
+	const headers = upstreamHeaders(upstream);
+	if (request.mode === "navigate") {
+		headers.set("Content-Type", "text/html; charset=utf-8");
+		return new Response(
+			`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lagniappe temporarily unavailable</title><style>body{font:16px system-ui,sans-serif;margin:0;background:#f8fafc;color:#0f172a}main{max-width:42rem;margin:12vh auto;padding:2rem}section{background:white;border:1px solid #cbd5e1;border-radius:.75rem;padding:2rem;box-shadow:0 8px 24px #0f172a14}a{display:inline-block;margin-top:1rem;padding:.65rem 1rem;border-radius:.4rem;background:#334155;color:white;text-decoration:none;font-weight:650}</style><main><section><h1>Lagniappe is temporarily unavailable</h1><p>The application server could not complete this request. Your saved work remains safe. Wait a moment, then try again.</p><a href="">Try again</a></section></main></html>`,
+			{ status: 503, statusText: "Service Unavailable", headers },
+		);
+	}
+
+	const applicationRequest =
+		request.headers.get("X-Lagniappe-Request") === "true" ||
+		request.method !== "GET";
+	if (applicationRequest) {
+		headers.set("Content-Type", "application/json");
+		return new Response(
+			JSON.stringify({
+				ok: false,
+				error: "The application server is temporarily unavailable.",
+				code: "upstream_instance_unavailable",
+				upstreamUnavailable: true,
+				stale: false,
+				retryable: request.method === "GET",
+				outcomeUncertain: request.method !== "GET",
+			}),
+			{ status: 503, statusText: "Service Unavailable", headers },
+		);
+	}
+
+	headers.set("Content-Type", "text/plain; charset=utf-8");
+	return new Response(
+		"Lagniappe is temporarily unavailable. Try again shortly.",
+		{
+			status: 503,
+			statusText: "Service Unavailable",
+			headers,
+		},
+	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::handleCacheable
+ * @covered-by src/script/sw.template.mjs::handleRequest
+ * @reason response selection and notification are exercised through fetch strategy owners
+ */
+function handleUpstreamUnavailable(event, request, response, cached = null) {
+	event.waitUntil(
+		notifyUpstreamUnavailable(request, response, { stale: Boolean(cached) }),
+	);
+	return cached
+		? markedStaleResponse(cached, response)
+		: brandedUpstreamResponse(request, response);
+}
+
 self.addEventListener("message", (event) => {
 	receiveConnectivityMessage(event.data);
 });
@@ -422,6 +624,9 @@ async function handleStatic(event) {
 
 	try {
 		const response = await fetch(event.request);
+		if (isUpstreamUnavailableResponse(response)) {
+			return handleUpstreamUnavailable(event, event.request, response);
+		}
 		if (responsePreventsStorage(response)) {
 			event.waitUntil(cache.delete(event.request, { ignoreVary: true }));
 		} else if (response.ok) {
@@ -460,7 +665,12 @@ async function unavailableResponse(request) {
 
 	if (request.headers.get("X-Lagniappe-Request") === "true") {
 		return new Response(
-			JSON.stringify({ ok: false, error: "You are offline" }),
+			JSON.stringify({
+				ok: false,
+				error: "You are offline",
+				retryable: false,
+				outcomeUncertain: true,
+			}),
 			{
 				status: 503,
 				headers: { "Content-Type": "application/json" },
@@ -523,6 +733,9 @@ async function handleNetworkOnlyGet(event) {
 	const cache = await caches.open(RESPONSE_CACHE);
 	try {
 		const response = await fetch(request);
+		if (isUpstreamUnavailableResponse(response)) {
+			return handleUpstreamUnavailable(event, request, response);
+		}
 		await discardCachedResponse(cache, request);
 		event.waitUntil(checkForCacheInvalidation(response));
 		return response;
@@ -568,6 +781,14 @@ async function handleCacheable(event, pathname) {
 	const networkPromise = (async () => {
 		try {
 			let response = await fetch(fetchRequest);
+			if (isUpstreamUnavailableResponse(response)) {
+				return handleUpstreamUnavailable(
+					event,
+					request,
+					response,
+					cachedResponse,
+				);
+			}
 			let invalidationResult = { invalidated: false };
 			let uncacheableResponse = await handleUncacheableResponse(
 				event,
@@ -596,6 +817,14 @@ async function handleCacheable(event, pathname) {
 				}
 				if (shouldFetchFresh) {
 					response = await fetch(networkRequest(request, { cache: "reload" }));
+					if (isUpstreamUnavailableResponse(response)) {
+						return handleUpstreamUnavailable(
+							event,
+							request,
+							response,
+							cachedResponse,
+						);
+					}
 					uncacheableResponse = await handleUncacheableResponse(
 						event,
 						cache,
@@ -655,6 +884,9 @@ async function handleRequest(event, pathname) {
 	const request = event.request;
 	try {
 		const response = await fetch(request);
+		if (isUpstreamUnavailableResponse(response)) {
+			return handleUpstreamUnavailable(event, request, response);
+		}
 
 		if (pathname !== "/l/validate-user" && responseInvalidatesCache(response)) {
 			event.waitUntil(checkForCacheInvalidation(response));

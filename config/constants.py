@@ -1,6 +1,6 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "be83515c"
+BUILD_ID = "b76aa3e8"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -45,7 +45,7 @@ DEFAULT_DEPLOYMENT_SETTINGS = {
     "DEPLOY_SCALING_TYPE": "basic",
     "DEPLOY_MAX_INSTANCES": "1",
     "DEPLOY_IDLE_TIMEOUT": "15m",
-    "DEPLOY_WORKER_COUNT": "4",
+    "DEPLOY_WORKER_COUNT": "3",
     "DEPLOY_INSTANCE_CLASS": "B2",
     "DEPLOY_MIN_IDLE_INSTANCES": "1",
 }
@@ -659,6 +659,7 @@ SCREENSHOTS = [
 # the application runtime.
 APP_BLUEPRINT_ROUTE_PREFIXES = (
     "analytics",
+    "api",
     "assets",
     "categories",
     "files",

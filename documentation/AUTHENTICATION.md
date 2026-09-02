@@ -107,6 +107,12 @@ The GIS credential is posted to `POST /users/google-signin`. The server:
 
 Lagniappe does not store Google provider refresh tokens.
 
+Flask-WTF exemption ownership is centralized in
+`lagniappe/web/start/blueprints.py`. It exempts only the
+`users.login_google` view, not the whole `users` blueprint. The route therefore
+must retain `verify_google_csrf` as its separate cookie/body double-submit
+boundary before reading or verifying a provider credential.
+
 ## Application accounts and roles
 
 Provider identity, Lagniappe roles, and Google Cloud IAM are independent.
@@ -192,3 +198,13 @@ Optional browser-review access uses `AGENT_ACCESS_ENABLED`,
 `AGENT_ACCESS_EMAIL`, `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. It is off by
 default. A successful `/users/agent-login` submission resolves to a normal user
 whose permissions remain group-managed in the owner interface.
+
+## External-agent API keys
+
+External-agent API authentication is independent of browser sessions. An
+authenticated non-public user can generate one 30-day bearer key from their own
+Settings panel, regardless of the site-funded AI-access level. Only a digest is
+persisted, rotation invalidates the previous key, and `/api/v1` never falls back
+to a login cookie. The API has no separate deployment-wide feature gate;
+normal entity permissions remain authoritative. See [External Agent
+API](AI_EXTERNAL_API.md).

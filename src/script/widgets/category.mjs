@@ -1,6 +1,5 @@
 import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
-import { primitives } from "../elements/primitives";
 import { sections } from "../elements/sections";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
@@ -142,95 +141,5 @@ export class CreateCategory extends CategoryForm {
 			description,
 			this.formSelectElement,
 		];
-	}
-}
-
-/**
- * @testable true
- * @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_explain_prompt_from_category_tools
- * @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_submit_marks_form_successful
- * @matrix pages : ai-form deferred-submit explain-button generate success-state
- */
-export class GeneratePages extends FormElement {
-	constructor(attributes) {
-		super(attributes);
-		this.messages = {
-			submit: "Generate Pages",
-			submitting: "Generating Pages",
-			submitted: "Pages Queued",
-		};
-		this.icon = "generate";
-		this.formSelect = null;
-		this.textarea = null;
-	}
-
-	get explainElement() {
-		return this.target.querySelector("[data-explain]");
-	}
-
-	async init() {
-		await super.init();
-		this.textarea = this.target.querySelector('[name="user_description"]');
-
-		this.textarea.addEventListener(
-			"input",
-			() => {
-				this.explainElement.dataset.visible = "true";
-			},
-			{ once: true },
-		);
-	}
-
-	get formSelectElement() {
-		const target = this.target.querySelector('[data-action="select-form"]');
-		if (!target) return null;
-
-		const control = SectionToggle.facet(this, target);
-		control.init();
-		this.destroyables.push(control);
-		return control.elt;
-	}
-
-	get html() {
-		const userDescription = primitives.textarea({
-			name: "user_description",
-			rows: 6,
-			label: "Details",
-			placeholder: "Add details about the pages you'd like to generate",
-			kind: "page",
-		});
-
-		const numberOfPages = primitives.input({
-			name: "num_pages",
-			type: "number",
-			kind: "page",
-			label: "Number of Pages",
-		});
-
-		return [userDescription, numberOfPages, this.formSelectElement];
-	}
-
-	success() {
-		this.form?.success();
-		this._success = false;
-	}
-
-	async prereconcile() {
-		await super.prereconcile();
-		if (this._created) await this.prepareReset();
-	}
-
-	postreconcile() {
-		const created = this._created;
-		if (created) this.commitReset();
-		super.postreconcile();
-
-		if (created) {
-			this.success();
-			this.target.querySelector("[name='num_pages']").value = 0;
-			this.target.querySelector("[name='user_description']").value = "";
-		}
-
-		this.textarea.focus();
 	}
 }

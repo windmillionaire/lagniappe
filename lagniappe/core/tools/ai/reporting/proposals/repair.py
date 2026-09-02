@@ -632,6 +632,7 @@ def validate_or_repair_proposal(
         "allow_pending_submissions": allow_pending_submissions,
     }
     if validator is validate_proposal:
+        validation_options["user"] = getattr(prompt, "_user", None)
         validation_options["allow_empty_submission_updates"] = (
             allow_empty_submission_updates
         )
@@ -837,7 +838,7 @@ summary only when it still matches the replacement proposal and does not claim
 that unexecuted changes already happened.
 
 Keep internal entity hash tokens in tool calls and executable action data only.
-Use human names in summary, answer_html, display labels, reasons, issues, notes,
+Use human names in summary, answer_markdown, display labels, reasons, issues, notes,
 and questions; if a human name is unavailable, describe the entity generically
 rather than displaying its hash token. Describe unexecuted actions as proposed
 changes that would or could happen, never as guaranteed future changes.

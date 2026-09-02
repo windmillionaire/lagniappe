@@ -121,6 +121,7 @@ def _attach_file_to_task(action, report, user, created):
 
 
 # @testable true
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_report_file_by_exact_url_and_file_prefix
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:file-summary
 def _summarize_file(action, report, _user, _created):
@@ -137,6 +138,16 @@ def _summarize_file(action, report, _user, _created):
     summarize.search = data.get("search", True) is not False
     summarize.status = "Summary saved from report."
     summarize.error = None
+    retrieval_terms = data.get("retrieval_terms")
+    if isinstance(retrieval_terms, list):
+        retrieval_terms = [
+            term.strip()
+            for term in retrieval_terms
+            if isinstance(term, str) and term.strip()
+        ][:2]
+    else:
+        retrieval_terms = []
+    summarize.retrieval_terms = retrieval_terms or None
     summarize.complete = True
     file.summary = summary
     return file, [file], {"file_summary": _file_summary_result(file)}

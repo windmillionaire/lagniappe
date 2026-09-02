@@ -2,8 +2,6 @@
 
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-import base64
-import binascii
 from email import policy
 from email.parser import Parser
 from html import escape
@@ -12,12 +10,12 @@ import hmac
 import json
 import re
 import tempfile
-import time
 from urllib.parse import quote, urlparse
 import uuid
 
 from bs4 import BeautifulSoup
 import requests
+from svix.webhooks import Webhook, WebhookVerificationError
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
@@ -26,7 +24,6 @@ from config.ai_email import normalize_email_address
 
 RESEND_API_ROOT = "https://api.resend.com"
 RESEND_TIMEOUT = 15
-SVIX_TOLERANCE_SECONDS = 300
 REPLY_MARKER = "--- Reply above this line to start a new report ---"
 SPOOL_MEMORY_BYTES = 1024 * 1024
 DOWNLOAD_CHUNK_BYTES = 64 * 1024
@@ -164,66 +161,29 @@ def _header_values(headers, name):
     return values
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::verify_svix_signature
-# @reason signing-secret decoding is exercised through the signed webhook boundary
-def _svix_secret_bytes(secret):
-    encoded = str(secret or "").strip()
-    if encoded.startswith("whsec_"):
-        encoded = encoded[6:]
-    try:
-        return base64.b64decode(encoded, validate=True)
-    except (ValueError, binascii.Error) as error:
-        raise AIEmailWebhookError("Webhook signing secret is invalid.") from error
-
-
 # @testable true
-# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_uses_raw_body_timestamp_and_any_v1_signature
-# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_invalid_or_stale_requests
-# @matrix ai-email webhook : invalid raw-body rotation signature stale timestamp webhook
-def verify_svix_signature(
-    raw_body,
-    headers,
-    webhook_secret,
-    *,
-    now=None,
-    tolerance_seconds=SVIX_TOLERANCE_SECONDS,
-):
+# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_accepts_raw_body_case_insensitive_headers_and_any_v1_signature
+# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_changed_or_non_bytes_body
+# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_missing_or_malformed_authentication_inputs
+# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_replayed_or_future_events
+# @matrix ai-email webhook : event-id future headers invalid raw-body replay rotation secret signature timestamp
+def verify_svix_signature(raw_body, headers, webhook_secret):
     """Verify a Resend/Svix signature against the untouched request bytes."""
     if not isinstance(raw_body, bytes):
         raise AIEmailWebhookError("Webhook body must be raw bytes.")
-    event_id = _header(headers, "svix-id").strip()
-    timestamp_text = _header(headers, "svix-timestamp").strip()
-    signature_header = _header(headers, "svix-signature").strip()
-    if not event_id or not timestamp_text or not signature_header:
-        raise AIEmailWebhookError("Required webhook signature headers are missing.")
-    try:
-        timestamp = int(timestamp_text)
-    except ValueError as error:
-        raise AIEmailWebhookError("Webhook timestamp is invalid.") from error
-    current_time = int(time.time() if now is None else now)
-    if abs(current_time - timestamp) > tolerance_seconds:
-        raise AIEmailWebhookError("Webhook timestamp is outside the allowed window.")
 
-    signed = (
-        event_id.encode("utf-8")
-        + b"."
-        + timestamp_text.encode("ascii")
-        + b"."
-        + raw_body
-    )
-    expected = base64.b64encode(
-        hmac.new(_svix_secret_bytes(webhook_secret), signed, hashlib.sha256).digest()
-    ).decode("ascii")
-    candidates = []
-    for item in signature_header.split():
-        version, separator, signature = item.partition(",")
-        if separator and version == "v1" and signature:
-            candidates.append(signature)
-    if not candidates or not any(
-        hmac.compare_digest(expected, candidate) for candidate in candidates
-    ):
-        raise AIEmailWebhookError("Webhook signature is invalid.")
+    try:
+        Webhook(webhook_secret).verify(raw_body, headers)
+    except WebhookVerificationError as error:
+        raise AIEmailWebhookError() from error
+    except Exception as error:
+        # The SDK can surface malformed secrets, bodies, headers, or signature
+        # entries through ordinary decoding and value exceptions.
+        raise AIEmailWebhookError() from error
+
+    event_id = _header(headers, "svix-id").strip()
+    if not event_id:
+        raise AIEmailWebhookError()
     return event_id
 
 

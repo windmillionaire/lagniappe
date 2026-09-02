@@ -8,6 +8,8 @@ from lagniappe import CONFIG
 from lagniappe.core.tools.ai.settings import runtime_ai_settings
 from lagniappe.core.tools.database import migrations as database_migrations
 from lagniappe.core.tools.database import site as site_database
+
+
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_deployment_settings_merge_live_values_over_runtime_defaults
 # @matrix admin : config deployment-settings metadata
@@ -27,7 +29,9 @@ def load_deployment_settings(*, config=None):
                 if key in DEFAULT_DEPLOYMENT_SETTINGS
             }
         )
-    return normalize_deployment_settings(defaults)
+    # Read legacy values without rewriting them. New submissions still use the
+    # strict worker ceiling in the route-level validation boundary.
+    return normalize_deployment_settings(defaults, enforce_worker_limit=False)
 
 
 # @testable true

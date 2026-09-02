@@ -6,7 +6,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.database import get as database_get
-from lagniappe.core.tools.files.html import clean_html
+from lagniappe.core.tools.files.html import sanitize_form_content_html
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,
@@ -31,7 +31,9 @@ def html_field(key, field_id, **kwargs):
     )
     form = entity if isinstance(entity, Entities.FORM) else entity.form
     html = form.get_html_field(field_id) if form else None
-    return responses.document_html(html)
+    return responses.document_html(
+        sanitize_form_content_html(html, form, field_id) if form else ""
+    )
 
 
 # @testable true
@@ -47,7 +49,8 @@ def form_html(key, field_id, **kwargs):
         request=Fetch.direct(),
     )
 
-    entity.set_html_field(field_id, request.json["html"])
+    html = sanitize_form_content_html(request.json["html"], entity, field_id)
+    entity.set_html_field(field_id, html)
     entity.save()
     return responses.ok()
 
@@ -170,12 +173,11 @@ def generate_text(key, **kwargs):
         return responses.explain(prompt)
 
     try:
-        html = ai.generate_ai_text(prompt)
+        markdown = ai.generate_ai_text(prompt)
     except exceptions.AIException as e:
         return responses.error(str(e), exception=e)
 
-    cleaned_html = clean_html(html)
-    return responses.document_html(cleaned_html)
+    return responses.document_html(ai.render_ai_markdown(markdown))
 
 
 # @testable true

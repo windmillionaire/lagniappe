@@ -17,7 +17,7 @@
     <ul class="text-base-medium space-y-2 mb-3">
       <li><strong>Primary Owner:</strong> the single configured business identity. The Owner has full application access, governs the Administrator roster, protects the canonical Owner account, and can download secret-bearing installation configuration.</li>
       <li><strong>Administrators:</strong> trusted managed users who can administer ordinary settings, users, groups, ingress, exports, and content. They cannot change the Owner or another Administrator, govern the Administrator roster, or retrieve installation secrets.</li>
-      <li><strong>AI access is separate:</strong> promoting a user to Administrator does not enable AI. AI entitlement is assigned independently.</li>
+      <li><strong>Provider access is separate:</strong> promoting a user to Administrator does not enable Lagniappe-funded model calls. That entitlement is assigned independently; provider-free external-agent plans still follow normal permissions.</li>
       <li><strong>Groups:</strong> users inherit permissions from every group they belong to.</li>
       <li><strong>Most permissive wins:</strong> if one group grants view and another grants edit, the user can edit.</li>
       <li><strong>Higher actions include lower actions:</strong> edit includes view; delete includes edit and view.</li>

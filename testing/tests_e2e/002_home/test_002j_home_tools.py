@@ -17,6 +17,7 @@ from testing.definitions import SitePages, Uploads, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements import Buttons, List, Modal
 from testing.resources import Report
+from testing.utility.network import browser_fetch
 
 pytestmark = pytest.mark.e2e
 
@@ -103,6 +104,56 @@ def _ready_report(user):
     )
     Entities.save(report)
     return report, category_name, page_name
+
+
+def _submission_preview_report(user):
+    owner = _owner(user)
+    suffix = _suffix()
+    report = Entities.REPORT.create(
+        {
+            "parent": owner,
+            "user": owner,
+            "name": f"test-submission-preview-report-{suffix}",
+            "status": "ready",
+            "pending": False,
+            "summary": "Ready submission-preview proposal.",
+            "proposal": {
+                "summary": "Create a labelled contact submission.",
+                "confidence": 1,
+                "actions": [
+                    {
+                        "id": "form",
+                        "type": "create_form",
+                        "data": {
+                            "name": f"test-contact-form-{suffix}",
+                            "form_type": "page",
+                            "schema": [
+                                {
+                                    "id": "select-status",
+                                    "type": "select",
+                                    "title": "Contact Status",
+                                    "options": [
+                                        {"value": "active", "label": "Active"}
+                                    ],
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "id": "page",
+                        "type": "create_page",
+                        "data": {
+                            "name": f"test-contact-{suffix}",
+                            "form_action": "form",
+                            "submission": {"select-status": "active"},
+                        },
+                    },
+                ],
+            },
+        }
+    )
+    Entities.save(report)
+    return report
 
 
 def _recoverable_failed_report(user):
@@ -345,6 +396,40 @@ def _create_ready_report(user):
     return report
 
 
+def _personal_task_report(user):
+    owner = _owner(user)
+    suffix = _suffix()
+    task_name = f"provider-free-task-{suffix}"
+    report = Entities.REPORT.create(
+        {
+            "parent": owner,
+            "user": owner,
+            "name": f"provider-free-ready-report-{suffix}",
+            "tool": "create",
+            "status": "ready",
+            "pending": False,
+            "summary": "Ready provider-free proposal.",
+            "proposal": {
+                "summary": "Create a Task on the user's personal Page.",
+                "confidence": 1,
+                "actions": [
+                    {
+                        "id": "personal_task",
+                        "type": "create_task",
+                        "display_label": task_name,
+                        "data": {
+                            "name": task_name,
+                            "page": owner.page.urlsafe_key,
+                        },
+                    }
+                ],
+            },
+        }
+    )
+    Entities.save(report)
+    return report, task_name
+
+
 def _ask_answer_report(user):
     owner = _owner(user)
     question = (
@@ -474,12 +559,23 @@ def test_tools_create_form_has_expected_controls(get_user):
 
 
 # @matrix ai-access : authentication route-gate
+# @matrix ai-report : empty-count toggle
+# @pair ai-report:provider-independent-history
 # @pair cache:invalidation-acknowledgement
 # @template home/home.html::main
 # @template home/tools.html::create_report
+# @template home/tools.html::report_list
 def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    user = get_user(Users.ai_access_tiers, creator=owner)
+    suffix = _suffix()
+    user = get_user(
+        UserDefinition(
+            name=f"AI Access Tiers {suffix}",
+            email=f"ai-access-tiers-{suffix}@example.test",
+            ai_access=AI.NONE,
+        ),
+        creator=owner,
+    )
 
     for tier, expected_statuses, visible_tools in (
         (AI.NONE, (403, 403, 403), ()),
@@ -509,9 +605,26 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
         else:
             home = user.go(SitePages.HOME)
 
+        report_toggle = user.locate(home.TOOL_REPORT_LIST_TOGGLE)
+        expect(report_toggle).to_be_visible()
+        expect(report_toggle).to_contain_text("Plans & Reports")
+
         toggle = user.locate(home.CREATE_TOOL_REPORT_TOGGLE)
         if tier is AI.NONE:
             expect(toggle).to_have_count(0)
+            expect(user.locate(home.CREATE_TOOL_REPORT_FORM)).to_have_count(0)
+            report_toggle.click()
+            report_list = user.locate(home.TOOL_REPORT_LIST)
+            expect(report_list).to_be_hidden()
+            expect(user.locate(home.TOOL_REPORT_LOADING)).to_be_visible()
+            expect(user.locate(home.TOOL_REPORT_LOADING)).to_have_text("0")
+            expect(user.locate(home.TOOLS_COMPONENT)).to_have_attribute(
+                "data-open", "ToolReportList"
+            )
+            report_toggle.click()
+            expect(user.locate(home.TOOLS_COMPONENT)).to_have_attribute(
+                "data-open", "false"
+            )
         else:
             expect(toggle).to_be_visible()
             toggle.click()
@@ -541,8 +654,13 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
         assert statuses == expected_statuses
 
 
-# @pairs ai-access:report-read cache:invalidation-acknowledgement
-def test_ask_access_can_read_create_report_without_create_actions(get_user):
+# @matrix ai-report : delete deterministic-run deterministic-undo entitlement-independent skip-action toggle
+# @pair ai-report:provider-independent-history
+# @pair ai-access:provider-boundary
+# @template home/home.html::main
+# @template home/tools.html::report_list
+# @template tools/report.html::proposal_action_item
+def test_saved_report_controls_do_not_require_provider_access(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
     user = get_user(
@@ -553,36 +671,60 @@ def test_ask_access_can_read_create_report_without_create_actions(get_user):
         ),
         creator=owner,
     )
-    report = _create_ready_report(user)
+    assert user.entity.ai_access == AI.NONE.name
+    report, task_name = _personal_task_report(user)
 
-    entity = Entities.USER.load(user.email)
-    entity.ai_access = AI.ASK
-    entity.save()
-    assert entity.invalidate_cache is True
-    user.entity = entity
+    home = user.go(SitePages.HOME)
+    expect(user.locate(home.CREATE_TOOL_REPORT_TOGGLE)).to_have_count(0)
+    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+    report_list = user.locate(home.TOOL_REPORT_LIST)
+    expect(report_list.get_by_role("link", name=report.name)).to_be_visible()
+    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+    expect(report_list).to_be_hidden()
+    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+    expect(report_list.get_by_role("link", name=report.name)).to_be_visible()
 
-    with user.page.context.expect_event(
-        "response",
-        predicate=lambda response: (
-            response.url.endswith("/l/validate-user")
-            and response.request.method == "POST"
-        ),
-    ) as validation_info:
-        report_page = user.go(Report.for_entity(user, report))
-
-    validation = validation_info.value
-    assert validation.status == 200
-    assert validation.json()["cacheCleared"] is True
-    assert Entities.USER.load(user.email).invalidate_cache is False
+    report_page = user.go(Report.for_entity(user, report))
 
     expect(report_page.title_element).to_have_text(report.name)
     expect(user.page.get_by_role("heading", name="Proposal")).to_be_visible()
     expect(report_page.proposal_actions).to_have_count(1)
-    expect(report_page.execute_button).to_have_count(0)
+    expect(report_page.execute_button).to_be_visible()
     expect(user.page.get_by_role("button", name="Revise Plan")).to_have_count(0)
-    expect(
-        report_page.proposal_actions.locator("[data-role='skip-action']")
-    ).to_have_count(0)
+    skip = report_page.proposal_actions.locator("[data-role='skip-action']")
+    expect(skip).to_be_visible()
+
+    with user.page.expect_response("**/tools/reports/*/actions/1/skip"):
+        skip.click()
+    expect(report_page.proposal_actions).to_have_attribute("data-skipped", "true")
+    with user.page.expect_response("**/tools/reports/*/actions/1/skip"):
+        skip.click()
+    expect(report_page.proposal_actions).to_have_attribute("data-skipped", "false")
+
+    report_page.execute()
+    expect(user.page.get_by_text("Work done.")).to_be_visible()
+    saved_report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
+    task_key = next(
+        action["entity"]["id"]
+        for action in saved_report.result["actions"]
+        if action.get("entity", {}).get("kind") == "task"
+    )
+    assert Entities.fetch_one(task_key, request=Fetch.direct()).name == task_name
+
+    undo = user.page.get_by_role("button", name="Undo Report")
+    expect(undo).to_be_visible()
+    with user.page.expect_response("**/tools/reports/*/undo"):
+        undo.click()
+    expect(user.page.get_by_text("Work undone.")).to_be_visible(timeout=10000)
+    assert Entities.fetch_one(task_key, request=Fetch.root()) is None
+
+    deleted = browser_fetch(
+        user,
+        f"/tools/reports/{report.urlsafe_key}",
+        method="DELETE",
+    )
+    assert deleted["status"] == 200
+    assert Entities.fetch_one(report.urlsafe_key, request=Fetch.root()) is None
 
 
 # @matrix ai-report : async create persistence title-truncation
@@ -877,6 +1019,7 @@ def test_report_detail_runs_ready_report(get_user):
 
     report_page = user.go(Report.for_entity(user, report))
     expect(report_page.execute_button).to_be_visible()
+    expect(report_page.execute_button).to_have_attribute("data-kind", "success")
     report_page.execute()
 
     expect(user.page.get_by_text("Work done.")).to_be_visible()
@@ -926,6 +1069,25 @@ def test_report_detail_runs_ready_report(get_user):
         re.compile(rf"/pages/{re.escape(page.urlsafe_key)}/delete$"),
     )
     modal.element.get_by_role("button", name="Cancel").click()
+
+
+# @matrix ai-report : details proposal submission-review
+# @pair form-schema:submission-review
+# @template tools/report.html::proposal_details
+def test_report_detail_shows_proposed_submission_values(get_user):
+    user = get_user(Users.OWNER)
+    report = _submission_preview_report(user)
+
+    report_page = user.go(Report.for_entity(user, report))
+
+    expect(report_page.proposal_actions).to_have_count(1)
+    expect(report_page.proposal_actions).to_contain_text("Submission: created")
+    expect(report_page.proposal_actions).to_contain_text("Contact Status: Active")
+    expect(
+        report_page.proposal_actions.locator("[data-role=proposal-detail]").filter(
+            has_text="Submission: created"
+        )
+    ).to_have_class(re.compile(r"\bbasis-full\b"))
 
 
 def test_email_report_detail_collapses_message_behind_subject_and_sender(get_user):

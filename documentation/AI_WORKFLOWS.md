@@ -8,7 +8,7 @@ contract.
 
 | Workflow | Context and tools | Provider stages | Durable outcome |
 | --- | --- | --- | --- |
-| Ask | Question/report context; Search, workspace reads, Task history, filter schema/query. | Initial/tool loop, structured final, optional repair. | Answer with optional reviewed actions. |
+| Ask | Question/report context; Search, workspace reads, Task history, filter schema/query. | Initial/tool loop, structured final, optional repair. | Read-only answer. |
 | Create | Creation request and workspace concepts; Search and workspace reads. | Initial/tool loop, structured final, optional repair. | Reviewed creation proposal. |
 | Organize | Uploaded-file metadata, saved summaries, retrieval candidates, workspace reads. | Utility summaries, primary plan/tool loop, optional repair, optional form completion. | Reviewed organization proposal. |
 | Autofill | One target, form, partial submission, parent context, direct attachments. | One JSON/tool conversation and local validation. | Submission applied to the target. |
@@ -20,12 +20,14 @@ contract.
 Ask uses a lean initial prompt and retrieves workspace data on demand. Its
 tool set includes shared entity/file reads, Task history, saved-filter schema,
 and permission-filtered structured filter queries. A result requires a nonempty
-summary, confidence from 0 to 1, optional HTML, and valid reviewed actions.
+summary, confidence from 0 to 1, optional Markdown, and an empty actions array.
+The validator converts the Markdown through the shared sanitized,
+editor-compatible renderer and stores the resulting answer HTML.
 
 The `AskReportAdapter` checkpoints the prepared answer before publishing it to
-the `AIReport`. Answers without actions become complete; answers with safe
-actions become ready for review. If repair cannot make every action safe, valid
-actions and the answer remain while rejected actions become review items.
+the `AIReport`. Ask is always read-only, so a valid answer becomes complete. A
+request for workspace changes is redirected to Create or Organize rather than
+being represented as Ask actions.
 
 Email-origin Ask may summarize attached evidence first. Those Files remain
 read-only evidence and do not grant Organize placement actions.
@@ -37,10 +39,19 @@ Projects, Forms, and Tasks. Its output is always a proposal. It may use Search
 for public facts and workspace tools for existing structure, then passes the
 shared proposal contract and repair boundary.
 
-Page generation distinguishes top-level Page metadata from attached form
-submission. Without a form, `name` and `description` are generated directly.
-With a form, canonical top-level values win and the corresponding form fields
-mirror them consistently.
+The in-app Create prompt includes the authenticated user's guaranteed editable
+personal Page reference directly, matching the external Create plan contract.
+The same reference also remains available from `list_workspace_resources`.
+
+Create Page proposals distinguish top-level Page metadata from attached form
+submissions. Without a form, `name` and `description` live directly on the
+Page action. With a form, canonical top-level values win and the corresponding
+form fields mirror them consistently.
+
+Create and Organize expose optional Page rich text to models as
+`document_markdown`. Shared proposal validation renders it to sanitized,
+editor-compatible `document` HTML before the proposal is stored. Existing
+ready reports that already contain `document` HTML remain executable.
 
 ## Organize
 
@@ -115,9 +126,15 @@ partial-extraction note.
 
 ## Reviewed report execution
 
-Ask and Organize proposals may include reviewed create, move, rename, attach,
-schema, and submission actions. `reporting/execution/` owns deterministic
+Create and Organize proposals may include reviewed create, move, rename,
+attach, schema, and submission actions. `reporting/execution/` owns deterministic
 application; the model is not called during execution.
+
+Because execution is provider-free, viewing, skipping actions, running,
+retrying, undoing, and deleting a saved report do not require `User.ai_access`.
+They remain creator-bound browser operations, and every action rechecks current
+resource permissions. Generating or revising an internal report still calls the
+configured provider and therefore retains its Ask or Create entitlement.
 
 Supported action families include:
 

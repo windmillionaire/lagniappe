@@ -100,11 +100,8 @@
 {% macro report_list(reports) %}
   <ul data-widget="ToolReportList"
       data-visible="false"
-      data-if-empty="CreateToolReport"
       class="{{ styles.home.ingress.list }}">
-    {%- for report in reports.list -%}
-      {{ report_item(report) }}
-    {%- endfor -%}
+    {% for report in reports.list %}{{ report_item(report) }}{% endfor %}
   </ul>
 {% endmacro %}
 

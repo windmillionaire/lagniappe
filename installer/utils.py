@@ -172,8 +172,7 @@ def deploy_to_app_engine(
 
     f = FORMATTER.initialize()
     legacy_upgrade_notice = (
-        not upgrade_notice_handled
-        and legacy_upgrade_deploy_notice_required(SETTINGS)
+        not upgrade_notice_handled and legacy_upgrade_deploy_notice_required(SETTINGS)
     )
     if legacy_upgrade_notice:
         target_version = str(
@@ -182,8 +181,7 @@ def deploy_to_app_engine(
         confirm_legacy_upgrade_deployment(f, target_version)
 
     progress = f.success(
-        "Deploy App Engine indexes and application "
-        "(may take up to 10 minutes)"
+        "Deploy App Engine indexes and application (may take up to 10 minutes)"
     )
     with f.yaspin(text=progress) as spinner:
         try:
@@ -199,6 +197,10 @@ def deploy_to_app_engine(
             spinner.fail(f.fail_glyph)
             raise
         spinner.ok(f.ok_glyph)
+
+    from installer.monitoring import reconcile_memory_alert_after_deploy
+
+    reconcile_memory_alert_after_deploy()
 
     custom_domain = str(SETTINGS.APP.get("CUSTOM_DOMAIN") or "").strip()
     if custom_domain:

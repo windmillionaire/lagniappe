@@ -86,7 +86,7 @@ def _registered_ai_job_types():
     )
 
 
-# @matrix deferred-jobs : adapter-lookup adapter-registration adapter-registry domain-strategy tier-declaration
+# @matrix deferred-jobs : adapter-lookup adapter-registration adapter-registry domain-strategy provider-boundary tier-declaration
 # @pair ai-access:tier-declaration
 @pytest.mark.unit
 def test_registered_adapters_declare_required_ai_tiers():
@@ -97,9 +97,8 @@ def test_registered_adapters_declare_required_ai_tiers():
         DeferredJobType.REPORT_ASK: AI.ASK,
         DeferredJobType.REPORT_ORGANIZE: AI.CREATE,
         DeferredJobType.REPORT_CREATE: AI.CREATE,
-        DeferredJobType.REPORT_EXECUTION: AI.CREATE,
+        DeferredJobType.REPORT_EXECUTION: None,
         DeferredJobType.AUTOFILL: AI.CREATE,
-        DeferredJobType.PAGE_GENERATION: AI.CREATE,
         DeferredJobType.FILE_SUMMARIZE: AI.CREATE,
         DeferredJobType.FILE_EXTRACT: None,
         DeferredJobType.EMAIL_INGEST: None,

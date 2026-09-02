@@ -9,8 +9,9 @@ GET_FILE = types.FunctionDeclaration(
     name="get_file",
     description=(
         "Retrieve metadata and extracted text for a file by its hash token. "
-        "Set include_original=true only when the original file part itself is "
-        "needed for direct analysis."
+        "Set include_original=true only when the original bytes are needed for "
+        "direct analysis. Transport adapters may return direct media or a "
+        "short-lived download URL; extracted text is returned by default."
     ),
     parameters={
         "type": "object",
@@ -24,8 +25,10 @@ GET_FILE = types.FunctionDeclaration(
             "include_original": {
                 "type": "boolean",
                 "description": (
-                    "Attach the original provider file part when supported. Use only "
-                    "after metadata or extracted text is not enough."
+                    "Request the original file content when available. Depending on "
+                    "the client transport, the result may include direct media or a "
+                    "short-lived download URL. Use only when metadata or extracted "
+                    "text is not enough."
                 ),
             },
         },
@@ -75,9 +78,9 @@ def execute_get_file(args, user):
                 "supported": True,
                 "attached": False,
                 "reason": (
-                    "Original file was not attached by default. Call get_file "
-                    "again with include_original=true if the original file part "
-                    "is necessary."
+                    "Original content was not included by default. Call get_file "
+                    "again with include_original=true if the original bytes are "
+                    "necessary."
                 ),
             }
         else:
@@ -90,7 +93,7 @@ def execute_get_file(args, user):
         result["original_file"] = {
             "supported": False,
             "attached": False,
-            "reason": "Original file cannot be attached to AI for this file.",
+            "reason": "Original content is unavailable for this file.",
         }
 
     if file_parts:

@@ -60,9 +60,16 @@ def _expected_action_state(action, record):
     if action_type == "update_form_schema":
         expected["schema_fingerprint"] = record.get("schema_fingerprint")
     if action_type == "summarize_file":
+        data = _data(action)
         expected["summary"] = (
-            _data(action).get("summary") or _data(action).get("description") or ""
+            data.get("summary") or data.get("description") or ""
         ).strip()
+        expected["retrieval_terms"] = [
+            term.strip()
+            for term in (data.get("retrieval_terms") or [])
+            if isinstance(term, str) and term.strip()
+        ][:2]
+        expected["search"] = data.get("search", True) is not False
     if action_type == "create_task" and _is_completed_task_event(_data(action)):
         expected["task"] = (record.get("target") or {}).get("id")
         expected["task_state_fingerprint"] = record.get("task_state_fingerprint")
@@ -222,6 +229,9 @@ def _inspect_action_applied(action, report, user, record):
             ACTION_APPLIED
             if entity.summary == expected.get("summary")
             and entity.properties.summarize.complete is True
+            and list(entity.properties.summarize.retrieval_terms or [])
+            == expected.get("retrieval_terms")
+            and entity.properties.summarize.search is expected.get("search")
             else ACTION_DRIFTED
         )
     return ACTION_APPLIED

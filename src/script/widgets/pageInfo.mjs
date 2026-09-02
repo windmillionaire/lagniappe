@@ -4,7 +4,7 @@ import { RadioElement } from "../elements/radio";
 import { sections } from "../elements/sections";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
-import { captureError, request, withTransition } from "../shared";
+import { captureError, Modal, request, withTransition } from "../shared";
 import { PagePermissions } from "./pagePermissions";
 
 /**
@@ -397,7 +397,180 @@ export class UserSettings extends PagePermissions {
 		this._initGroups();
 		this._initPageSelect();
 		this._initRemovePage();
+		this._initApiKey();
 		this.commitRevisionBaseline();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @matrix agent-api : copy-control expiry revoke rotate shown-once status
+	 */
+	_initApiKey() {
+		const section = this.target.querySelector("[data-role='api-key-settings']");
+		const route = this.target.dataset.apiKeyRoute;
+		if (!section || !route) return;
+
+		const controller = new AbortController();
+		const signal = controller.signal;
+		section
+			.querySelector("[data-action='issue-api-key']")
+			?.addEventListener(
+				"click",
+				() => void this._issueApiKey(section, route),
+				{ signal },
+			);
+		section
+			.querySelector("[data-action='revoke-api-key']")
+			?.addEventListener(
+				"click",
+				() => void this._revokeApiKey(section, route),
+				{ signal },
+			);
+		this.destroyables.push({
+			destroy: () => controller.abort(),
+		});
+		void request
+			.get(route, null, { signal, replaceErrorPage: false })
+			.then((response) => {
+				if (response.ok) this._renderApiKey(section, response.credential);
+				else this._apiKeyError(section, response.error);
+			});
+	}
+
+	_renderApiKey(section, credential = {}, token = null) {
+		const active = credential?.active === true;
+		const status = section.querySelector("[data-role='api-key-status']");
+		const issue = section.querySelector("[data-action='issue-api-key']");
+		const revoke = section.querySelector("[data-action='revoke-api-key']");
+		const secret = section.querySelector("[data-role='api-key-secret']");
+		const value = section.querySelector("[data-role='api-key-value']");
+		if (status) {
+			const expires = credential?.expires_at
+				? new Date(credential.expires_at).toLocaleString()
+				: null;
+			status.textContent = active
+				? `${credential.display_prefix || "API key"} — expires ${expires}`
+				: "No active API key.";
+		}
+		if (issue)
+			issue.textContent = active ? "Regenerate API key" : "Generate API key";
+		if (revoke) revoke.dataset.visible = active.toString();
+		if (secret) secret.dataset.visible = Boolean(token).toString();
+		if (value) value.textContent = token || "";
+		this._apiKeyError(section, null);
+	}
+
+	_apiKeyError(section, message) {
+		const target = section.querySelector("[data-role='api-key-message']");
+		if (!target) return;
+		target.textContent = message || "";
+		target.dataset.visible = Boolean(message).toString();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_without_provider_access_can_manage_external_agent_api_key
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_confirmation_uses_app_modal
+	 * @matrix agent-api user-settings : confirmation-modal revoke rotate
+	 */
+	async _confirmApiKeyAction(section, trigger, options) {
+		const template = section.querySelector(
+			"template[data-role='api-key-confirmation-template']",
+		);
+		const modalElement = template?.content
+			?.querySelector("#modal")
+			?.cloneNode(true);
+		if (!modalElement) {
+			captureError(
+				new Error("API key confirmation template is missing."),
+				trigger,
+				this.view?.dataset,
+			);
+			return false;
+		}
+
+		modalElement.querySelector("[data-role='confirmation-title']").textContent =
+			options.title;
+		modalElement.querySelector(
+			"[data-role='confirmation-description']",
+		).textContent = options.description;
+		const confirm = modalElement.querySelector(
+			"[data-role='confirmation-confirm']",
+		);
+		confirm.querySelector("[data-role='text']").textContent = options.label;
+
+		const modal = new Modal(this.view, trigger);
+		let settled = false;
+		let settle;
+		const confirmation = new Promise((resolve) => {
+			settle = (value) => {
+				if (settled) return;
+				settled = true;
+				resolve(value);
+			};
+		});
+		const remove = modal.remove.bind(modal);
+		modal.remove = async () => {
+			const result = await remove();
+			settle(false);
+			return result;
+		};
+		confirm.addEventListener(
+			"click",
+			async () => {
+				confirm.disabled = true;
+				await remove();
+				settle(true);
+			},
+			{ once: true },
+		);
+
+		const attached = await modal.attach(modalElement);
+		if (!attached) settle(false);
+		else confirm.focus();
+		return confirmation;
+	}
+
+	async _issueApiKey(section, route) {
+		const issue = section.querySelector("[data-action='issue-api-key']");
+		const isRotation = issue?.textContent?.includes("Regenerate");
+		if (
+			isRotation &&
+			!(await this._confirmApiKeyAction(section, issue, {
+				title: "Regenerate API key",
+				description:
+					"The current key will stop working immediately. Any client using it must be updated with the new key.",
+				label: "Regenerate API key",
+			}))
+		) {
+			return;
+		}
+		if (issue) issue.disabled = true;
+		const response = await request.post(route, {});
+		if (issue) issue.disabled = false;
+		if (!response.ok) return this._apiKeyError(section, response.error);
+		this._renderApiKey(section, response.credential, response.token);
+	}
+
+	async _revokeApiKey(section, route) {
+		const revoke = section.querySelector("[data-action='revoke-api-key']");
+		if (
+			!(await this._confirmApiKeyAction(section, revoke, {
+				title: "Revoke API key",
+				description:
+					"This key will stop working immediately. Any client using it will lose access until a new key is generated.",
+				label: "Revoke API key",
+			}))
+		) {
+			return;
+		}
+		if (revoke) revoke.disabled = true;
+		const response = await request.delete(route);
+		if (revoke) revoke.disabled = false;
+		if (!response.ok) return this._apiKeyError(section, response.error);
+		this._renderApiKey(section, response.credential);
 	}
 
 	/**
@@ -559,6 +732,10 @@ export class UserSettings extends PagePermissions {
 		return this.target.querySelector("[data-role='user-groups']");
 	}
 
+	get apiKeyElement() {
+		return this.target.querySelector("[data-role='api-key-settings']");
+	}
+
 	get ownerInboundElement() {
 		return this.target.querySelector("[data-role='owner-inbound']");
 	}
@@ -599,6 +776,7 @@ export class UserSettings extends PagePermissions {
 				this.userGroupsElement,
 				this.userAiAccessElement,
 				this.notificationEmailElement,
+				this.apiKeyElement,
 				publicEmailConsent,
 				this.ownerInboundElement,
 				userPage,
@@ -669,6 +847,11 @@ export class UserSettings extends PagePermissions {
 		return data;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
+	 * @matrix agent-api user-settings : poll-reconcile status
+	 */
 	postreconcile() {
 		const updated = this._updated;
 		if (!updated) return;
@@ -676,6 +859,10 @@ export class UserSettings extends PagePermissions {
 		this._updated = false;
 		this.commitReset();
 		this.target.dataset.visible = "true";
+		this._initGroups();
+		this._initPageSelect();
+		this._initRemovePage();
+		this._initApiKey();
 		this.setEntityMetadata();
 		if (this._success) {
 			this.form?.success();

@@ -63,7 +63,7 @@
     {{ public_nav({"title": metadata.title, "description": metadata.description, "url": metadata.canonical_url}) }}
     <main id="main"
           class="min-h-full pt-16 pb-16 text-slate-900 px-4 sm:px-6 lg:px-8">
-      <div id="content" class="html-content mx-auto max-w-4xl py-6 sm:mt-6">{{ document|safe }}</div>
+      <div id="content" class="html-content mx-auto max-w-4xl py-6 sm:mt-6">{{ document|safe_html }}</div>
     </main>
   </body>
 </html>

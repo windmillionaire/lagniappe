@@ -18,6 +18,13 @@ ORGANIZE_ACTION_GUIDELINES = """
 - Each uploaded file needs an auditable outcome. When a file is evidence for a
   task or completed task event, attach it with attach_file_to_task targeting
   that task action.
+- When summarize_file is listed in allowed_actions, include exactly one
+  summarize_file action for every uploaded file. Use the exact report file ref,
+  a grounded summary, exactly two broad retrieval_terms, and search: true. Put
+  it near the file's first attachment when practical. Summarize content you
+  already inspected locally or through get_file; do not fetch it again solely
+  for this action. When summarize_file is absent, do not return that action;
+  the internal workflow has already prepared file summaries separately.
 - Use add_category when an existing page should also appear in another category
   without changing its primary category. Do not relocate existing pages, tasks,
   or files in Organize; if a cleanup move would be useful, use needs_review.
@@ -116,6 +123,9 @@ REPORT_PREFLIGHT_CHECKS = """
   detail is genuinely the independently retrievable subject.
 - Make sure all task attachments use attach_file_to_task with executable refs
   from Report Input Files, including completed task evidence.
+- If summarize_file is allowed, make sure every Report Input Files ref appears
+  in exactly one non-skipped summarize_file action with a grounded summary and
+  exactly two distinct retrieval terms.
 - Make sure every file has been checked for both placement and structured-data
   handling: if it was attached to a page/task and a close form exists or was
   created, data.submission is filled when the summary/text should fill fields.
@@ -127,6 +137,10 @@ REPORT_PREFLIGHT_CHECKS = """
   summarize it on the appropriate page or task instead.
 - Make sure task forms are paired with non-empty data.submission when uploaded
   evidence should fill their fields.
+- If sources at the same priority conflict and no supplied rule resolves them,
+  omit the disputed submission field and preserve the conflict for human review.
+- Make sure a completed task date is not later than the supplied current date;
+  future-dated work must remain open.
 - Make sure any update_form_schema action needed for submission completion
   appears before the page/task action that uses the updated form.
 - Review the whole proposal for coherence before returning: pages, files,
@@ -276,7 +290,7 @@ Common data shapes:
 - create_category: {"name": string, "description": string, "form": entity_or_action_ref}
 - create_project: {"name": string, "description": string}
 - create_model_task: {"name": string, "project": entity_or_action_ref, "form": entity_or_action_ref}
-- create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document": html_string}
+- create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document_markdown": markdown_string}
 - create_task: {"name": string, "description": string, "page": entity_or_action_ref, "task": existing_task_ref_for_completed_occurrence, "task_action": root_new_task_action_for_completed_occurrence, "project": entity_or_action_ref, "model": entity_or_action_ref, "form": task_form_ref_only, "submission": object, "due_date": "YYYY-MM-DD", "completed": true, "completed_on": "YYYY-MM-DD"}
 - add_form_to_page: {"page": entity_ref, "form": entity_or_action_ref}
 - add_category: {"page": entity_ref, "category": entity_ref}
@@ -321,14 +335,12 @@ not skip the existing-page checks before proposing a new page.
    main subject from authors, providers, issuers, recipients, merchants, and
    other supporting roles.
 3. Choose the collection scope for each cluster. Start with the bounded
-   `workspace_searches` beside each file summary. These searches intentionally
-   use separate broad terms and contain only category, page, and form candidates.
-   Select the closest existing category whose scope fits the subject. Call
-   `list_workspace_resources` only when the prefetched candidates are insufficient
-   or the proposal needs project/model-task structure that is not represented
-   there. Propose a new category only when no existing category fits and the scope
-   will be reusable. Use Uncategorized Pages for a genuinely one-off or unclear
-   record.
+   `workspace_searches` beside each file summary when present. They contain only
+   category, page, and form candidates. Select the closest existing category
+   whose scope fits the subject. Call `list_workspace_resources` only when the
+   prefetched candidates are absent or insufficient, or project/model-task
+   structure is needed. Propose a new category only when none fits and its scope
+   will be reusable. Use Uncategorized Pages for a one-off or unclear record.
 4. Check page candidates for the chosen category. Compare the stable subject with
    prefetched page names, parents, and snippets. Treat exact names, synonyms,
    singular/plural forms, and other clearly equivalent labels as candidates. Batch
@@ -361,10 +373,11 @@ not skip the existing-page checks before proposing a new page.
    not enough. For a clearly historical occurrence, set `completed: true`; also
    use `completed_on` when the evidence supports a reliable date. Do not invent a
    completion date or use `needs_review` solely because the exact date is unknown.
-   Otherwise attach informational evidence to the page. Give completed work a
-   stable action name and reuse a close existing project and model task; the
-   runner records history only for one unambiguous matching page/model/name
-   family. Use an exact task hash only when a specific existing task matters.
+   Future-dated work is not complete; keep it open. Otherwise attach
+   informational evidence to the page. Give completed work a stable action name
+   and reuse a close existing project and model task; the runner records history
+   only for one unambiguous matching page/model/name family. Use an exact task
+   hash only when a specific existing task matters.
 8. Choose structured forms after the page/task target is settled. Reuse a close
    existing or inherited form, inspect its schema, and propose only bounded
    additive changes when needed. Never split a coherent subject to make a form
@@ -374,11 +387,12 @@ not skip the existing-page checks before proposing a new page.
    open task, propose `update_submission_fields` with that page/task reference
    and leave `data.updates` to the completion stage. Leave new-record
    `data.submission` to that stage as well.
-9. Build the ordered proposal. Give every uploaded file an attachment, review, or
-   explicit skip outcome; use skip rarely and `needs_review` only for genuine
-   ambiguity or permission limits. Attach exact report file refs after their
-   target actions. A file may support multiple targets only when the evidence
-   truly does. Place every referenced action before the action that uses it.
+9. Build the ordered proposal. Attach every uploaded file to an intended page or
+   task with its exact report file ref. Review/skip may supplement but never
+   replace a contract-required attachment. Use skip rarely and `needs_review`
+   only for genuine ambiguity or permission limits. Put attachments after their
+   targets. A file may support multiple targets only when the evidence truly does.
+   Place every referenced action before the action that uses it.
 """
 
 
@@ -447,7 +461,6 @@ ORGANIZE_PLANNING_ACTIONS = """
 ORGANIZE_PLANNING_PREFLIGHT = """
 ### Before Returning
 
-- Every uploaded file has a placement, review, or explicit skip outcome.
 - Internal hash tokens appear only in executable action data, never in the
   user-facing summary, issues, display labels, or reasons.
 - The complete upload set was clustered by stable subject before page actions

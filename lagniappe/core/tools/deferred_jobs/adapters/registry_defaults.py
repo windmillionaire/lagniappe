@@ -3,7 +3,6 @@
 from .autofill import AutofillAdapter
 from .email import EmailIngestAdapter
 from .files import FileExtractAdapter, FileSummarizeAdapter
-from .pages import PageGenerationAdapter
 from .reports import (
     AskReportAdapter,
     CreateReportAdapter,
@@ -23,7 +22,6 @@ def register_adapters(registry):
         CreateReportAdapter(),
         ReportExecutionAdapter(),
         AutofillAdapter(),
-        PageGenerationAdapter(),
         FileExtractAdapter(),
         FileSummarizeAdapter(),
     ):

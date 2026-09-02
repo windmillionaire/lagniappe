@@ -10,7 +10,9 @@ from ..tools.auth.context import current_context_user
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
+# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
 # @matrix ai-report : create delete files status
+# @pair agent-api:report-session
 class AIReport(Entity):
     """AI-generated report containing an ordered, deterministic action proposal."""
 
@@ -22,6 +24,7 @@ class AIReport(Entity):
             {
                 "instructions",
                 "upload_manifest",
+                "agent_manifest",
                 "inbound_manifest",
                 "process",
                 "proposal",
@@ -41,6 +44,7 @@ class AIReport(Entity):
                 "instructions": activity.Instructions,
                 "input_files": activity.InputFiles,
                 "upload_manifest": ai_report_input.UploadManifest,
+                "agent_manifest": ai_report_input.AgentManifest,
                 "origin": ai_report_input.Origin,
                 "inbound_manifest": ai_report_input.InboundManifest,
                 "process": ai_report_process.ReportProcess,
@@ -91,6 +95,7 @@ class AIReport(Entity):
         report.instructions = data.get("instructions")
         report.input_files = data.get("input_files", [])
         report.upload_manifest = data.get("upload_manifest")
+        report.agent_manifest = data.get("agent_manifest")
         report.origin = data.get("origin") or "web"
         report.inbound_manifest = data.get("inbound_manifest")
         report.status = data.get("status") or "pending"

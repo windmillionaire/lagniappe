@@ -1,7 +1,7 @@
 # Backend Deferred Jobs
 
 Deferred jobs provide one durable execution model for report generation and
-execution, Page/Task autofill, Page generation, file OCR, file summary, AI
+execution, Page/Task autofill, file OCR, file summary, AI
 email handoff, and selected site work. Ingress, filter-cache maintenance,
 notification email, and scheduled task uncompletion use focused workflows.
 

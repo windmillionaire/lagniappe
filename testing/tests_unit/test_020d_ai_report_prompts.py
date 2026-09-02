@@ -1,5 +1,6 @@
 """Focused AI-report characterization coverage."""
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -22,7 +23,12 @@ from testing.utility.test_entities import TestEntities
 
 # @matrix ai-report : files iteration-limit prompt tools
 @pytest.mark.unit
-def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
+def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkeypatch):
+    monkeypatch.setattr(
+        organize.dates,
+        "user_today",
+        lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
+    )
     user = _test_user("prompt-owner")
     file = _test_file("receipt.png", "image/png")
     report = TestEntities.get(
@@ -68,6 +74,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
     assert _prompt_context(prompt, "User Instructions") == (
         "```\nThis is probably a receipt.\n```"
     )
+    assert _prompt_context(prompt, "Current Date") == "```\n2026-08-31\n```"
     input_files = _prompt_context_json(prompt, "Report Input Files")
     assert input_files[0] | {
         "display_name": "receipt",
@@ -116,8 +123,9 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
         in semantic_preview
     )
     assert "Start with the bounded workspace_searches" in semantic_preview
-    assert "list_workspace_resources only when the prefetched candidates" in (
-        semantic_preview
+    assert (
+        "list_workspace_resources only when the prefetched candidates are absent"
+        in (semantic_preview)
     )
     assert "Batch get_entity calls for plausible candidates only" in semantic_preview
     assert 'search_entities with kinds=["page"]' in semantic_preview
@@ -126,11 +134,13 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
     assert "something specific was done or needs to be done" in semantic_preview
     assert "set completed: true" in semantic_preview
     assert "solely because the exact date is unknown" in semantic_preview
+    assert "Future-dated work is not complete" in semantic_preview
     assert "If the matching page cannot be edited, use needs_review" in (
         semantic_preview
     )
     assert "no broad category-level catch-all" in semantic_preview
     assert "New page names are concise subject labels" in semantic_preview
+    assert "Review/skip may supplement but never replace" in semantic_preview
     assert "Category default forms appear only" in semantic_preview
     assert (
         "add_category requires both the existing page and the additional existing "
@@ -637,6 +647,9 @@ def test_create_prompt_builds_creation_proposal_without_file_actions():
     assert "summarize_file" not in prompt.allowed_actions
     assert prompt.audit()["duplicate_headings"] == []
     assert "Category default forms are exceptional" in prompt.preview()
+    assert "Every create_task action requires its editable destination Page" in (
+        prompt.preview()
+    )
 
 
 
@@ -734,6 +747,13 @@ def test_report_prompts_attach_provider_json_schema():
             )
         )
     )
+    external_summary_actions = _response_action_schemas(
+        SimpleNamespace(
+            response_schema=organize.report_proposal_response_schema(
+                ("summarize_file",),
+            )
+        )
+    )
     organize_action_data = all_actions["create_form"]["properties"]["data"]
     organize_action_properties = all_actions["create_form"]["properties"]
     assert organize_schema["required"] == [
@@ -760,6 +780,8 @@ def test_report_prompts_attach_provider_json_schema():
     field_schema = organize_action_data["properties"]["schema"]["items"]
     assert field_schema["required"] == ["id", "type", "title"]
     assert field_schema["additionalProperties"] is False
+    assert "content_markdown" in field_schema["properties"]
+    assert "html" not in field_schema["properties"]
     assert field_schema["properties"]["options"]["items"]["required"] == [
         "value",
         "label",
@@ -798,6 +820,12 @@ def test_report_prompts_attach_provider_json_schema():
     assert update_schema["required"] == ["schema_id", "new_value"]
     assert update_schema["properties"]["page"] == {"type": "string"}
     assert update_schema["properties"]["task"] == {"type": "string"}
+    assert "earlier action in this proposal" in update_schema["properties"][
+        "page_action"
+    ]["description"]
+    assert "not a workspace hash" in update_schema["properties"]["task_action"][
+        "description"
+    ]
     assert update_schema["properties"]["schema_id"] == {"type": "string"}
     assert update_schema["properties"]["new_value"] == {}
     assert "anyOf" not in update_schema
@@ -823,6 +851,15 @@ def test_report_prompts_attach_provider_json_schema():
     assert "anyOf" not in add_category_data
     assert "completed" not in add_category_data["properties"]
     assert "updates" not in add_category_data["properties"]
+    assert "exact id of an earlier action" in add_category_data["properties"][
+        "page_action"
+    ]["description"].casefold()
+    create_page_data = full_actions["create_page"]["properties"]["data"]
+    submission_description = create_page_data["properties"]["submission"][
+        "description"
+    ]
+    assert "creates a new submission" in submission_description
+    assert "not a reference to an existing submission" in submission_description
     assert organize_action_data["propertyOrdering"][:2] == [
         "name",
         "form_type",
@@ -834,9 +871,23 @@ def test_report_prompts_attach_provider_json_schema():
     assert "submission_request" not in organize_action_data["propertyOrdering"]
     assert "submission_context" not in organize_action_data["propertyOrdering"]
     assert "submission_empty_reason" not in organize_action_data["propertyOrdering"]
+    summary_data = external_summary_actions["summarize_file"]["properties"]["data"]
+    assert set(summary_data["properties"]) == {
+        "file",
+        "summary",
+        "retrieval_terms",
+        "search",
+    }
+    assert summary_data["properties"]["retrieval_terms"] == {
+        "type": "array",
+        "items": {"type": "string"},
+        "minItems": 2,
+        "maxItems": 2,
+    }
 
     ask_schema = ask_prompt.response_schema
-    assert "answer_html" in ask_schema["properties"]
+    assert "answer_markdown" in ask_schema["properties"]
+    assert "answer_html" not in ask_schema["properties"]
     assert "issues" not in ask_schema["required"]
     assert ask_prompt.allowed_actions == ()
     assert ask_schema["properties"]["actions"] == {
@@ -844,6 +895,10 @@ def test_report_prompts_attach_provider_json_schema():
         "items": {"type": "object"},
         "maxItems": 0,
     }
+
+    create_page_data = create_actions["create_page"]["properties"]["data"]
+    assert "document_markdown" in create_page_data["properties"]
+    assert "document" not in create_page_data["properties"]
 
     assert "move_page" not in create_actions
     assert tuple(create_actions) == create_prompt.allowed_actions
@@ -960,7 +1015,6 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "can_create_projects": False,
         "can_create_model_tasks": False,
         "can_create_pages": True,
-        "can_create_tasks": True,
         "can_attach_files_to_pages": True,
         "can_add_forms_to_pages": True,
         "can_attach_files_to_tasks": True,
@@ -970,3 +1024,37 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "can_delete_pages": False,
     }
     assert permissions["allowed_actions"] == list(organize_prompt.allowed_actions)
+
+
+# @pairs ai-report:action-capabilities permissions:own-page
+@pytest.mark.unit
+def test_report_prompts_always_allow_tasks_on_the_personal_page():
+    user = _permissioned_user("personal-page-only", {})
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Personal task report",
+            "hash": "personal-task-report",
+            "parent": user,
+            "user": user,
+            "instructions": "Add a task to my personal page.",
+            "input_files": [],
+        },
+    )
+
+    with MockRestrictions().patch_cache():
+        prompt = create.create_prompt(report, user)
+
+    assert prompt.allowed_actions == ("create_task", "needs_review")
+    personal_page = _prompt_context_json(prompt, "Personal Page")
+    assert personal_page["kind"] == "page"
+    assert personal_page["hash"] == "hash:personal-page-only-page"
+    assert personal_page["name"] == "Permissioned Page"
+    assert personal_page["url"] == "/test/page/personal-page-only-page"
+    assert isinstance(personal_page["can_view"], bool)
+    assert isinstance(personal_page["can_edit"], bool)
+    permissions = _prompt_context_json(prompt, "Report Action Permissions")
+    assert "can_create_tasks" not in permissions["capabilities"]
+    assert any(
+        "editable target" in rule for rule in permissions["rules"]
+    )

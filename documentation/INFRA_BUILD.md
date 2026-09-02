@@ -77,7 +77,7 @@ The main startup path has four measured closures:
 
 | Budget key | Measured closure | Limit (KiB) |
 | --- | --- | ---: |
-| `main` | Main entry alone | 32 |
+| `main` | Main entry alone, including upstream failure recovery | 40 |
 | `shell` | Main plus a shell view | 64 |
 | `core` | Main plus a Core view | 120 |
 | `builder` | Builder view | 224 |

@@ -11,7 +11,6 @@ from lagniappe.core.tools.ai import (
     category,
     core as ai_core,
     dates,
-    pages,
     project,
     schema,
     summarize,
@@ -227,18 +226,6 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     schedule_prompt = dates.scheduling_prompt(
         mode="periodic", user_prompt="repeat every two weeks"
     )
-    page_prompt = pages.page_generation_prompt(
-        user=user,
-        user_request="make examples",
-        category_id="cat-key",
-        category_name="Customers",
-        form_schema=[{"id": "name", "type": "input"}],
-        num_pages=3,
-    )
-    unformed_page_prompt = pages.page_generation_prompt(
-        category_name="Notes",
-        category_description="Unstructured pages",
-    )
     text_prompt = text.text_generation_prompt(
         "Rewrite this",
         {
@@ -320,35 +307,6 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     assert category_prompt.model_tier == "primary"
     assert project_prompt.model_tier == "primary"
 
-    assert page_prompt.search is True
-    assert page_prompt.tools == [
-        "search_entities",
-        "get_entity",
-        "get_category_forms",
-        "get_category_pages",
-    ]
-    assert page_prompt.output_format["type"] == "JSON"
-    assert page_prompt.model_tier == "primary"
-    assert "collection scope / subject / action and evidence" in (
-        page_prompt.preview()
-    )
-    assert _context_text(page_prompt, "Category Name") == "Customers"
-    assert _context_text(page_prompt, "Category Id") == "cat-key"
-    assert _context_json(page_prompt, "Form Schema") == [
-        {"id": "name", "type": "input"}
-    ]
-    assert _context_json(page_prompt, "Number Of Pages") == 3
-    assert not any(
-        context["label"] == "Form Schema"
-        for context in unformed_page_prompt.context_blocks
-    )
-    assert "pages have no form; do not invent a submission object" in (
-        unformed_page_prompt.preview()
-    )
-    assert "Form Schema Element Type Reference" not in (
-        unformed_page_prompt.preview()
-    )
-
     assert text_prompt.search is True
     assert text_prompt.tools == [
         "search_entities",
@@ -356,7 +314,8 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
         "get_page_tasks",
         "get_file",
     ]
-    assert text_prompt.output_format["type"] == "HTML"
+    assert text_prompt.output_format["type"] == "MARKDOWN"
+    assert "never return HTML" in text_prompt.output_format["requirements"]
     assert text_prompt.model_tier == "primary"
     assert _context_text(text_prompt, "User Request") == "Rewrite this"
     assert _context_json(text_prompt, "Page Info") == {"name": "Ada"}

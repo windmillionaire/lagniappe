@@ -5,15 +5,20 @@ from google.genai import types
 from lagniappe.core.tools.ai.debug import ai_debug
 from lagniappe.core.tools.ai.guidelines import (
     CATEGORY_GENERATION_GUIDELINES,
-    DOCUMENT_GUIDELINES,
+    REPORT_DOCUMENT_GUIDELINES,
     FORM_AUTOFILL_RULES,
+    LAGNIAPPE_WORKSPACE_CONCEPTS,
     ORGANIZE_ACTION_GUIDELINES,
+    ORGANIZE_PLANNING_CONCEPTS,
+    ORGANIZE_PLANNING_POLICY,
+    ORGANIZE_PLANNING_PREFLIGHT,
     PAGE_FORM_CONTENT_GUIDELINES,
     PAGE_FORM_REQUIREMENTS,
     PAGE_FORM_SCHEMA_FORMAT,
     PROJECT_COMPLEXITY_GUIDELINES,
     PROJECT_GENERATION_GUIDELINES,
     REPORT_OUTPUT_REQUIREMENTS,
+    REPORT_PREFLIGHT_CHECKS,
     SCHEMA_TYPE_GUIDELINES,
     SCHEMA_EVOLUTION_GUIDELINES,
     SUBMISSION_OUTPUT_REQUIREMENTS,
@@ -25,6 +30,40 @@ from lagniappe.core.tools.ai.guidelines import (
 
 
 GUIDELINE_BUNDLES = {
+    "organize": {
+        "description": (
+            "Shared end-to-end workflow for constructing an Organize proposal."
+        ),
+        "instructions": (
+            "Apply this as a two-phase workflow. First use the planning sections "
+            "to settle structure and file assignments without submission fields; "
+            "do not submit that intermediate plan. Then use Action Planning, the "
+            "form_autofill bundle when form values are needed, each exact form "
+            "schema, and the current plan contract to add final submission or "
+            "update values. Fetch only specialized bundles required by actions you "
+            "will return: category for category structure, project for project/model "
+            "structure, page_form or task_form for standalone forms, "
+            "schema_evolution only for schema updates, and page_document only for "
+            "page documents. File-summary rules are already included here; do not "
+            "fetch file_summary separately for an Organize proposal. Do not fetch "
+            "report_actions because this organize bundle and the live contract "
+            "already provide the action/preflight rules. An external client must "
+            "complete both applicable phases before "
+            "/submit because the server will not call a model to finish or repair "
+            "the proposal. The current plan contract is authoritative if an "
+            "illustrative shape differs. Read tools only inspect context and never "
+            "execute the proposal."
+        ),
+        "sections": (
+            LAGNIAPPE_WORKSPACE_CONCEPTS,
+            ORGANIZE_PLANNING_CONCEPTS,
+            ORGANIZE_PLANNING_POLICY,
+            ORGANIZE_PLANNING_PREFLIGHT,
+            ORGANIZE_ACTION_GUIDELINES,
+            SUMMARY_GENERATION_GUIDELINES,
+            REPORT_PREFLIGHT_CHECKS,
+        ),
+    },
     "category": {
         "description": "Rules for proposing a new category and optional page form.",
         "sections": (
@@ -73,8 +112,8 @@ GUIDELINE_BUNDLES = {
         ),
     },
     "page_document": {
-        "description": "Rules for optional page document HTML.",
-        "sections": (DOCUMENT_GUIDELINES,),
+        "description": "Rules for optional report page document Markdown.",
+        "sections": (REPORT_DOCUMENT_GUIDELINES,),
     },
     "file_summary": {
         "description": "Rules for deciding when and how a file summary should support search.",
@@ -95,10 +134,11 @@ GET_GUIDELINES = types.FunctionDeclaration(
     name="get_guidelines",
     description=(
         "Return detailed prompt guidelines for one report-planning subtask. Use this "
-        "when a proposal would benefit from detailed rules for generated structure, "
-        "form schemas, form submissions, page documents, file summaries, or "
-        "action data. Before the tool turn, identify every relevant bundle whose need "
-        "is already known and request those get_guidelines calls together."
+        "tool with task=organize when the caller has not already received the shared "
+        "end-to-end Organize workflow. Use the other tasks for detailed rules about "
+        "generated structure, form schemas, form submissions, page documents, file "
+        "summaries, or action data. Request one bundle per call. Independent bundles "
+        "may be requested in parallel when the client supports it."
     ),
     parameters={
         "type": "object",
@@ -142,12 +182,13 @@ def execute_get_guidelines(args, _user):
         section_count=len(bundle["sections"]),
         chars=len(guidelines),
     )
+    instructions = bundle.get(
+        "instructions",
+        "Apply these guidelines when deciding or shaping report proposal action "
+        "data. Do not change the final report JSON shape.",
+    )
     return {
         "task": task,
         "description": bundle["description"],
-        "guidelines": (
-            "Apply these guidelines when deciding or shaping report proposal action data. "
-            "Do not change the final report JSON shape.\n\n"
-            f"{guidelines}"
-        ),
+        "guidelines": f"{instructions}\n\n{guidelines}",
     }

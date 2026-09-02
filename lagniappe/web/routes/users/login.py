@@ -22,7 +22,6 @@ from lagniappe.core.tools.auth import agent_access
 from lagniappe.core.tools.email import smtp as auth_email
 from lagniappe.core.tools.services import identity_platform
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
-from lagniappe.web import csrf
 from lagniappe.web.auth import (
     clear_login_session,
     login_cache_invalidation_required,
@@ -452,17 +451,20 @@ def login_agent():
     return redirect(_login_redirect_url(), code=302)
 
 
-# @testable false
-# @manual true
-# @reason live Google OAuth callback requires manual/provider validation
+# @testable true
+# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_csrf_exempt_surfaces_reach_replacement_authentication_gates
+# @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_enforces_double_submit_csrf_before_provider_auth
+# @matrix csrf : double-submit exemption-policy
+# @pair login:google-signin
 @users.route("/google-signin", methods=["POST"])
-@csrf.exempt
 def login_google():
     """Exchange a Google credential through Identity Platform and sign in."""
     limited = _enforce_auth_rate_limit("google-signin", 20, 300, json_mode=False)
     if limited:
         return limited
 
+    # Startup exempts only this users view from Flask-WTF. This route must keep
+    # Google's independent cookie/body double-submit verification before auth.
     verify_google_csrf(request)
 
     if CONFIG.GOOGLE_SIGNIN_ENABLED is not True:

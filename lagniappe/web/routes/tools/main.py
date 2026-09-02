@@ -21,7 +21,7 @@ from lagniappe.core.tools import ai
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
-from lagniappe.web.auth import ai_access, require_ai_access
+from lagniappe.web.auth import ai_access, logged_in, require_ai_access
 
 from . import tools
 
@@ -322,6 +322,8 @@ def create_create_report():
 # @covered-by lagniappe/web/routes/tools/main.py::delete_report
 # @reason report lookup and owner guard are exercised through report routes
 def _get_report(key):
+    if getattr(current_user, "is_public", False):
+        abort(403)
     report = Entities.fetch_one(
         key,
         request=Fetch.direct(),
@@ -344,12 +346,12 @@ def _get_report(key):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_access_can_read_create_report_without_create_actions
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
 # @matrix ai-report : detail live-submit needs-review no-execute organize revision schema-update skip-action
 # @matrix ai-report : structured-filter workspace-tools
-# @pair ai-access:report-read
+# @pair ai-access:provider-boundary
 @tools.route("/reports/<key>", methods=["GET"])
-@ai_access(AI.ASK)
+@logged_in
 def report(key):
     report = _get_report(key)
     if not report:
@@ -360,9 +362,10 @@ def report(key):
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
-# @matrix ai-report : detail deterministic-run idempotent recovery repeat-run retry
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+# @matrix ai-report : detail deterministic-run entitlement-independent idempotent recovery repeat-run retry
 @tools.route("/reports/<key>/run", methods=["POST"])
-@ai_access(AI.CREATE)
+@logged_in
 def run_report(key):
     report = _get_report(key)
     if not report:
@@ -439,9 +442,10 @@ def run_report(key):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
-# @matrix ai-report : deterministic-undo failed-prefix recovery undo
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+# @matrix ai-report : deterministic-undo entitlement-independent failed-prefix recovery undo
 @tools.route("/reports/<key>/undo", methods=["POST"])
-@ai_access(AI.CREATE)
+@logged_in
 def undo_report(key):
     report = _get_report(key)
     if not report:
@@ -471,13 +475,19 @@ def undo_report(key):
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_revision_is_provider_blocked
 # @matrix ai-report : async completed-state feedback live-submit organize ready-state revision route-guard
+# @pair agent-api:provider-free-revision
 @tools.route("/reports/<key>/revise", methods=["POST"])
 @ai_access(AI.ASK)
 def revise_report(key):
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
+    if report.origin == "api":
+        return responses.error(
+            "Externally submitted plans cannot be revised with the AI provider."
+        )
     if report.tool != "ask":
         require_ai_access(AI.CREATE)
     if report.tool not in {"organize", "ask", "create"}:
@@ -530,9 +540,10 @@ def revise_report(key):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
-# @matrix ai-report : dependencies skip-action
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+# @matrix ai-report : dependencies entitlement-independent skip-action
 @tools.route("/reports/<key>/actions/<int:action_index>/skip", methods=["POST"])
-@ai_access(AI.CREATE)
+@logged_in
 def skip_report_action(key, action_index):
     report = _get_report(key)
     if not report:
@@ -560,9 +571,10 @@ def skip_report_action(key, action_index):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
-# @matrix ai-report : delete-modal file-cleanup
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+# @matrix ai-report : delete delete-modal entitlement-independent file-cleanup
 @tools.route("/reports/<key>", methods=["DELETE"])
-@ai_access(AI.ASK)
+@logged_in
 def delete_report(key):
     report = _get_report(key)
     if not report:

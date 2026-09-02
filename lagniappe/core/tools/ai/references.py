@@ -2,12 +2,23 @@
 
 import re
 
+from lagniappe.core.definitions import Action
 from lagniappe.core.tools import cache
+from lagniappe.core.tools.files.html import render_markdown
 
 
 HASH_REFERENCE_REGEX = re.compile(r"\bhash:([0-9a-z]{12})\b")
 HASH_PREFIXED_ID_REGEX = re.compile(r"\bhash:(ah[A-Za-z0-9_-]{30,})\b")
 HASH_TOKEN_REGEX = re.compile(r"\bhash:([A-Za-z0-9_-]+)\b")
+
+
+# @testable true
+# @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_renders_answer_markdown
+# @tests tests_unit/test_032_agent_api.py::test_external_ask_submission_allows_hash_token_in_named_link_destination
+# @pairs ai-report:answer-only markdown:html-sanitization
+def render_ai_markdown(text):
+    """Render model Markdown after resolving known AI references for browser use."""
+    return render_markdown(normalize_hash_references(text))
 
 
 # @testable true
@@ -17,6 +28,22 @@ def hash_reference(entity):
     """Return the explicit AI reference token for an entity hash."""
     entity_hash = getattr(entity, "hash", None)
     return f"hash:{entity_hash}" if entity_hash else None
+
+
+# @testable true
+# @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
+# @pairs ai:resource-inventory permissions:personal-page
+def personal_page_reference(user):
+    """Return the authenticated user's guaranteed editable Page reference."""
+    page = user.page
+    return {
+        "kind": "page",
+        "hash": hash_reference(page),
+        "name": page.name,
+        "url": page.url,
+        "can_view": page.allowed(Action.VIEW, user=user),
+        "can_edit": page.allowed(Action.EDIT, user=user),
+    }
 
 
 # @testable true

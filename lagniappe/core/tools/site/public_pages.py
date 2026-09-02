@@ -1,6 +1,7 @@
 """Public-page discovery, document-image, and social metadata services."""
 
 from dataclasses import dataclass
+import re
 from urllib.parse import urlsplit
 from xml.etree import ElementTree
 
@@ -16,7 +17,7 @@ from lagniappe.core.properties.page_public import normalize_public_settings
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import site as site_database
 from lagniappe.core.tools.email.notifications.links import absolute_url
-from lagniappe.core.tools.files.html import strip_tags
+from lagniappe.core.tools.files.html import sanitize_public_document_html, strip_tags
 from lagniappe.core.tools.mentions.content import sanitize_mentions
 
 
@@ -24,6 +25,7 @@ SITEMAP_URL_LIMIT = 50_000
 PUBLIC_DIRECTORY_SCHEMA = 1
 PUBLIC_DIRECTORY_FALLBACK_ID = "public-pages"
 PUBLIC_DIRECTORY_FALLBACK_NAME = "Public Pages"
+MAX_PUBLIC_IMAGE_ALT = 500
 
 
 class SitemapLimitError(RuntimeError):
@@ -66,7 +68,17 @@ def _same_asset_url(source, asset_url):
     target = urlsplit(str(asset_url or ""))
     if not source.path or source.path != target.path:
         return False
-    return not target.netloc or source.netloc == target.netloc
+    if source.netloc or target.netloc:
+        return bool(source.netloc and source.netloc == target.netloc)
+    return True
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/site/public_pages.py::document_images
+# @reason bounded image metadata is exercised through document-image extraction
+def _bounded_image_alt(value):
+    value = re.sub(r"[\x00-\x1f\x7f]", "", str(value or "")).strip()
+    return value[:MAX_PUBLIC_IMAGE_ALT]
 
 
 # @testable true
@@ -103,7 +115,7 @@ def document_images(page):
             DocumentImage(
                 name=name,
                 url=asset.url,
-                alt=str(node.get("alt") or "").strip(),
+                alt=_bounded_image_alt(node.get("alt")),
                 content_type=asset.content_type,
                 fingerprint=asset.fingerprint,
                 extension=asset.extension,
@@ -112,28 +124,59 @@ def document_images(page):
     return candidates
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/site/public_pages.py::public_document_html
+# @reason callback URL validation is exercised through anonymous document rendering
+def _validated_public_image_url(page, candidate, image_url, public_origin):
+    value = image_url(candidate)
+    parsed = urlsplit(str(value or ""))
+    public_id = getattr(page, "public_id", None) or getattr(page, "db", {}).get(
+        "public_id"
+    )
+    name = candidate.name
+    if candidate.extension:
+        name = f"{name}.{candidate.extension}"
+    expected_path = f"/pages/public/{public_id}/images/{name}"
+    expected_origin = urlsplit(str(public_origin or ""))
+    if (
+        not public_id
+        or parsed.scheme not in {"", "http", "https"}
+        or parsed.username
+        or parsed.password
+        or parsed.path != expected_path
+        or parsed.query
+        or parsed.fragment
+        or (
+            parsed.netloc
+            and (
+                not expected_origin.netloc
+                or (parsed.scheme, parsed.netloc)
+                != (expected_origin.scheme, expected_origin.netloc)
+            )
+        )
+    ):
+        return None
+    return str(value)
+
+
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_public_document_rewrites_only_embedded_page_images
 # @matrix public-pages : document-image public-rendering
-def public_document_html(page, image_url):
-    """Sanitize mentions and rewrite embedded private images to public URLs."""
-    soup = BeautifulSoup(
-        sanitize_mentions(page.properties.document.html or ""),
-        "html.parser",
-    )
+def public_document_html(page, image_url, *, public_origin=None):
+    """Render anonymous-safe HTML with mentions and owned images transformed."""
+    content = sanitize_mentions(page.properties.document.html or "")
     candidates = document_images(page)
-    for node in soup.find_all("img"):
-        candidate = next(
-            (
-                item
-                for item in candidates
-                if _same_asset_url(node.get("src"), item.url)
-            ),
-            None,
+    image_sources = []
+    for candidate in candidates:
+        rewritten = _validated_public_image_url(
+            page,
+            candidate,
+            image_url,
+            public_origin,
         )
-        if candidate:
-            node["src"] = image_url(candidate)
-    return str(soup), candidates
+        if rewritten:
+            image_sources.append((candidate.url, rewritten))
+    return sanitize_public_document_html(content, image_sources), candidates
 
 
 # @testable true
@@ -142,7 +185,11 @@ def public_document_html(page, image_url):
 def metadata(page, *, canonical_url, site_image_url, public_image_url, indexing):
     """Build privacy-safe canonical, robots, Open Graph, and Twitter metadata."""
     settings = normalize_public_settings(page.public_settings)
-    document, candidates = public_document_html(page, public_image_url)
+    document, candidates = public_document_html(
+        page,
+        public_image_url,
+        public_origin=canonical_url,
+    )
     title = settings["title"] or page.name
     description = settings["description"] or strip_tags(document)[:300].strip()
     description = description or f"Public page: {title}"

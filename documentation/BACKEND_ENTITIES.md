@@ -132,9 +132,13 @@ Application roles, Google Cloud IAM, and AI entitlement are independent:
 
 - `User.is_admin` grants application administration, not cloud authority.
 - Google Cloud roles do not create a Lagniappe account or session.
-- `User.ai_access` is `NONE`, `ASK`, or `CREATE`; `CREATE` includes `ASK`.
-- AI routes and deferred adapters recheck both ordinary permissions and the
-  required AI tier before provider work and before applying mutations.
+- `User.ai_access` is `NONE`, `ASK`, or `CREATE`; `CREATE` includes `ASK`. This
+  is an entitlement for Lagniappe's configured model-provider usage, not a
+  workspace permission or a general ban on external agents.
+- Provider-backed routes and deferred adapters recheck both ordinary
+  permissions and the required AI tier. Provider-free external plans and
+  deterministic saved-report execution use normal authentication, ownership,
+  report state, and current resource permissions without consulting this tier.
 
 Role and AI-access state contribute to `User.authorization_fingerprint`.
 Changing either invalidates cached authorization-sensitive UI.

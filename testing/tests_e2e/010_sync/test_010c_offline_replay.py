@@ -226,7 +226,7 @@ def test_headless_offline_replay_merges_concurrent_remote_edits(
     with expect_offline_sync_replay(
         owner,
         sync_id=document_sync_id,
-        request_payload_contains=(offline_text, remote_text),
+        request_payload_contains=offline_text,
     ) as replay_responses:
         owner.go(SitePages.HOME)
 

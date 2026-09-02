@@ -3,9 +3,9 @@
 from lagniappe.core import exceptions
 
 from .guidelines import (
-    HTML_GENERATION_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
 )
+from .references import render_ai_markdown
 from .reporting.contracts.actions import (
     READ_ONLY_CONTEXT_TOOLS,
 )
@@ -46,11 +46,11 @@ ASK_PREFLIGHT_CHECKS = """
 
 - Make sure the summary directly answers the user's question.
 - Keep internal entity hash tokens out of the user-facing summary and
-  answer_html. Use the corresponding human name and URL when available; if no
+  answer_markdown. Use the corresponding human name and URL when available; if no
   human name is available, describe the entity generically rather than showing
   its hash token.
-- If links, lists, or emphasis would help, include answer_html with clean
-  semantic HTML and only use links backed by tool results or web search.
+- If links, lists, or emphasis would help, include answer_markdown with clean
+  Markdown and only use links backed by tool results or web search.
 - Always return an empty actions array. Ask reads and answers; Create and
   Organize own workspace changes.
 - Distinguish workspace evidence from outside-world information when both are
@@ -65,7 +65,7 @@ Return a single JSON object only, with no markdown fences or commentary.
 Shape:
 {
   "summary": "short plain-text answer for lists and notifications",
-  "answer_html": "optional clean HTML answer for the report detail view",
+  "answer_markdown": "optional Markdown answer for the report detail view",
   "confidence": 0.0,
   "actions": []
 }
@@ -73,10 +73,10 @@ Shape:
 Answer rules:
 - Put the direct answer in `summary`.
 - When the answer includes links, lists, or emphasis, also include
-  `answer_html` using clean semantic HTML.
+  `answer_markdown` using ordinary Markdown.
 - Hash tokens are internal references for tool calls. Never
-  display them in `summary` or `answer_html`; use human names and URLs instead.
-- Use links in `answer_html` when a tool result provides a `url` and `name`,
+  display them in `summary` or `answer_markdown`; use human names and URLs instead.
+- Use links in `answer_markdown` when a tool result provides a `url` and `name`,
   or when citing an external source found by web search.
 - Always return `actions` as an empty array. If the user requests workspace
   changes, answer what can be established and direct them to Create or Organize.
@@ -90,7 +90,7 @@ def ask_response_schema():
     """Return Ask's answer-only provider envelope."""
     properties = {
         "summary": {"type": "string"},
-        "answer_html": {"type": "string"},
+        "answer_markdown": {"type": "string"},
         "confidence": {"type": "number"},
         "actions": {
             "type": "array",
@@ -124,7 +124,6 @@ def _ask_prompt_base(report, user, intro, extra_contexts=()):
         prompt.add_context(key, value, quote=quote)
     prompt.add_workspace_concepts(LAGNIAPPE_WORKSPACE_CONCEPTS)
     prompt.add_instructions(ASK_SOURCE_GUIDELINES)
-    prompt.add_instructions(HTML_GENERATION_RULES)
     return prompt
 
 
@@ -160,8 +159,8 @@ def ask_prompt(report, user):
 Answer the user's question directly in the top-level summary and always return
 an empty actions array. When the answer mentions pages, tasks, files, or
 external sources with URLs,
-include `answer_html` with appropriate anchor tags so the report detail can
-show clickable links.
+include `answer_markdown` with ordinary Markdown links so the report detail can
+show clickable links after trusted server-side rendering.
 
 Use workspace search for people, pages, tasks, projects, categories, forms, and
 files mentioned in the question. Use get_page_file_list for files attached to a
@@ -257,9 +256,11 @@ def generate_ask_report(prompt):
 # @testable true
 # @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_requires_a_usable_answer[summary]
 # @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_requires_a_usable_answer[confidence]
+# @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_renders_answer_markdown
 # @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_requires_a_usable_answer[answer-html]
 # @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_discards_workspace_actions
 # @matrix ai-report : action-discard answer-only ask usable-answer validation
+# @pairs editor:html-sanitization markdown:html-sanitization
 def validate_ask_response(
     response,
     allowed_actions=None,
@@ -295,11 +296,20 @@ def validate_ask_response(
             "Ask response confidence must be a number from 0 to 1."
         )
 
-    answer_html = response.get("answer_html")
-    if answer_html is not None and not isinstance(answer_html, str):
+    answer_markdown = response.get("answer_markdown")
+    if answer_markdown is not None and not isinstance(answer_markdown, str):
         raise exceptions.AIException(
-            "Ask response answer_html must be a string when present."
+            "Ask response answer_markdown must be a string when present."
         )
+    if answer_markdown is not None:
+        response["answer_html"] = render_ai_markdown(answer_markdown)
+        response.pop("answer_markdown", None)
+    else:
+        answer_html = response.get("answer_html")
+        if answer_html is not None and not isinstance(answer_html, str):
+            raise exceptions.AIException(
+                "Ask response answer_html must be a string when present."
+            )
 
     return response
 

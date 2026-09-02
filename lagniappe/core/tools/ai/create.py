@@ -4,7 +4,6 @@ from lagniappe.core import exceptions
 
 from .guidelines import (
     CONTEXT_USAGE_GUIDELINES,
-    HTML_GENERATION_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
     REPORT_PREFLIGHT_CHECKS,
     REPORT_TASK_SCHEDULING_GUIDELINES,
@@ -21,6 +20,7 @@ from .reporting.proposals.repair import (
     generate_validated_proposal,
 )
 from .prompt import Prompt
+from .references import personal_page_reference
 
 CREATE_MAX_TOOL_ITERATIONS = 50
 
@@ -69,7 +69,8 @@ Create rules:
   and form submissions.
 - Use existing workspace structure only when read-only tools show it is a close
   fit for the user's request.
-- Create page document HTML when durable written content is useful.
+- Create page document Markdown when durable written content is useful. Trusted
+  application code renders it into sanitized editor-compatible HTML.
 - Use form schemas and submission objects only when structured fields add
   meaningful domain data beyond entity names, descriptions, and relationships.
 - Category default forms are exceptional: include one only when the request or
@@ -104,13 +105,16 @@ Reference rules:
 - When referencing an existing category, form, project, model task, page, or
   task by hash, also include the matching human display field when you know it:
   category_name, form_name, project_name, model_name, page_name, or task_name.
+- Every create_task action requires its editable destination Page in data.page
+  or data.page_action. page_name is display context only and cannot replace the
+  executable Page reference.
 
 Common data shapes:
 - create_form: {"name": string, "form_type": "page"|"task", "schema": [field_object, ...]}
 - create_category: {"name": string, "description": string, "form": entity_or_action_ref}
 - create_project: {"name": string, "description": string}
 - create_model_task: {"name": string, "project": entity_or_action_ref, "form": entity_or_action_ref}
-- create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document": html_string}
+- create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document_markdown": markdown_string}
 - create_task: {"name": string, "description": string, "page": entity_or_action_ref, "project": entity_or_action_ref, "model": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "due_date": "YYYY-MM-DD", "schedule": canonical_schedule_object}
 - needs_review: {"note": string, "questions": [string]}
 """
@@ -148,6 +152,7 @@ def _create_prompt_base(report, user, intro, extra_contexts=()):
         ),
     )
     prompt.add_context("user_request", report.instructions or "")
+    prompt.add_context("personal_page", personal_page_reference(user))
     prompt.add_context(
         "report_action_permissions",
         report_action_permission_context(user, allowed_actions),
@@ -163,7 +168,6 @@ def _create_prompt_base(report, user, intro, extra_contexts=()):
         role="action_permissions",
         unique=True,
     )
-    prompt.add_instructions(HTML_GENERATION_RULES)
     prompt.add_instructions(
         """
 Use read-only tools to understand existing workspace structure before proposing

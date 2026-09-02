@@ -10,6 +10,28 @@ function _listToggle(component, widgetName) {
 		`[lp-show='${component.name}:${widgetName}'][data-toggle]`,
 	);
 }
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/home/lists.mjs::LoadedHomeList._syncUnavailableToggle
+ * @covered-by src/script/widgets/home/lists.mjs::ToolReportList
+ * @reason shared zero-count presentation is exercised through home list E2E flows
+ */
+function _syncEmptyCount(toggle, widgetName, empty) {
+	const indicator = toggle?.querySelector(`[data-indicator='${widgetName}']`);
+	if (!indicator) return;
+
+	const wasEmpty = indicator.dataset.empty === "true";
+	indicator.dataset.empty = empty ? "true" : "false";
+	indicator.classList.toggle("hidden", !empty);
+	indicator.classList.toggle("font-bold", empty);
+	if (empty) {
+		indicator.textContent = "0";
+	} else if (wasEmpty) {
+		indicator.textContent = "";
+	}
+}
+
 /**
  * Shared loading lifecycle for simple home collection lists.
  *
@@ -39,21 +61,7 @@ class LoadedHomeList extends BaseList {
 		const unavailable = this.itemCount === 0 && !this.target.dataset.ifEmpty;
 		this._listToggle.disabled = unavailable;
 		this._listToggle.classList.toggle("opacity-50", unavailable);
-
-		const indicator = this._listToggle.querySelector(
-			`[data-indicator='${this.name}']`,
-		);
-		if (!indicator) return;
-
-		const wasUnavailable = indicator.dataset.empty === "true";
-		indicator.dataset.empty = unavailable ? "true" : "false";
-		indicator.classList.toggle("hidden", !unavailable);
-		indicator.classList.toggle("font-bold", unavailable);
-		if (unavailable) {
-			indicator.textContent = "0";
-		} else if (wasUnavailable) {
-			indicator.textContent = "";
-		}
+		_syncEmptyCount(this._listToggle, this.name, unavailable);
 	}
 
 	postreconcile() {
@@ -125,7 +133,9 @@ export class IngressList extends LoadedHomeList {
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_refreshes_stage_labels
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_lazy_report_list_reconciles_active_job_status
- * @matrix ai-report : deferred-refresh delete-modal lazy-load list operation-poll stage-labels status-reconciliation
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+ * @matrix ai-report : deferred-refresh delete-modal empty-count lazy-load list operation-poll stage-labels status-reconciliation toggle
  */
 export class ToolReportList extends BaseList {
 	constructor(attributes) {
@@ -138,6 +148,7 @@ export class ToolReportList extends BaseList {
 		void this.view
 			.ensureDeferredOperations?.()
 			.then((manager) => manager?.scan(this.target));
+		_syncEmptyCount(this._listToggle, this.name, this.itemCount === 0);
 		if (this.itemCount > 0 && this._listToggle) {
 			this._listToggle.classList.remove("opacity-50", "pointer-events-none");
 		}

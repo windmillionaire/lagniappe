@@ -436,3 +436,4 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
     assert note_section.list is notes
     assert ingress_section.list is ingress_files
     assert tools_section.list is reports
+    assert tools_section.label == "Plans & Reports"

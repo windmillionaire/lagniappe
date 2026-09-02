@@ -23,7 +23,7 @@
         The owner can add the user to one or more groups, or remove groups they no longer need.
       {% endcall %}
       {% call feature("AI Access", icon="generate", kind="user") %}
-        The owner can set None, Ask, or Create independently from permissions. Create includes Ask. Even the owner's own AI access can be reduced.
+        The owner can set None, Ask, or Create for calls to Lagniappe's configured AI provider, independently from permissions. Create includes Ask. Even the owner's own provider access can be reduced. External-agent API keys use the user's own AI client and remain available to non-public users at every level.
       {% endcall %}
       {% call feature("Notification Email", icon="email", kind="task") %}
         On your own non-public account, choose no email, email after five minutes, or a daily digest at 8:00 AM local time. In-app notifications remain available with any choice.
@@ -40,7 +40,7 @@
     {{ subheading("Worth Remembering") }}
     <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
       <li>Group membership controls broad access; page restrictions control exceptions on individual pages.</li>
-      <li>AI access only enables AI features; it never grants access to workspace records.</li>
+      <li>AI access enables site-funded provider features; it never grants access to workspace records or controls provider-free external plans and saved-report operations.</li>
       <li>If access looks stale after changing groups, the user may need to sign out and back in.</li>
       <li>The site owner cannot restrict their own owner access.</li>
     </ul>

@@ -58,6 +58,7 @@ function requestUrl(request) {{
 const responseCache = new CacheMock();
 const staticCache = new CacheMock();
 const fetchCalls = [];
+const clientMessages = [];
 const deletedCaches = [];
 const listeners = new Map();
 const cacheNames = new Set(["static-cache", "response-cache", "third-party-cache"]);
@@ -67,6 +68,7 @@ const context = {{
   console,
   deletedCaches,
   fetchCalls,
+  clientMessages,
   Headers,
   navigator: {{ onLine: true }},
   Request,
@@ -74,7 +76,11 @@ const context = {{
   listeners,
   self: {{
     addEventListener(type, listener) {{ listeners.set(type, listener); }},
-    clients: {{ matchAll: async () => [] }},
+    clients: {{
+      matchAll: async () => [{{
+        postMessage(message) {{ clientMessages.push(message); }},
+      }}],
+    }},
     location: new URL("https://example.test/"),
     navigator: {{}},
     Sentry: null,
@@ -292,7 +298,8 @@ if (!response.headers.get("Content-Type").includes("application/json")) {
   throw new Error("AJAX failure did not return JSON");
 }
 const body = await response.json();
-if (body.ok !== false || body.error !== "You are offline") {
+if (body.ok !== false || body.error !== "You are offline" ||
+    body.retryable !== false || body.outcomeUncertain !== true) {
   throw new Error(`Unexpected offline response: ${JSON.stringify(body)}`);
 }
 """,
@@ -1062,7 +1069,7 @@ def test_worker_accepts_only_versioned_valid_connectivity_messages(run_node):
         """
 const valid = {
   protocol: "lagniappe-browser",
-  protocol_version: 3,
+  protocol_version: 4,
   type: "connectivity-state",
   state: {
     browser: "online",
@@ -1080,7 +1087,7 @@ if (accepted.server !== "offline" || accepted.visibility !== "hidden") {
 }
 
 for (const invalid of [
-	{ ...valid, protocol_version: 2 },
+	{ ...valid, protocol_version: 3 },
   { ...valid, type: "server-status" },
   { ...valid, state: { ...valid.state, server: "maybe" } },
 ]) {
@@ -1091,6 +1098,179 @@ for (const invalid of [
 const retained = vm.runInContext("_connectivity", context);
 if (retained.server !== "offline") {
   throw new Error("Invalid message changed the retained connectivity state");
+}
+""",
+    )
+
+
+# @matrix request-errors service-worker : application-error-marker classification upstream-unavailable
+def test_worker_classifies_only_unmarked_upstream_html_failures(run_node):
+    run_service_worker_check(
+        run_node,
+        """
+for (const status of [500, 502, 503, 504]) {
+  const raw = new Response("<html>upstream</html>", {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+  if (!context.isUpstreamUnavailableResponse(raw)) {
+    throw new Error(`Unmarked upstream HTML ${status} was not classified`);
+  }
+  const marked = new Response("<html>application error</html>", {
+    status,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "X-Lagniappe-Error": "true",
+    },
+  });
+  if (context.isUpstreamUnavailableResponse(marked)) {
+    throw new Error(`Application-marked HTML ${status} was misclassified`);
+  }
+}
+if (context.isUpstreamUnavailableResponse(new Response("json", {
+  status: 503,
+  headers: { "Content-Type": "application/json" },
+}))) {
+  throw new Error("Non-HTML application response was misclassified");
+}
+""",
+    )
+
+
+# @matrix browser-protocol request-errors service-worker : client-message privacy upstream-unavailable
+def test_upstream_failure_notifies_controlled_clients_with_bounded_state(run_node):
+    run_service_worker_check(
+        run_node,
+        """
+const request = new Request(
+  "https://example.test/pages/secret-entity-id?private=yes",
+  { method: "GET" },
+);
+const upstream = new Response("<html>failure contains private data</html>", {
+  status: 504,
+  headers: {
+    "Content-Type": "text/html",
+    "Server": "x".repeat(200),
+    "X-Cloud-Trace-Context": "trace-value",
+  },
+});
+await context.notifyUpstreamUnavailable(request, upstream, { stale: true });
+if (clientMessages.length !== 1) {
+  throw new Error(`Expected one client message, got ${clientMessages.length}`);
+}
+const message = clientMessages[0];
+if (message.protocol_version !== 4 ||
+    message.type !== "upstream-unavailable" ||
+    message.state.route_class !== "pages" ||
+    message.state.server.length !== 128 ||
+    !message.state.trace_header_present ||
+    !message.state.stale) {
+  throw new Error(`Unexpected client diagnostic: ${JSON.stringify(message)}`);
+}
+const serialized = JSON.stringify(message);
+for (const secret of ["secret-entity-id", "private=yes", "failure contains private data", "trace-value"]) {
+  if (serialized.includes(secret)) {
+    throw new Error(`Client diagnostic exposed ${secret}`);
+  }
+}
+""",
+    )
+
+
+# @matrix cache request-errors service-worker : stale-cache upstream-unavailable
+def test_upstream_failure_uses_marked_stale_cache_without_caching_5xx(run_node):
+    run_service_worker_check(
+        run_node,
+        """
+const request = new Request("https://example.test/pages/example", {
+  credentials: "include",
+});
+responseCache.entries.set(request.url, new Response("current application page", {
+  status: 200,
+  headers: { "Content-Type": "text/html", ETag: '"safe"' },
+}));
+context.fetch = async (networkRequest) => {
+  fetchCalls.push(networkRequest);
+  return new Response("<html>upstream failure</html>", {
+    status: 503,
+    headers: {
+      "Content-Type": "text/html",
+      "Server": "Google Frontend",
+    },
+  });
+};
+const waitUntil = [];
+const response = await context.handleCacheable({
+  request,
+  waitUntil(promise) { waitUntil.push(Promise.resolve(promise)); },
+}, "/pages/example");
+await Promise.all(waitUntil);
+if (response.status !== 200 || await response.text() !== "current application page" ||
+    response.headers.get("X-Lagniappe-Upstream-Unavailable") !== "true" ||
+    response.headers.get("X-Lagniappe-Stale-Cache") !== "true" ||
+    response.headers.get("X-Lagniappe-Upstream-Status") !== "503") {
+  throw new Error("Upstream failure did not return an explicitly marked stale response");
+}
+if (responseCache.puts !== 0 || clientMessages[0]?.state?.stale !== true) {
+  throw new Error("Upstream failure was cached or did not notify stale state");
+}
+""",
+    )
+
+
+# @matrix request-errors service-worker : branded-response retry upstream-unavailable
+def test_upstream_failure_without_cache_returns_branded_retryable_503(run_node):
+    run_service_worker_check(
+        run_node,
+        """
+const request = { mode: "navigate", method: "GET", headers: new Headers() };
+const upstream = new Response("<html>raw host error</html>", {
+  status: 502,
+  headers: { "Content-Type": "text/html", Server: "Google Frontend" },
+});
+const response = context.brandedUpstreamResponse(request, upstream);
+const body = await response.text();
+if (response.status !== 503 ||
+    response.headers.get("Retry-After") !== "5" ||
+    response.headers.get("X-Lagniappe-Upstream-Status") !== "502" ||
+    !body.includes("Lagniappe is temporarily unavailable") ||
+    !body.includes("Try again") ||
+    body.includes("raw host error")) {
+  throw new Error("Navigation did not receive the branded retryable 503");
+}
+""",
+    )
+
+
+# @matrix request-errors service-worker : branded-response mutation no-replay upstream-unavailable
+def test_mutation_upstream_failure_returns_uncertain_json_without_replay(run_node):
+    run_service_worker_check(
+        run_node,
+        """
+context.fetch = async (request) => {
+  fetchCalls.push(request);
+  return new Response("<html>raw host error</html>", {
+    status: 500,
+    headers: { "Content-Type": "text/html" },
+  });
+};
+const request = new Request("https://example.test/pages/example", {
+  method: "PATCH",
+  body: JSON.stringify({ name: "private form value" }),
+  headers: { "Content-Type": "application/json" },
+});
+const waitUntil = [];
+const response = await context.handleRequest({
+  request,
+  waitUntil(promise) { waitUntil.push(Promise.resolve(promise)); },
+}, "/pages/example");
+await Promise.all(waitUntil);
+const body = await response.json();
+if (fetchCalls.length !== 1 || response.status !== 503 ||
+    body.code !== "upstream_instance_unavailable" ||
+    body.retryable !== false || body.outcomeUncertain !== true ||
+    clientMessages[0]?.state?.outcome_uncertain !== true) {
+  throw new Error(`Mutation failure was not safely translated: ${JSON.stringify(body)}`);
 }
 """,
     )

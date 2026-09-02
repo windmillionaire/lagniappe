@@ -202,7 +202,9 @@ class Pending(ReportProcessValue):
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
+# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
 # @pair ai-report:status
+# @pair agent-api:status
 class Note(Property):
     """User-facing note derived from the report process state."""
 
@@ -219,6 +221,7 @@ class Note(Property):
             "create": "Planning creation...",
         }.get(self.entity.tool, "Analyzing files...")
         labels = {
+            "draft": "Waiting for external plan",
             "pending": pending,
             "revising": "Revising report...",
             "ready": "Ready to run",

@@ -6,10 +6,16 @@
   {% if details %}
     <dl class="{{ classes }} flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-medium">
       {% for detail in details %}
-        <div class="flex min-w-0 flex-row gap-1">
-          <dt data-kind="{{ detail.kind }}"
-              class="font-semibold text-kind-default">{{ detail.label }}:</dt>
-          <dd class="min-w-0">{{ detail.value }}</dd>
+        <div data-role="proposal-detail"
+             class="flex min-w-0 flex-col gap-1{% if detail.label == 'Submission' %} basis-full{% endif %}">
+          <div class="flex min-w-0 flex-row gap-1">
+            <dt data-kind="{{ detail.kind }}"
+                class="font-semibold text-kind-default">{{ detail.label }}:</dt>
+            <dd class="min-w-0 break-words">{{ detail.value }}</dd>
+          </div>
+          {% if detail.get("items") %}
+            {{ proposal_details(detail.get("items"), "pl-3 flex flex-col gap-1 border-l-2 border-base-light") }}
+          {% endif %}
         </div>
       {% endfor %}
     </dl>
@@ -59,7 +65,7 @@
       {{ proposal_support(action.support) }}
       {% if action.reason %}<p class="pl-5">{{ action.reason }}</p>{% endif %}
     </div>
-    {% if current_user.access(AI.CREATE) and report.status == "ready" and action.action_index and action.type not in ["needs_review", "skip"] %}
+    {% if report.status == "ready" and action.action_index and action.type not in ["needs_review", "skip"] %}
       <button type="button"
               data-role="skip-action"
               data-route="{{ url_for('tools.skip_report_action', key=report.urlsafe_key, action_index=action.action_index) }}"
@@ -217,11 +223,12 @@
   {% set is_ask = report.tool == "ask" %}
   {% set report_title = report.name %}
   {% set report_icon = "ask" if report.tool == "ask" else "create" if report.tool == "create" else "organize" if report.tool == "organize" else "generate" %}
+  {% set can_ask_ai = current_user.access(AI.ASK) %}
   {% set can_create_ai = current_user.access(AI.CREATE) %}
-  {% set can_revise = report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" and (is_ask or can_create_ai) %}
+  {% set can_revise = report.origin != "api" and report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" and ((is_ask and can_ask_ai) or (not is_ask and can_create_ai)) %}
   {% set completed_result_actions = report.result.actions|selectattr("status", "equalto", "complete")|list if report.result and report.result.actions else [] %}
   {% set can_retry = report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
-  {% set can_undo = can_create_ai and report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone %}
+  {% set can_undo = report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone %}
   {% set revise_button_label = "Revise Response" if is_ask else "Revise Plan" %}
   {% set revise_heading = "Revise Response" if is_ask else "Revise Proposal" %}
   {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
@@ -296,6 +303,20 @@
               </div>
             </details>
           {% endif %}
+          {% if report.origin == "api" %}
+            <details data-role="api-submission"
+                     class="rounded-md bg-base-bg">
+              <summary class="cursor-pointer px-3 py-3 text-sm text-base-dark marker:text-kind-default">
+                <span class="font-semibold">External API submission</span>
+              </summary>
+              <div class="flex flex-col gap-2 border-t border-base-light px-3 pb-3 pt-3">
+                <span class="w-fit rounded-full bg-kind-default px-2 py-0.5 text-xs font-semibold text-white">API plan</span>
+                {% if report.instructions %}
+                  <p class="whitespace-pre-wrap text-sm text-base-dark">{{ report.instructions }}</p>
+                {% endif %}
+              </div>
+            </details>
+          {% endif %}
           {% if report.pending or report.error or report.status in ["running", "failed"] or (not is_ask and not report.proposal) %}
             <div data-role="report-status" class="flex flex-col gap-1">
               <h2 class="text-base font-semibold text-base-dark">Status</h2>
@@ -328,7 +349,7 @@
               <h2 class="text-base font-semibold text-base-dark">Answer</h2>
               {% if report.properties.proposal.answer_html %}
                 <div data-role="ask-answer-html"
-                     class="html-content text-base-dark">{{ report.properties.proposal.answer_html|safe }}</div>
+                     class="html-content text-base-dark">{{ report.properties.proposal.answer_html|safe_html }}</div>
               {% else %}
                 <p data-role="ask-answer-summary" class="text-base-dark">{{ report.proposal.summary or report.summary or report.note }}</p>
               {% endif %}
@@ -527,7 +548,7 @@
             </form>
           {% endif %}
 
-          {% if can_create_ai and ((report.status == "ready" and executable_actions) or can_retry) %}
+          {% if (report.status == "ready" and executable_actions) or can_retry %}
             <form method="post"
                   action="{{ url_for('tools.run_report', key=report.urlsafe_key) }}"
                   data-role="{{ 'retry-report-form' if can_retry else 'run-report-form' }}"
@@ -537,10 +558,10 @@
                 <div data-role="error"
                      data-visible="true"
                      data-kind="error"
-                     class="{{ styles.message }}">{{ report.error }}</div>
+                     class="{{ styles.message }} mb-4">{{ report.error }}</div>
               {% endif %}
               <button type="submit"
-                      data-kind="report"
+                      data-kind="{{ 'report' if can_retry else 'success' }}"
                       class="{{ styles.button.submit }}">{{ "Retry Proposal" if can_retry else "" }}</button>
             </form>
           {% endif %}

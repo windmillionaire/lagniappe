@@ -1,7 +1,7 @@
 from flask import abort, request, g, make_response
 
 from flask_login import current_user
-from lagniappe.core.definitions import AI, Action, Fetch, Resource
+from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.properties.notification_aggregate import counts as aggregate_counts
@@ -14,7 +14,7 @@ from lagniappe.core.tools.polling.projections import (
     render_operation_statuses,
 )
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
-from lagniappe.web.auth import home_permission, logged_in, require_ai_access
+from lagniappe.web.auth import home_permission, logged_in
 from lagniappe.web import responses
 
 from . import home, internal
@@ -33,12 +33,15 @@ def home_page():
 # @testable true
 # @tests tests_e2e/002_home/test_002a_home.py::test_tasks_prefetch
 # @tests tests_e2e/002_home/test_002a_home.py::test_model_lists_load_on_toggle
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
 # @matrix home : category-list lazy-load prefetch project-list task-count task-list
+# @pair ai-report:provider-independent-history
 @internal.route("/get/<kind>")
 @home_permission()
 def get(kind):
-    if kind == "tools":
-        require_ai_access(AI.ASK)
+    if kind == "tools" and getattr(current_user, "is_public", False):
+        abort(403)
     home = Entities.HOME()
     section = home.section(kind, **request.args)
     if kind == "tools":

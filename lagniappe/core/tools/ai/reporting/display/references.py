@@ -279,7 +279,9 @@ class ProposalReferenceResolver:
         actions = self.value.get("actions") if isinstance(self.value, dict) else []
         references = []
         for action in actions or []:
-            references.extend(self.entity_reference_values(action.get("data") or {}))
+            data = action.get("data") or {}
+            references.extend(self.entity_reference_values(data))
+            references.extend(self.opaque_submission_references(data.get("submission")))
         if not references:
             return {}
 
@@ -290,6 +292,28 @@ class ProposalReferenceResolver:
             if getattr(entity, "urlsafe_key", None) and getattr(entity, "name", None)
         }
 
+    # @testable false
+    # @covered-by lagniappe/core/tools/ai/reporting/display/references.py::ProposalReferenceResolver.entity_details
+    # @reason entity_details owns recursive discovery of normalized submission references
+    def opaque_submission_references(self, value):
+        """Collect possible normalized entity ids for schema-aware projection."""
+        if isinstance(value, dict):
+            references = []
+            for child in value.values():
+                references.extend(self.opaque_submission_references(child))
+            return references
+        if isinstance(value, list):
+            references = []
+            for child in value:
+                references.extend(self.opaque_submission_references(child))
+            return references
+        if self.reference_is_opaque(value):
+            return [value]
+        return []
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/ai/reporting/display/references.py::ProposalReferenceResolver.entity_details
+    # @reason entity_details owns persisted reference projection and its tests
     def entity_detail(self, entity):
         detail = {
             "label": entity.name,
@@ -298,6 +322,11 @@ class ProposalReferenceResolver:
         category = self.entity_category_label(entity)
         if category:
             detail["category"] = category
+        schema = getattr(entity, "schema", None)
+        if not isinstance(schema, list):
+            schema = getattr(getattr(entity, "form", None), "schema", None)
+        if isinstance(schema, list):
+            detail["schema"] = schema
         return detail
 
     def entity_category_label(self, entity):

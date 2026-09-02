@@ -11,6 +11,8 @@ from io import BytesIO
 from uuid import uuid4
 
 import pytest
+from jinja2 import Undefined
+from markupsafe import Markup
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
@@ -19,10 +21,24 @@ from lagniappe.core.tools.cache.core import cache as redis_cache
 from lagniappe.core.tools.cache.keys import Search
 from lagniappe.core.tools.database.core import DATA
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.files.html import sanitize_html
+from lagniappe.web.start.jinja import render_safe_html
 
 pytestmark = pytest.mark.e2e
 
 FIELD_ID = "input-lifecycle-text"
+
+
+# @matrix templates security : safe-html strict-filter
+def test_safe_html_filter_rejects_untyped_values():
+    safe = sanitize_html("<strong>safe</strong>")
+    assert render_safe_html(safe) == Markup("<strong>safe</strong>")
+
+    hostile = "<script>secret-value</script>"
+    for value in (hostile, Markup(hostile), None, Undefined(name=hostile)):
+        with pytest.raises(TypeError) as error:
+            render_safe_html(value)
+        assert "secret-value" not in str(error.value)
 
 
 def _name(label):

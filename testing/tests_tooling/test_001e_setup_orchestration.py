@@ -39,6 +39,7 @@ CLI_MODES = (
     pytest.param(["ai-email"], "ai-email", id="ai-email"),
     pytest.param(["security"], "security", id="security"),
     pytest.param(["jobs"], "jobs", id="jobs"),
+    pytest.param(["monitoring"], "monitoring", id="monitoring"),
     pytest.param(["handoff"], "handoff", id="handoff"),
     pytest.param(["update"], "update", id="update"),
     pytest.param(["upgrade"], "upgrade", id="upgrade"),
@@ -286,6 +287,8 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
     output = capsys.readouterr().out
     assert "Wrapping up installation..." in output
     assert "Deployment complete!" in output
+    assert "every Gunicorn worker adds application memory use" in output
+    assert "limits F2 and B2 to three workers" in output
     assert output.index("Deployment complete!") < output.index("Setup complete!")
     assert "Manual deployment steps:" not in output
 
@@ -306,6 +309,7 @@ def test_default_install_only_prints_manual_deployment_steps_when_declined(
     assert "Review the generated YAML files" in output
     assert "index.yaml --project project-1" in output
     assert "lagniappe.yaml --project project-1" in output
+    assert "Then reconcile memory monitoring: ./setup.sh monitoring" in output
     assert "Wrapping up installation..." not in output
     assert "deploy_to_app_engine" not in events
 
@@ -1254,10 +1258,12 @@ def test_cli_subprocess_routes_every_mode_and_returns_status(arguments, entry_po
     status = 7
     result = _run_cli(arguments, status=status)
 
-    expected_status = 1 if entry_point == "jobs" else status
+    expected_status = (
+        1 if entry_point == "jobs" else 0 if entry_point == "monitoring" else status
+    )
     assert result.returncode == expected_status
     assert f"CALL {entry_point}" in result.stdout
-    if entry_point == "jobs":
+    if entry_point in {"jobs", "monitoring"}:
         assert "CALL verify" in result.stdout
 
 

@@ -53,6 +53,10 @@ def _parser():
         help="Configure deferred-job recovery after deploying the app",
     )
     commands.add_parser(
+        "monitoring",
+        help="Reconcile App Engine memory monitoring after deployment",
+    )
+    commands.add_parser(
         "update",
         help="Update with new settings",
     )
@@ -83,7 +87,9 @@ def _parser():
         "prepare", help="Prepare one automatic Google backup as a manual backup"
     )
     backup_prepare.add_argument("backup_id", metavar="BACKUP_ID")
-    backup_delete = backup_commands.add_parser("delete", help="Delete one manual backup")
+    backup_delete = backup_commands.add_parser(
+        "delete", help="Delete one manual backup"
+    )
     backup_delete.add_argument("backup_id", metavar="BACKUP_ID")
 
     archive = commands.add_parser(
@@ -175,7 +181,10 @@ def _prepare_setup_dependencies(args):
             raise SetupError(str(error)) from error
         return
 
-    from installer.package_install import ensure_pip_is_available, ensure_setup_dependencies
+    from installer.package_install import (
+        ensure_pip_is_available,
+        ensure_setup_dependencies,
+    )
 
     ensure_pip_is_available()
     ensure_setup_dependencies()
@@ -251,6 +260,14 @@ def _dispatch(args):
         from installer.gcloud import create_deferred_job_reconciler
 
         return create_deferred_job_reconciler()
+    if command == "monitoring":
+        from installer.verify import prepare_existing_installation
+
+        prepare_existing_installation()
+        from installer.monitoring import reconcile_memory_alert
+
+        reconcile_memory_alert()
+        return True
     if command == "update":
         from installer.upgrade import update
 
@@ -309,6 +326,7 @@ def _dispatch(args):
         return 0
     if command == "restore":
         from installer.data_lifecycle.restore import restore_backup
+
         if args.dry_run:
             from installer.verify import validate_installation
 

@@ -5,12 +5,9 @@ from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai, filters
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
-from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.definitions import (
     AI,
     Action,
-    DeferredJobSpec,
-    DeferredJobType,
     MutationIntent,
     Resource,
 )
@@ -185,72 +182,3 @@ def delete(key, **kwargs):
     Entities.delete(category)
 
     return responses.ok()
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/categories/main.py::create_pages
-# @reason prompt data assembly is part of the generated-pages workflow
-def page_generation_data(category, form, form_data, user):
-    return {
-        "category_name": category.name,
-        "category_description": category.description,
-        "category_id": category.urlsafe_key,
-        "form_id": form.urlsafe_key if form else None,
-        "user_request": form_data.get("user_description"),
-        "num_pages": form_data.get("num_pages"),
-        "form_schema": form.schema if form else None,
-        "user": user,
-    }
-
-
-# @testable true
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_explain_prompt_from_category_tools
-# @matrix pages : ai-form explain-button generate
-@categories.route("<key>/generate-pages", methods=["POST"])
-@permission(Resource.CATEGORY, Action.EDIT)
-def create_pages(key, **kwargs):
-    require_ai_access(AI.CREATE)
-
-    category = kwargs["entity"]
-    explain = request.form.get("role") == "explain"
-    form_key = request.form.get("form")
-    try:
-        form = SubmittedReferenceResolver(current_user, form_key).one(
-            form_key,
-            expected=Entities.FORM,
-            action=Action.VIEW,
-            predicate=lambda candidate: candidate.form_type == "page",
-        )
-    except exceptions.ValidationError as error:
-        return responses.error(str(error))
-    fields = request.form.to_dict(flat=True)
-    operation_id = fields.pop("operation-id", None)
-
-    if explain:
-        generate_data = page_generation_data(category, form, fields, current_user)
-        return responses.explain(ai.page_generation_prompt(**generate_data))
-
-    job, notification = DeferredJobs.start(
-        DeferredJobSpec(
-            job_type=DeferredJobType.PAGE_GENERATION,
-            actor=current_user._get_current_object(),
-            idempotency_key=operation_id,
-            inputs={"category": category, "form": form},
-            parameters={"fields": fields},
-            notification_body="Generating pages...",
-            notification_target=category,
-            client={
-                "key": category.urlsafe_key,
-                "source_widget": "GeneratePages",
-                "destination": "table:IndexTable",
-            },
-        )
-    )
-
-    return responses.json_response(
-        {
-            "deferred": True,
-            "operation": job.urlsafe_key,
-            "notification": responses.notification_item(notification),
-        }
-    )

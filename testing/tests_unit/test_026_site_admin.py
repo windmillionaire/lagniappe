@@ -102,12 +102,22 @@ def test_public_document_rewrites_only_embedded_page_images():
 
     html, candidates = public_pages.public_document_html(
         page,
-        lambda image: f"/pages/public/id/images/{image.name}.png",
+        lambda image: f"/pages/public/public-id/images/{image.name}.png",
     )
 
-    assert "/pages/public/id/images/image_first.png" in html
-    assert "https://example.com/external.jpg" in html
+    assert "/pages/public/public-id/images/image_first.png" in html
+    assert "https://example.com/external.jpg" not in html
     assert [image.name for image in candidates] == ["image_first"]
+
+    forged, _ = public_pages.public_document_html(
+        page,
+        lambda image: (
+            f"https://attacker.test/pages/public/public-id/images/{image.name}.png"
+        ),
+        public_origin="https://site.test/pages/public/public-id",
+    )
+
+    assert "<img" not in forged
 
 
 # @matrix public-pages : metadata privacy social-preview
@@ -130,14 +140,18 @@ def test_public_metadata_uses_safe_fallbacks_and_selected_document_image(monkeyp
         page,
         canonical_url="https://site.test/pages/public/id",
         site_image_url="https://site.test/images/logo.png",
-        public_image_url=lambda image: f"https://site.test/public/{image.name}.png",
+        public_image_url=lambda image: (
+            f"https://site.test/pages/public/public-id/images/{image.name}.png"
+        ),
         indexing=True,
     )
 
     assert result["title"] == "Internal Name"
     assert result["description"] == "A document-only description."
     assert "Must not leak" not in result.values()
-    assert result["image"] == "https://site.test/public/image_first.png"
+    assert result["image"] == (
+        "https://site.test/pages/public/public-id/images/image_first.png"
+    )
     assert result["image_alt"] == "Diagram"
     assert result["robots"] == "index, follow"
 
@@ -228,7 +242,9 @@ def test_sitemap_xml_is_sorted_deduped_and_fails_closed_at_limit(monkeypatch):
 
 
 # @matrix public-pages public-directory : active category description opt-out public-url sorting
-def test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents(monkeypatch):
+def test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents(
+    monkeypatch,
+):
     alpha = SimpleNamespace(urlsafe_key="alpha-key", name="Alpha")
     fetch_requests = []
     pages = [
@@ -378,12 +394,18 @@ def test_deployment_settings_merge_live_values_over_runtime_defaults(monkeypatch
         "deployment",
         lambda: {"DEPLOY_WORKER_COUNT": "7", "version": 2},
     )
-    monkeypatch.setattr(site_admin, "normalize_deployment_settings", dict)
+    normalization = []
+    monkeypatch.setattr(
+        site_admin,
+        "normalize_deployment_settings",
+        lambda values, **kwargs: normalization.append(kwargs) or dict(values),
+    )
 
     settings = site_admin.load_deployment_settings(config=config)
 
     assert settings["DEPLOY_WORKER_COUNT"] == "7"
     assert "version" not in settings
+    assert normalization == [{"enforce_worker_limit": False}]
 
 
 # @matrix admin : ai-settings config metadata
@@ -459,7 +481,9 @@ def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
         "get_migration_status",
         lambda: report,
     )
-    monkeypatch.setattr(cache_rebuild.cache, "delete_cache", lambda: deleted.append(True))
+    monkeypatch.setattr(
+        cache_rebuild.cache, "delete_cache", lambda: deleted.append(True)
+    )
     monkeypatch.setattr(
         cache_rebuild.database_get, "all_models", lambda: iter(["one", "two"])
     )
@@ -553,7 +577,9 @@ def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
     )
     monkeypatch.setattr(cache_rebuild.cache, "delete_cache", lambda: None)
     monkeypatch.setattr(cache_rebuild.database_get, "all_models", lambda: iter([group]))
-    monkeypatch.setattr(cache_rebuild.database_get, "all_instances", lambda: iter([page]))
+    monkeypatch.setattr(
+        cache_rebuild.database_get, "all_instances", lambda: iter([page])
+    )
     monkeypatch.setattr(cache_rebuild.database_get, "all_files", lambda: iter(()))
     monkeypatch.setattr(cache_rebuild.database_get, "all_users", lambda: iter([user]))
     monkeypatch.setattr(

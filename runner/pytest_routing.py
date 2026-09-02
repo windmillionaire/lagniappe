@@ -23,6 +23,7 @@ SETUP_TEST_GROUPS = {
         "testing/tests_tooling/test_001f_setup_portability.py",
         "testing/tests_tooling/test_001g_setup_release_readiness.py",
         "testing/tests_tooling/test_001h_setup_ai_email.py",
+        "testing/tests_tooling/test_001i_setup_monitoring.py",
     ),
     "setup_drift": ("testing/tests_tooling/test_001d_setup_drift.py",),
     "setup_provider": (
@@ -92,9 +93,7 @@ def pytest_addoption(parser) -> None:
 # @matrix setup testing : pytest-markers
 def normalize_marker_expression(expression: str) -> str:
     """Expand the documented provider marker alias without substring matches."""
-    return _PROVIDER_MARKER_PATTERN.sub(
-        "(setup_drift or setup_provider)", expression
-    )
+    return _PROVIDER_MARKER_PATTERN.sub("(setup_drift or setup_provider)", expression)
 
 
 # @testable true
@@ -119,9 +118,7 @@ def _consume_runner_separator(arguments: list[str]) -> list[str]:
 
 # @testable false
 # @covered-by runner/pytest_routing.py::normalize_pytest_invocation
-def _expand_targets(
-    targets: list[str], marker_expression: str
-) -> tuple[str, ...]:
+def _expand_targets(targets: list[str], marker_expression: str) -> tuple[str, ...]:
     aliases = [target for target in targets if target in TEST_SUITE_ALIASES]
     explicit = [target for target in targets if target not in TEST_SUITE_ALIASES]
     if aliases and explicit:
@@ -165,9 +162,7 @@ def _target_path(target: str, repository_root: Path) -> Path:
 # @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_routes_registered_option_values
 # @tests tests_tooling/test_007_run_py_test_command.py::test_normalized_targets_control_actual_pytest_collection
 # @matrix testing : cli-routing target-selection
-def targets_include_e2e(
-    targets: tuple[str, ...], repository_root: Path
-) -> bool:
+def targets_include_e2e(targets: tuple[str, ...], repository_root: Path) -> bool:
     """Return whether targets collect from or above the repository E2E root."""
     e2e_root = (repository_root / "testing/tests_e2e").resolve()
     for target in targets:
@@ -196,8 +191,7 @@ def normalize_pytest_invocation(
 
     routed_args = _consume_runner_separator(test_args)
     indexed_args = [
-        _IndexedArgument(argument, index)
-        for index, argument in enumerate(routed_args)
+        _IndexedArgument(argument, index) for index, argument in enumerate(routed_args)
     ]
     parser_args = [
         "-c",
@@ -232,8 +226,7 @@ def normalize_pytest_invocation(
         }
         if disabled_plugins.intersection(reserved_plugins):
             raise PytestRoutingError(
-                "run.py's routing and traceability pytest plugins cannot be "
-                "disabled"
+                "run.py's routing and traceability pytest plugins cannot be disabled"
             )
         if bool(getattr(namespace, "pyargs", False)):
             raise PytestRoutingError(
@@ -264,9 +257,7 @@ def normalize_pytest_invocation(
         marker_expression = normalize_marker_expression(
             str(getattr(config.option, "markexpr", "") or "")
         )
-        normalized_targets = _expand_targets(
-            requested_targets, marker_expression
-        )
+        normalized_targets = _expand_targets(requested_targets, marker_expression)
 
         passthrough = [
             str(argument)
@@ -279,16 +270,12 @@ def normalize_pytest_invocation(
             if requested_targets
             else tuple(str(target) for target in config.args)
         )
-        strict_relations = bool(
-            getattr(config.option, "strict", False)
-        )
+        strict_relations = bool(getattr(config.option, "strict", False))
         return PytestInvocation(
             pytest_args=pytest_args,
             collection_targets=collection_targets,
             strict_relations=strict_relations,
-            includes_e2e=targets_include_e2e(
-                collection_targets, repository_root
-            ),
+            includes_e2e=targets_include_e2e(collection_targets, repository_root),
         )
     finally:
         if config is not None:

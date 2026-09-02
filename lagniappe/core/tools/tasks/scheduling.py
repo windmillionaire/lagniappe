@@ -3,6 +3,8 @@
 import hashlib
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
+from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, MO, rrule
+from dateutil.rrule import weekday as rrule_weekday
 from flask import url_for
 
 from lagniappe import CONFIG
@@ -36,10 +38,9 @@ def scheduled_uncomplete_time():
     return tomorrow_user.astimezone(timezone.utc)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::get_next_recurring_date
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::get_next_periodic_date
-# @reason interval stepping is owned by next recurring/periodic due-date helpers
+# @testable true
+# @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_recurring_due_date_preserves_interval_semantics
+# @matrix task-scheduling : recurring periodic interval-semantics
 def calculate_next_recurring_due_date(date, recurring):
     """Add one interval (day/week/month/year) to a date using a recurring config."""
     if not recurring or not date:
@@ -67,180 +68,150 @@ def calculate_next_recurring_due_date(date, recurring):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::get_next_scheduled_date
-# @reason scheduled occurrence stepping is owned by next scheduled due-date helper
-def calculate_next_scheduled_due_date(due_date, scheduled):
-    """Calculate the next occurrence after due_date for a scheduled config (daily/weekly/monthly/yearly)."""
-    mode = scheduled.get("mode")
-
-    if mode == "daily":
-        # Next day after now
-        next_date = due_date + timedelta(days=1)
-        return next_date
-
-    elif mode == "weekly":
-        days = scheduled.get("days", [])
-
-        # Find next occurrence of any of the selected days
-        current_date = due_date
-        for i in range(1, 8):  # Check next 7 days
-            check_date = current_date + timedelta(days=i)
-            weekday = check_date.weekday()  # 0=Monday, 1=Tuesday, etc.
-            if weekday in days:
-                return check_date
-
+# @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_next_scheduled_due_date
+# @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_skipped_scheduled_tasks
+# @reason private validation and translation are exercised by scheduled stepping and skipped counting
+def _scheduled_rrule_args(scheduled):
+    """Translate a valid stored calendar schedule into ``rrule`` arguments."""
+    if not isinstance(scheduled, dict):
         return None
 
-    elif mode == "monthly":
-        return calculate_next_monthly_occurrence(due_date, scheduled)
+    mode = scheduled.get("mode")
+    if mode == "daily":
+        return DAILY, {}
 
-    elif mode == "yearly":
-        return calculate_next_yearly_occurrence(due_date, scheduled)
+    if mode == "weekly":
+        days = scheduled.get("days")
+        if not isinstance(days, list) or not days:
+            return None
+        if any(type(day) is not int or not 0 <= day <= 6 for day in days):
+            return None
+        return WEEKLY, {
+            "wkst": MO,
+            "byweekday": tuple(rrule_weekday(day) for day in sorted(set(days))),
+        }
 
-    return None
+    if mode not in {"monthly", "yearly"}:
+        return None
+
+    schedule_type = scheduled.get("type")
+    if schedule_type == "specific_day":
+        day = scheduled.get("day")
+        if type(day) is not int or not 1 <= day <= 31:
+            return None
+        arguments = {"bymonthday": day}
+    elif schedule_type == "first_day":
+        arguments = {"bymonthday": 1}
+    elif schedule_type == "last_day":
+        arguments = {"bymonthday": -1}
+    elif schedule_type == "ordinal_weekday":
+        ordinal = scheduled.get("ordinal")
+        weekday_number = scheduled.get("weekday")
+        if type(ordinal) is not int or ordinal not in {-1, 1, 2, 3, 4}:
+            return None
+        if type(weekday_number) is not int or not 0 <= weekday_number <= 6:
+            return None
+        arguments = {"byweekday": rrule_weekday(weekday_number)(ordinal)}
+    else:
+        return None
+
+    if mode == "monthly":
+        return MONTHLY, arguments
+
+    month = scheduled.get("month")
+    if type(month) is not int or not 1 <= month <= 12:
+        return None
+
+    if schedule_type == "specific_day":
+        maximum_day = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[
+            month - 1
+        ]
+        if day > maximum_day:
+            return None
+
+    return YEARLY, {"bymonth": month, **arguments}
+
+
+# @testable true
+# @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_scheduled_due_date
+# @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_scheduled_due_date_rejects_invalid_rules
+# @matrix task-scheduling : scheduled calendar-validation exact-boundary timezone
+def calculate_next_scheduled_due_date(due_date, scheduled):
+    """Return the first valid calendar occurrence strictly after ``due_date``."""
+    if not isinstance(due_date, datetime):
+        return None
+
+    translated = _scheduled_rrule_args(scheduled)
+    if translated is None:
+        return None
+
+    frequency, arguments = translated
+    mode = scheduled["mode"]
+    if mode == "yearly":
+        rule_start = datetime(due_date.year, 1, 1, tzinfo=user_timezone())
+    else:
+        rule_start = due_date
+
+    try:
+        next_date = rrule(
+            frequency,
+            dtstart=rule_start,
+            **arguments,
+        ).after(due_date, inc=False)
+    except (TypeError, ValueError):
+        return None
+
+    if next_date is not None and mode != "yearly":
+        next_date = next_date.replace(microsecond=due_date.microsecond)
+    return next_date
 
 
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_find_ordinal_weekday_in_month
 # @pair dates:ordinal-weekday
 def find_ordinal_weekday_in_month(month_start, ordinal, weekday):
-    """Find the nth weekday in a month, or last if ordinal is -1"""
-    if ordinal == -1:
-        # Find last occurrence
-        # Start from last day of month and work backwards
-        last_day = month_start + relativedelta(months=1, days=-1)
-        for i in range(7):
-            check_date = last_day - timedelta(days=i)
-            check_weekday = check_date.weekday()  # 0=Monday, 1=Tuesday, etc.
-            if check_weekday == weekday:
-                return check_date
-    else:
-        # Find nth occurrence
-        count = 0
-        current = month_start
-        while current.month == month_start.month:
-            current_weekday = current.weekday()  # 0=Monday, 1=Tuesday, etc.
-            if current_weekday == weekday:
-                count += 1
-                if count == ordinal:
-                    return current
-            current += timedelta(days=1)
+    """Find the nth weekday in one month, or the last when ordinal is -1."""
+    if not isinstance(month_start, datetime):
+        return None
+    if type(ordinal) is not int or ordinal not in {-1, 1, 2, 3, 4, 5}:
+        return None
+    if type(weekday) is not int or not 0 <= weekday <= 6:
+        return None
 
-    return None
+    occurrence = rrule(
+        MONTHLY,
+        dtstart=month_start,
+        until=month_start + relativedelta(months=1) - timedelta(microseconds=1),
+        byweekday=rrule_weekday(weekday)(ordinal),
+    ).after(month_start, inc=True)
+    if occurrence is None or (occurrence.year, occurrence.month) != (
+        month_start.year,
+        month_start.month,
+    ):
+        return None
+    return occurrence.replace(microsecond=month_start.microsecond)
 
 
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_monthly_occurrence
 # @pair dates:monthly-occurrence
 def calculate_next_monthly_occurrence(due_date, scheduled):
-    """Find the next monthly occurrence after due_date (specific day, first/last, or ordinal weekday)."""
-    schedule_type = scheduled.get("type")
-    # Get beginning of first day of current month
-    month_start = due_date.replace(day=1)
-    day = scheduled.get("day")
-    if schedule_type == "specific_day" and not day:
+    """Find the next monthly calendar occurrence after ``due_date``."""
+    if not isinstance(scheduled, dict):
         return None
-
-    # @testable false
-    # @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_next_monthly_occurrence
-    # @reason specific-day recursion is part of monthly occurrence calculation
-    def _get_next_date(delta=0):
-        next_date = month_start + relativedelta(months=delta)
-        try:
-            next_date = next_date.replace(day=day)
-        except ValueError:
-            return None
-        if next_date > due_date:
-            return next_date
-        return _get_next_date(delta + 1)
-
-    if schedule_type == "specific_day":
-        for delta in range(3):
-            next_date = _get_next_date(delta)
-            if next_date:
-                return next_date
-        return None
-
-    elif schedule_type == "first_day":
-        # First day of next month
-        return month_start + relativedelta(months=1)
-
-    elif schedule_type == "last_day":
-        # Last day of current month if in future, otherwise last day of next month
-        last_day_current = month_start + relativedelta(months=1, days=-1)
-        if last_day_current > due_date:
-            return last_day_current
-        else:
-            return month_start + relativedelta(months=2, days=-1)
-
-    elif schedule_type == "ordinal_weekday":
-        ordinal = scheduled.get("ordinal")
-        weekday = scheduled.get("weekday")
-        if ordinal is None or weekday is None:
-            return None
-
-        # Try current month first
-        next_date = find_ordinal_weekday_in_month(month_start, ordinal, weekday)
-        if next_date and next_date > due_date:
-            return next_date
-
-        # Try next month
-        next_month = month_start + relativedelta(months=1)
-        return find_ordinal_weekday_in_month(next_month, ordinal, weekday)
-
-    return None
+    monthly = {**scheduled, "mode": "monthly"}
+    return calculate_next_scheduled_due_date(due_date, monthly)
 
 
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_yearly_occurrence
 # @pair dates:yearly-occurrence
 def calculate_next_yearly_occurrence(due_date, scheduled):
-    """Find the next yearly occurrence after due_date."""
-    tz = user_timezone()
-    schedule_type = scheduled.get("type")
-    month = scheduled.get("month")
-    day = scheduled.get("day")
-    if not month:
+    """Find the next yearly calendar occurrence after ``due_date``."""
+    if not isinstance(scheduled, dict):
         return None
-    elif schedule_type == "specific_day" and not day:
-        return None
-
-    current_year = due_date.year
-
-    # @testable false
-    # @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_next_yearly_occurrence
-    # @reason year-local occurrence selection is part of yearly occurrence calculation
-    def _get_next_date(year_start, schedule_type, scheduled):
-        next_date = None
-        if schedule_type == "specific_day":
-            try:
-                next_date = datetime(year_start.year, month, day, tzinfo=tz)
-            except ValueError:
-                pass
-        elif schedule_type == "first_day":
-            next_date = year_start
-        elif schedule_type == "last_day":
-            next_date = year_start + relativedelta(months=1, days=-1)
-        elif schedule_type == "ordinal_weekday":
-            ordinal = scheduled.get("ordinal")
-            weekday = scheduled.get("weekday")
-            if ordinal is not None and weekday is not None:
-                next_date = find_ordinal_weekday_in_month(year_start, ordinal, weekday)
-        return next_date
-
-    # Try current year first
-    year_start = datetime(current_year, month, 1, tzinfo=tz)
-    next_date = _get_next_date(year_start, schedule_type, scheduled)
-
-    # If date is in the future, use it
-    if next_date and next_date > due_date:
-        return next_date
-
-    # Otherwise try next year
-    next_year_start = datetime(current_year + 1, month, 1, tzinfo=tz)
-    next_date = _get_next_date(next_year_start, schedule_type, scheduled)
-
-    return next_date
+    yearly = {**scheduled, "mode": "yearly"}
+    return calculate_next_scheduled_due_date(due_date, yearly)
 
 
 # @testable true
@@ -396,10 +367,11 @@ def get_next_periodic_date(starting_due_date, periodic):
 
 # @testable true
 # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled
+# @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_calendar_boundaries
 # @matrix task-scheduling : scheduled skipped
 def calculate_skipped_scheduled_tasks(task, scheduled):
     """Calculate how many times a scheduled task should have been completed between the starting due date and today"""
-    if not scheduled:
+    if _scheduled_rrule_args(scheduled) is None:
         return 0
 
     starting_due_date = get_starting_due_date(task)
@@ -497,63 +469,47 @@ def calculate_skipped_recurring_tasks(task, periodic):
 # @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_skipped_scheduled_tasks
 # @reason monthly occurrence lookup is part of skipped scheduled-task counting
 def calculate_monthly_occurrence_for_date(month_start, scheduled):
-    """Calculate the specific occurrence date for a month"""
-    schedule_type = scheduled.get("type")
+    """Calculate the configured occurrence bounded to one month."""
+    if not isinstance(month_start, datetime) or not isinstance(scheduled, dict):
+        return None
 
-    if schedule_type == "specific_day":
-        day = scheduled.get("day")
-        if day:
-            try:
-                return month_start.replace(day=day)
-            except ValueError:
-                return None
-
-    elif schedule_type == "first_day":
-        return month_start
-
-    elif schedule_type == "last_day":
-        return month_start + relativedelta(months=1, days=-1)
-
-    elif schedule_type == "ordinal_weekday":
-        ordinal = scheduled.get("ordinal")
-        weekday = scheduled.get("weekday")
-        if ordinal is not None and weekday is not None:
-            return find_ordinal_weekday_in_month(month_start, ordinal, weekday)
-
-    return None
+    translated = _scheduled_rrule_args({**scheduled, "mode": "monthly"})
+    if translated is None:
+        return None
+    frequency, arguments = translated
+    occurrence = rrule(
+        frequency,
+        dtstart=month_start,
+        until=month_start + relativedelta(months=1) - timedelta(microseconds=1),
+        **arguments,
+    ).after(month_start, inc=True)
+    if occurrence is None or (occurrence.year, occurrence.month) != (
+        month_start.year,
+        month_start.month,
+    ):
+        return None
+    return occurrence.replace(microsecond=month_start.microsecond)
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_skipped_scheduled_tasks
 # @reason yearly occurrence lookup is part of skipped scheduled-task counting
 def calculate_yearly_occurrence_for_year(year, scheduled):
-    """Calculate the specific occurrence date for a year"""
-    month = scheduled.get("month")
-    tz = user_timezone()
-    if not month:
+    """Calculate the configured occurrence bounded to one year."""
+    if type(year) is not int or not isinstance(scheduled, dict):
         return None
 
-    schedule_type = scheduled.get("type")
-    year_start = datetime(year, month, 1, tzinfo=tz)
-
-    if schedule_type == "specific_day":
-        day = scheduled.get("day")
-        if day:
-            try:
-                return datetime(year, month, day, tzinfo=tz)
-            except ValueError:
-                return None
-
-    elif schedule_type == "first_day":
-        return year_start
-
-    elif schedule_type == "last_day":
-        return year_start + relativedelta(months=1, days=-1)
-
-    elif schedule_type == "ordinal_weekday":
-        ordinal = scheduled.get("ordinal")
-        weekday = scheduled.get("weekday")
-        if ordinal is not None and weekday is not None:
-            return find_ordinal_weekday_in_month(year_start, ordinal, weekday)
-
-    return None
+    translated = _scheduled_rrule_args({**scheduled, "mode": "yearly"})
+    if translated is None:
+        return None
+    frequency, arguments = translated
+    year_start = datetime(year, 1, 1, tzinfo=user_timezone())
+    occurrence = rrule(
+        frequency,
+        dtstart=year_start,
+        until=year_start + relativedelta(years=1) - timedelta(microseconds=1),
+        **arguments,
+    ).after(year_start, inc=True)
+    if occurrence is None or occurrence.year != year:
+        return None
+    return occurrence

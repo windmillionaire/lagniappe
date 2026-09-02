@@ -76,7 +76,7 @@
         <span>Manual</span>
       </span>
     </a>
-    {% if current_user.access(AI.ASK) %}
+    {% if not current_user.is_public %}
       <div id="tools"
            lp-component
            data-open="false"
@@ -100,18 +100,21 @@
               <span class="sr-only">Loading</span>
             </span>
           </button>
-          <button type="button"
-                  lp-show="tools:CreateToolReport"
-                  data-toggle="true"
-                  aria-label="Create tool report"
-                  title="Create tool report"
-                  class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
+          {% if current_user.access(AI.ASK) %}
+            <button type="button"
+                    lp-show="tools:CreateToolReport"
+                    data-toggle="true"
+                    aria-label="Create tool report"
+                    title="Create tool report"
+                    class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
+          {% endif %}
         </div>
-        {{ tools.create_report() }}
+        {% if current_user.access(AI.ASK) %}
+          {{ tools.create_report() }}
+        {% endif %}
         <ul lp-load
             data-widget="ToolReportList"
             data-route='{{ url_for("internal.get", kind="tools") }}'
-            data-if-empty="CreateToolReport"
             data-visible="false">
         </ul>
       </div>

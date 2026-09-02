@@ -16,6 +16,7 @@ TEXT_MIMETYPES = {
     "yml": "text/yaml",
     "csv": "text/csv",
     "rtf": "application/rtf",
+    "vcf": "text/vcard",
 }
 
 CODE_MIMETYPES = {

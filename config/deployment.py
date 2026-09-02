@@ -5,6 +5,10 @@ class ConfigDeploymentSettingsError(ValueError):
     """Raised when deployment settings cannot be applied safely."""
 
 
+MEMORY_SAFE_WORKER_CLASSES = frozenset({"F2", "B2"})
+MEMORY_SAFE_WORKER_LIMIT = 3
+
+
 # @testable false
 # @covered-by config/deployment.py::normalize_deployment_settings
 # @reason avoids importing the app package while setup creates config files
@@ -40,8 +44,8 @@ def _deployment_int(settings, defaults, key, label, min_value=1):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_normalize_validation
-# @matrix config user-settings : app-yaml deployment-settings validation
-def normalize_deployment_settings(deployment_settings):
+# @matrix config user-settings : app-yaml deployment-settings memory-pressure validation
+def normalize_deployment_settings(deployment_settings, *, enforce_worker_limit=True):
     from config import constants
 
     DeploymentSettingsError = _deployment_settings_error_class()
@@ -86,6 +90,16 @@ def normalize_deployment_settings(deployment_settings):
             f"{scaling_type.title()} scaling requires one of: {', '.join(valid_classes)}."
         )
 
+    if (
+        enforce_worker_limit
+        and instance_class in MEMORY_SAFE_WORKER_CLASSES
+        and int(worker_count) > MEMORY_SAFE_WORKER_LIMIT
+    ):
+        raise DeploymentSettingsError(
+            f"{instance_class} supports at most {MEMORY_SAFE_WORKER_LIMIT} "
+            "Lagniappe workers because each worker adds application memory use."
+        )
+
     if scaling_type == "automatic" and int(min_idle_instances) > int(max_instances):
         raise DeploymentSettingsError(
             "Minimum idle instances cannot exceed max instances."
@@ -105,7 +119,13 @@ def normalize_deployment_settings(deployment_settings):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_config
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config
 # @matrix config : app-yaml deployment-settings
-def apply_deployment_settings(app_config=None, app_settings=None, updated_settings=None):
+def apply_deployment_settings(
+    app_config=None,
+    app_settings=None,
+    updated_settings=None,
+    *,
+    enforce_worker_limit=True,
+):
     from config import constants
 
     try:
@@ -123,7 +143,9 @@ def apply_deployment_settings(app_config=None, app_settings=None, updated_settin
         deployment_settings = app_settings
         if app_config is None:
             if SETTINGS is None:
-                raise RuntimeError("SETTINGS is required when app config is not provided.")
+                raise RuntimeError(
+                    "SETTINGS is required when app config is not provided."
+                )
             target_app_config = SETTINGS.DEPLOY
         else:
             target_app_config = app_config
@@ -132,7 +154,9 @@ def apply_deployment_settings(app_config=None, app_settings=None, updated_settin
         deployment_settings = updated_settings
         if app_config is None:
             if SETTINGS is None:
-                raise RuntimeError("SETTINGS is required when app config is not provided.")
+                raise RuntimeError(
+                    "SETTINGS is required when app config is not provided."
+                )
             target_app_config = SETTINGS.DEPLOY
         else:
             target_app_config = app_config
@@ -143,7 +167,10 @@ def apply_deployment_settings(app_config=None, app_settings=None, updated_settin
         else:
             target_app_settings = {}
 
-    settings = normalize_deployment_settings(deployment_settings)
+    settings = normalize_deployment_settings(
+        deployment_settings,
+        enforce_worker_limit=enforce_worker_limit,
+    )
     target_app_settings.update(settings)
 
     target_app_config["runtime"] = constants.RUNTIME

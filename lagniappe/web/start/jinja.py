@@ -9,6 +9,7 @@ from markupsafe import Markup, escape
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI, Action, Resource
 from lagniappe.core.tools import cache, dates
+from lagniappe.core.tools.files.html import SafeHTML
 
 from . import formatters, styles
 
@@ -66,6 +67,16 @@ def _date(value):
 # @reason Flask/Jinja filters are exercised through rendered E2E pages
 def yesno(value):
     return "true" if value else "false"
+
+
+# @testable true
+# @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_safe_html_filter_rejects_untyped_values
+# @matrix templates security : safe-html strict-filter
+def render_safe_html(value):
+    """Expose only policy-stamped HTML at an explicit Jinja raw sink."""
+    if not isinstance(value, SafeHTML):
+        raise TypeError(f"safe_html requires SafeHTML, got {type(value).__name__}")
+    return Markup(str(value))
 
 
 # @testable false
@@ -160,8 +171,10 @@ def initialize(app):
             "format_number": formatters.format_number,
             "format_date_as_input_string": dates.format_date_as_input_string,
             "yesno": yesno,
+            "safe_html": render_safe_html,
         }
     )
+    app.jinja_env.filters.pop("safe", None)
     app.jinja_env.globals.update(
         {
             "CONFIG": CONFIG,

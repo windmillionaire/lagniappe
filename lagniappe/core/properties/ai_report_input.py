@@ -13,8 +13,20 @@ class UploadManifest(DBProperty):
 
 
 # @testable true
+# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
+# @pair agent-api:report-session
+class AgentManifest(DBProperty):
+    """Versioned, non-transcript metadata for an external plan workspace."""
+
+    _id = "agent_manifest"
+    json = True
+
+
+# @testable true
 # @tests tests_unit/test_028_ai_email.py::test_email_report_shape_preserves_safe_inbound_display_fields
+# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
 # @matrix ai-email ai-report : legacy-default origin
+# @pair agent-api:origin
 class Origin(DBProperty):
     """How the initial report was submitted; legacy reports are web-origin."""
 
@@ -27,8 +39,8 @@ class Origin(DBProperty):
     @value.setter
     def value(self, value):
         normalized = str(value or "web").strip().casefold()
-        if normalized not in {"web", "email"}:
-            raise ValueError("AI report origin must be web or email")
+        if normalized not in {"web", "email", "api"}:
+            raise ValueError("AI report origin must be web, email, or api")
         DBProperty.value.fset(self, normalized)
 
 

@@ -364,7 +364,14 @@ def _undo_summarize_file(action, user):
     previous = before.get("summarize") or {}
     file.summary = before.get("summary")
     summarize = file.properties.summarize
-    for name in ("enabled", "search", "status", "error", "complete"):
+    for name in (
+        "enabled",
+        "search",
+        "status",
+        "error",
+        "complete",
+        "retrieval_terms",
+    ):
         setattr(summarize, name, previous.get(name))
     Entities.save(file)
     return {
