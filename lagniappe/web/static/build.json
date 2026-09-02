@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "build_id": "b506293e",
-  "mode": "development",
+  "build_id": "ba4f5c4c",
+  "mode": "production",
   "version": "1.1.0",
   "source": {
     "sha256": "f209b323109f0906f617d28172ec19d03f8f66021fa102126b9ffc0d9581ecd5"
@@ -19,648 +19,648 @@
     },
     {
       "path": "lagniappe/web/static/chunks/activity.js",
-      "sha256": "af3adb89c74f072e66e89964e0815dda77b02cb005d4c6ad795b9da65dde2f8c",
-      "size": 5070
+      "sha256": "81f6f3d5041fac4d2636baa294030eafae8cd217159e8d8187a2a87251a72a37",
+      "size": 3663
     },
     {
       "path": "lagniappe/web/static/chunks/addImage.js",
-      "sha256": "2440c293ad53ba3774ade8f9f8a23a4646488f770d457443683d7d795db1cc2f",
-      "size": 3834
+      "sha256": "494b7119c511172795fb2585146cb21491cdff8ce1f1344405575446da3076f1",
+      "size": 3085
     },
     {
       "path": "lagniappe/web/static/chunks/addLink.js",
-      "sha256": "b00edd4246ed2dbe4dbbc8de6c8cf727acae5ee3b2a2353ff6a41224f3407fe0",
-      "size": 8685
+      "sha256": "8f6290633299f22befa3c6dfadc177940b63e30b83ece6380a2ac87857d5e685",
+      "size": 6134
     },
     {
       "path": "lagniappe/web/static/chunks/addYouTube.js",
-      "sha256": "6b67d3a29e4ad1680674b16d98c43da140b78d7035b1a89450a4ec3cf703aadd",
-      "size": 1898
+      "sha256": "df56747a690c853a6b3f2040176c82fba865f3d894cdba9ac0c84a246f8a117e",
+      "size": 1817
     },
     {
       "path": "lagniappe/web/static/chunks/administrators.js",
-      "sha256": "c713b18a2615cb2e06d63aa309a7a15b6add6def19b35a622c16ca58694e2ed0",
-      "size": 6261
+      "sha256": "eff2cd6482c69054082d2a92855978dda58375bc682b21ee4f2d133561b312ac",
+      "size": 4881
     },
     {
       "path": "lagniappe/web/static/chunks/aiModels.js",
-      "sha256": "818489d1d52ed62484a4027ca06d48953b1bba8f64fb44ee801effdc2e11b405",
-      "size": 6227
+      "sha256": "de93e54e3096337e371b8983ef220b17fae0ccf99dc17ef58433e5e2946bbd7a",
+      "size": 4468
     },
     {
       "path": "lagniappe/web/static/chunks/analytics.js",
-      "sha256": "e540f48a48ea9ba1b90c7e04ea85072840cb767ef8b8dc1df094a1f1c065df84",
-      "size": 3488
+      "sha256": "4fbc309440c92c7814614c762f43966b9e98b76c0eab93b0ff622d8830f786e3",
+      "size": 1934
     },
     {
       "path": "lagniappe/web/static/chunks/base.js",
-      "sha256": "72adeb8a04a936ec8645374fca6cfa450545314bc5b1d4df5252ff82a46795ab",
-      "size": 934
+      "sha256": "3af5cad3c7fce50f6a4e264a0543756909c191062894cac0f7ad94cb93267ffc",
+      "size": 917
     },
     {
       "path": "lagniappe/web/static/chunks/base2.js",
-      "sha256": "2b5e72192056b1e3698280920c1302499c473610b0074e10676bab3ed9064788",
-      "size": 7037
+      "sha256": "a2dd2d865d6f0939b2bd3fd68f8c3b972d721b0b667583af733b65d7eeae7c6f",
+      "size": 5093
     },
     {
       "path": "lagniappe/web/static/chunks/baseElement.js",
-      "sha256": "c9311d319fc4a4ea08565a9a60916cb2706cb312300ca576388c5b4e7cea135b",
-      "size": 7684
+      "sha256": "8f694a0c7654acede509cb82455714f3c643d1abb976bb3fdf7ccd8ad1f91dee",
+      "size": 5261
     },
     {
       "path": "lagniappe/web/static/chunks/baseForm.js",
-      "sha256": "c6b69af33a56d13a2a30fe31e43a790871455afabc7ec8a0c85813194921c8ff",
-      "size": 18243
+      "sha256": "e2335d9795a455a8fc71d0190e4068649004a97a1b54942b9b010e07e00b0954",
+      "size": 12175
     },
     {
       "path": "lagniappe/web/static/chunks/baseList.js",
-      "sha256": "2b69f4cfefbe5bffd36f412d602833e1cc735d0bd136b55cbfe616430b31b177",
-      "size": 2136
+      "sha256": "a24be40f8a3aa815a55836b6d1ec47b91ee49ed1c76c64d358099fa498276e35",
+      "size": 1991
     },
     {
       "path": "lagniappe/web/static/chunks/baseUpload.js",
-      "sha256": "6238f589d54c7dab9fd61e64cd16980d93f6539ffef079cba02dd57b8496aeeb",
-      "size": 39910
+      "sha256": "ff8c8e6074f63840916e383fca219f0e0109eb4746c9c9fce640ed5609aa1c57",
+      "size": 21046
     },
     {
       "path": "lagniappe/web/static/chunks/bookmark.js",
-      "sha256": "9aefabac15726ec62b829311c8dcd3ca636f04ca86c17a2f4128b35c9f976c52",
-      "size": 3230
+      "sha256": "0f0fe1154004a6b4bac8968b19de24f9522b49b07d8e319f65403580ca5c416c",
+      "size": 2782
     },
     {
       "path": "lagniappe/web/static/chunks/builder.js",
-      "sha256": "b966dcd559b684aefc15ff862bf5e2c3157d7b5ba53210873b5e80b668b09974",
-      "size": 159367
+      "sha256": "23155da579779ba0efaa8790176afb1453db1b3c5b996a7750be9a5d84c0d517",
+      "size": 77436
     },
     {
       "path": "lagniappe/web/static/chunks/buttons.js",
-      "sha256": "aa85456feb16b7ac0d61666eafbdd1cbd8c4078196176df7cd1de3a35361bab9",
-      "size": 3667
+      "sha256": "61517a57e812c2702796da25f9cfae40764f2fb98bbc9d144bb333e68be54cf4",
+      "size": 2152
     },
     {
       "path": "lagniappe/web/static/chunks/category.js",
-      "sha256": "7c6875007f09d017c9563560e7f970b53199ec903110830de3fe57118059ff17",
-      "size": 4488
+      "sha256": "6318dda74761cbe9f587e8cd29751e50141648ddeeaababa295cd94bcbdad383",
+      "size": 3156
     },
     {
       "path": "lagniappe/web/static/chunks/checkbox.js",
-      "sha256": "26992f2de3bd4f9fb6909a7b4453524319228cd04268925186b445a8fdb43e38",
-      "size": 1968
+      "sha256": "5fea6b162b65284c6e5e53790431d2db7d3af39f07fbf72528c9fdf6fb1b8bb9",
+      "size": 1839
     },
     {
       "path": "lagniappe/web/static/chunks/collaborative.js",
-      "sha256": "0e7d8ae212ddd44096e80f35030099b1dd4cdc5ea96fcc329f5f1a84228169df",
-      "size": 11797
+      "sha256": "814b48993ef752c3c7ad58be78c0528e43de97b5cd0275a964a66f895e3aac75",
+      "size": 6438
     },
     {
       "path": "lagniappe/web/static/chunks/columns.js",
-      "sha256": "01591a13dbba5ad6c4022545bed675cff617fec8f212539b7864874defcb63ee",
-      "size": 4176
+      "sha256": "aa08d83c91fadd346b47dce2cb0be5de06c050a661b05e621b98e69312f734d4",
+      "size": 3455
     },
     {
       "path": "lagniappe/web/static/chunks/combobox.js",
-      "sha256": "077319ec78350a243cc9335cd0952a0202d16906878d3c2682bffca01a0c276d",
-      "size": 66761
+      "sha256": "14548a2099cb3dcf75942699aa0c248ea601c7079edd9ff6af6ba152a68dcf24",
+      "size": 26538
     },
     {
       "path": "lagniappe/web/static/chunks/connectivity.js",
-      "sha256": "bb64954d24cadd4a44650562e77dcd6327bd3ca90884c76a6a26a0a0105a8610",
-      "size": 2412
+      "sha256": "28c632fc9c694c2c19270da9c0a2015b963a4190f8c8ac4aa38e1a16df56cd65",
+      "size": 1651
     },
     {
       "path": "lagniappe/web/static/chunks/core-foundation.js",
-      "sha256": "9bad5b3ec4e2a08ebb5d5c0d7587823f47d796a7a7995035aeb1f467c1bada98",
-      "size": 75078
+      "sha256": "fe3b0f11a4e0ea009661c6c773a6c4f07b87946b510a05c647fd032754f36232",
+      "size": 39803
     },
     {
       "path": "lagniappe/web/static/chunks/deferredOperations.js",
-      "sha256": "09a6fdf425f9eb9b1d896c456fc424a6a4e9b1b8f4d5d2d8a6badf50ca63150e",
-      "size": 11985
+      "sha256": "e8dc59defc4ab44f10a5e8e672939a79a3dc7b30bf8d537a46e03180108edd26",
+      "size": 7170
     },
     {
       "path": "lagniappe/web/static/chunks/deployment.js",
-      "sha256": "e7c4d687ff4455dc19ad080e1b6a72bcaac55685f0cc8402aaa9eeebdcf01d63",
-      "size": 8893
+      "sha256": "9b50185206c6ac8160a9fcdcf37a6913a064b4df681443bd6c4030ddc5c884df",
+      "size": 6209
     },
     {
       "path": "lagniappe/web/static/chunks/documentHistory.js",
-      "sha256": "af8816e12125a4d038d1b555549f4aa2f852ac09aa86be17f0010f77f543c16f",
-      "size": 3958
+      "sha256": "54604f5b9e0088c2e836facb597b10d94f8b44fa6d074906d2dbb67fb4f7f860",
+      "size": 2948
     },
     {
       "path": "lagniappe/web/static/chunks/documentSettings.js",
-      "sha256": "9fb3c7b8152fe07ffe4ab70698c5a1522f46e33aa04fcc0cb24b07e30862d594",
-      "size": 8259
+      "sha256": "4634e25d9fc47adee440eb77800f07623c5e2ea7616299b9a98bf52073456d98",
+      "size": 5823
     },
     {
       "path": "lagniappe/web/static/chunks/dropdown.js",
-      "sha256": "71360456196f0d84404e5d14eceef9ae4c2fb33054ff19ffb00344031c198539",
-      "size": 3734
+      "sha256": "0a7dd6cf40d5aae1c8b74e58620eda01d40dc6c203c10b271b37c2f34875804a",
+      "size": 2783
     },
     {
       "path": "lagniappe/web/static/chunks/editWatcher.js",
-      "sha256": "dd54cb0a2bc9c0f830baf9b09e745b9f99d58ca3822da350c82f1652e76cb48f",
-      "size": 43373
+      "sha256": "96be1d2dd45a84adc606a14ffa658e52c569c9b7ac653cf07356dcac9140cb4c",
+      "size": 24656
     },
     {
       "path": "lagniappe/web/static/chunks/entity-foundation.js",
-      "sha256": "8b48a02904f8da1919d7e9eb6c3d46fe473d2818bea0eacfb3e7efab5afbe086",
-      "size": 12684
+      "sha256": "d036c8427f19c9a66d10ac35db37d55e0c1a077098bb18d3e32ad1cc7844cbf0",
+      "size": 5213
     },
     {
       "path": "lagniappe/web/static/chunks/entityMenu.js",
-      "sha256": "3f055d8c4bdd3b65e9097d9d50791b501c38093927197795a690eb23652b8dde",
-      "size": 3074
+      "sha256": "eb4010ff78e24680beae1ba219cf1fdfd0b4b3974b26fb6e68b11fc8df87eb34",
+      "size": 2008
     },
     {
       "path": "lagniappe/web/static/chunks/facets.js",
-      "sha256": "4716dc7afae737b25de979926a521123cfc1f213eb22ea4e25312bc544337e85",
-      "size": 3897
+      "sha256": "32e23df45959b1ba9fbb8bc8cf1c7b4f830a94c0c5faca7fbf23512c8217d63e",
+      "size": 2700
     },
     {
       "path": "lagniappe/web/static/chunks/fileInfo.js",
-      "sha256": "683f082435a5a5b841f25698e91bb85e7e014129a474c73858d733b2cf8c00a3",
-      "size": 6654
+      "sha256": "587aaa8c6e5e41d68ddf8db02495c0b5bc21f7129ada5bc0ab1728d6f5ff2f00",
+      "size": 4854
     },
     {
       "path": "lagniappe/web/static/chunks/filePdfPreview.js",
-      "sha256": "1ef35930338c19300355090c02551bd25a79467c3744d42dc6831f5899f713f1",
-      "size": 873571
+      "sha256": "0329bb5fe4753abb43fdfa86c01243852be9e352085412b89b340c45067b3c0c",
+      "size": 449176
     },
     {
       "path": "lagniappe/web/static/chunks/filters.js",
-      "sha256": "640b6f7ff4efde3b6c5b2dc9574bfcfaf6cdfb3ec3dce2342a312983a2dd7c93",
-      "size": 11565
+      "sha256": "10299d8a4e719d8d6a31d09af28bc2666333d5453cfe987d209a35e2b101c9d1",
+      "size": 8172
     },
     {
       "path": "lagniappe/web/static/chunks/form.js",
-      "sha256": "d0ae22b7f8a60678b0a79b276613529709ca72866da3bce4ea844866fa34f207",
-      "size": 1664
+      "sha256": "dffa747d2bf3f43a02de0a1ae7d0fdbc7f4a3dde48d5db23b347c655dca5767e",
+      "size": 1576
     },
     {
       "path": "lagniappe/web/static/chunks/form2.js",
-      "sha256": "6b1a44596539b8d8c5ec699c296574b9069cb8a55cbf847b2b7b6d9b0c0f113d",
-      "size": 17315
+      "sha256": "eb87fa5d672cd3bbb7d9c5904bcc7b8ace64111c8bbd5f337689563054796b14",
+      "size": 10213
     },
     {
       "path": "lagniappe/web/static/chunks/formatting.js",
-      "sha256": "e54e1b3185113ed9d6cf76f48699c9093465ab214054dd57db9ba616ed625a90",
-      "size": 5943
+      "sha256": "9632447a854a5317c943d65c0a412a4dd720060cb403e4b98cc3e493339af6d2",
+      "size": 3445
     },
     {
       "path": "lagniappe/web/static/chunks/foundation.js",
-      "sha256": "54aebd669925d0ce233cbdb048bf1df87e2f5fda4cc40d8cb12a887f3f809bcb",
-      "size": 52272
+      "sha256": "1f5b8a05ff4982c1de18b082671e00252b45a62f24561489d0a8f8e4cafce0cf",
+      "size": 23540
     },
     {
       "path": "lagniappe/web/static/chunks/generateText.js",
-      "sha256": "114f65af1ffcf08907bc50a546374d7d61b48686c19a917e0c65672ad7a074c1",
-      "size": 8915
+      "sha256": "bbe607ed7bba6b2b36c98d1e5ed5680c239dba7d3255bdeee7825673b816b421",
+      "size": 6056
     },
     {
       "path": "lagniappe/web/static/chunks/html.js",
-      "sha256": "cfdf4e161ea33a44c04decd496c7e59126f70e4013da2b4f7ecb66e5d4b26f43",
-      "size": 12974
+      "sha256": "015dd041dd82f7e1493aa2428138cc8c4098674c2542aa1e26e4a53fd18edabb",
+      "size": 8543
     },
     {
       "path": "lagniappe/web/static/chunks/html2.js",
-      "sha256": "66609f33eda7c3af79d54eb78dc0fb2c5ab3030c17c5ec65f4408bf05ee85472",
-      "size": 1417
+      "sha256": "d1dae4ba9743d6e57e606e6ad60ef8b0d346e1232fe27aacd5d8e52f78a98f52",
+      "size": 1244
     },
     {
       "path": "lagniappe/web/static/chunks/icons.js",
-      "sha256": "a83f4617b126b475a6e25641c0af4ae9fa2303841e3e0aec3121bba8360163d4",
-      "size": 13511
+      "sha256": "7cf47a9023500b2d56a3466578038d82ce079be4a8aa9e7af20b9a244fa92f05",
+      "size": 7865
     },
     {
       "path": "lagniappe/web/static/chunks/image.js",
-      "sha256": "bdbe7f082b794b8b3dc202ce618b206919686a91a033790feb3baf9f781e60e1",
-      "size": 4902
+      "sha256": "5bdc2fc8acff488c65589632d3bdfa25b6a9470cef517719bd9291aff489f03e",
+      "size": 3764
     },
     {
       "path": "lagniappe/web/static/chunks/index-foundation.js",
-      "sha256": "588914ce79134629cd5d38a12f6dcc2a19119ed752f387f6de46f6da9a9326de",
-      "size": 12784
+      "sha256": "aa7b1d6fcaae8371e2b74cfe46e2e45d30e7b0c624b992a0e72590969e450228",
+      "size": 7431
     },
     {
       "path": "lagniappe/web/static/chunks/ingress.js",
-      "sha256": "27524c8fff569bebae9b52cee78edd33dc05ad027bf29eb52db1dddc3629c155",
-      "size": 20758
+      "sha256": "a60850d744f9970453abef725b633407706d938d4561a2b5f76e9f71f4f2e905",
+      "size": 11894
     },
     {
       "path": "lagniappe/web/static/chunks/ingressUpload.js",
-      "sha256": "146b249b2bd9d36f507110d48aa10649100724aba1e1a4cd217c06dd07c9e6b1",
-      "size": 1911
+      "sha256": "4c8b16bafad02e9187279c23d9debe462bb2f0b13fdca14dd3df2e1f2db0e44d",
+      "size": 1669
     },
     {
       "path": "lagniappe/web/static/chunks/input.js",
-      "sha256": "8ff839988c3d933e866ce3417120a61198dfdb826fc5634e8c55f1a9bb9d4956",
-      "size": 2486
+      "sha256": "a46c1e71eca94cd75db4d1537a0f6bd9ddf482b0658b0dd8f0c42bf9a5329d84",
+      "size": 2243
     },
     {
       "path": "lagniappe/web/static/chunks/installationAccess.js",
-      "sha256": "5bd9e0c645ae1db5b2fb5f5d21d728fc2ccbe10afb6aa9c4a239960e8097e507",
-      "size": 3505
+      "sha256": "e46ec4d5bf0581e5a47f76165c9a84e647c9c859f69240aa4e92297ad69e7446",
+      "size": 2539
     },
     {
       "path": "lagniappe/web/static/chunks/link.js",
-      "sha256": "6be6c5ab012f46a04d88f654af8af292594e7a2ed638a14fd61eacb4081aff75",
-      "size": 4918
+      "sha256": "97b1b2b5b770ba4a4307bae6294e6024f6842dcecd9460db02fea559e93f4812",
+      "size": 3858
     },
     {
       "path": "lagniappe/web/static/chunks/lists.js",
-      "sha256": "f211e4ead422e79e6a1dce669ec3f0264e95d733178e703dc030c3fd234f24b4",
-      "size": 5667
+      "sha256": "33ece5277145877ca5b73435bf5a1892120b515a193a9daef0e118a10dde9854",
+      "size": 2759
     },
     {
       "path": "lagniappe/web/static/chunks/loader.js",
-      "sha256": "114627ab50045f37e0e1757f39c666572223b6c1ae8d67a01c675d45f9bf0301",
-      "size": 2185
+      "sha256": "2c15ebd556eebc3dd4856ed428f6765e2aebcc0b0bc92d5fc1304c19e4852835",
+      "size": 1752
     },
     {
       "path": "lagniappe/web/static/chunks/location.js",
-      "sha256": "8c7316bc12c0fe5649cb0701df081151896963536dc350c90c278ac6e90628fa",
-      "size": 16077
+      "sha256": "ef3e0dbfa83f8cf698a9df145b96f4e047af1e666bc9bed8f3b6f7753fc74ca8",
+      "size": 10686
     },
     {
       "path": "lagniappe/web/static/chunks/logout.js",
-      "sha256": "aa446fe61b30e35888515c8a853671b449b288decb7424a3f6ac796aa2dd49e2",
-      "size": 1898
+      "sha256": "5a00a637912395f7d1c2ac68dfd08e61369c63e8e505ac50a105cf2fa2ca07cb",
+      "size": 1232
     },
     {
       "path": "lagniappe/web/static/chunks/maintenance.js",
-      "sha256": "9f304eb33a107ef81be266bf5f2e1652124a1f134831960d3e113862bd89cf09",
-      "size": 11406
+      "sha256": "46773cc6efbd79f33d2f9429d69371aeaa62fbf23e7db2295e5f2ddb4bd327d9",
+      "size": 7112
     },
     {
       "path": "lagniappe/web/static/chunks/menuItems.js",
-      "sha256": "827d19504ee4ca21f90741714971d4f61f6f3c5afcb1c9b4a426a5d21a8bd484",
-      "size": 4340
+      "sha256": "7da78585ff0bbd19069ac8cbf490d4b247004be246c1cee619e542ae5e6e7964",
+      "size": 2899
     },
     {
       "path": "lagniappe/web/static/chunks/messageComposer.js",
-      "sha256": "e9baac86fea41e383c33d1cdb851500f7d6dddb1fe5b5eade2e046222ac528b4",
-      "size": 8509
+      "sha256": "ce4274c55f089b78fedcfe51a9db793015b21bba8b002e78cce217c5e4c6b3cc",
+      "size": 6129
     },
     {
       "path": "lagniappe/web/static/chunks/mobileTableControls.js",
-      "sha256": "f2ce07f9aac6f7afbbef169ca756af32bbd21c5581d022646085312b7323cb3a",
-      "size": 3267
+      "sha256": "49537116fae272893366f0965ef78fb4a536aaf1bbf45640ff3b2f2f9140d095",
+      "size": 1767
     },
     {
       "path": "lagniappe/web/static/chunks/modal.js",
-      "sha256": "b581391b456928c03e8b55610d64e5833554ea1ccd32a613097018824bf6326f",
-      "size": 10319
+      "sha256": "e51254bd1582e09fa3bdf2320390107049aadfc0592ae391b03c0f26c59308ca",
+      "size": 6822
     },
     {
       "path": "lagniappe/web/static/chunks/modelTasks.js",
-      "sha256": "52dd652e15337f62fda1c466976220ec018ce5ab0245d5458374469b38d2fc99",
-      "size": 4079
+      "sha256": "aea8cf8b1054dcd8b5043c4fa3ab643517944e15112aef43abbc220819053f2b",
+      "size": 2725
     },
     {
       "path": "lagniappe/web/static/chunks/note.js",
-      "sha256": "7a1362a046d9242c633b920fd5771141932e8a5b382b79b5d976504e6194bc24",
-      "size": 3377
+      "sha256": "035d099e3f596923eb1baade35205979f7be1b4ab13a2ff1494b515ab66085c9",
+      "size": 2813
     },
     {
       "path": "lagniappe/web/static/chunks/notifications.js",
-      "sha256": "971bae1935c8eaeb3c8a31f0c114cfa3be2d9ed5964de452090b1439d49d94f7",
-      "size": 9786
+      "sha256": "e69b281e5fc9875b813551e488dd7a570dab0837346e584de1f93dec01d5d57b",
+      "size": 6439
     },
     {
       "path": "lagniappe/web/static/chunks/offline.js",
-      "sha256": "cf78058c07d4d0db6cc770f46ffaa11df843689a1c0f244566b6698b32a28ccd",
-      "size": 9850
+      "sha256": "6d958544e62c06d82d8dddb973d7a287547562b2982f228963a1e122ff61c21b",
+      "size": 3110
     },
     {
       "path": "lagniappe/web/static/chunks/offlineQueue.js",
-      "sha256": "b293fb0539037d727ece5c8c5061ee91e3ef97595eb0f7f8c0a2f038dd2889ac",
-      "size": 14962
+      "sha256": "7d4d9c081fb26af98973f3befb4a8a886fef0dc5ceae78f2da066e127fa3123a",
+      "size": 7362
     },
     {
       "path": "lagniappe/web/static/chunks/offlineReplay.js",
-      "sha256": "975850af57d77886fb3f2c3fb2e8221f69b64818f45db703b3aef0ce169dcd73",
-      "size": 938
+      "sha256": "b0da768844b721718158d30fb56293f46472b1e5425985b1ec4b0f216937c63e",
+      "size": 782
     },
     {
       "path": "lagniappe/web/static/chunks/offlineWork.js",
-      "sha256": "0e0c6f448bade8f8cc4f3a33460c994e68e7af1caf625b0aa1b85f4704789eb3",
-      "size": 1343
+      "sha256": "f136acce36005b0164a33f3bda3ac67231074bb73753babcccdd5b461581ddac",
+      "size": 1072
     },
     {
       "path": "lagniappe/web/static/chunks/options.js",
-      "sha256": "bfdeb88c04d73997a65bbc3bfe1430308f8cf4e8e0c2dcd0ef79a92373744087",
-      "size": 2211
+      "sha256": "82dcc653a0e80388362821c44eb3b4a865158b8613360419166abaffa5df3eef",
+      "size": 2042
     },
     {
       "path": "lagniappe/web/static/chunks/pageInfo.js",
-      "sha256": "7626d850e3214d92444fa6c9d8f94798a9d14c12fa5d51cc41bf0bc79c126936",
-      "size": 26060
+      "sha256": "f7d7a9dc4c4e7b7dd0429d62cb9839baf946c2d2f4ac0891a18b400913dc3990",
+      "size": 14933
     },
     {
       "path": "lagniappe/web/static/chunks/pagePermissions.js",
-      "sha256": "1f03e45011d6dd406f7b143fdca1220517bb528448e66c75eecde741569a0608",
-      "size": 4598
+      "sha256": "0e9f99ccc2ad39484291040935eb085968e91373dd5da421ed3f0a213de24a7e",
+      "size": 3383
     },
     {
       "path": "lagniappe/web/static/chunks/pagePhoto.js",
-      "sha256": "e53391395a5ed38d6a27ec814aec681f08e986b6f483a4b38b6bd67fe8ed075e",
-      "size": 9381
+      "sha256": "a4e8717e51116358208af54a234548c3840c78a4fb9a854650a9a43478d71ec0",
+      "size": 6223
     },
     {
       "path": "lagniappe/web/static/chunks/pageTaskList.js",
-      "sha256": "0242893a17516257e27564fef98e9785044de885ff31fb7482d321255f7c0a53",
-      "size": 16508
+      "sha256": "3521a00dd918f9ccddfcbe50666e41be638ef9e74c5db4a47bfce25e52dd8c9f",
+      "size": 9614
     },
     {
       "path": "lagniappe/web/static/chunks/pinVersion.js",
-      "sha256": "6677daff8793e38e1c2a1a1261cb0fb240f9933993c5f94d8acf8778f3c6d851",
-      "size": 2465
+      "sha256": "f1f1531fa4bdf74f371407d754f151e797742de27adb69440694b4a0f693c962",
+      "size": 2221
     },
     {
       "path": "lagniappe/web/static/chunks/polling.js",
-      "sha256": "05ceead7145c0b7050acf91d4270bcf79a7f301f5cca2d5a561d3a5cd7f0d99b",
-      "size": 35355
+      "sha256": "ba3645464ddbe2f98d4bd4bd1ebd12f67b519b5c2401e0e4fe51106f65d19254",
+      "size": 18466
     },
     {
       "path": "lagniappe/web/static/chunks/primitives.js",
-      "sha256": "f7a0aa724318493569ad4e2aba8810e521dc1aa77206ddbc5e390e2dc8647ee2",
-      "size": 9796
+      "sha256": "c54ec6d65674d1fd6bd8abaf4c24aa6698210281e23191248a26416b265154c0",
+      "size": 6143
     },
     {
       "path": "lagniappe/web/static/chunks/projectInfo.js",
-      "sha256": "389dc55b1f991fc573aa81daab7b903f10c82bd489b64d5094ab2e9ca7dc31ea",
-      "size": 3349
+      "sha256": "95acfbf77bfa67c819eb548250267f631a2513768dc7849b0dd3f423bc430a19",
+      "size": 2426
     },
     {
       "path": "lagniappe/web/static/chunks/providers.js",
-      "sha256": "ff8e1c1ce7f6581ad8d92ddbb67ec26630ec39ea201dd13721535c1448dbffeb",
-      "size": 2205
+      "sha256": "b3b63544aa3f035d51fb8660b73abd1785b2b0ce9c20d63ec7268900bd2fe605",
+      "size": 1921
     },
     {
       "path": "lagniappe/web/static/chunks/queryLifecycle.js",
-      "sha256": "d992abde1712ab115bbcb947a7d13e9b3636b7011ce50177ebc81a7bccd9c43c",
-      "size": 2094
+      "sha256": "8f88c3a0670ff0dfc662d21572bcc3f437b73617b71fd968a2c9e0a0ca62b3a6",
+      "size": 1302
     },
     {
       "path": "lagniappe/web/static/chunks/radio.js",
-      "sha256": "d6b2d100874ee44aee40e401433e4780ec86cacb783f283432f7ff9222d906e6",
-      "size": 2239
+      "sha256": "c90558f4b322b0a26f57323ec483ac1e1c374dd18b845666bf516a3aadad3a5d",
+      "size": 1928
     },
     {
       "path": "lagniappe/web/static/chunks/remote.js",
-      "sha256": "9d97e67a9e4f33fe7e81f89f81a45303583f00143583553ec02a33490838e85d",
-      "size": 3043
+      "sha256": "84fdd91b106c53ef728c4431419fd521457e1dad86d553d0600eb7d65e30bcde",
+      "size": 2221
     },
     {
       "path": "lagniappe/web/static/chunks/results.js",
-      "sha256": "163d58504875c05b37425f5c63dd4277277b8023945a054190e3ae719cd3f99a",
-      "size": 6430
+      "sha256": "5d1c6c73173b52bd57e8c13ac7e81eb2108d91e22b1360fe3ff3af30dc7e5164",
+      "size": 3577
     },
     {
       "path": "lagniappe/web/static/chunks/search.js",
-      "sha256": "52a1f35d363f08cbde1308c8d5775a15f188d23a554218e960e73a281b765250",
-      "size": 3030
+      "sha256": "0665c4feb43f7921bdeb47695b92d12ac8524cec70b1f77a7bc973beb694fb60",
+      "size": 2080
     },
     {
       "path": "lagniappe/web/static/chunks/sectionToggle.js",
-      "sha256": "4f1e57dc31c55e21efbbfaee921cc6ec0b6fe1f98b7eca6bdaeccb143852754f",
-      "size": 35237
+      "sha256": "ac5c5d9ad20a8fcacef9dca79ded3e6592db53a35d4102fe9272db8c096d6f78",
+      "size": 24067
     },
     {
       "path": "lagniappe/web/static/chunks/sections.js",
-      "sha256": "466ea8f5e5d466abcbbfe600b3b47ec8e2ca97472ee6cc339680ea4de085a165",
-      "size": 12670
+      "sha256": "981f13d839d0312098b4144e3f6c934dd35ef394d9808ed19354747c0cada3a8",
+      "size": 6748
     },
     {
       "path": "lagniappe/web/static/chunks/select.js",
-      "sha256": "836fece13193361e8c4907b838c7f730d3c7c55d73672085aa92c57b09fcc4e8",
-      "size": 2983
+      "sha256": "bdd2f5c6b7777aab96f50db2ff3b84e5de2a94056671bde94c3f9785760aee27",
+      "size": 2579
     },
     {
       "path": "lagniappe/web/static/chunks/select2.js",
-      "sha256": "b5a445529425eb8b9bbba53cb9fb1dfcc3e2447e1d93a98a58f461cd275da1f1",
-      "size": 1916
+      "sha256": "8ef1f5c0e59f033f4505f9652a4861cf5db45639175d4e0bcfda3cf949c607c0",
+      "size": 1829
     },
     {
       "path": "lagniappe/web/static/chunks/setColor.js",
-      "sha256": "15652f0a49b613a29bccd21227d5e4d272d28bf7b650780e1af33f7a07ed8597",
-      "size": 2953
+      "sha256": "22742db40e6250aa0a796a8db36e72a090bcca1befbda98928f6349bad7f6b27",
+      "size": 2348
     },
     {
       "path": "lagniappe/web/static/chunks/setFontFamily.js",
-      "sha256": "69f62dcc4dd918ac44c1c4ff84d96f0c72d8069624fcddc0089586bbe43ae22a",
-      "size": 2916
+      "sha256": "224313b7f27ed6654fbc671aa9494f149f4e054acd5912ab24aff08d6f777df9",
+      "size": 2342
     },
     {
       "path": "lagniappe/web/static/chunks/setImage.js",
-      "sha256": "fab73449df345270a3c25a82c868be6228933209973278593db0aab813ee23a8",
-      "size": 2183
+      "sha256": "405b5121cf3116ef119adf341f6e8a699918f608ddfb8938ad6cb284d66f4930",
+      "size": 1924
     },
     {
       "path": "lagniappe/web/static/chunks/signature.js",
-      "sha256": "d69bf5b02813a74605d6fa29b74f2657617ef017133ad615deb8b91e29f736d5",
-      "size": 9501
+      "sha256": "670cce65cf0682e89dcd3962831e44f4b0ace7a9d8b37ec09a89f0843b0783db",
+      "size": 6969
     },
     {
       "path": "lagniappe/web/static/chunks/siteSettings.js",
-      "sha256": "b0824edc768c41bccc8858e22942aabec8a406337414e03a966239a6c727c5ce",
-      "size": 7850
+      "sha256": "b6f185ac26e653d221fd7482a8efb42eec473106b213da799a24c859ca73d1e9",
+      "size": 5202
     },
     {
       "path": "lagniappe/web/static/chunks/status.js",
-      "sha256": "2487f94c539d00a852514df74db722b16c04dd202a0af199539add9b4502a054",
-      "size": 2776
+      "sha256": "85173393955683f6714e2a9997c9ffc7954a4cbe1d22aefe459e94b7c4c32b5c",
+      "size": 2441
     },
     {
       "path": "lagniappe/web/static/chunks/status2.js",
-      "sha256": "2dab7cd60d9c2e82ea92ebea896cabcd95897e1583c15340c655588981a94985",
-      "size": 1886
+      "sha256": "d3baa7fa9d8665412b8617c78205813d6ed96511ae256f98c67435e42d64ee5e",
+      "size": 1671
     },
     {
       "path": "lagniappe/web/static/chunks/storage.js",
-      "sha256": "49ebe066d8390e117310e479ef261b6e08cd21c5fcd4f55ad9b9d1033ea7b5c1",
-      "size": 1627
+      "sha256": "476272e554c6188ff76c7cf9b657a1a43bdf83741576a7fe3328ca67306795ba",
+      "size": 1121
     },
     {
       "path": "lagniappe/web/static/chunks/styles.js",
-      "sha256": "e86fd970a047d93150f0ae9e457cefea51d531780b142f43f32bf9d698a4f16a",
-      "size": 31225
+      "sha256": "4e59c56a881cb7e5436494dc88da9050f547046a6824d23183f2f9cbe8fa1952",
+      "size": 27966
     },
     {
       "path": "lagniappe/web/static/chunks/submission.js",
-      "sha256": "4bd4e4b599555d0846e00e581b372990c2efa0da467d3839a3de0cff68cfd526",
-      "size": 8399
+      "sha256": "c3e3c86f9587d8ad56ee185a51d88a0799a94d265c3203dcfd260937b0e3ff96",
+      "size": 4718
     },
     {
       "path": "lagniappe/web/static/chunks/submitter.js",
-      "sha256": "fb74c337030738ea3c9d164b6e81479d46095f9c5f183aab2a42ecd9a0978918",
-      "size": 4931
+      "sha256": "73c8b122638bcf44d2a3331ceb301ca90796c4fa34712f4df1dbb0a2863a3a56",
+      "size": 3500
     },
     {
       "path": "lagniappe/web/static/chunks/sync.js",
-      "sha256": "6fceeffd942d5a1cf314e9d2cebe088706aecdb17604fc8cc43daf424899bd6d",
-      "size": 18277
+      "sha256": "6e2a7d795b5518bebb974ab1fc502b6f4b709f0123347b4fb53d39dd5425a5fd",
+      "size": 10165
     },
     {
       "path": "lagniappe/web/static/chunks/table.js",
-      "sha256": "370bc730a1aa3b36aa639c210ac0cd619085db84a7fca790b902257e7d2996dc",
-      "size": 22293
+      "sha256": "ebf233cbdc7876a88de318883e1b498c09c3215004bff7e59468a5a6adb4be07",
+      "size": 15868
     },
     {
       "path": "lagniappe/web/static/chunks/tableEditor.js",
-      "sha256": "7b5317812c10794e9dd7a328fb3f7416010f807d4f983df66711c0ae58447a44",
-      "size": 12054
+      "sha256": "10c09dd9560a7f2de9ccc2ad6c648f434cbf84f34cfd084c3dd31fbb94bf26e7",
+      "size": 8377
     },
     {
       "path": "lagniappe/web/static/chunks/tableSorting.js",
-      "sha256": "8e774815cfca7e6eca67e1ef9fd9336fe99622d6fd7a36070487379a3a17b11d",
-      "size": 21257
+      "sha256": "97b7d6f2e4c47a8025f02aaeb1af3d9dce0d48bb99ddac16df85b6cb66972a66",
+      "size": 12760
     },
     {
       "path": "lagniappe/web/static/chunks/tableVisibility.js",
-      "sha256": "1c4c2979bb57aa6991fe10c8ab15d73d33ecb8f7f0f698b810839d61cd16e453",
-      "size": 4196
+      "sha256": "72d2bfc1318767c96f70ec7e1023696c3b1f2bec0bfd2aba33af0853a07483ed",
+      "size": 2240
     },
     {
       "path": "lagniappe/web/static/chunks/tables.js",
-      "sha256": "32ea7590b0b93259173a404073d6398a8efbdd7b5512583be07d44fcda298d7c",
-      "size": 20220
+      "sha256": "20de231d57ae4b6df350ecf47d407a08ff5fa8f3efd0d9d0bfdcfbeefa6bc834",
+      "size": 13605
     },
     {
       "path": "lagniappe/web/static/chunks/taskForm.js",
-      "sha256": "38514c987186f9f618c132d715b60d4502866f8995e447074dfa2b8bacdb150d",
-      "size": 5500
+      "sha256": "83cf5fee137abac140b1be46c93715a6a049193bd0e1dc32a3849bea76d96a79",
+      "size": 3465
     },
     {
       "path": "lagniappe/web/static/chunks/taskSettings.js",
-      "sha256": "0f4f392224df53e5b02bfc8d3b546ad9cfb22437f57478ff07afdb4425d0995c",
-      "size": 8493
+      "sha256": "d96b36214e02d110ac8b6957e9e8c4ed85f956b74606afec208072bf4222ceec",
+      "size": 5397
     },
     {
       "path": "lagniappe/web/static/chunks/tasks.js",
-      "sha256": "8e08fd790076823e3a35d7ce0ce48debd78ff0510cdbb369c6fe03d6e516279f",
-      "size": 16912
+      "sha256": "34ab78813662efc1e5ba158ef7709f38efe9c4e0b81e5f8817e969f97f4dd267",
+      "size": 9781
     },
     {
       "path": "lagniappe/web/static/chunks/textarea.js",
-      "sha256": "d3dbd415d7ad25369c2a9875e649a3941226cae35922d7e6ab63ef508d70c6f6",
-      "size": 1998
+      "sha256": "da816c5f6a18cd44489391b7e4b71df00f434e69acada253533388bc097009f2",
+      "size": 1692
     },
     {
       "path": "lagniappe/web/static/chunks/todo.js",
-      "sha256": "c532731fd29329a0236db93e0bf4430826d9f3121bcd1504f141c167fa26a6ee",
-      "size": 14441
+      "sha256": "f17ffbf120d28521376c5154c5ed44e3ef8dc07a1f9339d0fbf7e9e6f09fe9b9",
+      "size": 9974
     },
     {
       "path": "lagniappe/web/static/chunks/toolbar.js",
-      "sha256": "df7f818e5a1029fd8227996c539677b1d23eb6de963b5f9403f3bb14d94066c1",
-      "size": 1659737
+      "sha256": "b80fc59737a328fad72e755498b5c9e40511e9ea3a65c897934ca15a158dde9e",
+      "size": 614595
     },
     {
       "path": "lagniappe/web/static/chunks/toolbarButtons.js",
-      "sha256": "7c7f3c0066c77cc1c420b81fa77b0594cd3d6869817f79e6a7e3180d34a499cf",
-      "size": 2654
+      "sha256": "343fde1e32c2d976262dcd211ee95a6f37c61c49d9a4eeb6630576f879984cba",
+      "size": 2083
     },
     {
       "path": "lagniappe/web/static/chunks/tools.js",
-      "sha256": "7dc24c9ebff1a59af59247db19ab97c57325017922ed690fe931082336ae0ca1",
-      "size": 7289
+      "sha256": "a07b924c3f83fcd040bccc69c123e03db36922966b77f86f7ff9c5dfb0fa7f3e",
+      "size": 5630
     },
     {
       "path": "lagniappe/web/static/chunks/uploadFile.js",
-      "sha256": "e3f149e11713b81b613c0a59e049c12fabad539a2e8eeb091e0f3e121484e2e0",
-      "size": 2897
+      "sha256": "be2a6cce015bec10fd7f1f74fc5f82559ed350d4ce459601ce23bba939dc8ca8",
+      "size": 2464
     },
     {
       "path": "lagniappe/web/static/chunks/upstreamUnavailable.js",
-      "sha256": "2ff45bc0b7224010041772b02947227b3a3c9e93868b8a2e2fde67fd4ddd5db3",
-      "size": 16221
+      "sha256": "547cd0c823d7685590930d540ac8fc76f73a4c7f1ea4652525a215d19f06823e",
+      "size": 7171
     },
     {
       "path": "lagniappe/web/static/chunks/user.js",
-      "sha256": "cfdaebc0c41b53f60a72b19e3e8162ce89230970bd2b554fc95380fe66a529a2",
-      "size": 20309
+      "sha256": "f134a798c298a2d0c4607ade15f9b60b289cdaed2d932b99aa1d70c02cf0a784",
+      "size": 11194
     },
     {
       "path": "lagniappe/web/static/chunks/user2.js",
-      "sha256": "ae3d192194318f086a062ed4ba1ea19708ffc7d7646db47db36bae8906eb492f",
-      "size": 3908
+      "sha256": "2ee36b5bcd04df62c77744e5499ba05418f18c6d3e6c7a9e563a76a1c0b9e1a9",
+      "size": 1772
     },
     {
       "path": "lagniappe/web/static/chunks/views/admin.js",
-      "sha256": "726c46d9a2537983f277055eefadfa0e23bc2c9f948bc5e65ed400fee50891f7",
-      "size": 626
+      "sha256": "bbab6a03f2754520d321b1159a1a9272d96b980fa9ea0a6a58dc4376dac9ba8c",
+      "size": 806
     },
     {
       "path": "lagniappe/web/static/chunks/views/analytics.js",
-      "sha256": "1f8073993900f609e22d7f0ff056acd20169c2886dc09ce667a5cea3ab03dd5d",
-      "size": 5445
+      "sha256": "2513badf2dddcade0240da9ec8652a5f4172e0be4383c1897a06430ebd2df092",
+      "size": 3736
     },
     {
       "path": "lagniappe/web/static/chunks/views/builder.js",
-      "sha256": "09fa61d8848094ebea0797144c65afb068b701f1c9715ee785c2442538554c89",
-      "size": 844
+      "sha256": "dd1cb6192621027ba72bfc5e6bad7460778caf6de533c37633e021a4322b062d",
+      "size": 1233
     },
     {
       "path": "lagniappe/web/static/chunks/views/file.js",
-      "sha256": "be62f9f2fc3f736de9457f6be2637d076a13b774af78d478ca07b4394d32050a",
-      "size": 2405
+      "sha256": "f72a7778d0ed2b24bf3664d10cf7a629fb247e5b7bd6a9bcc752dafcd16568f5",
+      "size": 1422
     },
     {
       "path": "lagniappe/web/static/chunks/views/home.js",
-      "sha256": "036d9aac17397a0e3822508dc9892691a296e270d93168e19c60c1cde59da4cf",
-      "size": 5373
+      "sha256": "620a1357637cd317b20b36443f925600f1a598c8bd57eb5887b655db5f857f49",
+      "size": 3299
     },
     {
       "path": "lagniappe/web/static/chunks/views/index.js",
-      "sha256": "110cee32d1f88f68149e18d36ac261d4c0f4d7080137d674656b37287daad2c3",
-      "size": 289
+      "sha256": "055c295b1630d5120d0b03552ecfd83aa2642a6237d356bd806ae7acdb50e339",
+      "size": 710
     },
     {
       "path": "lagniappe/web/static/chunks/views/manual.js",
-      "sha256": "af1683206b0e142f3a1f23ac8c1b52bc320671b227a39a877049ad26682afc21",
-      "size": 5370
+      "sha256": "393de0ca461cded8dc6cc55f624b799794147555faa5ff14df4eecc408852fb9",
+      "size": 3539
     },
     {
       "path": "lagniappe/web/static/chunks/views/messages.js",
-      "sha256": "838d9f5e5cd21ab68cae1af66cbc2783fc0207cea6760395f6c55284f015dab5",
-      "size": 22426
+      "sha256": "ba560266fe78f6207858e93180a989bea5fbadef5741214587d65992e128e405",
+      "size": 15345
     },
     {
       "path": "lagniappe/web/static/chunks/views/page.js",
-      "sha256": "e05165c1c0d174ab5ca8dc215db62e4264ec3a516b53f130820dc2e1b0a852f0",
-      "size": 2432
+      "sha256": "86c76b7cca266af0f28135bc5f3d9329d6b627aee07197c7a612882d9e85028e",
+      "size": 1626
     },
     {
       "path": "lagniappe/web/static/chunks/views/project.js",
-      "sha256": "9d4b4bffa0c20570ef4dfb1f20711cdc7fdde5080dd86381fe57430dc27d77de",
-      "size": 612
+      "sha256": "ed69d23321c0620fd4ddf502c54a7fcd2c513c6740200fdcd100cfaeb7f5d8cb",
+      "size": 796
     },
     {
       "path": "lagniappe/web/static/chunks/views/public.js",
-      "sha256": "4470cc85b16ee83a524d8c914cbb85489c6f0a7f8b94962e380896efd9f8b5a6",
-      "size": 3988
+      "sha256": "79184cf52a80cb96996e1abaaa20d868bbe05198e0ad7efd2488c4e9d56c003a",
+      "size": 2104
     },
     {
       "path": "lagniappe/web/static/chunks/views/report.js",
-      "sha256": "b860a8ccb2d444c6d46ef417a13c4cbe3b8023aa4e9282f0bd021167debf876a",
-      "size": 13713
+      "sha256": "429d5e8f7606476cbfec435fd749a5a1004815ef1574beef2e74386f7605b6b2",
+      "size": 9268
     },
     {
       "path": "lagniappe/web/static/chunks/views/results.js",
-      "sha256": "ac4420c164ceebc9aeeb2757b494baaad2b04b0188e2e106c5e6c59c52a55885",
-      "size": 5118
+      "sha256": "7bce2287f16e4ddf303efc5ba77302b5eb9b21a4d5a0675b28256eb676466345",
+      "size": 3218
     },
     {
       "path": "lagniappe/web/static/chunks/views/user.js",
-      "sha256": "bb7162d6d57e5991f02349c3f7772146f180e56a1e915db777de0f2719911087",
-      "size": 11193
+      "sha256": "6a004fb0f6cde26025e75a82066bdb6672d542a3069c241961c67973ffe107f3",
+      "size": 5657
     },
     {
       "path": "lagniappe/web/static/chunks/visibility.js",
-      "sha256": "12ed0bfb92e3506779c64ba646031d8d90c104d3c80114137b83e3719d91ff2b",
-      "size": 2216
+      "sha256": "df725b9eb40aa599c03230f185dc82c0d1cd61796a7db29a99487809416c1d87",
+      "size": 1978
     },
     {
       "path": "lagniappe/web/static/fonts/material-symbols-rounded.d15c2d01dd61.woff2",
@@ -669,8 +669,8 @@
     },
     {
       "path": "lagniappe/web/static/login.js",
-      "sha256": "9acb9efbf3599347023ab2269915c0f2a7757f7e63af8a3ffc8f9712eb12adf1",
-      "size": 95743
+      "sha256": "262505f1d23d39d07be3c88586139c72e763d583e82126e39d406169dea75abf",
+      "size": 45078
     },
     {
       "path": "lagniappe/web/static/pdf.worker.min.mjs",
@@ -714,22 +714,22 @@
     },
     {
       "path": "lagniappe/web/static/script.js",
-      "sha256": "42cbb02d031f5a396f6e798af8a4a2f6a18d850f448890b488f55dfef45a98a3",
-      "size": 19034
+      "sha256": "d412fa9453edb68c55412793927df5e61b0e1a50a0bcf4809b03cc4a2d2df360",
+      "size": 7182
     },
     {
       "path": "lagniappe/web/static/sentry.js",
-      "sha256": "585863a922cb6cd6988050c2ae1b3d04393a3b6334872415a4693cb110b0740a",
-      "size": 1222592
+      "sha256": "7033965ee6a6f9c93399e6a7543c1964602a564a916e15836b872a1ad1894b37",
+      "size": 535449
     },
     {
       "path": "lagniappe/web/static/style.css",
-      "sha256": "a399d2e2f21b44e2057517a95e1afb21605eabf0d276e4be6aa01cc777abc3d6",
-      "size": 137907
+      "sha256": "9f65d72409331367871dbfdbb94a8125d075972ce4a6060de27cd38d7a70bad1",
+      "size": 111041
     },
     {
       "path": "lagniappe/web/static/sw.js",
-      "sha256": "d49de2d1c37b69c12149b94e486399d502e8bddfe5e614eb6fc23dbfa81b4156",
+      "sha256": "55914ef6161b1aa69e428b055551e3173a43af07592f31a7177e7e7f927f9ed5",
       "size": 33641
     },
     {

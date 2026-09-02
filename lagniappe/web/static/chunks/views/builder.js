@@ -1,22 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.2.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="72e9b2e4-6225-4511-9a24-7b17c2acd5d5",e._sentryDebugIdIdentifier="sentry-dbid-72e9b2e4-6225-4511-9a24-7b17c2acd5d5");}catch(e){}}();import"../search.js?v=ba4f5c4c";import"../entityMenu.js?v=ba4f5c4c";import"../foundation.js?v=ba4f5c4c";import"../connectivity.js?v=ba4f5c4c";import"../modal.js?v=ba4f5c4c";import{F as q}from"../builder.js?v=ba4f5c4c";import"../styles.js?v=ba4f5c4c";import"../remote.js?v=ba4f5c4c";import"../queryLifecycle.js?v=ba4f5c4c";import"../combobox.js?v=ba4f5c4c";import"../primitives.js?v=ba4f5c4c";import"../icons.js?v=ba4f5c4c";import"../results.js?v=ba4f5c4c";import"../storage.js?v=ba4f5c4c";import"../formatting.js?v=ba4f5c4c";import"../upstreamUnavailable.js?v=ba4f5c4c";import"../dropdown.js?v=ba4f5c4c";import"../baseForm.js?v=ba4f5c4c";import"../loader.js?v=ba4f5c4c";import"../facets.js?v=ba4f5c4c";import"../submitter.js?v=ba4f5c4c";export{q as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=b506293e';
-import '../entityMenu.js?v=b506293e';
-import '../foundation.js?v=b506293e';
-import '../connectivity.js?v=b506293e';
-import '../modal.js?v=b506293e';
-export { F as default } from '../builder.js?v=b506293e';
-import '../styles.js?v=b506293e';
-import '../remote.js?v=b506293e';
-import '../queryLifecycle.js?v=b506293e';
-import '../combobox.js?v=b506293e';
-import '../primitives.js?v=b506293e';
-import '../icons.js?v=b506293e';
-import '../results.js?v=b506293e';
-import '../storage.js?v=b506293e';
-import '../formatting.js?v=b506293e';
-import '../upstreamUnavailable.js?v=b506293e';
-import '../dropdown.js?v=b506293e';
-import '../baseForm.js?v=b506293e';
-import '../loader.js?v=b506293e';
-import '../facets.js?v=b506293e';
-import '../submitter.js?v=b506293e';
