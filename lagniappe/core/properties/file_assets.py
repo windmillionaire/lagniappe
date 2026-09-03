@@ -84,15 +84,16 @@ class FileAsset(AssetProperty):
     # @matrix ai file : mimetype uri
     @property
     def uri_to_ai(self):
-        from ..tools.ai.constants import GEMINI_MIMETYPES
+        from ..tools.ai.constants import gemini_mimetype
 
-        if self.entity.mimetype not in GEMINI_MIMETYPES:
+        mime_type = gemini_mimetype(self.entity.mimetype)
+        if not mime_type:
             return None
 
         uri = self.uri
         if not uri:
             return None
-        return {"uri": uri, "mime_type": self.entity.mimetype}
+        return {"uri": uri, "mime_type": mime_type}
 
 
 # @testable false

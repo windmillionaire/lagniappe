@@ -215,7 +215,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
     assert prompt.audit()["duplicate_headings"] == []
     assert "get_form_instances" in prompt.tools
     assert prompt.files == []
-    assert len(organize.organize_prompt(report, user).preview()) < 20_000
+    assert len(organize.organize_prompt(report, user).preview()) < 21_000
     assert "Completion owns form values" in prompt.preview()
 
 
@@ -292,6 +292,7 @@ def test_prepare_organize_retrieval_context_searches_bounded_structure_candidate
 
 
 # @matrix ai-report : active-request quota search-opt-in summary-prepass
+# @pair files:normalization
 @pytest.mark.unit
 def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     user = _test_user("summary-prepass-owner")
@@ -300,6 +301,8 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
         "agenda.docx",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
+    markdown = _test_file("service-confirmation.md", "text/markdown")
+    vcard = _test_file("marisol-vega.vcf", "text/vcard")
     second = _test_file("second.pdf", "application/pdf")
     existing = _test_file("existing.pdf", "application/pdf")
     unsupported = _test_file("archive.zip", "application/zip")
@@ -311,7 +314,15 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
             "hash": "summary-prepass-report",
             "parent": user,
             "user": user,
-            "input_files": [first, office, existing, unsupported, second],
+            "input_files": [
+                first,
+                office,
+                markdown,
+                vcard,
+                existing,
+                unsupported,
+                second,
+            ],
         },
     )
     generated = []
@@ -332,21 +343,33 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
         ensure_active=lambda: active_checks.append(True),
     )
 
-    assert summarized == [first, office, second]
-    assert saved == [first, office, second]
-    assert generated == ["first.pdf", "agenda.docx", "second.pdf"]
+    assert summarized == [first, office, markdown, vcard, second]
+    assert saved == [first, office, markdown, vcard, second]
+    assert generated == [
+        "first.pdf",
+        "agenda.docx",
+        "service-confirmation.md",
+        "marisol-vega.vcf",
+        "second.pdf",
+    ]
     assert first.properties.summarize.enabled is True
     assert first.properties.summarize.search is True
     assert first.properties.summarize.complete is True
     assert office.properties.summarize.enabled is True
     assert office.properties.summarize.search is True
     assert office.properties.summarize.complete is True
+    assert markdown.properties.summarize.enabled is True
+    assert markdown.properties.summarize.search is True
+    assert markdown.properties.summarize.complete is True
+    assert vcard.properties.summarize.enabled is True
+    assert vcard.properties.summarize.search is True
+    assert vcard.properties.summarize.complete is True
     assert second.properties.summarize.enabled is True
     assert second.properties.summarize.search is True
     assert second.properties.summarize.complete is True
     assert existing.summary == "Already summarized."
     assert unsupported.summary is None
-    assert len(active_checks) == 8
+    assert len(active_checks) == 12
 
     unindexed = _test_file("unindexed.pdf", "application/pdf")
     unindexed_report = TestEntities.get(

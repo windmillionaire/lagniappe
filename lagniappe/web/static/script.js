@@ -1,2 +1,565 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1011358e-d79f-4987-b39f-4a75d3742cd5",e._sentryDebugIdIdentifier="sentry-dbid-1011358e-d79f-4987-b39f-4a75d3742cd5");}catch(e){}}();import{c as v}from"./chunks/connectivity.js?v=b0c39e75";import{e as j}from"./chunks/foundation.js?v=b0c39e75";import{i as L,c as S}from"./chunks/upstreamUnavailable.js?v=b0c39e75";const k="b0c39e75",E=Object.freeze({project:{entry:"project",source:"./views/project.mjs"},page:{entry:"page",source:"./views/page.mjs"},home:{entry:"home",source:"./views/home.mjs"},manual:{entry:"manual",source:"./views/manual.mjs"},user:{entry:"user",source:"./views/user.mjs"},form:{entry:"index",source:"./views/base/index.mjs"},category:{entry:"index",source:"./views/base/index.mjs"},task:{entry:"index",source:"./views/base/index.mjs"},builder:{entry:"builder",source:"./views/builder/builder.mjs"},results:{entry:"results",source:"./views/results.mjs"},file:{entry:"file",source:"./views/file.mjs"},report:{entry:"report",source:"./views/report.mjs"},analytics:{entry:"analytics",source:"./views/analytics.mjs"},admin:{entry:"admin",source:"./views/admin.mjs"},messages:{entry:"messages",source:"./views/messages.mjs"}});Object.freeze(Object.fromEntries(Object.values(E).map(({entry:e,source:n})=>[e,n])));const O=e=>{const n=E[e]?.entry;return n?`./chunks/views/${n}.js?v=${k}`:null},D=e=>{const n=O(e);return n?import(n):null};async function I(e){const{captureError:n,isSkippedViewTransitionError:t,isTransientNetworkError:r}=await import("./chunks/foundation.js?v=b0c39e75").then(function(c){return c.l}),o=e.error||e.reason||e.message||"Unknown error";if(t(o)||r(o)){e.preventDefault();return}const l=e.type==="unhandledrejection"?{event:{type:"unhandledrejection"}}:{},a=document.activeElement!==document.body?document.activeElement:null;n(o,a,l)}window.__CONNECTIVITY__=v.snapshot(),window.__CONNECTIVITY_READY__=Promise.resolve();function V(){window.__NAVIGATION_TRANSITION_READY__||(window.__NAVIGATION_TRANSITION_SETTLED__=!1,window.__NAVIGATION_TRANSITION_READY__=new Promise(e=>{const n=()=>{const t=document.activeViewTransition;if(t){Promise.resolve(t.finished).catch(()=>{}).then(()=>requestAnimationFrame(n));return}window.__NAVIGATION_TRANSITION_SETTLED__=!0,e()};if(document.activeViewTransition){n();return}requestAnimationFrame(()=>requestAnimationFrame(n))}))}V();let m=null;const g=async()=>{const e=document.querySelector("[lp-view]");return e?e._lp_view?e._lp_view:m?await m:(m=(async()=>{const n=await D(e.dataset.kind);if(!n){const{captureError:r}=await import("./chunks/foundation.js?v=b0c39e75").then(function(o){return o.l});return r(new Error(`Unknown view kind: ${e.dataset.kind||"missing"}`),e,{view_kind:e.dataset.kind||""}),null}if(e.isConnected===!1)return null;const t=new n.default(e);return await t.init(),t._destroyed||e.isConnected===!1?null:(t.publish?.(),t)})(),await m):null};let w=null;async function C(){if(w)return w;w=(async()=>{const n=new AbortController,t=setTimeout(()=>n.abort(),500);try{const r=await fetch("/l/ping",{method:"HEAD",signal:n.signal});return j(r.headers),r.ok}catch{return!1}finally{clearTimeout(t),w=null}})();const e=w;return window.__PING_PENDING__=e,e.finally(()=>{window.__PING_PENDING__===e&&(window.__PING_PENDING__=null)}),e}let _=null;const P=600*1e3,G=2*1e3,R=5*1e3;function h(){_&&(clearTimeout(_),_=null)}function W(e){if(h(),window.__TESTING__&&e)return;const n=v.snapshot().browser==="online";_=setTimeout(s,e?P:n?G:R)}let u=null,i=null;function x(){return document.hidden||document.hasFocus?.()===!1}function f(e,{notifyController:n=!0}={}){const t=v.transition(e);return window.__CONNECTIVITY__=t,n&&navigator.serviceWorker?.controller?.postMessage(S(t)),t}function M({hidden:e,blurred:n,blurredAt:t,force:r=!1,browser:o}={}){const l=e===void 0?i?.hidden:!!e,a=n===void 0?i?.blurred:!!n,c=t===void 0?i?.blurredAt:t,d=o===void 0?i?.browser:o;i={force:!!(i?.force||r)},l!==void 0&&(i.hidden=l),a!==void 0&&(i.blurred=a),c!==void 0&&(i.blurredAt=c),d!==void 0&&(i.browser=d)}async function Y({hidden:e=x(),blurred:n=e&&!document.hidden&&document.hasFocus?.()===!1,blurredAt:t=n?Date.now():null,force:r=!1,browser:o=navigator.onLine===!1?"offline":"online"}={}){const l=navigator.serviceWorker?.controller?"controlled":"uncontrolled";f({browser:o,controller:l,visibility:e?"hidden":"visible"},{notifyController:e});const a=g();if(e){h();const p=await a;p?.sync&&await p.sync({hidden:!0,blurred:n,blurredAt:t,force:r});return}const c=await C();f({server:c?"online":"offline"}),W(c);const d=await a;d?.sync&&await d.sync({hidden:e,blurred:!1,blurredAt:null,force:r})}async function s(e={}){return M(e),u||(u=(async()=>{let n=null;for(;i;){const t=i;i=null;try{await Y(t)}catch(r){n||=r}}if(n)throw n})().finally(()=>{u=null}),window.__CONNECTIVITY_READY__=u,u)}function N(e){return f({browser:e}),s({browser:e})}function y({blurred:e=!1,blurredAt:n=e?Date.now():null}={}){return f({browser:navigator.onLine===!1?"offline":"online",controller:navigator.serviceWorker?.controller?"controlled":"uncontrolled",visibility:"hidden"}),s({hidden:!0,blurred:e,blurredAt:n})}function B(){document?.querySelector("meta[name='mode']")?.getAttribute("content")==="testing"&&(window.__TESTING__=!0)}function F(){return document?.querySelector("meta[name='mode']")?.getAttribute("content")}async function T(){const{analytics:e}=await import("./chunks/analytics.js?v=b0c39e75");e.view()}function b(){window.addEventListener("unhandledrejection",I),window.addEventListener("error",I)}function q(){"serviceWorker"in navigator&&(navigator.serviceWorker.register("/sw.js").catch(async e=>{const{captureNetworkError:n}=await import("./chunks/foundation.js?v=b0c39e75").then(function(t){return t.l});n(e,"/sw.js",{context:"service_worker"})}),navigator.serviceWorker.addEventListener("controllerchange",async()=>{f({controller:navigator.serviceWorker?.controller?"controlled":"uncontrolled"});const{clearRecentSearchResults:e}=await import("./chunks/foundation.js?v=b0c39e75").then(function(n){return n.n});e(),s()}))}async function U(){b();const[{initializeLogoutForms:e},{updateUserData:n}]=await Promise.all([import("./chunks/logout.js?v=b0c39e75"),import("./chunks/user2.js?v=b0c39e75")]);e(),T(),s(),document.addEventListener("visibilitychange",()=>{document.hidden?y():s()}),window.addEventListener("offline",()=>N("offline")),window.addEventListener("online",()=>N("online")),window.addEventListener("blur",()=>y({blurred:!document.hidden})),window.addEventListener("focus",()=>s({hidden:!1,blurred:!1,blurredAt:null})),window.addEventListener("pagehide",y),window.addEventListener("pageshow",t=>{s({force:t.persisted})}),n()}function A(){if(window.__INITIALIZED__)return;window.__INITIALIZED__=!0,B(),L();const e=F();if(q(),e==="public"){g(),b(),T();return}U()}document.readyState==="loading"?document.addEventListener("DOMContentLoaded",A,{once:!0}):A();
 /*! Third-party licenses: /third-party-licenses.txt */
+import { c as connectivity } from './chunks/connectivity.js?v=b3952f7d';
+import { e as applyNotificationStateHeader } from './chunks/foundation.js?v=b3952f7d';
+import { i as installUpstreamUnavailableBanner, c as connectivityMessage } from './chunks/upstreamUnavailable.js?v=b3952f7d';
+
+const BUILD_ID =
+	"b3952f7d";
+
+/**
+ * One registry owns both build inputs and runtime view selection. `entry` is a
+ * stable emitted filename; `source` is consumed by the Rollup configuration.
+ */
+const VIEW_REGISTRY = Object.freeze({
+	project: { entry: "project", source: "./views/project.mjs" },
+	page: { entry: "page", source: "./views/page.mjs" },
+	home: { entry: "home", source: "./views/home.mjs" },
+	manual: { entry: "manual", source: "./views/manual.mjs" },
+	user: { entry: "user", source: "./views/user.mjs" },
+	form: { entry: "index", source: "./views/base/index.mjs" },
+	category: { entry: "index", source: "./views/base/index.mjs" },
+	task: { entry: "index", source: "./views/base/index.mjs" },
+	builder: { entry: "builder", source: "./views/builder/builder.mjs" },
+	results: { entry: "results", source: "./views/results.mjs" },
+	file: { entry: "file", source: "./views/file.mjs" },
+	report: { entry: "report", source: "./views/report.mjs" },
+	analytics: { entry: "analytics", source: "./views/analytics.mjs" },
+	admin: { entry: "admin", source: "./views/admin.mjs" },
+	messages: { entry: "messages", source: "./views/messages.mjs" },
+});
+
+Object.freeze(
+	Object.fromEntries(
+		Object.values(VIEW_REGISTRY).map(({ entry, source }) => [entry, source]),
+	),
+);
+
+/**
+ * @testable true
+ * @tests tests_js/test_032_build_configuration.py::test_frontend_entries_and_startup_budget_contract
+ * @tests tests_js/test_032_build_configuration.py::test_templates_preload_registered_view_and_interaction_foundations
+ * @pair frontend-build:view-registry
+ */
+const viewEntryUrl = (kind) => {
+	const entry = VIEW_REGISTRY[kind]?.entry;
+	return entry ? `./chunks/views/${entry}.js?v=${BUILD_ID}` : null;
+};
+
+/**
+ * @testable infrastructure
+ * @covered-by src/script/viewRegistry.mjs::viewEntryUrl
+ */
+const loadView = (kind) => {
+	const url = viewEntryUrl(kind);
+	if (!url) return null;
+	return import(url);
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_navigation_fetch_abort_is_not_reported_as_application_error
+ * @matrix startup : error-reporting navigation transient-network
+ */
+async function onError(event) {
+	const {
+		captureError,
+		isSkippedViewTransitionError,
+		isTransientNetworkError,
+	} = await import('./chunks/foundation.js?v=b3952f7d').then(function (n) { return n.l; });
+	const error = event.error || event.reason || event.message || "Unknown error";
+	if (isSkippedViewTransitionError(error) || isTransientNetworkError(error)) {
+		event.preventDefault();
+		return;
+	}
+	const context =
+		event.type === "unhandledrejection"
+			? { event: { type: "unhandledrejection" } }
+			: {};
+	const element =
+		document.activeElement !== document.body ? document.activeElement : null;
+
+	captureError(error, element, context);
+}
+
+window.__CONNECTIVITY__ = connectivity.snapshot();
+// Optional observation boundary for callers that explicitly need the latest
+// background connectivity cycle to settle. Rendering never awaits this.
+window.__CONNECTIVITY_READY__ = Promise.resolve();
+
+/**
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_cross_document_transition_publishes_settled_readiness
+ * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
+ * @pairs startup:settled-boundary view-transition:navigation
+ */
+function publishNavigationTransitionReadiness() {
+	// A parser-time observer can publish the exact `pagereveal` boundary before
+	// this deferred module evaluates. Preserve it when available.
+	if (window.__NAVIGATION_TRANSITION_READY__) return;
+	window.__NAVIGATION_TRANSITION_SETTLED__ = false;
+	window.__NAVIGATION_TRANSITION_READY__ = new Promise((resolve) => {
+		/**
+		 * @testable false
+		 * @covered-by src/script/main.mjs::publishNavigationTransitionReadiness
+		 * @reason recursive browser-state sampling is owned by the published readiness boundary
+		 */
+		const publishWhenInactive = () => {
+			const transition = document.activeViewTransition;
+			if (transition) {
+				Promise.resolve(transition.finished)
+					.catch(() => undefined)
+					.then(() => requestAnimationFrame(publishWhenInactive));
+				return;
+			}
+			window.__NAVIGATION_TRANSITION_SETTLED__ = true;
+			resolve();
+		};
+
+		if (document.activeViewTransition) {
+			publishWhenInactive();
+			return;
+		}
+
+		// Cross-document transitions begin after `pagereveal` and the first
+		// rendered frame. Sample after that paint so an initially absent active
+		// transition cannot be mistaken for a settled navigation.
+		requestAnimationFrame(() => requestAnimationFrame(publishWhenInactive));
+	});
+}
+
+// Product startup remains independent; browser tests can await visual
+// completion after the destination view publishes structural readiness.
+publishNavigationTransitionReadiness();
+
+let __activeView = null;
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
+ * @pair offline:view-reset
+ */
+const getView = async () => {
+	const viewElt = document.querySelector("[lp-view]");
+	if (!viewElt) return null;
+
+	if (viewElt._lp_view) return viewElt._lp_view;
+
+	if (__activeView) return await __activeView;
+
+	__activeView = (async () => {
+		const viewModule = await loadView(viewElt.dataset.kind);
+		if (!viewModule) {
+			const { captureError } = await import('./chunks/foundation.js?v=b3952f7d').then(function (n) { return n.l; });
+			captureError(
+				new Error(`Unknown view kind: ${viewElt.dataset.kind || "missing"}`),
+				viewElt,
+				{ view_kind: viewElt.dataset.kind || "" },
+			);
+			return null;
+		}
+
+		if (viewElt.isConnected === false) return null;
+		const view = new viewModule.default(viewElt);
+		await view.init();
+		if (view._destroyed || viewElt.isConnected === false) return null;
+		view.publish?.();
+		return view;
+	})();
+
+	return await __activeView;
+};
+
+let _ping = null;
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
+ * @tests tests_js/test_017_main_lifecycle.py::test_ping_uses_server_owned_cache_policy
+ * @tests tests_js/test_017_main_lifecycle.py::test_ping_clears_only_the_settled_pending_promise
+ * @matrix offline : cache-policy pending-ownership server-health settled-cleanup
+ * @pair offline:indicator
+ */
+async function pingServer() {
+	if (_ping) return _ping;
+
+	_ping = (async () => {
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 500);
+		try {
+			const response = await fetch("/l/ping", {
+				method: "HEAD",
+				signal: controller.signal,
+			});
+			applyNotificationStateHeader(response.headers);
+			return response.ok;
+		} catch {
+			return false;
+		} finally {
+			clearTimeout(timeoutId);
+			_ping = null;
+		}
+	})();
+	const pending = _ping;
+	window.__PING_PENDING__ = pending;
+	void pending.finally(() => {
+		if (window.__PING_PENDING__ === pending) window.__PING_PENDING__ = null;
+	});
+
+	return pending;
+}
+
+let _pollTimeout = null;
+
+const KEEP_AWAKE_MS = 10 * 60 * 1000;
+const POLL_MS = 2 * 1000;
+const OFFLINE_POLL_MS = 5 * 1000;
+
+/**
+ * @testable false
+ * @covered-by src/script/main.mjs::syncViewOnce
+ * @covered-by src/script/main.mjs::pollServer
+ * @reason timer cancellation is owned by the foreground/background sync lifecycle
+ */
+function stopPolling() {
+	if (!_pollTimeout) return;
+	clearTimeout(_pollTimeout);
+	_pollTimeout = null;
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/main.mjs::syncViewOnce
+ * @reason timer scheduling supports the server-health sync contract
+ */
+function pollServer(online) {
+	stopPolling();
+	// Healthy testing-mode views do not need the production keep-awake timer,
+	// but an offline view still needs a retry in case the browser misses the
+	// native online transition after an offline reload.
+	if (window.__TESTING__ && online) return;
+
+	const browserOnline = connectivity.snapshot().browser === "online";
+	const delay = online
+		? KEEP_AWAKE_MS
+		: browserOnline
+			? POLL_MS
+			: OFFLINE_POLL_MS;
+	_pollTimeout = setTimeout(syncView, delay);
+}
+
+let _sync = null;
+let _syncPending = null;
+
+/**
+ * Treat a visible tab in an unfocused browser window as inactive. Focus runs
+ * an explicit catch-up cycle, so ordinary periodic work can stop while the
+ * user is working elsewhere. Rendered deferred operations receive the bounded
+ * visible-blur exception downstream.
+ *
+ * @testable false
+ * @covered-by src/script/main.mjs::syncViewOnce
+ * @covered-by src/script/main.mjs::initialize
+ * @reason shared inactivity predicate is exercised through lifecycle entry points
+ */
+function documentInactive() {
+	return document.hidden || document.hasFocus?.() === false;
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/main.mjs::syncViewOnce
+ * @covered-by src/script/main.mjs::suspendCurrentView
+ * @reason connectivity publication is owned by the visible/hidden sync lifecycle
+ */
+function updateConnectivity(patch, { notifyController = true } = {}) {
+	const state = connectivity.transition(patch);
+	window.__CONNECTIVITY__ = state;
+	if (notifyController) {
+		navigator.serviceWorker?.controller?.postMessage(
+			connectivityMessage(state),
+		);
+	}
+	return state;
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/main.mjs::syncView
+ * @reason pending sync option merging is private queue plumbing for the public sync runner
+ */
+function queueSync({
+	hidden,
+	blurred,
+	blurredAt,
+	force = false,
+	browser,
+} = {}) {
+	const pendingHidden =
+		hidden === undefined ? _syncPending?.hidden : Boolean(hidden);
+	const pendingBlurred =
+		blurred === undefined ? _syncPending?.blurred : Boolean(blurred);
+	const pendingBlurredAt =
+		blurredAt === undefined ? _syncPending?.blurredAt : blurredAt;
+	const pendingBrowser =
+		browser === undefined ? _syncPending?.browser : browser;
+
+	_syncPending = {
+		force: Boolean(_syncPending?.force || force),
+	};
+	if (pendingHidden !== undefined) _syncPending.hidden = pendingHidden;
+	if (pendingBlurred !== undefined) _syncPending.blurred = pendingBlurred;
+	if (pendingBlurredAt !== undefined) _syncPending.blurredAt = pendingBlurredAt;
+	if (pendingBrowser !== undefined) _syncPending.browser = pendingBrowser;
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
+ * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
+ * @tests tests_js/test_017_main_lifecycle.py::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
+ * @matrix offline : browser-state coalescing indicator rapid-transitions reconnect server-health transitions view-reset visible-blur
+ */
+async function syncViewOnce({
+	hidden = documentInactive(),
+	blurred = hidden && !document.hidden && document.hasFocus?.() === false,
+	blurredAt = blurred ? Date.now() : null,
+	force = false,
+	browser = navigator.onLine === false ? "offline" : "online",
+} = {}) {
+	const controller = navigator.serviceWorker?.controller
+		? "controlled"
+		: "uncontrolled";
+	updateConnectivity(
+		{
+			browser,
+			controller,
+			visibility: hidden ? "hidden" : "visible",
+		},
+		{ notifyController: hidden },
+	);
+	const viewPromise = getView();
+	if (hidden) {
+		stopPolling();
+		const view = await viewPromise;
+		if (view?.sync) {
+			await view.sync({ hidden: true, blurred, blurredAt, force });
+		}
+		return;
+	}
+
+	const online = await pingServer();
+
+	updateConnectivity({ server: online ? "online" : "offline" });
+	pollServer(online);
+
+	const view = await viewPromise;
+	if (view?.sync) {
+		await view.sync({ hidden, blurred: false, blurredAt: null, force });
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
+ * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
+ * @tests tests_js/test_017_main_lifecycle.py::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
+ * @matrix offline : browser-state server-health settled-boundary transitions
+ * @pairs connectivity:error-recovery offline:error-recovery
+ */
+async function syncView(options = {}) {
+	queueSync(options);
+	if (_sync) return _sync;
+
+	_sync = (async () => {
+		let firstError = null;
+		while (_syncPending) {
+			const nextSync = _syncPending;
+			_syncPending = null;
+			try {
+				await syncViewOnce(nextSync);
+			} catch (error) {
+				firstError ||= error;
+			}
+		}
+		if (firstError) throw firstError;
+	})().finally(() => {
+		_sync = null;
+	});
+	window.__CONNECTIVITY_READY__ = _sync;
+
+	return _sync;
+}
+
+/**
+ * Publish native browser-link changes before scheduling health checks, view
+ * synchronization, or replay. Consumers can read connectivity synchronously;
+ * only callers that need the background cycle's completion await the result.
+ *
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
+ * @matrix connectivity offline : browser-state settled-boundary transitions
+ */
+function browserConnectivityChanged(browser) {
+	updateConnectivity({ browser });
+	return syncView({ browser });
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_suspend_current_view_deregisters_without_health_check
+ * @matrix offline sync : deregistration pagehide visibility
+ */
+function suspendCurrentView({
+	blurred = false,
+	blurredAt = blurred ? Date.now() : null,
+} = {}) {
+	updateConnectivity({
+		browser: navigator.onLine === false ? "offline" : "online",
+		controller: navigator.serviceWorker?.controller
+			? "controlled"
+			: "uncontrolled",
+		visibility: "hidden",
+	});
+	return syncView({ hidden: true, blurred, blurredAt });
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
+ * @pair offline:view-reset
+ */
+function setTestMode() {
+	const mode = document
+		?.querySelector("meta[name='mode']")
+		?.getAttribute("content");
+	if (mode === "testing") {
+		window.__TESTING__ = true;
+	}
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/main.mjs::initialize
+ * @reason mode metadata lookup only gates authenticated session startup work
+ */
+function pageMode() {
+	return document?.querySelector("meta[name='mode']")?.getAttribute("content");
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/main.mjs::initialize
+ * @reason analytics startup is composition owned by the page-mode lifecycle
+ */
+async function startAnalytics() {
+	const { analytics } = await import('./chunks/analytics.js?v=b3952f7d');
+	analytics.view();
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/main.mjs::initialize
+ * @reason global error-listener installation is composition owned by startup
+ */
+function startErrorHandling() {
+	window.addEventListener("unhandledrejection", onError);
+	window.addEventListener("error", onError);
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_service_worker_registration_starts_immediately
+ * @tests tests_js/test_017_main_lifecycle.py::test_controller_replacement_receives_current_versioned_connectivity_state
+ * @tests tests_js/test_017_main_lifecycle.py::test_upstream_unavailable_worker_message_shows_retryable_banner
+ * @tests tests_js/test_017_main_lifecycle.py::test_public_page_skips_authenticated_lifecycle
+ * @matrix connectivity service-worker : controller-replacement state-publication version
+ * @matrix request-errors service-worker : upstream-unavailable validation
+ * @pairs service-worker:registration startup:interaction-ready
+ */
+function startServiceWorker() {
+	if (!("serviceWorker" in navigator)) return;
+	navigator.serviceWorker.register("/sw.js").catch(async (error) => {
+		const { captureNetworkError } = await import('./chunks/foundation.js?v=b3952f7d').then(function (n) { return n.l; });
+		captureNetworkError(error, "/sw.js", { context: "service_worker" });
+	});
+
+	navigator.serviceWorker.addEventListener("controllerchange", async () => {
+		updateConnectivity({
+			controller: navigator.serviceWorker?.controller
+				? "controlled"
+				: "uncontrolled",
+		});
+		const { clearRecentSearchResults } = await import('./chunks/foundation.js?v=b3952f7d').then(function (n) { return n.n; });
+		clearRecentSearchResults();
+		syncView();
+	});
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_public_page_skips_authenticated_lifecycle
+ * @tests tests_js/test_017_main_lifecycle.py::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
+ * @matrix polling : blur catch-up focus visibility
+ * @matrix startup : analytics deferred-lifecycle public-boundary
+ */
+async function startAuthenticatedLifecycle() {
+	startErrorHandling();
+
+	const [{ initializeLogoutForms }, { updateUserData }] = await Promise.all([
+		import('./chunks/logout.js?v=b3952f7d'),
+		import('./chunks/user2.js?v=b3952f7d'),
+	]);
+	initializeLogoutForms();
+	void startAnalytics();
+	void syncView();
+
+	document.addEventListener("visibilitychange", () => {
+		document.hidden ? suspendCurrentView() : syncView();
+	});
+	window.addEventListener("offline", () =>
+		browserConnectivityChanged("offline"),
+	);
+	window.addEventListener("online", () => browserConnectivityChanged("online"));
+	window.addEventListener("blur", () =>
+		suspendCurrentView({ blurred: !document.hidden }),
+	);
+	window.addEventListener("focus", () =>
+		syncView({ hidden: false, blurred: false, blurredAt: null }),
+	);
+	window.addEventListener("pagehide", suspendCurrentView);
+	window.addEventListener("pageshow", (event) => {
+		syncView({ force: event.persisted });
+	});
+
+	updateUserData();
+}
+
+/**
+ * @testable infrastructure
+ */
+function initialize() {
+	if (window.__INITIALIZED__) return;
+	window.__INITIALIZED__ = true;
+	setTestMode();
+	installUpstreamUnavailableBanner();
+	const mode = pageMode();
+	// Registration is fire-and-forget, but the controller/cache boundary is
+	// foundational infrastructure. Establish it before view startup instead of
+	// introducing it later during live interaction.
+	startServiceWorker();
+	if (mode === "public") {
+		void getView();
+		startErrorHandling();
+		void startAnalytics();
+		return;
+	}
+	void startAuthenticatedLifecycle();
+}
+
+document.readyState === "loading"
+	? document.addEventListener("DOMContentLoaded", initialize, { once: true })
+	: initialize();

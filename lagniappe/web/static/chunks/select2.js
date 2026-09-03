@@ -1,2 +1,82 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="d10777e8-c821-4f95-bda4-d891f1809bb0",e._sentryDebugIdIdentifier="sentry-dbid-d10777e8-c821-4f95-bda4-d891f1809bb0");}catch(e){}}();import{C as s}from"./combobox.js?v=b0c39e75";import{R as i}from"./results.js?v=b0c39e75";import{S as l}from"./submitter.js?v=b0c39e75";class a extends l(s){constructor(e){super(e),this.results=new i,this.items=[]}init(){this.select=this.parent.querySelector("select"),this.multiple=JSON.parse(this.select.dataset.multiple||"false"),this.select.name=this.name,this.select.multiple=this.multiple,this.select.style.display="none",this.element=document.createElement("input"),this.select.after(this.element),this.element.className=`${this.select.className}`,this.element.dataset.mode="select",this.element.readOnly=!0,this.element.setAttribute("inputmode","none"),this._createItems(),super.init()}updateSelect(e=!1){Array.from(this.select.options).forEach(t=>{t.selected=this.values.has(t.value)}),this.values.size===0&&(this.select.selectedIndex=-1),this.updatePlaceholder(),e||this.dispatchChangeEvents()}_createItems(){this.select.options.length!==0&&(this.items=Array.from(this.select.options).filter(e=>e.value).map(e=>({id:e.value,name:e.textContent,kind:this.select.dataset.kind||"default",...JSON.parse(e.dataset.details||"{}")})))}elementClick(e){e.stopPropagation(),this.panelOpen?this.hidePanel():this.showPanel()}addOption(e){this.items||this._createItems(),this.values.add(e.id)}hidePanel(){super.hidePanel(),this.element.blur()}}export{a as S};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { C as Combobox } from './combobox.js?v=b3952f7d';
+import { R as Results } from './results.js?v=b3952f7d';
+import { S as Submitter } from './submitter.js?v=b3952f7d';
+
+/**
+ * @testable infrastructure
+ */
+class SelectBox extends Submitter(Combobox) {
+	constructor(element) {
+		super(element);
+		this.results = new Results();
+		this.items = [];
+	}
+
+	init() {
+		this.select = this.parent.querySelector("select");
+		this.multiple = JSON.parse(this.select.dataset.multiple || "false");
+		this.select.name = this.name;
+		this.select.multiple = this.multiple;
+		this.select.style.display = "none";
+
+		this.element = document.createElement("input");
+		this.select.after(this.element);
+
+		this.element.className = `${this.select.className}`;
+		this.element.dataset.mode = "select";
+		this.element.readOnly = true;
+		this.element.setAttribute("inputmode", "none");
+
+		this._createItems();
+
+		super.init();
+	}
+
+	updateSelect(preloading = false) {
+		Array.from(this.select.options).forEach((option) => {
+			option.selected = this.values.has(option.value);
+		});
+
+		if (this.values.size === 0) {
+			this.select.selectedIndex = -1;
+		}
+
+		this.updatePlaceholder();
+
+		if (!preloading) {
+			this.dispatchChangeEvents();
+		}
+	}
+
+	_createItems() {
+		if (this.select.options.length === 0) return;
+
+		this.items = Array.from(this.select.options)
+			.filter((option) => option.value)
+			.map((option) => ({
+				id: option.value,
+				name: option.textContent,
+				kind: this.select.dataset.kind || "default",
+				...JSON.parse(option.dataset.details || "{}"),
+			}));
+	}
+
+	elementClick(event) {
+		event.stopPropagation();
+
+		this.panelOpen ? this.hidePanel() : void this.showPanel();
+	}
+
+	addOption(option) {
+		if (!this.items) this._createItems();
+		this.values.add(option.id);
+	}
+
+	hidePanel() {
+		super.hidePanel();
+		this.element.blur();
+	}
+}
+
+export { SelectBox as S };

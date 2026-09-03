@@ -170,6 +170,13 @@ def test_file_to_ai_exports_metadata_and_uri_to_ai():
         "mime_type": "application/pdf",
     }
 
+    for mimetype in ("text/markdown", "text/md", "text/vcard"):
+        file.mimetype = mimetype
+        assert file.properties.file.uri_to_ai == {
+            "uri": "gs://private-bucket/permit-packet.pdf",
+            "mime_type": "text/plain",
+        }
+
     file.mimetype = "application/octet-stream"
 
     assert file.properties.file.uri_to_ai is None

@@ -1,2 +1,56 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="4fbee892-4cae-4527-987d-586dc7e53507",e._sentryDebugIdIdentifier="sentry-dbid-4fbee892-4cae-4527-987d-586dc7e53507");}catch(e){}}();import{r as s,E as m,c as i}from"./foundation.js?v=b0c39e75";import"./connectivity.js?v=b0c39e75";import{B as n}from"./baseElement.js?v=b0c39e75";import"./upstreamUnavailable.js?v=b0c39e75";import"./styles.js?v=b0c39e75";import"./icons.js?v=b0c39e75";import"./primitives.js?v=b0c39e75";class h extends n{constructor(t,e,r){super(t,e,r),this.static=!0,this.html=null}async _getHtml(){return await s.get(m.html(this.renderer.form.key,this.schema.id).getContent).then(t=>t.markup).catch(t=>(i(t,this.renderer.form.target,{schema:this.schema}),""))}create(){if(this._elt)return this._elt;const t=document.createElement("div");return t.className="html-content",this.html?t.innerHTML=this.html:this._getHtml().then(e=>{this.html=e,t.innerHTML=e}),t}}export{h as HtmlElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request, E as ENDPOINTS, c as captureError } from './foundation.js?v=b3952f7d';
+import './connectivity.js?v=b3952f7d';
+import { B as BaseElement } from './baseElement.js?v=b3952f7d';
+import './upstreamUnavailable.js?v=b3952f7d';
+import './styles.js?v=b3952f7d';
+import './icons.js?v=b3952f7d';
+import './primitives.js?v=b3952f7d';
+
+/**
+ * @testable infrastructure
+ */
+class HtmlElement extends BaseElement {
+	constructor(renderer, schema, submission) {
+		super(renderer, schema, submission);
+		this.static = true;
+		this.html = null;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_037_html_element_frontend.py::test_html_element_reports_request_failure_without_masking_original
+	 * @pair form-html:error-reporting
+	 */
+	async _getHtml() {
+		return await request
+			.get(ENDPOINTS.html(this.renderer.form.key, this.schema.id).getContent)
+			.then((response) => response.markup)
+			.catch((error) => {
+				captureError(error, this.renderer.form.target, {
+					schema: this.schema,
+				});
+				return "";
+			});
+	}
+
+	create() {
+		if (this._elt) return this._elt;
+
+		const elt = document.createElement("div");
+		elt.className = "html-content";
+
+		if (!this.html) {
+			this._getHtml().then((html) => {
+				this.html = html;
+				elt.innerHTML = html;
+			});
+		} else {
+			elt.innerHTML = this.html;
+		}
+
+		return elt;
+	}
+}
+
+export { HtmlElement };

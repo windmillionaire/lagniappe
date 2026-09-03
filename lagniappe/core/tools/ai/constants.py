@@ -41,7 +41,6 @@ GEMINI_MIMETYPES = {
     "text/plain",
     "text/html",
     "text/css",
-    "text/md",
     "text/csv",
     "text/xml",
     "text/rtf",
@@ -73,3 +72,24 @@ GEMINI_MIMETYPES = {
     "video/wmv",
     "video/3gpp",
 }
+
+
+GEMINI_MIMETYPE_ALIASES = {
+    # Gemini accepts text/plain file parts, while Lagniappe retains these
+    # canonical media types for storage, downloads, and previews.
+    "text/markdown": "text/plain",
+    "text/md": "text/plain",
+    "text/vcard": "text/plain",
+}
+
+
+# @testable true
+# @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
+# @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_normalizes_textual_file_mimetypes_for_gemini
+# @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_saves_missing_summaries
+# @matrix ai files : mimetype normalization
+def gemini_mimetype(mimetype):
+    """Return the provider-supported media type for a Lagniappe MIME type."""
+    mimetype = str(mimetype or "").partition(";")[0].strip().lower()
+    mimetype = GEMINI_MIMETYPE_ALIASES.get(mimetype, mimetype)
+    return mimetype if mimetype in GEMINI_MIMETYPES else None

@@ -105,6 +105,33 @@ def _ooxml_summary_file(filename="source.docx", mimetype=DOCX_MIMETYPE):
     return file
 
 
+# @matrix ai files : mimetype normalization
+@pytest.mark.unit
+def test_prompt_normalizes_textual_file_mimetypes_for_gemini():
+    prompt = Prompt()
+
+    prompt.add_bytes(BytesIO(b"# Service confirmation"), "text/markdown")
+    prompt.add_bytes(
+        BytesIO(b"BEGIN:VCARD\nFN:Marisol Vega\nEND:VCARD"),
+        "text/vcard; charset=utf-8",
+    )
+    prompt.add_bytes(BytesIO(b"not supported"), "application/octet-stream")
+
+    assert prompt.bytes == [
+        {"bytes": b"# Service confirmation", "mime_type": "text/plain"},
+        {
+            "bytes": b"BEGIN:VCARD\nFN:Marisol Vega\nEND:VCARD",
+            "mime_type": "text/plain",
+        },
+    ]
+
+    contents = ai_core.GenAI()._build_contents(prompt)
+    assert [part.inline_data.mime_type for part in contents[1:]] == [
+        "text/plain",
+        "text/plain",
+    ]
+
+
 # @matrix ai : attachments cache-prefix context output-format prompt service-tier tool-batching tools
 @pytest.mark.unit
 def test_prompt_tracks_context_output_examples_and_attachments():

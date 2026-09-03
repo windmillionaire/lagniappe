@@ -15,6 +15,12 @@ contract.
 | File summary | One File and summary options. | Utility-model generation with extraction/provider fallback. | Summary/process state on the File. |
 | Report execution | Approved proposal; no model tools. | No provider call. | Action ledger, domain mutations, and optional undo. |
 
+Lagniappe preserves canonical MIME types on stored Files and downloads. At the
+Gemini request boundary, recognized Markdown (`text/markdown`) and vCard
+(`text/vcard`) inputs are sent as the provider-supported `text/plain` media type;
+their content remains unchanged. The same normalization applies to stored-file
+URI parts and direct inline autofill attachments.
+
 ## Ask
 
 Ask uses a lean initial prompt and retrieves workspace data on demand. Its

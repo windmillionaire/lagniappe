@@ -1,2 +1,96 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="9d45dc8b-d181-46bd-b238-aa37d97bdfc3",e._sentryDebugIdIdentifier="sentry-dbid-9d45dc8b-d181-46bd-b238-aa37d97bdfc3");}catch(e){}}();import{F as r}from"./toolbar.js?v=b0c39e75";import"./styles.js?v=b0c39e75";import"./combobox.js?v=b0c39e75";import"./foundation.js?v=b0c39e75";import"./upstreamUnavailable.js?v=b0c39e75";import"./connectivity.js?v=b0c39e75";import"./primitives.js?v=b0c39e75";import"./icons.js?v=b0c39e75";import"./queryLifecycle.js?v=b0c39e75";import"./dropdown.js?v=b0c39e75";import"./buttons.js?v=b0c39e75";import"./formatting.js?v=b0c39e75";class n{constructor(a){this.toolbar=a,this.name="setFontFamily",this.usedWithEditor=!0,this.active=!1,this.toggles=new Map}_fontToggle(a,e){const t=document.createElement("button");return t.className="cursor-pointer rounded bg-slate-200 px-3 py-1.5 text-base transition-transform hover:scale-110 hover:bg-slate-300 data-[active=true]:bg-slate-300 sm:text-sm",t.textContent=e,t.dataset.style=a,t.title=e,t.dataset.active="false",t}setActiveFontStyle(a){this.toggles.forEach((e,t)=>{const o=t===a;o!==e.active&&(e.button.dataset.active=o?"true":"false",e.active=o)})}init(){const a=this.toolbar.element.appendChild(document.createElement("div"));a.dataset.option=this.name,a.className='group mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setFontFamily"]/toolbar:flex',r.forEach(({style:e,name:t})=>{const o=this._fontToggle(e,t);this.toggles.set(e,{active:!1,button:o})}),a.append(...Array.from(this.toggles.values()).map(e=>e.button)),this.active=!0,a.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;const o=this.toggles.get(t.dataset.style),s=Array.from(this.toggles.values()).find(i=>i.active&&i!==o);s&&(s.active=!1,s.button.dataset.active="false"),o.active=!o.active,t.dataset.active=o.active?"true":"false",o.active?this.toolbar.editor.chain().focus().setFontFamily(t.dataset.style).run():this.toolbar.editor.chain().focus().unsetFontFamily().run()})}}export{n as setFontFamily};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FONT_MENU } from './toolbar.js?v=b3952f7d';
+import './styles.js?v=b3952f7d';
+import './combobox.js?v=b3952f7d';
+import './foundation.js?v=b3952f7d';
+import './upstreamUnavailable.js?v=b3952f7d';
+import './connectivity.js?v=b3952f7d';
+import './primitives.js?v=b3952f7d';
+import './icons.js?v=b3952f7d';
+import './queryLifecycle.js?v=b3952f7d';
+import './dropdown.js?v=b3952f7d';
+import './buttons.js?v=b3952f7d';
+import './formatting.js?v=b3952f7d';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_font_family
+ * @matrix editor : font-family reload
+ */
+class FontFamilyPicker {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.name = "setFontFamily";
+		this.usedWithEditor = true;
+		this.active = false;
+		this.toggles = new Map();
+	}
+
+	_fontToggle(style, name) {
+		const fontButton = document.createElement("button");
+		fontButton.className = `cursor-pointer rounded bg-slate-200 px-3 py-1.5 text-base transition-transform hover:scale-110 hover:bg-slate-300 data-[active=true]:bg-slate-300 sm:text-sm`;
+		fontButton.textContent = name;
+		fontButton.dataset.style = style;
+		fontButton.title = name;
+		fontButton.dataset.active = "false";
+		return fontButton;
+	}
+
+	setActiveFontStyle(activeFont) {
+		this.toggles.forEach((toggle, style) => {
+			const isActive = style === activeFont;
+			if (isActive !== toggle.active) {
+				toggle.button.dataset.active = isActive ? "true" : "false";
+				toggle.active = isActive;
+			}
+		});
+	}
+
+	init() {
+		const fontOptions = this.toolbar.element.appendChild(
+			document.createElement("div"),
+		);
+		fontOptions.dataset.option = this.name;
+		fontOptions.className = `group mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setFontFamily"]/toolbar:flex`;
+
+		FONT_MENU.forEach(({ style, name }) => {
+			const fontButton = this._fontToggle(style, name);
+			this.toggles.set(style, { active: false, button: fontButton });
+		});
+
+		fontOptions.append(
+			...Array.from(this.toggles.values()).map((toggle) => toggle.button),
+		);
+		this.active = true;
+
+		fontOptions.addEventListener("click", (e) => {
+			const fontButton = e.target.closest("button");
+			if (!fontButton) return;
+
+			const toggle = this.toggles.get(fontButton.dataset.style);
+
+			const currentActive = Array.from(this.toggles.values()).find(
+				(t) => t.active && t !== toggle,
+			);
+			if (currentActive) {
+				currentActive.active = false;
+				currentActive.button.dataset.active = "false";
+			}
+
+			toggle.active = !toggle.active;
+			fontButton.dataset.active = toggle.active ? "true" : "false";
+
+			if (toggle.active) {
+				this.toolbar.editor
+					.chain()
+					.focus()
+					.setFontFamily(fontButton.dataset.style)
+					.run();
+			} else {
+				this.toolbar.editor.chain().focus().unsetFontFamily().run();
+			}
+		});
+	}
+}
+
+export { FontFamilyPicker as setFontFamily };
