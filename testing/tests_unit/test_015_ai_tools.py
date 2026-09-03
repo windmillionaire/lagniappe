@@ -1355,7 +1355,7 @@ def test_get_guidelines_returns_named_bundle():
     assert "do not submit that intermediate plan" in organize["guidelines"]
     assert "form_autofill bundle" in organize["guidelines"]
     assert "Fetch only specialized bundles required" in organize["guidelines"]
-    assert "Do not fetch report_actions" in organize["guidelines"]
+    assert "report_actions with the chosen action names" in organize["guidelines"]
     assert "do not fetch file_summary separately" in organize["guidelines"]
     assert "server will not call a model" in organize["guidelines"]
     assert "Required Workflow" in organize["guidelines"]
@@ -1364,11 +1364,10 @@ def test_get_guidelines_returns_named_bundle():
     assert "when present" in organize["guidelines"]
     assert "contract-required attachment" in organize["guidelines"]
     assert "Future-dated work is not complete" in organize["guidelines"]
-    assert "Before Returning" in organize["guidelines"]
-    assert "add data.submission" in organize["guidelines"]
-    assert "When summarize_file is listed" in organize["guidelines"]
+    assert "Before Completing Structure Planning" in organize["guidelines"]
     assert "Summary Generation Guidelines" in organize["guidelines"]
     assert "exactly two distinct retrieval terms" in organize["guidelines"]
+    assert organize["content_bytes"] == len(organize["guidelines"].encode("utf-8"))
 
     result = ai_get_guidelines.execute_get_guidelines(
         {"task": "form_autofill"},
@@ -1421,6 +1420,100 @@ def test_get_guidelines_returns_named_bundle():
     assert "file_summary" in unknown["available"]
     assert "schema_evolution" in unknown["available"]
     assert "organize" in unknown["available"]
+
+
+# @matrix ai guidelines : action-selection field-type-selection payload-size
+@pytest.mark.unit
+def test_get_guidelines_filters_actions_and_schema_field_types():
+    selected_actions = ai_get_guidelines.execute_get_guidelines(
+        {
+            "task": "report_actions",
+            "actions": ["create_page", "attach_file_to_page"],
+        },
+        SimpleNamespace(),
+    )
+    assert selected_actions["filters"]["actions"] == [
+        "create_page",
+        "attach_file_to_page",
+    ]
+    assert "`create_page`" in selected_actions["guidelines"]
+    assert "`attach_file_to_page`" in selected_actions["guidelines"]
+    assert "`create_task`" not in selected_actions["guidelines"]
+    assert selected_actions["content_bytes"] < len(
+        ai_get_guidelines.ORGANIZE_ACTION_GUIDELINES.encode("utf-8")
+    )
+
+    selected_fields = ai_get_guidelines.execute_get_guidelines(
+        {"task": "form_autofill", "field_types": ["input", "table"]},
+        SimpleNamespace(),
+    )
+    assert selected_fields["filters"]["field_types"] == ["input", "table"]
+    assert "`input` Submission Value Guidelines" in selected_fields["guidelines"]
+    assert "`table` Submission Value Guidelines" in selected_fields["guidelines"]
+    assert "`checkbox` Submission Value Guidelines" not in selected_fields["guidelines"]
+
+
+# @matrix ai search : exact-name parent-scope permissions
+@pytest.mark.unit
+def test_ai_exact_name_search_is_parent_scoped_and_returns_permissions(monkeypatch):
+    parent = SimpleNamespace(
+        hash="category-hash",
+        allowed=lambda action, user=None: True,
+    )
+    page = SimpleNamespace(
+        urlsafe_key="page-key",
+        allowed=lambda action, user=None: action.name != "EDIT",
+    )
+    user = SimpleNamespace(
+        properties=SimpleNamespace(
+            restrictions=SimpleNamespace(search=["models"], belongs_to=[])
+        )
+    )
+    captured = {}
+    monkeypatch.setattr(ai_search.Entities, "CATEGORY", parent.__class__)
+    monkeypatch.setattr(
+        ai_search.Entities,
+        "fetch_one",
+        lambda identifier, request: parent,
+    )
+    monkeypatch.setattr(
+        ai_search.Entities,
+        "fetch",
+        lambda *identifiers, request: [page],
+    )
+    monkeypatch.setattr(
+        ai_search.cache,
+        "exact_name_search",
+        lambda name, restrictions, belongs_to, **kwargs: captured.update(
+            name=name,
+            restrictions=restrictions,
+            belongs_to=belongs_to,
+            **kwargs,
+        ) or [{
+            "kind": "page",
+            "id": "page-key",
+            "name": "Recovery",
+            "details": {"hash": "abcdef123456"},
+        }],
+    )
+
+    result = ai_search.execute_search(
+        {
+            "query": "Recovery",
+            "kinds": ["page"],
+            "match_mode": "exact_name",
+            "parent_id": "hash:category-hash",
+        },
+        user,
+    )
+
+    assert captured["parent_hash"] == "category-hash"
+    assert result[0]["hash"] == "hash:abcdef123456"
+    assert result[0]["permissions"] == {
+        "can_view": True,
+        "can_edit": False,
+        "can_create": True,
+    }
 
 
 # @matrix ai : autofill tool-context

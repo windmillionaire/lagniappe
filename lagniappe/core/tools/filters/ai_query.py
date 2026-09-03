@@ -1,7 +1,7 @@
 """Validated, read-only filter queries for AI workspace tools."""
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 
 from .cache import FilterCache
@@ -10,6 +10,15 @@ from .contract import compile_filter_contract, describe_filter_contract
 
 DEFAULT_LIMIT = 25
 MAX_LIMIT = 100
+MAX_SERIALIZATION_ERRORS = 5
+RECOVERABLE_RESULT_ERRORS = (
+    exceptions.UnloadedRelationError,
+    exceptions.PropertyError,
+    AttributeError,
+    KeyError,
+    TypeError,
+    ValueError,
+)
 SORTS = frozenset(
     {
         "modified_desc",
@@ -75,24 +84,86 @@ def query_workspace_filter(
     ]
     visible = _sort_results(visible, sort)
     result_limit = _result_limit(limit)
-    returned = visible[:result_limit]
-    task_pages = [
-        result.page
-        for result in returned
-        if isinstance(result, Entities.TASK) and result.page
-    ]
+    selected = visible[:result_limit]
+    task_pages = []
+    for result in selected:
+        if not isinstance(result, Entities.TASK):
+            continue
+        try:
+            page = result.page
+        except RECOVERABLE_RESULT_ERRORS:
+            continue
+        if page:
+            task_pages.append(page)
     if task_pages:
-        # Task AI output derives categories from its parent Page. Treat those
-        # Pages as direct roots only for the rows this response will serialize.
-        Entities.fetch(*returned, *task_pages, request=Fetch.direct())
+        # Task AI output includes direct Task relations such as completed_by and
+        # categories derived through the parent Page. The filter UI needs only
+        # row projections, but this AI boundary serializes that two-hop graph.
+        try:
+            Entities.fetch(
+                *selected,
+                *task_pages,
+                request=Fetch.nested(
+                    because=FetchReason.AI_FILTER_RESULT_SERIALIZATION
+                ),
+            )
+        except RECOVERABLE_RESULT_ERRORS:
+            # Serialization below isolates affected rows and returns a bounded
+            # corrective result instead of promoting legacy data to an API 500.
+            pass
+    serialized, serialization_errors = _serialize_results(selected, user)
     return {
         "parent": _entity_reference(parent),
         "result_kind": "task" if parent.kind == "project" else "page",
         "matched": len(visible),
-        "returned": len(returned),
-        "truncated": len(visible) > len(returned),
-        "results": [result.to_ai(user) for result in returned],
+        "returned": len(serialized),
+        "truncated": len(visible) > len(selected),
+        "results": serialized,
+        **(
+            {
+                "serialization_errors": serialization_errors,
+                "incomplete": True,
+            }
+            if serialization_errors
+            else {}
+        ),
     }
+
+
+# @testable true
+# @tests tests_unit/test_015c_ai_filter_query.py::test_query_workspace_filter_reports_bounded_row_serialization_errors
+# @matrix ai-filter : legacy-record bounded-error output
+def _serialize_results(results, user):
+    """Serialize rows independently so one legacy record cannot hide all matches."""
+    serialized = []
+    errors = []
+    omitted_errors = 0
+    for result in results:
+        try:
+            serialized.append(result.to_ai(user))
+        except RECOVERABLE_RESULT_ERRORS:
+            if len(errors) < MAX_SERIALIZATION_ERRORS:
+                errors.append(
+                    {
+                        "code": "unrepresentable_result",
+                        "entity": _entity_reference(result),
+                        "message": (
+                            "This matching record could not be represented for AI "
+                            "output. Open and resave it, or inspect it in the app."
+                        ),
+                    }
+                )
+            else:
+                omitted_errors += 1
+    if omitted_errors:
+        errors.append(
+            {
+                "code": "additional_unrepresentable_results",
+                "count": omitted_errors,
+                "message": "Additional matching records could not be represented.",
+            }
+        )
+    return serialized, errors
 
 
 # @testable false

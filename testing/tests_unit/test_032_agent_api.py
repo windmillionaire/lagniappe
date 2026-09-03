@@ -42,7 +42,7 @@ def test_client_skill_markdown_is_minimal_and_discovery_first():
     assert "Choose Ask for a read-only answer" in skill
     assert "untrusted evidence" in skill
     assert "ready for authenticated website review" in skill
-    assert "not a round-trippable submission source" in skill
+    assert "can be edited and resubmitted" in skill
     assert "authenticated website" in skill
     assert "create_page" not in skill
     assert "Bearer <" not in skill
@@ -191,6 +191,30 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         "allowed": ("create_page", "move_page", "summarize_file")
     }
     assert contract["required_file_refs"] == ["hash:aaaaaaaaaaaa"]
+    assert contract["upload_inventory"]["count"] == 1
+    assert contract["upload_inventory"]["authoritative"] is True
+    assert contract["upload_inventory"]["status"] == "finalized"
+    assert contract["file_checklist"] == [
+        {
+            "file": "hash:aaaaaaaaaaaa",
+            "inspect_complete_content": "required",
+            "duplicate_check": "required",
+            "destination_decision": "required",
+            "placement_action": "required",
+            "attachment": "at_least_one",
+            "summary": "exactly_one",
+        }
+    ]
+    assert contract["guidance_requirements"]["required_before_analysis"] == [
+        {"task": "organize"}
+    ]
+    assert any(
+        item["request"].get("task") == "form_autofill"
+        and "field_types" in item["request"]
+        for item in contract["guidance_requirements"]["conditional"]
+    )
+    assert contract["payload_sizes"]["proposal_schema_bytes"] > 0
+    assert contract["payload_sizes"]["contract_without_payload_sizes_bytes"] > 0
     assert any(
         "Upload and finalize at least one file" in rule
         for rule in contract["workflow_rules"]
@@ -319,6 +343,23 @@ def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
     names = [tool["name"] for tool in ai_functions.tool_catalog()]
     assert names == list(ai_functions.DECLARATIONS)
     assert all(tool["input_schema"]["type"] == "object" for tool in ai_functions.tool_catalog())
+    assert all("output_schema" in tool for tool in ai_functions.tool_catalog())
+    assert all("result_paths" in tool for tool in ai_functions.tool_catalog())
+    search_definition = ai_functions.TOOL_DEFINITIONS["search_entities"]
+    assert search_definition["output_schema"]["type"] == "array"
+    assert search_definition["result_paths"]["primary_collection"] == "$"
+    page_definition = ai_functions.TOOL_DEFINITIONS["get_page_details"]
+    assert "page" in page_definition["output_schema"]["required"]
+    assert page_definition["result_paths"]["primary_entity"] == "$.page"
+    assert ai_functions.tool_catalog(
+        names=["get_entity", "search_entities"], names_only=True
+    ) == ["get_entity", "search_entities"]
+    assert [
+        tool["name"]
+        for tool in ai_functions.tool_catalog(names=["get_entity"])
+    ] == ["get_entity"]
+    with pytest.raises(ValueError, match="Unknown tool names"):
+        ai_functions.tool_catalog(names=["invented_tool"])
     rest_get_file = next(
         tool
         for tool in ai_functions.tool_catalog(transport="rest")
@@ -424,6 +465,50 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
         external_api.validate_external_proposal(inaccessible, report, actor)
 
 
+# @matrix agent-api : envelope schema field-path bounded-validation
+@pytest.mark.unit
+def test_external_submission_validation_collects_independent_field_errors():
+    report = SimpleNamespace(tool="ask")
+    errors = external_api.submission_validation_errors(
+        {
+            "contract_version": external_api.CONTRACT_VERSION,
+            "proposal": {"actions": []},
+        },
+        report,
+        object(),
+    )
+    by_path = {error["path"]: error for error in errors}
+    assert by_path["$.proposal.summary"]["code"] == "required"
+    assert by_path["$.proposal.confidence"]["code"] == "required"
+
+    missing_wrapper = external_api.submission_validation_errors(
+        {
+            "summary": "This is a raw proposal, not the submission wrapper.",
+            "confidence": 0.8,
+            "actions": [],
+        },
+        SimpleNamespace(tool="organize"),
+        object(),
+    )
+    paths = {error["path"] for error in missing_wrapper}
+    assert "$.contract_version" in paths
+    assert "$.proposal" in paths
+    assert "$.summary" in paths
+    assert len(missing_wrapper) <= external_api.MAX_VALIDATION_ERRORS
+
+    noisy_wrapper = {
+        "summary": "Still not the submission wrapper.",
+        **{f"unsupported_{index}": index for index in range(30)},
+    }
+    bounded = external_api.submission_validation_errors(
+        noisy_wrapper,
+        SimpleNamespace(tool="organize"),
+        object(),
+    )
+    assert len(bounded) == external_api.MAX_VALIDATION_ERRORS
+    assert bounded[-1]["code"] == "validation_errors_truncated"
+
+
 # @matrix agent-api ai-report : idempotency proposal-publication ready-state
 # @pair agent-api:organize-revision
 @pytest.mark.unit
@@ -458,7 +543,7 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
     monkeypatch.setattr(
         external_api,
         "validate_external_proposal",
-        lambda value, current_report, user: value,
+        lambda value, current_report, user, **_options: value,
     )
     monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
 
@@ -545,7 +630,7 @@ def test_external_ask_submission_completes_without_files_or_execution(monkeypatc
 
     assert submitted is repeated is revised is report
     assert report.status == "complete"
-    assert "answer_markdown" not in report.proposal
+    assert report.proposal["answer_markdown"].startswith("## Updated result")
     assert report.summary == "The page now has one open task."
     assert "<h2>Updated result</h2>" in report.proposal["answer_html"]
     assert saved == [report, report]
@@ -579,7 +664,7 @@ def test_external_ask_submission_allows_hash_token_in_named_link_destination(
         object(),
     )
 
-    assert "answer_markdown" not in normalized
+    assert normalized["answer_markdown"].startswith("Review [Cypress Hive]")
     assert 'href="/pages/canonical-cypress-page-key"' in normalized["answer_html"]
     assert ">Cypress Hive</a>" in normalized["answer_html"]
     assert "hash:8328b23bef92" not in normalized["answer_html"]
@@ -680,10 +765,112 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
     assert report.status == "ready"
     assert submitted.input_files == []
     data = report.proposal["actions"][0]["data"]
-    assert "document_markdown" not in data
+    assert data["document_markdown"].startswith("# Field Guide")
     assert data["document"].startswith("<h1>Field Guide</h1>")
     assert "A revised introduction." in data["document"]
     assert saved == [report, report]
+
+
+# @matrix agent-api ai-report : markdown public-reference round-trip stored-execution
+@pytest.mark.unit
+def test_public_plan_proposal_round_trips_hash_references_and_markdown(monkeypatch):
+    entity = SimpleNamespace(
+        urlsafe_key="ah-internal-page-key-with-enough-characters-123456",
+        hash="abcdef123456",
+    )
+    monkeypatch.setattr(
+        external_api.database_get,
+        "is_urlsafe_key",
+        lambda value: value == entity.urlsafe_key,
+    )
+    monkeypatch.setattr(
+        external_api.Entities,
+        "fetch",
+        lambda *identifiers, request: [entity],
+    )
+    report = SimpleNamespace(
+        tool="create",
+        agent_manifest={
+            "public_references": {
+                entity.urlsafe_key: "hash:abcdef123456",
+            }
+        },
+        proposal={
+            "summary": "Create the page.",
+            "confidence": 0.9,
+            "issues": [],
+            "actions": [
+                {
+                    "id": "page",
+                    "type": "create_page",
+                    "data": {
+                        "name": "Field Guide",
+                        "category": entity.urlsafe_key,
+                        "document_markdown": "# Field Guide\n\nPublic source.",
+                        "document": "<h1>Field Guide</h1><p>Public source.</p>",
+                        "submission": {
+                            "related-page": f"/pages/{entity.urlsafe_key}",
+                        },
+                    },
+                }
+            ],
+        },
+    )
+
+    public = external_api.public_plan_proposal(report)
+
+    assert public["actions"][0]["data"] == {
+        "name": "Field Guide",
+        "category": "hash:abcdef123456",
+        "document_markdown": "# Field Guide\n\nPublic source.",
+        "submission": {
+            "related-page": "/pages/hash:abcdef123456",
+        },
+    }
+    assert report.proposal["actions"][0]["data"]["category"] == entity.urlsafe_key
+
+
+# @matrix agent-api files : complete-inventory deterministic-fingerprint seven-file-regression
+@pytest.mark.unit
+def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatch):
+    actor = _contract_actor()
+    files = [
+        SimpleNamespace(
+            hash=f"{index:012d}",
+            name=f"File {index}",
+            filename=f"file-{index}.txt",
+            mimetype="text/plain",
+            size=index + 1,
+        )
+        for index in range(7)
+    ]
+    monkeypatch.setattr(
+        external_api,
+        "allowed_report_actions",
+        lambda user: ("attach_file_to_page",),
+    )
+    monkeypatch.setattr(
+        external_api,
+        "report_action_permission_context",
+        lambda user, allowed: {"allowed_actions": list(allowed)},
+    )
+    monkeypatch.setattr(
+        external_api.dates,
+        "user_today",
+        lambda _user=None: datetime(2026, 9, 2, tzinfo=timezone.utc),
+    )
+    report = SimpleNamespace(tool="organize", input_files=files, upload_manifest=None)
+    contract = external_api.plan_contract(report, actor)
+    repeated_inventory = external_api.report_file_inventory(report)
+
+    assert contract["upload_inventory"]["count"] == 7
+    assert repeated_inventory["fingerprint"] == contract["upload_inventory"][
+        "fingerprint"
+    ]
+    assert len(contract["required_file_refs"]) == 7
+    assert [item["file"] for item in contract["file_checklist"]] == (
+        contract["required_file_refs"]
+    )
 
 
 # @matrix agent-api : authentication expiry issue revoke shown-once

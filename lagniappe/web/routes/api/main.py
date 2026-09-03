@@ -330,7 +330,7 @@ def _plan_payload(report, *, include_proposal=True):
         ),
     }
     if include_proposal:
-        payload["proposal"] = report.proposal
+        payload["proposal"] = external_api.public_plan_proposal(report)
     return _json_safe(payload)
 
 
@@ -583,10 +583,64 @@ def openapi_document():
                     "hash: references only as allowed by the selected plan contract."
                 ),
                 "tags": ["Discovery"],
+                "parameters": [
+                    {
+                        "name": "names",
+                        "in": "query",
+                        "required": False,
+                        "description": (
+                            "Optional comma-separated or repeated exact tool names. "
+                            "Use this to retrieve only selected definitions."
+                        ),
+                        "schema": {"type": "array", "items": {"type": "string"}},
+                        "style": "form",
+                        "explode": True,
+                    },
+                    {
+                        "name": "view",
+                        "in": "query",
+                        "required": False,
+                        "description": (
+                            "Use names for a compact array of exact registered names; "
+                            "the default full view includes input and output schemas."
+                        ),
+                        "schema": {
+                            "type": "string",
+                            "enum": ["full", "names"],
+                            "default": "full",
+                        },
+                    },
+                ],
                 "responses": {
                     "200": {
                         "description": "Read-tool catalog and reference format.",
-                        **json_content({"type": "object"}),
+                        **json_content(
+                            {
+                                "type": "object",
+                                "required": [
+                                    "tools",
+                                    "view",
+                                    "selected_count",
+                                    "reference_format",
+                                    "execution_envelope",
+                                ],
+                                "properties": {
+                                    "tools": {
+                                        "type": "array",
+                                        "items": {
+                                            "oneOf": [
+                                                {"$ref": "#/components/schemas/ToolDefinition"},
+                                                {"type": "string"},
+                                            ]
+                                        },
+                                    },
+                                    "view": {"type": "string", "enum": ["full", "names"]},
+                                    "selected_count": {"type": "integer"},
+                                    "reference_format": {"type": "string"},
+                                    "execution_envelope": {"type": "object"},
+                                },
+                            }
+                        ),
                     },
                     "default": error_response,
                 },
@@ -866,6 +920,15 @@ def openapi_document():
                             {"$ref": "#/components/schemas/SubmissionReceipt"}
                         ),
                     },
+                    "422": {
+                        "description": (
+                            "Invalid submission. Independent wrapper and schema "
+                            "failures are returned together in "
+                            "error.details.errors; later semantic failures retain "
+                            "the concise Error envelope."
+                        ),
+                        **json_content({"$ref": "#/components/schemas/Error"}),
+                    },
                     "default": error_response,
                 },
             }
@@ -924,10 +987,33 @@ def openapi_document():
                             "properties": {
                                 "code": {"type": "string"},
                                 "message": {"type": "string"},
-                                "details": {},
+                                "details": {
+                                    "type": "object",
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "maxItems": external_api.MAX_VALIDATION_ERRORS,
+                                            "items": {
+                                                "$ref": "#/components/schemas/ValidationErrorDetail"
+                                            },
+                                        }
+                                    },
+                                    "additionalProperties": True,
+                                },
                             },
                         },
                         "request_id": {"type": "string"},
+                    },
+                },
+                "ValidationErrorDetail": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["code", "path", "message"],
+                    "properties": {
+                        "code": {"type": "string"},
+                        "path": {"type": "string"},
+                        "message": {"type": "string"},
+                        "expected": {},
                     },
                 },
                 "PlanFile": {
@@ -1004,7 +1090,15 @@ def openapi_document():
                             "format": "uri",
                             "description": "Canonical full browser report URL.",
                         },
-                        "proposal": {"oneOf": [{"type": "object"}, {"type": "null"}]},
+                        "proposal": {
+                            "oneOf": [{"type": "object"}, {"type": "null"}],
+                            "description": (
+                                "The public submission representation: existing "
+                                "entities use hash: references and generated rich "
+                                "text uses Markdown. A reusable plan's proposal may "
+                                "be edited and submitted again."
+                            ),
+                        },
                     },
                 },
                 "SubmissionReceipt": {
@@ -1062,6 +1156,36 @@ def openapi_document():
                         },
                     },
                 },
+                "ToolDefinition": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "name",
+                        "description",
+                        "input_schema",
+                        "output_schema",
+                        "result_paths",
+                    ],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "description": {"type": "string"},
+                        "input_schema": {"type": "object"},
+                        "output_schema": {
+                            "type": "object",
+                            "description": (
+                                "Schema for a successful direct shared-tool value. "
+                                "REST places it beneath the success result field."
+                            ),
+                        },
+                        "result_paths": {
+                            "type": "object",
+                            "description": (
+                                "JSON paths for the primary entity or collection "
+                                "and any pagination metadata within result."
+                            ),
+                        },
+                    },
+                },
             },
         },
         "paths": paths,
@@ -1098,9 +1222,42 @@ def me():
 @api.get("/tools")
 @_route
 def tools():
+    selected = []
+    for value in request.args.getlist("names"):
+        selected.extend(name.strip() for name in value.split(",") if name.strip())
+    selected = selected or None
+    view = str(request.args.get("view") or "full").strip().casefold()
+    if view not in {"full", "names"}:
+        raise APIProblem(
+            "invalid_tool_catalog_view",
+            "Tool catalog view must be full or names.",
+            422,
+        )
+    try:
+        catalog = ai_functions.tool_catalog(
+            names=selected,
+            names_only=view == "names",
+            transport="rest",
+        )
+    except ValueError as error:
+        raise APIProblem(
+            "unknown_tool_selection",
+            str(error),
+            422,
+            details={"available": list(ai_functions.DECLARATIONS)},
+        ) from error
     return {
-        "tools": ai_functions.tool_catalog(transport="rest"),
+        "tools": catalog,
+        "view": view,
+        "selected_count": len(catalog),
         "reference_format": "hash:<12-character-hash>",
+        "execution_envelope": {
+            "success": {"result": "<value matching the selected output_schema>"},
+            "failure": {
+                "error": {"code": "tool_error", "message": "<message>"},
+                "request_id": "<request id>",
+            },
+        },
     }
 
 
@@ -1150,7 +1307,17 @@ def get_plan(plan_id):
 @_route
 def get_plan_contract(plan_id):
     report = _load_plan(plan_id)
-    return external_api.plan_contract(report, g.agent_api_user)
+    contract = external_api.plan_contract(report, g.agent_api_user)
+    LOGGER.info(
+        "agent_api_contract request_id=%s user_hash=%s plan=%s "
+        "contract_bytes=%d proposal_schema_bytes=%d",
+        g.agent_api_request_id,
+        g.agent_api_user.hash,
+        report.hash,
+        len(json.dumps(contract, ensure_ascii=False, default=str).encode("utf-8")),
+        (contract.get("payload_sizes") or {}).get("proposal_schema_bytes", 0),
+    )
+    return contract
 
 
 # @testable false
@@ -1351,7 +1518,7 @@ def execute_tool(plan_id, tool_name):
     _require_tools_available(report)
     if tool_name not in ai_functions.TOOL_DEFINITIONS:
         raise APIProblem("tool_not_found", "Tool not found.", 404)
-    _rate_limit(
+    rate_state = _rate_limit(
         "agent-api-plan-tools",
         report.urlsafe_key,
         external_api.MAX_PLAN_TOOL_CALLS,
@@ -1376,6 +1543,7 @@ def execute_tool(plan_id, tool_name):
 
     started = time.monotonic()
     outcome = "success"
+    result_bytes = 0
     try:
         result, _file_parts = ai_functions.execute_registered_tool(
             tool_name,
@@ -1383,6 +1551,10 @@ def execute_tool(plan_id, tool_name):
             g.agent_api_user,
         )
         result = _original_file_download(tool_name, arguments, result)
+        safe_result = _json_safe(result)
+        result_bytes = len(
+            json.dumps(safe_result, ensure_ascii=False, default=str).encode("utf-8")
+        )
         if isinstance(result, dict) and result.get("error"):
             outcome = "tool_error"
             details = {
@@ -1399,7 +1571,7 @@ def execute_tool(plan_id, tool_name):
                 422,
                 details=details,
             )
-        return {"result": _json_safe(result)}
+        return {"result": safe_result}
     except APIProblem:
         if outcome != "tool_error":
             outcome = "api_error"
@@ -1410,12 +1582,14 @@ def execute_tool(plan_id, tool_name):
     finally:
         LOGGER.info(
             "agent_api_tool request_id=%s user_hash=%s plan=%s tool=%s "
-            "outcome=%s elapsed_ms=%d",
+            "outcome=%s call_number=%d result_bytes=%d elapsed_ms=%d",
             g.agent_api_request_id,
             g.agent_api_user.hash,
             report.hash,
             tool_name,
             outcome,
+            rate_state["count"],
+            result_bytes,
             round((time.monotonic() - started) * 1000),
         )
 
@@ -1435,6 +1609,18 @@ def submit_plan(plan_id):
             409,
         )
     data = _json_body()
+    validation_errors = external_api.submission_validation_errors(
+        data,
+        report,
+        g.agent_api_user,
+    )
+    if validation_errors:
+        raise APIProblem(
+            "validation_failed",
+            "Submission failed validation.",
+            422,
+            details={"errors": validation_errors},
+        )
     try:
         submitted = external_api.submit_plan(
             report,

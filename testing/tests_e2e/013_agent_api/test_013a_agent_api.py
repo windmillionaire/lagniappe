@@ -235,6 +235,11 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     tools_operation = openapi.json["paths"]["/api/v1/tools"]["get"]
     assert "task=organize" in tools_operation["description"]
     assert "exact input_schema" in tools_operation["description"]
+    assert {parameter["name"] for parameter in tools_operation["parameters"]} == {
+        "names",
+        "view",
+    }
+    assert "ToolDefinition" in openapi.json["components"]["schemas"]
     execute_tool_operation = openapi.json["paths"][
         "/api/v1/plans/{plan_id}/tools/{tool_name}"
     ]["post"]
@@ -260,6 +265,13 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert submit_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ] == {"$ref": "#/components/schemas/SubmissionReceipt"}
+    assert submit_operation["responses"]["422"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/Error"}
+    assert "error.details.errors" in submit_operation["responses"]["422"][
+        "description"
+    ]
+    assert "ValidationErrorDetail" in openapi.json["components"]["schemas"]
     plan_schema = openapi.json["components"]["schemas"]["Plan"]
     assert "execute_url" not in plan_schema["properties"]
     assert "execution" not in plan_schema["properties"]
@@ -294,6 +306,21 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert {tool["name"] for tool in catalog.json["tools"]} == set(
         ai_functions.DECLARATIONS
     )
+    assert all("output_schema" in tool for tool in catalog.json["tools"])
+    assert all("result_paths" in tool for tool in catalog.json["tools"])
+    selected_catalog = client.get(
+        "/api/v1/tools?names=search_entities,get_page_details",
+        headers={"Authorization": "Bearer valid-key"},
+    )
+    assert [tool["name"] for tool in selected_catalog.json["tools"]] == [
+        "search_entities",
+        "get_page_details",
+    ]
+    compact_catalog = client.get(
+        "/api/v1/tools?view=names&names=get_entity&names=get_file",
+        headers={"Authorization": "Bearer valid-key"},
+    )
+    assert compact_catalog.json["tools"] == ["get_entity", "get_file"]
     get_file = next(
         tool for tool in catalog.json["tools"] if tool["name"] == "get_file"
     )
@@ -530,12 +557,31 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         return current
 
     monkeypatch.setattr(external_api, "submit_plan", submit)
+    monkeypatch.setattr(
+        external_api,
+        "_external_allowed_report_actions",
+        lambda user, tool="organize": (
+            ("needs_review", "summarize_file") if tool == "organize" else ()
+        ),
+    )
     proposal = {
         "summary": "Ready for review.",
         "confidence": 1,
         "issues": [],
         "actions": [],
     }
+    malformed_submission = client.post(
+        "/api/v1/plans/report-key/submit",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"summary": "Raw proposal", "actions": []},
+    )
+    assert malformed_submission.status_code == 422
+    assert malformed_submission.json["error"]["code"] == "validation_failed"
+    malformed_paths = {
+        error["path"]
+        for error in malformed_submission.json["error"]["details"]["errors"]
+    }
+    assert {"$.contract_version", "$.proposal", "$.summary"} <= malformed_paths
     submitted = client.post(
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},

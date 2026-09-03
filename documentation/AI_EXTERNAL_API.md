@@ -82,8 +82,12 @@ still be fetched after uploads and immediately before submission.
    capabilities. It intentionally does not expose or consult the unrelated
    site-funded model-provider entitlement.
 4. `GET /tools` returns permission-bounded read tools as plain JSON Schema.
-   Inspect the selected tool's exact `input_schema` rather than guessing field
-   names such as `id`, `hash`, or `ref`.
+   Each full definition contains `input_schema`, `output_schema`, and
+   `result_paths`. The output schema describes a successful direct shared-handler
+   result; REST places it beneath the success response's `result` field. Inspect these
+   contracts rather than guessing field names or whether a result is a list or
+   object. Use repeated/comma-separated `names` to retrieve selected definitions,
+   or `view=names` for only exact registered names.
    `list_workspace_resources` includes the personal Page alongside the
    permission-filtered workspace inventory.
 5. `POST /plans` creates a provider-free draft with `tool` set to `ask`,
@@ -92,9 +96,10 @@ still be fetched after uploads and immediately before submission.
    is a draft. Reads remain available after a saved Ask answer and while a
    Create or Organize proposal remains ready for browser review.
 7. `GET /plans/{id}/contract` returns the selected tool's authoritative output
-   schema, submission wrapper, workflow rules, reference rules, permissions,
-   limits, actor timezone, personal Page reference, and timezone-aware
-   `current_date`.
+   schema, submission wrapper, machine-readable guidance requirements, workflow
+   and reference rules, permissions, payload sizes, limits, actor timezone,
+   personal Page reference, and timezone-aware `current_date`. Organize also
+   returns the authoritative finalized-upload inventory and per-file checklist.
 8. `POST /plans/{id}/submit` validates and publishes the final result. It returns
    a compact receipt containing status, review URLs, and the normalized proposal
    fingerprint rather than echoing the proposal. It never calls a provider or
@@ -120,6 +125,8 @@ The skill deliberately contains no action schemas, permission lists, or
 use-case-specific proposal instructions. It defines the general Ask/Create/
 Organize boundary, early uploaded-file safety, and run-local discovery reuse;
 the live OpenAPI and each plan contract remain authoritative as the API evolves.
+It also defines evidence provenance, long-file completion, review-state wording,
+and compact-receipt behavior that should not be rediscovered per client.
 
 Within Create and Organize proposals, a `data.submission` object contains the
 Form values to create with that new Page or Task, keyed by exact Form schema
@@ -177,6 +184,14 @@ concerning the authenticated user's own Page. Proposal submission rejects a
 Task without an executable Page reference, and the deterministic runner does not
 gain permission to write to any other Page.
 
+Ordinary `search_entities` calls retain the main full-text cache query used by
+the application. `match_mode: "exact_name"` selects a separate bounded cache
+lookup with a final case-insensitive full-name check. When `kinds` is exactly
+`["page"]`, `parent_id` may constrain that exact lookup to one viewable Category.
+Exact results include view/edit/create permissions so a verified target need not
+be loaded again solely to check editability. This addition does not change the
+main search query, ranking, snippets, or website search behavior.
+
 Optional page rich text is model-facing `document_markdown`. Proposal
 validation renders it through the same sanitized Markdown pipeline used by the
 frontend document editor and stores legacy executable `document` HTML. This
@@ -199,6 +214,24 @@ and immediately before constructing the proposal. Include exactly one
 retrieval terms, and normally `search: true`. The server does not call a model
 to repair form values or create file summaries.
 
+The contract's `guidance_requirements` makes those bundle decisions
+machine-readable. After selecting actions, request `task: report_actions` with
+the unique selected `actions`; when filling Forms, request `task: form_autofill`
+with the unique actual `field_types` from the exact schemas. Identical requests
+are fetched once per run. Guideline responses report `content_bytes` and
+`section_count`; contracts report their major component byte sizes. Correlated
+API logs record tool-call sequence number, result bytes, and elapsed time.
+
+For Organize, `upload_inventory` is the authoritative finalized file scope even
+when natural-language instructions mention fewer filenames. Its deterministic
+fingerprint changes whenever the finalized set changes. `file_checklist` has one
+entry per file for full inspection, duplicate checking, destination, action,
+attachment, and summary. Shared proposal validation still enforces at least one
+attachment and exactly one summary for every listed file and rejects unknown
+file references or pending uploads. Inspection and duplicate judgment are model
+work rather than server-observable facts, so the contract requires them while
+the executable attachment/summary outcomes are enforced directly.
+
 The external Organize contract remains permission-scoped and adds the
 external-only `summarize_file` action without inferring a narrower action set
 from the request. Its proposal schema uses standard JSON Schema `$defs` and
@@ -218,11 +251,13 @@ Execute control starts the normal deterministic runner and applies the exact
 validated proposal without a model call.
 
 The compact receipt is a response-shape change for clients that previously read
-`proposal` directly from the submit response. Such clients should retain the
-public `hash:` proposal they sent for later revisions. `status_url` returns the
-detailed Plan, but its saved proposal is the execution-normalized inspection
-state and is not a round-trippable submission source. A proper public projection
-remains a separate compatibility improvement.
+`proposal` directly from the submit response. Treat a successful receipt as
+authoritative and fetch `status_url` only for later polling or an ambiguous
+outcome. A Plan GET projects saved execution state back into the public
+submission shape: existing references use `hash:` tokens and generated rich text
+uses Markdown, while internal keys and executable HTML remain server-side. A
+ready Create or Organize proposal, or completed Ask answer, can therefore be
+edited and resubmitted directly while the plan remains reusable.
 
 Opening, changing, executing, retrying, undoing, or deleting a saved report is
 provider-free and therefore does not require site AI access. Those browser
@@ -245,6 +280,15 @@ malformed final submissions, and missing Organize file placements fail without
 model repair. Exact form fields remain authoritative at the normal
 `SubmitterMixin` execution boundary. A completed-task date later than the
 submitting user's current date is rejected; future work remains open.
+
+Before semantic validation, the external submit boundary validates the wrapper
+and current permission-scoped proposal schema. Independent safe failures are
+returned together under `error.details.errors`, bounded to twenty entries. When
+needed, the final entry is a truncation marker. Each entry has a stable `code`,
+JSON `path`, concise message,
+and an `expected` value when useful. The top-level `validation_failed` message
+and request ID remain concise; private target Form metadata and raw exceptions
+are never added.
 
 The browser review projects proposed submission values beneath each action,
 using the referenced form's human field, option, and table-column labels when

@@ -672,6 +672,70 @@ def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
     )
 
 
+# @matrix search : exact-name parent-scope permissions bounded-query
+@pytest.mark.unit
+def test_exact_name_search_is_bounded_permission_and_parent_scoped(monkeypatch):
+    captured = {}
+    docs = [
+        SimpleNamespace(
+            id=f"{query.CONFIG.PREFIX}page:recovery-key",
+            kind="page",
+            name="Recovery",
+            details_key="recovery-hash",
+        ),
+        SimpleNamespace(
+            id=f"{query.CONFIG.PREFIX}page:recovery-notes-key",
+            kind="page",
+            name="Recovery Notes",
+            details_key="notes-hash",
+        ),
+    ]
+
+    class FakeCache:
+        def search(self, redis_query):
+            captured["query"] = redis_query
+            return SimpleNamespace(docs=docs, total=len(docs))
+
+        def delete(self, *_keys):
+            return None
+
+    monkeypatch.setattr(query, "cache", FakeCache())
+    monkeypatch.setattr(
+        query,
+        "hydrate_search_results",
+        lambda results: [
+            {
+                **result,
+                "details": {
+                    "id": result["id"],
+                    "hash": result["details_key"],
+                    "kind": result["kind"],
+                    "name": result["name"],
+                },
+            }
+            for result in results
+        ],
+    )
+
+    results = query.exact_name_search(
+        " recovery ",
+        ["models", "actor-hash"],
+        ["group-hash"],
+        kinds=["page"],
+        parent_hash="category-hash",
+        limit=3,
+    )
+
+    assert [result["name"] for result in results] == ["Recovery"]
+    assert captured["query"]._query_string == (
+        "(@name:recovery*) (@kind:{ page }) (@requires:{ category-hash }) "
+        "(@requires:{ models | actor-hash }) "
+        "(ismissing(@restricted_to) | @restricted_to:{ group-hash })"
+    )
+    assert captured["query"]._offset == 0
+    assert captured["query"]._num == 25
+
+
 # @matrix search : empty-access permissions
 @pytest.mark.unit
 def test_search_empty_access_returns_without_querying_redis(monkeypatch):

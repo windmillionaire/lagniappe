@@ -35,6 +35,13 @@ Search results therefore do not carry a second embedded copy of display data.
 `query.py` applies the viewer's `requires` tags, boosts exact name coverage,
 and hydrates results only after the permission-filtered search.
 
+The public AI `search_entities` exact-name mode uses the separate
+`exact_name_search()` cache query. It is candidate-bounded, may add a parent
+hash through the existing `requires` index, and confirms normalized full-name
+equality after hydration. Do not fold this behavior into `search()`: the main
+full-text query, ranking, snippets, and website callers have a different
+contract.
+
 Saved filters use a separate Redis JSON projection keyed by parent and access
 scope. See [BACKEND_FILTERS.md](BACKEND_FILTERS.md).
 

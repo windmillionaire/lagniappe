@@ -328,6 +328,10 @@ not skip the existing-page checks before proposing a new page.
    content is not by itself a reason to refuse organization. A `File too large
    to summarize.` result is not evidence about content, so use the remaining
    metadata and relationships and preserve the file as an attachment.
+   Keep user assertions, visible file content, repository/release evidence, and
+   filesystem metadata distinct. A modification timestamp is not evidence of a
+   completion date. When long text is available in bounded chunks, continue
+   through the end before writing a whole-file summary.
 2. Cluster the uploads by stable subject or independently tracked occurrence.
    Group different documents, accounts, policies, providers, dates, identifiers,
    and corroborating files when they concern the same durable subject. Split only
@@ -459,7 +463,7 @@ ORGANIZE_PLANNING_ACTIONS = """
 
 
 ORGANIZE_PLANNING_PREFLIGHT = """
-### Before Returning
+### Before Completing Structure Planning
 
 - Internal hash tokens appear only in executable action data, never in the
   user-facing summary, issues, display labels, or reasons.

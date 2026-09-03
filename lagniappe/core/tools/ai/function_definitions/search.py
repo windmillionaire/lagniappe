@@ -2,7 +2,8 @@
 
 from google.genai import types
 
-from lagniappe.core.definitions import SearchFacets
+from lagniappe.core.definitions import Action, Fetch, SearchFacets
+from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
 
 SEARCH_LIMIT = 10
@@ -19,6 +20,7 @@ SEARCH_KIND_ALIASES.update(
 )
 SEARCH_KIND_ALIASES["model"] = "model"
 ALLOWED_SEARCH_KINDS = tuple(sorted(SEARCH_KIND_ALIASES))
+SEARCH_MATCH_MODES = ("keywords", "exact_name")
 
 
 # @testable true
@@ -84,7 +86,9 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
         "matching snippets. Use the returned hash with get_entity to load full details, "
         "get_file to retrieve file content, or get_category_pages to load "
         "sample pages from a category. Also useful for finding forms by name "
-        "across the entire workspace."
+        "across the entire workspace. Use match_mode=exact_name for a bounded, "
+        "case-insensitive full-name lookup. Exact Page lookup may also be scoped "
+        "to one Category with parent_id; exact matches include permissions."
     ),
     parameters={
         "type": "object",
@@ -112,6 +116,21 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
                     f"{MAX_SEARCH_LIMIT}."
                 ),
             },
+            "match_mode": {
+                "type": "string",
+                "enum": list(SEARCH_MATCH_MODES),
+                "description": (
+                    "keywords uses the existing full-text search. exact_name uses "
+                    "a separate bounded full-name cache lookup. Defaults to keywords."
+                ),
+            },
+            "parent_id": {
+                "type": "string",
+                "description": (
+                    "Optional Category hash token for exact_name Page lookup. "
+                    "It is rejected for keyword search or non-Page kinds."
+                ),
+            },
         },
         "required": ["query"],
     },
@@ -136,6 +155,39 @@ def execute_search(args, user):
 
     limit = _search_limit(args.get("limit"))
 
+    match_mode = str(args.get("match_mode") or "keywords").strip().casefold()
+    if match_mode not in SEARCH_MATCH_MODES:
+        return {
+            "error": "Unknown search match mode.",
+            "allowed_match_modes": list(SEARCH_MATCH_MODES),
+        }
+    parent_hash = None
+    if args.get("parent_id"):
+        if match_mode != "exact_name" or kinds != ["page"]:
+            return {
+                "error": (
+                    "parent_id is supported only for exact_name searches with "
+                    "kinds=[\"page\"]."
+                )
+            }
+        parent = Entities.fetch_one(args["parent_id"], request=Fetch.direct())
+        if not isinstance(parent, Entities.CATEGORY):
+            return {"error": "Parent Category not found."}
+        if not parent.allowed(Action.VIEW, user=user):
+            return {"error": "Access denied"}
+        parent_hash = parent.hash
+
+    if match_mode == "exact_name":
+        results = cache.exact_name_search(
+            query,
+            restrictions,
+            belongs_to,
+            kinds=kinds,
+            parent_hash=parent_hash,
+            limit=limit,
+        )
+        return _exact_results_with_permissions(results, user)
+
     results, _ = cache.search(
         query,
         restrictions,
@@ -144,6 +196,30 @@ def execute_search(args, user):
         limit=limit,
     )
     return [format_search_result(result) for result in results]
+
+
+# @testable true
+# @tests tests_unit/test_015_ai_tools.py::test_ai_exact_name_search_is_parent_scoped_and_returns_permissions
+# @matrix ai search : exact-name parent-scope permissions
+def _exact_results_with_permissions(results, user):
+    entities = Entities.fetch(
+        *[result.get("id") for result in results if result.get("id")],
+        request=Fetch.direct(),
+    )
+    by_id = {entity.urlsafe_key: entity for entity in entities if entity}
+    formatted = []
+    for result in results:
+        entity = by_id.get(result.get("id"))
+        if not entity:
+            continue
+        item = format_search_result(result)
+        item["permissions"] = {
+            "can_view": entity.allowed(Action.VIEW, user=user),
+            "can_edit": entity.allowed(Action.EDIT, user=user),
+            "can_create": entity.allowed(Action.CREATE, user=user),
+        }
+        formatted.append(item)
+    return formatted
 
 
 # @testable true

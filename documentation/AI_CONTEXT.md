@@ -61,6 +61,17 @@ The external-agent REST API publishes ordinary JSON Schema definitions for
 this same registry and invokes the same handlers as the bearer key's user. It
 does not maintain a separate privileged data-access path.
 
+Every catalog definition includes a provider-neutral input schema, output
+schema, and result-path descriptor. Provider-native calls receive the successful
+direct handler value; REST preserves its `{result: ...}` success envelope. External
+catalog selection can return exact definitions or names only, but it never
+creates a second handler registry.
+
+`search_entities` defaults to the unchanged full-text search. Its optional
+exact-name mode invokes a separate bounded cache query and can scope exact Page
+matches to a Category. Both internal Gemini and external clients reach the same
+declaration and handler, so provider entry point does not change lookup results.
+
 ## Structured output
 
 When JSON, tools, and a provider response schema are enabled together, the
@@ -94,7 +105,10 @@ tool, declare:
 `get_guidelines` defers specialized form, schema, page, project, scheduling,
 image, and output policy until relevant. Treat its result as model guidance,
 not proof that a required rule was followed; the application validator remains
-the contract.
+the contract. External plan contracts publish required/conditional bundle
+arguments. The guideline tool can restrict Form value rules to actual schema
+field types and action rules to selected action types; filtered and full calls
+remain different arguments in the normal exact-call cache.
 
 `get_category_pages` returns at most ten Pages per call. Its response separates
 the caller's `requested_limit`, the enforced `effective_limit`, and

@@ -19,6 +19,7 @@ SUBSTITUTE = re.compile(r"[^a-zA-Z0-9\s]")
 PRIMARY_NAME_KINDS = ("category", "project", "page")
 PRIMARY_NAME_BOOST = 4.0
 SEARCH_QUERY_DIALECT = 2
+EXACT_LOOKUP_CANDIDATE_LIMIT = 100
 
 STOPWORDS = frozenset(
     {
@@ -407,3 +408,54 @@ def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
         return formatted_results, max(0, results.total - stale_count)
     else:
         return [], 0
+
+
+# @testable true
+# @tests tests_unit/test_017_cache_query.py::test_exact_name_search_is_bounded_permission_and_parent_scoped
+# @matrix search : exact-name parent-scope permissions bounded-query
+def exact_name_search(
+    name,
+    required,
+    belongs_to,
+    *,
+    kinds=None,
+    parent_hash=None,
+    limit=10,
+):
+    """Run a bounded exact-name lookup without changing full-text ``search``."""
+    if Restriction.is_denied(required):
+        return []
+
+    normalized_name = " ".join(str(name or "").split())
+    if not normalized_name:
+        return []
+
+    term_list = _build_term_list(normalized_name)
+    expanded_kinds = _expand_result_kinds(kinds)
+    if expanded_kinds:
+        term_list.append(f"(@kind:{{ {' | '.join(expanded_kinds)} }})")
+    if parent_hash:
+        term_list.append(_add_required([parent_hash]))
+    if not Restriction.is_unrestricted(required):
+        term_list.append(_add_required(required))
+    term_list.append(_add_restricted_to(belongs_to))
+
+    candidate_limit = min(
+        EXACT_LOOKUP_CANDIDATE_LIMIT,
+        max(int(limit or 1) * 4, 25),
+    )
+    redis_query = (
+        Query(" ".join(term_list) or "*")
+        .dialect(SEARCH_QUERY_DIALECT)
+        .paging(offset=0, num=candidate_limit)
+    )
+    results = cache.search(redis_query)
+    formatted = [_format_result(doc, snippets=False) for doc in results.docs]
+    current, _stale_count = _current_search_results(formatted)
+    exact = [
+        result
+        for result in current
+        if " ".join(str(result.get("name") or "").split()).casefold()
+        == normalized_name.casefold()
+    ]
+    return exact[: max(1, int(limit or 1))]

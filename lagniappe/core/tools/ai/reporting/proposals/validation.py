@@ -31,7 +31,7 @@ ENTITY_PAIR_ACTION_REFERENCES = {
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_renders_page_document_markdown
 # @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
-def normalize_report_markdown(proposal):
+def normalize_report_markdown(proposal, *, preserve_markdown=False):
     """Render new model-facing Markdown fields into legacy executable HTML."""
     if not isinstance(proposal, dict):
         return proposal
@@ -50,7 +50,8 @@ def normalize_report_markdown(proposal):
                 "Create page document_markdown must be a string."
             )
         data["document"] = render_ai_markdown(source)
-        data.pop("document_markdown", None)
+        if not preserve_markdown:
+            data.pop("document_markdown", None)
     return proposal
 
 
@@ -80,12 +81,15 @@ def validate_proposal(
     require_file_summaries=False,
     validate_reference_kinds=False,
     user=None,
+    preserve_document_markdown=False,
+    resolved_reference_details=None,
 ):
     """Validate the JSON action proposal returned by the organize prompt."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
     raw_proposal = proposal
     submitted_required_file_refs = list(required_file_refs or ())
-    resolved_reference_details = {}
+    if resolved_reference_details is None:
+        resolved_reference_details = {}
     normalized = normalize_hash_references(
         {
             "proposal": proposal,
@@ -97,7 +101,10 @@ def validate_proposal(
     required_file_refs = normalized["required_file_refs"]
     if not isinstance(proposal, dict):
         raise exceptions.AIException("Report proposal must be a JSON object.")
-    proposal = normalize_report_markdown(proposal)
+    proposal = normalize_report_markdown(
+        proposal,
+        preserve_markdown=preserve_document_markdown,
+    )
 
     issues = proposal.get("issues")
     if issues is None:
