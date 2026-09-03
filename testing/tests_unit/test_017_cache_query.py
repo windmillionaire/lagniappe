@@ -453,6 +453,68 @@ def test_cache_update_writes_pointer_search_rows_and_parent_free_details(monkeyp
     assert "parent" not in details
 
 
+# @pair cache:search-visibility
+@pytest.mark.unit
+def test_cache_update_keeps_non_searchable_entity_hash_addressable(monkeypatch):
+    deleted = []
+    hset_calls = []
+
+    class FakePipe:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def delete(self, key):
+            deleted.append(key)
+
+        def hset(self, key, *args, mapping=None):
+            hset_calls.append((key, mapping, args))
+
+        def execute(self):
+            return None
+
+    monkeypatch.setattr(
+        cache_add,
+        "cache",
+        SimpleNamespace(pipeline=lambda: FakePipe()),
+    )
+    entity = SimpleNamespace(
+        hash="staged-file-hash",
+        kind="file",
+        searchable=False,
+        urlsafe_key="staged-file-id",
+        to_cache={
+            "id": "staged-file-id",
+            "kind": "file",
+            "name": "Staged evidence",
+            "hash": "staged-file-hash",
+            "details_key": "staged-file-hash",
+        },
+        details={
+            "id": "staged-file-id",
+            "kind": "file",
+            "hash": "staged-file-hash",
+            "name": "Staged evidence",
+        },
+    )
+
+    cache_add.update(entity, update=False)
+
+    assert deleted == [Search.file.key(entity)]
+    assert not any(
+        key == Search.file.key(entity) for key, _mapping, _args in hset_calls
+    )
+    details_call = next(
+        (key, args)
+        for key, mapping, args in hset_calls
+        if key == Keys.ENTITY_HASHES.value
+    )
+    assert details_call[1][0] == "staged-file-hash"
+    assert json.loads(details_call[1][1])["id"] == "staged-file-id"
+
+
 # @pairs cache:delete search:user-projection
 def test_cache_delete_removes_page_and_user_search_projections(monkeypatch):
     deleted = []

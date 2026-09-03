@@ -62,6 +62,7 @@ def _uploaded_report_files():
                 "filename": upload.filename,
                 "mimetype": upload.content_type,
             },
+            report_user=current_user._get_current_object(),
         )
         files.append(file)
     return files

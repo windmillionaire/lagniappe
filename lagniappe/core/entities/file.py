@@ -14,6 +14,14 @@ from .entity import Entity
 class File(AssetMixin, Entity):
     entity_kind = "file"
 
+    # @testable true
+    # @tests tests_unit/test_006_file_properties.py::test_report_file_is_searchable_only_after_workspace_attachment
+    # @pairs ai-report:pre-execution files:search-visibility
+    @property
+    def searchable(self):
+        """Keep report-only evidence out of workspace search until attachment."""
+        return not self.properties.report_user.exists or self.has_references
+
     @property
     def exclude_from_index(self):
         return frozenset({"summary", "options", "assets"})

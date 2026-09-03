@@ -88,7 +88,8 @@ def prepare_report_upload_manifest(records, input_name="tool-files"):
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_resumes_and_checkpoints
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_retains_source_until_checkpoint
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_accepts_actual_oversized_object
-# @matrix ai-report direct-upload : active-request background-finalization checkpoint-failure large-file progress resume upload-manifest
+# @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_marks_default_files_as_report_only
+# @matrix ai-report direct-upload : active-request background-finalization checkpoint-failure large-file pre-execution progress resume upload-manifest
 def finalize_report_upload_manifest(
     report,
     user,
@@ -106,7 +107,18 @@ def finalize_report_upload_manifest(
 
     save = save or Entities.save
     upload_loader = upload_loader or storage_assets.direct_upload_file
-    file_factory = file_factory or Entities.FILE.create
+    if file_factory is None:
+
+        # @testable false
+        # @covered-by lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
+        # @reason default factory ownership is asserted through the public finalizer
+        def file_factory(*, upload, data):
+            return Entities.FILE.create(
+                upload=upload,
+                data=data,
+                report_user=user,
+            )
+
     upload_cleanup = upload_cleanup or storage_assets.delete_direct_upload
     input_files = list(report.input_files or [])
     attached = {file.urlsafe_key: file for file in input_files}

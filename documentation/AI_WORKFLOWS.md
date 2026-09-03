@@ -65,6 +65,13 @@ Organize evaluates an upload batch as a whole:
 6. repair locally or through one model pass when needed; and
 7. run a focused form-completion generation only for form-backed targets.
 
+Finalized uploads remain report-only evidence before browser execution. They
+are addressable through the owning report and its exact file references, but
+are omitted from ordinary workspace search while they have no Page or Task
+attachment. A successful attachment action makes the File searchable through
+the normal post-commit cache refresh. This boundary is shared by API, email,
+and on-site Organize uploads.
+
 The stages `uploads_finalized`, `summaries_ready`, `plan_ready`, and
 `ready_to_apply` are durable. A retry resumes without repeating completed
 uploads, summaries, or planning.

@@ -86,6 +86,24 @@ def test_file_description_form_field_populates_search_cache():
     assert file.to_cache["desc"] == "Generated permit packet description."
 
 
+# @pairs ai-report:pre-execution files:search-visibility
+@pytest.mark.unit
+def test_report_file_is_searchable_only_after_workspace_attachment():
+    user = TestEntities.get("USER", {"name": "Report owner", "hash": "reportowner"})
+    file = TestEntities.get(
+        "FILE",
+        {"filename": "staged-evidence.pdf", "hash": "stagedevidence"},
+    )
+    file.report_user = user
+
+    assert file.searchable is False
+
+    page = TestEntities.get("PAGE", {"name": "Evidence Page", "hash": "evidencepage"})
+    file.db["pages"] = [page.key]
+
+    assert file.searchable is True
+
+
 # @matrix file : option-preservation update
 @pytest.mark.unit
 def test_file_update_preserves_processing_options_when_controls_absent():

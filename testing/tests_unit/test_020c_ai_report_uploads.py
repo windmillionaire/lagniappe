@@ -306,6 +306,43 @@ def test_finalize_report_upload_manifest_accepts_actual_oversized_object():
     assert len(cleaned) == 1
 
 
+# @matrix ai-report direct-upload : pre-execution upload-manifest
+@pytest.mark.unit
+def test_finalize_report_upload_manifest_marks_default_files_as_report_only(monkeypatch):
+    user = _test_user("default-upload-owner")
+    report = SimpleNamespace(
+        upload_manifest=[{"token": "signed", "filename": "evidence.pdf"}],
+        input_files=[],
+        summary=None,
+    )
+    upload = SimpleNamespace(
+        filename="evidence.pdf",
+        content_type="application/pdf",
+        size=1024,
+    )
+    created = []
+
+    def create_file(**options):
+        created.append(options)
+        return SimpleNamespace(
+            filename=options["data"]["filename"],
+            urlsafe_key="staged-evidence-file",
+        )
+
+    monkeypatch.setattr(report_uploads.Entities.FILE, "create", create_file)
+
+    finalized = report_uploads.finalize_report_upload_manifest(
+        report,
+        user,
+        save=lambda *_entities: None,
+        upload_loader=lambda _record: upload,
+        upload_cleanup=lambda _record: None,
+    )
+
+    assert finalized == report.input_files
+    assert created[0]["report_user"] is user
+
+
 
 
 # @matrix ai-report direct-upload : cleanup partial-progress upload-manifest

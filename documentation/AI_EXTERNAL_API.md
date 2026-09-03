@@ -232,6 +232,12 @@ file references or pending uploads. Inspection and duplicate judgment are model
 work rather than server-observable facts, so the contract requires them while
 the executable attachment/summary outcomes are enforced directly.
 
+Finalization creates durable report evidence so the draft can be resumed, but
+does not publish those Files into ordinary workspace search. Exact references
+in the contract and report remain usable for analysis and review. A File enters
+search only after browser execution attaches it to a Page or Task; deleting or
+undoing that last attachment hides report-only evidence again.
+
 The external Organize contract remains permission-scoped and adds the
 external-only `summarize_file` action without inferring a narrower action set
 from the request. Its proposal schema uses standard JSON Schema `$defs` and

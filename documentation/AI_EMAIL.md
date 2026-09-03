@@ -68,7 +68,9 @@ deterministically keyed report-owned Files, and then starts the normal
 address, requested/resolved workflow, received time, and safe attachment display
 metadata. Provider IDs and signed URLs remain outside the report. Temporary
 `report_user` relationships let the submitting User read evidence attached only
-to the report without granting edit or placement authority.
+to the report without granting edit or placement authority. Report-only Files
+remain absent from workspace search until approved execution attaches them to a
+Page or Task.
 
 Acceptance and handoff are independently idempotent. Ingestion failure before
 a report job starts creates a linked error Notification. Once the report job

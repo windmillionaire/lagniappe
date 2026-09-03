@@ -35,6 +35,12 @@ Search results therefore do not carry a second embedded copy of display data.
 `query.py` applies the viewer's `requires` tags, boosts exact name coverage,
 and hydrates results only after the permission-filtered search.
 
+An entity may retain its hash-details pointer while opting out of its searchable
+row. Report-owned Files use this boundary before execution: exact report and
+contract references continue to resolve, but unattached evidence does not
+appear in website or AI workspace search. Attaching the File restores its
+search row through the ordinary entity mutation refresh.
+
 The public AI `search_entities` exact-name mode uses the separate
 `exact_name_search()` cache query. It is candidate-bounded, may add a parent
 hash through the existing `requires` index, and confirms normalized full-name

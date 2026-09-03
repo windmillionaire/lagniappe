@@ -58,7 +58,8 @@ def delete_entity_from_search(kind, entity):
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_cache_update_writes_pointer_search_rows_and_parent_free_details
-# @matrix cache : details parent-key redis-storage
+# @tests tests_unit/test_017_cache_query.py::test_cache_update_keeps_non_searchable_entity_hash_addressable
+# @matrix cache : details parent-key redis-storage search-visibility
 def update(*entities, update=True):
     """Write entity data to the hash cache and update JSON indexes."""
     cacheable = [e for e in entities if getattr(e, "to_cache", None)]
@@ -76,6 +77,15 @@ def update(*entities, update=True):
             if not key:
                 continue
             pipe.delete(key)
+
+            if getattr(entity, "searchable", True) is False:
+                if entity.hash:
+                    pipe.hset(
+                        Keys.ENTITY_HASHES.value,
+                        entity.hash,
+                        json.dumps(_redis_details(entity)),
+                    )
+                continue
 
             if not cache_map.get("name"):
                 continue

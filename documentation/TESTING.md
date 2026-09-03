@@ -2,8 +2,10 @@
 
 This is the command and suite entry point. Read
 [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) before adding or reshaping
-tests, and [TESTING_SERVER.md](TESTING_SERVER.md) before starting a managed
-Flask/browser session.
+tests, [TESTING_AI_PROCESS.md](TESTING_AI_PROCESS.md) before running a recorded
+live-model or paired before/after evaluation, and
+[TESTING_SERVER.md](TESTING_SERVER.md) before starting a managed Flask/browser
+session.
 
 ## Suites
 

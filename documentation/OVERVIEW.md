@@ -95,6 +95,7 @@ begin in the [README](../README.md).
 | --- | --- |
 | [TESTING.md](TESTING.md) | Suites, commands, markers, strict checks, layout, and evidence. |
 | [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) | Test design and placement; read before adding or reshaping tests. |
+| [TESTING_AI_PROCESS.md](TESTING_AI_PROCESS.md) | Recorded live-model cases, paired before/after evaluation, scoring, and entry-point parity. |
 | [TESTING_SERVER.md](TESTING_SERVER.md) | Managed local server, seed packs, agent login, browser review, and teardown. |
 | [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) | Cloud Run test job, exact-source candidate, artifacts, evidence, and teardown. |
 | [TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) | Reviewing a test and the source claims it makes. |
