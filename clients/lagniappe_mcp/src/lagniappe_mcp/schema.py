@@ -562,6 +562,37 @@ def validate_schema_document(
 
 # @testable true
 # @pair mcp-adapter:product-contract
+# @tests tests_unit/test_033_mcp_adapter.py::test_wrapped_result_schema_preserves_local_references
+def wrap_result_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Put a validated output schema under an object's required result field."""
+    nested = deepcopy(schema)
+    # Local references resolve from the document root, not from the nested
+    # schema. Preserve arbitrary JSON Pointers, not just references to $defs.
+    for node in _walk(nested):
+        if not isinstance(node, dict):
+            continue
+        reference = node.get("$ref")
+        if isinstance(reference, str):
+            node["$ref"] = "#/properties/result" + reference[1:]
+        discriminator = node.get("discriminator")
+        if isinstance(discriminator, dict) and "mapping" in discriminator:
+            discriminator["mapping"] = {
+                name: "#/properties/result" + reference[1:]
+                for name, reference in discriminator["mapping"].items()
+            }
+    wrapped = {
+        "type": "object",
+        "properties": {"result": nested},
+        "required": ["result"],
+        "additionalProperties": False,
+    }
+    if "$schema" in schema:
+        wrapped["$schema"] = schema["$schema"]
+    return wrapped
+
+
+# @testable true
+# @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 def inject_plan_id(schema: Any) -> dict[str, Any]:
     # ``plan_id`` must genuinely be injectable, not merely present in the

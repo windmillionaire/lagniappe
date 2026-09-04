@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import builtins
 from contextlib import contextmanager, suppress
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -18,6 +19,7 @@ import subprocess
 import sys
 import threading
 import time
+import tomllib
 from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlencode
@@ -83,6 +85,7 @@ from lagniappe_mcp.schema import (
     inject_plan_id,
     validate_schema_document,
     validate_value,
+    wrap_result_schema,
 )
 from lagniappe_mcp.server import (
     _bounded_stdin_lines,
@@ -1282,6 +1285,9 @@ def test_cli_source_modes_and_lowercase_profile_names_are_exact() -> None:
         ]
     )
     assert controlled_trial.trial_required is True
+    saved_profile = parser.parse_args(["configure", "codex", "--profile", "project"])
+    assert saved_profile.url is None
+    assert saved_profile.profile == "project"
 
 
 # @pair mcp-adapter:product-contract
@@ -1312,18 +1318,100 @@ def test_configure_remove_rejects_configuration_arguments(
         )
     assert caught.value.code == "invalid_arguments"
 
-    with pytest.raises(ConfigurationError) as missing_url:
-        asyncio.run(
-            cli_module._configure_codex(
-                SimpleNamespace(
-                    profile="personal",
-                    remove=False,
-                    url=None,
-                    trial_required=False,
-                )
-            )
-        )
-    assert missing_url.value.code == "invalid_arguments"
+
+# @pair mcp-adapter:product-contract
+def test_configure_named_profiles_reuses_saved_site_and_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from lagniappe_mcp import cli as cli_module
+
+    monkeypatch.setenv("LAGNIAPPE_MCP_CONFIG_HOME", str(tmp_path / "profiles"))
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
+    monkeypatch.setenv("LAGNIAPPE_URL", "https://unrelated.example")
+    monkeypatch.setenv("LAGNIAPPE_API_KEY", "unrelated-env-key")
+    monkeypatch.setattr(cli_module.sys, "stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
+    monkeypatch.setattr(cli_module, "console_executable", lambda: "/usr/bin/lagniappe-mcp")
+    sites = {
+        "project": ("https://project.example", "project-key", "project00001"),
+        "personal": ("https://personal.example", "personal-key", "personal0001"),
+    }
+    checked: list[tuple[str, str, str | None]] = []
+
+    async def validate_key(site_url: str, key: str, *, expected_hash: str | None = None):
+        checked.append((site_url, key, expected_hash))
+        _, expected_key, actor_hash = next(site for site in sites.values() if site[0] == site_url)
+        assert key == expected_key
+        assert expected_hash in {None, actor_hash}
+        actor = _actor()
+        actor["user"]["hash"] = actor_hash
+        return actor["user"], actor["credential"]
+
+    monkeypatch.setattr(cli_module, "_validate_key", validate_key)
+    for name, (url, key, _) in sites.items():
+        monkeypatch.setattr(builtins, "input", lambda _prompt: f"  {url}/  ")
+        monkeypatch.setattr(cli_module, "_prompt_key", lambda: key)
+        assert cli_module.main(["configure", "codex", "--profile", name]) == 0
+
+    monkeypatch.setattr(builtins, "input", lambda _prompt: pytest.fail("saved URL must be reused"))
+    monkeypatch.setattr(cli_module, "_prompt_key", lambda: pytest.fail("saved key must be reused"))
+    for name, (url, key, actor_hash) in sites.items():
+        other_name = next(other for other in sites if other != name)
+        other_before = profile_path(other_name).read_bytes()
+        assert cli_module.main(["configure", "codex", "--profile", name]) == 0
+        assert checked[-1] == (url, key, actor_hash)
+        saved = load_profile(name)
+        assert (saved["site_url"], saved["api_key"]) == (url, key)
+        assert profile_path(other_name).read_bytes() == other_before
+
+    registered = tomllib.loads(codex_config_path().read_text())["mcp_servers"]
+    assert set(registered) == {"lagniappe-project", "lagniappe-personal"}
+    for name in sites:
+        assert registered[f"lagniappe-{name}"]["args"] == ["serve", "--profile", name]
+
+    before_conflict = {name: profile_path(name).read_bytes() for name in sites}
+    configuration_before = codex_config_path().read_bytes()
+    assert cli_module.main([
+        "configure", "codex", "--profile", "project", "--url", sites["personal"][0],
+    ]) == 1
+    assert len(checked) == 4  # No bearer was sent to the conflicting site.
+    assert {name: profile_path(name).read_bytes() for name in sites} == before_conflict
+    assert codex_config_path().read_bytes() == configuration_before
+    captured = capsys.readouterr()
+    assert "profile_site_conflict" in captured.err
+    for key in ("project-key", "personal-key", "unrelated-env-key"):
+        assert key not in captured.out + captured.err
+
+
+# @pair mcp-adapter:product-contract
+@pytest.mark.parametrize("unavailable", ["noninteractive", "eof", "oserror"])
+def test_configure_new_profile_requires_an_explicit_or_interactive_site(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    unavailable: str,
+) -> None:
+    from lagniappe_mcp import cli as cli_module
+
+    monkeypatch.setenv("LAGNIAPPE_MCP_CONFIG_HOME", str(tmp_path / "profiles"))
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
+    monkeypatch.setattr(
+        cli_module.sys, "stdin", SimpleNamespace(isatty=lambda: unavailable != "noninteractive")
+    )
+
+    def no_input(_prompt: str) -> str:
+        if unavailable == "noninteractive":
+            pytest.fail("noninteractive URL input must not be attempted")
+        raise EOFError() if unavailable == "eof" else OSError("terminal unavailable")
+
+    monkeypatch.setattr(builtins, "input", no_input)
+    monkeypatch.setattr(cli_module, "_prompt_key", lambda: pytest.fail("no site chosen"))
+    assert cli_module.main(["configure", "codex", "--profile", "project"]) == 1
+    assert "site_url_required" in capsys.readouterr().err
+    assert not profile_path("project").exists()
+    assert not codex_config_path().exists()
 
 
 # @pair mcp-adapter:product-contract
@@ -3985,6 +4073,125 @@ def test_low_level_server_negotiates_modern_types_without_resources(
 
 
 # @pair mcp-adapter:product-contract
+@pytest.mark.parametrize("mode", ["auto", "legacy"])
+def test_server_presents_matching_schemas_and_values_for_each_protocol(
+    monkeypatch: pytest.MonkeyPatch, mode: str,
+) -> None:
+    referenced_schema = {
+        "$defs": {"item": {"type": "integer", "minimum": 0}},
+        "type": "array",
+        "items": {"$ref": "#/$defs/item"},
+    }
+    cases = {
+        "array_read": (referenced_schema, [1, 2]),
+        "empty_read": (referenced_schema, []),
+        "scalar_read": ({"type": "string"}, "hello"),
+        "nullable_object_read": ({"type": ["object", "null"]}, {"name": "hello"}),
+        "union_read": ({"anyOf": [{"type": "integer"}, {"type": "null"}]}, 7),
+        "object_read": ({"type": "object"}, {"result": [1, 2]}),
+    }
+    # The v2 SDK client treats a direct JSON null as missing structured content.
+    # A legacy wrapper must retain null; the live REST catalog has no null root.
+    if mode == "legacy":
+        cases["null_read"] = ({"type": ["object", "null"]}, None)
+    definitions = {
+        name: ToolDefinition(
+            name, "Read a fixture value.",
+            {"type": "object", "properties": {}, "additionalProperties": False},
+            validate_schema_document(schema), "read", READ_ANNOTATIONS,
+            result_paths={"primary_collection": "$", "pagination": None},
+        )
+        for name, (schema, _) in cases.items()
+    }
+    original_definitions = deepcopy(definitions)
+
+    class FakeAdapter:
+        def __init__(self, _config: ConnectionConfig) -> None:
+            self.tools = definitions
+
+        async def initialize(self) -> None:
+            return None
+
+        async def execute(self, name: str, _arguments: Any) -> AdapterResult:
+            return AdapterResult(cases[name][1])
+
+        async def aclose(self) -> None:
+            return None
+
+    async def exercise() -> None:
+        from lagniappe_mcp import server as server_module
+
+        monkeypatch.setattr(server_module, "LagniappeAdapter", FakeAdapter)
+        config = ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
+        server = server_module.create_server(config)
+        async with Client(server, mode=mode) as client:
+            assert client.protocol_version == (
+                "2025-11-25" if mode == "legacy" else "2026-07-28"
+            )
+            listed = await client.list_tools()
+            assert {tool.name for tool in listed.tools} == set(cases)
+            for tool in listed.tools:
+                raw_schema, raw_value = cases[tool.name]
+                wrapped = mode == "legacy" and raw_schema.get("type") != "object"
+                expected = {"result": raw_value} if wrapped else raw_value
+                if mode == "legacy":
+                    assert tool.output_schema["type"] == "object"
+                else:
+                    assert tool.output_schema == raw_schema
+                called = await client.call_tool(tool.name, {})
+                assert called.is_error is False
+                assert called.structured_content == expected
+                assert json.loads(called.content[0].text) == expected
+                validate_value(tool.output_schema, expected, phase="output")
+                assert tool.meta["lagniappe/resultPaths"] == {
+                    "primary_collection": "$.result" if wrapped else "$",
+                    "pagination": None,
+                }
+            assert definitions == original_definitions
+
+    asyncio.run(exercise())
+
+
+# @pair mcp-adapter:product-contract
+def test_wrapped_result_schema_preserves_local_references() -> None:
+    schema = validate_schema_document({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$defs": {"amount": {"type": "integer", "minimum": 1}},
+        "type": "array",
+        "items": {
+            "oneOf": [{"$ref": "#/items/$defs/entry"}],
+            "discriminator": {
+                "propertyName": "kind",
+                "mapping": {"entry": "#/items/$defs/entry"},
+            },
+            "$defs": {"entry": {
+                "type": "object",
+                "properties": {
+                    "kind": {"const": "entry"},
+                    "amount": {"$ref": "#/$defs/amount"},
+                    "literal": {"const": "#/$defs/amount"},
+                },
+                "required": ["kind", "amount", "literal"],
+            }},
+        },
+    })
+    original = deepcopy(schema)
+    wrapped = wrap_result_schema(schema)
+    assert schema == original
+    assert wrapped["properties"]["result"]["items"]["discriminator"]["mapping"] == {
+        "entry": "#/properties/result/items/$defs/entry",
+    }
+    value = [{"kind": "entry", "amount": 1, "literal": "#/$defs/amount"}]
+    validate_schema_document(wrapped)
+    validate_value(wrapped, {"result": value}, phase="output")
+    for invalid in ({}, value, {"result": value, "extra": True}, {"result": [{
+        "kind": "entry", "amount": 0, "literal": "#/$defs/amount",
+    }]}):
+        with pytest.raises(SchemaError):
+            validate_value(wrapped, invalid, phase="output")
+
+
+# @pair mcp-adapter:product-contract
 def test_requested_unsupported_original_is_a_bounded_tool_error() -> None:
     config = ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
     adapter = LagniappeAdapter(config)
@@ -4132,7 +4339,7 @@ def test_standalone_sources_have_no_application_imports() -> None:
 class _StdioLifecycleAPI:
     """Tiny loopback API whose second actor response stalls mid-body."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, catalog: dict[str, Any] | None = None) -> None:
         self.actor_calls = 0
         self.actor_lock = threading.Lock()
         self.request_started = threading.Event()
@@ -4200,6 +4407,9 @@ class _StdioLifecycleAPI:
                     )
                     return
                 if self.path == "/api/v1/tools":
+                    if catalog is not None:
+                        self._send_json(catalog)
+                        return
                     self._send_json(
                         {
                             "tools": [],
@@ -4307,19 +4517,22 @@ _MODERN_META = {
 def _write_stdio_frame(
     process: subprocess.Popen[bytes],
     *,
-    request_id: str,
+    request_id: str | None,
     method: str,
     params: dict[str, Any] | None = None,
+    modern: bool = True,
 ) -> None:
     assert process.stdin is not None
     body = dict(params or {})
-    body["_meta"] = deepcopy(_MODERN_META)
+    if modern:
+        body["_meta"] = deepcopy(_MODERN_META)
     frame = {
         "jsonrpc": "2.0",
-        "id": request_id,
         "method": method,
         "params": body,
     }
+    if request_id is not None:
+        frame["id"] = request_id
     process.stdin.write(json.dumps(frame, separators=(",", ":")).encode() + b"\n")
     process.stdin.flush()
 
@@ -4400,6 +4613,55 @@ def _stdio_telemetry(diagnostic: str) -> list[dict[str, Any]]:
         for event in events
     )
     return events
+
+
+# @pair mcp-adapter:product-contract
+@pytest.mark.parametrize(
+    "protocol_version",
+    ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25", "2026-07-28"],
+)
+def test_real_stdio_negotiates_catalog_and_actor_across_protocol_versions(
+    protocol_version: str,
+) -> None:
+    catalog = asyncio.run(_WorkflowREST().startup())[2]
+    modern = protocol_version == "2026-07-28"
+    with _StdioLifecycleAPI(catalog=catalog) as api, _stdio_adapter_process(api) as process:
+        api.release_request.set()
+        buffer = bytearray()
+        if not modern:
+            _write_stdio_frame(
+                process, request_id="initialize", method="initialize", modern=False,
+                params={
+                    "protocolVersion": protocol_version,
+                    "capabilities": {},
+                    "clientInfo": {"name": "handshake-client", "version": "1"},
+                },
+            )
+            initialized = _read_stdio_until(process, buffer, "initialize")[-1]
+            assert initialized["result"]["protocolVersion"] == protocol_version
+            _write_stdio_frame(
+                process, request_id=None, method="notifications/initialized", modern=False,
+            )
+        _write_stdio_frame(process, request_id="list", method="tools/list", modern=modern)
+        listed = _read_stdio_until(process, buffer, "list")[-1]
+        tools = {tool["name"]: tool for tool in listed["result"]["tools"]}
+        assert "get_actor" in tools
+        # The pinned SDK retains structured-output extension fields even for
+        # handshake versions that predate their standardization.
+        assert tools["search"]["outputSchema"]["type"] == (
+            "array" if modern else "object"
+        )
+        _write_stdio_frame(
+            process, request_id="actor", method="tools/call", modern=modern,
+            params={"name": "get_actor", "arguments": {}},
+        )
+        called = _read_stdio_until(process, buffer, "actor")[-1]["result"]
+        assert called["isError"] is False
+        assert json.loads(called["content"][0]["text"]) == _actor()
+        assert called["structuredContent"] == _actor()
+        process.stdin.close()
+        assert process.wait(timeout=3) == 0
+        _stdio_diagnostics(process)
 
 
 # @pair mcp-adapter:product-contract

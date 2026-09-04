@@ -74,7 +74,10 @@ def _parser() -> argparse.ArgumentParser:
     configure = commands.add_parser("configure")
     configure_clients = configure.add_subparsers(dest="client", required=True)
     codex = configure_clients.add_parser("codex")
-    codex.add_argument("--url")
+    codex.add_argument(
+        "--url",
+        help="site URL for a new profile; existing profiles reuse their saved URL",
+    )
     codex.add_argument("--profile", required=True, type=validate_profile_name)
     codex.add_argument("--remove", action="store_true")
     codex.add_argument(
@@ -175,6 +178,23 @@ def _prompt_key() -> str:
 
 # @testable false
 # @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/cli.py::_configure_codex
+def _prompt_site_url() -> str:
+    if not sys.stdin.isatty():
+        raise ConfigurationError(
+            "site_url_required",
+            "A new profile needs --url or an interactive terminal to enter its site URL.",
+        )
+    try:
+        return input("Lagniappe site URL: ").strip()
+    except (EOFError, OSError) as error:
+        raise ConfigurationError(
+            "site_url_required",
+            "No site URL was entered; use --url or re-run in an interactive terminal.",
+        ) from error
+
+
+# @testable false
+# @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/cli.py::_configure_codex
 def _confirm(message: str) -> None:
     if not sys.stdin.isatty():
         raise ConfigurationError(
@@ -194,6 +214,8 @@ def _confirm(message: str) -> None:
 # @tests tests_unit/test_033_mcp_adapter.py::test_configure_manual_fallback_preserves_a_changed_manual_identity
 # @tests tests_unit/test_033_mcp_adapter.py::test_configure_save_failure_restores_prior_required_entry
 # @tests tests_unit/test_033_mcp_adapter.py::test_configure_remove_rejects_configuration_arguments
+# @tests tests_unit/test_033_mcp_adapter.py::test_configure_named_profiles_reuses_saved_site_and_key
+# @tests tests_unit/test_033_mcp_adapter.py::test_configure_new_profile_requires_an_explicit_or_interactive_site
 async def _configure_codex(args: argparse.Namespace) -> int:
     name = args.profile
     trial_required = bool(getattr(args, "trial_required", False))
@@ -268,12 +290,6 @@ async def _configure_codex(args: argparse.Namespace) -> int:
         save_profile(profile, expected_snapshot=profile_snapshot)
         return 0
 
-    if not args.url:
-        raise ConfigurationError(
-            "invalid_arguments",
-            "configure codex requires --url unless --remove is used.",
-        )
-    authority = normalize_site_url(args.url)
     try:
         existing, profile_snapshot = load_profile_snapshot(name)
     except ConfigurationError as error:
@@ -281,6 +297,10 @@ async def _configure_codex(args: argparse.Namespace) -> int:
             raise
         existing = None
         profile_snapshot = None
+    site_url = args.url
+    if site_url is None:
+        site_url = existing["site_url"] if existing is not None else _prompt_site_url()
+    authority = normalize_site_url(site_url)
     if existing is not None and existing["site_url"] != authority.origin:
         raise ConfigurationError(
             "profile_site_conflict",

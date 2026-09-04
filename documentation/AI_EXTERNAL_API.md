@@ -88,7 +88,7 @@ the validated pipx 1.17.2 path, forcing pip and binary-only dependencies:
 
 ```bash
 pipx install --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
-  "https://example.test/mcp/releases/0.1.2/<sha256>/lagniappe_mcp-0.1.2-py3-none-any.whl#sha256=<sha256>"
+  "https://example.test/mcp/releases/0.1.4/<sha256>/lagniappe_mcp-0.1.4-py3-none-any.whl#sha256=<sha256>"
 lagniappe-mcp configure codex --url "https://example.test" \
   --profile personal
 lagniappe-mcp check --profile personal
@@ -125,16 +125,51 @@ lagniappe-mcp check --profile personal
 Release `0.1.0` remains a historical, supported predecessor with its original
 root-gated upload interface, and immutable `0.1.1` remains in the release
 ledger as the first rootless local candidate. New installations and the local
-MCP trial use `0.1.2`; do not downgrade during a measured run. Never install an
+MCP trial use `0.1.4`; do not downgrade during a measured run. Never install an
 unadvertised predecessor or a release whose API/contract or platform metadata
 does not match the current site.
+
+Release `0.1.3` fixes `Handler returned an invalid result` at Codex startup.
+Earlier releases could pass the API-only `check` diagnostic while failing the
+MCP `tools/list` response: handshake-era protocols require object-root output
+schemas, but `search_entities` returns an array. The adapter now advertises and
+returns `{"result": <value>}` for non-object output schemas on those protocols,
+with matching JSON text and result-path hints. Object results are unchanged;
+the `2026-07-28` protocol continues to use direct values. This is solely an MCP
+presentation change, not a REST API change. Upgrade the wheel and restart the
+client; keep the existing profile, key, and registration. Confirm the tools
+actually load in the client before starting a trial, not just that `check` or
+`codex mcp list` succeeds.
 
 Generate or rotate the shown-once API key only after installing. `configure`
 prompts without echo and stores it in the owner-only local profile; generated
 Codex configuration contains the absolute adapter executable and profile name,
 never the bearer. In `--profile personal`, `personal` is only the local profile
 name; the URL and key are read from that protected profile rather than placed in
-the MCP registration. Uninstall in this order: revoke the site key, run
+the MCP registration. Starting with `0.1.4`, the profile-only configuration
+command is sufficient:
+
+```bash
+lagniappe-mcp configure codex --profile project
+```
+
+For a new profile it prompts for the site URL and key; `--url` may still be
+supplied explicitly. For an existing profile it reuses both saved values and
+revalidates the same actor. A conflicting explicit URL is rejected before
+sending the saved credential anywhere. Configure another profile for another
+installation; ambient `LAGNIAPPE_URL`/`LAGNIAPPE_API_KEY` do not replace a
+named profile's values.
+
+Profiles `project` and `personal` register separate `lagniappe-project` and
+`lagniappe-personal` MCP servers. Configuring one does not disable the other.
+With both enabled, the user can name the intended installation in a request,
+but both remain accessible. The CLI's `/mcp` lists tools rather than switching
+profiles. For a project-only session with both registrations present, pass
+`-c 'mcp_servers.lagniappe-personal.enabled=false'` when launching Codex; use the
+opposite name for a personal-only session. A startup override does not mutate
+the adapter-owned fingerprinted registration.
+
+Uninstall in this order: revoke the site key, run
 `configure codex --remove --profile personal`, then `credentials remove
 --profile personal`, `profile remove --profile personal`, and finally uninstall
 the isolated pipx tool.

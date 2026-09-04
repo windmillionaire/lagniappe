@@ -12,11 +12,22 @@ The first evaluation release supports Linux x86_64 with glibc 2.17 or newer
 and CPython 3.14. Follow the install command shown by the site rather than
 installing an unadvertised wheel.
 
-`lagniappe-mcp configure codex --url URL --profile NAME` securely prompts for
-the existing API key and saves the URL, key, and actor metadata in an owner-only
-local profile. `--profile NAME` later selects that profile; it is not a place to
-pass the URL or key. The generated Codex entry contains only the absolute
-executable and `serve --profile NAME` arguments.
+`lagniappe-mcp configure codex --profile NAME` creates or reuses an owner-only
+local profile containing the site URL, API key, and actor metadata. A new
+profile prompts for the URL and then securely prompts for the key; supply
+`--url URL` to skip the URL prompt. An existing profile reuses its saved URL
+and key, revalidates the actor, and previews its Codex registration without
+asking for those values again. An explicit URL must match that profile's site;
+use a separate profile for another site. The generated Codex entry contains
+only the absolute executable and `serve --profile NAME` arguments.
+
+Each profile registers a distinct `lagniappe-NAME` server. Configuring `project`
+does not disable `personal`, and vice versa. Both can be available in one
+conversation; name the intended installation in requests. For a single-site
+session when both are registered, use a Codex startup override such as
+`-c 'mcp_servers.lagniappe-personal.enabled=false'`. This leaves the saved
+profile and managed registration unchanged. CLI `/mcp` lists available tools;
+it does not select an active Lagniappe profile.
 
 Owner-only storage does not sandbox the client from the credential. Codex, the
 adapter, and other processes running as the same OS user may have permission to
@@ -49,6 +60,15 @@ to the pinned Codex trial client. Other CLI, IDE, desktop, or GUI clients must b
 able to launch a local stdio child process and satisfy this server's negotiated
 protocol; until their own interoperability smokes pass, treat them as unvalidated
 integrations rather than advertised supported clients.
+
+Output presentation follows the negotiated protocol. For handshake-era clients
+(including the current Codex trial client), a tool whose output schema does not
+have an object root returns `{"result": <value>}`. Its advertised output schema,
+JSON text fallback, and result-path hints describe that same wrapper. Ordinary
+object results are unchanged; the `2026-07-28` protocol retains direct values.
+The REST API and its response validation are unchanged. Release `0.1.3` fixes
+the earlier tool-list startup failure for handshake-era clients; existing
+profiles and client registrations do not need to be recreated after upgrading.
 
 Standard output is reserved for MCP frames. Standard error emits bounded JSONL
 evaluation records that join each startup or tool call to its API and storage

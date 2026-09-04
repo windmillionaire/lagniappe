@@ -9,6 +9,7 @@ from typing import Any
 
 from mcp import Tool
 from mcp_types import ToolAnnotations
+from mcp_types.version import LATEST_MODERN_VERSION, MODERN_PROTOCOL_VERSIONS
 
 from .errors import SchemaError, TransportError
 from .limits import (
@@ -21,7 +22,7 @@ from .limits import (
     MAX_TOTAL_SCHEMA_BYTES,
     MAX_UPLOAD_FILES,
 )
-from .schema import inject_plan_id, json_size, validate_schema_document
+from .schema import inject_plan_id, json_size, validate_schema_document, wrap_result_schema
 
 
 TOOL_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -457,6 +458,7 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_low_level_server_negotiates_modern_types_without_resources
+# @tests tests_unit/test_033_mcp_adapter.py::test_server_presents_matching_schemas_and_values_for_each_protocol
 @dataclass(frozen=True, slots=True)
 class ToolDefinition:
     name: str
@@ -470,19 +472,49 @@ class ToolDefinition:
 
     # @testable false
     # @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
-    def as_mcp_tool(self) -> Tool:
+    def requires_result_wrapper(self, protocol_version: str) -> bool:
+        # Select by the declared schema, including nullable/union roots, so
+        # every successful value matches the same advertised result shape.
+        return (
+            protocol_version not in MODERN_PROTOCOL_VERSIONS
+            and self.output_schema.get("type") != "object"
+        )
+
+    # @testable false
+    # @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
+    def as_mcp_tool(self, protocol_version: str = LATEST_MODERN_VERSION) -> Tool:
+        wrapped = self.requires_result_wrapper(protocol_version)
+        result_paths = (
+            _wrap_result_paths(self.result_paths)
+            if wrapped else deepcopy(self.result_paths)
+        )
         return Tool(
             name=self.name,
             description=self.description,
             input_schema=self.input_schema,
-            output_schema=self.output_schema,
+            output_schema=(
+                wrap_result_schema(self.output_schema) if wrapped else self.output_schema
+            ),
             annotations=self.annotations,
             meta=(
-                {"lagniappe/resultPaths": deepcopy(self.result_paths)}
-                if self.result_paths is not None
+                {"lagniappe/resultPaths": result_paths}
+                if result_paths is not None
                 else None
             ),
         )
+
+
+# @testable false
+# @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
+def _wrap_result_paths(value: Any) -> Any:
+    """Keep catalog JSONPath hints relative to the advertised MCP value."""
+    if isinstance(value, dict):
+        return {key: _wrap_result_paths(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_wrap_result_paths(child) for child in value]
+    if isinstance(value, str) and (value == "$" or value.startswith(("$.", "$["))):
+        return "$.result" + value[1:]
+    return value
 
 
 READ_ANNOTATIONS = ToolAnnotations(

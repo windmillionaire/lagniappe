@@ -97,13 +97,16 @@ def _ensure_frame_limit(
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_mcp_v2_results_use_direct_structured_values_and_complete_aliases
+# @tests tests_unit/test_033_mcp_adapter.py::test_server_presents_matching_schemas_and_values_for_each_protocol
 def _success_result(
     result: AdapterResult,
     *,
     request_id: RequestId = 0,
     server_info: dict[str, Any] | None = None,
+    wrap_result: bool = False,
 ) -> CallToolResult:
-    content: list[Any] = [TextContent(type="text", text=compact_json(result.value))]
+    value = {"result": result.value} if wrap_result else result.value
+    content: list[Any] = [TextContent(type="text", text=compact_json(value))]
     for media in result.media:
         encoded = base64.b64encode(media.data).decode("ascii")
         if media.kind == "image":
@@ -116,7 +119,7 @@ def _success_result(
             )
     response = CallToolResult(
         content=content,
-        structured_content=result.value,
+        structured_content=value,
         is_error=False,
         result_type="complete",
     )
@@ -208,6 +211,8 @@ async def _bounded_stdin_lines(stream: BinaryIO) -> AsyncIterator[str]:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_low_level_server_negotiates_modern_types_without_resources
+# @tests tests_unit/test_033_mcp_adapter.py::test_server_presents_matching_schemas_and_values_for_each_protocol
+# @tests tests_unit/test_033_mcp_adapter.py::test_real_stdio_negotiates_catalog_and_actor_across_protocol_versions
 def create_server(config: ConnectionConfig) -> Server[LagniappeAdapter]:
     """Create a stdio-only server whose lifespan owns one authenticated client."""
 
@@ -232,7 +237,7 @@ def create_server(config: ConnectionConfig) -> Server[LagniappeAdapter]:
         _params: PaginatedRequestParams | None,
     ) -> ListToolsResult:
         tools = [
-            definition.as_mcp_tool()
+            definition.as_mcp_tool(ctx.protocol_version)
             for definition in ctx.lifespan_context.tools.values()
         ]
         return ListToolsResult(tools=tools, result_type="complete")
@@ -265,6 +270,7 @@ def create_server(config: ConnectionConfig) -> Server[LagniappeAdapter]:
                     result,
                     request_id=request_id,
                     server_info=server_info,
+                    wrap_result=definition.requires_result_wrapper(ctx.protocol_version),
                 )
                 metric.complete("success")
                 return response

@@ -405,9 +405,23 @@ def _openapi(contract_version: int) -> dict[str, Any]:
 
 def _catalog() -> dict[str, Any]:
     return {
-        "tools": [],
+        "tools": [{
+            "name": "search_entities",
+            "description": "Search the fixture workspace.",
+            "input_schema": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+            "output_schema": {
+                "type": "array",
+                "items": {"type": "object", "properties": {"hash": {"type": "string"}}},
+            },
+            "result_paths": {"primary_collection": "$", "pagination": None},
+        }],
         "view": "full",
-        "selected_count": 0,
+        "selected_count": 1,
         "reference_format": "hash:<12-character-hash>",
         "execution_envelope": {
             "success": {"result": "<value matching the selected output_schema>"},
@@ -911,7 +925,7 @@ async def main():
         errlog=diagnostics,
     )
     try:
-        async with Client(transport, mode="auto", cache=None) as client:
+        async with Client(transport, mode=specification["mode"], cache=None) as client:
             tools = dump(await client.list_tools())["tools"]
             catalog_seconds = time.perf_counter() - started
             actor = dump(await client.call_tool("get_actor", {}))
@@ -944,6 +958,7 @@ def _sdk_call(
     registration: dict[str, Any],
     environment: dict[str, str],
     cwd: Path,
+    mode: str = "auto",
 ) -> dict[str, Any]:
     driver = cwd / "mcp_sdk_driver.py"
     specification_path = cwd / "mcp_sdk_specification.json"
@@ -954,6 +969,7 @@ def _sdk_call(
     assert transport.get("env_vars") == []
     assert transport.get("cwd") is None
     specification = {
+        "mode": mode,
         "command": transport["command"],
         "args": transport["args"],
         "environment": {
@@ -1344,6 +1360,16 @@ def test_public_mcp_wheel_clean_home_installation_contract(
         assert "startup_timeout_sec: 30" in get_text
         assert "tool_timeout_sec: 300" in get_text
 
+        # Reconfigure the installed profile without repeating its URL or key.
+        # Only the existing confirmation prompt should be needed.
+        _pty_run(
+            [str(pipx_executable), "configure", "codex", "--profile", PROFILE_NAME],
+            environment=configure_environment,
+            cwd=work,
+            interactions=((b"[y/N]", b"y\n"),),
+        )
+        assert codex_config.read_text(encoding="utf-8") == codex_text
+
         sdk_results = [
             _sdk_call(
                 pipx_executable,
@@ -1371,10 +1397,31 @@ def test_public_mcp_wheel_clean_home_installation_contract(
             "start_ask",
             "start_create",
             "start_organize",
+            "search_entities",
         } <= tool_names
+        assert next(
+            tool for tool in sdk_result["tools"] if tool["name"] == "search_entities"
+        )["outputSchema"]["type"] == "array"
         actor_result = sdk_result["actor"]
         assert actor_result["isError"] is False
         assert actor_result["structuredContent"]["user"]["hash"] == "actor013c001"
+
+        # Configuration registration alone does not start Codex's MCP client.
+        # Also exercise its handshake-era tool-list/result serialization, not
+        # only the v2 SDK's newest per-request protocol above.
+        legacy_result = _sdk_call(
+            pipx_executable,
+            registration=registered,
+            environment=pipx_environment,
+            cwd=work,
+            mode="legacy",
+        )
+        assert legacy_result["protocol_version"] == "2025-11-25"
+        assert legacy_result["catalog_seconds"] <= MAX_COLD_START_CATALOG_SECONDS
+        assert {item["name"] for item in legacy_result["tools"]} == tool_names
+        assert all(item["outputSchema"]["type"] == "object" for item in legacy_result["tools"])
+        assert legacy_result["actor"]["isError"] is False
+        assert legacy_result["actor"]["structuredContent"] == actor_result["structuredContent"]
 
         blocked_remove = _run(
             [str(pipx_executable), "profile", "remove", "--profile", PROFILE_NAME],
