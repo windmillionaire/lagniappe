@@ -1,21 +1,21 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=b3952f7d';
-import { EntityMenu } from './entityMenu.js?v=b3952f7d';
-import { w as withTransition, r as request, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=b3952f7d';
-import { c as connectivity } from './connectivity.js?v=b3952f7d';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b3952f7d';
-import { STYLES } from './styles.js?v=b3952f7d';
-import { s as setIcon } from './icons.js?v=b3952f7d';
-import { p as primitives } from './primitives.js?v=b3952f7d';
-import { B as BaseForm, R as Renderer } from './baseForm.js?v=b3952f7d';
-import { F as FacetsBox } from './facets.js?v=b3952f7d';
+import { SearchBox } from './search.js?v=b052d07c';
+import { EntityMenu } from './entityMenu.js?v=b052d07c';
+import { w as withTransition, r as request, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=b052d07c';
+import { c as connectivity } from './connectivity.js?v=b052d07c';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b052d07c';
+import { STYLES } from './styles.js?v=b052d07c';
+import { s as setIcon } from './icons.js?v=b052d07c';
+import { p as primitives } from './primitives.js?v=b052d07c';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=b052d07c';
+import { F as FacetsBox } from './facets.js?v=b052d07c';
 
 const CONDITION_REGISTRY = {
-	html: () => import('./html.js?v=b3952f7d'),
-	status: () => import('./status.js?v=b3952f7d'),
-	visibility: () => import('./visibility.js?v=b3952f7d'),
-	columns: () => import('./columns.js?v=b3952f7d'),
-	options: () => import('./options.js?v=b3952f7d'),
+	html: () => import('./html.js?v=b052d07c'),
+	status: () => import('./status.js?v=b052d07c'),
+	visibility: () => import('./visibility.js?v=b052d07c'),
+	columns: () => import('./columns.js?v=b052d07c'),
+	options: () => import('./options.js?v=b052d07c'),
 };
 
 /**

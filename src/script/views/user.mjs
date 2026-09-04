@@ -33,7 +33,7 @@ export default class Users extends EntityIndex {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_group_column_link_opens_group_tools_and_tracks_url
-	 * @matrix user-groups : column-link query-route same-page-navigation
+	 * @matrix user-groups : column-link isolation query-route same-page-navigation
 	 */
 	_click(e) {
 		const groupLink = e.target.closest("a[data-kind='group'][href]");

@@ -609,3 +609,65 @@ def test_delete_survivor_merge_combines_relation_removals():
     assert merged[0].entity is file_a
     assert merged[0].properties == {"pages"}
     assert file_a.db.get("pages") is None
+
+
+# @pairs file:delete file:reverse-link mutations:delete mutations:unlink
+# @pairs tasks:delete tasks:list-owner-fingerprint tasks:reverse-link
+# @pairs tasks:task-history tasks:unlink
+def test_file_delete_unlinks_task_references_and_list_owners(monkeypatch):
+    page = TestEntities.get(
+        "PAGE",
+        {"name": "Attachment page", "hash": "attachment-page"},
+    )
+    task = TestEntities.get(
+        "TASK",
+        {
+            "name": "Attachment task",
+            "hash": "attachment-task",
+            "page": {"name": page.name, "hash": page.hash},
+        },
+    )
+    task.properties.page._value = page
+    retained = TestEntities.get(
+        "FILE",
+        {"name": "Retained attachment", "hash": "retained-attachment"},
+    )
+    deleted = TestEntities.get(
+        "FILE",
+        {"name": "Deleted attachment", "hash": "deleted-attachment"},
+    )
+    task.files = [retained, deleted]
+
+    history = Entities.TASK_HISTORY(testing=True)
+    history._key = "attachment-history"
+    history.kind = "task_history"
+    history.created = datetime.now(timezone.utc)
+    history.task = task
+    history.page = page
+    history.linked_pages = []
+    history.files = [deleted]
+
+    linked = {task.key: task, history.key: history}
+
+    def fetch_linked_tasks(*identifiers, request):
+        assert request.depth.name == "NESTED"
+        return [linked[key] for key in identifiers]
+
+    monkeypatch.setattr(Entities, "fetch", fetch_linked_tasks)
+
+    plan = plan_mutation(MutationOperation.DELETE, deleted, registry=Entities)
+    writes = {effect.entity.key: effect for effect in _writes(plan)}
+    deleted_entities = [
+        effect.entity
+        for effect in plan.effects
+        if effect.effect is MutationEffectType.DELETE
+    ]
+
+    assert deleted_entities == [deleted]
+    assert task.files == [retained]
+    assert history.files == []
+    assert deleted.properties.tasks.keys == []
+    assert retained.properties.tasks.keys == [task.key]
+    assert writes[task.key].property_mask == ("files", "modified")
+    assert writes[history.key].property_mask == ("files",)
+    assert writes[page.key].property_mask == ("modified",)

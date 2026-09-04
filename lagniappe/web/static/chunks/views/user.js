@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition, r as request } from '../foundation.js?v=b3952f7d';
-import { E as EntityIndex } from '../index-foundation.js?v=b3952f7d';
-import '../upstreamUnavailable.js?v=b3952f7d';
-import '../connectivity.js?v=b3952f7d';
-import '../core-foundation.js?v=b3952f7d';
+import { w as withTransition, r as request } from '../foundation.js?v=b052d07c';
+import { E as EntityIndex } from '../index-foundation.js?v=b052d07c';
+import '../upstreamUnavailable.js?v=b052d07c';
+import '../connectivity.js?v=b052d07c';
+import '../core-foundation.js?v=b052d07c';
 
 /**
  * @testable true
@@ -36,7 +36,7 @@ class Users extends EntityIndex {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_group_column_link_opens_group_tools_and_tracks_url
-	 * @matrix user-groups : column-link query-route same-page-navigation
+	 * @matrix user-groups : column-link isolation query-route same-page-navigation
 	 */
 	_click(e) {
 		const groupLink = e.target.closest("a[data-kind='group'][href]");

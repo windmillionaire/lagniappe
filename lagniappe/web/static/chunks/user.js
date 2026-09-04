@@ -1,24 +1,24 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b3952f7d';
-import { w as withTransition } from './foundation.js?v=b3952f7d';
-import './connectivity.js?v=b3952f7d';
-import { p as primitives } from './primitives.js?v=b3952f7d';
-import { F as FacetsBox } from './facets.js?v=b3952f7d';
-import { f as formatting } from './formatting.js?v=b3952f7d';
-import { B as BaseElement } from './baseElement.js?v=b3952f7d';
-import { F as FormElement } from './form2.js?v=b3952f7d';
-import { InputElement } from './input.js?v=b3952f7d';
-import { B as BaseForm } from './baseForm.js?v=b3952f7d';
-import { RadioElement } from './radio.js?v=b3952f7d';
-import './upstreamUnavailable.js?v=b3952f7d';
-import './icons.js?v=b3952f7d';
-import './remote.js?v=b3952f7d';
-import './queryLifecycle.js?v=b3952f7d';
-import './combobox.js?v=b3952f7d';
-import './results.js?v=b3952f7d';
-import './storage.js?v=b3952f7d';
-import './submitter.js?v=b3952f7d';
-import './loader.js?v=b3952f7d';
+import { STYLES } from './styles.js?v=b052d07c';
+import { w as withTransition } from './foundation.js?v=b052d07c';
+import './connectivity.js?v=b052d07c';
+import { p as primitives } from './primitives.js?v=b052d07c';
+import { F as FacetsBox } from './facets.js?v=b052d07c';
+import { f as formatting } from './formatting.js?v=b052d07c';
+import { B as BaseElement } from './baseElement.js?v=b052d07c';
+import { F as FormElement } from './form2.js?v=b052d07c';
+import { InputElement } from './input.js?v=b052d07c';
+import { B as BaseForm } from './baseForm.js?v=b052d07c';
+import { RadioElement } from './radio.js?v=b052d07c';
+import './upstreamUnavailable.js?v=b052d07c';
+import './icons.js?v=b052d07c';
+import './remote.js?v=b052d07c';
+import './queryLifecycle.js?v=b052d07c';
+import './combobox.js?v=b052d07c';
+import './results.js?v=b052d07c';
+import './storage.js?v=b052d07c';
+import './submitter.js?v=b052d07c';
+import './loader.js?v=b052d07c';
 
 /**
  * @testable infrastructure
@@ -407,7 +407,7 @@ class PermissionsForm extends FormElement {
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_group_selector_accepts_multiple_groups
  * @tests tests_js/test_044_user_widget_frontend.py::test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus
- * @matrix users : create-form create-form-reset focus-preservation group-selector multiple submitted-form-data
+ * @matrix users : create-form create-form-reset focus-preservation group-selector multiple submitted-form-data visibility-isolation
  * @pair users:page-form-preserved
  */
 class CreateUser extends FormElement {
@@ -505,7 +505,6 @@ class CreateUser extends FormElement {
 		if (focusName && !this.target?.contains(document.activeElement)) {
 			this.nameElement.focus();
 		}
-		this.target.dataset.visible = "true";
 	}
 }
 

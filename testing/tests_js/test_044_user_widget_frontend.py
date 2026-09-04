@@ -1,7 +1,7 @@
 """DOM-light checks for user widget reconciliation behavior."""
 
 
-# @matrix users : create-form create-form-reset focus-preservation
+# @matrix users : create-form create-form-reset focus-preservation visibility-isolation
 def test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus(
     run_node,
 ):
@@ -130,6 +130,13 @@ function createWidget(visible) {
   ordinary.widget.postreconcile();
   if (ordinary.focusCount !== 0 || activeElement !== ordinary.email) {
     throw new Error("Ordinary reconciliation stole focus from a live form field");
+  }
+
+  const inactive = createWidget(false);
+  inactive.widget.visible = false;
+  inactive.widget.postreconcile();
+  if (inactive.target.dataset.visible !== "false") {
+    throw new Error("Inactive create-user reconciliation made the form visible");
   }
 
   const created = createWidget(true);

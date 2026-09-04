@@ -1,16 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b3952f7d';
-import { D as Doc, c as collaborativeEditor, M as MentionSuggestions, T as Toolbar, m as mergeUpdates, e as encodeStateAsUpdate, a as applyUpdate } from './toolbar.js?v=b3952f7d';
-import { i as waitForAttribute, u as uint8ArrayToBase64, j as base64ToUint8Array } from './foundation.js?v=b3952f7d';
-import './connectivity.js?v=b3952f7d';
-import './combobox.js?v=b3952f7d';
-import './primitives.js?v=b3952f7d';
-import './icons.js?v=b3952f7d';
-import './queryLifecycle.js?v=b3952f7d';
-import './dropdown.js?v=b3952f7d';
-import './upstreamUnavailable.js?v=b3952f7d';
-import './buttons.js?v=b3952f7d';
-import './formatting.js?v=b3952f7d';
+import { STYLES } from './styles.js?v=b052d07c';
+import { D as Doc, c as collaborativeEditor, M as MentionSuggestions, T as Toolbar, m as mergeUpdates, e as encodeStateAsUpdate, a as applyUpdate } from './toolbar.js?v=b052d07c';
+import { i as waitForAttribute, u as uint8ArrayToBase64, j as base64ToUint8Array } from './foundation.js?v=b052d07c';
+import './connectivity.js?v=b052d07c';
+import './combobox.js?v=b052d07c';
+import './primitives.js?v=b052d07c';
+import './icons.js?v=b052d07c';
+import './queryLifecycle.js?v=b052d07c';
+import './dropdown.js?v=b052d07c';
+import './upstreamUnavailable.js?v=b052d07c';
+import './buttons.js?v=b052d07c';
+import './formatting.js?v=b052d07c';
 
 /**
  * @testable true

@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition, c as captureError } from './foundation.js?v=b3952f7d';
-import { c as createIcon } from './icons.js?v=b3952f7d';
-import './upstreamUnavailable.js?v=b3952f7d';
-import './connectivity.js?v=b3952f7d';
+import { c as captureError, w as withTransition } from './foundation.js?v=b052d07c';
+import { c as createIcon } from './icons.js?v=b052d07c';
+import './upstreamUnavailable.js?v=b052d07c';
+import './connectivity.js?v=b052d07c';
 
 /**
  * @testable false
@@ -60,6 +60,7 @@ function operationNodeVisible(node) {
  *
  * @testable true
  * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_batches_orders_and_renders_status
+ * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_reconciles_server_rendered_terminal_status
  * @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-visibility revision status teardown terminal-ownership timing visible-blur
  */
 class DeferredOperationManager {
@@ -68,6 +69,7 @@ class DeferredOperationManager {
 		this.operations = new Map();
 		this.destroyed = false;
 		this.ignored = new Set();
+		this.receivingTerminals = new Set();
 		this.unsubscribers = new Map();
 	}
 
@@ -79,8 +81,11 @@ class DeferredOperationManager {
 	scan(root = document) {
 		const nodes = Array.from(root.querySelectorAll?.("[data-operation]") || []);
 		if (root.matches?.("[data-operation]")) nodes.unshift(root);
+		const terminalStatuses = new Map();
 		for (const node of nodes) {
 			const revision = operationRevision(node.dataset.operationRevision);
+			const entityKey =
+				node.dataset.key || node.closest?.("[data-key]")?.dataset?.key;
 			const status = node.dataset.operationStatus
 				? {
 						key: node.dataset.operation,
@@ -91,17 +96,40 @@ class DeferredOperationManager {
 						elapsed_seconds: Number(node.dataset.operationElapsed) || 0,
 						recovering: node.dataset.operationRecovering === "true",
 						terminal: node.dataset.operationTerminal === "true",
+						...(entityKey ? { entity_key: entityKey } : {}),
 						...(node.dataset.operationError
 							? { error: node.dataset.operationError }
 							: {}),
 					}
 				: null;
-			this.track(node.dataset.operation, {
+			const tracked = this.track(node.dataset.operation, {
 				revision,
 				node,
 				immediate: false,
 				status,
 			});
+			if (
+				tracked &&
+				status?.terminal &&
+				!this.receivingTerminals.has(status.key)
+			) {
+				this.receivingTerminals.add(status.key);
+				terminalStatuses.set(status.key, status);
+			}
+		}
+		// A render can capture an older entity snapshot alongside a terminal
+		// operation projection. Process that projection now: polling starts from
+		// the rendered revision and will otherwise correctly report no change.
+		for (const status of terminalStatuses.values()) {
+			void this.receive(status)
+				.catch((error) => {
+					captureError(error, this.view.elt, {
+						context: "server-rendered-terminal-operation",
+					});
+				})
+				.finally(() => {
+					this.receivingTerminals.delete(status.key);
+				});
 		}
 	}
 
@@ -368,6 +396,7 @@ class DeferredOperationManager {
 		this.unsubscribers.clear();
 		this.operations.clear();
 		this.ignored.clear();
+		this.receivingTerminals.clear();
 	}
 }
 

@@ -1,23 +1,23 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b3952f7d';
-import { b as buttons } from './buttons.js?v=b3952f7d';
-import './foundation.js?v=b3952f7d';
-import './connectivity.js?v=b3952f7d';
-import { F as FacetsBox } from './facets.js?v=b3952f7d';
-import './styles.js?v=b3952f7d';
-import './icons.js?v=b3952f7d';
-import './dropdown.js?v=b3952f7d';
-import './combobox.js?v=b3952f7d';
-import './primitives.js?v=b3952f7d';
-import './upstreamUnavailable.js?v=b3952f7d';
-import './baseForm.js?v=b3952f7d';
-import './loader.js?v=b3952f7d';
-import './formatting.js?v=b3952f7d';
-import './remote.js?v=b3952f7d';
-import './queryLifecycle.js?v=b3952f7d';
-import './results.js?v=b3952f7d';
-import './storage.js?v=b3952f7d';
-import './submitter.js?v=b3952f7d';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b052d07c';
+import { b as buttons } from './buttons.js?v=b052d07c';
+import './foundation.js?v=b052d07c';
+import './connectivity.js?v=b052d07c';
+import { F as FacetsBox } from './facets.js?v=b052d07c';
+import './styles.js?v=b052d07c';
+import './icons.js?v=b052d07c';
+import './dropdown.js?v=b052d07c';
+import './combobox.js?v=b052d07c';
+import './primitives.js?v=b052d07c';
+import './upstreamUnavailable.js?v=b052d07c';
+import './baseForm.js?v=b052d07c';
+import './loader.js?v=b052d07c';
+import './formatting.js?v=b052d07c';
+import './remote.js?v=b052d07c';
+import './queryLifecycle.js?v=b052d07c';
+import './results.js?v=b052d07c';
+import './storage.js?v=b052d07c';
+import './submitter.js?v=b052d07c';
 
 const FILE_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";

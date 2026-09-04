@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b3952f7d';
-import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=b3952f7d';
-import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=b3952f7d';
-import './connectivity.js?v=b3952f7d';
-import { Q as QueryLifecycle } from './queryLifecycle.js?v=b3952f7d';
-import { s as setIcon } from './icons.js?v=b3952f7d';
-import { Dropdown } from './dropdown.js?v=b3952f7d';
-import { b as buttons } from './buttons.js?v=b3952f7d';
+import { STYLES } from './styles.js?v=b052d07c';
+import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=b052d07c';
+import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=b052d07c';
+import './connectivity.js?v=b052d07c';
+import { Q as QueryLifecycle } from './queryLifecycle.js?v=b052d07c';
+import { s as setIcon } from './icons.js?v=b052d07c';
+import { Dropdown } from './dropdown.js?v=b052d07c';
+import { b as buttons } from './buttons.js?v=b052d07c';
 
 /**
  * Utility module to work with key-value stores.
@@ -47329,6 +47329,7 @@ class MentionSuggestions {
 		this.onInsert = onInsert;
 		this.options = [];
 		this.focused = 0;
+		this.dismissedFrom = null;
 		this.queries = new QueryLifecycle();
 		this._refresh = this._refresh.bind(this);
 		this._keydown = this._keydown.bind(this);
@@ -47371,7 +47372,12 @@ class MentionSuggestions {
 	async search() {
 		if (this._destroyed) return false;
 		const active = currentQuery(this.editor);
-		if (!active) return this.hide();
+		if (!active) {
+			this.dismissedFrom = null;
+			return this.hide();
+		}
+		if (active.from === this.dismissedFrom) return this.hide();
+		this.dismissedFrom = null;
 		const params = new URLSearchParams({
 			q: active.query,
 			permission: "mention",
@@ -47490,6 +47496,7 @@ class MentionSuggestions {
 		if (this.popup.classList.contains("hidden")) return;
 		if (event.key === "Escape") {
 			event.preventDefault();
+			this.dismissedFrom = this.active?.from ?? null;
 			this.hide();
 		} else if (
 			this.options.length &&
@@ -48837,44 +48844,44 @@ class MarkdownPastePrompt {
 }
 
 const OPTION_REGISTRY = {
-	toggleFocus: () => import('./toolbarButtons.js?v=b3952f7d'),
-	toggleBold: () => import('./toolbarButtons.js?v=b3952f7d'),
-	toggleItalic: () => import('./toolbarButtons.js?v=b3952f7d'),
-	toggleBulletList: () => import('./toolbarButtons.js?v=b3952f7d'),
-	toggleOrderedList: () => import('./toolbarButtons.js?v=b3952f7d'),
-	toggleTaskList: () => import('./toolbarButtons.js?v=b3952f7d'),
-	undo: () => import('./toolbarButtons.js?v=b3952f7d'),
-	redo: () => import('./toolbarButtons.js?v=b3952f7d'),
-	documentHistory: () => import('./documentHistory.js?v=b3952f7d'),
-	setFontFamily: () => import('./menuItems.js?v=b3952f7d'),
-	setColor: () => import('./menuItems.js?v=b3952f7d'),
-	toggleUnderline: () => import('./menuItems.js?v=b3952f7d'),
-	toggleStrike: () => import('./menuItems.js?v=b3952f7d'),
-	toggleCode: () => import('./menuItems.js?v=b3952f7d'),
-	toggleSuperscript: () => import('./menuItems.js?v=b3952f7d'),
-	toggleSubscript: () => import('./menuItems.js?v=b3952f7d'),
-	clearFormat: () => import('./menuItems.js?v=b3952f7d'),
-	toggleHeading: () => import('./menuItems.js?v=b3952f7d'),
-	setParagraph: () => import('./menuItems.js?v=b3952f7d'),
-	addLink: () => import('./menuItems.js?v=b3952f7d'),
-	addImage: () => import('./menuItems.js?v=b3952f7d'),
-	addYouTube: () => import('./menuItems.js?v=b3952f7d'),
-	generateText: () => import('./menuItems.js?v=b3952f7d'),
-	setHorizontalRule: () => import('./menuItems.js?v=b3952f7d'),
-	toggleCodeBlock: () => import('./menuItems.js?v=b3952f7d'),
-	toggleBlockquote: () => import('./menuItems.js?v=b3952f7d'),
-	setTextAlign: () => import('./menuItems.js?v=b3952f7d'),
+	toggleFocus: () => import('./toolbarButtons.js?v=b052d07c'),
+	toggleBold: () => import('./toolbarButtons.js?v=b052d07c'),
+	toggleItalic: () => import('./toolbarButtons.js?v=b052d07c'),
+	toggleBulletList: () => import('./toolbarButtons.js?v=b052d07c'),
+	toggleOrderedList: () => import('./toolbarButtons.js?v=b052d07c'),
+	toggleTaskList: () => import('./toolbarButtons.js?v=b052d07c'),
+	undo: () => import('./toolbarButtons.js?v=b052d07c'),
+	redo: () => import('./toolbarButtons.js?v=b052d07c'),
+	documentHistory: () => import('./documentHistory.js?v=b052d07c'),
+	setFontFamily: () => import('./menuItems.js?v=b052d07c'),
+	setColor: () => import('./menuItems.js?v=b052d07c'),
+	toggleUnderline: () => import('./menuItems.js?v=b052d07c'),
+	toggleStrike: () => import('./menuItems.js?v=b052d07c'),
+	toggleCode: () => import('./menuItems.js?v=b052d07c'),
+	toggleSuperscript: () => import('./menuItems.js?v=b052d07c'),
+	toggleSubscript: () => import('./menuItems.js?v=b052d07c'),
+	clearFormat: () => import('./menuItems.js?v=b052d07c'),
+	toggleHeading: () => import('./menuItems.js?v=b052d07c'),
+	setParagraph: () => import('./menuItems.js?v=b052d07c'),
+	addLink: () => import('./menuItems.js?v=b052d07c'),
+	addImage: () => import('./menuItems.js?v=b052d07c'),
+	addYouTube: () => import('./menuItems.js?v=b052d07c'),
+	generateText: () => import('./menuItems.js?v=b052d07c'),
+	setHorizontalRule: () => import('./menuItems.js?v=b052d07c'),
+	toggleCodeBlock: () => import('./menuItems.js?v=b052d07c'),
+	toggleBlockquote: () => import('./menuItems.js?v=b052d07c'),
+	setTextAlign: () => import('./menuItems.js?v=b052d07c'),
 };
 
 const FORM_REGISTRY = {
-	pinVersion: () => import('./pinVersion.js?v=b3952f7d'),
-	setColor: () => import('./setColor.js?v=b3952f7d'),
-	setFontFamily: () => import('./setFontFamily.js?v=b3952f7d'),
-	setImage: () => import('./setImage.js?v=b3952f7d'),
-	addLink: () => import('./addLink.js?v=b3952f7d'),
-	addImage: () => import('./addImage.js?v=b3952f7d'),
-	addYouTube: () => import('./addYouTube.js?v=b3952f7d'),
-	generateText: () => import('./generateText.js?v=b3952f7d'),
+	pinVersion: () => import('./pinVersion.js?v=b052d07c'),
+	setColor: () => import('./setColor.js?v=b052d07c'),
+	setFontFamily: () => import('./setFontFamily.js?v=b052d07c'),
+	setImage: () => import('./setImage.js?v=b052d07c'),
+	addLink: () => import('./addLink.js?v=b052d07c'),
+	addImage: () => import('./addImage.js?v=b052d07c'),
+	addYouTube: () => import('./addYouTube.js?v=b052d07c'),
+	generateText: () => import('./generateText.js?v=b052d07c'),
 };
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";

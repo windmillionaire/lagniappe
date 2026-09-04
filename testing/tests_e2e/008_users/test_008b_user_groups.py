@@ -7,7 +7,7 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import General, Levels, Site
 from testing.definitions import Groups, Permissions, SitePages, Users
 from testing.definitions.group_definitions import GroupDefinition
-from testing.elements import Buttons, Modal, PermissionsForm, SpinnerButtons
+from testing.elements import Buttons, Modal, PermissionsForm, SpinnerButtons, Tools
 from testing.resources import Group
 
 pytestmark = pytest.mark.e2e
@@ -54,7 +54,7 @@ def _create_group(user, user_index, group):
     return title
 
 
-# @matrix user-groups : column-link query-route reload same-page-navigation
+# @matrix user-groups : column-link isolation query-route reload same-page-navigation
 # @template common.html::format_name
 # @template users/tools.html::group_permissions
 def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
@@ -62,6 +62,11 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
     member = get_user(Users.general_users_view_only, creator=owner)
     group = Groups.general_users_view_only.get(owner)
     user_index = owner.go(SitePages.USER_INDEX)
+
+    tools = Tools(owner)
+    tools.open()
+    create_user = tools.locate(user_index.CREATE_USER_WIDGET)
+    expect(create_user).to_be_visible()
 
     row = owner.locate(f"#table tbody tr[data-key='{member.key}']")
     expect(row).to_be_visible()
@@ -76,6 +81,7 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
         f"form[data-widget^='GroupPermissions/'][data-key='{group.key}']"
     )
     expect(permissions).to_be_visible()
+    expect(create_user).to_be_hidden()
     expect(owner.page).to_have_url(
         re.compile(rf"/users/index\?group={re.escape(group.key)}$")
     )

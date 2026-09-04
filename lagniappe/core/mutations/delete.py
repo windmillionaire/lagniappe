@@ -2,7 +2,13 @@
 
 from dataclasses import dataclass, field
 
-from ..definitions import Fetch, MutationEffectType, MutationOperation, Restriction
+from ..definitions import (
+    Fetch,
+    FetchReason,
+    MutationEffectType,
+    MutationOperation,
+    Restriction,
+)
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import messaging as database_messaging
 from .base import MutationPlanBuilder
@@ -165,6 +171,41 @@ class DeleteCollector:
                 )
             else:
                 self.delete(file)
+
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_file_delete_unlinks_task_references_and_list_owners
+    # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_delete_file_removes_attached_task_badge
+    # @pairs file:badge file:delete file:reverse-link
+    # @pairs mutations:delete mutations:unlink
+    # @pairs tasks:badge tasks:delete tasks:list-owner-fingerprint
+    # @pairs tasks:reverse-link tasks:task-history tasks:unlink
+    def file_tasks(self, file):
+        tasks = [
+            entity
+            for entity in self.entities.fetch(
+                *file.properties.tasks.keys,
+                request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+            )
+            if isinstance(entity, (self.entities.TASK, self.entities.TASK_HISTORY))
+        ]
+        for task in tasks:
+            if not task.properties.files.remove(file):
+                continue
+
+            is_history = isinstance(task, self.entities.TASK_HISTORY)
+            self.repair(
+                task,
+                "files",
+                property_updates=() if is_history else ("modified",),
+                reason="file-delete-task-unlink",
+            )
+            owners = (
+                [task.task, task.page, *task.linked_pages]
+                if is_history
+                else task.task_list_owners
+            )
+            for owner in owners:
+                self.repair(owner, reason="file-delete-task-list-owner")
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_task_delete_updates_task_list_owners
@@ -358,6 +399,15 @@ class TaskDeleteMutation(StandardDeleteMutation):
         collector.task_files(entity)
 
 
+# @testable infrastructure
+class FileDeleteMutation(StandardDeleteMutation):
+    # @testable infrastructure
+    # @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.file_tasks
+    def collect(self, entity, collector):
+        collector.delete(entity)
+        collector.file_tasks(entity)
+
+
 # @testable false
 # @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.note
 # @reason planner dispatch delegates note behavior to the tested collector
@@ -409,7 +459,7 @@ DELETE_PLANNERS = {
     "user": UserDeleteMutation(),
     "project": ProjectDeleteMutation(),
     "model": ModelDeleteMutation(),
-    "file": STANDARD_DELETE,
+    "file": FileDeleteMutation(),
     "ingress": STANDARD_DELETE,
     "form": FormDeleteMutation(),
     "category": CategoryDeleteMutation(),

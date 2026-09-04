@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as captureError, r as request, E as ENDPOINTS } from './foundation.js?v=b3952f7d';
-import './upstreamUnavailable.js?v=b3952f7d';
-import './connectivity.js?v=b3952f7d';
+import { c as captureError, r as request, E as ENDPOINTS } from './foundation.js?v=b052d07c';
+import './upstreamUnavailable.js?v=b052d07c';
+import './connectivity.js?v=b052d07c';
 
 const POLL_PROTOCOL_VERSION = 1;
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;

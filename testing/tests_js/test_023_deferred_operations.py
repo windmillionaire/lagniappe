@@ -186,3 +186,113 @@ const manager = new context.DeferredOperationManager(view).init();
 });
 """
     )
+
+
+# @pair deferred-jobs:terminal-ownership
+def test_deferred_operation_manager_reconciles_server_rendered_terminal_status(
+    run_node,
+):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const phase = { textContent: "Complete" };
+const elapsed = { textContent: "just now" };
+const node = {
+  dataset: {
+    key: "report-ready",
+    operation: "operation-complete",
+    operationRevision: "7",
+    operationStatus: "succeeded",
+    operationPhase: "complete",
+    operationPhaseLabel: "Complete",
+    operationElapsed: "3",
+    operationRecovering: "false",
+    operationTerminal: "true",
+  },
+  isConnected: true,
+  closest() { return null; },
+  getClientRects() { return [{}]; },
+  querySelector(selector) {
+    if (selector === "[data-role='deferred-phase']") return phase;
+    if (selector === "[data-role='deferred-elapsed']") return elapsed;
+    return null;
+  },
+  querySelectorAll() { return []; },
+};
+const subscriptions = new Map();
+const events = [];
+const reconciled = [];
+const expectedCompletions = [];
+const context = {
+  console,
+  setTimeout,
+  CustomEvent: class {
+    constructor(type, options) { this.type = type; this.detail = options.detail; }
+  },
+  createIcon() { return {}; },
+  withTransition(callback) { return callback(); },
+  document: {
+    querySelectorAll(selector) {
+      return selector === "[data-operation]" ? [node] : [];
+    },
+  },
+  window: { dispatchEvent(event) { events.push(event); } },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/deferredOperations.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace(
+  "export class DeferredOperationManager",
+  "class DeferredOperationManager",
+);
+source += "\nglobalThis.DeferredOperationManager = DeferredOperationManager;";
+vm.runInContext(source, context);
+
+const view = {
+  PollingCoordinator: {
+    subscribe(descriptor) {
+      subscriptions.set(descriptor.id, descriptor);
+      return () => subscriptions.delete(descriptor.id);
+    },
+    reschedule() {},
+  },
+  EditWatcher: {
+    expectDeferredCompletion(key, operation) {
+      expectedCompletions.push({ key, operation });
+    },
+  },
+  async reconcileChange(change) { reconciled.push(change); },
+};
+
+(async () => {
+  const manager = new context.DeferredOperationManager(view).init();
+  manager.scan();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  if (
+    events.length !== 1 ||
+    events[0].type !== "deferred-operation" ||
+    events[0].detail.key !== "operation-complete" ||
+    events[0].detail.entity_key !== "report-ready"
+  ) {
+    throw new Error("Server-rendered terminal status was not published to its view owner");
+  }
+  if (
+    reconciled.length !== 1 ||
+    reconciled[0].type !== "deferred-complete" ||
+    reconciled[0].key !== "report-ready" ||
+    expectedCompletions[0]?.operation !== "operation-complete"
+  ) {
+    throw new Error("Server-rendered terminal status was not reconciled");
+  }
+  if (manager.operations.size || subscriptions.size) {
+    throw new Error("Reconciled terminal seed remained subscribed");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )
