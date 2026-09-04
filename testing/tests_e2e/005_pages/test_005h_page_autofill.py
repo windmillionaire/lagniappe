@@ -77,6 +77,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     expect(progress).to_be_visible()
     expect(progress.locator("[data-role='deferred-phase']")).not_to_have_text("")
     expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
+    expect(form).to_have_css("opacity", "0.5")
 
     with expect_poll_result(
         user.page,
@@ -89,6 +90,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     expect(form).to_have_attribute("data-operation", payload["operation"])
     expect(form.locator("[data-role='deferred-progress']")).to_be_visible()
     expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
+    expect(form).to_have_css("opacity", "0.5")
 
     update_path = f"/pages/{page.entity.urlsafe_key}/update"
     original_name = page.entity.name
@@ -139,3 +141,4 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     expect(form.locator("[data-role='deferred-progress']")).not_to_be_attached()
     expect(form.locator("[data-role='submit-group']")).to_be_attached()
     expect(form.locator("[data-role='autofill']")).to_be_attached()
+    expect(form).to_have_css("opacity", "1")

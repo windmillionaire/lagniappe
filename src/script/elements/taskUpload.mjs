@@ -136,7 +136,7 @@ export class TaskUpload extends BaseUpload {
 		item.dataset.key = file.key || file.id || "";
 		item.dataset.kind = "file";
 		item.className =
-			"flex flex-row items-baseline justify-between gap-4 p-4 rounded-md bg-base-bg";
+			"flex flex-row items-center justify-between gap-4 p-4 rounded-md bg-base-bg";
 
 		const link = item.appendChild(document.createElement("a"));
 		link.href = this._fileUrl(file);

@@ -818,6 +818,9 @@ def test_create_page_task_with_file(get_user):
     create_saved_files = create_form.locator("[data-role='saved-files']")
     expect(create_saved_files).to_be_visible()
     expect(create_saved_files).to_contain_text(filename)
+    expect(create_saved_files.locator("li").first).to_have_css(
+        "align-items", "center"
+    )
     expect(create_saved_files.locator("a").first).to_have_attribute(
         "href", re.compile(r"/files/")
     )

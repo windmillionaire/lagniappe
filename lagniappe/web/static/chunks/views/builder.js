@@ -1,22 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7112e3bf-023b-4ba1-be37-c22128357cdf",e._sentryDebugIdIdentifier="sentry-dbid-7112e3bf-023b-4ba1-be37-c22128357cdf");}catch(e){}}();import"../search.js?v=bd92b33b";import"../entityMenu.js?v=bd92b33b";import"../foundation.js?v=bd92b33b";import"../connectivity.js?v=bd92b33b";import"../modal.js?v=bd92b33b";import{F as q}from"../builder.js?v=bd92b33b";import"../styles.js?v=bd92b33b";import"../remote.js?v=bd92b33b";import"../queryLifecycle.js?v=bd92b33b";import"../combobox.js?v=bd92b33b";import"../primitives.js?v=bd92b33b";import"../icons.js?v=bd92b33b";import"../results.js?v=bd92b33b";import"../storage.js?v=bd92b33b";import"../formatting.js?v=bd92b33b";import"../upstreamUnavailable.js?v=bd92b33b";import"../dropdown.js?v=bd92b33b";import"../baseForm.js?v=bd92b33b";import"../loader.js?v=bd92b33b";import"../facets.js?v=bd92b33b";import"../submitter.js?v=bd92b33b";export{q as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=b052d07c';
-import '../entityMenu.js?v=b052d07c';
-import '../foundation.js?v=b052d07c';
-import '../connectivity.js?v=b052d07c';
-import '../modal.js?v=b052d07c';
-export { F as default } from '../builder.js?v=b052d07c';
-import '../styles.js?v=b052d07c';
-import '../remote.js?v=b052d07c';
-import '../queryLifecycle.js?v=b052d07c';
-import '../combobox.js?v=b052d07c';
-import '../primitives.js?v=b052d07c';
-import '../icons.js?v=b052d07c';
-import '../results.js?v=b052d07c';
-import '../storage.js?v=b052d07c';
-import '../formatting.js?v=b052d07c';
-import '../upstreamUnavailable.js?v=b052d07c';
-import '../dropdown.js?v=b052d07c';
-import '../baseForm.js?v=b052d07c';
-import '../loader.js?v=b052d07c';
-import '../facets.js?v=b052d07c';
-import '../submitter.js?v=b052d07c';
