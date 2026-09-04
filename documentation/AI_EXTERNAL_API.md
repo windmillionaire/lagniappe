@@ -88,7 +88,7 @@ the validated pipx 1.17.2 path, forcing pip and binary-only dependencies:
 
 ```bash
 pipx install --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
-  "https://example.test/mcp/releases/0.1.1/<sha256>/lagniappe_mcp-0.1.1-py3-none-any.whl#sha256=<sha256>"
+  "https://example.test/mcp/releases/0.1.2/<sha256>/lagniappe_mcp-0.1.2-py3-none-any.whl#sha256=<sha256>"
 lagniappe-mcp configure codex --url "https://example.test" \
   --profile personal
 lagniappe-mcp check --profile personal
@@ -123,10 +123,11 @@ lagniappe-mcp check --profile personal
 ```
 
 Release `0.1.0` remains a historical, supported predecessor with its original
-root-gated upload interface. New installations and the local MCP trial use
-`0.1.1`; do not downgrade during a measured run. Never install an unadvertised
-predecessor or a release whose API/contract or platform metadata does not match
-the current site.
+root-gated upload interface, and immutable `0.1.1` remains in the release
+ledger as the first rootless local candidate. New installations and the local
+MCP trial use `0.1.2`; do not downgrade during a measured run. Never install an
+unadvertised predecessor or a release whose API/contract or platform metadata
+does not match the current site.
 
 Generate or rotate the shown-once API key only after installing. `configure`
 prompts without echo and stores it in the owner-only local profile; generated
