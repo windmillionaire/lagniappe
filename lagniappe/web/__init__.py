@@ -9,12 +9,14 @@ cache clearing.
 
 from datetime import timedelta
 import json
+import re
 from urllib.parse import urlsplit
 
 from flask import Flask, g, request, session
 from flask_wtf.csrf import CSRFProtect
 
 from lagniappe import CONFIG
+from config.constants import MCP_MANIFEST_URL, MCP_RELEASE_URL_PATTERN
 from lagniappe.core.exceptions.request import filter_sentry_event, sanitize_sentry_event
 from lagniappe.core.tools import cache
 
@@ -105,6 +107,7 @@ CSP = "; ".join(
         "form-action 'self'",
     ]
 )
+MCP_RELEASE_URL_RE = re.compile(MCP_RELEASE_URL_PATTERN)
 
 
 # @testable false
@@ -143,8 +146,10 @@ def record_authenticated_site_activity(response):
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_common_security_headers
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
+# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_mcp_public_artifact_headers
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
 # @matrix web-headers : conditional-request entity-revision etag missing-fingerprint security
+# @matrix mcp-package web-headers : build-marker immutable-cache no-store public-artifact
 # @pair login:logout
 @app.after_request
 def add_lagniappe_headers(response):
@@ -157,6 +162,22 @@ def add_lagniappe_headers(response):
         "Cache-Control": "no-store" if g.get("NO_CACHE") else "private, no-cache",
         "Content-Security-Policy": CSP,
     }
+
+    if request.path == MCP_MANIFEST_URL:
+        headers.update(
+            {
+                "Cache-Control": "no-store",
+                "Content-Type": "application/json; charset=utf-8",
+                "X-Lagniappe-Build-ID": CONFIG.BUILD_ID,
+            }
+        )
+    elif MCP_RELEASE_URL_RE.fullmatch(request.path):
+        headers.update(
+            {
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "Content-Type": "application/octet-stream",
+            }
+        )
 
     if getattr(g, "fingerprint", False):
         headers["ETag"] = f'"{g.fingerprint}"'

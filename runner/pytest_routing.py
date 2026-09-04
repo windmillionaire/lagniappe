@@ -13,6 +13,8 @@ import sys
 PYTEST_CONFIG = "testing/pytest.ini"
 TRACEABILITY_RESULTS_PLUGIN = "testing.utility.traceability_results"
 PYTEST_ROUTING_PLUGIN = "runner.pytest_routing"
+MCP_ADAPTER_TEST = "testing/tests_unit/test_033_mcp_adapter.py"
+MCP_PACKAGE_TEST_ROOT = "clients/lagniappe_mcp/tests"
 
 SETUP_TEST_GROUPS = {
     "ordinary": (
@@ -73,6 +75,14 @@ class PytestInvocation:
     collection_targets: tuple[str, ...]
     strict_relations: bool
     includes_e2e: bool
+
+
+@dataclass(frozen=True)
+class PytestPartitions:
+    """Root and standalone-package pytest arguments for one invocation."""
+
+    root_args: tuple[str, ...] | None
+    mcp_args: tuple[str, ...] | None
 
 
 # @testable true
@@ -174,6 +184,116 @@ def targets_include_e2e(targets: tuple[str, ...], repository_root: Path) -> bool
         if e2e_root.is_relative_to(target_path):
             return True
     return False
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_partition_mcp_adapter_test_selection
+# @matrix mcp-package testing : cli-routing environment-isolation no-duplicate-collection
+def partition_mcp_adapter_tests(
+    invocation: PytestInvocation, repository_root: Path
+) -> PytestPartitions:
+    """Split adapter collection from tests that run in the root environment."""
+    adapter_path = (repository_root / MCP_ADAPTER_TEST).resolve()
+    package_test_root = (repository_root / MCP_PACKAGE_TEST_ROOT).resolve()
+    collection_targets = invocation.collection_targets
+    pytest_args = invocation.pytest_args
+    target_count = len(collection_targets)
+    explicit_targets: tuple[str, ...] = ()
+    if (
+        target_count
+        and len(pytest_args) >= target_count
+        and tuple(pytest_args[-target_count:]) == collection_targets
+    ):
+        explicit_targets = collection_targets
+    passthrough = pytest_args[: len(pytest_args) - len(explicit_targets)]
+
+    broad_adapter_selection = False
+    broad_package_selection = False
+    exact_adapter_targets = []
+    exact_package_targets = []
+    root_targets = []
+    for target in collection_targets:
+        target_path = _target_path(target, repository_root)
+        if target_path == adapter_path:
+            if explicit_targets:
+                exact_adapter_targets.append(target)
+            else:
+                broad_adapter_selection = True
+            continue
+        if target_path == package_test_root or target_path.is_relative_to(
+            package_test_root
+        ):
+            if explicit_targets:
+                exact_package_targets.append(target)
+            else:
+                broad_package_selection = True
+            continue
+        if adapter_path.is_relative_to(target_path):
+            broad_adapter_selection = True
+        if package_test_root.is_relative_to(target_path):
+            broad_package_selection = True
+        if explicit_targets:
+            root_targets.append(target)
+
+    # The package-local transport tests are part of the unit/default MCP
+    # partition even though the root pytest configuration cannot collect them.
+    if broad_adapter_selection:
+        broad_package_selection = True
+
+    if not any(
+        (
+            broad_adapter_selection,
+            broad_package_selection,
+            exact_adapter_targets,
+            exact_package_targets,
+        )
+    ):
+        return PytestPartitions(root_args=pytest_args, mcp_args=None)
+
+    adapter_targets = []
+    adapter_targets.extend(
+        [MCP_ADAPTER_TEST]
+        if broad_adapter_selection
+        else dict.fromkeys(exact_adapter_targets)
+    )
+    adapter_targets.extend(
+        [MCP_PACKAGE_TEST_ROOT]
+        if broad_package_selection
+        else dict.fromkeys(exact_package_targets)
+    )
+    adapter_args = (*passthrough, *adapter_targets)
+
+    if broad_adapter_selection or broad_package_selection:
+        ignored = []
+        if broad_adapter_selection:
+            ignored.append(f"--ignore={MCP_ADAPTER_TEST}")
+        if broad_package_selection:
+            ignored.append(f"--ignore={MCP_PACKAGE_TEST_ROOT}")
+        root_args = (
+            *passthrough,
+            *ignored,
+            *root_targets,
+        )
+    elif root_targets:
+        root_args = (*passthrough, *root_targets)
+    else:
+        root_args = None
+    return PytestPartitions(root_args=root_args, mcp_args=adapter_args)
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_targets_include_repository_file
+# @matrix mcp-package testing : cli-routing local-preflight
+def targets_include_repository_file(
+    targets: tuple[str, ...], relative_path: str, repository_root: Path
+) -> bool:
+    """Return whether a collection target includes a repository file."""
+    candidate = (repository_root / relative_path).resolve()
+    return any(
+        candidate == (target_path := _target_path(target, repository_root))
+        or candidate.is_relative_to(target_path)
+        for target in targets
+    )
 
 
 # @testable true

@@ -6,6 +6,7 @@ from lagniappe.core.definitions import (
     FileConsumer,
     FileConsumerLimitError,
     INDIVIDUAL_FILES_ONLY_ERROR,
+    MutationIntent,
     enforce_file_consumer,
 )
 from lagniappe.core.tools.database import assets as storage_assets
@@ -20,13 +21,27 @@ DIRECT_UPLOAD_RECORD_KEYS = (
     "generation",
     "path",
 )
+CHECKPOINT_NOT_COMMITTED = "not_committed"
+CHECKPOINT_AMBIGUOUS = "ambiguous"
 
 
 # @testable true
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_prepare_report_upload_manifest_normalizes_browser_records
-# @matrix ai-report direct-upload : normalization upload-manifest validation
-def prepare_report_upload_manifest(records, input_name="tool-files"):
+# @tests tests_unit/test_032_agent_api.py::test_external_upload_batch_identity_is_preserved_in_every_record
+# @matrix ai-report direct-upload : normalization upload-batch-identity upload-manifest validation
+def prepare_report_upload_manifest(
+    records,
+    input_name="tool-files",
+    *,
+    upload_batch_id=None,
+):
     """Return bounded signed-upload metadata safe to persist on a report."""
+    if upload_batch_id is not None and (
+        not isinstance(upload_batch_id, str) or not upload_batch_id
+    ):
+        raise exceptions.ValidationError(
+            "The upload batch identity could not be prepared."
+        )
     manifest = []
     for record in records or []:
         if not isinstance(record, dict):
@@ -56,6 +71,8 @@ def prepare_report_upload_manifest(records, input_name="tool-files"):
         normalized["token"] = token.strip()
         normalized["filename"] = filename.strip()
         normalized["input_name"] = input_name
+        if upload_batch_id is not None:
+            normalized["upload_batch_id"] = upload_batch_id
 
         if "size" in normalized:
             try:
@@ -90,6 +107,12 @@ def prepare_report_upload_manifest(records, input_name="tool-files"):
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_accepts_actual_oversized_object
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_marks_default_files_as_report_only
 # @matrix ai-report direct-upload : active-request background-finalization checkpoint-failure large-file pre-execution progress resume upload-manifest
+# @pairs ai-report:generation-cleanup direct-upload:generation-cleanup
+# @pairs ai-report:lease-renewal direct-upload:lease-renewal
+# @pairs ai-report:factory-failure direct-upload:factory-failure
+# @pairs ai-report:cleanup direct-upload:cleanup
+# @pairs ai-report:partial-progress direct-upload:partial-progress
+# @pairs ai-report:retry direct-upload:retry
 def finalize_report_upload_manifest(
     report,
     user,
@@ -98,6 +121,7 @@ def finalize_report_upload_manifest(
     upload_loader=None,
     file_factory=None,
     upload_cleanup=None,
+    failed_file_cleanup=None,
     ensure_active=None,
 ):
     """Finalize staged uploads before removing their checkpointed sources."""
@@ -126,6 +150,15 @@ def finalize_report_upload_manifest(
     prepared = 0
     finalized = []
 
+    # @testable false
+    # @covered-by lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
+    # @reason source-cleanup retry behavior is asserted through the public finalizer
+    def cleanup_source(record):
+        if not upload_cleanup(record):
+            raise exceptions.ValidationError(
+                "Temporary upload cleanup did not complete. Retry finalization."
+            )
+
     for record in manifest:
         if ensure_active:
             ensure_active()
@@ -136,7 +169,7 @@ def finalize_report_upload_manifest(
 
         file_key = record.get("file_key")
         if record.get("complete") is True and file_key in attached:
-            upload_cleanup(record)
+            cleanup_source(record)
             prepared += 1
             continue
 
@@ -150,45 +183,86 @@ def finalize_report_upload_manifest(
         except FileConsumerLimitError as error:
             raise exceptions.ValidationError(str(error)) from error
         upload.lagniappe_preserve_source = True
-        file = file_factory(
-            upload=upload,
-            data={
-                "filename": upload.filename,
-                "mimetype": upload.content_type,
-            },
-        )
-        input_files.append(file)
-        attached[file.urlsafe_key] = file
-        report.input_files = input_files
+        file = None
+        checkpoint_started = False
+        try:
+            file = file_factory(
+                upload=upload,
+                data={
+                    "filename": upload.filename,
+                    "mimetype": upload.content_type,
+                },
+            )
+            input_files.append(file)
+            attached[file.urlsafe_key] = file
+            report.input_files = input_files
 
-        record["file_key"] = file.urlsafe_key
-        record["complete"] = True
-        prepared += 1
-        report.upload_manifest = manifest
-        report.summary = f"Preparing files ({prepared} of {total})..."
-        if ensure_active:
-            ensure_active()
-        save(file, report, user)
-        upload_cleanup(record)
+            record["file_key"] = file.urlsafe_key
+            record["complete"] = True
+            prepared += 1
+            report.upload_manifest = manifest
+            report.summary = f"Preparing files ({prepared} of {total})..."
+            if ensure_active:
+                ensure_active()
+            # Keep the caller's potentially old User snapshot out of this
+            # checkpoint. An explicit intent preserves owner-list invalidation
+            # as a modified-only update without reverting concurrent profile,
+            # group, or permission changes.
+            if hasattr(report, "add_mutation_intents"):
+                report.add_mutation_intents(
+                    MutationIntent.touch(
+                        user,
+                        reason="report-upload-owner-invalidation",
+                    )
+                )
+            checkpoint_started = True
+            save(file, report)
+        except BaseException as error:
+            if failed_file_cleanup:
+                disposition = getattr(error, "checkpoint_disposition", None)
+                if disposition not in {
+                    CHECKPOINT_NOT_COMMITTED,
+                    CHECKPOINT_AMBIGUOUS,
+                }:
+                    disposition = (
+                        CHECKPOINT_AMBIGUOUS
+                        if checkpoint_started
+                        else CHECKPOINT_NOT_COMMITTED
+                    )
+                failed_file_cleanup(
+                    file=file,
+                    upload=upload,
+                    error=error,
+                    checkpoint_disposition=disposition,
+                )
+            raise
+        cleanup_source(record)
         finalized.append(file)
 
     report.upload_manifest = None
     report.summary = None
     if ensure_active:
         ensure_active()
-    save(report, user)
+    if hasattr(report, "add_mutation_intents"):
+        report.add_mutation_intents(
+            MutationIntent.touch(
+                user,
+                reason="report-upload-owner-invalidation",
+            )
+        )
+    save(report)
     return finalized
 
 
 # @testable true
-# @tests tests_unit/test_020c_ai_report_uploads.py::test_cleanup_report_upload_manifest_deletes_only_pending_uploads
+# @tests tests_unit/test_020c_ai_report_uploads.py::test_cleanup_report_upload_manifest_deletes_all_temporary_sources
 # @matrix ai-report direct-upload : cleanup partial-progress upload-manifest
 def cleanup_report_upload_manifest(report, delete_upload=None):
-    """Delete temporary objects that were not finalized into File entities."""
+    """Delete every temporary source still represented by an upload manifest."""
     delete_upload = delete_upload or storage_assets.delete_direct_upload
     deleted = 0
     for record in report.upload_manifest or []:
-        if not isinstance(record, dict) or record.get("complete") is True:
+        if not isinstance(record, dict):
             continue
         if delete_upload(record):
             deleted += 1

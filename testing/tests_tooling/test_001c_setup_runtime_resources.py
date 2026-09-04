@@ -478,6 +478,14 @@ def test_development_setup_is_additive_and_idempotent(monkeypatch):
         [
             sys.executable,
             "-m",
+            "runner.uv_bootstrap",
+            "install",
+            "--non-interactive",
+        ],
+        [sys.executable, "-m", "runner.uv_bootstrap", "check"],
+        [
+            sys.executable,
+            "-m",
             "pip",
             "install",
             "-r",

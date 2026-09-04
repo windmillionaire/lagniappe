@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tarfile
@@ -20,6 +21,24 @@ REPORT_ROOT = REPOSITORY_ROOT / "reports"
 HOSTED_REPORT_ROOT = REPORT_ROOT / "hosted-e2e"
 EVIDENCE_PATH = REPOSITORY_ROOT / "testing/evidence/latest.json"
 MAX_FOCUSED_TARGETS = 50
+HOSTED_E2E_ENVIRONMENTS = ("standard", "mcp-package")
+STANDARD_JOB = "lagniappe-e2e"
+MCP_PACKAGE_TARGET = "testing/tests_e2e/013_agent_api/test_013c_mcp_package_install.py"
+MCP_PACKAGE_JOB = "lagniappe-mcp-package"
+MCP_PACKAGE_PLATFORM = "linux-x86_64-cpython-3.14"
+MCP_PACKAGE_VERSIONS = {
+    "uv_version": "0.12.9",
+    "pipx_version": "1.17.2",
+    "codex_version": "0.153.0",
+}
+MCP_PACKAGE_DIGEST_ENV = {
+    "mcp_image_contract_sha256": "LAGNIAPPE_MCP_IMAGE_CONTRACT_SHA256",
+    "mcp_lock_sha256": "LAGNIAPPE_MCP_LOCK_SHA256",
+    "mcp_manifest_sha256": "LAGNIAPPE_MCP_MANIFEST_SHA256",
+    "mcp_ledger_sha256": "LAGNIAPPE_MCP_LEDGER_SHA256",
+    "mcp_wheel_sha256": "LAGNIAPPE_MCP_WHEEL_SHA256",
+    "mcp_dependency_graph_sha256": "LAGNIAPPE_MCP_DEPENDENCY_GRAPH_SHA256",
+}
 
 
 def _required_environment(name: str) -> str:
@@ -27,6 +46,38 @@ def _required_environment(name: str) -> str:
     if not value:
         raise RuntimeError(f"Hosted E2E job requires {name}.")
     return value
+
+
+def _hosted_environment() -> str:
+    value = str(
+        os.environ.get("LAGNIAPPE_HOSTED_E2E_ENVIRONMENT") or "standard"
+    ).strip()
+    if value not in HOSTED_E2E_ENVIRONMENTS:
+        raise RuntimeError("Hosted E2E job received an invalid environment.")
+    return value
+
+
+def _mcp_package_attestation() -> dict:
+    values = {}
+    for name, env_name in MCP_PACKAGE_DIGEST_ENV.items():
+        value = _required_environment(env_name)
+        if not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise RuntimeError(f"MCP package job received an invalid {env_name}.")
+        values[name] = value
+    image_digest = _required_environment("LAGNIAPPE_MCP_IMAGE_DIGEST")
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", image_digest):
+        raise RuntimeError("MCP package job received an invalid image digest.")
+    values["mcp_image_digest"] = image_digest
+    platform = _required_environment("LAGNIAPPE_MCP_PLATFORM")
+    if platform != MCP_PACKAGE_PLATFORM:
+        raise RuntimeError("MCP package job received an unadvertised platform.")
+    values["mcp_platform"] = platform
+    for name, expected in MCP_PACKAGE_VERSIONS.items():
+        value = _required_environment(f"LAGNIAPPE_MCP_{name.upper()}")
+        if value != expected:
+            raise RuntimeError(f"MCP package job received a stale {name}.")
+        values[name] = value
+    return values
 
 
 # @testable true
@@ -59,7 +110,9 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
             )
         relative_path = Path(path_text)
         if relative_path.is_absolute() or ".." in relative_path.parts:
-            raise RuntimeError("Focused hosted E2E targets cannot traverse directories.")
+            raise RuntimeError(
+                "Focused hosted E2E targets cannot traverse directories."
+            )
         target_path = (REPOSITORY_ROOT / relative_path).resolve()
         if (
             not target_path.is_relative_to(e2e_root)
@@ -70,10 +123,11 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
                 "Focused hosted E2E targets must name existing E2E Python files."
             )
         if separator and (
-            not selector
-            or any(not component for component in selector.split("::"))
+            not selector or any(not component for component in selector.split("::"))
         ):
-            raise RuntimeError("Focused hosted E2E received an invalid nodeid selector.")
+            raise RuntimeError(
+                "Focused hosted E2E received an invalid nodeid selector."
+            )
     return normalized
 
 
@@ -81,8 +135,27 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract
 # @matrix hosted-e2e : argument-injection focused-execution target-validation
-def _pytest_command(suite: str, targets=()) -> list[str]:
-    if suite == "all":
+def _pytest_command(
+    suite: str,
+    targets=(),
+    *,
+    environment="standard",
+) -> list[str]:
+    if environment not in HOSTED_E2E_ENVIRONMENTS:
+        raise RuntimeError("Hosted E2E job received an invalid environment.")
+    targets = tuple(targets or ())
+    if environment == "mcp-package":
+        if suite != "focused" or targets != (MCP_PACKAGE_TARGET,):
+            raise RuntimeError(
+                "The mcp-package job accepts only its exact packaging target."
+            )
+        pytest_targets = [
+            MCP_PACKAGE_TARGET,
+            "--noconftest",
+            "-m",
+            "mcp_package_install",
+        ]
+    elif suite == "all":
         if targets:
             raise RuntimeError("All hosted tests do not accept focused targets.")
         pytest_targets = [
@@ -91,18 +164,22 @@ def _pytest_command(suite: str, targets=()) -> list[str]:
             "tooling",
             "e2e",
             "-m",
-            "not unfinished",
+            "not unfinished and not mcp_package_install",
         ]
     elif suite == "full":
         if targets:
             raise RuntimeError("Full hosted E2E does not accept focused targets.")
-        pytest_targets = ["e2e"]
+        pytest_targets = ["e2e", "-m", "not mcp_package_install"]
     elif suite == "focused":
         pytest_targets = [
             *validate_focused_targets(targets),
             "-m",
-            "not unfinished",
+            "not unfinished and not mcp_package_install",
         ]
+        if any(target.partition("::")[0] == MCP_PACKAGE_TARGET for target in targets):
+            raise RuntimeError(
+                "The MCP package install target requires the mcp-package job."
+            )
     else:
         raise RuntimeError(f"Unsupported hosted E2E suite {suite!r}.")
     return [
@@ -124,6 +201,12 @@ def _artifact_manifest(
     finished_at: datetime,
     targets=(),
 ) -> dict:
+    environment = _hosted_environment()
+    job = _required_environment("CLOUD_RUN_JOB")
+    declared_job = _required_environment("LAGNIAPPE_HOSTED_E2E_JOB")
+    expected_job = MCP_PACKAGE_JOB if environment == "mcp-package" else STANDARD_JOB
+    if declared_job != job or job != expected_job:
+        raise RuntimeError("Hosted E2E job identity does not match its environment.")
     manifest = {
         "schema_version": 1,
         "kind": "hosted-e2e-result",
@@ -131,7 +214,7 @@ def _artifact_manifest(
         "suite_started_at": started_at.astimezone(timezone.utc).isoformat(),
         "suite_finished_at": finished_at.astimezone(timezone.utc).isoformat(),
         "execution": execution,
-        "job": _required_environment("CLOUD_RUN_JOB"),
+        "job": job,
         "project": _required_environment("GOOGLE_CLOUD_PROJECT"),
         "service": _required_environment("LAGNIAPPE_HOSTED_E2E_SERVICE"),
         "version": _required_environment("LAGNIAPPE_HOSTED_E2E_VERSION"),
@@ -140,11 +223,14 @@ def _artifact_manifest(
             "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT"
         ),
         "build_id": _required_environment("LAGNIAPPE_HOSTED_E2E_BUILD_ID"),
+        "environment": environment,
         "suite": suite,
         "exit_status": int(exit_status),
     }
     if targets:
         manifest["targets"] = list(targets)
+    if environment == "mcp-package":
+        manifest.update(_mcp_package_attestation())
     return manifest
 
 
@@ -178,6 +264,8 @@ def _stamp_evidence(manifest: dict) -> None:
             "suite_finished_at",
         )
     }
+    if manifest.get("environment"):
+        provenance["hosted_e2e"]["environment"] = manifest["environment"]
     if manifest.get("targets"):
         provenance["hosted_e2e"]["targets"] = list(manifest["targets"])
     evidence["provenance"] = provenance
@@ -224,6 +312,7 @@ def main(arguments=None) -> int:
     parser.add_argument("--target", action="append", default=[])
     args = parser.parse_args(arguments)
 
+    environment = _hosted_environment()
     targets = (
         validate_focused_targets(args.target)
         if args.suite == "focused"
@@ -234,7 +323,7 @@ def main(arguments=None) -> int:
     HOSTED_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
     started_at = datetime.now(timezone.utc)
     result = subprocess.run(
-        _pytest_command(args.suite, targets),
+        _pytest_command(args.suite, targets, environment=environment),
         cwd=REPOSITORY_ROOT,
     )
     finished_at = datetime.now(timezone.utc)

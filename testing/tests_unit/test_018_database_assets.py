@@ -915,6 +915,48 @@ def test_verify_direct_upload_rejects_generation_mismatch(monkeypatch):
         )
 
 
+# @pair storage:object
+# @pair storage:generation-conditional-cleanup
+# @source lagniappe/core/tools/database/assets.py::delete_direct_upload
+@pytest.mark.unit
+def test_verified_direct_upload_pins_generation_for_later_cleanup(monkeypatch):
+    calls = []
+
+    class Blob:
+        size = 10
+        content_type = "text/plain"
+        generation = "7"
+
+        def reload(self):
+            pass
+
+        def delete(self, **options):
+            calls.append(options)
+            if int(options["if_generation_match"]) != int(self.generation):
+                raise assets.google_exceptions.PreconditionFailed("replaced")
+
+    blob = Blob()
+    monkeypatch.setattr(
+        assets,
+        "DATA",
+        SimpleNamespace(
+            bucket=lambda _name: SimpleNamespace(blob=lambda _path: blob)
+        ),
+    )
+    record = {
+        "token": _direct_upload_token(),
+        "input_name": "file-upload",
+        "path": "tmp/uploads/upload-1/file.txt",
+    }
+
+    assets.verify_direct_upload(record)
+    assert record["generation"] == "7"
+
+    blob.generation = "8"
+    assert assets.delete_direct_upload(record) is False
+    assert calls == [{"if_generation_match": 7}]
+
+
 # @matrix storage : direct-upload final-copy
 @pytest.mark.unit
 def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
@@ -933,9 +975,10 @@ def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
 
     class CopiedBlob:
         content_type = "text/plain"
+        generation = "11"
 
-        def patch(self):
-            calls.append("patch-copy")
+        def patch(self, **options):
+            calls.append(("patch-copy", options))
 
     class Bucket:
         def __init__(self, name):
@@ -945,8 +988,17 @@ def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
             calls.append(("blob", self.name, path))
             return Blob()
 
-        def copy_blob(self, blob, destination_bucket, path):
-            calls.append(("copy", self.name, destination_bucket.name, path, blob))
+        def copy_blob(self, blob, destination_bucket, path, **options):
+            calls.append(
+                (
+                    "copy",
+                    self.name,
+                    destination_bucket.name,
+                    path,
+                    blob,
+                    options,
+                )
+            )
             return CopiedBlob()
 
     monkeypatch.setattr(
@@ -974,8 +1026,19 @@ def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
     assert copied.content_type == "application/pdf"
     assert calls[:3] == [
         ("blob", "private", "tmp/uploads/upload-1/file.txt"),
-        ("copy", "private", "private", "entity_file.txt", upload.blob),
-        "patch-copy",
+        (
+            "copy",
+            "private",
+            "private",
+            "entity_file.txt",
+            upload.blob,
+            {
+                "source_generation": 7,
+                "if_source_generation_match": 7,
+                "if_generation_match": 0,
+            },
+        ),
+        ("patch-copy", {"if_generation_match": 11}),
     ]
     assert calls[3:] == ["delete-source"]
 
@@ -988,6 +1051,144 @@ def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
         delete_source=False,
     )
     assert "delete-source" not in calls
+
+
+# @source lagniappe/core/tools/database/assets.py::copy_direct_upload_file
+# @pair storage:final-copy
+@pytest.mark.unit
+def test_copy_direct_upload_registers_destination_before_metadata_patch(monkeypatch):
+    class SourceBlob:
+        generation = "7"
+
+    class CopiedBlob:
+        content_type = "application/octet-stream"
+        generation = "11"
+
+        def patch(self, **_options):
+            raise RuntimeError("metadata patch failed")
+
+    copied = CopiedBlob()
+    bucket = SimpleNamespace(copy_blob=lambda *_args, **_kwargs: copied)
+    monkeypatch.setattr(
+        assets,
+        "DATA",
+        SimpleNamespace(bucket=lambda _visibility: bucket),
+    )
+    upload = SimpleNamespace(
+        blob=SourceBlob(),
+        visibility="private",
+        lagniappe_saved_blob=None,
+        lagniappe_saved_destination=None,
+    )
+
+    with pytest.raises(RuntimeError, match="metadata patch failed"):
+        assets.copy_direct_upload_file(
+            upload,
+            "filehash_attempt.pdf",
+            "private",
+            content_type="application/pdf",
+            delete_source=False,
+        )
+
+    assert upload.lagniappe_saved_blob is copied
+    assert upload.lagniappe_saved_destination == {
+        "path": "filehash_attempt.pdf",
+        "visibility": "private",
+        "generation": "11",
+    }
+
+
+# @matrix direct-upload storage : attempt-isolation destination-path
+@pytest.mark.unit
+def test_direct_upload_attempt_path_is_unique_and_validated():
+    upload = SimpleNamespace(lagniappe_asset_nonce="a" * 32)
+    assert assets.direct_upload_destination_path("filehash_file.pdf", upload) == (
+        f"filehash_file_{'a' * 32}.pdf"
+    )
+    assert assets.direct_upload_destination_path(
+        "extensionless",
+        upload,
+    ) == f"extensionless_{'a' * 32}"
+    assert assets.direct_upload_destination_path(
+        "ordinary.pdf",
+        SimpleNamespace(),
+    ) == "ordinary.pdf"
+
+    upload.lagniappe_asset_nonce = "../unsafe"
+    with pytest.raises(assets.DirectUploadError, match="identity is invalid"):
+        assets.direct_upload_destination_path("ordinary.pdf", upload)
+
+
+# @matrix storage : attempt-isolation generation-conditional-cleanup
+@pytest.mark.unit
+def test_delete_file_generation_never_deletes_a_replacement(monkeypatch):
+    calls = []
+
+    class Blob:
+        def __init__(self, replaced=False):
+            self.replaced = replaced
+
+        def delete(self, **options):
+            calls.append(options)
+            if self.replaced:
+                raise assets.google_exceptions.PreconditionFailed("replaced")
+
+    current = Blob()
+    monkeypatch.setattr(
+        assets,
+        "DATA",
+        SimpleNamespace(
+            bucket=lambda _visibility: SimpleNamespace(blob=lambda _path: current)
+        ),
+    )
+    assert assets.delete_file_generation("attempt.pdf", "private", "17") is True
+    assert calls == [{"if_generation_match": 17}]
+
+    current = Blob(replaced=True)
+    assert assets.delete_file_generation("attempt.pdf", "private", 17) is False
+    assert calls[-1] == {"if_generation_match": 17}
+
+
+# @matrix direct-upload storage : cleanup generation-conditional-cleanup idempotency
+@pytest.mark.unit
+def test_delete_direct_upload_is_idempotent_and_generation_conditional(monkeypatch):
+    calls = []
+
+    class Blob:
+        generation = "7"
+
+        def delete(self, **options):
+            calls.append(options)
+
+    current = Blob()
+    monkeypatch.setattr(
+        assets,
+        "DATA",
+        SimpleNamespace(
+            bucket=lambda _visibility: SimpleNamespace(blob=lambda _path: current)
+        ),
+    )
+    record = {
+        "token": _direct_upload_token(),
+        "path": "tmp/uploads/upload-1/file.txt",
+        "input_name": "file-upload",
+        "generation": "7",
+    }
+
+    assert assets.delete_direct_upload(record) is True
+    assert calls == [{"if_generation_match": 7}]
+
+    def missing(**_options):
+        raise assets.google_exceptions.NotFound("already gone")
+
+    current.delete = missing
+    assert assets.delete_direct_upload(record) is True
+
+    def replaced(**_options):
+        raise assets.google_exceptions.PreconditionFailed("replaced")
+
+    current.delete = replaced
+    assert assets.delete_direct_upload(record) is False
 
 
 # @matrix admin : metadata site-image-upload

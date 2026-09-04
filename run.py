@@ -9,6 +9,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 
 from runner.context import (
     GCLOUD_CLI,
@@ -24,6 +25,8 @@ from runner.pytest_routing import (
     TRACEABILITY_RESULTS_PLUGIN,
     PytestRoutingError,
     normalize_pytest_invocation,
+    partition_mcp_adapter_tests,
+    targets_include_repository_file,
 )
 
 if len(sys.argv) > 1 and sys.argv[1] in {"browser-review", "test", "test-server"}:
@@ -67,6 +70,8 @@ RELEASE_SERVICE_WORKER_PATH = "lagniappe/web/static/sw.js"
 RELEASE_MIGRATION_CATALOG_PATH = (
     "lagniappe/core/tools/database/migrations.py"
 )
+RELEASE_MCP_PROJECT_PATH = "clients/lagniappe_mcp/pyproject.toml"
+RELEASE_MCP_LEDGER_PATH = "clients/lagniappe_mcp/releases/releases.json"
 RELEASE_MAINTENANCE_HEADING = "## Required post-upgrade maintenance"
 RELEASE_VERSION_PATTERN = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
@@ -119,10 +124,82 @@ def _run_pytest_subprocess(command: list[str]) -> int:
             signal.signal(signum, handler)
 
 
+MCP_E2E_TEST = "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py"
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_unit_partitions_adapter_once_and_merges_results
+# @matrix mcp-package testing : result-aggregation exit-status
+def _combine_pytest_exit_statuses(*statuses: int) -> int:
+    """Combine partitions while treating an empty companion selection as neutral."""
+    for status in statuses:
+        if status not in {0, 5}:
+            return status
+    return 0 if 0 in statuses else 5
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_merge_mcp_test_evidence_validates_and_forwards_outcomes
+# @matrix mcp-package testing traceability : result-aggregation test-evidence
+def _merge_mcp_test_evidence(
+    result_path: Path,
+    full_command: list[str],
+    adapter_status: int,
+    combined_status: int,
+) -> None:
+    """Validate and merge results transported from package-isolated pytest."""
+    try:
+        if result_path.stat().st_size > 10_000_000:
+            raise ValueError("result payload is too large")
+        payload = json.loads(result_path.read_text(encoding="utf-8"))
+        payload_status = payload["exit_status"]
+        outcomes = payload["outcomes"]
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            "The MCP adapter test process returned invalid test evidence."
+        ) from error
+    if payload_status != adapter_status or not isinstance(outcomes, dict):
+        raise RuntimeError(
+            "The MCP adapter test process returned inconsistent test evidence."
+        )
+    normalized_outcomes = {}
+    for nodeid, row in outcomes.items():
+        if not isinstance(nodeid, str) or not isinstance(row, dict):
+            raise RuntimeError(
+                "The MCP adapter test process returned inconsistent test evidence."
+            )
+        canonical_nodeid = nodeid.removeprefix("../").removeprefix("testing/")
+        test_path = canonical_nodeid.partition("::")[0]
+        if not (
+            test_path == "tests_unit/test_033_mcp_adapter.py"
+            or test_path == "clients/lagniappe_mcp/tests/test_files.py"
+        ) or canonical_nodeid in normalized_outcomes:
+            raise RuntimeError(
+                "The MCP adapter test process returned unexpected test evidence."
+            )
+        normalized_outcomes[canonical_nodeid] = row
+
+    from testing.utility.traceability_results import _write_manifest
+
+    _write_manifest(
+        REPOSITORY_ROOT,
+        full_command,
+        normalized_outcomes,
+        combined_status,
+    )
+
+
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_e2e_aligns_adc_before_pytest
 # @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_focused_adapter_uses_only_locked_package_bridge
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_unit_partitions_adapter_once_and_merges_results
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_adapter_preflight_stops_before_root_test_work
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_hosted_adapter_selection_checks_prebuilt_environment
 # @matrix hosted-e2e testing : cli-routing
+# @matrix hosted-e2e mcp-package testing : environment-check isolation
+# @matrix mcp-package testing : cli-routing environment-isolation no-duplicate-collection
+# @matrix mcp-package testing : fail-closed local-preflight repair-guidance
 # @pairs hosted-e2e:frontend-build testing:adc
 def run_tests(test_args: list[str]) -> int:
     """Run pytest through the repo wrapper.
@@ -144,11 +221,37 @@ def run_tests(test_args: list[str]) -> int:
         print(f"Test argument error: {error}", file=sys.stderr)
         return 4
 
+    partitions = partition_mcp_adapter_tests(invocation, REPOSITORY_ROOT)
+    hosted = hosted_e2e_enabled()
+    local_mcp_e2e = (
+        not hosted
+        and (REPOSITORY_ROOT / MCP_E2E_TEST).is_file()
+        and targets_include_repository_file(
+            invocation.collection_targets,
+            MCP_E2E_TEST,
+            REPOSITORY_ROOT,
+        )
+    )
+    if partitions.mcp_args is not None or local_mcp_e2e:
+        try:
+            from runner.mcp_environment import (
+                check_environment,
+                prepare_environment,
+            )
+
+            if hosted:
+                check_environment()
+            else:
+                prepare_environment()
+        except RuntimeError as error:
+            print(f"Test startup stopped: {error}")
+            return 1
+
     if invocation.strict_relations or invocation.includes_e2e:
         os.environ["STRICT_RELATION_LOADS"] = "1"
 
     configure_test_environment(includes_e2e=invocation.includes_e2e)
-    if not hosted_e2e_enabled():
+    if partitions.root_args is not None and not hosted:
         try:
             activate_repository_gcloud(
                 ensure_adc=invocation.includes_e2e,
@@ -172,7 +275,7 @@ def run_tests(test_args: list[str]) -> int:
     crossed_data_boundary = False
     session_environment = {}
     try:
-        if invocation.includes_e2e and not hosted_e2e_enabled():
+        if invocation.includes_e2e and not hosted:
             from runner.test_session import (
                 SESSION_MODE_ENV,
                 SESSION_NONCE_ENV,
@@ -208,7 +311,31 @@ def run_tests(test_args: list[str]) -> int:
             server_process = run_test_server(authority)
             authority.update(phase="ready")
 
-        return _run_pytest_subprocess(pytest_command(list(invocation.pytest_args)))
+        statuses = []
+        if partitions.root_args is not None:
+            statuses.append(
+                _run_pytest_subprocess(pytest_command(list(partitions.root_args)))
+            )
+        if partitions.mcp_args is not None:
+            from runner.mcp_environment import run_pytest as run_mcp_pytest
+
+            with tempfile.TemporaryDirectory(prefix="lagniappe-mcp-pytest-") as temp:
+                result_path = Path(temp) / "results.json"
+                adapter_status = run_mcp_pytest(
+                    list(partitions.mcp_args),
+                    prepared=True,
+                    result_path=result_path,
+                )
+                statuses.append(adapter_status)
+                combined_status = _combine_pytest_exit_statuses(*statuses)
+                if "--no-test-evidence" not in invocation.pytest_args:
+                    _merge_mcp_test_evidence(
+                        result_path,
+                        full_command,
+                        adapter_status,
+                        combined_status,
+                    )
+        return _combine_pytest_exit_statuses(*statuses)
     except RuntimeError as error:
         print(f"Test startup stopped: {error}")
         return 1
@@ -619,6 +746,123 @@ def _read_optional_git_text(
 
 
 # @testable false
+# @covered-by run.py::_mcp_release_issues
+# @reason release acceptance tests exercise immutable ledger history through Git objects
+def _mcp_ledger_bindings(content: str, *, label: str) -> list[tuple[str, str]]:
+    """Read the ordered immutable version-to-digest history from one ledger."""
+    try:
+        ledger = json.loads(content)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"{label} is not valid JSON") from error
+    releases = ledger.get("releases") if isinstance(ledger, dict) else None
+    if not isinstance(releases, list):
+        raise ValueError(f"{label} has no release history")
+    bindings = []
+    for entry in releases:
+        version = entry.get("version") if isinstance(entry, dict) else None
+        digest = entry.get("sha256") if isinstance(entry, dict) else None
+        if (
+            not isinstance(version, str)
+            or not RELEASE_VERSION_PATTERN.fullmatch(version)
+            or not isinstance(digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", digest)
+        ):
+            raise ValueError(f"{label} has an invalid release binding")
+        bindings.append((version, digest))
+    if len(set(bindings)) != len(bindings) or len({item[0] for item in bindings}) != len(
+        bindings
+    ):
+        raise ValueError(f"{label} has duplicate release bindings")
+    return bindings
+
+
+# @testable false
+# @covered-by run.py::release_readiness_issues
+# @reason candidate materialization is exercised through release-check acceptance tests
+def _mcp_release_issues(
+    repo_root: Path,
+    merge_base: str,
+) -> list[str]:
+    """Validate MCP release inputs from the prospective Git index."""
+    candidate_project = _read_optional_git_text(
+        repo_root,
+        f":{RELEASE_MCP_PROJECT_PATH}",
+    )
+    base_project = _read_optional_git_text(
+        repo_root,
+        f"{merge_base}:{RELEASE_MCP_PROJECT_PATH}",
+    )
+    if candidate_project is None and base_project is None:
+        return []
+    if candidate_project is None:
+        return [f"{RELEASE_MCP_PROJECT_PATH} was removed from the release."]
+
+    issues = []
+    base_ledger = _read_optional_git_text(
+        repo_root,
+        f"{merge_base}:{RELEASE_MCP_LEDGER_PATH}",
+    )
+    candidate_ledger = _read_optional_git_text(
+        repo_root,
+        f":{RELEASE_MCP_LEDGER_PATH}",
+    )
+    if base_ledger is not None:
+        if candidate_ledger is None:
+            issues.append("The MCP release ledger removed previously published releases.")
+        else:
+            try:
+                base_bindings = _mcp_ledger_bindings(
+                    base_ledger, label="Base MCP release ledger"
+                )
+                candidate_bindings = _mcp_ledger_bindings(
+                    candidate_ledger, label="Candidate MCP release ledger"
+                )
+                if candidate_bindings[: len(base_bindings)] != base_bindings:
+                    issues.append(
+                        "The MCP release ledger changed, removed, or reordered a "
+                        "previously published version-to-digest binding."
+                    )
+            except ValueError as error:
+                issues.append(str(error))
+
+    index_paths = _nul_paths(
+        _run_release_git(
+            repo_root,
+            [
+                "ls-files",
+                "-z",
+                "--",
+                "clients/lagniappe_mcp",
+                "lagniappe/core/tools/ai/external_api.py",
+                "lagniappe/web/routes/api/main.py",
+                "lagniappe/web/static/build.json",
+                "config/constants.py",
+                "package.json",
+            ],
+        )
+    )
+    try:
+        with tempfile.TemporaryDirectory(prefix="lagniappe-mcp-release-check-") as temp:
+            candidate_root = Path(temp)
+            _run_release_git(
+                repo_root,
+                [
+                    "checkout-index",
+                    "--force",
+                    f"--prefix={candidate_root.as_posix()}/",
+                    "--",
+                    *sorted(index_paths),
+                ],
+            )
+            from runner.mcp_artifact import validate_release_inputs
+
+            validate_release_inputs(candidate_root)
+    except (RuntimeError, OSError) as error:
+        issues.append(f"MCP release inputs are invalid: {error}")
+    return issues
+
+
+# @testable false
 # @covered-by run.py::release_readiness_issues
 # @reason literal catalog extraction is exercised through release-check acceptance tests
 def _migration_catalog_metadata(content: str) -> dict[str, dict]:
@@ -772,8 +1016,11 @@ def _migration_release_issues(
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_incomplete_release
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_major_version_for_new_migration
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_matching_migration_release_metadata
+# @tests tests_tooling/test_007_run_py_test_command.py::test_release_check_validates_indexed_mcp_inputs_not_worktree
+# @tests tests_tooling/test_007_run_py_test_command.py::test_release_check_preserves_every_published_mcp_ledger_binding
 # @matrix release : build-mode delivery-tree
 # @matrix migrations release : major-version release-note version-metadata
+# @matrix mcp-package release : immutable-release prospective-index release-validation
 def release_readiness_issues(
     repo_root: Path,
     base_ref: str,
@@ -938,6 +1185,7 @@ def release_readiness_issues(
                     f"the current build ID {build_id}."
                 )
 
+    issues.extend(_mcp_release_issues(repo_root, merge_base))
     return merge_base, issues
 
 
@@ -986,6 +1234,23 @@ def run_release_check_command(
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] in {"mcp", "mcp-artifact"}:
+        from runner.mcp_environment import McpEnvironmentError, run_adapter, run_python
+
+        try:
+            if sys.argv[1] == "mcp":
+                sys.exit(run_adapter(sys.argv[2:]))
+            sys.exit(
+                run_python(
+                    [
+                        str(REPOSITORY_ROOT / "runner/mcp_artifact.py"),
+                        *sys.argv[2:],
+                    ]
+                )
+            )
+        except McpEnvironmentError as error:
+            print(f"MCP command stopped: {error}", file=sys.stderr)
+            sys.exit(1)
     if len(sys.argv) > 1 and sys.argv[1] == "auth":
         sys.exit(run_auth_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "test":
@@ -1027,6 +1292,8 @@ if __name__ == "__main__":
             "browser-review",
             "dev",
             "indexes",
+            "mcp",
+            "mcp-artifact",
             "deploy",
             "icons",
             "hosted-e2e",

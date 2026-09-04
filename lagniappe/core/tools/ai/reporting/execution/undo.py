@@ -15,9 +15,12 @@ from .ledger import REPORT_LEDGER_VERSION
 # @tests tests_unit/test_020h_ai_report_execution.py::test_undo_report_compensates_completed_prefix_of_failed_report
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_renames_entity_without_submission_and_undoes
+# @tests tests_unit/test_020h_ai_report_execution.py::test_undo_report_stops_before_compensation_when_initial_save_is_rejected
 # @matrix ai-report : compensation completed-task created-entities delete-links deterministic-run failed-prefix file-links idempotency idempotent page-form recovery rename report-files reuse undo
-def undo_report(report, user):
+# @matrix agent-api ai-report : browser-review cas compensation delete undo
+def undo_report(report, user, *, save=None):
     """Compensate a complete report or the completed prefix of a failed report."""
+    save = save or Entities.save
     result = report.result if isinstance(report.result, dict) else {}
     if result.get("ledger_version") != REPORT_LEDGER_VERSION:
         raise exceptions.ValidationError("This report has no recovery ledger.")
@@ -57,7 +60,7 @@ def undo_report(report, user):
         undo["status"] = "running"
     result["undo"] = undo
     report.properties.process.begin_undo(result)
-    Entities.save(report)
+    save(report)
 
     for undo_record in undo["actions"]:
         action = result["actions"][undo_record["action_index"]]
@@ -70,7 +73,7 @@ def undo_report(report, user):
                 if state == ACTION_APPLIED:
                     undo_record["status"] = "complete"
                     undo_record.pop("error", None)
-                    Entities.save(report)
+                    save(report)
                     continue
                 if state == ACTION_DRIFTED:
                     raise exceptions.ValidationError(
@@ -80,23 +83,23 @@ def undo_report(report, user):
             undo_record["status"] = "applying"
             undo_record["attempts"] = int(undo_record.get("attempts") or 0) + 1
             undo_record.pop("error", None)
-            Entities.save(report)
+            save(report)
             summary = adapter.compensate(action, report, user)
             undo_record.update(summary)
             undo_record["status"] = "complete"
-            Entities.save(report)
+            save(report)
         except Exception as error:
             undo_record["status"] = "failed"
             undo_record["error"] = str(error)
             undo["status"] = "failed"
             result["undo"] = undo
             report.properties.process.fail_undo(str(error), result)
-            Entities.save(report)
+            save(report)
             return undo
 
     undo["status"] = "complete"
     result["status"] = "undone"
     result["undone"] = True
     report.properties.process.complete_undo(result)
-    Entities.save(report)
+    save(report)
     return undo

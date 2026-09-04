@@ -1,5 +1,8 @@
+import ipaddress
 import math
 import os
+import re
+from urllib.parse import urlsplit
 
 from config import SETTINGS, Environment, constants
 from config.locations import (
@@ -41,13 +44,132 @@ def _sample_rate(value, name):
     return normalized
 
 
+# @testable false
+# @covered-by lagniappe/__init__.py::normalize_mcp_evaluation_config
+# @reason strict origin parsing is exercised through the complete evaluation configuration
+def _mcp_origin(value, name, *, hostname=False):
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        raise RuntimeError(f"Invalid {name}: expected one HTTPS origin")
+    value = value.strip()
+    if not value:
+        return None
+    if hostname:
+        if ":" in value or any(character in value for character in "/?#@"):
+            raise RuntimeError(f"Invalid {name}: expected one HTTPS hostname")
+        value = f"https://{value}"
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError as error:
+        raise RuntimeError(f"Invalid {name}: expected one HTTPS origin") from error
+    if (
+        parsed.scheme.casefold() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in (None, 443)
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or parsed.hostname.endswith(".")
+    ):
+        raise RuntimeError(f"Invalid {name}: expected one HTTPS origin")
+    hostname_value = parsed.hostname.casefold()
+    if hostname_value.endswith(".") or len(hostname_value) > 253:
+        raise RuntimeError(f"Invalid {name}: expected one HTTPS origin")
+    try:
+        address = ipaddress.ip_address(hostname_value)
+    except ValueError:
+        try:
+            hostname_value.encode("ascii")
+        except UnicodeEncodeError as error:
+            raise RuntimeError(
+                f"Invalid {name}: expected a canonical ASCII DNS or IP host"
+            ) from error
+        labels = hostname_value.split(".")
+        if any(
+            not label
+            or len(label) > 63
+            or re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", label) is None
+            for label in labels
+        ):
+            raise RuntimeError(
+                f"Invalid {name}: expected a canonical ASCII DNS or IP host"
+            )
+    else:
+        hostname_value = address.compressed
+        if address.version == 6:
+            hostname_value = f"[{hostname_value}]"
+    return f"https://{hostname_value}"
+
+
+# @testable true
+# @tests tests_unit/test_016_config.py::test_mcp_evaluation_config_requires_actor_allowlist_and_strict_origins
+# @matrix config mcp-package : actor-allowlist feature-flag mcp-evaluation origin-validation trial-gate
+def normalize_mcp_evaluation_config(settings, constants_module):
+    """Normalize the closed actor/origin gate for the MCP evaluation panel."""
+    enabled = getattr(
+        settings,
+        "MCP_EVALUATION_ENABLED",
+        getattr(constants_module, "DEFAULT_MCP_EVALUATION_ENABLED", False),
+    )
+    if not isinstance(enabled, bool):
+        raise RuntimeError("Invalid MCP_EVALUATION_ENABLED: expected true or false")
+    if not enabled:
+        return False, frozenset(), ()
+
+    actors = getattr(
+        settings,
+        "MCP_EVALUATION_ACTORS",
+        getattr(constants_module, "DEFAULT_MCP_EVALUATION_ACTORS", ()),
+    )
+    if (
+        not isinstance(actors, (list, tuple))
+        or not actors
+        or any(not isinstance(actor, str) or not actor.strip() for actor in actors)
+    ):
+        raise RuntimeError(
+            "Invalid MCP_EVALUATION_ACTORS: expected a nonempty email list"
+        )
+    normalized_actors = tuple(actor.strip().casefold() for actor in actors)
+    if len(set(normalized_actors)) != len(normalized_actors) or any(
+        re.fullmatch(r"[^@\s]+@[^@\s]+", actor) is None
+        for actor in normalized_actors
+    ):
+        raise RuntimeError("Invalid MCP_EVALUATION_ACTORS: invalid or duplicate actor")
+
+    origins = [
+        _mcp_origin(getattr(settings, "APP_URL", None), "APP_URL"),
+        _mcp_origin(
+            getattr(settings, "CUSTOM_DOMAIN", None),
+            "CUSTOM_DOMAIN",
+            hostname=True,
+        ),
+        _mcp_origin(
+            getattr(
+                settings,
+                "MCP_EVALUATION_ORIGIN",
+                getattr(constants_module, "DEFAULT_MCP_EVALUATION_ORIGIN", ""),
+            ),
+            "MCP_EVALUATION_ORIGIN",
+        ),
+    ]
+    normalized_origins = tuple(dict.fromkeys(origin for origin in origins if origin))
+    if not normalized_origins:
+        raise RuntimeError("MCP evaluation requires at least one configured HTTPS origin")
+    return True, frozenset(normalized_actors), normalized_origins
+
+
 # @testable true
 # @tests tests_unit/test_016_config.py::test_config_prefers_tracked_build_id_over_app_settings
 # @tests tests_unit/test_016_config.py::test_config_requires_hosted_build_id_to_match_built_source
 # @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
 # @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
+# @tests tests_unit/test_016_config.py::test_mcp_evaluation_config_requires_actor_allowlist_and_strict_origins
 # @tests tests_unit/test_016_config.py::test_config_normalizes_and_validates_sentry_sample_rates
-# @matrix config : ai-email build-id constants error-reporting google-signin observability-setting optional-providers public-projection secrets source-link stale-settings
+# @matrix config : actor-allowlist ai-email build-id constants error-reporting google-signin mcp-evaluation observability-setting optional-providers origin-validation public-projection secrets source-link stale-settings trial-gate
 # @pairs ai:observability error-reporting:sampling
 class Config:
     """Application configuration."""
@@ -178,6 +300,11 @@ class Config:
         self.CUSTOM_DOMAIN = str(
             getattr(self, "CUSTOM_DOMAIN", "") or ""
         ).strip()
+        (
+            self.MCP_EVALUATION_ENABLED,
+            self.MCP_EVALUATION_ACTORS,
+            self.MCP_EVALUATION_ORIGINS,
+        ) = normalize_mcp_evaluation_config(self, constants)
         self.CLOUDFLARE_ACCOUNT_ID = str(
             getattr(self, "CLOUDFLARE_ACCOUNT_ID", "") or ""
         ).strip()

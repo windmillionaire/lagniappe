@@ -431,6 +431,7 @@ def _external_report_action_response_schema(
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
+# @covered-by lagniappe/core/tools/ai/external_api.py::plan_contract
 # @reason provider-only ordering hints are removed through the public external serializer
 def _standard_json_schema(value):
     """Remove provider-only annotations from an ordinary JSON Schema tree."""

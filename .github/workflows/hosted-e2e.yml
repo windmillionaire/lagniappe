@@ -288,11 +288,13 @@ jobs:
           rm -f -- "$credentials_file"
 
       - name: Set up Python
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
 
       - name: Merge hosted evidence
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         env:
           EXECUTION: ${{ steps.run.outputs.execution }}
         run: |
@@ -303,6 +305,7 @@ jobs:
             --execution "$EXECUTION"
 
       - name: Commit evidence to the tested branch
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         id: evidence
         env:
           BRANCH: ${{ needs.request.outputs.branch }}
@@ -396,6 +399,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
+      candidate_sha: ${{ steps.context.outputs.candidate_sha }}
       evidence_sha: ${{ steps.context.outputs.evidence_sha }}
     permissions:
       contents: read
@@ -549,9 +553,255 @@ jobs:
           RELEASE_BASE_REF: ${{ steps.context.outputs.base_sha }}
         run: venv/bin/python run.py release-check --base "$RELEASE_BASE_REF"
 
-  attest:
+  mcp_package:
     needs: quality
-    if: ${{ always() && needs.quality.result == 'success' }}
+    if: >-
+      ${{
+        always() &&
+        needs.quality.result == 'success' &&
+        (
+          github.event_name != 'workflow_dispatch' ||
+          inputs.mode == 'continuation'
+        )
+      }}
+    name: Validate isolated MCP package installation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 130
+    environment: hosted-e2e
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out the source-quality-verified head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.quality.outputs.evidence_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Authenticate without a stored key
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_E2E_INVOKER_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          version: ">= 498.0.0"
+
+      - name: Bind the package job to the exact public candidate
+        id: preflight
+        env:
+          E2E_JOB: lagniappe-mcp-package
+          E2E_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+          E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
+          EXPECTED_SOURCE: ${{ needs.quality.outputs.candidate_sha }}
+        run: |
+          job_json="$(gcloud run jobs describe "$E2E_JOB" --region "$E2E_REGION" --format=json)"
+          job_value() {
+            jq -er --arg name "$1" '[.. | objects | select(.name? == $name) | .value][0]' <<<"$job_json"
+          }
+          configured_environment="$(job_value LAGNIAPPE_HOSTED_E2E_ENVIRONMENT)"
+          configured_source="$(job_value LAGNIAPPE_HOSTED_E2E_SOURCE)"
+          configured_build="$(job_value LAGNIAPPE_HOSTED_E2E_BUILD_ID)"
+          artifact_bucket="$(job_value LAGNIAPPE_HOSTED_E2E_ARTIFACT_BUCKET)"
+          image_digest="$(job_value LAGNIAPPE_MCP_IMAGE_DIGEST)"
+          configured_image="$(jq -er '[.. | objects | .image? // empty][0]' <<<"$job_json")"
+          configured_service_account="$(jq -er '[.. | objects | (.serviceAccount? // .serviceAccountName? // empty)][0]' <<<"$job_json")"
+          if [[ "$configured_environment" != "mcp-package" || "$configured_source" != "$EXPECTED_SOURCE" ]]; then
+            echo "The MCP package job is not bound to the exact candidate."
+            exit 1
+          fi
+          expected_build="$(jq -er '.application.build_id' lagniappe/web/static/mcp/manifest.json)"
+          if [[ "$configured_build" != "$expected_build" ]]; then
+            echo "The MCP package job has a stale application build marker."
+            exit 1
+          fi
+          if [[ ! "$image_digest" =~ ^sha256:[0-9a-f]{64}$ || "$configured_image" != */mcp-package-runner@"$image_digest" ]]; then
+            echo "The MCP package job does not use its attested immutable image."
+            exit 1
+          fi
+          if [[ "$configured_service_account" != "lagniappe-mcp-package-runtime@$E2E_PROJECT.iam.gserviceaccount.com" ]]; then
+            echo "The MCP package job does not use its isolated runtime identity."
+            exit 1
+          fi
+          if [[ ! "$artifact_bucket" =~ ^[a-z0-9][a-z0-9._-]+$ ]]; then
+            echo "The MCP package job has an invalid artifact bucket."
+            exit 1
+          fi
+
+          declare -A expected
+          expected[LAGNIAPPE_MCP_LOCK_SHA256]="$(sha256sum clients/lagniappe_mcp/uv.lock | cut -d' ' -f1)"
+          expected[LAGNIAPPE_MCP_MANIFEST_SHA256]="$(sha256sum lagniappe/web/static/mcp/manifest.json | cut -d' ' -f1)"
+          expected[LAGNIAPPE_MCP_LEDGER_SHA256]="$(sha256sum clients/lagniappe_mcp/releases/releases.json | cut -d' ' -f1)"
+          expected[LAGNIAPPE_MCP_WHEEL_SHA256]="$(jq -er '.current.sha256' lagniappe/web/static/mcp/manifest.json)"
+          expected[LAGNIAPPE_MCP_DEPENDENCY_GRAPH_SHA256]="$(jq -er '.current.platforms[0].dependency_graph_sha256' lagniappe/web/static/mcp/manifest.json)"
+          contract_inputs=(
+            runner/mcp_package_container/Dockerfile
+            runner/mcp_package_container/cloudbuild.yaml
+            runner/mcp_package_container/gcloudignore
+            .gcloudignore
+            clients/lagniappe_mcp/uv.lock
+            clients/lagniappe_mcp/pyproject.toml
+            clients/lagniappe_mcp/uv-bootstrap.json
+            clients/lagniappe_mcp/releases/releases.json
+            lagniappe/web/static/mcp/manifest.json
+          )
+          contract_material="$RUNNER_TEMP/mcp-image-contract"
+          : > "$contract_material"
+          for path in "${contract_inputs[@]}"; do
+            digest="$(sha256sum "$path" | cut -d' ' -f1)"
+            printf '%s\0%s' "$path" "$digest" >> "$contract_material"
+          done
+          expected[LAGNIAPPE_MCP_IMAGE_CONTRACT_SHA256]="$(sha256sum "$contract_material" | cut -d' ' -f1)"
+
+          for name in "${!expected[@]}"; do
+            actual="$(job_value "$name")"
+            if [[ "$actual" != "${expected[$name]}" ]]; then
+              echo "The MCP package job has stale $name metadata."
+              exit 1
+            fi
+            output_name="$(tr '[:upper:]' '[:lower:]' <<<"${name#LAGNIAPPE_MCP_}")"
+            echo "$output_name=$actual" >> "$GITHUB_OUTPUT"
+          done
+          if ! jq -e --arg platform linux-x86_64-cpython-3.14 \
+            '[.releases[].platforms[].id] | length > 0 and all(.[]; . == $platform)' \
+            lagniappe/web/static/mcp/manifest.json >/dev/null; then
+            echo "The public MCP manifest advertises an untested platform."
+            exit 1
+          fi
+          for pin in \
+            LAGNIAPPE_MCP_PLATFORM=linux-x86_64-cpython-3.14 \
+            LAGNIAPPE_MCP_UV_VERSION=0.12.9 \
+            LAGNIAPPE_MCP_PIPX_VERSION=1.17.2 \
+            LAGNIAPPE_MCP_CODEX_VERSION=0.153.0; do
+            name="${pin%%=*}"
+            value="${pin#*=}"
+            if [[ "$(job_value "$name")" != "$value" ]]; then
+              echo "The MCP package job has a stale $name pin."
+              exit 1
+            fi
+          done
+          echo "artifact_bucket=$artifact_bucket" >> "$GITHUB_OUTPUT"
+          echo "build_id=$configured_build" >> "$GITHUB_OUTPUT"
+          echo "image_digest=$image_digest" >> "$GITHUB_OUTPUT"
+
+      - name: Run the exact MCP package installation target
+        id: run
+        env:
+          E2E_JOB: lagniappe-mcp-package
+          E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
+          E2E_TARGET: testing/tests_e2e/013_agent_api/test_013c_mcp_package_install.py
+        run: |
+          execution_json="$(gcloud run jobs execute "$E2E_JOB" \
+            --region "$E2E_REGION" \
+            "--args=--suite=focused,--target=$E2E_TARGET" \
+            --async \
+            --format=json)"
+          execution="$(jq -er '.metadata.name // .name' <<<"$execution_json" 2>/dev/null || true)"
+          execution="${execution##*/}"
+          if [[ ! "$execution" =~ ^lagniappe-mcp-package-[a-z0-9-]*[a-z0-9]$ ]]; then
+            echo "Cloud Run did not identify the MCP package execution."
+            exit 2
+          fi
+          echo "execution=$execution" >> "$GITHUB_OUTPUT"
+
+      - name: Download and verify the package attestation
+        env:
+          ARTIFACT_BUCKET: ${{ steps.preflight.outputs.artifact_bucket }}
+          EXECUTION: ${{ steps.run.outputs.execution }}
+          EXPECTED_DEPENDENCY_GRAPH_SHA256: ${{ steps.preflight.outputs.dependency_graph_sha256 }}
+          EXPECTED_BUILD_ID: ${{ steps.preflight.outputs.build_id }}
+          EXPECTED_IMAGE_CONTRACT_SHA256: ${{ steps.preflight.outputs.image_contract_sha256 }}
+          EXPECTED_IMAGE_DIGEST: ${{ steps.preflight.outputs.image_digest }}
+          EXPECTED_LEDGER_SHA256: ${{ steps.preflight.outputs.ledger_sha256 }}
+          EXPECTED_LOCK_SHA256: ${{ steps.preflight.outputs.lock_sha256 }}
+          EXPECTED_MANIFEST_SHA256: ${{ steps.preflight.outputs.manifest_sha256 }}
+          EXPECTED_SOURCE: ${{ needs.quality.outputs.candidate_sha }}
+          EXPECTED_WHEEL_SHA256: ${{ steps.preflight.outputs.wheel_sha256 }}
+          TARGET: testing/tests_e2e/013_agent_api/test_013c_mcp_package_install.py
+        run: |
+          result_dir="$RUNNER_TEMP/mcp-package/$EXECUTION"
+          mkdir -p "$result_dir"
+          manifest_uri="gs://$ARTIFACT_BUCKET/executions/$EXECUTION/manifest.json"
+          manifest_ready=false
+          for ((attempt=1; attempt<=720; attempt++)); do
+            if gcloud storage cp "$manifest_uri" "$result_dir/manifest.json" >/dev/null 2>&1; then
+              manifest_ready=true
+              break
+            fi
+            if (( attempt == 1 || attempt % 30 == 0 )); then
+              echo "Waiting for MCP package execution $EXECUTION to publish its attestation."
+            fi
+            sleep 10
+          done
+          if [[ "$manifest_ready" != "true" ]]; then
+            echo "The MCP package execution did not publish an attestation."
+            exit 1
+          fi
+          manifest="$result_dir/manifest.json"
+          jq -e \
+            --arg execution "$EXECUTION" \
+            --arg source "$EXPECTED_SOURCE" \
+            --arg target "$TARGET" \
+            --arg build "$EXPECTED_BUILD_ID" \
+            '.execution == $execution and
+             .source == $source and
+             .build_id == $build and
+             .environment == "mcp-package" and
+             .job == "lagniappe-mcp-package" and
+             .suite == "focused" and
+             .targets == [$target] and
+             .mcp_platform == "linux-x86_64-cpython-3.14" and
+             .uv_version == "0.12.9" and
+             .pipx_version == "1.17.2" and
+             .codex_version == "0.153.0"' \
+            "$manifest" >/dev/null
+          for binding in \
+            "mcp_dependency_graph_sha256=$EXPECTED_DEPENDENCY_GRAPH_SHA256" \
+            "mcp_image_contract_sha256=$EXPECTED_IMAGE_CONTRACT_SHA256" \
+            "mcp_image_digest=$EXPECTED_IMAGE_DIGEST" \
+            "mcp_ledger_sha256=$EXPECTED_LEDGER_SHA256" \
+            "mcp_lock_sha256=$EXPECTED_LOCK_SHA256" \
+            "mcp_manifest_sha256=$EXPECTED_MANIFEST_SHA256" \
+            "mcp_wheel_sha256=$EXPECTED_WHEEL_SHA256"; do
+            name="${binding%%=*}"
+            expected_value="${binding#*=}"
+            actual_value="$(jq -er --arg name "$name" '.[$name]' "$manifest")"
+            if [[ "$actual_value" != "$expected_value" ]]; then
+              echo "The MCP package attestation has stale $name metadata."
+              exit 1
+            fi
+          done
+          exit_status="$(jq -er '.exit_status' "$manifest")"
+          if [[ "$exit_status" != "0" ]]; then
+            echo "The MCP package installation target failed with status $exit_status."
+            exit "$exit_status"
+          fi
+
+      - name: Remove the transient WIF credential
+        if: ${{ always() }}
+        run: |
+          credentials_file="${GOOGLE_APPLICATION_CREDENTIALS:-}"
+          if [[ "$credentials_file" != "$GITHUB_WORKSPACE"/gha-creds-*.json ]]; then
+            echo "The WIF credential path was missing or outside the checkout."
+            exit 1
+          fi
+          rm -f -- "$credentials_file"
+
+  attest:
+    needs:
+      - quality
+      - mcp_package
+    if: >-
+      ${{
+        always() &&
+        needs.quality.result == 'success' &&
+        needs.mcp_package.result == 'success'
+      }}
     name: Publish current-head release status
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -574,5 +824,5 @@ jobs:
           gh api --method POST "repos/$REPOSITORY/statuses/$EVIDENCE_SHA" \
             -f state=success \
             -f context="$STATUS_CONTEXT" \
-            -f description="Exact hosted evidence and release gates passed" \
+            -f description="Hosted evidence, package attestation, and release gates passed" \
             -f target_url="$RUN_URL"

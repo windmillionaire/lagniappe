@@ -2,18 +2,23 @@
 
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+import json
+import threading
 
+from google.cloud.datastore import Entity as DatastoreEntity
 from google.cloud.datastore import Key
 import pytest
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
+from lagniappe.core.entities.ai_report import AIReport
 from lagniappe.core.tools.ai import external_api
+from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai import references as ai_references
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.database import agent_api as credential_store
-from testing.utility.ai_report_fakes import _patch_fake_keys, _test_user
+from testing.utility.ai_report_fakes import _patch_fake_keys, _test_file, _test_user
 
 
 def _contract_actor():
@@ -79,6 +84,681 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch):
     assert report.agent_manifest["version"] == 1
     assert report.agent_manifest["contract_version"] == external_api.CONTRACT_VERSION
     assert report.note == "Waiting for external plan"
+
+
+# @matrix agent-api ai-report : upload-batch-identity upload-manifest
+@pytest.mark.unit
+def test_external_upload_batch_identity_is_preserved_in_every_record():
+    records = [
+        {
+            "token": "first-storage-token",
+            "input_name": "agent-api-files",
+            "filename": "same.bin",
+            "content_type": "application/octet-stream",
+            "size": 4,
+            "upload_batch_id": "caller-controlled-value",
+        },
+        {
+            "token": "second-storage-token",
+            "input_name": "agent-api-files",
+            "filename": "same.bin",
+            "content_type": "application/octet-stream",
+            "size": 4,
+        },
+    ]
+
+    manifest = external_api.prepare_upload_manifest(
+        records,
+        upload_batch_id="batch-aaaaaaaaaaaaaaaa",
+    )
+
+    assert {record["upload_batch_id"] for record in manifest} == {
+        "batch-aaaaaaaaaaaaaaaa"
+    }
+    assert [record["token"] for record in manifest] == [
+        "first-storage-token",
+        "second-storage-token",
+    ]
+    assert records[0]["upload_batch_id"] == "caller-controlled-value"
+
+
+# @matrix agent-api mcp-upload : deterministic-file-identity retry upload-manifest
+# @matrix ai-report : deterministic-file-identity upload-manifest
+@pytest.mark.unit
+def test_upload_file_identity_is_deterministic_per_batch_record(monkeypatch):
+    report_key = object()
+
+    def urlsafe_key(key):
+        if key is report_key:
+            return "encoded-report-key"
+        return f"encoded:{key[1]}"
+
+    monkeypatch.setattr(credential_store.database_get, "urlsafe_key", urlsafe_key)
+    monkeypatch.setattr(
+        credential_store,
+        "create_named_key",
+        lambda kind, identifier, parent=None: (kind, identifier, parent),
+    )
+    batch_id = "batch-aaaaaaaaaaaaaaaa"
+
+    first = credential_store.upload_file_key(report_key, batch_id, 0)
+    repeated = credential_store.upload_file_key(report_key, batch_id, 0)
+    second = credential_store.upload_file_key(report_key, batch_id, 1)
+    other_batch = credential_store.upload_file_key(
+        report_key,
+        "batch-bbbbbbbbbbbbbbbb",
+        0,
+    )
+    bound = external_api.bind_upload_file_identities(
+        SimpleNamespace(key=report_key),
+        [
+            {
+                "token": "storage-token",
+                "filename": "records.pdf",
+                "input_name": "agent-api-files",
+                "upload_batch_id": batch_id,
+            }
+        ],
+        upload_batch_id=batch_id,
+    )
+
+    assert first == repeated
+    assert len({first, second, other_batch}) == 3
+    assert bound[0]["file_index"] == 0
+    assert bound[0]["file_key"] == f"encoded:{first[1]}"
+
+
+# @matrix agent-api mcp-upload : claim cleanup concurrency fencing lease ownership renewal transaction
+@pytest.mark.unit
+def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
+    report_key = Key("activity", "report", project="test-project")
+    claim_key = Key(
+        "agent-api-plan-operation-claims",
+        "operation",
+        parent=report_key,
+    )
+    report_row = DatastoreEntity(key=report_key)
+    report_row.update(
+        {
+            "type": "report",
+            "origin": "api",
+            "tool": "organize",
+            "process": json.dumps({"report": {"status": "draft"}}),
+            "agent_manifest": json.dumps({"contract_version": 1}),
+        }
+    )
+    rows = {report_key: report_row}
+    datastore_lock = threading.Lock()
+
+    class Transaction:
+        def __enter__(self):
+            datastore_lock.acquire()
+            return self
+
+        def __exit__(self, *args):
+            datastore_lock.release()
+            return False
+
+        def put(self, row):
+            rows[row.key] = row
+
+        def delete(self, key):
+            rows.pop(key, None)
+
+    class Datastore:
+        def transaction(self):
+            return Transaction()
+
+        def get(self, requested, transaction=None):
+            assert isinstance(transaction, Transaction)
+            return rows.get(requested)
+
+    monkeypatch.setattr(
+        credential_store,
+        "plan_operation_claim_key",
+        lambda _key: claim_key,
+    )
+    monkeypatch.setattr(credential_store.DATA, "_datastore_client", Datastore())
+    now = datetime(2026, 9, 4, 12, tzinfo=timezone.utc)
+
+    def compete(calls):
+        start = threading.Barrier(len(calls) + 1)
+        results = []
+        failures = []
+
+        def worker(options):
+            try:
+                start.wait()
+                outcome = credential_store.claim_plan_operation(
+                    report_key,
+                    now=now,
+                    **options,
+                )
+                results.append((options, outcome))
+            except BaseException as error:  # surfaced in the joining test thread
+                failures.append(error)
+
+        threads = [threading.Thread(target=worker, args=(call,)) for call in calls]
+        for thread in threads:
+            thread.start()
+        start.wait()
+        for thread in threads:
+            thread.join(timeout=2)
+            assert not thread.is_alive()
+        assert not failures
+        return results
+
+    create_calls = [
+        {
+            "phase": "create",
+            "operation_id": "batch-aaaaaaaaaaaaaaaa",
+            "claim_token": "a" * 32,
+        },
+        {
+            "phase": "create",
+            "operation_id": "batch-bbbbbbbbbbbbbbbb",
+            "claim_token": "b" * 32,
+        },
+    ]
+    create_results = compete(create_calls)
+    assert sorted(outcome for _options, outcome in create_results) == [
+        credential_store.PLAN_OPERATION_BUSY,
+        credential_store.PLAN_OPERATION_CLAIMED,
+    ]
+    creator = next(
+        options
+        for options, outcome in create_results
+        if outcome == credential_store.PLAN_OPERATION_CLAIMED
+    )
+
+    # Once the creator's manifest is durable, finalization is the next valid
+    # phase even if best-effort release of the create claim did not run.
+    report_row["agent_manifest"] = json.dumps(
+        {
+            "contract_version": 1,
+            "upload_batch_id": creator["operation_id"],
+        }
+    )
+    report_row["upload_manifest"] = json.dumps(
+        [{"upload_batch_id": creator["operation_id"]}]
+    )
+    finalize_token = "c" * 32
+    assert credential_store.claim_plan_operation(
+        report_key,
+        phase="finalize",
+        operation_id=creator["operation_id"],
+        claim_token=finalize_token,
+        now=now,
+    ) == credential_store.PLAN_OPERATION_CLAIMED
+    assert not credential_store.release_plan_operation(
+        report_key,
+        **creator,
+    )
+
+    # A deterministic barrier makes two workers compete for the exact same
+    # pending batch; exactly one may enter the storage side-effect section.
+    assert credential_store.release_plan_operation(
+        report_key,
+        phase="finalize",
+        operation_id=creator["operation_id"],
+        claim_token=finalize_token,
+    )
+    finalize_calls = [
+        {
+            "phase": "finalize",
+            "operation_id": creator["operation_id"],
+            "claim_token": "d" * 32,
+        },
+        {
+            "phase": "finalize",
+            "operation_id": creator["operation_id"],
+            "claim_token": "e" * 32,
+        },
+    ]
+    finalize_results = compete(finalize_calls)
+    assert sorted(outcome for _options, outcome in finalize_results) == [
+        credential_store.PLAN_OPERATION_BUSY,
+        credential_store.PLAN_OPERATION_CLAIMED,
+    ]
+    finalizer = next(
+        options
+        for options, outcome in finalize_results
+        if outcome == credential_store.PLAN_OPERATION_CLAIMED
+    )
+    assert credential_store.renew_plan_operation(
+        report_key,
+        **finalizer,
+        now=now + timedelta(seconds=1),
+    )
+    loser = next(options for options in finalize_calls if options != finalizer)
+    assert not credential_store.renew_plan_operation(
+        report_key,
+        **loser,
+        now=now + timedelta(seconds=1),
+    )
+    assert not credential_store.release_plan_operation(
+        report_key,
+        **loser,
+    )
+    assert credential_store.release_plan_operation(
+        report_key,
+        **finalizer,
+    )
+
+    # A delayed retry for the just-finalized batch must not remove or replace
+    # the active claim for the next batch.
+    report_row.pop("upload_manifest")
+    next_creator = {
+        "phase": "create",
+        "operation_id": "batch-cccccccccccccccc",
+        "claim_token": "f" * 32,
+    }
+    assert credential_store.claim_plan_operation(
+        report_key,
+        **next_creator,
+        now=now,
+    ) == credential_store.PLAN_OPERATION_CLAIMED
+    assert credential_store.claim_plan_operation(
+        report_key,
+        phase="finalize",
+        operation_id=creator["operation_id"],
+        claim_token="1" * 32,
+        now=now,
+    ) == credential_store.PLAN_OPERATION_COMPLETE
+    assert rows[claim_key]["phase"] == "create"
+    assert rows[claim_key]["operation_id"] == next_creator["operation_id"]
+    assert rows[claim_key]["claim_token"] == next_creator["claim_token"]
+
+    # Submission participates in the same report claim and cannot race a
+    # creator before that creator's report-side checkpoint is durable.
+    assert credential_store.claim_plan_operation(
+        report_key,
+        phase="submit",
+        operation_id="submit-aaaaaaaaaaaaaaaa",
+        claim_token="2" * 32,
+        now=now,
+    ) == credential_store.PLAN_OPERATION_BUSY
+
+    # Existing ready/complete status does not prove that an in-flight
+    # replacement submission committed. Its active lease remains exclusive.
+    assert credential_store.release_plan_operation(report_key, **next_creator)
+    report_row["process"] = json.dumps(
+        {
+            "report": {
+                "status": "ready",
+                "deferred-job": {
+                    "key": "active-execution-job",
+                    "idempotency_key": "run-1",
+                },
+            }
+        }
+    )
+    assert credential_store.claim_plan_operation(
+        report_key,
+        phase="submit",
+        operation_id="submit-blockedbyjob",
+        claim_token="2" * 32,
+        now=now,
+    ) == credential_store.PLAN_OPERATION_INVALID
+    report_row["process"] = json.dumps({"report": {"status": "ready"}})
+    submitter = {
+        "phase": "submit",
+        "operation_id": "submit-aaaaaaaaaaaaaaaa",
+        "claim_token": "2" * 32,
+    }
+    assert credential_store.claim_plan_operation(
+        report_key,
+        **submitter,
+        now=now,
+    ) == credential_store.PLAN_OPERATION_CLAIMED
+    assert credential_store.claim_plan_operation(
+        report_key,
+        phase="submit",
+        operation_id="submit-bbbbbbbbbbbbbbbb",
+        claim_token="3" * 32,
+        now=now,
+    ) == credential_store.PLAN_OPERATION_BUSY
+
+
+# @matrix agent-api mcp-upload : atomic-checkpoint cas claim fencing transaction
+@pytest.mark.unit
+def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
+    report_key = Key("activity", "report", project="test-project")
+    claim_key = Key(
+        "agent-api-plan-operation-claims",
+        "operation",
+        parent=report_key,
+    )
+    report_row = DatastoreEntity(key=report_key)
+    report_row.update(
+        {
+            "type": "report",
+            "origin": "api",
+            "tool": "organize",
+            "process": json.dumps({"report": {"status": "draft"}}),
+            "agent_manifest": json.dumps({"contract_version": 1}),
+        }
+    )
+    claim_row = DatastoreEntity(key=claim_key)
+    claim_row.update(
+        {
+            "phase": "create",
+            "operation_id": "batch-aaaaaaaaaaaaaaaa",
+            "claim_token": "a" * 32,
+            "expires_at": datetime(2026, 9, 4, 12, 5, tzinfo=timezone.utc),
+        }
+    )
+    rows = {report_key: report_row, claim_key: claim_row}
+
+    class Transaction:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def put(self, row):
+            rows[row.key] = row
+
+    class Datastore:
+        def transaction(self):
+            return Transaction()
+
+        def get(self, requested, transaction=None):
+            assert isinstance(transaction, Transaction)
+            return rows.get(requested)
+
+    monkeypatch.setattr(
+        credential_store,
+        "plan_operation_claim_key",
+        lambda _key: claim_key,
+    )
+    monkeypatch.setattr(credential_store.DATA, "_datastore_client", Datastore())
+    monkeypatch.setattr(
+        credential_store.database_utility,
+        "update_site_fingerprints",
+        lambda *_rows: [],
+    )
+    expected = dict(report_row)
+    replacement = DatastoreEntity(key=report_key)
+    replacement.update(
+        {
+            **expected,
+            "upload_manifest": json.dumps(
+                [{"upload_batch_id": "batch-aaaaaaaaaaaaaaaa"}]
+            ),
+        }
+    )
+    entity = SimpleNamespace(db=replacement, key=report_key)
+    options = {
+        "phase": "create",
+        "operation_id": "batch-aaaaaaaaaaaaaaaa",
+        "claim_token": "a" * 32,
+        "expected_report": expected,
+        "writes": [(entity, None)],
+        "now": datetime(2026, 9, 4, 12, 1, tzinfo=timezone.utc),
+    }
+
+    # A lease takeover immediately before the guarded save replaces the exact
+    # token. The stale worker cannot write its report snapshot.
+    rows[claim_key] = DatastoreEntity(key=claim_key)
+    rows[claim_key].update({**claim_row, "claim_token": "b" * 32})
+    assert credential_store.commit_plan_operation(
+        report_key,
+        **options,
+    ) == credential_store.PLAN_OPERATION_LOST
+    assert "upload_manifest" not in rows[report_key]
+
+    # A non-claim writer changing the report after the route's authoritative
+    # reload is detected by the raw-state compare-and-set.
+    rows[claim_key] = claim_row
+    rows[report_key]["concurrent_change"] = True
+    assert credential_store.commit_plan_operation(
+        report_key,
+        **options,
+    ) == credential_store.PLAN_OPERATION_STALE
+    assert "upload_manifest" not in rows[report_key]
+
+    rows[report_key].pop("concurrent_change")
+    assert credential_store.commit_plan_operation(
+        report_key,
+        **options,
+    ) == credential_store.PLAN_OPERATION_COMMITTED
+    assert json.loads(rows[report_key]["upload_manifest"])[0][
+        "upload_batch_id"
+    ] == "batch-aaaaaaaaaaaaaaaa"
+    assert rows[claim_key]["claim_token"] == "a" * 32
+    assert rows[claim_key]["expires_at"] > options["now"]
+
+
+# @matrix agent-api ai-report : browser-review cas claim fencing transaction
+@pytest.mark.unit
+def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
+    monkeypatch,
+):
+    report_key = Key("activity", "report", project="test-project")
+    file_key = Key("activity", "file", project="test-project")
+    user_key = Key("activity", "user", project="test-project")
+    claim_key = Key(
+        "agent-api-plan-operation-claims",
+        "operation",
+        parent=report_key,
+    )
+    now = datetime(2026, 9, 4, 12, 0, tzinfo=timezone.utc)
+    report_row = DatastoreEntity(key=report_key)
+    report_row.update(
+        {
+            "type": "report",
+            "origin": "api",
+            "tool": "create",
+            "process": json.dumps({"report": {"status": "ready"}}),
+            "proposal": json.dumps({"summary": "API proposal"}),
+        }
+    )
+    file_row = DatastoreEntity(key=file_key)
+    file_row.update({"type": "file", "name": "report-only"})
+    user_row = DatastoreEntity(key=user_key)
+    user_row.update(
+        {
+            "type": "user",
+            "email": "new-profile@example.com",
+            "modified": "concurrent",
+        }
+    )
+    claim_row = DatastoreEntity(key=claim_key)
+    claim_row.update(
+        {
+            "phase": "submit",
+            "operation_id": "submit-aaaaaaaaaaaaaaaa",
+            "claim_token": "a" * 32,
+            "expires_at": now + timedelta(minutes=1),
+        }
+    )
+    rows = {
+        report_key: report_row,
+        file_key: file_row,
+        user_key: user_row,
+        claim_key: claim_row,
+    }
+    applied = []
+
+    class Transaction:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def put(self, row):
+            rows[row.key] = row
+
+        def delete(self, key):
+            rows.pop(key, None)
+
+    class Datastore:
+        def transaction(self):
+            return Transaction()
+
+        def get(self, requested, transaction=None):
+            assert isinstance(transaction, Transaction)
+            return rows.get(requested)
+
+    def put_mutation(_transaction, row, mask=None):
+        applied.append((row.key, mask))
+        if mask is None:
+            rows[row.key] = row
+            return
+        current = rows[row.key]
+        for field in mask:
+            if field in row:
+                current[field] = row[field]
+            else:
+                current.pop(field, None)
+
+    monkeypatch.setattr(
+        credential_store,
+        "plan_operation_claim_key",
+        lambda _key: claim_key,
+    )
+    monkeypatch.setattr(credential_store.DATA, "_datastore_client", Datastore())
+    monkeypatch.setattr(
+        credential_store.database_utility,
+        "_put_mutation",
+        put_mutation,
+    )
+    monkeypatch.setattr(
+        credential_store.database_utility,
+        "update_site_fingerprints",
+        lambda *_rows: [],
+    )
+
+    expected = dict(report_row)
+    browser_report = DatastoreEntity(key=report_key)
+    browser_report.update(
+        {**expected, "proposal": json.dumps({"summary": "Browser skip"})}
+    )
+    stale_user = DatastoreEntity(key=user_key)
+    stale_user.update(
+        {
+            "type": "user",
+            "email": "old-profile@example.com",
+            "modified": "browser-touch",
+        }
+    )
+    options = {
+        "expected_report": expected,
+        "writes": [
+            (SimpleNamespace(db=browser_report, key=report_key), None),
+            (SimpleNamespace(db=stale_user, key=user_key), ("modified",)),
+        ],
+        "deletes": [SimpleNamespace(db=file_row, key=file_key)],
+        "now": now,
+    }
+
+    assert credential_store.commit_plan_mutation_if_idle(
+        report_key,
+        **options,
+    ) == credential_store.PLAN_OPERATION_BUSY
+    assert rows[report_key]["proposal"] == expected["proposal"]
+    assert file_key in rows
+    assert applied == []
+
+    rows[claim_key]["expires_at"] = now - timedelta(seconds=1)
+    rows[report_key]["proposal"] = json.dumps({"summary": "Newer API proposal"})
+    assert credential_store.commit_plan_mutation_if_idle(
+        report_key,
+        **options,
+    ) == credential_store.PLAN_OPERATION_STALE
+    assert rows[report_key]["proposal"] != browser_report["proposal"]
+    assert file_key in rows
+
+    rows[report_key]["proposal"] = expected["proposal"]
+    assert credential_store.commit_plan_mutation_if_idle(
+        report_key,
+        **options,
+    ) == credential_store.PLAN_OPERATION_COMMITTED
+    assert rows[report_key]["proposal"] == browser_report["proposal"]
+    assert claim_key not in rows
+    assert file_key not in rows
+    assert rows[user_key]["email"] == "new-profile@example.com"
+    assert rows[user_key]["modified"] == "browser-touch"
+    assert (user_key, ("modified",)) in applied
+
+    # The expired API owner cannot publish even if it reloads the browser's
+    # latest Report revision after losing the shared claim key.
+    assert credential_store.commit_plan_operation(
+        report_key,
+        phase="submit",
+        operation_id="submit-aaaaaaaaaaaaaaaa",
+        claim_token="a" * 32,
+        expected_report=dict(rows[report_key]),
+        writes=[(SimpleNamespace(db=browser_report, key=report_key), None)],
+        now=now,
+    ) == credential_store.PLAN_OPERATION_LOST
+
+
+# @matrix agent-api ai-report : browser-review cas delete file-cleanup save
+@pytest.mark.unit
+def test_external_browser_plan_save_and_delete_use_idle_transaction(monkeypatch):
+    _patch_fake_keys(monkeypatch)
+    user = _test_user("external-browser-owner")
+    file = _test_file("evidence.pdf")
+    report = AIReport.create(
+        {
+            "parent": user,
+            "user": user,
+            "name": "External browser mutation",
+            "tool": "organize",
+            "origin": "api",
+            "status": "ready",
+            "input_files": [file],
+        }
+    )
+    expected = external_operations.report_snapshot(report)
+    report.proposal = {"summary": "Skipped one action"}
+    calls = []
+
+    def commit(report_key, **options):
+        calls.append((report_key, options))
+        return credential_store.PLAN_OPERATION_COMMITTED
+
+    monkeypatch.setattr(
+        external_operations.agent_api_store,
+        "commit_plan_mutation_if_idle",
+        commit,
+    )
+    monkeypatch.setattr(
+        external_operations,
+        "execute_post_commit",
+        lambda _plan: ([], []),
+    )
+
+    assert external_operations.save_plan_if_idle(
+        report,
+        expected,
+        file,
+        report,
+    ) == credential_store.PLAN_OPERATION_COMMITTED
+    writes = calls[-1][1]["writes"]
+    masks = {entity.key: mask for entity, mask in writes}
+    assert masks[report.key] is None
+    assert masks[file.key] is None
+    assert masks[user.key] == ("modified",)
+    assert calls[-1][1]["deletes"] == []
+
+    calls.clear()
+    expected = external_operations.report_snapshot(report)
+    assert external_operations.delete_plan_if_idle(
+        report,
+        expected,
+        report,
+        file,
+    ) == credential_store.PLAN_OPERATION_COMMITTED
+    assert calls[-1][1]["writes"] == []
+    assert {entity.key for entity in calls[-1][1]["deletes"]} == {
+        report.key,
+        file.key,
+    }
 
 
 # @matrix agent-api ai-report : external-schema proposal-contract structured-output
@@ -351,6 +1031,7 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     assert ask_contract["uploads_supported"] is False
     assert "execution_supported" not in ask_contract
     assert ask_contract["required_file_refs"] == []
+    assert "propertyOrdering" not in ask_contract["proposal_schema"]
     assert "answer_markdown" in ask_contract["proposal_schema"]["properties"]
     assert ask_contract["proposal_schema"]["properties"]["actions"]["maxItems"] == 0
     assert any("separate Create or Organize plan" in rule for rule in ask_contract["workflow_rules"])
@@ -1182,29 +1863,105 @@ def test_credential_rotation_and_revocation_are_transactional(monkeypatch):
     assert len(transactions) == 4
 
 
-# @matrix agent-api ai-report : upload-finalization temporary-view-ownership
+# @matrix agent-api ai-report mcp-upload : deterministic-file-identity lease-renewal upload-finalization temporary-view-ownership
 @pytest.mark.unit
 def test_external_upload_finalization_binds_report_user(monkeypatch):
     actor = object()
     captured = {}
+    batch_id = "batch-aaaaaaaaaaaaaaaa"
+    report_key = Key("activity", "report", project="test-project")
+    file_key = Key("files", "stable-file", project="test-project")
+    report = SimpleNamespace(
+        key=report_key,
+        upload_manifest=[
+            {
+                "token": "storage-token",
+                "input_name": "agent-api-files",
+                "filename": "records.pdf",
+                "upload_batch_id": batch_id,
+            }
+        ],
+    )
 
-    def finalize(report, user, *, file_factory):
+    def finalize(
+        current,
+        user,
+        *,
+        file_factory,
+        failed_file_cleanup=None,
+        ensure_active=None,
+        save=None,
+    ):
+        assert current is report
+        assert save is None
+        assert callable(failed_file_cleanup)
+        captured["failed_file_cleanup"] = failed_file_cleanup
         captured["user"] = user
+        if ensure_active:
+            ensure_active()
+        captured["upload"] = SimpleNamespace(record=current.upload_manifest[0])
         captured["file"] = file_factory(
-            upload=SimpleNamespace(),
+            upload=captured["upload"],
             data={"filename": "records.pdf"},
         )
         return [captured["file"]]
 
     monkeypatch.setattr(external_api, "finalize_report_upload_manifest", finalize)
     monkeypatch.setattr(
+        credential_store,
+        "upload_file_key",
+        lambda current_report_key, current_batch_id, index: file_key,
+    )
+    monkeypatch.setattr(
         external_api.Entities.FILE,
         "create",
         lambda **options: SimpleNamespace(**options),
     )
+    active_checks = []
+    deleted_generations = []
+    monkeypatch.setattr(
+        external_api.storage_assets,
+        "delete_file_generation",
+        lambda path, visibility, generation: deleted_generations.append(
+            (path, visibility, generation)
+        ),
+    )
 
-    files = external_api.finalize_uploads(object(), actor)
+    files = external_api.finalize_uploads(
+        report,
+        actor,
+        asset_nonce="a" * 32,
+        ensure_active=lambda: active_checks.append(True),
+    )
 
     assert files == [captured["file"]]
     assert captured["user"] is actor
     assert captured["file"].report_user is actor
+    assert captured["file"].key == file_key
+    assert report.upload_manifest[0]["file_index"] == 0
+    assert report.upload_manifest[0]["file_key"]
+    assert active_checks == [True]
+    assert captured["file"]._agent_upload_asset_nonce == "a" * 32
+
+    captured["upload"].lagniappe_saved_destination = {
+        "path": "private/files/stable-file.attempt-aaaaaaaa",
+        "visibility": "private",
+        "generation": 17,
+    }
+    captured["failed_file_cleanup"](
+        file=captured["file"],
+        upload=captured["upload"],
+        error=RuntimeError("ambiguous transaction response"),
+        checkpoint_disposition="ambiguous",
+    )
+    assert deleted_generations == []
+
+    captured["failed_file_cleanup"](
+        file=captured["file"],
+        upload=captured["upload"],
+        error=SimpleNamespace(code="plan_operation_lost"),
+        checkpoint_disposition="not_committed",
+    )
+    assert deleted_generations == [
+        ("private/files/stable-file.attempt-aaaaaaaa", "private", 17)
+    ]

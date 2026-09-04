@@ -133,6 +133,32 @@ checkForCacheInvalidation = async () => {{}};
     run_node(script)
 
 
+# @matrix mcp-package cache : public-artifact service-worker-bypass
+def test_mcp_distribution_requests_bypass_service_worker(run_node):
+    run_service_worker_check(
+        run_node,
+        """
+for (const path of [
+  "/mcp/manifest.json",
+  "/mcp/releases/0.1.0/" + "a".repeat(64) +
+    "/lagniappe_mcp-0.1.0-py3-none-any.whl",
+]) {
+  let responded = false;
+  context.listeners.get("fetch")({
+    request: new Request(`https://example.test${path}`),
+    respondWith() { responded = true; },
+  });
+  if (responded) {
+    throw new Error(`Service worker intercepted public MCP artifact ${path}`);
+  }
+}
+if (fetchCalls.length !== 0 || responseCache.puts !== 0 || staticCache.puts !== 0) {
+  throw new Error("MCP bypass touched network or cache handlers");
+}
+""",
+    )
+
+
 # @matrix cache : no-store service-worker
 def test_no_store_304_discards_cached_response(run_node):
     run_service_worker_check(

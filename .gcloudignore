@@ -24,6 +24,7 @@ venv/
 # Root-anchor top-level development folders so nested runtime packages with the
 # same names, such as lagniappe/web/routes/testing/, are still uploaded.
 /build/
+/clients/
 /documentation/
 /node_modules/
 /reports/

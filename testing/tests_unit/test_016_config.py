@@ -8,6 +8,8 @@ import types
 
 import pytest
 
+from lagniappe import normalize_mcp_evaluation_config
+
 pytestmark = pytest.mark.unit
 
 
@@ -47,6 +49,63 @@ def _disabled_ai_email_config():
             "dailyPerUser": 200,
         },
     }
+
+
+# @matrix config mcp-package : actor-allowlist feature-flag mcp-evaluation origin-validation trial-gate
+def test_mcp_evaluation_config_requires_actor_allowlist_and_strict_origins():
+    defaults = types.SimpleNamespace(
+        DEFAULT_MCP_EVALUATION_ENABLED=False,
+        DEFAULT_MCP_EVALUATION_ACTORS=(),
+        DEFAULT_MCP_EVALUATION_ORIGIN="",
+    )
+    disabled = types.SimpleNamespace()
+    assert normalize_mcp_evaluation_config(disabled, defaults) == (
+        False,
+        frozenset(),
+        (),
+    )
+
+    enabled = types.SimpleNamespace(
+        MCP_EVALUATION_ENABLED=True,
+        MCP_EVALUATION_ACTORS=[" Pilot@Example.Test "],
+        MCP_EVALUATION_ORIGIN="https://version-dot-project.uc.r.appspot.com/",
+        APP_URL="https://app.example.test/",
+        CUSTOM_DOMAIN="workspace.example.test",
+    )
+    assert normalize_mcp_evaluation_config(enabled, defaults) == (
+        True,
+        frozenset({"pilot@example.test"}),
+        (
+            "https://app.example.test",
+            "https://workspace.example.test",
+            "https://version-dot-project.uc.r.appspot.com",
+        ),
+    )
+
+    for field, value, message in (
+        ("MCP_EVALUATION_ACTORS", [], "nonempty email list"),
+        ("MCP_EVALUATION_ACTORS", ["pilot@example.test", "PILOT@example.test"], "duplicate"),
+        ("MCP_EVALUATION_ACTORS", ["pilot@@example.test"], "invalid"),
+        ("MCP_EVALUATION_ORIGIN", "https://example.test/path", "HTTPS origin"),
+        ("MCP_EVALUATION_ORIGIN", "http://example.test", "HTTPS origin"),
+        ("MCP_EVALUATION_ORIGIN", "https://example.test:0", "HTTPS origin"),
+        ("MCP_EVALUATION_ORIGIN", "https://éxample.test", "canonical ASCII"),
+        ("MCP_EVALUATION_ORIGIN", "https://bad_label.example", "canonical ASCII"),
+        ("MCP_EVALUATION_ORIGIN", "https://-bad.example", "canonical ASCII"),
+        ("MCP_EVALUATION_ORIGIN", "https://bad..example", "canonical ASCII"),
+        ("CUSTOM_DOMAIN", "example.test:443", "HTTPS hostname"),
+        ("CUSTOM_DOMAIN", "éxample.test", "canonical ASCII"),
+    ):
+        invalid = types.SimpleNamespace(**vars(enabled))
+        setattr(invalid, field, value)
+        with pytest.raises(RuntimeError, match=message):
+            normalize_mcp_evaluation_config(invalid, defaults)
+
+    ipv6 = types.SimpleNamespace(**vars(enabled))
+    ipv6.APP_URL = "https://[2001:0db8:0:0:0:0:0:1]/"
+    assert normalize_mcp_evaluation_config(ipv6, defaults)[2][0] == (
+        "https://[2001:db8::1]"
+    )
 
 
 # @matrix config : ai-email build-id constants optional-providers public-projection secrets stale-settings
@@ -475,7 +534,7 @@ def test_google_access_token_refreshes_adc_when_stale(monkeypatch):
     assert isinstance(failure.value.__cause__, PermissionError)
 
 
-# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix
+# @matrix hosted-e2e mcp-package testing : actor-allowlist configuration deployment-binding fail-closed identity mcp-evaluation origin-validation prefix trial-gate
 def test_hosted_e2e_overrides_require_exact_runtime_identity():
     from config.hosted_e2e import hosted_e2e_settings_overrides
     from lagniappe import Config
@@ -534,6 +593,9 @@ def test_hosted_e2e_overrides_require_exact_runtime_identity():
         "https://e2e-abcdef1234567890-dot-e2e-dot-"
         "project-1.uc.r.appspot.com"
     )
+    assert overrides["MCP_EVALUATION_ENABLED"] is True
+    assert overrides["MCP_EVALUATION_ACTORS"] == ["admin@test.com"]
+    assert overrides["MCP_EVALUATION_ORIGIN"] == overrides["BASE_URL"]
     assert overrides["RUNTIME_SERVICE_ACCOUNT_EMAIL"] == (
         "runner@project-1.iam.gserviceaccount.com"
     )

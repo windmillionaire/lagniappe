@@ -1,11 +1,12 @@
 import ast
+import copy
 import fnmatch
 import json
 from pathlib import Path
 import re
 import sys
 
-from runner.context import GCLOUD_CLI, NPM_CLI
+from runner.context import GCLOUD_CLI, GIT_CLI, NPM_CLI
 from config import (
     SETTINGS,
     Directory,
@@ -17,6 +18,10 @@ from runner.frontend_build import (
     FilesystemFrontendBuildReader,
     inspect_frontend_build,
     verify_frontend_build,
+)
+from runner.mcp_artifact import (
+    assemble_deployment_artifacts,
+    check_deployment_artifacts,
 )
 from runner.process import run_command
 
@@ -426,7 +431,48 @@ def ensure_production_frontend_bundle(*, announce_progress=True):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
+# @matrix deploy frontend-build mcp-package : app-yaml build-identity static-handlers
+def synchronize_mcp_manifest_handler(build_id, *, persist):
+    """Bind the generated static manifest handler to the validated frontend build."""
+    from config import constants
+
+    templates = [
+        handler
+        for handler in constants.APP_HANDLERS
+        if handler.get("url") == constants.MCP_MANIFEST_HANDLER_PATTERN
+    ]
+    handlers = SETTINGS.DEPLOY.get("handlers")
+    matches = [
+        index
+        for index, handler in enumerate(handlers or [])
+        if handler.get("url") == constants.MCP_MANIFEST_HANDLER_PATTERN
+    ]
+    if len(templates) != 1 or not isinstance(handlers, list) or len(matches) != 1:
+        raise RuntimeError(
+            "Generated App Engine MCP handlers are stale. Rerun setup before deployment."
+        )
+
+    expected = copy.deepcopy(templates[0])
+    expected["http_headers"]["X-Lagniappe-Build-ID"] = build_id
+    index = matches[0]
+    if handlers[index] == expected:
+        return False
+    if not persist:
+        raise RuntimeError(
+            "Generated App Engine MCP manifest build marker is stale. "
+            "Rebuild deployment configuration before publishing."
+        )
+    handlers[index] = expected
+    SETTINGS.save(File.APP_YAML)
+    return True
+
+
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
+# @tests tests_tooling/test_003_config.py::test_app_engine_mcp_handlers_are_exact_and_precede_dynamic_catchall
 # @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
+# @pairs deploy:immutable-cache deploy:no-store deploy:public-artifact deploy:static-handlers
+# @pairs mcp-package:immutable-cache mcp-package:no-store mcp-package:public-artifact mcp-package:static-handlers
 def deploy(
     *,
     build_assets=True,
@@ -446,11 +492,18 @@ def deploy(
     if build_assets:
         ensure_production_frontend_bundle(announce_progress=announce_progress)
 
-    verify_frontend_build(
+    frontend_validation = verify_frontend_build(
         app_dir=Directory.APP.value,
         expected_mode="production",
         expected_version=str(SETTINGS.APP["VERSION"]),
     )
+    synchronize_mcp_manifest_handler(
+        frontend_validation.metadata["build_id"],
+        persist=build_assets,
+    )
+    if build_assets:
+        assemble_deployment_artifacts(Directory.APP.value)
+    check_deployment_artifacts(Directory.APP.value, git_cli=GIT_CLI)
     verify_generation_manifest()
     if announce_progress:
         print(

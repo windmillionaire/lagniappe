@@ -5,6 +5,7 @@ import { sections } from "../elements/sections";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
 import { captureError, Modal, request, withTransition } from "../shared";
+import { McpSetup } from "./mcpSetup";
 import { PagePermissions } from "./pagePermissions";
 
 /**
@@ -398,7 +399,21 @@ export class UserSettings extends PagePermissions {
 		this._initPageSelect();
 		this._initRemovePage();
 		this._initApiKey();
+		this._initMcpSetup();
 		this.commitRevisionBaseline();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
+	 * @matrix mcp-package user-settings : poll-reconcile setup-panel
+	 */
+	_initMcpSetup() {
+		const target = this.target.querySelector("[data-role='mcp-setup']");
+		if (!target) return;
+		const setup = new McpSetup(target);
+		setup.init();
+		this.destroyables.push(setup);
 	}
 
 	/**
@@ -863,6 +878,7 @@ export class UserSettings extends PagePermissions {
 		this._initPageSelect();
 		this._initRemovePage();
 		this._initApiKey();
+		this._initMcpSetup();
 		this.setEntityMetadata();
 		if (this._success) {
 			this.form?.success();

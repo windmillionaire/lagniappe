@@ -2,14 +2,17 @@
 
 from dataclasses import replace
 from datetime import timedelta
+import io
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from flask import Flask, session
+from werkzeug.test import EnvironBuilder
 
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.web import CSP, app, configure_flask_security
 from lagniappe.web.start import blueprints as blueprint_start
@@ -355,7 +358,28 @@ def test_common_security_headers():
     assert response.headers["Cache-Control"] == "private, no-cache"
 
 
-# @matrix agent-api : bearer-only error-envelope no-store request-correlation session-independent
+# @matrix mcp-package web-headers : build-marker immutable-cache no-store public-artifact
+def test_mcp_public_artifact_headers():
+    with app.test_request_context("/mcp/manifest.json"):
+        manifest = app.process_response(app.make_response("{}"))
+    assert manifest.headers["Cache-Control"] == "no-store"
+    assert manifest.headers["Content-Type"] == "application/json; charset=utf-8"
+    assert manifest.headers["X-Lagniappe-Build-ID"] == CONFIG.BUILD_ID
+
+    digest = "a" * 64
+    path = (
+        f"/mcp/releases/0.1.0/{digest}/"
+        "lagniappe_mcp-0.1.0-py3-none-any.whl"
+    )
+    with app.test_request_context(path):
+        wheel = app.process_response(app.make_response(b"wheel"))
+    assert wheel.headers["Cache-Control"] == (
+        "public, max-age=31536000, immutable"
+    )
+    assert wheel.headers["Content-Type"] == "application/octet-stream"
+
+
+# @matrix agent-api : bearer-only build-marker error-envelope no-store request-correlation session-independent
 @pytest.mark.parametrize("path", ("/api", "/api/v1"))
 def test_external_api_authentication_and_header_contract(monkeypatch, path):
     actor = SimpleNamespace(is_public=False, urlsafe_key="security-wiring-actor")
@@ -380,6 +404,7 @@ def test_external_api_authentication_and_header_contract(monkeypatch, path):
     assert unauthorized.headers["WWW-Authenticate"] == ('Bearer realm="Lagniappe API"')
     assert unauthorized.headers["Cache-Control"] == "no-store"
     assert unauthorized.headers["X-Request-ID"] == "client-request-1"
+    assert unauthorized.headers["X-Lagniappe-Build-ID"] == CONFIG.BUILD_ID
     assert unauthorized.json["request_id"] == "client-request-1"
 
     invalid_id = "invalid request id"
@@ -404,4 +429,39 @@ def test_external_api_authentication_and_header_contract(monkeypatch, path):
     assert authorized.status_code == 200
     assert authorized.headers["Cache-Control"] == "no-store"
     assert authorized.headers["X-Request-ID"] == "success-request-1"
+    assert authorized.headers["X-Lagniappe-Build-ID"] == CONFIG.BUILD_ID
     assert authorized.headers.get("WWW-Authenticate") is None
+
+
+# @matrix agent-api : body-limit error-envelope streaming
+def test_external_api_bounds_json_without_a_declared_content_length(monkeypatch):
+    actor = SimpleNamespace(is_public=False, urlsafe_key="bounded-body-actor")
+    monkeypatch.setattr(
+        agent_auth,
+        "authenticate_credential",
+        lambda _token: (actor, {"active": True}),
+    )
+    max_json_body_bytes = external_api.MAX_PROPOSAL_BYTES + 64 * 1024
+    body = b'{"padding":"' + (
+        b"x" * max_json_body_bytes
+    ) + b'"}'
+
+    builder = EnvironBuilder(
+        path="/api/v1/plans",
+        method="POST",
+        headers={
+            "Authorization": "Bearer valid-key",
+            "Content-Type": "application/json",
+        },
+        input_stream=io.BytesIO(body),
+    )
+    environ = builder.get_environ()
+    environ.pop("CONTENT_LENGTH", None)
+    environ["wsgi.input_terminated"] = True
+    response = app.test_client().open(environ)
+
+    assert response.status_code == 413
+    assert response.json["error"] == {
+        "code": "request_too_large",
+        "message": "Request body is too large.",
+    }

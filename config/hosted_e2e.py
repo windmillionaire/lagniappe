@@ -59,7 +59,7 @@ def is_reserved_hosted_e2e_hostname(hostname: str) -> bool:
 # @testable true
 # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
 # @tests tests_unit/test_016_config.py::test_hosted_e2e_server_rejects_wrong_app_engine_version
-# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix
+# @matrix hosted-e2e mcp-package testing : actor-allowlist configuration deployment-binding fail-closed identity mcp-evaluation origin-validation prefix trial-gate
 def hosted_e2e_settings_overrides(
     app_settings: dict[str, object],
     *,
@@ -188,6 +188,9 @@ def hosted_e2e_settings_overrides(
         "PREFIX": prefix,
         "BASE_URL": base_url,
         "APP_URL": base_url,
+        "MCP_EVALUATION_ENABLED": True,
+        "MCP_EVALUATION_ACTORS": [DEFAULT_ADMIN_EMAIL],
+        "MCP_EVALUATION_ORIGIN": base_url,
         "SERVER_NAME": parsed.hostname,
         "SERVER_PORT": "443",
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": runtime_email,

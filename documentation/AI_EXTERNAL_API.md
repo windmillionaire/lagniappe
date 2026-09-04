@@ -50,11 +50,144 @@ operational shutoff.
   further reads or submissions for that plan.
 - Existing entities are represented as `hash:<12-character-hash>` references.
   URL-safe Datastore keys are rejected in submitted proposals.
-- API responses are `no-store`; no CORS policy is added. Original-file URLs,
+- API responses are `no-store` and include the non-secret
+  `X-Lagniappe-Build-ID` marker; no CORS policy is added. Original-file URLs,
   when explicitly requested through `get_file`, are signed for five minutes.
 - Limits are 60 general requests per minute per user/IP, 10 new plans per hour,
   100 tool calls per plan, and 100 proposal actions. Organize additionally
   allows 20 files per plan, 30 MiB per file, and 50 MiB total.
+
+## MCP evaluation adapter
+
+The optional `lagniappe-mcp` process is a user-local stdio adapter over this
+REST API. It is not imported or executed by the site. Its public manifest is at
+`/mcp/manifest.json`; that no-store response identifies the application build,
+one current supported adapter release, its content-addressed wheel, Python
+range, proven platform, exact dependency-wheel graph, and API/contract range.
+Wheel URLs remain immutable for their declared support window and require no
+cookie, bearer key, signed URL, or OAuth exchange.
+
+The `serve` command and its REST mapping are client-neutral: a conforming local
+stdio MCP harness can launch the same adapter. Automatic client-configuration
+mutation and the current interoperability evidence are specific to the pinned
+Codex trial client. Other CLI, IDE, desktop, or GUI clients remain unvalidated
+integrations until their own interoperability smokes pass; protocol
+compatibility alone is not an advertised support claim.
+
+During the trial, setup instructions appear inside a signed-in user's existing
+**External agent API** Settings panel only when both the site evaluation flag
+and that user's explicit actor allowlist entry are present. The browser first
+requires its current origin to match configured `APP_URL`, `CUSTOM_DOMAIN`, or
+the explicit version-targeted evaluation origin. It then fetches the manifest
+with a literal same-origin path, omitted credentials, no-store cache mode, and
+redirect refusal. The service worker does not intercept `/mcp/`.
+
+The initial supported tuple is Linux x86_64 with glibc 2.17 or newer and
+CPython 3.14. The panel shows
+the validated pipx 1.17.2 path, forcing pip and binary-only dependencies:
+
+```bash
+pipx install --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
+  "https://example.test/mcp/releases/0.1.0/<sha256>/lagniappe_mcp-0.1.0-py3-none-any.whl#sha256=<sha256>"
+lagniappe-mcp configure codex --url "https://example.test" \
+  --profile personal --allowed-root "/path/the-user-approves"
+lagniappe-mcp check --profile personal
+```
+
+Run `pipx ensurepath` when needed, open a fresh shell, and restart Codex. The
+explicit `--python python3.14` prevents pipx from choosing the interpreter that
+runs pipx when that interpreter cannot satisfy the adapter's Python 3.14 range.
+The wheel hash fragment and URL path bind the same release digest. A `uv tool`
+command is deliberately not shown: the pinned uv trial proved its direct-wheel
+URL fragment did not fail closed on a wrong digest. Public-index access remains
+necessary for the wheel's exact dependencies; the adapter lock controls only
+repository builds/tests, not this direct-wheel installation. Run the diagnostic
+after entering the key and before relying on the client registration.
+
+Reinstall the exact same content-addressed release by repeating the advertised
+command with `--force`:
+
+```bash
+pipx install --force --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
+  "https://example.test/mcp/releases/<version>/<sha256>/lagniappe_mcp-<version>-py3-none-any.whl#sha256=<sha256>"
+```
+
+When the site manifest advertises another compatible release, the same closed
+command shape performs either an upgrade or an intentional downgrade by naming
+that release's exact version, path, and digest:
+
+```bash
+pipx install --upgrade --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
+  "https://example.test/mcp/releases/<selected-version>/<selected-sha256>/lagniappe_mcp-<selected-version>-py3-none-any.whl#sha256=<selected-sha256>"
+lagniappe-mcp check --profile personal
+```
+
+The initial public ledger contains only `0.1.0`, so no public downgrade is
+currently available. Never install an unadvertised predecessor or a release
+whose API/contract or platform metadata does not match the current site.
+
+Generate or rotate the shown-once API key only after installing. `configure`
+prompts without echo and stores it in the owner-only local profile; generated
+Codex configuration contains the absolute adapter executable and profile name,
+never the bearer. In `--profile personal`, `personal` is only the local profile
+name; the URL and key are read from that protected profile rather than placed in
+the MCP registration. Uninstall in this order: revoke the site key, run
+`configure codex --remove --profile personal`, then `credentials remove
+--profile personal`, `profile remove --profile personal`, and finally uninstall
+the isolated pipx tool.
+
+The owner-only profile is a credential-placement boundary, not a sandbox around
+the AI client. Codex, the adapter, and other processes running as the same OS
+user may have permission to read it; a client with unrestricted local shell or
+file access can therefore obtain the saved key. The profile keeps the bearer out
+of client configuration, MCP arguments/results, and model-authored HTTP, but it
+does not isolate that bearer from the local user account.
+
+For a secondary nonpersistent Codex registration, keep the URL and key in the
+Codex parent process environment and allowlist their names instead of writing a
+literal secret into `config.toml`. Replace the command and root placeholders
+with absolute paths:
+
+```toml
+[mcp_servers.lagniappe-env]
+command = "/absolute/path/to/lagniappe-mcp"
+args = ["serve", "--from-env", "--allowed-root", "/path/the-user-approves"]
+env_vars = ["LAGNIAPPE_URL", "LAGNIAPPE_API_KEY"]
+startup_timeout_sec = 30
+tool_timeout_sec = 300
+required = false
+default_tools_approval_mode = "writes"
+```
+
+This form persists only the variable names. Set `LAGNIAPPE_URL` and
+`LAGNIAPPE_API_KEY` in the environment that launches Codex; do not paste the
+key into the TOML file or a shell-history-bearing command. Environment
+forwarding is not general shell isolation either: the client process and other
+same-user processes may be able to inspect the ambient value. OAuth would
+replace this bearer with another local credential, such as a refresh token, but
+would not remove the same-user host trust boundary.
+
+For the manual evaluation, the REST Skill baseline and MCP candidate both use
+this same `/api/v1` contract. Freeze one application build and build marker,
+actor/key, permissions, workspace state, and client/model settings. Run the two
+arms in separate fresh sessions and configurations—Skill-only for the baseline,
+MCP-only for the candidate—and do not deploy, reinstall, upgrade, downgrade, or
+retune either environment between measured arms.
+
+Before freezing the isolated candidate configuration, rerun its configuration
+with the trial-only mandatory-server setting (and the same URL/profile; omitted
+roots retain the saved roots):
+
+```bash
+lagniappe-mcp configure codex --url "https://example.test" \
+  --profile personal --trial-required
+```
+
+This regenerates the owned fingerprinted block with `required = true`, so a
+startup failure cannot silently turn a candidate arm into a non-MCP run. The
+ordinary Settings command deliberately omits this flag and writes
+`required = false`. Do not hand-edit the TOML value: `required` participates in
+the entry ownership fingerprint.
 
 ## Workflow
 
@@ -217,7 +350,36 @@ Organize is available to every eligible external-agent user and requires at
 least one finalized upload. Use
 `POST /plans/{id}/uploads` to create resumable Cloud Storage sessions, upload
 the declared bytes to each returned `session_url`, and call
-`POST /plans/{id}/uploads/finalize`. Ask and Create reject these endpoints.
+`POST /plans/{id}/uploads/finalize` with the exact opaque `upload_batch_id`
+returned alongside those sessions. The server binds that identity to every
+staged record and rejects a stale identity if another caller replaced the
+batch, even when both declarations have identical filenames, MIME types, and
+sizes. Plan responses retain the current or most recently finalized identity
+so a client can resolve a lost finalization response with one authoritative
+read instead of replaying the write. The MCP adapter validates this transport
+field privately and removes it from MCP results. Ask and Create reject these
+endpoints.
+
+Each finalization attempt keeps the stable per-batch File identity but copies
+the uploaded bytes to an internal, attempt-unique destination path. The copy is
+conditional on the exact temporary source generation and on the destination not
+already existing. Immediately after the copy succeeds, the finalizer registers
+its destination path and generation on the upload attempt before applying the
+content-type metadata patch; that patch is conditional on the same destination
+generation. The coordinates are therefore available for cleanup even if the
+metadata patch fails, and are committed with the File and Report under the
+Plan-operation fence when finalization reaches its checkpoint. A definitely
+uncommitted attempt may clean up only the exact destination generation it
+created, so it cannot delete a replacement from a winning attempt. An ambiguous
+commit outcome retains the copy for reconciliation instead of guessing that it
+is safe to delete.
+
+The temporary source remains until the fenced File/Report checkpoint succeeds.
+Finalization records the exact verified source generation in that checkpoint;
+deletion is conditional on it and treats an already absent object as success. If that cleanup
+fails, the report retains the completed upload-manifest entry and finalization
+returns an error. A retry recognizes that completed entry and retries only the
+idempotent source cleanup instead of copying the file or creating another File.
 
 Before analyzing files, call `get_guidelines` with `task: organize`. Settle
 structure and file placement first, then use the specialized form bundles and
@@ -290,6 +452,21 @@ resource. Internal report revision is different: it calls Lagniappe's configured
 provider and still requires the corresponding site AI-access level. External
 reports cannot invoke that provider-backed revision route.
 
+For an API-origin report, browser skip, execution start, every undo checkpoint,
+execution-failure persistence, terminal execution cleanup, and deletion use the
+shared claim key as a one-shot transactional fence rather than taking a
+long-lived API lease. Each transaction compares the exact Report revision,
+reads the shared operation-claim key, and deletes an absent or expired claim as
+part of the guarded mutation. An active API claim or a changed Report produces
+a conflict with no mutation; mutating the claim key also forces a simultaneous
+API claimant to retry and observe the browser or execution worker's winner.
+
+Delete rejects an API-origin report that still has a deferred execution or is
+in `undoing` status, so deletion is not an active-job cancellation mechanism.
+Once deletion is eligible, its guarded transaction commits the Report and
+report-only File entity deletions first. Temporary-upload cleanup and other blob
+or cache effects happen only after that durable delete succeeds.
+
 Submitting the same normalized result again is idempotent. A later valid Ask
 result replaces the saved read-only answer. A ready Create plan also
 remains open to permission-bounded reads and a complete replacement proposal so
@@ -350,7 +527,9 @@ curl --fail-with-body --silent --show-error \
 Copy the returned Plan fields into `PLAN_ID`, `CONTRACT_URL`, `SUBMIT_URL`, and
 `STATUS_URL`. Use the ID for the Plan-scoped upload and read-tool templates from
 OpenAPI, but follow the returned canonical URLs for contract, submission, and
-status instead of reconstructing those three paths:
+status instead of reconstructing those three paths. Copy the upload-session
+response's top-level identity into `UPLOAD_BATCH_ID`; do not derive it from the
+session URL or file declaration:
 
 ```bash
 curl --fail-with-body --silent --show-error \
@@ -365,7 +544,8 @@ curl --fail-with-body --silent --show-error \
 
 curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
-  -H 'Content-Type: application/json' -d '{}' \
+  -H 'Content-Type: application/json' \
+  -d "{\"upload_batch_id\":\"$UPLOAD_BATCH_ID\"}" \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/uploads/finalize"
 ```
 
@@ -460,14 +640,15 @@ plan = session.post(
 ).json()
 
 path = Path("records.pdf")
-upload = session.post(
+upload_batch = session.post(
     f"{base}/plans/{plan['id']}/uploads",
     json={"files": [{
         "filename": path.name,
         "content_type": "application/pdf",
         "size": path.stat().st_size,
     }]},
-).json()["uploads"][0]
+).json()
+upload = upload_batch["uploads"][0]
 
 with path.open("rb") as source:
     requests.put(
@@ -476,7 +657,10 @@ with path.open("rb") as source:
         headers={"Content-Type": "application/pdf"},
     ).raise_for_status()
 
-session.post(f"{base}/plans/{plan['id']}/uploads/finalize", json={}).raise_for_status()
+session.post(
+    f"{base}/plans/{plan['id']}/uploads/finalize",
+    json={"upload_batch_id": upload_batch["upload_batch_id"]},
+).raise_for_status()
 # Reuse this catalog for the rest of the run. Do not persist it as an HTTP cache.
 tools = session.get(f"{base}/tools").json()
 organize_guidelines = session.post(

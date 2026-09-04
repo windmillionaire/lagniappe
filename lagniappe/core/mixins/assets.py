@@ -101,6 +101,12 @@ class AssetMixin:
                 content, "lagniappe_content_type", None
             ) or getattr(content, "content_type", None)
 
+        if getattr(content, "lagniappe_direct_upload", False):
+            asset._path = database_assets.direct_upload_destination_path(
+                asset.path,
+                content,
+            )
+
         saved = asset.save(content)
         if not saved:
             return None

@@ -1,15 +1,22 @@
 """HTTP contract coverage for external-agent API and key management."""
 
 from types import SimpleNamespace
+import re
 from uuid import uuid4
 
 import pytest
 
+from lagniappe import CONFIG
+from lagniappe.core import exceptions
 from lagniappe.core.definitions import AI
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools import ai as ai_tools
 from lagniappe.core.tools.ai import external_api
+from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.auth import agent_api as agent_auth
+from lagniappe.core.tools import cache as cache_store
+from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
@@ -17,6 +24,13 @@ from lagniappe.web import app
 
 
 pytestmark = pytest.mark.e2e
+
+
+class FakeProperties(SimpleNamespace):
+    """Minimal property registry for route-level fake entities."""
+
+    def __contains__(self, _name):
+        return False
 
 
 class PersonalPage:
@@ -70,6 +84,10 @@ def _authenticated_client(monkeypatch, actor):
 
 def _report(actor, tool="organize"):
     return SimpleNamespace(
+        key="report-datastore-key",
+        kind="report",
+        db={},
+        processes={},
         urlsafe_key="report-key",
         hash="reporthash12",
         status="draft",
@@ -86,11 +104,149 @@ def _report(actor, tool="organize"):
             "contract_version": external_api.CONTRACT_VERSION
         },
         origin="api",
-        properties=SimpleNamespace(
+        parent=None,
+        user=None,
+        properties=FakeProperties(
             user=SimpleNamespace(key=actor.key),
             parent=SimpleNamespace(key=actor.key),
         ),
         allowed=lambda action, user=None: user is actor,
+    )
+
+
+def _allow_claimed_saves(monkeypatch, saved_reports=None):
+    """Commit route mutation plans without bypassing the decorated HTTP route."""
+
+    def commit(_report_key, *, writes, **_options):
+        if saved_reports is not None:
+            saved_reports.extend(
+                entity
+                for entity, _property_mask in writes
+                if getattr(entity, "kind", None) == "report"
+            )
+        return agent_api_store.PLAN_OPERATION_COMMITTED
+
+    monkeypatch.setattr(agent_api_store, "commit_plan_operation", commit)
+    monkeypatch.setattr(cache_store, "update", lambda *_entities, **_options: None)
+    monkeypatch.setattr(
+        cache_store,
+        "update_owner_projection",
+        lambda *_entities, **_options: None,
+    )
+
+
+# @matrix agent-api mcp-package : discovery origin-validation proposal-contract setup-command
+def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
+    actor = Actor()
+    report = _report(actor)
+    allowed_origin = "https://version-dot-project.uc.r.appspot.com"
+    authorization = {"Authorization": "Bearer valid-key"}
+    monkeypatch.setattr(
+        agent_auth,
+        "authenticate_credential",
+        lambda _token: (actor, {"active": True}),
+    )
+    monkeypatch.setattr(
+        CONFIG,
+        "MCP_EVALUATION_ORIGINS",
+        (allowed_origin,),
+    )
+    monkeypatch.setattr(
+        external_api,
+        "create_plan",
+        lambda *_args, **_kwargs: report,
+    )
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(
+        Entities,
+        "fetch_one",
+        lambda _identifier, request: report,
+    )
+    monkeypatch.setattr(
+        external_api,
+        "plan_contract",
+        lambda current, user, *, submit_url: {
+            "contract_version": external_api.CONTRACT_VERSION,
+            "actor": user.hash,
+            "submission_format": {"method": "POST", "url": submit_url},
+        },
+    )
+    client = app.test_client()
+
+    index = client.get(
+        "/api/v1",
+        base_url=allowed_origin,
+        headers=authorization,
+    )
+    assert index.status_code == 200
+    for field in (
+        "base_url",
+        "openapi_url",
+        "actor_url",
+        "tools_url",
+        "plans_url",
+        "client_skill_url",
+    ):
+        assert index.json[field].startswith(f"{allowed_origin}/")
+
+    skill = client.get(
+        "/api/v1/client-skill.md",
+        base_url=allowed_origin,
+        headers=authorization,
+    )
+    assert skill.status_code == 200
+    assert allowed_origin in skill.get_data(as_text=True)
+
+    openapi = client.get(
+        "/api/v1/openapi.json",
+        base_url=allowed_origin,
+        headers=authorization,
+    )
+    assert openapi.status_code == 200
+    assert openapi.json["servers"] == [{"url": allowed_origin}]
+
+    created = client.post(
+        "/api/v1/plans",
+        base_url=allowed_origin,
+        headers=authorization,
+        json={"tool": "organize", "instructions": "Organize these files."},
+    )
+    assert created.status_code == 201
+    for field in (
+        "contract_url",
+        "submit_url",
+        "status_url",
+        "preview_url",
+        "review_url",
+    ):
+        assert created.json[field].startswith(f"{allowed_origin}/")
+
+    contract = client.get(
+        "/api/v1/plans/report-key/contract",
+        base_url=allowed_origin,
+        headers=authorization,
+    )
+    assert contract.status_code == 200
+    assert contract.json["submission_format"]["url"].startswith(
+        f"{allowed_origin}/"
+    )
+
+    hostile = client.get(
+        "/api/v1",
+        base_url="https://credential-thief.invalid",
+        headers=authorization,
+    )
+    assert hostile.status_code == 200
+    assert all(
+        "credential-thief.invalid" not in hostile.json[field]
+        for field in (
+            "base_url",
+            "openapi_url",
+            "actor_url",
+            "tools_url",
+            "plans_url",
+            "client_skill_url",
+        )
     )
 
 
@@ -263,6 +419,22 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert "instead of reconstructing those lifecycle paths" in create_description
     upload_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/uploads"]["post"]
     assert upload_operation["requestBody"]["required"] is True
+    upload_response_schema = upload_operation["responses"]["201"]["content"][
+        "application/json"
+    ]["schema"]
+    assert upload_response_schema["additionalProperties"] is False
+    assert upload_response_schema["required"] == [
+        "plan_id",
+        "upload_batch_id",
+        "uploads",
+    ]
+    finalize_schema = openapi.json["paths"][
+        "/api/v1/plans/{plan_id}/uploads/finalize"
+    ]["post"]["requestBody"]
+    assert finalize_schema["required"] is True
+    assert finalize_schema["content"]["application/json"]["schema"]["required"] == [
+        "upload_batch_id"
+    ]
     tools_operation = openapi.json["paths"]["/api/v1/tools"]["get"]
     assert "task=organize" in tools_operation["description"]
     assert "exact input_schema" in tools_operation["description"]
@@ -344,6 +516,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert submission_format_schema["properties"]["method"]["const"] == "POST"
     plan_schema = openapi.json["components"]["schemas"]["Plan"]
     assert "submit_url" in plan_schema["required"]
+    assert "upload_batch_id" in plan_schema["required"]
     assert plan_schema["properties"]["submit_url"] == {
         "type": "string",
         "format": "uri",
@@ -544,9 +717,32 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         },
     )
     monkeypatch.setattr(
+        agent_api_store,
+        "claim_plan_operation",
+        lambda *_args, **_kwargs: agent_api_store.PLAN_OPERATION_CLAIMED,
+    )
+    monkeypatch.setattr(
+        agent_api_store,
+        "renew_plan_operation",
+        lambda *_args, **_kwargs: True,
+    )
+    monkeypatch.setattr(
+        agent_api_store,
+        "release_plan_operation",
+        lambda *_args, **_kwargs: True,
+    )
+    _allow_claimed_saves(monkeypatch)
+    monkeypatch.setattr(
         external_api,
-        "prepare_upload_manifest",
-        lambda records: records,
+        "bind_upload_file_identities",
+        lambda _report, manifest, *, upload_batch_id: [
+            {
+                **record,
+                "file_index": index,
+                "file_key": f"stable-file-{index}",
+            }
+            for index, record in enumerate(manifest)
+        ],
     )
     monkeypatch.setattr(Entities, "save", lambda *entities: None)
     invalid_upload = client.post(
@@ -658,6 +854,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         },
     )
     assert upload.status_code == 201
+    upload_batch_id = upload.json["upload_batch_id"]
+    assert re.fullmatch(r"[A-Za-z0-9_-]{16,128}", upload_batch_id)
     assert upload.json["uploads"] == [
         {
             "index": 0,
@@ -668,8 +866,19 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     ]
     assert "token" not in upload.json["uploads"][0]
 
-    def finalize(current, user):
+    def finalize(
+        current,
+        user,
+        *,
+        asset_nonce=None,
+        ensure_active=None,
+        save=None,
+    ):
         assert user is actor
+        assert re.fullmatch(r"[a-f0-9]{32}", asset_nonce)
+        assert ensure_active is not None
+        assert save is not None
+        ensure_active()
         current.upload_manifest = None
 
     monkeypatch.setattr(external_api, "finalize_uploads", finalize)
@@ -681,17 +890,31 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert invalid_finalization.status_code == 422
     assert invalid_finalization.json["error"] == {
         "code": "unsupported_field",
-        "message": "Upload finalization accepts only an empty JSON object.",
-        "details": {"path": "$", "fields": ["force"]},
+        "message": "Upload finalization request contains unsupported fields.",
+        "details": {
+            "path": "$",
+            "fields": ["force"],
+            "allowed_fields": ["upload_batch_id"],
+        },
     }
-    assert report.upload_manifest
-    finalized = client.post(
+    missing_batch_identity = client.post(
         "/api/v1/plans/report-key/uploads/finalize",
         headers={"Authorization": "Bearer valid-key"},
         json={},
     )
+    assert missing_batch_identity.status_code == 422
+    assert missing_batch_identity.json["error"]["code"] == (
+        "invalid_upload_batch_id"
+    )
+    assert report.upload_manifest
+    finalized = client.post(
+        "/api/v1/plans/report-key/uploads/finalize",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"upload_batch_id": upload_batch_id},
+    )
     assert finalized.status_code == 200
     assert finalized.json["uploads_pending"] is False
+    assert finalized.json["upload_batch_id"] == upload_batch_id
 
     def execute(name, arguments, user):
         seen.update(name=name, arguments=arguments, user=user)
@@ -722,6 +945,16 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
             },
             [],
         ),
+    )
+    monkeypatch.setattr(
+        agent_api_store,
+        "claim_plan_operation",
+        lambda *_args, **_kwargs: agent_api_store.PLAN_OPERATION_CLAIMED,
+    )
+    monkeypatch.setattr(
+        agent_api_store,
+        "release_plan_operation",
+        lambda *_args, **_kwargs: True,
     )
     rejected_tool = client.post(
         "/api/v1/plans/report-key/tools/get_schema",
@@ -813,9 +1046,10 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     }
     assert signed == [("private/person.vcf", 300)]
 
-    def submit(current, user, proposal, *, contract_version):
+    def submit(current, user, proposal, *, contract_version, save=None):
         assert user is actor
         assert contract_version == external_api.CONTRACT_VERSION
+        assert save is not None
         current.status = "ready"
         current.proposal = proposal
         current.agent_manifest["proposal_fingerprint"] = "normalized-proposal"
@@ -929,6 +1163,345 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert browser_execution_locked_revision.json["error"]["code"] == (
         "plan_state_conflict"
     )
+
+
+# @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
+def test_upload_batch_identity_rejects_a_same_metadata_last_writer(monkeypatch):
+    actor = Actor()
+    report = _report(actor)
+    headers = {
+        "Authorization": "Bearer valid-key",
+        "X-Request-ID": "upload-race-test",
+    }
+    monkeypatch.setattr(
+        agent_auth,
+        "authenticate_credential",
+        lambda _token: (actor, {"active": True}),
+    )
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: report)
+    monkeypatch.setattr(Entities, "save", lambda *_entities: None)
+    claim_outcomes = {
+        "create": agent_api_store.PLAN_OPERATION_CLAIMED,
+        "finalize": agent_api_store.PLAN_OPERATION_CLAIMED,
+    }
+    claim_calls = []
+    renew_calls = []
+
+    def claim(report_key, **options):
+        claim_calls.append((report_key, options))
+        return claim_outcomes[options["phase"]]
+
+    def renew(report_key, **options):
+        renew_calls.append((report_key, options))
+        return True
+
+    monkeypatch.setattr(agent_api_store, "claim_plan_operation", claim)
+    monkeypatch.setattr(agent_api_store, "renew_plan_operation", renew)
+    monkeypatch.setattr(
+        agent_api_store,
+        "release_plan_operation",
+        lambda *_args, **_kwargs: True,
+    )
+    _allow_claimed_saves(monkeypatch)
+    monkeypatch.setattr(
+        external_api,
+        "bind_upload_file_identities",
+        lambda _report, manifest, *, upload_batch_id: [
+            {
+                **record,
+                "file_index": index,
+                "file_key": f"stable-file-{index}",
+            }
+            for index, record in enumerate(manifest)
+        ],
+    )
+
+    session_count = 0
+
+    def create_session(*_args, **_kwargs):
+        nonlocal session_count
+        session_count += 1
+        return {
+            "token": f"storage-token-{session_count}",
+            "session_url": f"https://storage.example/upload-{session_count}",
+            "chunk_size": 8 * 1024 * 1024,
+        }
+
+    monkeypatch.setattr(
+        storage_assets,
+        "create_direct_upload_session",
+        create_session,
+    )
+    client = app.test_client()
+    first_bytes = b"AAAA"
+    second_bytes = b"BBBB"
+    assert first_bytes != second_bytes
+    assert len(first_bytes) == len(second_bytes)
+    declaration = {
+        "files": [
+            {
+                "filename": "same.bin",
+                "content_type": "application/octet-stream",
+                "size": len(first_bytes),
+            }
+        ]
+    }
+
+    first = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers=headers,
+        json=declaration,
+    )
+    assert first.status_code == 201
+    first_record = dict(report.upload_manifest[0])
+
+    # A worker with a pre-claim snapshot that shows no manifest cannot create
+    # storage sessions while another transaction owns the report claim.
+    report.upload_manifest = None
+    claim_outcomes["create"] = agent_api_store.PLAN_OPERATION_BUSY
+    competing = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers=headers,
+        json=declaration,
+    )
+    assert competing.status_code == 409
+    assert competing.json["error"]["code"] == "plan_operation_in_progress"
+    assert session_count == 1
+    assert report.upload_manifest is None
+
+    # Once the previous operation has durably completed, a later batch with
+    # identical public metadata remains valid and gets a distinct identity.
+    claim_outcomes["create"] = agent_api_store.PLAN_OPERATION_CLAIMED
+    second = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers=headers,
+        json=declaration,
+    )
+    assert second.status_code == 201
+    second_record = dict(report.upload_manifest[0])
+    assert re.fullmatch(r"[A-Za-z0-9_-]{16,128}", first.json["upload_batch_id"])
+    assert re.fullmatch(r"[A-Za-z0-9_-]{16,128}", second.json["upload_batch_id"])
+    assert first.json["upload_batch_id"] != second.json["upload_batch_id"]
+    assert first_record["token"] != second_record["token"]
+    assert {
+        key: first_record[key]
+        for key in ("filename", "content_type", "size")
+    } == {
+        key: second_record[key]
+        for key in ("filename", "content_type", "size")
+    }
+
+    finalized_batches = []
+
+    def finalize(
+        current,
+        user,
+        *,
+        asset_nonce=None,
+        ensure_active=None,
+        save=None,
+    ):
+        assert user is actor
+        assert re.fullmatch(r"[a-f0-9]{32}", asset_nonce)
+        assert ensure_active is not None
+        assert save is not None
+        ensure_active()
+        finalized_batches.append(current.upload_manifest[0]["upload_batch_id"])
+        current.upload_manifest = None
+
+    monkeypatch.setattr(external_api, "finalize_uploads", finalize)
+    stale = client.post(
+        "/api/v1/plans/report-key/uploads/finalize",
+        headers=headers,
+        json={"upload_batch_id": first.json["upload_batch_id"]},
+    )
+    assert stale.status_code == 409
+    assert stale.json["error"]["code"] == "upload_batch_mismatch"
+    assert finalized_batches == []
+    assert report.upload_manifest[0]["token"] == second_record["token"]
+
+    claim_outcomes["finalize"] = agent_api_store.PLAN_OPERATION_BUSY
+    competing_finalizer = client.post(
+        "/api/v1/plans/report-key/uploads/finalize",
+        headers=headers,
+        json={"upload_batch_id": second.json["upload_batch_id"]},
+    )
+    assert competing_finalizer.status_code == 409
+    assert competing_finalizer.json["error"]["code"] == (
+        "plan_operation_in_progress"
+    )
+    assert finalized_batches == []
+
+    claim_outcomes["finalize"] = agent_api_store.PLAN_OPERATION_CLAIMED
+    current = client.post(
+        "/api/v1/plans/report-key/uploads/finalize",
+        headers=headers,
+        json={"upload_batch_id": second.json["upload_batch_id"]},
+    )
+    assert current.status_code == 200
+    assert current.json["upload_batch_id"] == second.json["upload_batch_id"]
+    assert finalized_batches == [second.json["upload_batch_id"]]
+    assert len([call for call in claim_calls if call[1]["phase"] == "create"]) == 3
+    assert len([call for call in claim_calls if call[1]["phase"] == "finalize"]) == 2
+    assert len([call for call in renew_calls if call[1]["phase"] == "create"]) == 2
+    assert len([call for call in renew_calls if call[1]["phase"] == "finalize"]) == 1
+
+
+# @matrix agent-api mcp-upload : authoritative-reload concurrency checkpoint resume stale-snapshot
+def test_claimed_upload_routes_reload_before_storage_side_effects(monkeypatch):
+    actor = Actor()
+    headers = {"Authorization": "Bearer valid-key"}
+    monkeypatch.setattr(
+        agent_auth,
+        "authenticate_credential",
+        lambda _token: (actor, {"active": True}),
+    )
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(
+        agent_api_store,
+        "claim_plan_operation",
+        lambda *_args, **_kwargs: agent_api_store.PLAN_OPERATION_CLAIMED,
+    )
+    monkeypatch.setattr(
+        agent_api_store,
+        "renew_plan_operation",
+        lambda *_args, **_kwargs: True,
+    )
+    monkeypatch.setattr(
+        agent_api_store,
+        "release_plan_operation",
+        lambda *_args, **_kwargs: True,
+    )
+
+    existing_file = SimpleNamespace(
+        key="existing-file-key",
+        db={},
+        properties={},
+        urlsafe_key="existing-file-key",
+        hash="existingfile1",
+        name="Earlier upload",
+        filename="earlier.txt",
+        mimetype="text/plain",
+        size=7,
+    )
+    initial_create = _report(actor)
+    canonical_create = _report(actor)
+    canonical_create.input_files = [existing_file]
+    fetched = iter((initial_create, canonical_create))
+    monkeypatch.setattr(
+        Entities,
+        "fetch_one",
+        lambda *_args, **_kwargs: next(fetched),
+    )
+    saved_reports = []
+    _allow_claimed_saves(monkeypatch, saved_reports)
+    monkeypatch.setattr(
+        storage_assets,
+        "create_direct_upload_session",
+        lambda *_args, **_kwargs: {
+            "token": "new-storage-token",
+            "session_url": "https://storage.example/new-session",
+            "chunk_size": 8 * 1024 * 1024,
+        },
+    )
+    monkeypatch.setattr(
+        external_api,
+        "bind_upload_file_identities",
+        lambda _report, manifest, *, upload_batch_id: [
+            {
+                **record,
+                "file_index": index,
+                "file_key": f"stable-file-{index}",
+            }
+            for index, record in enumerate(manifest)
+        ],
+    )
+    client = app.test_client()
+    created = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers=headers,
+        json={"files": [{"filename": "new.txt", "size": 5}]},
+    )
+    assert created.status_code == 201
+    assert saved_reports == [canonical_create]
+    assert canonical_create.input_files == [existing_file]
+    assert initial_create.upload_manifest is None
+
+    batch_id = "batch-aaaaaaaaaaaaaaaa"
+    initial_finalize = _report(actor)
+    initial_finalize.agent_manifest["upload_batch_id"] = batch_id
+    initial_finalize.upload_manifest = [
+        {"upload_batch_id": batch_id, "token": "old-first"},
+        {"upload_batch_id": batch_id, "token": "old-second"},
+    ]
+    canonical_finalize = _report(actor)
+    canonical_finalize.agent_manifest["upload_batch_id"] = batch_id
+    canonical_finalize.input_files = [existing_file]
+    canonical_finalize.upload_manifest = [
+        {
+            "upload_batch_id": batch_id,
+            "token": "old-first",
+            "file_key": existing_file.urlsafe_key,
+            "complete": True,
+        },
+        {"upload_batch_id": batch_id, "token": "old-second"},
+    ]
+    fetched = iter((initial_finalize, canonical_finalize, canonical_finalize))
+    finalized_reports = []
+    monkeypatch.setattr(
+        external_api,
+        "finalize_uploads",
+        lambda current, _user, **_kwargs: (
+            finalized_reports.append(current),
+            setattr(current, "upload_manifest", None),
+        ),
+    )
+    finalized = client.post(
+        "/api/v1/plans/report-key/uploads/finalize",
+        headers=headers,
+        json={"upload_batch_id": batch_id},
+    )
+    assert finalized.status_code == 200
+    assert finalized_reports == [canonical_finalize]
+    assert initial_finalize.upload_manifest[0].get("complete") is not True
+
+
+# @pairs agent-api:concurrency agent-api:plan-operation agent-api:submission
+# @pairs mcp-upload:concurrency mcp-upload:plan-operation
+def test_submission_is_serialized_with_upload_operations(monkeypatch):
+    actor = Actor()
+    report = _report(actor, tool="ask")
+    monkeypatch.setattr(
+        agent_auth,
+        "authenticate_credential",
+        lambda _token: (actor, {"active": True}),
+    )
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: report)
+    claims = []
+
+    def claim(report_key, **options):
+        claims.append((report_key, options))
+        return agent_api_store.PLAN_OPERATION_BUSY
+
+    monkeypatch.setattr(agent_api_store, "claim_plan_operation", claim)
+    monkeypatch.setattr(
+        external_api,
+        "submit_plan",
+        lambda *_args, **_kwargs: pytest.fail(
+            "submission must not run while an upload operation owns the claim"
+        ),
+    )
+    response = app.test_client().post(
+        "/api/v1/plans/report-key/submit",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"contract_version": external_api.CONTRACT_VERSION, "proposal": {}},
+    )
+    assert response.status_code == 409
+    assert response.json["error"]["code"] == "plan_operation_in_progress"
+    assert claims[0][0] == report.key
+    assert claims[0][1]["phase"] == "submit"
 
 
 # @matrix agent-api : entitlement-independent public-user request-recheck stale-plan
@@ -1059,6 +1632,17 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         lambda identifier, request: report,
     )
     monkeypatch.setattr(
+        agent_api_store,
+        "claim_plan_operation",
+        lambda *_args, **_kwargs: agent_api_store.PLAN_OPERATION_CLAIMED,
+    )
+    monkeypatch.setattr(
+        agent_api_store,
+        "release_plan_operation",
+        lambda *_args, **_kwargs: True,
+    )
+    _allow_claimed_saves(monkeypatch)
+    monkeypatch.setattr(
         ai_functions,
         "execute_registered_tool",
         lambda tool_name, arguments, user: (
@@ -1126,11 +1710,12 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         "actions": [],
     }
 
-    def submit(current, user, value, *, contract_version):
+    def submit(current, user, value, *, contract_version, save=None):
         assert current is report
         assert user is actor
         assert value is not None
         assert contract_version == external_api.CONTRACT_VERSION
+        assert save is not None
         current.status = "complete"
         current.proposal = {
             **value,
@@ -1299,3 +1884,247 @@ def test_api_report_revision_is_provider_blocked(monkeypatch):
 
     assert response.status_code == 422, response.get_data(as_text=True)
     assert "cannot be revised with the AI provider" in response.get_data(as_text=True)
+
+
+# @matrix agent-api ai-report : browser-review cas delete skip-action
+@pytest.mark.parametrize(
+    ("outcome", "message"),
+    (
+        (agent_api_store.PLAN_OPERATION_BUSY, "being updated"),
+        (agent_api_store.PLAN_OPERATION_STALE, "plan changed"),
+    ),
+)
+def test_api_report_browser_mutations_reject_fenced_state_without_side_effects(
+    monkeypatch,
+    outcome,
+    message,
+):
+    actor = Actor()
+    report = _report(actor)
+    report.status = "ready"
+    report.db = {"proposal": "authoritative-api-proposal"}
+    report.proposal = {
+        "summary": "Review this external proposal.",
+        "confidence": 1,
+        "actions": [
+            {
+                "id": "review-external-plan",
+                "type": "needs_review",
+                "display_label": "Review external plan",
+                "data": {},
+            }
+        ],
+    }
+    guarded_calls = []
+
+    def reject_save(current, expected_report, *_entities):
+        guarded_calls.append(("save", current, expected_report))
+        return outcome
+
+    def reject_delete(current, expected_report, *_entities):
+        guarded_calls.append(("delete", current, expected_report))
+        return outcome
+
+    def forbidden_side_effect(*_args, **_kwargs):
+        pytest.fail("A rejected browser Plan mutation performed a side effect")
+
+    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: report)
+    monkeypatch.setattr(Entities, "save", forbidden_side_effect)
+    monkeypatch.setattr(Entities, "delete", forbidden_side_effect)
+    monkeypatch.setattr(Entities, "touch", forbidden_side_effect)
+    monkeypatch.setattr(
+        external_operations,
+        "save_plan_if_idle",
+        reject_save,
+    )
+    monkeypatch.setattr(
+        external_operations,
+        "delete_plan_if_idle",
+        reject_delete,
+    )
+    monkeypatch.setattr(DeferredJobs, "cancel", forbidden_side_effect)
+    monkeypatch.setattr(
+        ai_tools,
+        "cleanup_report_upload_manifest",
+        forbidden_side_effect,
+    )
+    client = _authenticated_client(monkeypatch, actor)
+
+    skipped = client.post(
+        "/tools/reports/report-key/actions/1/skip",
+        json={},
+    )
+    deleted = client.delete("/tools/reports/report-key")
+
+    assert skipped.status_code == 409, skipped.get_data(as_text=True)
+    assert deleted.status_code == 409, deleted.get_data(as_text=True)
+    assert message in skipped.get_data(as_text=True).lower()
+    assert message in deleted.get_data(as_text=True).lower()
+    assert [call[0] for call in guarded_calls] == ["save", "delete"]
+    assert all(call[1] is report for call in guarded_calls)
+    assert all(
+        call[2] == {"proposal": "authoritative-api-proposal"}
+        for call in guarded_calls
+    )
+
+
+# @matrix agent-api ai-report : browser-review delete report-execution
+def test_api_report_delete_rejects_active_execution_without_side_effects(monkeypatch):
+    actor = Actor()
+    report = _report(actor)
+    report.status = "ready"
+    report.deferred_job = {"key": "active-execution-job"}
+
+    def forbidden_side_effect(*_args, **_kwargs):
+        pytest.fail("Deleting an active API-origin report performed a side effect")
+
+    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: report)
+    monkeypatch.setattr(Entities, "delete", forbidden_side_effect)
+    monkeypatch.setattr(Entities, "touch", forbidden_side_effect)
+    monkeypatch.setattr(
+        external_operations,
+        "delete_plan_if_idle",
+        forbidden_side_effect,
+    )
+    monkeypatch.setattr(DeferredJobs, "cancel", forbidden_side_effect)
+    monkeypatch.setattr(
+        ai_tools,
+        "cleanup_report_upload_manifest",
+        forbidden_side_effect,
+    )
+
+    response = _authenticated_client(monkeypatch, actor).delete(
+        "/tools/reports/report-key"
+    )
+
+    assert response.status_code == 409, response.get_data(as_text=True)
+    assert "being updated" in response.get_data(as_text=True).lower()
+
+
+# @matrix agent-api ai-report : browser-review cas compensation delete undo
+def test_api_report_undo_delete_first_fence_stops_before_compensation(monkeypatch):
+    actor = Actor()
+    report = _report(actor)
+    report.status = "complete"
+    report.db = {"process": "complete-api-report"}
+    report.result = {
+        "ledger_version": 1,
+        "status": "complete",
+        "actions": [{"id": "undo-one", "type": "skip", "status": "complete"}],
+    }
+    undo_calls = []
+    guarded_calls = []
+    compensation_calls = []
+
+    def undo(current, user, *, save=None):
+        undo_calls.append((current, user._get_current_object(), save))
+        assert save is not None
+        save(current)
+        compensation_calls.append(current)
+
+    def reject_deleted_report(current, expected_report):
+        guarded_calls.append((current, expected_report))
+        return agent_api_store.PLAN_OPERATION_MISSING
+
+    def forbidden_side_effect(*_args, **_kwargs):
+        pytest.fail("A delete-first guarded undo performed a persistence side effect")
+
+    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: report)
+    monkeypatch.setattr(Entities, "save", forbidden_side_effect)
+    monkeypatch.setattr(Entities, "delete", forbidden_side_effect)
+    monkeypatch.setattr(Entities, "touch", forbidden_side_effect)
+    monkeypatch.setattr(ai_tools, "undo_report", undo)
+    monkeypatch.setattr(
+        external_operations,
+        "save_plan_if_idle",
+        reject_deleted_report,
+    )
+
+    response = _authenticated_client(monkeypatch, actor).post(
+        "/tools/reports/report-key/undo"
+    )
+
+    assert response.status_code == 422, response.get_data(as_text=True)
+    assert "plan changed while undo was in progress" in response.get_data(
+        as_text=True
+    ).lower()
+    assert len(undo_calls) == 1
+    assert undo_calls[0][:2] == (report, actor)
+    assert guarded_calls == [(report, {"process": "complete-api-report"})]
+    assert compensation_calls == []
+
+
+# @matrix agent-api ai-report : browser-review delete undo
+def test_api_report_delete_rejects_undo_in_progress_without_side_effects(monkeypatch):
+    actor = Actor()
+    report = _report(actor)
+    report.status = "undoing"
+
+    def forbidden_side_effect(*_args, **_kwargs):
+        pytest.fail("Deleting an API-origin undo in progress performed a side effect")
+
+    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: report)
+    monkeypatch.setattr(Entities, "delete", forbidden_side_effect)
+    monkeypatch.setattr(Entities, "touch", forbidden_side_effect)
+    monkeypatch.setattr(
+        external_operations,
+        "delete_plan_if_idle",
+        forbidden_side_effect,
+    )
+    monkeypatch.setattr(DeferredJobs, "cancel", forbidden_side_effect)
+    monkeypatch.setattr(
+        ai_tools,
+        "cleanup_report_upload_manifest",
+        forbidden_side_effect,
+    )
+
+    response = _authenticated_client(monkeypatch, actor).delete(
+        "/tools/reports/report-key"
+    )
+
+    assert response.status_code == 409, response.get_data(as_text=True)
+    assert "being updated" in response.get_data(as_text=True).lower()
+
+
+# @matrix agent-api ai-report : browser-review error-isolation report-execution
+def test_api_report_run_start_error_does_not_save_stale_report(monkeypatch):
+    actor = Actor()
+    report = _report(actor)
+    report.status = "ready"
+    report.proposal = {"summary": "Ready", "actions": []}
+    start_calls = []
+
+    def fail_start(spec):
+        start_calls.append(spec)
+        raise RuntimeError("stale external report")
+
+    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: report)
+    monkeypatch.setattr(
+        Entities,
+        "save",
+        lambda *_args, **_kwargs: pytest.fail(
+            "The API-origin report was saved after its run start failed"
+        ),
+    )
+    monkeypatch.setattr(DeferredJobs, "start", fail_start)
+    monkeypatch.setattr(exceptions, "capture", lambda *_args, **_kwargs: None)
+
+    response = _authenticated_client(monkeypatch, actor).post(
+        "/tools/reports/report-key/run",
+        data={"operation-id": "external-run"},
+    )
+
+    assert response.status_code == 422, response.get_data(as_text=True)
+    assert "could not be started" in response.get_data(as_text=True)
+    assert len(start_calls) == 1
+    assert start_calls[0].inputs["report"] is report

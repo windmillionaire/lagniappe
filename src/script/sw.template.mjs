@@ -584,6 +584,15 @@ function isStatic(pathname) {
 	);
 }
 
+/**
+ * @testable true
+ * @tests tests_js/test_008_service_worker.py::test_mcp_distribution_requests_bypass_service_worker
+ * @matrix cache mcp-package : public-artifact service-worker-bypass
+ */
+function isMcpDistributionPath(pathname) {
+	return pathname.startsWith("/mcp/");
+}
+
 self.addEventListener("fetch", (event) => {
 	const requestUrl = event.request.url;
 	const url = new URL(requestUrl);
@@ -591,6 +600,7 @@ self.addEventListener("fetch", (event) => {
 
 	if (requestUrl.includes("extension://")) return;
 	if (url.origin !== self.location.origin) return;
+	if (isMcpDistributionPath(pathname)) return;
 	if (pathname === "/l/ping") return;
 	if (pathname === "/l/token" && event.request.method === "GET") {
 		event.respondWith(handleNetworkOnlyGet(event));

@@ -13,10 +13,13 @@ use one reviewed source/build generation.
 2. production frontend validation using the same source/artifact freshness
    checks as the test server, running `npm run build` only when the bundle is
    missing, incomplete, corrupt, non-production, or stale;
-3. source and artifact manifest validation for one complete production build;
-4. PWA manifest update;
-5. Datastore index deployment when requested; and
-6. `gcloud app deploy` with the generated descriptor.
+3. MCP adapter deploy-tree assembly from the committed immutable release ledger,
+   followed by a separate check tied to the finished frontend build, plus
+   regeneration of the static manifest handler's matching build-marker header;
+4. source and artifact manifest validation for one complete production build;
+5. PWA manifest update;
+6. Datastore index deployment when requested; and
+7. `gcloud app deploy` with the generated descriptor.
 
 When `SENTRY_AUTH_TOKEN` is set, production source maps are generated, uploaded,
 and removed from static output. Without it, no source maps or upload plugins are
@@ -38,15 +41,26 @@ Freeze the release tree, then create one canonical build:
 ```bash
 npm ci
 npm run build
+venv/bin/python run.py mcp-artifact build
+git add -A
+git commit -m "Release Candidate X.Y.Z"
+venv/bin/python run.py mcp-artifact check
 venv/bin/python run.py release-check --base origin/main
 ```
 
-Commit the complete source and generated release output. `release-check`
+Review and commit the complete source and generated release output before the
+artifact check; it requires every release input to be tracked, clean, and
+committed. `release-check`
 requires a `next/*` or `hotfix/*` candidate, rejects installation-local files,
 and checks that package metadata, lockfile, production build metadata,
 `BUILD_ID`, settings version, and release note agree on one `X.Y.Z` version.
 It computes source and artifact digests from the exact Git index, preventing an
 unstaged working-tree build from validating a different committed candidate.
+For candidates containing the standalone MCP project, this same indexed check
+reconstructs and validates the immutable ledger, current wheel, exact locked
+dependency graph, canonical frozen-OpenAPI digest, contract compatibility, and
+frontend build binding. A candidate predating the package has no MCP release
+inputs to validate.
 
 Hosted E2E exports that exact commit for both its App Engine version and Cloud
 Run runner image and never rebuilds it. `hosted-e2e create` runs source-quality,
@@ -59,9 +73,22 @@ cannot publish release attestation. See
 ## App Engine upload boundary
 
 `.gcloudignore` root-anchors local directories such as `/testing/`,
-`/installer/`, and `/runner/`. Keep those patterns root-anchored so nested
-runtime packages are not excluded. `config/files/` is excluded, then only
-`lagniappe_settings.yaml` and optional `redis_ca.pem` are included.
+`/installer/`, `/runner/`, and the standalone `/clients/` source tree. Keep
+those patterns root-anchored so nested runtime packages are not excluded.
+The separately generated `lagniappe/web/static/mcp/` manifest and supported
+content-addressed wheels remain on the upload surface. `config/files/` is
+excluded, then only `lagniappe_settings.yaml` and optional `redis_ca.pem` are
+included.
+
+Cloud Build images use their own explicit ignore files rather than the App
+Engine upload boundary. Both the ordinary hosted-E2E image and the dedicated
+MCP packaging image re-include `/clients/lagniappe_mcp/`, exclude its local
+`.venv` and cache, and copy package metadata plus `uv.lock` before source so
+either kind of drift invalidates the correct build layer. The ordinary image
+copies only the resulting noneditable locked adapter environment into its final
+stage; uv and pipx are absent there. The packaging-only image pins its Python
+base, uv 0.12.9, pipx 1.17.2, and Codex CLI 0.153.0 to verified artifact
+digests for clean-home installation testing.
 
 `config/constants.py` is the template source for App Engine handlers. Keep
 specific static handlers before broad ones:
@@ -70,6 +97,11 @@ specific static handlers before broad ones:
 - CSS with the correct UTF-8 content type;
 - PDF.js auxiliary assets before general JavaScript; and
 - registered dynamic blueprint/root prefixes before the terminal static 404.
+
+The exact `/mcp/manifest.json` handler is no-store JSON. The constrained MCP
+release-wheel handler uses an immutable one-year cache policy and
+`application/octet-stream`; both precede dynamic routes and the terminal
+catch-all. The service worker deliberately does not intercept `/mcp/`.
 
 The final unknown-path handler serves the authored no-store/no-index 404 page
 without starting Gunicorn. Because App Engine static handlers cannot set 404

@@ -2,6 +2,8 @@
 *.py[cod]
 __pycache__/
 venv/
+clients/lagniappe_mcp/.venv/
+clients/lagniappe_mcp/.uv-cache/
 .pytest_cache/
 
 # JS

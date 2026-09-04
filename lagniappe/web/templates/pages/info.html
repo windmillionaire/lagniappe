@@ -98,6 +98,81 @@
                 <p class="text-sm text-base-medium">
                   Use another AI client to Ask questions or prepare Create and Organize plans within your workspace permissions. API plans never run automatically.
                 </p>
+                {% set mcp_actor = (page.user.email or '')|lower %}
+                {% if CONFIG.MCP_EVALUATION_ENABLED and mcp_actor in CONFIG.MCP_EVALUATION_ACTORS %}
+                  <section data-role="mcp-setup"
+                           data-build-id="{{ CONFIG.BUILD_ID }}"
+                           data-allowed-origins='{{ CONFIG.MCP_EVALUATION_ORIGINS|tojson }}'
+                           class="space-y-3 rounded-md border border-user-default p-3">
+                    <h3 class="{{ styles.label.sectionHeading }}">Lagniappe MCP evaluation</h3>
+                    <p class="text-sm text-base-medium">
+                      This trial supports Linux x86_64 with glibc 2.17 or newer and CPython 3.14. Installation requires pipx 1.17.2 and public package-index access for the exact binary-only dependencies.
+                    </p>
+                    <p data-role="mcp-setup-status"
+                       aria-live="polite"
+                       class="text-sm font-semibold text-base-dark">
+                      Loading the verified adapter release...
+                    </p>
+                    <div data-role="mcp-setup-commands"
+                         data-visible="false"
+                         class="space-y-3">
+                      <div>
+                        <p class="{{ styles.label.sectionHeading }}">Install the verified adapter</p>
+                        <div data-role="manual-command-shell" class="{{ styles.manual.codeShell }}">
+                          <div class="{{ styles.manual.codeToolbar }}">
+                            <button type="button"
+                                    data-action="copy-mcp-install"
+                                    aria-label="Copy MCP install command"
+                                    aria-live="polite"
+                                    class="{{ styles.manual.copyButton }}">Copy</button>
+                          </div>
+                          <pre tabindex="0" class="{{ styles.manual.code }}"><code data-role="mcp-install-command"></code></pre>
+                        </div>
+                      </div>
+                      <div>
+                        <p class="{{ styles.label.sectionHeading }}">Connect Codex</p>
+                        <div data-role="manual-command-shell" class="{{ styles.manual.codeShell }}">
+                          <div class="{{ styles.manual.codeToolbar }}">
+                            <button type="button"
+                                    data-action="copy-mcp-configure"
+                                    aria-label="Copy MCP configuration command"
+                                    aria-live="polite"
+                                    class="{{ styles.manual.copyButton }}">Copy</button>
+                          </div>
+                          <pre tabindex="0" class="{{ styles.manual.code }}"><code data-role="mcp-configure-command"></code></pre>
+                        </div>
+                      </div>
+                      <div>
+                        <p class="{{ styles.label.sectionHeading }}">Check the connection</p>
+                        <div data-role="manual-command-shell" class="{{ styles.manual.codeShell }}">
+                          <div class="{{ styles.manual.codeToolbar }}">
+                            <button type="button"
+                                    data-action="copy-mcp-diagnostic"
+                                    aria-label="Copy MCP diagnostic command"
+                                    aria-live="polite"
+                                    class="{{ styles.manual.copyButton }}">Copy</button>
+                          </div>
+                          <pre tabindex="0" class="{{ styles.manual.code }}"><code data-role="mcp-diagnostic-command"></code></pre>
+                        </div>
+                      </div>
+                      <p class="text-sm text-base-medium">
+                        Run <code>pipx ensurepath</code> if needed, then start a fresh shell and restart Codex. Generate or rotate the API key below only after installation; the key is entered into the adapter's no-echo prompt and is never placed in the command or Codex configuration.
+                      </p>
+                      <p class="text-sm text-base-medium">
+                        To reinstall this exact release, repeat the Install command with <code>--force</code>. When this page advertises a newer compatible release, use its new content-addressed command with <code>--upgrade</code>, then run Check again. No supported downgrade is currently advertised; do not install an unlisted release.
+                      </p>
+                      <p class="text-sm text-base-medium">
+                        To uninstall, first revoke the key on this page. Then run <code>lagniappe-mcp configure codex --remove --profile personal</code>, <code>lagniappe-mcp credentials remove --profile personal</code>, <code>lagniappe-mcp profile remove --profile personal</code>, and finally <code>pipx uninstall lagniappe-mcp</code>, in that order.
+                      </p>
+                      <p class="text-sm font-semibold text-delete-default">
+                        The local profile is owner-only, but it is not a sandbox: an unrestricted process or shell running as the same OS user can read the saved API key. Configure it only in a trusted local account.
+                      </p>
+                    </div>
+                    <p data-role="mcp-setup-error"
+                       data-visible="false"
+                       class="text-sm font-semibold text-delete-default"></p>
+                  </section>
+                {% endif %}
                 <p data-role="api-key-status" class="text-sm font-semibold text-base-dark">
                   Loading API key status...
                 </p>

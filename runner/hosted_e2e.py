@@ -46,7 +46,9 @@ SERVICE = "e2e"
 ANCHOR_VERSION = "e2e-anchor"
 ANCHOR_REVISION = "2"
 JOB = "lagniappe-e2e"
+MCP_PACKAGE_JOB = "lagniappe-mcp-package"
 RUNTIME_ACCOUNT = "lagniappe-e2e-runtime"
+MCP_PACKAGE_RUNTIME_ACCOUNT = "lagniappe-mcp-package-runtime"
 INVOKER_ACCOUNT = "lagniappe-e2e-invoker"
 ARTIFACT_REPOSITORY = "lagniappe-e2e"
 SETTINGS_SECRET = "lagniappe-e2e-settings"
@@ -56,9 +58,12 @@ WORKLOAD_PROVIDER = "github"
 GITHUB_ENVIRONMENT = "hosted-e2e"
 STATE_ROOT = APP_DIR / "reports/hosted-e2e"
 STATE_PATH = STATE_ROOT / "state.json"
+MCP_PACKAGE_STATE_FILENAME = "mcp-package-state.json"
 SETUP_PATH = STATE_ROOT / "setup.json"
 CONTAINER_RELATIVE_ROOT = Path("runner/hosted_e2e_container")
 CONTAINER_ROOT = APP_DIR / CONTAINER_RELATIVE_ROOT
+MCP_PACKAGE_CONTAINER_RELATIVE_ROOT = Path("runner/mcp_package_container")
+MCP_PACKAGE_CONTAINER_ROOT = APP_DIR / MCP_PACKAGE_CONTAINER_RELATIVE_ROOT
 RUNNER_GCLOUDIGNORE_COPY = "root.gcloudignore"
 ANCHOR_ROOT = APP_DIR / "runner/hosted_e2e_anchor"
 APP_SETTINGS_RELATIVE_PATH = Path("config/files/lagniappe_settings.yaml")
@@ -73,6 +78,7 @@ HOSTED_APIS = (
     "sts.googleapis.com",
 )
 VERSION_RE = re.compile(r"^e2e-[0-9a-f]{16}$")
+MCP_PACKAGE_VERSION_RE = re.compile(r"^e2e-mcp-[0-9a-f]{16}$")
 EXECUTION_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
 CLOUD_BUILD_IDENTITY_RETRY_DELAYS = (2, 4, 8, 16)
 CLOUD_BUILD_ID_RE = re.compile(
@@ -80,11 +86,229 @@ CLOUD_BUILD_ID_RE = re.compile(
     re.IGNORECASE,
 )
 CLOUD_BUILD_PENDING_STATUSES = {"STATUS_UNKNOWN", "QUEUED", "WORKING", "PENDING"}
+HOSTED_E2E_ENVIRONMENTS = ("standard", "mcp-package")
+MCP_PACKAGE_TARGET = "testing/tests_e2e/013_agent_api/test_013c_mcp_package_install.py"
+MCP_PACKAGE_PLATFORM = {
+    "id": "linux-x86_64-cpython-3.14",
+    "system": "linux",
+    "architecture": "x86_64",
+    "libc": "glibc>=2.17",
+    "python": "3.14",
+}
+MCP_PACKAGE_TOOLCHAIN = {
+    "uv_version": "0.12.9",
+    "uv_sha256": "ec7a99cd05e0cd7f80243f135ce1361c76835cb0ee60055d14d20eba8eba1460",
+    "pipx_version": "1.17.2",
+    "pipx_sha256": "31d517b7afebf55d3b597d613c735389068a973a54712a50641845cf2cb2bb1d",
+    "codex_version": "0.153.0",
+    "codex_sha256": "35a82c153d83959de09c2cb84ac70ba69d05788aeeb08d4a95ca68e39f86680e",
+}
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+MCP_PACKAGE_RESULT_BUCKET_ROLE = "roles/storage.objectCreator"
+MCP_PACKAGE_DEPLOYER_ROLE = "roles/iam.serviceAccountUser"
+MCP_PACKAGE_CLOUD_RUN_AGENT_ROLE = "roles/iam.serviceAccountTokenCreator"
 
 
 # @testable infrastructure
 class HostedE2EError(RuntimeError):
     """Raised when a hosted-E2E lifecycle invariant is not satisfied."""
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_environment_has_isolated_lifecycle_identity
+# @matrix hosted-e2e mcp-package : deletion-safety environment-selection image-boundary
+@dataclass(frozen=True)
+class HostedE2EEnvironment:
+    """Closed lifecycle identity for one hosted test environment."""
+
+    name: str
+    job: str
+    image_repository: str
+    state_filename: str
+    result_directory: str
+    container_relative_root: Path
+
+    # @testable true
+    # @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_environment_has_isolated_lifecycle_identity
+    # @matrix hosted-e2e mcp-package : environment-selection image-boundary
+    def image_base(self, infrastructure) -> str:
+        registry = infrastructure.image_base.rsplit("/", 1)[0]
+        return f"{registry}/{self.image_repository}"
+
+    # @testable true
+    # @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_environment_has_isolated_lifecycle_identity
+    # @matrix hosted-e2e mcp-package : deletion-safety environment-selection
+    @property
+    def state_path(self) -> Path:
+        if self.name == "standard":
+            return STATE_PATH
+        return STATE_ROOT / self.state_filename
+
+    # @testable true
+    # @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_environment_has_isolated_lifecycle_identity
+    # @matrix hosted-e2e mcp-package : deletion-safety environment-selection
+    @property
+    def result_root(self) -> Path:
+        return STATE_ROOT / self.result_directory
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_environment_has_isolated_lifecycle_identity
+# @matrix hosted-e2e mcp-package : deletion-safety environment-selection fail-closed image-boundary
+def _environment(environment="standard") -> HostedE2EEnvironment:
+    """Resolve the public environment enum without accepting aliases."""
+    definitions = {
+        "standard": HostedE2EEnvironment(
+            name="standard",
+            job=JOB,
+            image_repository="runner",
+            state_filename=STATE_PATH.name,
+            result_directory="results",
+            container_relative_root=CONTAINER_RELATIVE_ROOT,
+        ),
+        "mcp-package": HostedE2EEnvironment(
+            name="mcp-package",
+            job=MCP_PACKAGE_JOB,
+            image_repository="mcp-package-runner",
+            state_filename=MCP_PACKAGE_STATE_FILENAME,
+            result_directory="mcp-package-results",
+            container_relative_root=MCP_PACKAGE_CONTAINER_RELATIVE_ROOT,
+        ),
+    }
+    try:
+        return definitions[environment]
+    except (KeyError, TypeError) as error:
+        allowed = "|".join(HOSTED_E2E_ENVIRONMENTS)
+        raise HostedE2EError(
+            f"Hosted E2E environment must be one of {allowed}."
+        ) from error
+
+
+# @testable false
+# @covered-by runner/hosted_e2e.py::_mcp_package_image_contract
+# @reason the image contract owns safety checks and every digest consumer
+def _sha256_file(path: Path) -> str:
+    path = Path(path)
+    if path.is_symlink() or not path.is_file():
+        raise HostedE2EError(f"Hosted E2E image input is missing or unsafe: {path}")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_image_contract_binds_platform_lock_and_tools
+# @tests tests_tooling/test_012_mcp_package.py::test_mcp_docker_builds_pin_tools_and_explicitly_include_client_source
+# @matrix deploy hosted-e2e mcp-package : build-context dependency-layer image-boundary immutable-release installer-pin platform-pin source-quality
+def _mcp_package_image_contract(source_root=APP_DIR):
+    """Validate and fingerprint the packaging image and public wheel contract."""
+    source_root = Path(source_root)
+    container_root = source_root / MCP_PACKAGE_CONTAINER_RELATIVE_ROOT
+    docker_path = container_root / "Dockerfile"
+    cloudbuild_path = container_root / "cloudbuild.yaml"
+    ignore_path = container_root / "gcloudignore"
+    lock_path = source_root / "clients/lagniappe_mcp/uv.lock"
+    project_path = source_root / "clients/lagniappe_mcp/pyproject.toml"
+    bootstrap_path = source_root / "clients/lagniappe_mcp/uv-bootstrap.json"
+    ledger_path = source_root / "clients/lagniappe_mcp/releases/releases.json"
+    manifest_path = source_root / "lagniappe/web/static/mcp/manifest.json"
+    root_ignore_path = source_root / ".gcloudignore"
+    inputs = (
+        docker_path,
+        cloudbuild_path,
+        ignore_path,
+        root_ignore_path,
+        lock_path,
+        project_path,
+        bootstrap_path,
+        ledger_path,
+        manifest_path,
+    )
+    digests = {path: _sha256_file(path) for path in inputs}
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise HostedE2EError("The deployed MCP manifest is invalid.") from error
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("releases"), list):
+        raise HostedE2EError("The deployed MCP manifest is invalid.")
+    platforms = []
+    for release in manifest["releases"]:
+        if not isinstance(release, dict) or not isinstance(
+            release.get("platforms"), list
+        ):
+            raise HostedE2EError("The deployed MCP manifest is invalid.")
+        platforms.extend(release["platforms"])
+    if not platforms or any(
+        not isinstance(platform, dict)
+        or any(
+            platform.get(key) != value for key, value in MCP_PACKAGE_PLATFORM.items()
+        )
+        for platform in platforms
+    ):
+        raise HostedE2EError("The MCP package image refuses an unadvertised platform.")
+    current = manifest.get("current")
+    if not isinstance(current, dict):
+        raise HostedE2EError("The deployed MCP manifest has no current release.")
+    current_platforms = current.get("platforms")
+    if not isinstance(current_platforms, list) or len(current_platforms) != 1:
+        raise HostedE2EError("The deployed MCP manifest is invalid.")
+    wheel_sha256 = current.get("sha256")
+    dependency_sha256 = current_platforms[0].get("dependency_graph_sha256")
+    if not isinstance(wheel_sha256, str) or not SHA256_RE.fullmatch(wheel_sha256):
+        raise HostedE2EError("The deployed MCP manifest has an invalid wheel digest.")
+    if not isinstance(dependency_sha256, str) or not SHA256_RE.fullmatch(
+        dependency_sha256
+    ):
+        raise HostedE2EError(
+            "The deployed MCP manifest has an invalid dependency graph digest."
+        )
+
+    dockerfile = docker_path.read_text(encoding="utf-8")
+    required_fragments = (
+        "python:3.14-slim-bookworm@sha256:",
+        f"/download/{MCP_PACKAGE_TOOLCHAIN['uv_version']}/",
+        f"sha256:{MCP_PACKAGE_TOOLCHAIN['uv_sha256']}",
+        f"/download/{MCP_PACKAGE_TOOLCHAIN['pipx_version']}/pipx.pyz",
+        f"sha256:{MCP_PACKAGE_TOOLCHAIN['pipx_sha256']}",
+        f"rust-v{MCP_PACKAGE_TOOLCHAIN['codex_version']}/",
+        f"sha256:{MCP_PACKAGE_TOOLCHAIN['codex_sha256']}",
+    )
+    if any(fragment not in dockerfile for fragment in required_fragments):
+        raise HostedE2EError(
+            "The MCP package image toolchain is stale or not integrity-pinned."
+        )
+    metadata_copy = dockerfile.find("COPY clients/lagniappe_mcp/pyproject.toml")
+    locked_sync = dockerfile.find("uv sync --project clients/lagniappe_mcp --locked")
+    source_copy = dockerfile.find("COPY clients/lagniappe_mcp/src")
+    final_sync = dockerfile.find(
+        "uv sync --project clients/lagniappe_mcp --locked",
+        locked_sync + 1,
+    )
+    if not (0 <= metadata_copy < locked_sync < source_copy < final_sync):
+        raise HostedE2EError(
+            "The MCP package image and package lock have a stale build boundary."
+        )
+    if "runner/mcp_package_container/Dockerfile" not in cloudbuild_path.read_text(
+        encoding="utf-8"
+    ):
+        raise HostedE2EError("The MCP package Cloud Build definition is stale.")
+    ignore = ignore_path.read_text(encoding="utf-8")
+    if "!/clients/lagniappe_mcp/**" not in ignore:
+        raise HostedE2EError("The MCP package image excludes its locked source.")
+
+    digest = hashlib.sha256()
+    for path in inputs:
+        digest.update(path.relative_to(source_root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(digests[path].encode("ascii"))
+    return {
+        "mcp_platform": MCP_PACKAGE_PLATFORM["id"],
+        "mcp_lock_sha256": digests[lock_path],
+        "mcp_manifest_sha256": digests[manifest_path],
+        "mcp_ledger_sha256": digests[ledger_path],
+        "mcp_wheel_sha256": wheel_sha256,
+        "mcp_dependency_graph_sha256": dependency_sha256,
+        "mcp_image_contract_sha256": digest.hexdigest(),
+        **MCP_PACKAGE_TOOLCHAIN,
+    }
 
 
 # @testable infrastructure
@@ -96,6 +320,7 @@ class HostedE2EInfrastructure:
     service: str
     job: str
     runtime_email: str
+    mcp_package_runtime_email: str
     invoker_email: str
     artifact_repository: str
     artifact_bucket: str
@@ -244,6 +469,9 @@ def _infrastructure(*, project_number=None):
         service=SERVICE,
         job=JOB,
         runtime_email=f"{RUNTIME_ACCOUNT}@{project}.iam.gserviceaccount.com",
+        mcp_package_runtime_email=(
+            f"{MCP_PACKAGE_RUNTIME_ACCOUNT}@{project}.iam.gserviceaccount.com"
+        ),
         invoker_email=f"{INVOKER_ACCOUNT}@{project}.iam.gserviceaccount.com",
         artifact_repository=ARTIFACT_REPOSITORY,
         artifact_bucket=f"lagniappe-e2e-artifacts-{digest[:20]}",
@@ -265,7 +493,8 @@ def _write_json(path: Path, payload: dict, *, owner_only=False):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_setup_contract_rejects_stale_runtime_roles
-# @matrix hosted-e2e : iam setup-contract stale-state
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_identity_requirements_are_setup_fingerprinted
+# @matrix hosted-e2e mcp-package : iam identity setup-contract stale-state
 def _setup_contract_fingerprint():
     """Fingerprint stable cloud requirements that setup must reconcile."""
     contract = {
@@ -273,6 +502,13 @@ def _setup_contract_fingerprint():
         "hosted_apis": HOSTED_APIS,
         "runtime_project_roles": RUNTIME_PROJECT_ROLES,
         "runtime_bucket_roles": RUNTIME_BUCKET_ROLES,
+        "mcp_package_runtime_account": MCP_PACKAGE_RUNTIME_ACCOUNT,
+        "mcp_package_result_bucket_role": MCP_PACKAGE_RESULT_BUCKET_ROLE,
+        "mcp_package_deployer_role": MCP_PACKAGE_DEPLOYER_ROLE,
+        "mcp_package_cloud_run_agent_role": MCP_PACKAGE_CLOUD_RUN_AGENT_ROLE,
+        "mcp_package_data_role_policy": "direct-bindings-reconciled-v1",
+        "mcp_package_service_account_policy": "exact-launch-bindings-v1",
+        "mcp_package_live_identity_assertion": "pre-job-v1",
         "anchor_revision": ANCHOR_REVISION,
     }
     encoded = json.dumps(contract, sort_keys=True, separators=(",", ":"))
@@ -803,7 +1039,328 @@ def _grant_runtime_identity_roles(infrastructure, runtime_member, deployer_membe
     )
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_runtime_identity_has_only_required_bindings
+# @matrix hosted-e2e mcp-package : identity least-privilege public-inputs secrets
+def _grant_mcp_package_runtime_identity_roles(infrastructure, deployer_member):
+    """Grant the package runtime only its result-write and launch bindings."""
+    package_member = f"serviceAccount:{infrastructure.mcp_package_runtime_email}"
+    _gcloud(
+        "storage",
+        "buckets",
+        "add-iam-policy-binding",
+        f"gs://{infrastructure.artifact_bucket}",
+        f"--member={package_member}",
+        f"--role={MCP_PACKAGE_RESULT_BUCKET_ROLE}",
+        "--quiet",
+    )
+    if deployer_member:
+        _service_account_role(
+            infrastructure.mcp_package_runtime_email,
+            deployer_member,
+            MCP_PACKAGE_DEPLOYER_ROLE,
+        )
+    cloud_run_agent = (
+        f"service-{infrastructure.project_number}@serverless-robot-prod."
+        "iam.gserviceaccount.com"
+    )
+    _service_account_role(
+        infrastructure.mcp_package_runtime_email,
+        f"serviceAccount:{cloud_run_agent}",
+        MCP_PACKAGE_CLOUD_RUN_AGENT_ROLE,
+    )
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_runtime_reconciles_stale_direct_data_roles
+# @matrix hosted-e2e mcp-package : identity least-privilege reconciliation public-inputs secrets
+def _reconcile_mcp_package_runtime_data_roles(infrastructure):
+    """Remove stale direct data grants from the dedicated package identity."""
+    member = f"serviceAccount:{infrastructure.mcp_package_runtime_email}"
+
+    def bindings(policy, *, keep=()):
+        retained = set(keep)
+        for binding in policy.get("bindings", []):
+            if not isinstance(binding, dict) or member not in binding.get("members", []):
+                continue
+            role = binding.get("role")
+            if not isinstance(role, str):
+                continue
+            conditional = "condition" in binding
+            if role in retained and not conditional:
+                continue
+            if conditional:
+                raise HostedE2EError(
+                    "Remove conditional IAM grants from the MCP package runtime "
+                    "before hosted setup can continue."
+                )
+            yield role
+
+    project_policy = _json_result(
+        _gcloud(
+            "projects",
+            "get-iam-policy",
+            infrastructure.project,
+            "--format=json",
+        ),
+        "project IAM policy",
+    )
+    for role in bindings(project_policy):
+        _gcloud(
+            "projects",
+            "remove-iam-policy-binding",
+            infrastructure.project,
+            f"--member={member}",
+            f"--role={role}",
+            "--condition=None",
+            "--quiet",
+        )
+
+    for bucket_name in (*_test_bucket_names(), infrastructure.artifact_bucket):
+        uri = f"gs://{bucket_name}"
+        bucket_policy = _json_result(
+            _gcloud("storage", "buckets", "get-iam-policy", uri, "--format=json"),
+            f"bucket IAM policy for {bucket_name}",
+        )
+        keep = (
+            (MCP_PACKAGE_RESULT_BUCKET_ROLE,)
+            if bucket_name == infrastructure.artifact_bucket
+            else ()
+        )
+        for role in bindings(bucket_policy, keep=keep):
+            _gcloud(
+                "storage",
+                "buckets",
+                "remove-iam-policy-binding",
+                uri,
+                f"--member={member}",
+                f"--role={role}",
+                "--quiet",
+            )
+
+    for secret_name in (
+        infrastructure.settings_secret,
+        infrastructure.redis_ca_secret,
+    ):
+        secret_policy = _json_result(
+            _gcloud(
+                "secrets",
+                "get-iam-policy",
+                secret_name,
+                f"--project={infrastructure.project}",
+                "--format=json",
+            ),
+            f"secret IAM policy for {secret_name}",
+        )
+        for role in bindings(secret_policy):
+            _gcloud(
+                "secrets",
+                "remove-iam-policy-binding",
+                secret_name,
+                f"--member={member}",
+                f"--role={role}",
+                f"--project={infrastructure.project}",
+                "--quiet",
+            )
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_runtime_reconciles_service_account_policy
+# @matrix hosted-e2e mcp-package : identity least-privilege reconciliation
+def _reconcile_mcp_package_runtime_service_account_roles(
+    infrastructure,
+    deployer_member,
+):
+    """Remove stale unconditional principals from the package account policy."""
+    email = infrastructure.mcp_package_runtime_email
+    cloud_run_agent = (
+        f"serviceAccount:service-{infrastructure.project_number}"
+        "@serverless-robot-prod.iam.gserviceaccount.com"
+    )
+    expected = {(cloud_run_agent, MCP_PACKAGE_CLOUD_RUN_AGENT_ROLE)}
+    if deployer_member:
+        expected.add((deployer_member, MCP_PACKAGE_DEPLOYER_ROLE))
+    policy = _json_result(
+        _gcloud(
+            "iam",
+            "service-accounts",
+            "get-iam-policy",
+            email,
+            f"--project={infrastructure.project}",
+            "--format=json",
+        ),
+        "MCP package runtime service-account IAM policy",
+    )
+    for binding in policy.get("bindings", []):
+        if not isinstance(binding, dict):
+            raise HostedE2EError("The MCP package runtime IAM policy is invalid.")
+        role = binding.get("role")
+        members = binding.get("members")
+        if not isinstance(role, str) or not isinstance(members, list):
+            raise HostedE2EError("The MCP package runtime IAM policy is invalid.")
+        if "condition" in binding:
+            raise HostedE2EError(
+                "Remove conditional IAM grants from the MCP package runtime "
+                "service-account policy before hosted setup can continue."
+            )
+        for member in members:
+            if not isinstance(member, str):
+                raise HostedE2EError("The MCP package runtime IAM policy is invalid.")
+            if (member, role) in expected:
+                continue
+            _gcloud(
+                "iam",
+                "service-accounts",
+                "remove-iam-policy-binding",
+                email,
+                f"--member={member}",
+                f"--role={role}",
+                "--condition=None",
+                f"--project={infrastructure.project}",
+                "--quiet",
+            )
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_runtime_live_identity_assertion_is_exact
+# @matrix hosted-e2e mcp-package : identity least-privilege public-inputs secrets
+def _assert_mcp_package_runtime_identity(infrastructure):
+    """Read back and require the package runtime's exact live IAM boundary."""
+    email = infrastructure.mcp_package_runtime_email
+    package_member = f"serviceAccount:{email}"
+
+    def read_policy(arguments, label):
+        result = _gcloud(*arguments, "--format=json", check=False)
+        if result.returncode != 0:
+            raise HostedE2EError(f"Could not inspect {label}.")
+        return _json_result(result, label)
+
+    def member_bindings(policy, member, label):
+        selected = []
+        bindings = policy.get("bindings", [])
+        if not isinstance(bindings, list):
+            raise HostedE2EError(f"{label} is invalid.")
+        for binding in bindings:
+            if not isinstance(binding, dict):
+                raise HostedE2EError(f"{label} is invalid.")
+            role = binding.get("role")
+            members = binding.get("members")
+            if not isinstance(role, str) or not isinstance(members, list):
+                raise HostedE2EError(f"{label} is invalid.")
+            if member in members:
+                selected.append((role, "condition" in binding))
+        return selected
+
+    project_policy = read_policy(
+        ("projects", "get-iam-policy", infrastructure.project),
+        "MCP package runtime project IAM policy",
+    )
+    if member_bindings(project_policy, package_member, "Project IAM policy"):
+        raise HostedE2EError(
+            "MCP package runtime identity drift: direct project roles are forbidden."
+        )
+
+    for bucket_name in _test_bucket_names():
+        policy = read_policy(
+            (
+                "storage",
+                "buckets",
+                "get-iam-policy",
+                f"gs://{bucket_name}",
+            ),
+            f"MCP package runtime test-bucket IAM policy for {bucket_name}",
+        )
+        if member_bindings(policy, package_member, "Test-bucket IAM policy"):
+            raise HostedE2EError(
+                "MCP package runtime identity drift: test-bucket roles are forbidden."
+            )
+
+    artifact_policy = read_policy(
+        (
+            "storage",
+            "buckets",
+            "get-iam-policy",
+            f"gs://{infrastructure.artifact_bucket}",
+        ),
+        "MCP package runtime result-bucket IAM policy",
+    )
+    if member_bindings(
+        artifact_policy,
+        package_member,
+        "Result-bucket IAM policy",
+    ) != [(MCP_PACKAGE_RESULT_BUCKET_ROLE, False)]:
+        raise HostedE2EError(
+            "MCP package runtime identity drift: the result bucket must have "
+            "exactly one unconditional objectCreator binding."
+        )
+
+    for secret_name in (
+        infrastructure.settings_secret,
+        infrastructure.redis_ca_secret,
+    ):
+        policy = read_policy(
+            (
+                "secrets",
+                "get-iam-policy",
+                secret_name,
+                f"--project={infrastructure.project}",
+            ),
+            f"MCP package runtime secret IAM policy for {secret_name}",
+        )
+        if member_bindings(policy, package_member, "Secret IAM policy"):
+            raise HostedE2EError(
+                "MCP package runtime identity drift: Secret Manager roles are forbidden."
+            )
+
+    account_policy = read_policy(
+        (
+            "iam",
+            "service-accounts",
+            "get-iam-policy",
+            email,
+            f"--project={infrastructure.project}",
+        ),
+        "MCP package runtime service-account IAM policy",
+    )
+    actual_account_bindings = []
+    bindings = account_policy.get("bindings", [])
+    if not isinstance(bindings, list):
+        raise HostedE2EError("Service-account IAM policy is invalid.")
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            raise HostedE2EError("Service-account IAM policy is invalid.")
+        role = binding.get("role")
+        members = binding.get("members")
+        if not isinstance(role, str) or not isinstance(members, list):
+            raise HostedE2EError("Service-account IAM policy is invalid.")
+        for member in members:
+            if not isinstance(member, str):
+                raise HostedE2EError("Service-account IAM policy is invalid.")
+            actual_account_bindings.append(
+                (member, role, "condition" in binding)
+            )
+    cloud_run_agent = (
+        f"serviceAccount:service-{infrastructure.project_number}"
+        "@serverless-robot-prod.iam.gserviceaccount.com"
+    )
+    expected_account_bindings = [
+        (cloud_run_agent, MCP_PACKAGE_CLOUD_RUN_AGENT_ROLE, False)
+    ]
+    deployer_member = _deployer_member()
+    if deployer_member:
+        expected_account_bindings.append(
+            (deployer_member, MCP_PACKAGE_DEPLOYER_ROLE, False)
+        )
+    if sorted(actual_account_bindings) != sorted(expected_account_bindings):
+        raise HostedE2EError(
+            "MCP package runtime identity drift: the service-account policy "
+            "does not contain exactly the approved launch bindings."
+        )
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_setup_provisions_mcp_package_runtime_identity
+# @matrix hosted-e2e mcp-package : identity setup-contract
 def setup(github_repository=None):
     """Provision stable least-privilege resources and the inert service anchor."""
     _activate(adc=False)
@@ -819,6 +1376,11 @@ def setup(github_repository=None):
 
     _gcloud("services", "enable", *HOSTED_APIS, f"--project={infrastructure.project}")
     _ensure_service_account(infrastructure, RUNTIME_ACCOUNT, "Lagniappe E2E runtime")
+    _ensure_service_account(
+        infrastructure,
+        MCP_PACKAGE_RUNTIME_ACCOUNT,
+        "Lagniappe MCP package runtime",
+    )
     _ensure_service_account(infrastructure, INVOKER_ACCOUNT, "Lagniappe E2E CI invoker")
 
     runtime_member = f"serviceAccount:{infrastructure.runtime_email}"
@@ -931,6 +1493,13 @@ def setup(github_repository=None):
             f"--project={infrastructure.project}",
             "--quiet",
         )
+    _reconcile_mcp_package_runtime_data_roles(infrastructure)
+    _reconcile_mcp_package_runtime_service_account_roles(
+        infrastructure,
+        deployer_member,
+    )
+    _grant_mcp_package_runtime_identity_roles(infrastructure, deployer_member)
+    _assert_mcp_package_runtime_identity(infrastructure)
     _ensure_workload_identity(infrastructure, github_repository)
     _ensure_anchor(infrastructure)
 
@@ -1093,18 +1662,35 @@ def _change_test_bucket_cors(infrastructure, origin, *, present):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_uses_the_exported_commit
-# @matrix hosted-e2e : deployment-source image-boundary
-def _build_runner_image(infrastructure, source, source_root):
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_runner_selects_dedicated_image_definition
+# @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_refuses_an_unsafe_staged_root_ignore
+# @matrix hosted-e2e mcp-package : deployment-source environment-selection image-boundary symlink-safety
+def _build_runner_image(
+    infrastructure,
+    source,
+    source_root,
+    *,
+    environment="standard",
+):
     """Start a resumable image build from the exported committed tree."""
-    container_root = Path(source_root) / CONTAINER_RELATIVE_ROOT
+    selected = _environment(environment)
+    container_root = Path(source_root) / selected.container_relative_root
     canonical_ignore = Path(source_root) / ".gcloudignore"
     if not canonical_ignore.is_file():
         raise HostedE2EError("The committed source has no canonical .gcloudignore.")
-    shutil.copyfile(
-        canonical_ignore,
-        container_root / RUNNER_GCLOUDIGNORE_COPY,
-    )
-    image = f"{infrastructure.image_base}:{source}"
+    staged_ignore = container_root / RUNNER_GCLOUDIGNORE_COPY
+    if staged_ignore.exists() or staged_ignore.is_symlink():
+        raise HostedE2EError(
+            "The runner image's staged root .gcloudignore path is not clean."
+        )
+    shutil.copyfile(canonical_ignore, staged_ignore)
+    if (
+        staged_ignore.is_symlink()
+        or not staged_ignore.is_file()
+        or staged_ignore.read_bytes() != canonical_ignore.read_bytes()
+    ):
+        raise HostedE2EError("The runner image's staged root .gcloudignore is invalid.")
+    image = f"{selected.image_base(infrastructure)}:{source}"
     result = _gcloud(
         "builds",
         "submit",
@@ -1176,6 +1762,34 @@ def _wait_runner_image_build(
                 f"Cloud Build {cloud_build_id} did not finish within {timeout} seconds."
             )
         time.sleep(poll_interval)
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_image_digest_is_bound_to_build_output
+# @matrix hosted-e2e mcp-package : build-identity image-boundary immutable-release
+def _cloud_build_image_digest(payload, expected_image):
+    """Extract the one exact image digest emitted by a successful Cloud Build."""
+    results = payload.get("results") if isinstance(payload, dict) else None
+    images = results.get("images") if isinstance(results, dict) else None
+    if not isinstance(images, list):
+        raise HostedE2EError("Cloud Build did not attest the packaging image digest.")
+    matches = []
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        name = str(image.get("name") or "")
+        digest = str(image.get("digest") or "")
+        if (
+            name == expected_image
+            and digest.startswith("sha256:")
+            and SHA256_RE.fullmatch(digest.removeprefix("sha256:"))
+        ):
+            matches.append(digest)
+    if len(matches) != 1:
+        raise HostedE2EError(
+            "Cloud Build did not attest one exact packaging image digest."
+        )
+    return matches[0]
 
 
 # @testable false
@@ -1275,57 +1889,117 @@ def _sync_settings_secret(infrastructure):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_job_grants_only_job_scoped_ci_permissions
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_job_receives_only_public_attested_inputs
 # @matrix hosted-e2e : identity invocation-overrides least-privilege
-def _update_job(infrastructure, state):
-    environment = {
-        "FLASK_ENV": "testing",
+# @matrix hosted-e2e mcp-package : image-boundary immutable-release public-inputs secrets
+def _update_job(infrastructure, state, *, environment="standard"):
+    selected = _environment(environment)
+    job_service_account = (
+        infrastructure.runtime_email
+        if selected.name == "standard"
+        else infrastructure.mcp_package_runtime_email
+    )
+    configured_job = state.get("job", selected.job)
+    if configured_job != selected.job:
+        raise HostedE2EError(
+            "Hosted E2E lifecycle state names the wrong environment job."
+        )
+    job_environment = {
         "GOOGLE_CLOUD_PROJECT": infrastructure.project,
         "LAGNIAPPE_HOSTED_E2E": "true",
         "LAGNIAPPE_HOSTED_E2E_ROLE": "runner",
+        "LAGNIAPPE_HOSTED_E2E_ENVIRONMENT": selected.name,
         "LAGNIAPPE_HOSTED_E2E_BASE_URL": state["base_url"],
-        "LAGNIAPPE_HOSTED_E2E_PREFIX": DEFAULT_TEST_PREFIX,
-        "LAGNIAPPE_HOSTED_E2E_RUNTIME_SERVICE_ACCOUNT_EMAIL": infrastructure.runtime_email,
         "LAGNIAPPE_HOSTED_E2E_VERSION": state["version"],
         "LAGNIAPPE_HOSTED_E2E_SOURCE": state["source"],
         "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT": state["source_snapshot"],
         "LAGNIAPPE_HOSTED_E2E_BUILD_ID": state["build_id"],
         "LAGNIAPPE_HOSTED_E2E_SERVICE": SERVICE,
-        "LAGNIAPPE_HOSTED_E2E_CALLER_EMAIL": infrastructure.runtime_email,
-        "LAGNIAPPE_HOSTED_E2E_JOB": infrastructure.job,
+        "LAGNIAPPE_HOSTED_E2E_JOB": selected.job,
         "LAGNIAPPE_HOSTED_E2E_ARTIFACT_BUCKET": infrastructure.artifact_bucket,
     }
-    env_argument = ",".join(f"{key}={value}" for key, value in environment.items())
-    secret_mounts = [
-        "/workspace/config/files/lagniappe_settings.yaml="
-        f"{infrastructure.settings_secret}:latest"
-    ]
-    if SETTINGS.APP.get("REDIS_TLS"):
-        secret_mounts.append(
-            "/workspace/config/files/redis_ca.pem="
-            f"{infrastructure.redis_ca_secret}:latest"
+    secret_argument = "--clear-secrets"
+    job_image = state["image"]
+    if selected.name == "standard":
+        job_environment.update(
+            {
+                "FLASK_ENV": "testing",
+                "LAGNIAPPE_HOSTED_E2E_PREFIX": DEFAULT_TEST_PREFIX,
+                "LAGNIAPPE_HOSTED_E2E_RUNTIME_SERVICE_ACCOUNT_EMAIL": infrastructure.runtime_email,
+                "LAGNIAPPE_HOSTED_E2E_CALLER_EMAIL": infrastructure.runtime_email,
+            }
         )
+        secret_mounts = [
+            "/workspace/config/files/lagniappe_settings.yaml="
+            f"{infrastructure.settings_secret}:latest"
+        ]
+        if SETTINGS.APP.get("REDIS_TLS"):
+            secret_mounts.append(
+                "/workspace/config/files/redis_ca.pem="
+                f"{infrastructure.redis_ca_secret}:latest"
+            )
+        secret_argument = f"--set-secrets={','.join(secret_mounts)}"
+    else:
+        digest_fields = {
+            "LAGNIAPPE_MCP_IMAGE_CONTRACT_SHA256": "mcp_image_contract_sha256",
+            "LAGNIAPPE_MCP_LOCK_SHA256": "mcp_lock_sha256",
+            "LAGNIAPPE_MCP_MANIFEST_SHA256": "mcp_manifest_sha256",
+            "LAGNIAPPE_MCP_LEDGER_SHA256": "mcp_ledger_sha256",
+            "LAGNIAPPE_MCP_WHEEL_SHA256": "mcp_wheel_sha256",
+            "LAGNIAPPE_MCP_DEPENDENCY_GRAPH_SHA256": "mcp_dependency_graph_sha256",
+        }
+        for env_name, state_name in digest_fields.items():
+            value = str(state.get(state_name) or "")
+            if not SHA256_RE.fullmatch(value):
+                raise HostedE2EError(
+                    f"MCP package lifecycle state has an invalid {state_name}."
+                )
+            job_environment[env_name] = value
+        if state.get("mcp_platform") != MCP_PACKAGE_PLATFORM["id"]:
+            raise HostedE2EError(
+                "MCP package lifecycle state has an invalid platform attestation."
+            )
+        job_environment["LAGNIAPPE_MCP_PLATFORM"] = state["mcp_platform"]
+        for name in ("uv_version", "pipx_version", "codex_version"):
+            if state.get(name) != MCP_PACKAGE_TOOLCHAIN[name]:
+                raise HostedE2EError(
+                    f"MCP package lifecycle state has an invalid {name}."
+                )
+            job_environment[f"LAGNIAPPE_MCP_{name.upper()}"] = state[name]
+        image_digest = str(state.get("image_digest") or "")
+        if not image_digest.startswith("sha256:") or not SHA256_RE.fullmatch(
+            image_digest.removeprefix("sha256:")
+        ):
+            raise HostedE2EError(
+                "MCP package lifecycle state has an invalid image digest."
+            )
+        job_environment["LAGNIAPPE_MCP_IMAGE_DIGEST"] = image_digest
+        job_image = f"{state['image'].rsplit(':', 1)[0]}@{image_digest}"
+    env_argument = ",".join(f"{key}={value}" for key, value in job_environment.items())
     exists = _describe(
         [
             "run",
             "jobs",
             "describe",
-            infrastructure.job,
+            selected.job,
             f"--region={infrastructure.region}",
             f"--project={infrastructure.project}",
         ]
     )
     action = "update" if exists else "create"
+    if selected.name == "mcp-package":
+        _assert_mcp_package_runtime_identity(infrastructure)
     _gcloud(
         "run",
         "jobs",
         action,
-        infrastructure.job,
-        f"--image={state['image']}",
+        selected.job,
+        f"--image={job_image}",
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
-        f"--service-account={infrastructure.runtime_email}",
+        f"--service-account={job_service_account}",
         f"--set-env-vars={env_argument}",
-        f"--set-secrets={','.join(secret_mounts)}",
+        secret_argument,
         "--tasks=1",
         "--parallelism=1",
         "--max-retries=0",
@@ -1339,7 +2013,7 @@ def _update_job(infrastructure, state):
         "run",
         "jobs",
         "add-iam-policy-binding",
-        infrastructure.job,
+        selected.job,
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
         f"--member=serviceAccount:{infrastructure.invoker_email}",
@@ -1350,7 +2024,7 @@ def _update_job(infrastructure, state):
         "run",
         "jobs",
         "add-iam-policy-binding",
-        infrastructure.job,
+        selected.job,
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
         f"--member=serviceAccount:{infrastructure.invoker_email}",
@@ -1363,7 +2037,7 @@ def _update_job(infrastructure, state):
             "run",
             "jobs",
             "add-iam-policy-binding",
-            infrastructure.job,
+            selected.job,
             f"--region={infrastructure.region}",
             f"--project={infrastructure.project}",
             f"--member={deployer_member}",
@@ -1382,8 +2056,10 @@ def _resumable_create_state(
     source,
     source_snapshot,
     build_id,
+    environment="standard",
 ):
     """Return interrupted exact-source state, or reject an unsafe replacement."""
+    selected = _environment(environment)
     if not previous or previous.get("status") == "torn-down":
         return None
     if previous.get("schema_version") != STATE_SCHEMA_VERSION:
@@ -1393,7 +2069,11 @@ def _resumable_create_state(
             "The previous hosted E2E lifecycle has not been torn down; "
             "inspect its status and tear it down first."
         )
-    _validate_state_infrastructure(previous, infrastructure)
+    _validate_state_infrastructure(
+        previous,
+        infrastructure,
+        environment=selected.name,
+    )
     expected = {
         "source": source,
         "source_snapshot": source_snapshot,
@@ -1408,11 +2088,14 @@ def _resumable_create_state(
             f"committed build ({', '.join(mismatches)}); tear it down first."
         )
     version = str(previous.get("version") or "")
-    if not VERSION_RE.fullmatch(version):
+    version_pattern = (
+        MCP_PACKAGE_VERSION_RE if selected.name == "mcp-package" else VERSION_RE
+    )
+    if not version_pattern.fullmatch(version):
         raise HostedE2EError("The interrupted lifecycle has an invalid version.")
     if previous.get("base_url") != _version_url(infrastructure, version):
         raise HostedE2EError("The interrupted lifecycle has an invalid version URL.")
-    expected_image = f"{infrastructure.image_base}:{source}"
+    expected_image = f"{selected.image_base(infrastructure)}:{source}"
     if previous.get("image") not in {None, expected_image}:
         raise HostedE2EError("The interrupted lifecycle has an unexpected image.")
     cloud_build_id = previous.get("cloud_build_id")
@@ -1421,6 +2104,14 @@ def _resumable_create_state(
             "The interrupted lifecycle completed its image without recording "
             "a Cloud Build ID."
         )
+    if selected.name == "mcp-package" and previous.get("image_ready"):
+        image_digest = str(previous.get("image_digest") or "")
+        if not image_digest.startswith("sha256:") or not SHA256_RE.fullmatch(
+            image_digest.removeprefix("sha256:")
+        ):
+            raise HostedE2EError(
+                "The interrupted MCP package lifecycle has no valid image digest."
+            )
     if cloud_build_id is not None and not CLOUD_BUILD_ID_RE.fullmatch(
         str(cloud_build_id)
     ):
@@ -1481,11 +2172,16 @@ def _require_current_setup(infrastructure):
 
 
 # @testable infrastructure
-def create(*, base_ref=None):
+def create(*, base_ref=None, environment="standard"):
     """Deploy one committed production build as a test app and runner."""
+    selected = _environment(environment)
     source = require_clean_source()
     build_id = _require_committed_production_build(source)
     _run_create_preflight(source, base_ref=base_ref)
+    package_contract = {}
+    if selected.name == "mcp-package":
+        with _committed_source_tree(source) as contract_root:
+            package_contract = _mcp_package_image_contract(contract_root)
     from testing.utility.traceability_common import behavior_snapshot
 
     source_snapshot, _source_paths = behavior_snapshot(APP_DIR)
@@ -1493,16 +2189,19 @@ def create(*, base_ref=None):
     infrastructure = _infrastructure()
     _require_current_setup(infrastructure)
     _verify_soft_routing_guard(infrastructure)
-    previous = _load_json(STATE_PATH)
+    state_path = selected.state_path
+    previous = _load_json(state_path)
     state = _resumable_create_state(
         previous,
         infrastructure,
         source=source,
         source_snapshot=source_snapshot,
         build_id=build_id,
+        environment=selected.name,
     )
     if state is None:
-        version = "e2e-" + secrets.token_hex(8)
+        version_prefix = "e2e-mcp-" if selected.name == "mcp-package" else "e2e-"
+        version = version_prefix + secrets.token_hex(8)
         base_url = _version_url(infrastructure, version)
         state = {
             "schema_version": STATE_SCHEMA_VERSION,
@@ -1511,43 +2210,69 @@ def create(*, base_ref=None):
             "project": infrastructure.project,
             "region": infrastructure.region,
             "service": SERVICE,
-            "job": infrastructure.job,
+            "job": selected.job,
+            "environment": selected.name,
             "version": version,
             "source": source,
             "source_snapshot": source_snapshot,
             "build_id": build_id,
             "base_url": base_url,
             "artifact_bucket": infrastructure.artifact_bucket,
-            "image": f"{infrastructure.image_base}:{source}",
+            "image": f"{selected.image_base(infrastructure)}:{source}",
         }
     else:
+        contract_mismatches = [
+            name for name, value in package_contract.items() if state.get(name) != value
+        ]
+        if contract_mismatches:
+            raise HostedE2EError(
+                "The interrupted MCP package lifecycle has a stale image/lock "
+                f"attestation ({', '.join(contract_mismatches)})."
+            )
         state["status"] = "creating"
         state["resumed_at"] = datetime.now(timezone.utc).isoformat()
-        state.setdefault("image", f"{infrastructure.image_base}:{source}")
+        state.setdefault("image", f"{selected.image_base(infrastructure)}:{source}")
+    state.update(package_contract)
     STATE_ROOT.mkdir(parents=True, exist_ok=True)
-    _write_json(STATE_PATH, state, owner_only=True)
+    _write_json(state_path, state, owner_only=True)
 
     try:
         with _committed_source_tree(source) as source_root:
             if not state.get("image_ready"):
                 cloud_build_id = state.get("cloud_build_id")
                 if cloud_build_id is None:
-                    image, cloud_build_id = _build_runner_image(
-                        infrastructure,
-                        source,
-                        source_root,
-                    )
+                    if selected.name == "standard":
+                        image, cloud_build_id = _build_runner_image(
+                            infrastructure,
+                            source,
+                            source_root,
+                        )
+                    else:
+                        image, cloud_build_id = _build_runner_image(
+                            infrastructure,
+                            source,
+                            source_root,
+                            environment=selected.name,
+                        )
                     state["image"] = image
                     state["cloud_build_id"] = cloud_build_id
-                    _write_json(STATE_PATH, state, owner_only=True)
-                _wait_runner_image_build(infrastructure, cloud_build_id)
+                    _write_json(state_path, state, owner_only=True)
+                build_payload = _wait_runner_image_build(
+                    infrastructure,
+                    cloud_build_id,
+                )
+                if selected.name == "mcp-package":
+                    state["image_digest"] = _cloud_build_image_digest(
+                        build_payload,
+                        state["image"],
+                    )
                 state["image_ready"] = True
-                _write_json(STATE_PATH, state, owner_only=True)
+                _write_json(state_path, state, owner_only=True)
 
             if not state.get("settings_synced"):
                 _sync_settings_secret(infrastructure)
                 state["settings_synced"] = True
-                _write_json(STATE_PATH, state, owner_only=True)
+                _write_json(state_path, state, owner_only=True)
 
             _change_test_bucket_cors(
                 infrastructure,
@@ -1555,11 +2280,11 @@ def create(*, base_ref=None):
                 present=True,
             )
             state["cors_added"] = True
-            _write_json(STATE_PATH, state, owner_only=True)
+            _write_json(state_path, state, owner_only=True)
 
             if _hosted_app_version_present(infrastructure, state):
                 state["app_deployed"] = True
-                _write_json(STATE_PATH, state, owner_only=True)
+                _write_json(state_path, state, owner_only=True)
             else:
                 _stage_app_runtime_files(source_root)
                 descriptor = _hosted_app_descriptor(
@@ -1590,31 +2315,39 @@ def create(*, base_ref=None):
                         capture_output=False,
                     )
                     state["app_deployed"] = True
-                    _write_json(STATE_PATH, state, owner_only=True)
+                    _write_json(state_path, state, owner_only=True)
                 finally:
                     descriptor_path.unlink(missing_ok=True)
 
         _wait_hosted_health(state)
-        _update_job(infrastructure, state)
+        if selected.name == "standard":
+            _update_job(infrastructure, state)
+        else:
+            _update_job(infrastructure, state, environment=selected.name)
         state["job_updated"] = True
         state["status"] = "ready"
-        _write_json(STATE_PATH, state, owner_only=True)
+        _write_json(state_path, state, owner_only=True)
         return state
     except Exception:
         state["status"] = "failed"
-        _write_json(STATE_PATH, state, owner_only=True)
+        _write_json(state_path, state, owner_only=True)
         raise
 
 
 # @testable infrastructure
-def _validate_state_infrastructure(state, infrastructure):
+def _validate_state_infrastructure(state, infrastructure, *, environment=None):
+    selected = _environment(environment) if environment is not None else None
     expected = {
         "project": infrastructure.project,
         "region": infrastructure.region,
         "service": SERVICE,
-        "job": infrastructure.job,
+        "job": selected.job if selected is not None else infrastructure.job,
         "artifact_bucket": infrastructure.artifact_bucket,
     }
+    if selected is not None and not (
+        selected.name == "standard" and "environment" not in state
+    ):
+        expected["environment"] = selected.name
     mismatches = [name for name, value in expected.items() if state.get(name) != value]
     if mismatches:
         raise HostedE2EError(
@@ -1625,8 +2358,9 @@ def _validate_state_infrastructure(state, infrastructure):
 
 
 # @testable infrastructure
-def _state_ready(infrastructure):
-    state = _load_json(STATE_PATH)
+def _state_ready(infrastructure, *, environment="standard"):
+    selected = _environment(environment)
+    state = _load_json(selected.state_path)
     if not state or state.get("schema_version") != STATE_SCHEMA_VERSION:
         raise HostedE2EError("No hosted E2E lifecycle state exists.")
     if state.get("status") != "ready":
@@ -1635,26 +2369,40 @@ def _state_ready(infrastructure):
         )
     if not re.fullmatch(r"b[0-9a-f]{7}", str(state.get("build_id") or "")):
         raise HostedE2EError("Hosted E2E lifecycle state contains an invalid build ID.")
-    if not VERSION_RE.fullmatch(str(state.get("version") or "")):
+    version_pattern = (
+        MCP_PACKAGE_VERSION_RE if selected.name == "mcp-package" else VERSION_RE
+    )
+    if not version_pattern.fullmatch(str(state.get("version") or "")):
         raise HostedE2EError("Hosted E2E lifecycle state contains an invalid version.")
-    _validate_state_infrastructure(state, infrastructure)
+    _validate_state_infrastructure(
+        state,
+        infrastructure,
+        environment=selected.name,
+    )
     return state
 
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr
 # @matrix hosted-e2e : execution-name failure-recovery
-def _execution_name(payload, *output):
+def _execution_name(payload, *output, environment="standard"):
+    selected = _environment(environment)
+    prefix = f"{selected.job}-"
     metadata = payload.get("metadata") if isinstance(payload, dict) else None
     name = metadata.get("name") if isinstance(metadata, dict) else None
     if isinstance(name, str) and "/" in name:
         name = name.rsplit("/", 1)[-1]
-    if isinstance(name, str) and EXECUTION_RE.fullmatch(name):
+    if (
+        isinstance(name, str)
+        and name.startswith(prefix)
+        and EXECUTION_RE.fullmatch(name)
+    ):
         return name
+    escaped_prefix = re.escape(prefix)
     patterns = (
-        r"\bexecutions/(?P<name>lagniappe-e2e-[a-z0-9-]*[a-z0-9])\b",
-        r"\bExecution\s+\[?(?P<name>lagniappe-e2e-[a-z0-9-]*[a-z0-9])\]?",
-        r"\bexecutions\s+describe\s+(?P<name>lagniappe-e2e-[a-z0-9-]*[a-z0-9])\b",
+        rf"\bexecutions/(?P<name>{escaped_prefix}[a-z0-9-]*[a-z0-9])\b",
+        rf"\bExecution\s+\[?(?P<name>{escaped_prefix}[a-z0-9-]*[a-z0-9])\]?",
+        rf"\bexecutions\s+describe\s+(?P<name>{escaped_prefix}[a-z0-9-]*[a-z0-9])\b",
     )
     for value in output:
         for pattern in patterns:
@@ -1798,7 +2546,14 @@ def _wait_for_execution(
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_and_imports
 # @matrix hosted-e2e : artifact-location duration junit result-summary
 # @pair hosted-e2e:suite-scope
-def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
+def format_execute_summary(
+    payload,
+    *,
+    imported=True,
+    state_root=STATE_ROOT,
+    result_root=None,
+    environment="standard",
+):
     """Format an operator-facing summary for one hosted execution result."""
     execution = str(payload.get("execution") or "unknown")
     exit_status = int(payload.get("exit_status") or 0)
@@ -1839,7 +2594,13 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
         except ValueError:
             pass
 
-    destination = Path(state_root) / "results" / execution
+    selected = _environment(environment)
+    result_root = (
+        Path(result_root)
+        if result_root is not None
+        else Path(state_root) / selected.result_directory
+    )
+    destination = result_root / execution
     junit_path = destination / "junit.xml"
     if imported and junit_path.is_file():
         try:
@@ -1926,9 +2687,12 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
             lines.append(f"JUnit XML: {junit_path.resolve()}")
     else:
         lines.append("Results were left in Cloud Storage and were not imported.")
+        environment_argument = (
+            "" if selected.name == "standard" else f"--environment {selected.name} "
+        )
         lines.append(
             "Import later: venv/bin/python run.py hosted-e2e results "
-            f"--execution {execution}"
+            f"{environment_argument}--execution {execution}"
         )
     return "\n".join(lines)
 
@@ -1936,11 +2700,21 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_dispatches_validated_focused_targets
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
-# @matrix hosted-e2e : argument-injection cloud-run focused-execution local-dispatch override target-validation
-def execute(*, suite="all", targets=(), import_results=True, progress=True):
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_environment_accepts_only_exact_target
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_execute_uses_only_package_job_and_state
+# @matrix hosted-e2e mcp-package : argument-injection cloud-run environment-selection execution-name focused-execution local-dispatch override target-validation
+def execute(
+    *,
+    suite="all",
+    targets=(),
+    import_results=True,
+    progress=True,
+    environment="standard",
+):
     """Execute the shared Cloud Run job and normally import its evidence."""
     from testing.utility.hosted_e2e_job import validate_focused_targets
 
+    selected = _environment(environment)
     targets = tuple(targets or ())
     if suite == "focused":
         try:
@@ -1951,21 +2725,36 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
         raise HostedE2EError("Focused targets require the hosted E2E focused suite.")
     elif suite not in {"all", "full"}:
         raise HostedE2EError(f"Unsupported hosted E2E suite {suite!r}.")
+    if selected.name == "mcp-package":
+        if suite != "focused" or targets != (MCP_PACKAGE_TARGET,):
+            raise HostedE2EError(
+                "The mcp-package environment accepts only its exact packaging "
+                f"target: {MCP_PACKAGE_TARGET}."
+            )
+    elif any(target.partition("::")[0] == MCP_PACKAGE_TARGET for target in targets):
+        raise HostedE2EError(
+            "The MCP package install target requires --environment mcp-package."
+        )
 
     _activate(adc=import_results)
     infrastructure = _infrastructure()
-    state = _state_ready(infrastructure)
+    if selected.name == "standard":
+        state = _state_ready(infrastructure)
+    else:
+        state = _state_ready(infrastructure, environment=selected.name)
     # Cloud Run's execution override uses gcloud's UpdateAction parser, which
     # rejects repeated list entries such as separate ``--target`` tokens.
     # ``argparse`` accepts the equivalent equals form inside the container.
     job_arguments = [f"--suite={suite}"]
     for target in targets:
         job_arguments.append(f"--target={target}")
+    if selected.name == "mcp-package":
+        _assert_mcp_package_runtime_identity(infrastructure)
     result = _gcloud(
         "run",
         "jobs",
         "execute",
-        infrastructure.job,
+        selected.job,
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
         f"--args={','.join(job_arguments)}",
@@ -1981,7 +2770,12 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
         except HostedE2EError:
             if result.returncode == 0:
                 raise
-    execution = _execution_name(payload, result.stdout, result.stderr)
+    execution = _execution_name(
+        payload,
+        result.stdout,
+        result.stderr,
+        environment=selected.name,
+    )
     if execution is None:
         raise HostedE2EError(
             result.stderr.strip() or "Cloud Run did not identify the job execution."
@@ -1989,7 +2783,7 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
     state["last_execution"] = execution
     state["last_suite"] = suite
     state["last_targets"] = list(targets)
-    _write_json(STATE_PATH, state, owner_only=True)
+    _write_json(selected.state_path, state, owner_only=True)
     if progress:
         print(f"Hosted E2E execution: {execution}", flush=True)
         print(
@@ -2003,12 +2797,18 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
     )
     if not import_results:
         return {"execution": execution, "exit_status": exit_status, "suite": suite}
-    manifest = results(execution=execution, latest=False, merge=True)
+    manifest = results(
+        execution=execution,
+        latest=False,
+        merge=True,
+        environment=selected.name,
+    )
     return manifest
 
 
 # @testable infrastructure
-def _latest_execution(infrastructure):
+def _latest_execution(infrastructure, *, environment="standard"):
+    selected = _environment(environment)
     from google.cloud import storage
 
     client = storage.Client(project=infrastructure.project)
@@ -2017,6 +2817,7 @@ def _latest_execution(infrastructure):
         blob
         for blob in client.list_blobs(bucket, prefix="executions/")
         if blob.name.endswith("/manifest.json")
+        and blob.name.split("/", 2)[1].startswith(f"{selected.job}-")
     ]
     if not manifests:
         raise HostedE2EError("No hosted E2E result artifacts exist.")
@@ -2253,20 +3054,26 @@ def results(
     latest=False,
     merge=True,
     include_report_archive=True,
+    environment="standard",
 ):
     """Download one result bundle and merge its outcomes into evidence.json."""
+    selected = _environment(environment)
     _activate(adc=True)
     infrastructure = _infrastructure()
-    state = _load_json(STATE_PATH) or {}
+    state = _load_json(selected.state_path) or {}
     if latest:
-        execution = _latest_execution(infrastructure)
+        execution = _latest_execution(infrastructure, environment=selected.name)
     execution = execution or state.get("last_execution")
-    if not isinstance(execution, str) or not EXECUTION_RE.fullmatch(execution):
+    if (
+        not isinstance(execution, str)
+        or not execution.startswith(f"{selected.job}-")
+        or not EXECUTION_RE.fullmatch(execution)
+    ):
         raise HostedE2EError("A valid Cloud Run execution name is required.")
 
     from google.cloud import storage
 
-    destination = STATE_ROOT / "results" / execution
+    destination = selected.result_root / execution
     destination.mkdir(parents=True, exist_ok=True)
     print(f"Downloading hosted test artifacts to {destination}", flush=True)
     client = storage.Client(project=infrastructure.project)
@@ -2290,7 +3097,16 @@ def results(
     manifest = _load_json(downloaded["manifest.json"])
     if not manifest or manifest.get("execution") != execution:
         raise HostedE2EError("Hosted result manifest does not match its execution.")
-    if merge:
+    manifest_job = manifest.get("job")
+    if (
+        manifest_job not in {None, selected.job}
+        or selected.name == "mcp-package"
+        and (
+            manifest_job != selected.job or manifest.get("environment") != selected.name
+        )
+    ):
+        raise HostedE2EError("Hosted result manifest belongs to another environment.")
+    if merge and selected.name == "standard":
         return import_result_directory(
             destination,
             expected_execution=execution,
@@ -2318,13 +3134,14 @@ def _acquire_cleanup_lease():
 
 
 # @testable infrastructure
-def _active_job_executions(infrastructure):
+def _active_job_executions(infrastructure, *, job=None):
+    job = job or infrastructure.job
     result = _gcloud(
         "run",
         "jobs",
         "executions",
         "list",
-        f"--job={infrastructure.job}",
+        f"--job={job}",
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
         "--limit=20",
@@ -2361,9 +3178,9 @@ def _active_job_executions(infrastructure):
 # @testable false
 # @covered-by runner/hosted_e2e.py::teardown
 # @reason teardown owns the lifecycle boundary for downloaded result cleanup
-def _clear_local_result_artifacts():
+def _clear_local_result_artifacts(*, environment="standard"):
     """Remove downloaded result bundles after a successful lifecycle teardown."""
-    result_root = STATE_ROOT / "results"
+    result_root = _environment(environment).result_root
     if not result_root.exists() and not result_root.is_symlink():
         return False
     if result_root.is_symlink() or result_root.is_file():
@@ -2376,19 +3193,28 @@ def _clear_local_result_artifacts():
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_removes_downloaded_results_after_success
-# @matrix hosted-e2e : deletion-safety evidence-retention local-artifacts teardown
-def teardown(*, force=False):
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_teardown_cannot_delete_standard_lifecycle
+# @matrix hosted-e2e mcp-package : deletion-safety environment-selection evidence-retention local-artifacts teardown
+def teardown(*, force=False, environment="standard"):
     """Delete ephemeral resources and downloaded artifacts for the lifecycle."""
+    selected = _environment(environment)
     (APP_DIR / ".hosted-e2e-app.yaml").unlink(missing_ok=True)
     _activate(adc=True)
     infrastructure = _infrastructure()
-    state = _load_json(STATE_PATH)
+    state = _load_json(selected.state_path)
     if not state:
         raise HostedE2EError("No hosted E2E lifecycle state exists.")
-    _validate_state_infrastructure(state, infrastructure)
+    _validate_state_infrastructure(
+        state,
+        infrastructure,
+        environment=selected.name,
+    )
     version = str(state.get("version") or "")
     base_url = str(state.get("base_url") or "")
-    if not VERSION_RE.fullmatch(version) or version == ANCHOR_VERSION:
+    version_pattern = (
+        MCP_PACKAGE_VERSION_RE if selected.name == "mcp-package" else VERSION_RE
+    )
+    if not version_pattern.fullmatch(version) or version == ANCHOR_VERSION:
         raise HostedE2EError("Refusing to tear down an invalid App Engine version.")
     if base_url != _version_url(infrastructure, version):
         raise HostedE2EError(
@@ -2401,12 +3227,14 @@ def teardown(*, force=False):
             "run",
             "jobs",
             "describe",
-            infrastructure.job,
+            selected.job,
             f"--region={infrastructure.region}",
             f"--project={infrastructure.project}",
         ]
     )
-    active_executions = _active_job_executions(infrastructure) if job else ()
+    active_executions = (
+        _active_job_executions(infrastructure, job=selected.job) if job else ()
+    )
     if active_executions and not force:
         raise HostedE2EError(
             "Cloud Run still has active hosted E2E executions: "
@@ -2427,15 +3255,16 @@ def teardown(*, force=False):
             )
 
     cleanup_lease = None
-    try:
-        cleanup_lease = _acquire_cleanup_lease()
-    except Exception as error:
-        if not force:
-            raise HostedE2EError(
-                "Could not acquire the shared data lease for final cleanup; "
-                f"wait for an active run or resolve the cleanup error ({error}), "
-                "then retry or use --force."
-            ) from error
+    if selected.name == "standard":
+        try:
+            cleanup_lease = _acquire_cleanup_lease()
+        except Exception as error:
+            if not force:
+                raise HostedE2EError(
+                    "Could not acquire the shared data lease for final cleanup; "
+                    f"wait for an active run or resolve the cleanup error ({error}), "
+                    "then retry or use --force."
+                ) from error
 
     try:
         if job is not None:
@@ -2443,7 +3272,7 @@ def teardown(*, force=False):
                 "run",
                 "jobs",
                 "delete",
-                infrastructure.job,
+                selected.job,
                 f"--region={infrastructure.region}",
                 f"--project={infrastructure.project}",
                 "--quiet",
@@ -2473,23 +3302,35 @@ def teardown(*, force=False):
             _change_test_bucket_cors(infrastructure, base_url, present=False)
         state["status"] = "torn-down"
         state["torn_down_at"] = datetime.now(timezone.utc).isoformat()
-        _write_json(STATE_PATH, state, owner_only=True)
-        _clear_local_result_artifacts()
+        _write_json(selected.state_path, state, owner_only=True)
+        _clear_local_result_artifacts(environment=selected.name)
         return state
     finally:
         if cleanup_lease is not None:
             cleanup_lease.__exit__(None, None, None)
 
 
-# @testable infrastructure
-def status():
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_status_surfaces_runtime_identity_drift
+# @matrix hosted-e2e mcp-package : identity provider-status
+def status(*, environment="standard"):
     """Return local lifecycle state plus live App Engine/job presence."""
+    selected = _environment(environment)
     _activate(adc=False)
     infrastructure = _infrastructure()
-    state = _load_json(STATE_PATH) or {"status": "absent"}
+    state = _load_json(selected.state_path) or {"status": "absent"}
+    if state.get("status") != "absent":
+        _validate_state_infrastructure(
+            state,
+            infrastructure,
+            environment=selected.name,
+        )
     version = state.get("version")
     app_version = None
-    if isinstance(version, str) and VERSION_RE.fullmatch(version):
+    version_pattern = (
+        MCP_PACKAGE_VERSION_RE if selected.name == "mcp-package" else VERSION_RE
+    )
+    if isinstance(version, str) and version_pattern.fullmatch(version):
         app_version = _describe(
             [
                 "app",
@@ -2505,21 +3346,32 @@ def status():
             "run",
             "jobs",
             "describe",
-            infrastructure.job,
+            selected.job,
             f"--region={infrastructure.region}",
             f"--project={infrastructure.project}",
         ]
     )
-    return {
+    result = {
         **state,
         "app_version_present": app_version is not None,
         "job_present": job is not None,
     }
+    if selected.name == "mcp-package":
+        try:
+            _assert_mcp_package_runtime_identity(infrastructure)
+        except HostedE2EError as error:
+            result["identity_valid"] = False
+            result["identity_error"] = str(error)
+        else:
+            result["identity_valid"] = True
+            result["identity_error"] = None
+    return result
 
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_and_imports
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_command_routes_preflight_base
+# @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_cli_routes_closed_environment
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_release_evidence_command_routes_validation
 # @matrix hosted-e2e : cli-routing evidence-import suite-scope
 def run_hosted_e2e_command(arguments):
@@ -2528,6 +3380,18 @@ def run_hosted_e2e_command(arguments):
         description="Run repository tests in an isolated Google-hosted environment.",
     )
     commands = parser.add_subparsers(dest="action", required=True)
+
+    # @testable true
+    # @tests tests_tooling/test_009_hosted_e2e.py::test_mcp_package_cli_routes_closed_environment
+    # @matrix hosted-e2e mcp-package : cli-routing environment-selection target-validation
+    def add_environment_argument(command_parser):
+        command_parser.add_argument(
+            "--environment",
+            choices=HOSTED_E2E_ENVIRONMENTS,
+            default="standard",
+            help="Select the isolated standard or MCP-package lifecycle.",
+        )
+
     setup_parser = commands.add_parser(
         "setup", help="Provision stable hosted-E2E resources."
     )
@@ -2545,7 +3409,9 @@ def run_hosted_e2e_command(arguments):
             "Defaults to origin/main, then main."
         ),
     )
+    add_environment_argument(create_parser)
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
+    add_environment_argument(execute_parser)
     execute_scope = execute_parser.add_mutually_exclusive_group()
     execute_scope.add_argument("--suite", choices=("all", "full"))
     execute_scope.add_argument(
@@ -2562,6 +3428,7 @@ def run_hosted_e2e_command(arguments):
     results_parser = commands.add_parser(
         "results", help="Download and import job artifacts."
     )
+    add_environment_argument(results_parser)
     result_selector = results_parser.add_mutually_exclusive_group()
     result_selector.add_argument("--execution")
     result_selector.add_argument("--latest", action="store_true")
@@ -2584,10 +3451,14 @@ def run_hosted_e2e_command(arguments):
     validate_parser.add_argument("--candidate", required=True)
     validate_parser.add_argument("--evidence", required=True)
     validate_parser.add_argument("--base", required=True)
-    commands.add_parser("status", help="Show local and provider lifecycle state.")
+    status_parser = commands.add_parser(
+        "status", help="Show local and provider lifecycle state."
+    )
+    add_environment_argument(status_parser)
     teardown_parser = commands.add_parser(
         "teardown", help="Delete the ephemeral version and job."
     )
+    add_environment_argument(teardown_parser)
     teardown_parser.add_argument("--force", action="store_true")
     args = parser.parse_args(arguments)
 
@@ -2600,19 +3471,35 @@ def run_hosted_e2e_command(arguments):
                 "documentation/TESTING_HOSTED_E2E.md before dispatching CI."
             )
         elif args.action == "create":
-            payload = create(base_ref=args.base_ref)
+            create_options = {"base_ref": args.base_ref}
+            if args.environment != "standard":
+                create_options["environment"] = args.environment
+            payload = create(**create_options)
             print(f"Hosted E2E version ready: {payload['base_url']}")
         elif args.action == "execute":
             suite = args.suite or ("focused" if args.targets else "all")
+            execute_options = {
+                "suite": suite,
+                "targets": args.targets or (),
+                "import_results": not args.no_import_results,
+            }
+            if args.environment != "standard":
+                execute_options["environment"] = args.environment
             payload = execute(
-                suite=suite,
-                targets=args.targets or (),
-                import_results=not args.no_import_results,
+                **execute_options,
             )
+            summary_options = {"imported": not args.no_import_results}
+            if args.environment != "standard":
+                summary_options.update(
+                    {
+                        "environment": args.environment,
+                        "result_root": _environment(args.environment).result_root,
+                    }
+                )
             print(
                 format_execute_summary(
                     payload,
-                    imported=not args.no_import_results,
+                    **summary_options,
                 )
             )
             return int(payload.get("exit_status") or 0)
@@ -2624,11 +3511,16 @@ def run_hosted_e2e_command(arguments):
             print(json.dumps(payload, indent=2, sort_keys=True))
             return 0
         elif args.action == "results":
+            result_options = {
+                "execution": args.execution,
+                "latest": args.latest,
+                "merge": not args.download_only,
+                "include_report_archive": not args.skip_report_archive,
+            }
+            if args.environment != "standard":
+                result_options["environment"] = args.environment
             payload = results(
-                execution=args.execution,
-                latest=args.latest,
-                merge=not args.download_only,
-                include_report_archive=not args.skip_report_archive,
+                **result_options,
             )
             print(json.dumps(payload, indent=2, sort_keys=True))
             return int(payload.get("exit_status") or 0)
@@ -2641,9 +3533,15 @@ def run_hosted_e2e_command(arguments):
             print(json.dumps(payload, indent=2, sort_keys=True))
             return 0
         elif args.action == "status":
-            print(json.dumps(status(), indent=2, sort_keys=True))
+            status_options = {}
+            if args.environment != "standard":
+                status_options["environment"] = args.environment
+            print(json.dumps(status(**status_options), indent=2, sort_keys=True))
         elif args.action == "teardown":
-            payload = teardown(force=args.force)
+            teardown_options = {"force": args.force}
+            if args.environment != "standard":
+                teardown_options["environment"] = args.environment
+            payload = teardown(**teardown_options)
             print(f"Hosted E2E version {payload['version']} was torn down.")
     except HostedE2EError as error:
         print(f"Hosted E2E command stopped: {error}")

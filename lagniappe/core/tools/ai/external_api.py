@@ -10,6 +10,8 @@ from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools import cache, dates
+from lagniappe.core.tools.database import agent_api as agent_api_store
+from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.files.html import render_markdown, strip_tags
 
@@ -22,6 +24,7 @@ from .references import (
 from .ask import ask_report_name, ask_response_schema, validate_ask_response
 from .create import CREATE_ACTION_TYPES
 from .reporting.uploads import (
+    CHECKPOINT_NOT_COMMITTED,
     finalize_report_upload_manifest,
     prepare_report_upload_manifest,
 )
@@ -29,7 +32,10 @@ from .reporting.contracts.permissions import (
     allowed_report_actions,
     report_action_permission_context,
 )
-from .reporting.contracts.schema import external_report_proposal_response_schema
+from .reporting.contracts.schema import (
+    _standard_json_schema,
+    external_report_proposal_response_schema,
+)
 from .reporting.proposals.validation import validate_proposal
 
 
@@ -43,6 +49,7 @@ MAX_PLAN_FILES = 20
 MAX_FILE_BYTES = 30 * 1024 * 1024
 MAX_TOTAL_FILE_BYTES = 50 * 1024 * 1024
 MAX_VALIDATION_ERRORS = 20
+UPLOAD_BATCH_ID_PATTERN = r"^[A-Za-z0-9_-]{16,128}$"
 
 REFERENCE_FIELDS = frozenset(
     {
@@ -599,7 +606,7 @@ def plan_contract(report, user, *, submit_url):
     tool = normalize_plan_tool(getattr(report, "tool", None))
     allowed = _external_allowed_report_actions(user, tool)
     if tool == "ask":
-        proposal_schema = ask_response_schema()
+        proposal_schema = _standard_json_schema(ask_response_schema())
         permissions = {
             "allowed_actions": [],
             "capabilities": {"read_only": True},
@@ -1069,7 +1076,7 @@ def public_plan_proposal(report):
 # @matrix agent-api ai-report : idempotency proposal-publication ready-state
 # @pairs agent-api:ask agent-api:create ai-report:answer-only
 # @pairs agent-api:ask-revision agent-api:create-revision agent-api:organize-revision
-def submit_plan(report, user, proposal, *, contract_version):
+def submit_plan(report, user, proposal, *, contract_version, save=None):
     try:
         submitted_contract_version = int(contract_version or 0)
     except (TypeError, ValueError) as error:
@@ -1105,34 +1112,166 @@ def submit_plan(report, user, proposal, *, contract_version):
     manifest["proposal_fingerprint"] = proposal_fingerprint(normalized)
     manifest["public_references"] = public_references
     report.agent_manifest = manifest
-    Entities.save(report)
+    (save or Entities.save)(report)
     return report
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/uploads.py::prepare_report_upload_manifest
-# @reason external wrapper fixes the input name for the tested shared normalizer
-def prepare_upload_manifest(records):
-    """Normalize signed upload records for an external plan checkpoint."""
-    return prepare_report_upload_manifest(records, input_name="agent-api-files")
+# @testable true
+# @tests tests_unit/test_032_agent_api.py::test_external_upload_batch_identity_is_preserved_in_every_record
+# @matrix agent-api ai-report : upload-batch-identity upload-manifest
+def prepare_upload_manifest(records, *, upload_batch_id):
+    """Normalize an external upload batch with one server-issued identity."""
+    return prepare_report_upload_manifest(
+        records,
+        input_name="agent-api-files",
+        upload_batch_id=upload_batch_id,
+    )
+
+
+# @testable true
+# @tests tests_unit/test_032_agent_api.py::test_upload_file_identity_is_deterministic_per_batch_record
+# @matrix agent-api ai-report mcp-upload : deterministic-file-identity upload-manifest
+def bind_upload_file_identities(report, manifest, *, upload_batch_id):
+    """Bind each external upload record to one deterministic future File key."""
+    if not isinstance(manifest, list) or len(manifest) > MAX_PLAN_FILES:
+        raise exceptions.ValidationError("The upload manifest is invalid.")
+    result = deepcopy(manifest)
+    for index, record in enumerate(result):
+        if (
+            not isinstance(record, dict)
+            or record.get("upload_batch_id") != upload_batch_id
+        ):
+            raise exceptions.ValidationError("The upload manifest is invalid.")
+        try:
+            key = agent_api_store.upload_file_key(
+                report.key,
+                upload_batch_id,
+                index,
+            )
+            identity = database_get.urlsafe_key(key)
+        except (TypeError, ValueError) as error:
+            raise exceptions.ValidationError(
+                "The upload manifest identity is invalid."
+            ) from error
+        if not isinstance(identity, str) or not identity:
+            raise exceptions.ValidationError(
+                "The upload manifest identity is invalid."
+            )
+        stored_index = record.get("file_index")
+        stored_identity = record.get("file_key")
+        if stored_index is not None and stored_index != index:
+            raise exceptions.ValidationError(
+                "The upload manifest identity is invalid."
+            )
+        if stored_identity is not None and stored_identity != identity:
+            raise exceptions.ValidationError(
+                "The upload manifest identity is invalid."
+            )
+        record["file_index"] = index
+        record["file_key"] = identity
+    return result
 
 
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_upload_finalization_binds_report_user
-# @matrix agent-api ai-report : temporary-view-ownership upload-finalization
-def finalize_uploads(report, user):
+# @matrix agent-api ai-report mcp-upload : deterministic-file-identity lease-renewal temporary-view-ownership upload-finalization
+def finalize_uploads(
+    report,
+    user,
+    *,
+    asset_nonce=None,
+    ensure_active=None,
+    save=None,
+):
     """Finalize external uploads and make draft files visible to their submitter."""
+
+    manifest = list(report.upload_manifest or [])
+    batch_ids = {
+        record.get("upload_batch_id")
+        for record in manifest
+        if isinstance(record, dict)
+    }
+    if len(batch_ids) != 1:
+        raise exceptions.ValidationError("The upload manifest identity is invalid.")
+    upload_batch_id = next(iter(batch_ids))
+    report.upload_manifest = bind_upload_file_identities(
+        report,
+        manifest,
+        upload_batch_id=upload_batch_id,
+    )
 
     # @testable false
     # @covered-by lagniappe/core/tools/ai/external_api.py::finalize_uploads
     # @reason callback binds report ownership inside the public finalizer
     def create_file(*, upload, data):
-        return Entities.FILE.create(upload=upload, data=data, report_user=user)
+        record = getattr(upload, "record", None)
+        if not isinstance(record, dict):
+            raise exceptions.ValidationError("The upload manifest identity is invalid.")
+        file_key = database_get.datastore_key(record.get("file_key"))
+        expected_key = agent_api_store.upload_file_key(
+            report.key,
+            record.get("upload_batch_id"),
+            record.get("file_index"),
+        )
+        if file_key != expected_key:
+            raise exceptions.ValidationError("The upload manifest identity is invalid.")
+        if asset_nonce is not None:
+            upload.lagniappe_asset_nonce = asset_nonce
+        file = Entities.FILE.create(
+            upload=upload,
+            data=data,
+            key=expected_key,
+            report_user=user,
+        )
+        file._agent_upload_asset_nonce = asset_nonce
+        return file
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/ai/external_api.py::finalize_uploads
+    # @reason failure cleanup is exercised through the public external finalizer
+    def cleanup_failed_file(
+        *,
+        file,
+        upload,
+        error,
+        checkpoint_disposition,
+    ):
+        if (
+            asset_nonce is None
+            or checkpoint_disposition != CHECKPOINT_NOT_COMMITTED
+        ):
+            return
+        destination = getattr(upload, "lagniappe_saved_destination", None) or {}
+        if not destination and file is not None:
+            destination = (getattr(file, "assets", None) or {}).get("file") or {}
+        path = destination.get("path")
+        generation = destination.get("generation")
+        if not path or generation is None:
+            return
+        try:
+            storage_assets.delete_file_generation(
+                path,
+                destination.get("visibility", "private"),
+                generation,
+            )
+        except Exception as cleanup_error:
+            exceptions.capture(
+                cleanup_error,
+                context={
+                    "agent_api": {
+                        "phase": "discard_uncommitted_upload",
+                        "report_key": getattr(report, "urlsafe_key", None),
+                    }
+                },
+            )
 
     return finalize_report_upload_manifest(
         report,
         user,
         file_factory=create_file,
+        failed_file_cleanup=cleanup_failed_file,
+        ensure_active=ensure_active,
+        save=save,
     )
 
 
@@ -1143,6 +1282,8 @@ __all__ = [
     "MAX_PLAN_TOOL_CALLS",
     "MAX_TOTAL_FILE_BYTES",
     "SUPPORTED_PLAN_TOOLS",
+    "UPLOAD_BATCH_ID_PATTERN",
+    "bind_upload_file_identities",
     "client_skill_markdown",
     "create_plan",
     "finalize_uploads",

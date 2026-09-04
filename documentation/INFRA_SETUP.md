@@ -152,8 +152,11 @@ Developer onboarding is two-stage:
 ./setup.sh development
 ```
 
-The second command is additive and idempotent. See
-[INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md).
+The second command is additive and idempotent. It also provisions the
+repository-pinned, digest-verified `uv` executable used only for the standalone
+MCP package build/test environment; ordinary owner setup and deployment do not
+install MCP dependencies. Unsupported host tuples fail closed with WSL guidance
+for Windows. See [INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md).
 
 ## Operator output
 

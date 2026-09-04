@@ -58,10 +58,24 @@ Then:
 venv/bin/python run.py hosted-e2e setup --github-repository OWNER/REPOSITORY
 ```
 
-The idempotent command creates the dedicated runtime and invoker accounts,
-Artifact Registry repository, result bucket, settings/CA Secret Manager mounts,
-WIF pool/provider, scoped IAM, and App Engine anchor. Non-secret identifiers are
-written to `reports/hosted-e2e/setup.json`.
+The idempotent command creates the dedicated application runtime, MCP-package
+runtime, and invoker accounts, Artifact Registry repository, result bucket,
+settings/CA Secret Manager mounts, WIF pool/provider, scoped IAM, and App Engine
+anchor. The package runtime receives no application project roles, test-bucket
+roles, or Secret Manager access: its only data permission is
+`roles/storage.objectCreator` on the result bucket. The deployer may attach that
+identity to the job, and the Cloud Run service agent may mint its runtime token.
+Setup removes stale direct project, test-bucket, artifact-bucket, and secret
+grants from that dedicated identity; conditional grants fail closed for operator
+review instead of being guessed or retained. It reconciles the service-account
+policy in the same way and reads every relevant policy back before recording
+success. Repository-driven package-job create/update and execution repeat that
+read-only exact IAM assertion. The release workflow's narrower WIF identity
+verifies the configured package-job service-account name before its direct
+execution; it cannot read project-wide IAM policies. `hosted-e2e status
+--environment mcp-package` reports
+`identity_valid` and any `identity_error` so drift is visible before execution.
+Non-secret identifiers are written to `reports/hosted-e2e/setup.json`.
 
 The setup record includes a fingerprint of the stable API, IAM-role, bucket,
 and anchor requirements. `create` refuses a stale record and tells the operator
@@ -123,6 +137,58 @@ session. Direct fixtures execute from Cloud Run; browser requests target the
 exact App Engine version. The runner image includes Git and POSIX process
 inspection tools because repository and test-session contracts run in that
 same container. Local execution follows status and imports results by default.
+
+## MCP packaging environment
+
+The clean-home packaging test has a separate, closed lifecycle and identity:
+
+```bash
+venv/bin/python run.py hosted-e2e create --environment mcp-package
+venv/bin/python run.py hosted-e2e status --environment mcp-package
+venv/bin/python run.py hosted-e2e execute --environment mcp-package \
+  --target testing/tests_e2e/013_agent_api/test_013c_mcp_package_install.py
+venv/bin/python run.py hosted-e2e teardown --environment mcp-package
+```
+
+Its dedicated Dockerfile and Cloud Build configuration pin the Python base,
+uv, pipx, and Codex artifacts and checksums. Its explicit build-context ignore
+file re-includes the standalone `/clients/lagniappe_mcp/` source and lock even
+though the root App Engine `.gcloudignore` excludes `/clients/`; local package
+environments and caches remain excluded. The ordinary hosted image separately
+prebuilds the same exact locked, noneditable adapter environment but does not
+carry uv or pipx into its final stage.
+
+The standard lifecycle remains `lagniappe-e2e`,
+`reports/hosted-e2e/state.json`, the `runner` image repository, and
+`reports/hosted-e2e/results/`. The package lifecycle uses
+`lagniappe-mcp-package`, `reports/hosted-e2e/mcp-package-state.json`, the
+`mcp-package-runner` image repository, and
+`reports/hosted-e2e/mcp-package-results/`. Execution names inherit those
+different job prefixes. Status, result lookup, and teardown validate the
+selected identity before reading or deleting anything; there is no environment
+alias or fallback.
+
+Only the public candidate URL, build marker, and advertised wheel metadata enter
+the packaging job. The installed adapter and real pinned Codex client run from
+fresh per-run homes outside the checkout. A loopback fake API supplies only a
+synthetic key for configure/check/client lifecycle coverage; authenticated live
+API behavior remains owned by `test_013b_agent_api_mcp.py`.
+
+That clean-home check launches the installed adapter five times through the
+official SDK and requires each complete cold `tools/list` catalog within 1.0
+second. This deterministic local/process gate protects Codex's unchanged
+optional-server grace; the deployed-network and exact target-client timing is
+recorded separately before the paired trial.
+
+The release workflow can execute this one exact target only after the existing
+source-quality and traceability job succeeds. It checks the candidate commit,
+application build marker, public manifest, release ledger, wheel, dependency
+graph, package lock, packaging-image contract, immutable image digest, tool
+versions, and Linux x86_64/CPython 3.14 platform again before accepting the
+result manifest. Package-job output is an attestation gate, not replacement
+test evidence: it is never merged or committed. Manual hosted runs are
+diagnostic and likewise never merge, commit, or publish test evidence or the
+required release status.
 
 ## Status and teardown
 

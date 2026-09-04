@@ -164,6 +164,7 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
         urlsafe_key = "report-key"
 
         def __init__(self):
+            self.origin = "web"
             self.status = "ready"
             self.pending = False
             self.error = None
@@ -250,6 +251,175 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
 
     assert report.deferred_job is None
     assert saved
+
+
+# @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution
+def test_external_report_execution_start_rejects_stale_browser_snapshot(monkeypatch):
+    adapter = report_adapters.ReportExecutionAdapter()
+
+    class FakeProcess:
+        def __init__(self, report):
+            self.report = report
+
+        def begin_execution(self):
+            self.report.status = "running"
+            self.report.pending = True
+
+    class FakeReport:
+        origin = "api"
+        urlsafe_key = "external-report-key"
+
+        def __init__(self):
+            self.db = {
+                "origin": "api",
+                "proposal": "stale-browser-proposal",
+                "status": "ready",
+            }
+            self.status = "ready"
+            self.pending = False
+            self.deferred_job = None
+            self.properties = SimpleNamespace(process=FakeProcess(self))
+
+    report = FakeReport()
+    actor = SimpleNamespace()
+    context = DeferredJobContext(
+        job=SimpleNamespace(
+            urlsafe_key="external-execution-job",
+            idempotency_key="external-execution-operation",
+            status_revision=3,
+        ),
+        actor=actor,
+        notification=None,
+        inputs={"report": report},
+        parameters={},
+        checkpoint={},
+    )
+    guarded_calls = []
+
+    def reject_stale(current, expected_report):
+        guarded_calls.append((current, expected_report))
+        return report_adapters.agent_api_store.PLAN_OPERATION_STALE
+
+    monkeypatch.setattr(
+        report_adapters.external_operations,
+        "save_plan_if_idle",
+        reject_stale,
+    )
+    monkeypatch.setattr(
+        report_adapters.Entities,
+        "save",
+        lambda *_args: pytest.fail(
+            "A stale API-origin execution start used an ordinary report save"
+        ),
+    )
+
+    with pytest.raises(
+        report_adapters.exceptions.ValidationError,
+        match="plan changed while execution was starting",
+    ):
+        adapter.started(context)
+
+    assert guarded_calls == [
+        (
+            report,
+            {
+                "origin": "api",
+                "proposal": "stale-browser-proposal",
+                "status": "ready",
+            },
+        )
+    ]
+    assert report.db["proposal"] == "stale-browser-proposal"
+    assert report.status == "running"
+    assert report.deferred_job == {
+        "key": "external-execution-job",
+        "idempotency_key": "external-execution-operation",
+        "previous_status": "ready",
+        "revision": 3,
+    }
+
+
+# @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution terminal-delivery
+def test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal(
+    monkeypatch,
+):
+    adapter = report_adapters.ReportExecutionAdapter()
+
+    class FakeReport:
+        origin = "api"
+        urlsafe_key = "external-report-key"
+
+        def __init__(self):
+            self.db = {
+                "origin": "api",
+                "proposal": "reviewed-proposal",
+                "process": "active-execution",
+            }
+            self.proposal = "reviewed-proposal"
+            self.deferred_job = {"key": "external-execution-job"}
+
+    first_delivery = FakeReport()
+    duplicate_delivery = FakeReport()
+    actor = SimpleNamespace()
+    context = DeferredJobContext(
+        job=SimpleNamespace(urlsafe_key="external-execution-job"),
+        actor=actor,
+        notification=None,
+        inputs={"report": first_delivery},
+        parameters={},
+        checkpoint={},
+    )
+    fetched = iter((first_delivery, duplicate_delivery))
+    authoritative = dict(first_delivery.db)
+    guarded_calls = []
+
+    def save_if_idle(current, expected_report):
+        guarded_calls.append((current, expected_report))
+        if expected_report != authoritative:
+            return report_adapters.agent_api_store.PLAN_OPERATION_STALE
+        authoritative["process"] = "execution-cleaned-up"
+        return report_adapters.agent_api_store.PLAN_OPERATION_COMMITTED
+
+    monkeypatch.setattr(report_adapters.Entities, "REPORT", FakeReport)
+    monkeypatch.setattr(
+        report_adapters.Entities,
+        "fetch_one",
+        lambda *_args, **_kwargs: next(fetched),
+    )
+    monkeypatch.setattr(
+        report_adapters.Entities,
+        "save",
+        lambda *_args: pytest.fail(
+            "API-origin execution cleanup used an ordinary report save"
+        ),
+    )
+    monkeypatch.setattr(
+        report_adapters.external_operations,
+        "save_plan_if_idle",
+        save_if_idle,
+    )
+
+    adapter.cleanup(context, terminal=True)
+    authoritative["proposal"] = "replacement-api-proposal"
+    adapter.cleanup(context, terminal=True)
+
+    assert [call[0] for call in guarded_calls] == [
+        first_delivery,
+        duplicate_delivery,
+    ]
+    assert all(
+        call[1]
+        == {
+            "origin": "api",
+            "proposal": "reviewed-proposal",
+            "process": "active-execution",
+        }
+        for call in guarded_calls
+    )
+    assert first_delivery.deferred_job is None
+    assert duplicate_delivery.deferred_job is None
+    assert authoritative["proposal"] == "replacement-api-proposal"
+    assert authoritative["process"] == "execution-cleaned-up"
 
 
 # @pairs ai-report:recovery deferred-jobs:report-execution

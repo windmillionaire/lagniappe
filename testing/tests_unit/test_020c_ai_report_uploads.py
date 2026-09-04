@@ -157,7 +157,7 @@ def test_finalize_report_upload_manifest_resumes_and_checkpoints(monkeypatch):
         save=save_entities,
         upload_loader=load_upload,
         file_factory=create_file,
-        upload_cleanup=lambda record: cleaned.append(record["filename"]),
+        upload_cleanup=lambda record: cleaned.append(record["filename"]) or True,
         ensure_active=lambda: active_checks.append(True),
     )
 
@@ -169,9 +169,11 @@ def test_finalize_report_upload_manifest_resumes_and_checkpoints(monkeypatch):
         "second.pdf",
     ]
     assert saved[0]["summary"] == "Preparing files (2 of 2)..."
+    assert saved[0]["entities"] == (finalized[0], report)
     assert saved[0]["manifest"][1]["complete"] is True
     assert saved[0]["manifest"][1]["file_key"] == finalized[0].urlsafe_key
     assert saved[-1]["manifest"] is None
+    assert saved[-1]["entities"] == (report,)
     assert report.upload_manifest is None
     assert report.summary is None
     assert len(active_checks) == 4
@@ -224,6 +226,7 @@ def test_finalize_report_upload_manifest_retains_source_until_checkpoint(monkeyp
         nonlocal source_available
         events.append("delete-source")
         source_available = False
+        return True
 
     with pytest.raises(RuntimeError, match="interrupted before checkpoint"):
         report_uploads.finalize_report_upload_manifest(
@@ -268,6 +271,129 @@ def test_finalize_report_upload_manifest_retains_source_until_checkpoint(monkeyp
     assert report.upload_manifest is None
 
 
+# @matrix ai-report direct-upload : checkpoint-failure generation-cleanup lease-renewal
+# @source lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
+@pytest.mark.unit
+def test_finalize_report_upload_manifest_cleans_copied_file_after_definite_lease_loss():
+    user = SimpleNamespace()
+    report = SimpleNamespace(
+        upload_manifest=[{"token": "signed", "filename": "lost.pdf"}],
+        input_files=[],
+        summary=None,
+    )
+    upload = SimpleNamespace(
+        filename="lost.pdf",
+        content_type="application/pdf",
+        size=1024,
+    )
+    file = SimpleNamespace(filename="lost.pdf", urlsafe_key="lost-file")
+    active_checks = 0
+    events = []
+
+    def ensure_active():
+        nonlocal active_checks
+        active_checks += 1
+        if active_checks == 2:
+            raise RuntimeError("lease was replaced")
+
+    with pytest.raises(RuntimeError, match="lease was replaced"):
+        report_uploads.finalize_report_upload_manifest(
+            report,
+            user,
+            save=lambda *_entities: pytest.fail("checkpoint must not run"),
+            upload_loader=lambda _record: upload,
+            file_factory=lambda **_kwargs: file,
+            upload_cleanup=lambda _record: events.append("delete-source") or True,
+            failed_file_cleanup=lambda **failure: events.append(failure),
+            ensure_active=ensure_active,
+        )
+
+    assert len(events) == 1
+    assert events[0]["file"] is file
+    assert events[0]["upload"] is upload
+    assert str(events[0]["error"]) == "lease was replaced"
+    assert events[0]["checkpoint_disposition"] == (
+        report_uploads.CHECKPOINT_NOT_COMMITTED
+    )
+
+
+# @matrix ai-report direct-upload : factory-failure generation-cleanup
+# @source lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
+@pytest.mark.unit
+def test_finalize_report_upload_manifest_owns_cleanup_when_file_factory_fails():
+    report = SimpleNamespace(
+        upload_manifest=[{"token": "signed", "filename": "factory.pdf"}],
+        input_files=[],
+        summary=None,
+    )
+    upload = SimpleNamespace(
+        filename="factory.pdf",
+        content_type="application/pdf",
+        size=1024,
+        lagniappe_saved_destination={
+            "path": "factory_attempt.pdf",
+            "visibility": "private",
+            "generation": "19",
+        },
+    )
+    failures = []
+
+    with pytest.raises(RuntimeError, match="factory failed after copy"):
+        report_uploads.finalize_report_upload_manifest(
+            report,
+            SimpleNamespace(),
+            save=lambda *_entities: pytest.fail("checkpoint must not run"),
+            upload_loader=lambda _record: upload,
+            file_factory=lambda **_kwargs: (_ for _ in ()).throw(
+                RuntimeError("factory failed after copy")
+            ),
+            upload_cleanup=lambda _record: pytest.fail(
+                "temporary source must remain"
+            ),
+            failed_file_cleanup=lambda **failure: failures.append(failure),
+        )
+
+    assert len(failures) == 1
+    assert failures[0]["file"] is None
+    assert failures[0]["upload"] is upload
+    assert failures[0]["checkpoint_disposition"] == (
+        report_uploads.CHECKPOINT_NOT_COMMITTED
+    )
+
+
+# @matrix ai-report direct-upload : cleanup partial-progress retry
+# @source lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
+@pytest.mark.unit
+def test_finalize_report_upload_manifest_retains_checkpoint_when_source_cleanup_fails():
+    report = SimpleNamespace(
+        upload_manifest=[{"token": "signed", "filename": "cleanup.pdf"}],
+        input_files=[],
+        summary=None,
+    )
+    upload = SimpleNamespace(
+        filename="cleanup.pdf",
+        content_type="application/pdf",
+        size=1024,
+    )
+    file = SimpleNamespace(filename="cleanup.pdf", urlsafe_key="cleanup-file")
+    saved = []
+
+    with pytest.raises(exceptions.ValidationError, match="Retry finalization"):
+        report_uploads.finalize_report_upload_manifest(
+            report,
+            SimpleNamespace(),
+            save=lambda *_entities: saved.append(copy.deepcopy(report.upload_manifest)),
+            upload_loader=lambda _record: upload,
+            file_factory=lambda **_kwargs: file,
+            upload_cleanup=lambda _record: False,
+        )
+
+    assert len(saved) == 1
+    assert saved[0][0]["complete"] is True
+    assert saved[0][0]["file_key"] == "cleanup-file"
+    assert report.upload_manifest[0]["complete"] is True
+
+
 
 
 # @matrix ai-report direct-upload : large-file
@@ -295,7 +421,7 @@ def test_finalize_report_upload_manifest_accepts_actual_oversized_object():
         save=lambda *entities: saves.append(entities),
         upload_loader=lambda _record: upload,
         file_factory=lambda **_kwargs: file,
-        upload_cleanup=lambda record: cleaned.append(record),
+        upload_cleanup=lambda record: cleaned.append(record) or True,
     )
 
     assert finalized == [file]
@@ -336,7 +462,7 @@ def test_finalize_report_upload_manifest_marks_default_files_as_report_only(monk
         user,
         save=lambda *_entities: None,
         upload_loader=lambda _record: upload,
-        upload_cleanup=lambda _record: None,
+        upload_cleanup=lambda _record: True,
     )
 
     assert finalized == report.input_files
@@ -347,7 +473,7 @@ def test_finalize_report_upload_manifest_marks_default_files_as_report_only(monk
 
 # @matrix ai-report direct-upload : cleanup partial-progress upload-manifest
 @pytest.mark.unit
-def test_cleanup_report_upload_manifest_deletes_only_pending_uploads(monkeypatch):
+def test_cleanup_report_upload_manifest_deletes_all_temporary_sources(monkeypatch):
     _patch_fake_keys(monkeypatch)
     user = _test_user("upload-cleanup-owner")
     report = AIReport.create(
@@ -368,5 +494,5 @@ def test_cleanup_report_upload_manifest_deletes_only_pending_uploads(monkeypatch
         delete_upload=lambda record: deleted.append(record["filename"]) or True,
     )
 
-    assert count == 1
-    assert deleted == ["pending.pdf"]
+    assert count == 2
+    assert deleted == ["complete.pdf", "pending.pdf"]

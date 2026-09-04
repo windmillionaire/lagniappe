@@ -1,6 +1,7 @@
 """Stable delivery identities and application links."""
 
 from hashlib import sha256
+import os
 from urllib.parse import urlsplit, urlunsplit
 
 from lagniappe import CONFIG
@@ -16,15 +17,23 @@ def identity(*parts):
     return sha256("\0".join(str(part) for part in parts).encode()).hexdigest()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason configured origin resolution is exercised through task dispatch and rendering
+# @testable true
+# @tests tests_unit/test_029b_notification_email_events.py::test_managed_local_test_origin_ignores_request_host_headers
+# @matrix agent-api testing web-headers : origin-validation
 def origin():
-    configured = (
-        str(getattr(CONFIG, "GOOGLE_LOGIN_URI", "") or "").strip()
-        or str(getattr(CONFIG, "APP_URL", "") or "").strip()
-        or str(getattr(CONFIG, "BASE_URL", "") or "").strip()
-    )
+    managed_test_mode = os.environ.get("LAGNIAPPE_TEST_SESSION_MODE")
+    if (
+        CONFIG.testing
+        and not CONFIG.hosted_e2e
+        and managed_test_mode in {"local-e2e", "managed-server"}
+    ):
+        configured = str(getattr(CONFIG, "BASE_URL", "") or "").strip()
+    else:
+        configured = (
+            str(getattr(CONFIG, "GOOGLE_LOGIN_URI", "") or "").strip()
+            or str(getattr(CONFIG, "APP_URL", "") or "").strip()
+            or str(getattr(CONFIG, "BASE_URL", "") or "").strip()
+        )
     parsed = urlsplit(configured)
     if parsed.scheme and parsed.netloc:
         return urlunsplit((parsed.scheme, parsed.netloc, "", "", "")).rstrip("/")

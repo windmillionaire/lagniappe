@@ -192,6 +192,15 @@ generated settings. Access is controlled by user AI eligibility, per-user
 credential revocation, and ordinary workspace permissions; it does not enable
 or invoke an AI provider.
 
+The MCP setup panel has a separate temporary evaluation-only presentation
+gate. `MCP_EVALUATION_ENABLED` defaults to `false`; enabling it also requires a
+nonempty, case-normalized `MCP_EVALUATION_ACTORS` email list. Setup commands are
+rendered only on exact HTTPS origins derived from `APP_URL`, the hostname-only
+`CUSTOM_DOMAIN`, and optional version-targeted `MCP_EVALUATION_ORIGIN`. Paths,
+queries, fragments, credentials, nonstandard ports, duplicate actors, and an
+enabled gate without any canonical origin fail configuration. This gate does
+not disable the REST API or grant any API/workspace capability.
+
 ## Runtime-safe exports
 
 Runtime code imports only configuration surfaces:

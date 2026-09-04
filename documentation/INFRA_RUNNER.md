@@ -7,9 +7,23 @@ They are excluded from App Engine uploads.
 ## Process and path boundary
 
 `runner/context.py` resolves the repository root, project virtualenv, supported
-platform commands, and exact external executables. Paths do not depend on the
-caller's current directory. `runner/process.py` runs argument-list subprocesses
-and provides the shared error/exit boundary.
+platform commands, and exact external executables. Its `UV_CLI` is derived
+only from the version in `clients/lagniappe_mcp/uv-bootstrap.json` and resolves
+to `venv/tools/uv/<version>/uv`; it never consults `PATH`. Paths do not depend
+on the caller's current directory. `runner/process.py` runs argument-list
+subprocesses and provides the shared error/exit boundary.
+
+`runner/uv_bootstrap.py` is a standard-library-only install/check boundary for
+that executable. Developer and CI provisioning explicitly run:
+
+```bash
+venv/bin/python -m runner.uv_bootstrap install --non-interactive
+venv/bin/python -m runner.uv_bootstrap check
+```
+
+Adapter-dependent commands do not download or repair this tool implicitly. A
+missing, byte-mismatched, or wrong-version managed copy stops with the exact
+`./setup.sh development` repair command.
 
 ## Gcloud and ADC
 
@@ -42,11 +56,79 @@ provider provisioning.
 | `run.py traceability ...` | Source/test/template/style evidence. |
 | `run.py template-contracts ...` | Jinja/selector contracts. |
 | `run.py hosted-e2e ...` | Hosted App Engine/Cloud Run lifecycle. |
+| `run.py mcp ...` | Standalone adapter development shim in its locked environment. |
+| `run.py mcp-artifact build|check` | Immutable adapter release and public deploy artifacts. |
 | `run.py release-check ...` | Frozen release-tree validation. |
 | `run.py version ...` | Coordinated package/settings/release-note version. |
 | `run.py icons` | Material Symbols registry subset refresh. |
 | `run.py upgrade` | Maintainer dependency upgrade. |
 | deployment command | `runner/deploy.py`. |
+
+## Standalone MCP package environment
+
+`runner/mcp_environment.py` is the one-way bridge from repository tooling into
+the standalone package. It verifies the manifest-selected managed `uv`, runs
+the exact locked synchronization command
+
+```bash
+venv/tools/uv/<version>/uv sync --project clients/lagniappe_mcp --locked --group test \
+  --python <current-project-python> --no-managed-python --no-python-downloads --no-config
+```
+
+and invokes only `clients/lagniappe_mcp/.venv/bin/python -I` for adapter code.
+The bridge removes inherited `UV_*` configuration, pins the current project
+interpreter explicitly, disables managed-Python downloads, and ignores ambient
+uv configuration files. Local preparation checks that the environment shares
+that interpreter's base prefix and that Python 3.14, the MCP SDK, pytest, `uv-build`, and
+the editable adapter source resolve from that isolated environment. The hosted check instead
+requires the adapter itself to be installed inside the prebuilt environment,
+so copied images do not depend on an editable source path. Both hosted images
+first install the locked test group without the project, then install the copied
+first-party source offline with build isolation disabled. That second layer can
+therefore use only the exact `uv-build` backend installed from `uv.lock`.
+Adapter pytest runs use
+the shared `testing/pytest.ini` with `--noconftest`, disabled plugin
+autodiscovery, and only the explicit AnyIO plugin, keeping Lagniappe application
+imports and the root virtualenv out of the package suite. The sync also sets
+uv's no-build policy for third-party source distributions while still allowing
+the first-party editable project build. A stale lock, failed sync, unexpected
+interpreter, missing binary dependency, or ambient dependency resolution is a
+hard failure with development-setup repair guidance.
+
+The default and `unit` test selections split MCP coverage into that locked
+environment: both `testing/tests_unit/test_033_mcp_adapter.py` and the
+standalone `clients/lagniappe_mcp/tests/` transport suite run exactly once
+there, while the root pytest process explicitly ignores them. Focused paths or
+nodeids beneath either location take the same bridge. The runner validates and
+merges the isolated outcomes into ordinary traceability evidence and combines
+the two pytest exit statuses without treating an empty companion selection as
+a failure.
+
+`mcp` and `mcp-artifact` are explicit early dispatches: they run before gcloud
+configuration and never import the adapter into the application virtualenv.
+`mcp-artifact build` first synchronizes the exact locked test/build group
+without installing the project, then invokes the locked `uv-build` backend
+offline with build isolation disabled. It produces the wheel twice with a fixed source epoch,
+requires identical bytes, prevents an existing version from being rebound to a
+new digest, and promotes the wheel into the ordinary-Git release ledger. It
+then creates the separate public deploy tree after the production frontend
+build. `mcp-artifact check` independently verifies wheel metadata and RECORD,
+the exact dependency-wheel graph, compatibility/source digests, supported
+release set, byte and file ceilings, frontend-build freshness, and release
+inputs that are tracked, clean, and already committed rather than merely
+staged. The current wheel must exactly match every current package-source byte;
+retained historical wheels instead keep their immutable ledger digest and
+closed wheel structure, because an intentional new version necessarily changes
+the current source tree. The OpenAPI compatibility digest hashes a canonical,
+origin-neutral serialization of the frozen OpenAPI document, rather than the
+Python source bytes that construct it, so comments and formatting do not alter
+compatibility while any schema change does.
+
+`release-check` validates MCP inputs from the exact prospective Git index. Once
+the standalone package exists in a release candidate, a missing, stale,
+corrupt, rebound, or untracked wheel/ledger input fails the release even when a
+different working-tree copy would validate. Candidates from before the MCP
+package was introduced remain valid without fabricating release inputs.
 
 Testing commands and server concurrency rules are in [TESTING.md](TESTING.md).
 Hosted infrastructure is in [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md).
@@ -91,7 +173,9 @@ read-only and `--recover` is the fail-closed stale-owner path.
 configuration. It validates the production frontend against its declared
 sources and complete artifact inventory, preserving a current bundle and
 running `npm run build` only when that validation reports stale or incomplete
-output. Installation and configuration changes should still use
+output. After that final frontend operation it assembles and validates the MCP
+deploy tree from durable release inputs; publish-only mode validates the
+already-built tree and never invokes the managed uv bootstrap. Installation and configuration changes should still use
 `setup.sh update`; installer deployment consumes a validated prebuilt bundle
 and does not require Node.js or npm.
 

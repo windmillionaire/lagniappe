@@ -1,6 +1,6 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "bd92b33b"
+BUILD_ID = "bff5c845"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -40,6 +40,9 @@ DEFAULT_AGENT_ACCESS_ENABLED = False
 DEFAULT_AGENT_ACCESS_EMAIL = "agent@localhost"
 DEFAULT_AGENT_ACCESS_NAME = "Agent"
 DEFAULT_AGENT_ACCESS_TEST_CODE = "agent-test-code"
+DEFAULT_MCP_EVALUATION_ENABLED = False
+DEFAULT_MCP_EVALUATION_ACTORS = ()
+DEFAULT_MCP_EVALUATION_ORIGIN = ""
 
 DEFAULT_DEPLOYMENT_SETTINGS = {
     "DEPLOY_SCALING_TYPE": "basic",
@@ -691,6 +694,19 @@ APP_ROOT_ROUTE_PREFIXES = (
 )
 
 
+MCP_MANIFEST_URL = "/mcp/manifest.json"
+MCP_MANIFEST_HANDLER_PATTERN = r"/mcp/manifest\.json$"
+MCP_RELEASE_URL_PATTERN = (
+    "/mcp/releases/([0-9]+(?:\\.[0-9]+){2})/([0-9a-f]{64})/"
+    "(lagniappe_mcp-[0-9]+(?:\\.[0-9]+){2}-py3-none-any\\.whl)$"
+)
+MCP_RELEASE_UPLOAD_PATTERN = (
+    "lagniappe/web/static/mcp/releases/"
+    "[0-9]+(?:\\.[0-9]+){2}/[0-9a-f]{64}/"
+    "lagniappe_mcp-[0-9]+(?:\\.[0-9]+){2}-py3-none-any\\.whl"
+)
+
+
 APP_HANDLERS = [
     {
         "url": "/(.*\\.css)$",
@@ -775,6 +791,30 @@ APP_HANDLERS = [
         "static_files": "lagniappe/web/static/manifest.json",
         "upload": "lagniappe/web/static/manifest.json",
         "mime_type": "application/manifest+json",
+    },
+    {
+        "url": MCP_MANIFEST_HANDLER_PATTERN,
+        "secure": "always",
+        "static_files": "lagniappe/web/static/mcp/manifest.json",
+        "upload": "lagniappe/web/static/mcp/manifest.json",
+        "mime_type": "application/json; charset=utf-8",
+        "expiration": "0s",
+        "http_headers": {
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Lagniappe-Build-ID": BUILD_ID,
+        },
+    },
+    {
+        "url": MCP_RELEASE_URL_PATTERN,
+        "secure": "always",
+        "static_files": "lagniappe/web/static/mcp/releases/\\1/\\2/\\3",
+        "upload": MCP_RELEASE_UPLOAD_PATTERN,
+        "mime_type": "application/octet-stream",
+        "http_headers": {
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
     },
 ]
 

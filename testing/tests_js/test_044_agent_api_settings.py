@@ -3,6 +3,7 @@
 
 # @matrix agent-api : expiry poll-reconcile revoke rotate shown-once status
 # @matrix user-settings : poll-reconcile status
+# @pair mcp-package:setup-panel
 def test_agent_api_key_controls_keep_secret_ephemeral(run_node):
     run_node(
         r'''
@@ -124,10 +125,11 @@ widget._confirmApiKeyAction = async (_section, _trigger, options) => {
   widget._initPageSelect = () => initialized.push("page-select");
   widget._initRemovePage = () => initialized.push("remove-page");
   widget._initApiKey = () => initialized.push("api-key");
+  widget._initMcpSetup = () => initialized.push("mcp-setup");
   widget.setEntityMetadata = () => initialized.push("metadata");
   widget.postreconcile();
   if (initialized.join(",") !==
-      "commit,groups,page-select,remove-page,api-key,metadata" ||
+      "commit,groups,page-select,remove-page,api-key,mcp-setup,metadata" ||
       widget._updated !== false || widget.target.dataset.visible !== "true") {
     throw new Error("Polling replacement did not reinitialize API key status");
   }

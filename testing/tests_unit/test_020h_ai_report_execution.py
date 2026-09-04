@@ -505,6 +505,75 @@ def test_undo_report_compensates_completed_prefix_of_failed_report(monkeypatch):
         report_undo.undo_report(report, user)
 
 
+# @matrix agent-api ai-report : browser-review cas compensation delete undo
+@pytest.mark.unit
+def test_undo_report_stops_before_compensation_when_initial_save_is_rejected(
+    monkeypatch,
+):
+    report = SimpleNamespace(
+        status="complete",
+        pending=False,
+        error=None,
+        result={
+            "ledger_version": report_ledger.REPORT_LEDGER_VERSION,
+            "status": "complete",
+            "actions": [
+                {
+                    "id": "deleted-report-action",
+                    "type": "skip",
+                    "status": "complete",
+                }
+            ],
+        },
+    )
+
+    class Process:
+        def begin_undo(self, result):
+            report.status = "undoing"
+            report.pending = True
+            report.error = None
+            report.result = result
+
+    report.properties = SimpleNamespace(process=Process())
+    compensation_calls = []
+    monkeypatch.setitem(
+        REPORT_ACTION_ADAPTERS,
+        "skip",
+        SimpleNamespace(
+            compensate=lambda *_args: compensation_calls.append(_args),
+        ),
+    )
+    monkeypatch.setattr(
+        report_undo.Entities,
+        "save",
+        lambda *_args: pytest.fail(
+            "A rejected guarded undo fell back to an ordinary report upsert"
+        ),
+    )
+    save_calls = []
+
+    def reject_deleted_report(current):
+        save_calls.append(current)
+        raise exceptions.ValidationError(
+            "This plan changed while undo was in progress."
+        )
+
+    with pytest.raises(
+        exceptions.ValidationError,
+        match="plan changed while undo was in progress",
+    ):
+        report_undo.undo_report(
+            report,
+            SimpleNamespace(),
+            save=reject_deleted_report,
+        )
+
+    assert save_calls == [report]
+    assert compensation_calls == []
+    assert report.status == "undoing"
+    assert report.result["undo"]["actions"][0]["status"] == "pending"
+
+
 
 
 # @matrix ai-report : compensation completed-task deterministic-run recovery reuse

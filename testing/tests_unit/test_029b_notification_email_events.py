@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+from flask import Flask, request
 from google.cloud.datastore import Entity as DatastoreEntity
 import pytest
 
@@ -21,6 +22,43 @@ from testing.utility.notification_email_fakes import (
 
 
 pytestmark = pytest.mark.unit
+
+
+# @matrix agent-api testing web-headers : origin-validation
+def test_managed_local_test_origin_ignores_request_host_headers(monkeypatch):
+    configuration = SimpleNamespace(
+        testing=True,
+        hosted_e2e=False,
+        BASE_URL="http://127.0.0.1:8081",
+        APP_URL="https://app.example.test",
+        GOOGLE_LOGIN_URI="https://app.example.test/users/login",
+    )
+    monkeypatch.setattr(email_links, "CONFIG", configuration)
+    monkeypatch.setenv("LAGNIAPPE_TEST_SESSION_MODE", "local-e2e")
+    app = Flask(__name__)
+
+    with app.test_request_context(
+        "/",
+        headers={
+            "Host": "credential-thief.invalid",
+            "X-Forwarded-Host": "forwarded-thief.invalid",
+        },
+    ):
+        assert request.host == "credential-thief.invalid"
+        assert request.headers["X-Forwarded-Host"] == "forwarded-thief.invalid"
+        assert email_links.origin() == "http://127.0.0.1:8081"
+        assert email_links.absolute_url("/api/v1/plans") == (
+            "http://127.0.0.1:8081/api/v1/plans"
+        )
+
+    configuration.hosted_e2e = True
+    assert email_links.origin() == "https://app.example.test"
+    configuration.hosted_e2e = False
+    monkeypatch.delenv("LAGNIAPPE_TEST_SESSION_MODE")
+    assert email_links.origin() == "https://app.example.test"
+    monkeypatch.setenv("LAGNIAPPE_TEST_SESSION_MODE", "local-e2e")
+    configuration.testing = False
+    assert email_links.origin() == "https://app.example.test"
 
 
 # @matrix notification-email : html idempotency immediate notification pending-filter presence-suppression

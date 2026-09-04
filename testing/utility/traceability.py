@@ -1031,16 +1031,67 @@ def should_ignore_symbol(
 
 def normalized_test_root(root: object) -> str:
     text = str(root).strip().strip("/")
+    if text.startswith("repo:"):
+        return text.removeprefix("repo:").strip("/")
     if text.startswith("testing/"):
         return text.removeprefix("testing/")
     return text
 
 
+def _repository_test_root(root: object) -> str | None:
+    text = str(root).strip()
+    if not text.startswith("repo:"):
+        return None
+    relative = text.removeprefix("repo:").strip().strip("/").replace("\\", "/")
+    parts = Path(relative).parts
+    if (
+        not relative
+        or Path(relative).is_absolute()
+        or ".." in parts
+        or len(parts) < 3
+        or parts[0] != "clients"
+        or "tests" not in parts[2:]
+    ):
+        raise ValueError(
+            "repo: test roots must stay within a clients/.../tests directory"
+        )
+    return relative
+
+
+def _test_source_path(repo_root: Path, test_path: str) -> Path:
+    relative = test_path.replace("\\", "/").strip("/")
+    parts = Path(relative).parts
+    if Path(relative).is_absolute() or ".." in parts:
+        raise ValueError("test paths must stay within the repository")
+    if parts and parts[0] == "clients":
+        return repo_root / relative
+    if parts and parts[0] == "testing":
+        return repo_root / relative
+    return repo_root / "testing" / relative
+
+
+def _canonical_test_path(repo_root: Path, path: Path) -> str:
+    resolved = path.resolve()
+    testing_root = (repo_root / "testing").resolve()
+    repository_root = repo_root.resolve()
+    if resolved.is_relative_to(testing_root):
+        return relpath(resolved, testing_root)
+    if resolved.is_relative_to(repository_root):
+        return relpath(resolved, repository_root)
+    raise ValueError("test paths must stay within the repository")
+
+
 def pytest_collect_root_args(roots: Iterable[object]) -> list[str]:
-    normalized_roots = [
-        root for root in (normalized_test_root(r) for r in roots) if root
-    ]
-    return [f"testing/{root}" for root in normalized_roots]
+    arguments = []
+    for root in roots:
+        repository_root = _repository_test_root(root)
+        if repository_root is not None:
+            arguments.append(repository_root)
+            continue
+        normalized = normalized_test_root(root)
+        if normalized:
+            arguments.append(f"testing/{normalized}")
+    return arguments
 
 
 def collect_pytest_nodeids(
@@ -1095,7 +1146,7 @@ def base_nodeid(nodeid: str) -> str:
 
 
 def test_path_from_nodeid(nodeid: str, repo_root: Path) -> Path:
-    return repo_root / "testing" / nodeid.split("::", 1)[0]
+    return _test_source_path(repo_root, nodeid.split("::", 1)[0])
 
 
 def collect_python_test_symbol_info(path: Path) -> dict[str, TestSymbolInfo]:
@@ -1149,7 +1200,7 @@ def collect_test_symbol_info(
             info_by_nodeid[nodeid] = TestSymbolInfo(Metadata(), 0)
             continue
 
-        path = repo_root / "testing" / path_part
+        path = _test_source_path(repo_root, path_part)
         if path not in by_path:
             by_path[path] = collect_python_test_symbol_info(path)
 
@@ -1173,10 +1224,23 @@ def test_files_in_roots(repo_root: Path, roots: Iterable[object]) -> list[Path]:
     files: set[Path] = set()
     testing_root = repo_root / "testing"
     for value in roots:
-        relative = normalized_test_root(value)
+        repository_relative = _repository_test_root(value)
+        relative = repository_relative or normalized_test_root(value)
         if not relative:
             continue
-        root = testing_root / relative
+        root = (
+            repo_root / relative
+            if repository_relative is not None
+            else testing_root / relative
+        )
+        resolved_root = root.resolve(strict=False)
+        expected_parent = (
+            repo_root.resolve()
+            if repository_relative is not None
+            else testing_root.resolve()
+        )
+        if not resolved_root.is_relative_to(expected_parent):
+            raise ValueError("test roots must stay within their configured boundary")
         if root.is_file() and root.name.startswith("test_") and root.suffix == ".py":
             files.add(root)
         elif root.is_dir():
@@ -1187,9 +1251,8 @@ def test_files_in_roots(repo_root: Path, roots: Iterable[object]) -> list[Path]:
 def discover_tests(repo_root: Path, roots: Iterable[object] = ()) -> dict[str, TestCase]:
     """Discover test functions statically without importing application modules."""
     tests: dict[str, TestCase] = {}
-    testing_root = repo_root / "testing"
     for path in test_files_in_roots(repo_root, roots):
-        test_path = relpath(path, testing_root)
+        test_path = _canonical_test_path(repo_root, path)
         for qualname, info in collect_python_test_symbol_info(path).items():
             nodeid = f"{test_path}::{qualname}"
             tests[nodeid] = TestCase(
@@ -1213,9 +1276,8 @@ def changed_tests_for_paths(
 ) -> list[TestCase]:
     """Select tests in changed files, narrowed to edited symbol ranges when known."""
     changed_test_paths = {
-        path.removeprefix("testing/")
+        path.removeprefix("testing/") if path.startswith("testing/") else path
         for path in changed_paths
-        if path.startswith("testing/")
     }
     candidates = [test for test in tests.values() if test.path in changed_test_paths]
     if changed_line_ranges is None:
@@ -1223,7 +1285,12 @@ def changed_tests_for_paths(
 
     focused = []
     for test in candidates:
-        ranges = changed_line_ranges.get(f"testing/{test.path}")
+        changed_path = (
+            test.path
+            if test.path.startswith("clients/")
+            else f"testing/{test.path}"
+        )
+        ranges = changed_line_ranges.get(changed_path)
         if ranges is None:
             focused.append(test)
             continue
@@ -1411,12 +1478,10 @@ def collect_tests(
     verify_collection: bool = False,
     results_path: Path | None = None,
 ) -> dict[str, TestCase]:
-    normalized_roots = tuple(
-        root for root in (normalized_test_root(r) for r in roots) if root
-    )
-    tests = discover_tests(repo_root, normalized_roots)
+    configured_roots = tuple(root for root in roots if str(root).strip())
+    tests = discover_tests(repo_root, configured_roots)
     if verify_collection:
-        verify_test_collection(tests, repo_root, normalized_roots)
+        verify_test_collection(tests, repo_root, configured_roots)
     attach_test_results(tests, repo_root, results_path)
     return tests
 
@@ -1468,7 +1533,7 @@ def test_function_source(test: TestCase, repo_root: Path, cache: dict[str, str])
     if not test.path or not test.lineno:
         return ""
 
-    path = repo_root / "testing" / test.path
+    path = _test_source_path(repo_root, test.path)
     cache_key = f"{path}:{test.lineno}"
     if cache_key in cache:
         return cache[cache_key]
@@ -1921,7 +1986,7 @@ def annotation_scope_issues(
 
     allowed_test_roots = list(config["test_roots"])
     configured_test_paths = {
-        relpath(path, repo_root / "testing")
+        _canonical_test_path(repo_root, path)
         for path in test_files_in_roots(repo_root, allowed_test_roots)
     }
     for path in sorted((repo_root / "testing").rglob("test_*.py")):
@@ -2560,7 +2625,7 @@ def focused_test_context_paths(
 
         if not test.path:
             continue
-        test_path = repo_root / "testing" / test.path
+        test_path = _test_source_path(repo_root, test.path)
         if not test_path.exists():
             continue
         try:
@@ -2715,7 +2780,7 @@ def test_mentions_source_path(
     if not test.path:
         return False
 
-    path = repo_root / "testing" / test.path
+    path = _test_source_path(repo_root, test.path)
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:

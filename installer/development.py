@@ -175,6 +175,20 @@ def setup_development():
 
     commands = (
         (
+            "Installing the pinned managed uv executable...",
+            [
+                sys.executable,
+                "-m",
+                "runner.uv_bootstrap",
+                "install",
+                "--non-interactive",
+            ],
+        ),
+        (
+            "Verifying the managed uv executable...",
+            [sys.executable, "-m", "runner.uv_bootstrap", "check"],
+        ),
+        (
             "Installing Python development dependencies...",
             [
                 sys.executable,

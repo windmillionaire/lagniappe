@@ -25,3 +25,11 @@ bundle-stats*.html
 gha-creds-*.json
 **/__pycache__/
 **/*.pyc
+
+# App Engine excludes /clients, but this explicit Cloud Build context owns the
+# prebuilt, locked MCP environment used by the normal hosted E2E image.
+!/clients/
+!/clients/lagniappe_mcp/
+!/clients/lagniappe_mcp/**
+/clients/lagniappe_mcp/.venv/
+/clients/lagniappe_mcp/.uv-cache/

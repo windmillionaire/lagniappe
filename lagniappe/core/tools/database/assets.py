@@ -3,6 +3,7 @@
 import base64
 import datetime
 import io
+import re
 import uuid
 
 from google.api_core import exceptions as google_exceptions
@@ -25,10 +26,27 @@ DIRECT_UPLOAD_TOKEN_MAX_AGE = 60 * 60
 DIRECT_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 DIRECT_UPLOAD_SALT = "lagniappe-direct-upload"
 GENERIC_CONTENT_TYPES = {"", None, "application/octet-stream"}
+DIRECT_UPLOAD_ASSET_NONCE = re.compile(r"^[a-f0-9]{32}$")
 
 
 class DirectUploadError(ValueError):
     """Raised when direct-upload metadata or storage state fails validation."""
+
+
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_direct_upload_attempt_path_is_unique_and_validated
+# @matrix direct-upload storage : attempt-isolation destination-path
+def direct_upload_destination_path(path, upload):
+    """Add an internal attempt nonce without trusting user-controlled paths."""
+    nonce = getattr(upload, "lagniappe_asset_nonce", None)
+    if nonce is None:
+        return path
+    if not isinstance(nonce, str) or not DIRECT_UPLOAD_ASSET_NONCE.fullmatch(nonce):
+        raise DirectUploadError("Direct upload asset attempt identity is invalid")
+    stem, separator, extension = str(path).rpartition(".")
+    if not separator:
+        return f"{path}_{nonce}"
+    return f"{stem}_{nonce}.{extension}"
 
 
 # @testable infrastructure
@@ -52,6 +70,7 @@ class DirectUploadFile:
         self._buffer = None
         self._file_consumer = None
         self.lagniappe_saved_blob = None
+        self.lagniappe_saved_destination = None
 
     @property
     def stream(self):
@@ -215,6 +234,7 @@ def _content_types_match(expected, actual):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_mismatched_size
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_generation_mismatch
+# @tests tests_unit/test_018_database_assets.py::test_verified_direct_upload_pins_generation_for_later_cleanup
 # @matrix storage : direct-upload object validation
 def verify_direct_upload(
     record,
@@ -256,9 +276,18 @@ def verify_direct_upload(
     if not _content_types_match(expected_type, getattr(blob, "content_type", None)):
         raise DirectUploadError("Direct upload content type mismatch")
 
+    observed_generation = getattr(blob, "generation", None)
+    try:
+        observed_generation = int(observed_generation)
+    except (TypeError, ValueError) as error:
+        raise DirectUploadError("Direct upload generation is invalid") from error
     generation = record.get("generation")
-    if generation and str(generation) != str(getattr(blob, "generation", "")):
+    if generation and str(generation) != str(observed_generation):
         raise DirectUploadError("Direct upload generation mismatch")
+    # Bind later cleanup to the exact object revision verified here. The value
+    # is checkpointed with finalized manifests, so an out-of-band replacement
+    # at this private temporary path cannot be deleted by a delayed retry.
+    record["generation"] = str(observed_generation)
 
     upload = DirectUploadFile(record, payload, blob)
     if consumer is not None:
@@ -288,25 +317,95 @@ def copy_direct_upload_file(
     """Copy a verified direct-upload temp object into its permanent asset path."""
     source_bucket = DATA.bucket(upload.visibility)
     destination_bucket = DATA.bucket(visibility)
-    copied = source_bucket.copy_blob(upload.blob, destination_bucket, path)
+    try:
+        source_generation = int(upload.blob.generation)
+    except (AttributeError, TypeError, ValueError) as error:
+        raise DirectUploadError("Direct upload generation is invalid") from error
+    try:
+        copied = source_bucket.copy_blob(
+            upload.blob,
+            destination_bucket,
+            path,
+            source_generation=source_generation,
+            if_source_generation_match=source_generation,
+            if_generation_match=0,
+        )
+    except google_exceptions.PreconditionFailed as error:
+        raise DirectUploadError(
+            "Direct upload source changed or destination already exists"
+        ) from error
+    upload.lagniappe_saved_blob = copied
+    destination_generation = getattr(copied, "generation", None)
+    if destination_generation is not None:
+        upload.lagniappe_saved_destination = {
+            "path": path,
+            "visibility": visibility,
+            "generation": str(destination_generation),
+        }
     if content_type and getattr(copied, "content_type", None) != content_type:
         copied.content_type = content_type
-        copied.patch()
+        patch_options = (
+            {"if_generation_match": int(destination_generation)}
+            if destination_generation is not None
+            else {}
+        )
+        copied.patch(**patch_options)
     if delete_source:
         upload.blob.delete()
-    upload.lagniappe_saved_blob = copied
     return copied
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::verify_direct_upload
-# @reason best-effort temp cleanup is a provider-owned side effect
-def delete_direct_upload(record):
-    """Best-effort delete for an uploaded temp object."""
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_delete_file_generation_never_deletes_a_replacement
+# @matrix storage : attempt-isolation generation-conditional-cleanup
+def delete_file_generation(path, visibility, generation):
+    """Delete only the exact blob generation created by one failed attempt."""
     try:
-        upload = verify_direct_upload(record)
-        upload.blob.delete()
+        expected_generation = int(generation)
+    except (TypeError, ValueError) as error:
+        raise DirectUploadError("Direct upload generation is invalid") from error
+    blob = DATA.bucket(visibility).blob(path)
+    try:
+        blob.delete(if_generation_match=expected_generation)
         return True
+    except google_exceptions.NotFound:
+        return True
+    except google_exceptions.PreconditionFailed:
+        return False
+
+
+# @testable true
+# @tests tests_unit/test_018_database_assets.py::test_delete_direct_upload_is_idempotent_and_generation_conditional
+# @matrix direct-upload storage : cleanup generation-conditional-cleanup idempotency
+def delete_direct_upload(record):
+    """Delete exactly one signed temporary upload, treating absence as success."""
+    try:
+        if not isinstance(record, dict):
+            return False
+        payload = load_direct_upload_token(record.get("token"), max_age=None)
+        submitted_path = record.get("path") or record.get("name")
+        if submitted_path and submitted_path != payload["path"]:
+            return False
+        submitted_input = record.get("input_name")
+        if (
+            submitted_input
+            and payload.get("input_name")
+            and submitted_input != payload.get("input_name")
+        ):
+            return False
+        blob = DATA.bucket(
+            payload.get("visibility") or DIRECT_UPLOAD_VISIBILITY
+        ).blob(payload["path"])
+        generation = record.get("generation")
+        if generation is None:
+            blob.reload()
+            generation = blob.generation
+        blob.delete(if_generation_match=int(generation))
+        return True
+    except google_exceptions.NotFound:
+        return True
+    except google_exceptions.PreconditionFailed:
+        return False
     except Exception:
         return False
 
