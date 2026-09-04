@@ -74,11 +74,21 @@ def execute_get_category_pages(args, user):
     if not identifier:
         return {"error": "id is required"}
 
-    entities = Entities.fetch(identifier, form_identifier, request=Fetch.direct())
-    category = next((e for e in entities if isinstance(e, Entities.CATEGORY)), None)
-    form = next((e for e in entities if isinstance(e, Entities.FORM)), None)
-    if not category:
+    category = Entities.fetch_one(identifier, request=Fetch.direct())
+    if not category or not isinstance(category, Entities.CATEGORY):
         return {"error": "Category not found"}
+    if not category.allowed(Action.RESTRICTED, user=user):
+        return {"error": "Access denied"}
+    form = None
+    if form_identifier:
+        form = Entities.fetch_one(form_identifier, request=Fetch.direct())
+        if not form or not isinstance(form, Entities.FORM):
+            return {"error": "Form not found"}
+        if (
+            not form.allowed(Action.VIEW, user=user)
+            or getattr(form, "reserved", False)
+        ):
+            return {"error": "Access denied"}
 
     raw_limit = args.get("limit", CATEGORY_PAGES_LIMIT)
     if isinstance(raw_limit, bool) or not isinstance(raw_limit, int):
@@ -103,7 +113,11 @@ def execute_get_category_pages(args, user):
         hashes=restrictions,
     )
 
-    pages = Entities.fetch(*db.results, request=Fetch.direct())
+    pages = [
+        page
+        for page in Entities.fetch(*db.results, request=Fetch.direct())
+        if page.allowed(Action.VIEW, user=user)
+    ]
     next_cursor = getattr(db, "next_cursor", None)
 
     return {

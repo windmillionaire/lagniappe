@@ -2,7 +2,7 @@
 
 from google.genai import types
 
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from ..references import hash_reference
 
@@ -43,10 +43,19 @@ def execute_get_category_forms(args, user):
     category = Entities.fetch_one(identifier, request=Fetch.direct())
     if not category or not isinstance(category, Entities.CATEGORY):
         return {"error": "Category not found"}
+    if not category.allowed(Action.RESTRICTED, user=user):
+        return {"error": "Access denied"}
 
     forms = list(category.forms)
     if category.form and category.form not in forms:
         forms.insert(0, category.form)
+    forms = [
+        form
+        for form in forms
+        if form
+        and not getattr(form, "reserved", False)
+        and form.allowed(Action.VIEW, user=user)
+    ]
 
     if not forms:
         return {"category": category.name, "form_count": 0, "forms": []}

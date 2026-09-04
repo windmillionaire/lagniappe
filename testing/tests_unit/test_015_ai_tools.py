@@ -38,6 +38,9 @@ from lagniappe.core.tools.ai.function_definitions import get_forms as ai_get_for
 from lagniappe.core.tools.ai.function_definitions import get_pages as ai_get_pages
 from lagniappe.core.tools.ai.function_definitions import get_schema as ai_get_schema
 from lagniappe.core.tools.ai.function_definitions import (
+    get_category_details as ai_get_category_details,
+)
+from lagniappe.core.tools.ai.function_definitions import (
     get_form_instances as ai_get_form_instances,
 )
 from lagniappe.core.tools.ai.function_definitions import (
@@ -1298,7 +1301,7 @@ def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch
     )
 
     all_result = ai_get_form_instances.execute_get_form_instances(
-        {"form_id": "form-hash", "limit": 10},
+        {"id": "form-hash", "limit": 10},
         SimpleNamespace(),
     )
     assert all_result["form"] == {
@@ -1315,7 +1318,7 @@ def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch
 
     completed_result = ai_get_form_instances.execute_get_form_instances(
         {
-            "form_id": "form-hash",
+            "id": "form-hash",
             "kinds": ["task"],
             "task_status": "completed",
             "limit": 1,
@@ -1694,13 +1697,17 @@ def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
         ),
     )
 
+    def fake_fetch_one(identifier, *, request):
+        if identifier == "category-ai":
+            return category
+        return None
+
     def fake_load(*identifiers, request):
-        if identifiers == ("category-ai", None):
-            return [category]
         if identifiers == ("page-key",):
             return [page]
         return []
 
+    monkeypatch.setattr(ai_get_pages.Entities, "fetch_one", fake_fetch_one)
     monkeypatch.setattr(ai_get_pages.Entities, "fetch", fake_load)
     monkeypatch.setattr(
         ai_get_pages.database_get,
@@ -1754,7 +1761,32 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
         "CATEGORY",
         {"name": "People", "hash": "people-category-ai"},
     )
-    page = SimpleNamespace(to_ai=lambda user: {"name": "Avery Rowan"})
+    visible_form = TestEntities.get(
+        "FORM",
+        {"name": "Contact", "hash": "visible-form-ai"},
+    )
+    denied_form = TestEntities.get(
+        "FORM",
+        {"name": "Private Contact", "hash": "denied-form-ai"},
+    )
+    reserved_form = TestEntities.get(
+        "FORM",
+        {"name": "Reserved Contact", "hash": "reserved-form-ai", "reserved": True},
+    )
+    monkeypatch.setattr(category, "allowed", lambda action, user=None: True)
+    monkeypatch.setattr(visible_form, "allowed", lambda action, user=None: True)
+    monkeypatch.setattr(denied_form, "allowed", lambda action, user=None: False)
+    monkeypatch.setattr(reserved_form, "allowed", lambda action, user=None: True)
+    page = SimpleNamespace(
+        allowed=lambda action, user=None: True,
+        to_ai=lambda user: {"name": "Avery Rowan"},
+    )
+    restricted_page = SimpleNamespace(
+        allowed=lambda action, user=None: False,
+        to_ai=lambda user: (_ for _ in ()).throw(
+            AssertionError("restricted page must not be projected")
+        ),
+    )
     user = SimpleNamespace(
         properties=SimpleNamespace(
             restrictions=SimpleNamespace(
@@ -1764,12 +1796,17 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
     )
     calls = []
 
+    def fake_fetch_one(identifier, request):
+        return {
+            "people-category-ai": category,
+            "visible-form-ai": visible_form,
+            "denied-form-ai": denied_form,
+            "reserved-form-ai": reserved_form,
+        }.get(identifier)
+
     def fake_load(*identifiers, request):
-        if identifiers == ("people-category-ai", None):
-            return [category]
-        if identifiers == ("page-key",):
-            return [page]
-        return []
+        assert identifiers == ("page-key",)
+        return [page, restricted_page]
 
     def fake_pages(*args, **kwargs):
         calls.append((args, kwargs))
@@ -1778,6 +1815,7 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
             next_cursor="next-page-token",
         )
 
+    monkeypatch.setattr(ai_get_pages.Entities, "fetch_one", fake_fetch_one)
     monkeypatch.setattr(ai_get_pages.Entities, "fetch", fake_load)
     monkeypatch.setattr(ai_get_pages.database_get, "pages", fake_pages)
 
@@ -1793,6 +1831,30 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
         {"id": "people-category-ai", "limit": "10"},
         user,
     )
+    missing_form = ai_get_pages.execute_get_category_pages(
+        {"id": "people-category-ai", "form_id": "missing-form"},
+        user,
+    )
+    visible_form_result = ai_get_pages.execute_get_category_pages(
+        {"id": "people-category-ai", "form_id": "visible-form-ai"},
+        user,
+    )
+    denied_form_result = ai_get_pages.execute_get_category_pages(
+        {"id": "people-category-ai", "form_id": "denied-form-ai"},
+        user,
+    )
+    reserved_form_result = ai_get_pages.execute_get_category_pages(
+        {"id": "people-category-ai", "form_id": "reserved-form-ai"},
+        user,
+    )
+    swapped_identifiers = ai_get_pages.execute_get_category_pages(
+        {"id": "visible-form-ai", "form_id": "people-category-ai"},
+        user,
+    )
+    category_as_form = ai_get_pages.execute_get_category_pages(
+        {"id": "people-category-ai", "form_id": "people-category-ai"},
+        user,
+    )
 
     limit_schema = ai_get_pages.GET_CATEGORY_PAGES.parameters.properties["limit"]
     assert limit_schema.minimum == 1
@@ -1806,13 +1868,28 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
                 "limit": ai_get_pages.SEARCH_LIMIT,
                 "hashes": [],
             },
-        )
+        ),
+        (
+            (category.key,),
+            {
+                "form": visible_form,
+                "start_cursor": None,
+                "limit": ai_get_pages.CATEGORY_PAGES_LIMIT,
+                "hashes": [],
+            },
+        ),
     ]
     assert invalid_limit == {
         "error": "limit must be an integer from 1 to 10",
         "minimum": 1,
         "maximum": 10,
     }
+    assert missing_form == {"error": "Form not found"}
+    assert visible_form_result["pages"] == [{"name": "Avery Rowan"}]
+    assert denied_form_result == {"error": "Access denied"}
+    assert reserved_form_result == {"error": "Access denied"}
+    assert swapped_identifiers == {"error": "Category not found"}
+    assert category_as_form == {"error": "Form not found"}
     assert result == {
         "category": "People",
         "requested_limit": 25,
@@ -1823,6 +1900,55 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
         "page_count": 1,
         "pages": [{"name": "Avery Rowan"}],
     }
+
+
+# @matrix ai categories : category-details permissions tool-context
+@pytest.mark.unit
+def test_get_category_details_uses_canonical_id_and_checks_permission(monkeypatch):
+    class FakeCategory:
+        def __init__(self):
+            self.can_view = True
+            self.allowed_actions = []
+
+        def allowed(self, action, user):
+            self.allowed_actions.append(action)
+            return self.can_view
+
+        def to_ai(self, user):
+            return {"hash": "hash:category-ai", "name": "People"}
+
+    category = FakeCategory()
+
+    def fetch_one(identifier, request):
+        return category if identifier == "category-ai" else None
+
+    monkeypatch.setattr(
+        ai_get_category_details,
+        "Entities",
+        SimpleNamespace(CATEGORY=FakeCategory, fetch_one=fetch_one),
+    )
+    user = SimpleNamespace()
+
+    assert ai_get_category_details.execute_get_category_details(
+        {"category_id": "category-ai"}, user
+    ) == {"error": "id is required"}
+    assert ai_get_category_details.execute_get_category_details(
+        {"id": "missing"}, user
+    ) == {"error": "Category not found"}
+
+    category.can_view = False
+    assert ai_get_category_details.execute_get_category_details(
+        {"id": "category-ai"}, user
+    ) == {"error": "Access denied"}
+
+    category.can_view = True
+    assert ai_get_category_details.execute_get_category_details(
+        {"id": "category-ai"}, user
+    ) == {"hash": "hash:category-ai", "name": "People"}
+    assert category.allowed_actions == [
+        ai_get_category_details.Action.VIEW,
+        ai_get_category_details.Action.VIEW,
+    ]
 
 
 # @matrix ai form-schema : form model-task page task tool-context
@@ -1949,11 +2075,21 @@ def test_get_schema_returns_schema_for_form_bearing_entities(monkeypatch):
 @pytest.mark.unit
 def test_get_category_forms_returns_full_form_schema(monkeypatch):
     class FakeForm:
-        def __init__(self):
-            self.urlsafe_key = "form-trades"
-            self.hash = "form-trades"
-            self.name = "Professional / Trades"
+        def __init__(
+            self,
+            *,
+            name="Professional / Trades",
+            hash_value="form-trades",
+            can_view=True,
+            reserved=False,
+        ):
+            self.urlsafe_key = hash_value
+            self.hash = self.urlsafe_key
+            self.name = name
             self.form_type = "page"
+            self.can_view = can_view
+            self.reserved = reserved
+            self.allowed_actions = []
             self.schema = [
                 {
                     "id": "input-phone",
@@ -1963,11 +2099,32 @@ def test_get_category_forms_returns_full_form_schema(monkeypatch):
                 }
             ]
 
+        def allowed(self, action, user=None):
+            self.allowed_actions.append(action)
+            return self.can_view
+
     class FakeCategory:
         def __init__(self):
             self.name = "Professionals"
             self.form = FakeForm()
-            self.forms = []
+            self.forms = [
+                FakeForm(
+                    name="Private Type",
+                    hash_value="private-form",
+                    can_view=False,
+                ),
+                FakeForm(
+                    name="Reserved Type",
+                    hash_value="reserved-form",
+                    reserved=True,
+                ),
+            ]
+            self.can_access = True
+            self.allowed_actions = []
+
+        def allowed(self, action, user=None):
+            self.allowed_actions.append(action)
+            return self.can_access
 
     category = FakeCategory()
     monkeypatch.setattr(
@@ -1984,6 +2141,10 @@ def test_get_category_forms_returns_full_form_schema(monkeypatch):
         SimpleNamespace(),
     )
 
+    assert category.allowed_actions == [ai_get_forms.Action.RESTRICTED]
+    assert category.form.allowed_actions == [ai_get_forms.Action.VIEW]
+    assert category.forms[0].allowed_actions == [ai_get_forms.Action.VIEW]
+    assert category.forms[1].allowed_actions == []
     assert result == {
         "category": "Professionals",
         "form_count": 1,
@@ -2003,6 +2164,12 @@ def test_get_category_forms_returns_full_form_schema(monkeypatch):
             }
         ],
     }
+
+    category.can_access = False
+    assert ai_get_forms.execute_get_category_forms(
+        {"id": "cat-professionals"},
+        SimpleNamespace(),
+    ) == {"error": "Access denied"}
 
 
 # @matrix ai : error-context tool-dispatch trace
@@ -2383,7 +2550,7 @@ def test_ai_file_tools_return_summary_and_content(monkeypatch):
     monkeypatch.setattr(ai_get_page_file_list.Entities, "fetch_one", fake_get)
 
     file_list = ai_get_page_file_list.execute_get_page_file_list(
-        {"page_id": "page-key"},
+        {"id": "page-key"},
         user,
     )
     loaded_file = ai_get_file.execute_get_file({"id": "file-key"}, user)
@@ -2464,7 +2631,7 @@ def test_get_page_tasks_returns_active_and_completed_tasks(monkeypatch):
     )
 
     result = ai_get_page_tasks.execute_get_page_tasks(
-        {"page_id": "prescriptions-page"},
+        {"id": "prescriptions-page"},
         user,
     )
 
@@ -2519,10 +2686,10 @@ def test_ai_page_details_includes_file_summaries_by_default(monkeypatch):
     )
 
     details = ai_get_page_details.execute_get_page_details(
-        {"page_id": "page-key"}, user
+        {"id": "page-key"}, user
     )
     without_related = ai_get_page_details.execute_get_page_details(
-        {"page_id": "page-key", "exclude_tasks": True, "exclude_files": True},
+        {"id": "page-key", "exclude_tasks": True, "exclude_files": True},
         user,
     )
 
@@ -2596,7 +2763,7 @@ def test_ai_get_file_skips_large_original_unless_requested(monkeypatch):
     monkeypatch.setattr(ai_get_file.Entities, "fetch_one", fake_get)
 
     file_list = ai_get_page_file_list.execute_get_page_file_list(
-        {"page_id": "large-page-key"},
+        {"id": "large-page-key"},
         user,
     )
     loaded_file = ai_get_file.execute_get_file({"id": "large-file-key"}, user)
@@ -2784,7 +2951,7 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     )
 
     result = ai_get_task_history.execute_get_task_history(
-        {"task_id": "history-oil-task", "limit": 1},
+        {"id": "history-oil-task", "limit": 1},
         user,
     )
 
@@ -2833,11 +3000,11 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
 
     monkeypatch.setattr(task, "allowed", lambda *_args, **_kwargs: False)
     assert ai_get_task_history.execute_get_task_history(
-        {"task_id": "history-oil-task"},
+        {"id": "history-oil-task"},
         user,
     ) == {"error": "Access denied"}
     assert ai_get_task_history.execute_get_task_history({}, user) == {
-        "error": "task_id is required"
+        "error": "id is required"
     }
 
 

@@ -512,7 +512,7 @@ def test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
     )
 
     schema_result = workspace_filter.execute_get_filter_schema(
-        {"parent_id": project.hash},
+        {"id": project.hash},
         user,
     )
     assert schema_result == {
@@ -520,16 +520,16 @@ def test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
         "user": user,
     }
     assert workspace_filter.execute_query_workspace_filter(
-        {"parent_id": project.hash, "conditions": []},
+        {"id": project.hash, "conditions": []},
         user,
     ) == {"error": "bad condition"}
     assert workspace_filter.execute_get_filter_schema({}, user) == {
-        "error": "parent_id is required"
+        "error": "id is required"
     }
 
     project._allowed = False
     denied_result = workspace_filter.execute_get_filter_schema(
-        {"parent_id": project.hash},
+        {"id": project.hash},
         user,
     )
     assert denied_result == {

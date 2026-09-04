@@ -33,7 +33,7 @@ from .reporting.contracts.schema import external_report_proposal_response_schema
 from .reporting.proposals.validation import validate_proposal
 
 
-CONTRACT_VERSION = 5
+CONTRACT_VERSION = 6
 SUPPORTED_PLAN_TOOLS = ("ask", "create", "organize")
 MAX_INSTRUCTIONS_BYTES = 65536
 MAX_PROPOSAL_BYTES = 1024 * 1024
@@ -88,8 +88,11 @@ OpenAPI, and the tool catalog once per run and reuse them in memory; inspect a
 selected tool's exact `input_schema` and `output_schema` before calling it. Use
 the catalog's `names` and `view=names` query options when only a small selection
 is needed. Refetch the plan contract after Organize uploads and immediately
-before every final submission. A Plan GET returns the public `hash:` and Markdown
-proposal shape and can be edited and resubmitted while the plan remains reusable.
+before every final submission. After creating a Plan, keep its opaque `id` for
+Plan-scoped read tools and uploads, but follow its returned `contract_url`,
+`submit_url`, and `status_url` exactly instead of reconstructing those lifecycle
+paths. A Plan GET returns the public `hash:` and Markdown proposal shape.
+It can be edited and resubmitted while the plan remains reusable.
 
 Choose Ask for a read-only answer, Create for proposed workspace content without
 uploaded artifacts, and Organize when uploaded artifacts must be analyzed and
@@ -250,7 +253,13 @@ def _guidance_requirements(tool):
             },
             "request": {
                 "task": "form_autofill",
-                "field_types": "<unique types from exact target schemas>",
+            },
+            "derived_request_arguments": {
+                "field_types": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "source": "unique type values from the exact target schemas",
+                },
             },
         },
         {
@@ -261,7 +270,13 @@ def _guidance_requirements(tool):
             "when": {"actions_selected": True},
             "request": {
                 "task": "report_actions",
-                "actions": "<unique selected action types>",
+            },
+            "derived_request_arguments": {
+                "actions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "source": "unique selected proposal action types",
+                },
             },
         },
     ]
@@ -274,6 +289,12 @@ def _guidance_requirements(tool):
         "deduplication": (
             "Fetch each identical task/field_types/actions request once per run; "
             "the current plan contract remains authoritative."
+        ),
+        "derived_request_rule": (
+            "Each request is valid as written and returns the complete bundle. "
+            "When derived_request_arguments is present, add those arguments as "
+            "actual arrays to request a smaller relevant bundle; never copy the "
+            "descriptor object or its source text into a tool argument."
         ),
     }
 
@@ -571,7 +592,10 @@ def _external_allowed_report_actions(user, tool="organize"):
 # @matrix agent-api ai-report : file-placement file-summary permissions proposal-contract
 # @pair ai-report:task-page
 # @pairs agent-api:create-revision agent-api:organize-revision
-def plan_contract(report, user):
+def plan_contract(report, user, *, submit_url):
+    submit_url = str(submit_url or "").strip()
+    if not submit_url:
+        raise ValueError("submit_url is required")
     tool = normalize_plan_tool(getattr(report, "tool", None))
     allowed = _external_allowed_report_actions(user, tool)
     if tool == "ask":
@@ -708,20 +732,24 @@ def plan_contract(report, user):
     inventory = report_file_inventory(report) if tool == "organize" else None
     guidance = _guidance_requirements(tool)
     contract = {
-        "version": CONTRACT_VERSION,
+        "contract_version": CONTRACT_VERSION,
         "tool": tool,
         "current_date": dates.user_today(user).date().isoformat(),
         "timezone": user_timezone_name(user),
         "personal_page": personal_page,
         "submission_format": {
+            "method": "POST",
+            "url": submit_url,
             "contract_version": CONTRACT_VERSION,
             "body": {
                 "contract_version": CONTRACT_VERSION,
-                "proposal": "<object matching proposal_schema>",
+                "proposal": {},
             },
             "rule": (
-                "POST this wrapper object to submit_url; do not post the proposal "
-                "object as the top-level request body."
+                "Replace the empty proposal template with an object matching "
+                "proposal_schema, then send the wrapper body with the stated "
+                "method and URL; do not post the proposal object as the top-level "
+                "request body."
             ),
         },
         "proposal_schema": proposal_schema,

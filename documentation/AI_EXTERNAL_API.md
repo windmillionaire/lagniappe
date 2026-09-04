@@ -86,26 +86,39 @@ still be fetched after uploads and immediately before submission.
    `result_paths`. The output schema describes a successful direct shared-handler
    result; REST places it beneath the success response's `result` field. Inspect these
    contracts rather than guessing field names or whether a result is a list or
-   object. Use repeated/comma-separated `names` to retrieve selected definitions,
-   or `view=names` for only exact registered names.
+   object. A read tool with one required subject entity always names that argument
+   `id`; its value is the returned `hash:<12-character-hash>` token. Names such as
+   `form_id`, `parent_id`, and `source_id` are reserved for secondary filters or
+   scopes when a request has another subject. Use repeated/comma-separated `names`
+   to retrieve selected definitions, or `view=names` for only exact registered names.
    `list_workspace_resources` includes the personal Page alongside the
    permission-filtered workspace inventory.
 5. `POST /plans` creates a provider-free draft with `tool` set to `ask`,
-   `create`, or `organize`.
+   `create`, or `organize`. The returned Plan includes canonical `contract_url`,
+   `submit_url`, and `status_url` links so callers do not construct paths.
 6. Run permitted reads with `POST /plans/{id}/tools/{tool_name}` while the plan
    is a draft. Reads remain available after a saved Ask answer and while a
    Create or Organize proposal remains ready for browser review.
 7. `GET /plans/{id}/contract` returns the selected tool's authoritative output
    schema, submission wrapper, machine-readable guidance requirements, workflow
    and reference rules, permissions, payload sizes, limits, actor timezone,
-   personal Page reference, and timezone-aware `current_date`. Organize also
-   returns the authoritative finalized-upload inventory and per-file checklist.
+   personal Page reference, timezone-aware `current_date`, and top-level
+   `contract_version`. Its `submission_format` gives the exact `POST` method,
+   URL, and wrapper body shape. Organize also returns the authoritative
+   finalized-upload inventory and per-file checklist.
 8. `POST /plans/{id}/submit` validates and publishes the final result. It returns
    a compact receipt containing status, review URLs, and the normalized proposal
    fingerprint rather than echoing the proposal. It never calls a provider or
    applies workspace actions. Repeating this call with a valid complete result
    replaces the prior result while the report remains reusable; `status_url`
    retrieves the detailed Plan resource.
+
+Contract version 6 is an intentional breaking cutover: the contract uses only
+top-level `contract_version`, and primary read-tool subjects use only `id`.
+There are no legacy aliases. Clients must refresh discovery, OpenAPI, the tool
+catalog, and the current Plan contract rather than replaying a version 5 shape.
+Absolute API and review links use the installation's validated configured
+origin; an incoming HTTP `Host` header never selects their destination.
 
 ### Minimal client skill
 
@@ -218,9 +231,13 @@ The contract's `guidance_requirements` makes those bundle decisions
 machine-readable. After selecting actions, request `task: report_actions` with
 the unique selected `actions`; when filling Forms, request `task: form_autofill`
 with the unique actual `field_types` from the exact schemas. Identical requests
-are fetched once per run. Guideline responses report `content_bytes` and
-`section_count`; contracts report their major component byte sizes. Correlated
-API logs record tool-call sequence number, result bytes, and elapsed time.
+are fetched once per run. Each conditional entry's `request` is valid as written
+and retrieves the complete bundle. An optional `derived_request_arguments`
+descriptor says which actual array values may be added to request a smaller
+bundle; it is metadata, never a literal tool argument. Guideline responses report
+`content_bytes` and `section_count`; contracts report their major component byte
+sizes. Correlated API logs record tool-call sequence number, result bytes, and
+elapsed time.
 
 For Organize, `upload_inventory` is the authoritative finalized file scope even
 when natural-language instructions mention fewer filenames. Its deterministic
@@ -330,7 +347,10 @@ curl --fail-with-body --silent --show-error \
   "$LAGNIAPPE_URL/api/v1/plans"
 ```
 
-Use the returned plan `id` to start an upload:
+Copy the returned Plan fields into `PLAN_ID`, `CONTRACT_URL`, `SUBMIT_URL`, and
+`STATUS_URL`. Use the ID for the Plan-scoped upload and read-tool templates from
+OpenAPI, but follow the returned canonical URLs for contract, submission, and
+status instead of reconstructing those three paths:
 
 ```bash
 curl --fail-with-body --silent --show-error \
@@ -362,13 +382,13 @@ curl --fail-with-body --silent --show-error \
 
 curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
-  "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/contract"
+  "$CONTRACT_URL"
 
 curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   -H 'Content-Type: application/json' \
   --data-binary @submission.json \
-  "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/submit"
+  "$SUBMIT_URL"
 ```
 
 Present the returned `preview_url` and direct the user to the authenticated
@@ -378,7 +398,7 @@ write step. A client may fetch the plan later to observe its top-level state:
 ```bash
 curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
-  "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID"
+  "$STATUS_URL"
 ```
 
 The short `preview_url` lives with the other user-facing AI report routes at
@@ -392,7 +412,7 @@ access.
 
 ```json
 {
-  "contract_version": 5,
+  "contract_version": 6,
   "proposal": {
     "summary": "Organize the records into a new page.",
     "confidence": 0.94,
@@ -463,8 +483,8 @@ organize_guidelines = session.post(
     f"{base}/plans/{plan['id']}/tools/get_guidelines",
     json={"arguments": {"task": "organize"}},
 ).json()["result"]
-contract = session.get(f"{base}/plans/{plan['id']}/contract").json()
+contract = session.get(plan["contract_url"]).json()
 # Give the model the plan, tools, shared two-phase Organize guidelines, and
 # contract. Run requested reads; settle structure first; then apply form_autofill
-# and exact schemas to add final values before POSTing to /submit.
+# and exact schemas to add final values before POSTing to plan["submit_url"].
 ```

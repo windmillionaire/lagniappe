@@ -175,6 +175,15 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert index.json["actor_url"].endswith("/api/v1/me")
     assert index.json["client_skill_url"].endswith("/api/v1/client-skill.md")
     assert "before using or guessing resource paths" in index.json["instructions"]
+    hostile_host_index = client.get(
+        "/api/v1",
+        headers={
+            "Authorization": "Bearer valid-key",
+            "Host": "credential-thief.invalid",
+        },
+    )
+    assert hostile_host_index.status_code == 200
+    assert hostile_host_index.json == index.json
     trailing_index = client.get(
         "/api/v1/",
         headers={"Authorization": "Bearer valid-key"},
@@ -192,6 +201,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert client_skill.headers["Cache-Control"] == "no-store"
     assert "name: lagniappe" in client_skill.get_data(as_text=True)
     assert "$LAGNIAPPE_API_KEY" in client_skill.get_data(as_text=True)
+    assert "follow its returned `contract_url`" in client_skill.get_data(as_text=True)
 
     openapi = client.get(
         "/api/v1/openapi.json",
@@ -199,6 +209,18 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert openapi.status_code == 200
     assert openapi.json["openapi"] == "3.1.0"
+    hostile_host_openapi = client.get(
+        "/api/v1/openapi.json",
+        headers={
+            "Authorization": "Bearer valid-key",
+            "Host": "credential-thief.invalid",
+        },
+    )
+    assert hostile_host_openapi.status_code == 200
+    assert hostile_host_openapi.json["servers"] == openapi.json["servers"]
+    assert "credential-thief.invalid" not in hostile_host_openapi.json["servers"][0][
+        "url"
+    ]
     assert "/api/v1" in openapi.json["paths"]
     assert "/api/v1/client-skill.md" in openapi.json["paths"]
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
@@ -225,11 +247,20 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "content"
     ]["application/json"]["schema"]
     assert create_schema["required"] == ["instructions"]
+    assert create_schema["additionalProperties"] is False
+    assert create_schema["properties"]["instructions"]["pattern"] == "\\S"
     assert create_schema["properties"]["tool"]["enum"] == [
         "ask",
         "create",
         "organize",
     ]
+    create_description = openapi.json["paths"]["/api/v1/plans"]["post"][
+        "description"
+    ]
+    assert "Follow the returned contract_url, submit_url, and status_url" in (
+        create_description
+    )
+    assert "instead of reconstructing those lifecycle paths" in create_description
     upload_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/uploads"]["post"]
     assert upload_operation["requestBody"]["required"] is True
     tools_operation = openapi.json["paths"]["/api/v1/tools"]["get"]
@@ -272,7 +303,51 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "description"
     ]
     assert "ValidationErrorDetail" in openapi.json["components"]["schemas"]
+    contract_response_schema = openapi.json["paths"][
+        "/api/v1/plans/{plan_id}/contract"
+    ]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    assert contract_response_schema == {
+        "$ref": "#/components/schemas/PlanContract"
+    }
+    plan_contract_schema = openapi.json["components"]["schemas"]["PlanContract"]
+    expected_contract_fields = {
+        "contract_version",
+        "tool",
+        "current_date",
+        "timezone",
+        "personal_page",
+        "submission_format",
+        "proposal_schema",
+        "permissions",
+        "required_file_refs",
+        "upload_inventory",
+        "file_checklist",
+        "guidance_requirements",
+        "uploads_supported",
+        "workflow_rules",
+        "reference_rules",
+        "limits",
+        "payload_sizes",
+    }
+    assert set(plan_contract_schema["required"]) == expected_contract_fields
+    assert set(plan_contract_schema["properties"]) == expected_contract_fields
+    submission_format_schema = openapi.json["components"]["schemas"][
+        "PlanSubmissionFormat"
+    ]
+    assert submission_format_schema["required"] == [
+        "method",
+        "url",
+        "contract_version",
+        "body",
+        "rule",
+    ]
+    assert submission_format_schema["properties"]["method"]["const"] == "POST"
     plan_schema = openapi.json["components"]["schemas"]["Plan"]
+    assert "submit_url" in plan_schema["required"]
+    assert plan_schema["properties"]["submit_url"] == {
+        "type": "string",
+        "format": "uri",
+    }
     assert "execute_url" not in plan_schema["properties"]
     assert "execution" not in plan_schema["properties"]
     assert "Execution" not in openapi.json["components"]["schemas"]
@@ -330,6 +405,62 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert "provider file part" not in get_file["description"]
 
     monkeypatch.setattr(external_api, "create_plan", lambda *args, **kwargs: report)
+    malformed_plan_requests = [
+        (
+            {"instructions": report.instructions, "unexpected": True},
+            "unsupported_field",
+            {"path": "$", "fields": ["unexpected"]},
+        ),
+        (
+            {"instructions": [report.instructions]},
+            "invalid_instructions",
+            {"path": "$.instructions", "expected": "non-empty string"},
+        ),
+        (
+            {"instructions": "   \n\t"},
+            "invalid_instructions",
+            {"path": "$.instructions", "expected": "non-empty string"},
+        ),
+        (
+            {"instructions": report.instructions, "name": 7},
+            "invalid_name",
+            {
+                "path": "$.name",
+                "expected": "string with at most 120 characters",
+            },
+        ),
+        (
+            {"instructions": report.instructions, "name": None},
+            "invalid_name",
+            {
+                "path": "$.name",
+                "expected": "string with at most 120 characters",
+            },
+        ),
+        (
+            {"instructions": report.instructions, "name": "x" * 121},
+            "invalid_name",
+            {
+                "path": "$.name",
+                "expected": "string with at most 120 characters",
+            },
+        ),
+        (
+            {"tool": "ORGANIZE", "instructions": report.instructions},
+            "unsupported_tool",
+            {"path": "$.tool"},
+        ),
+    ]
+    for payload, code, expected_details in malformed_plan_requests:
+        invalid_plan = client.post(
+            "/api/v1/plans",
+            headers={"Authorization": "Bearer valid-key"},
+            json=payload,
+        )
+        assert invalid_plan.status_code == 422
+        assert invalid_plan.json["error"]["code"] == code
+        for field, value in expected_details.items():
+            assert invalid_plan.json["error"]["details"][field] == value
     created = client.post(
         "/api/v1/plans",
         headers={"Authorization": "Bearer valid-key"},
@@ -339,6 +470,9 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert created.json["id"] == report.urlsafe_key
     assert created.json["status"] == "draft"
     assert created.json["status_url"].endswith("/api/v1/plans/report-key")
+    assert created.json["submit_url"].endswith(
+        "/api/v1/plans/report-key/submit"
+    )
     assert "execute_url" not in created.json
     assert "execution" not in created.json
     assert created.json["preview_url"].endswith("/tools/api-plan/reporthash12")
@@ -355,14 +489,34 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert fetched.status_code == 200
     assert fetched.json["id"] == "report-key"
+    hostile_host_plan = client.get(
+        "/api/v1/plans/report-key",
+        headers={
+            "Authorization": "Bearer valid-key",
+            "Host": "credential-thief.invalid",
+        },
+    )
+    assert hostile_host_plan.status_code == 200
+    for field in (
+        "contract_url",
+        "submit_url",
+        "status_url",
+        "preview_url",
+        "review_url",
+    ):
+        assert hostile_host_plan.json[field] == fetched.json[field]
 
     monkeypatch.setattr(
         external_api,
         "plan_contract",
-        lambda current, user: {
-            "version": 1,
+        lambda current, user, *, submit_url: {
+            "contract_version": external_api.CONTRACT_VERSION,
             "required_file_refs": [],
             "actor": user.hash,
+            "submission_format": {
+                "method": "POST",
+                "url": submit_url,
+            },
         },
     )
     contract = client.get(
@@ -371,9 +525,13 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert contract.status_code == 200
     assert contract.json == {
-        "version": 1,
+        "contract_version": external_api.CONTRACT_VERSION,
         "required_file_refs": [],
         "actor": actor.hash,
+        "submission_format": {
+            "method": "POST",
+            "url": created.json["submit_url"],
+        },
     }
 
     monkeypatch.setattr(
@@ -391,6 +549,101 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         lambda records: records,
     )
     monkeypatch.setattr(Entities, "save", lambda *entities: None)
+    invalid_upload = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"files": [{"filename": "records.pdf", "size_bytes": 100}]},
+    )
+    assert invalid_upload.status_code == 422
+    assert invalid_upload.json["error"] == {
+        "code": "unsupported_field",
+        "message": "Upload file entry contains unsupported fields.",
+        "details": {
+            "path": "$.files[0]",
+            "fields": ["size_bytes"],
+            "allowed_fields": ["content_type", "filename", "size"],
+            "use_field": "size",
+        },
+    }
+    redundant_alias = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers={"Authorization": "Bearer valid-key"},
+        json={
+            "files": [
+                {"filename": "records.pdf", "size": 100, "size_bytes": 100}
+            ]
+        },
+    )
+    assert redundant_alias.status_code == 422
+    assert redundant_alias.json["error"]["code"] == "unsupported_field"
+    unsupported_top_level = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers={"Authorization": "Bearer valid-key"},
+        json={
+            "files": [{"filename": "records.pdf", "size": 100}],
+            "plan_id": "report-key",
+        },
+    )
+    assert unsupported_top_level.status_code == 422
+    assert unsupported_top_level.json["error"]["details"] == {
+        "path": "$",
+        "fields": ["plan_id"],
+        "allowed_fields": ["files"],
+    }
+    malformed_upload = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers={"Authorization": "Bearer valid-key"},
+        json={
+            "files": [
+                {"filename": "valid.pdf", "size": 100},
+                {"filename": "invalid.pdf", "size": "many"},
+            ]
+        },
+    )
+    assert malformed_upload.status_code == 422
+    assert malformed_upload.json["error"] == {
+        "code": "invalid_file_size",
+        "message": 'Each file\'s "size" must be a positive integer byte size.',
+        "details": {
+            "path": "$.files[1].size",
+            "expected": "positive integer byte size",
+        },
+    }
+    boolean_upload = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"files": [{"filename": "invalid.pdf", "size": True}]},
+    )
+    assert boolean_upload.status_code == 422
+    assert boolean_upload.json["error"]["details"] == {
+        "path": "$.files[0].size",
+        "expected": "positive integer byte size",
+    }
+    invalid_filename = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"files": [{"filename": ["records.pdf"], "size": 100}]},
+    )
+    assert invalid_filename.status_code == 422
+    assert invalid_filename.json["error"]["details"] == {
+        "path": "$.files[0].filename",
+        "expected": "non-empty string",
+    }
+    invalid_content_type = client.post(
+        "/api/v1/plans/report-key/uploads",
+        headers={"Authorization": "Bearer valid-key"},
+        json={
+            "files": [
+                {"filename": "records.pdf", "content_type": 7, "size": 100}
+            ]
+        },
+    )
+    assert invalid_content_type.status_code == 422
+    assert invalid_content_type.json["error"]["details"] == {
+        "path": "$.files[0].content_type",
+        "expected": "non-empty string",
+    }
+
     upload = client.post(
         "/api/v1/plans/report-key/uploads",
         headers={"Authorization": "Bearer valid-key"},
@@ -420,6 +673,18 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         current.upload_manifest = None
 
     monkeypatch.setattr(external_api, "finalize_uploads", finalize)
+    invalid_finalization = client.post(
+        "/api/v1/plans/report-key/uploads/finalize",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"force": True},
+    )
+    assert invalid_finalization.status_code == 422
+    assert invalid_finalization.json["error"] == {
+        "code": "unsupported_field",
+        "message": "Upload finalization accepts only an empty JSON object.",
+        "details": {"path": "$", "fields": ["force"]},
+    }
+    assert report.upload_manifest
     finalized = client.post(
         "/api/v1/plans/report-key/uploads/finalize",
         headers={"Authorization": "Bearer valid-key"},

@@ -20,6 +20,7 @@ from lagniappe.core.tools.ai.references import hash_reference, normalize_hash_re
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.core.tools.database import assets as storage_assets
+from lagniappe.core.tools.email.notifications.links import absolute_url
 
 from . import api, api_family
 
@@ -308,25 +309,35 @@ def _plan_payload(report, *, include_proposal=True):
         "files": [_file_payload(file) for file in report.input_files],
         "uploads_pending": bool(report.upload_manifest),
         "contract_version": external_api.CONTRACT_VERSION,
-        "contract_url": url_for(
-            "agent_api.get_plan_contract",
-            plan_id=report.urlsafe_key,
-            _external=True,
+        "contract_url": absolute_url(
+            url_for(
+                "agent_api.get_plan_contract",
+                plan_id=report.urlsafe_key,
+            )
         ),
-        "status_url": url_for(
-            "agent_api.get_plan",
-            plan_id=report.urlsafe_key,
-            _external=True,
+        "submit_url": absolute_url(
+            url_for(
+                "agent_api.submit_plan",
+                plan_id=report.urlsafe_key,
+            )
         ),
-        "preview_url": url_for(
-            "tools.api_plan_preview",
-            plan_hash=report.hash,
-            _external=True,
+        "status_url": absolute_url(
+            url_for(
+                "agent_api.get_plan",
+                plan_id=report.urlsafe_key,
+            )
         ),
-        "review_url": url_for(
-            "tools.report",
-            key=report.urlsafe_key,
-            _external=True,
+        "preview_url": absolute_url(
+            url_for(
+                "tools.api_plan_preview",
+                plan_hash=report.hash,
+            )
+        ),
+        "review_url": absolute_url(
+            url_for(
+                "tools.report",
+                key=report.urlsafe_key,
+            )
         ),
     }
     if include_proposal:
@@ -410,17 +421,15 @@ def _discovery_payload():
     return {
         "name": "Lagniappe External Agent API",
         "version": "v1",
-        "base_url": url_for("agent_api.api_index", _external=True).rstrip("/"),
-        "openapi_url": url_for(
-            "agent_api.openapi_document",
-            _external=True,
+        "base_url": absolute_url(url_for("agent_api.api_index")).rstrip("/"),
+        "openapi_url": absolute_url(
+            url_for("agent_api.openapi_document")
         ),
-        "actor_url": url_for("agent_api.me", _external=True),
-        "tools_url": url_for("agent_api.tools", _external=True),
-        "plans_url": url_for("agent_api.create_plan", _external=True),
-        "client_skill_url": url_for(
-            "agent_api.client_skill",
-            _external=True,
+        "actor_url": absolute_url(url_for("agent_api.me")),
+        "tools_url": absolute_url(url_for("agent_api.tools")),
+        "plans_url": absolute_url(url_for("agent_api.create_plan")),
+        "client_skill_url": absolute_url(
+            url_for("agent_api.client_skill")
         ),
         "authentication": "Authorization: Bearer <user API key>",
         "instructions": (
@@ -464,7 +473,7 @@ def client_skill():
     """Return a copyable, discovery-first client skill without API schemas."""
     response = make_response(
         external_api.client_skill_markdown(
-            url_for("agent_api.api_index", _external=True).rstrip("/")
+            absolute_url(url_for("agent_api.api_index")).rstrip("/")
         )
     )
     response.headers["Content-Type"] = "text/markdown; charset=utf-8"
@@ -654,8 +663,10 @@ def openapi_document():
                     "Starts a durable provider-free workspace. Creation does not run "
                     "a model or change workspace data. The client chooses one fixed "
                     "tool for this plan and may create another plan if the conversation "
-                    "later changes modes. Keep the returned opaque ID for every tool, "
-                    "contract, upload when supported, and submission call."
+                    "later changes modes. Keep the returned opaque ID for Plan-scoped "
+                    "read tools and uploads when supported. Follow the returned "
+                    "contract_url, submit_url, and status_url exactly instead of "
+                    "reconstructing those lifecycle paths."
                 ),
                 "tags": ["Plans"],
                 "requestBody": {
@@ -679,6 +690,7 @@ def openapi_document():
                                 "instructions": {
                                     "type": "string",
                                     "minLength": 1,
+                                    "pattern": "\\S",
                                     "description": (
                                         "The question or requested work, limited to 65,536 "
                                         "UTF-8 bytes."
@@ -704,10 +716,10 @@ def openapi_document():
                 "description": (
                     "Checks draft/ready state, finalized files, pending uploads, "
                     "contract and browser-review URLs, and any submitted execution-"
-                    "normalized proposal. The stored proposal is inspection state, "
-                    "not a round-trippable submission source; retain the public hash: "
-                    "proposal sent by the client for revisions. The plan ID is the "
-                    "top-level id field in every plan response."
+                    "normalized proposal. The proposal is projected back into the "
+                    "public hash-reference and Markdown submission contract so a "
+                    "reusable Plan can be edited and submitted again. The plan ID is "
+                    "the top-level id field in every plan response."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -736,7 +748,9 @@ def openapi_document():
                 "responses": {
                     "200": {
                         "description": "Current proposal and permission contract.",
-                        **json_content({"type": "object"}),
+                        **json_content(
+                            {"$ref": "#/components/schemas/PlanContract"}
+                        ),
                     },
                     "default": error_response,
                 },
@@ -960,7 +974,7 @@ def openapi_document():
                 "browser execution starts."
             ),
         },
-        "servers": [{"url": request.url_root.rstrip("/")}],
+        "servers": [{"url": absolute_url("/").rstrip("/")}],
         "security": [{"bearerAuth": []}],
         "tags": [
             {"name": "Discovery", "description": "Actor and tool discovery."},
@@ -1042,6 +1056,7 @@ def openapi_document():
                         "uploads_pending",
                         "contract_version",
                         "contract_url",
+                        "submit_url",
                         "status_url",
                         "preview_url",
                         "review_url",
@@ -1076,6 +1091,7 @@ def openapi_document():
                             "const": external_api.CONTRACT_VERSION,
                         },
                         "contract_url": {"type": "string", "format": "uri"},
+                        "submit_url": {"type": "string", "format": "uri"},
                         "status_url": {"type": "string", "format": "uri"},
                         "preview_url": {
                             "type": "string",
@@ -1099,6 +1115,102 @@ def openapi_document():
                                 "be edited and submitted again."
                             ),
                         },
+                    },
+                },
+                "PlanSubmissionFormat": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "method",
+                        "url",
+                        "contract_version",
+                        "body",
+                        "rule",
+                    ],
+                    "properties": {
+                        "method": {"type": "string", "const": "POST"},
+                        "url": {"type": "string", "format": "uri"},
+                        "contract_version": {
+                            "type": "integer",
+                            "const": external_api.CONTRACT_VERSION,
+                        },
+                        "body": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["contract_version", "proposal"],
+                            "properties": {
+                                "contract_version": {
+                                    "type": "integer",
+                                    "const": external_api.CONTRACT_VERSION,
+                                },
+                                "proposal": {"type": "object"},
+                            },
+                        },
+                        "rule": {"type": "string"},
+                    },
+                },
+                "PlanContract": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "contract_version",
+                        "tool",
+                        "current_date",
+                        "timezone",
+                        "personal_page",
+                        "submission_format",
+                        "proposal_schema",
+                        "permissions",
+                        "required_file_refs",
+                        "upload_inventory",
+                        "file_checklist",
+                        "guidance_requirements",
+                        "uploads_supported",
+                        "workflow_rules",
+                        "reference_rules",
+                        "limits",
+                        "payload_sizes",
+                    ],
+                    "properties": {
+                        "contract_version": {
+                            "type": "integer",
+                            "const": external_api.CONTRACT_VERSION,
+                        },
+                        "tool": {
+                            "type": "string",
+                            "enum": list(external_api.SUPPORTED_PLAN_TOOLS),
+                        },
+                        "current_date": {"type": "string", "format": "date"},
+                        "timezone": {"type": "string"},
+                        "personal_page": {"type": "object"},
+                        "submission_format": {
+                            "$ref": "#/components/schemas/PlanSubmissionFormat"
+                        },
+                        "proposal_schema": {"type": "object"},
+                        "permissions": {"type": "object"},
+                        "required_file_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "upload_inventory": {
+                            "oneOf": [{"type": "object"}, {"type": "null"}]
+                        },
+                        "file_checklist": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                        },
+                        "guidance_requirements": {"type": "object"},
+                        "uploads_supported": {"type": "boolean"},
+                        "workflow_rules": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "reference_rules": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "limits": {"type": "object"},
+                        "payload_sizes": {"type": "object"},
                     },
                 },
                 "SubmissionReceipt": {
@@ -1143,9 +1255,15 @@ def openapi_document():
                     "additionalProperties": False,
                     "required": ["filename", "size"],
                     "properties": {
-                        "filename": {"type": "string", "minLength": 1},
+                        "filename": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S",
+                        },
                         "content_type": {
                             "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S",
                             "default": "application/octet-stream",
                         },
                         "size": {
@@ -1275,18 +1393,55 @@ def create_plan():
         *PLAN_START_RATE_LIMIT,
     )
     data = _json_body()
-    tool = str(data.get("tool") or "organize").strip().casefold()
-    if tool not in external_api.SUPPORTED_PLAN_TOOLS:
+    unsupported_fields = sorted(set(data) - {"instructions", "name", "tool"})
+    if unsupported_fields:
+        raise APIProblem(
+            "unsupported_field",
+            "Plan request contains unsupported fields.",
+            422,
+            details={
+                "path": "$",
+                "fields": unsupported_fields,
+                "allowed_fields": ["instructions", "name", "tool"],
+            },
+        )
+    tool = data.get("tool", "organize")
+    if not isinstance(tool, str) or tool not in external_api.SUPPORTED_PLAN_TOOLS:
         raise APIProblem(
             "unsupported_tool",
             "Plan tool must be ask, create, or organize.",
             422,
+            details={"path": "$.tool"},
+        )
+    instructions = data.get("instructions")
+    if not isinstance(instructions, str) or not instructions.strip():
+        raise APIProblem(
+            "invalid_instructions",
+            '"instructions" must be a non-empty string.',
+            422,
+            details={
+                "path": "$.instructions",
+                "expected": "non-empty string",
+            },
+        )
+    name = data.get("name")
+    if "name" in data and (
+        not isinstance(name, str) or len(name) > 120
+    ):
+        raise APIProblem(
+            "invalid_name",
+            '"name" must be a string of at most 120 characters.',
+            422,
+            details={
+                "path": "$.name",
+                "expected": "string with at most 120 characters",
+            },
         )
     report = external_api.create_plan(
         actor,
-        instructions=data.get("instructions"),
+        instructions=instructions,
         tool=tool,
-        name=data.get("name"),
+        name=name,
     )
     return _plan_payload(report), 201
 
@@ -1307,7 +1462,16 @@ def get_plan(plan_id):
 @_route
 def get_plan_contract(plan_id):
     report = _load_plan(plan_id)
-    contract = external_api.plan_contract(report, g.agent_api_user)
+    contract = external_api.plan_contract(
+        report,
+        g.agent_api_user,
+        submit_url=absolute_url(
+            url_for(
+                "agent_api.submit_plan",
+                plan_id=report.urlsafe_key,
+            )
+        ),
+    )
     LOGGER.info(
         "agent_api_contract request_id=%s user_hash=%s plan=%s "
         "contract_bytes=%d proposal_schema_bytes=%d",
@@ -1361,31 +1525,85 @@ def create_uploads(plan_id):
             409,
         )
     data = _json_body()
+    unsupported_fields = sorted(set(data) - {"files"})
+    if unsupported_fields:
+        raise APIProblem(
+            "unsupported_field",
+            "Upload-session request contains unsupported fields.",
+            422,
+            details={
+                "path": "$",
+                "fields": unsupported_fields,
+                "allowed_fields": ["files"],
+            },
+        )
     requested = data.get("files")
     if not isinstance(requested, list) or not requested:
         raise APIProblem("invalid_files", "files must be a non-empty list.", 422)
 
     normalized = []
-    for item in requested:
+    for index, item in enumerate(requested):
         if not isinstance(item, dict):
             raise APIProblem("invalid_files", "Each file must be an object.", 422)
-        filename = str(item.get("filename") or "").strip()
-        content_type = str(
-            item.get("content_type") or "application/octet-stream"
-        ).strip()
-        try:
-            size = int(item.get("size"))
-        except (TypeError, ValueError) as error:
+        unsupported_fields = sorted(
+            set(item) - {"filename", "content_type", "size"}
+        )
+        if unsupported_fields:
+            details = {
+                "path": f"$.files[{index}]",
+                "fields": unsupported_fields,
+                "allowed_fields": ["content_type", "filename", "size"],
+            }
+            if "size_bytes" in unsupported_fields:
+                details["use_field"] = "size"
             raise APIProblem(
-                "invalid_file_size",
-                "Each file must declare its byte size.",
+                "unsupported_field",
+                "Upload file entry contains unsupported fields.",
                 422,
-            ) from error
-        if not filename or size <= 0:
+                details=details,
+            )
+        filename = item.get("filename")
+        if not isinstance(filename, str) or not filename.strip():
             raise APIProblem(
                 "invalid_file",
-                "Each file needs a filename and a positive byte size.",
+                'Each file\'s "filename" must be a non-empty string.',
                 422,
+                details={
+                    "path": f"$.files[{index}].filename",
+                    "expected": "non-empty string",
+                },
+            )
+        filename = filename.strip()
+        content_type = item.get("content_type", "application/octet-stream")
+        if not isinstance(content_type, str) or not content_type.strip():
+            raise APIProblem(
+                "invalid_content_type",
+                'Each file\'s "content_type" must be a non-empty string.',
+                422,
+                details={
+                    "path": f"$.files[{index}].content_type",
+                    "expected": "non-empty string",
+                },
+            )
+        content_type = content_type.strip()
+        size_details = {
+            "path": f"$.files[{index}].size",
+            "expected": "positive integer byte size",
+        }
+        size = item.get("size")
+        if isinstance(size, bool) or not isinstance(size, int):
+            raise APIProblem(
+                "invalid_file_size",
+                'Each file\'s "size" must be a positive integer byte size.',
+                422,
+                details=size_details,
+            )
+        if size <= 0:
+            raise APIProblem(
+                "invalid_file_size",
+                'Each file\'s "size" must be a positive integer byte size.',
+                422,
+                details=size_details,
             )
         if size > external_api.MAX_FILE_BYTES:
             raise APIProblem(
@@ -1446,6 +1664,15 @@ def finalize_uploads(plan_id):
             "File uploads are supported only for Organize plans.",
             409,
         )
+    if request.get_data(cache=True):
+        data = _json_body()
+        if data:
+            raise APIProblem(
+                "unsupported_field",
+                "Upload finalization accepts only an empty JSON object.",
+                422,
+                details={"path": "$", "fields": sorted(data)},
+            )
     if report.upload_manifest:
         external_api.finalize_uploads(report, g.agent_api_user)
     return _plan_payload(report)

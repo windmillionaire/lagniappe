@@ -19,12 +19,12 @@ GET_PAGE_FILE_LIST = types.FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
-            "page_id": {
+            "id": {
                 "type": "string",
                 "description": "The page hash token from prompt context or search results.",
             },
         },
-        "required": ["page_id"],
+        "required": ["id"],
     },
 )
 
@@ -33,11 +33,11 @@ GET_PAGE_FILE_LIST = types.FunctionDeclaration(
 # @tests tests_unit/test_015_ai_tools.py::test_ai_file_tools_return_summary_and_content
 # @matrix ai files : page-file-list projection summary
 def execute_get_page_file_list(args, user):
-    page_id = args.get("page_id")
-    if not page_id:
-        return {"error": "page_id is required"}
+    identifier = args.get("id")
+    if not identifier:
+        return {"error": "id is required"}
 
-    page = Entities.fetch_one(page_id, request=Fetch.direct())
+    page = Entities.fetch_one(identifier, request=Fetch.direct())
     if not page or not isinstance(page, Entities.PAGE):
         return {"error": "Page not found"}
 

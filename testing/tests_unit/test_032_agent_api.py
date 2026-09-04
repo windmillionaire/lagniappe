@@ -39,6 +39,8 @@ def test_client_skill_markdown_is_minimal_and_discovery_first():
     assert '{"arguments": {...}}' in skill
     assert "reuse them in memory" in skill
     assert "exact `input_schema`" in skill
+    assert "follow its returned `contract_url`" in skill
+    assert "instead of reconstructing those lifecycle" in skill
     assert "Choose Ask for a read-only answer" in skill
     assert "untrusted evidence" in skill
     assert "ready for authenticated website review" in skill
@@ -156,9 +158,33 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
     )
 
-    contract = external_api.plan_contract(report, actor)
+    contract = external_api.plan_contract(
+        report,
+        actor,
+        submit_url="https://example.test/api/v1/plans/report-key/submit",
+    )
 
-    assert contract["version"] == external_api.CONTRACT_VERSION
+    assert set(contract) == {
+        "contract_version",
+        "tool",
+        "current_date",
+        "timezone",
+        "personal_page",
+        "submission_format",
+        "proposal_schema",
+        "permissions",
+        "required_file_refs",
+        "upload_inventory",
+        "file_checklist",
+        "guidance_requirements",
+        "uploads_supported",
+        "workflow_rules",
+        "reference_rules",
+        "limits",
+        "payload_sizes",
+    }
+    assert contract["contract_version"] == external_api.CONTRACT_VERSION
+    assert "version" not in contract
     assert contract["current_date"] == "2026-08-31"
     assert contract["timezone"] == "UTC"
     assert contract["personal_page"] == {
@@ -173,14 +199,18 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         "personal_page is the authenticated user's guaranteed editable Page"
     )
     assert contract["submission_format"] == {
+        "method": "POST",
+        "url": "https://example.test/api/v1/plans/report-key/submit",
         "contract_version": external_api.CONTRACT_VERSION,
         "body": {
             "contract_version": external_api.CONTRACT_VERSION,
-            "proposal": "<object matching proposal_schema>",
+            "proposal": {},
         },
         "rule": (
-            "POST this wrapper object to submit_url; do not post the proposal "
-            "object as the top-level request body."
+            "Replace the empty proposal template with an object matching "
+            "proposal_schema, then send the wrapper body with the stated "
+            "method and URL; do not post the proposal object as the top-level "
+            "request body."
         ),
     }
     assert contract["proposal_schema"] == {
@@ -208,11 +238,62 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     assert contract["guidance_requirements"]["required_before_analysis"] == [
         {"task": "organize"}
     ]
-    assert any(
-        item["request"].get("task") == "form_autofill"
-        and "field_types" in item["request"]
+    guidance_by_task = {
+        item["request"]["task"]: item
         for item in contract["guidance_requirements"]["conditional"]
-    )
+    }
+    assert guidance_by_task["form_autofill"]["request"] == {
+        "task": "form_autofill"
+    }
+    assert guidance_by_task["form_autofill"]["derived_request_arguments"] == {
+        "field_types": {
+            "type": "array",
+            "items": {"type": "string"},
+            "source": "unique type values from the exact target schemas",
+        }
+    }
+    assert guidance_by_task["report_actions"]["request"] == {
+        "task": "report_actions"
+    }
+    assert guidance_by_task["report_actions"]["derived_request_arguments"] == {
+        "actions": {
+            "type": "array",
+            "items": {"type": "string"},
+            "source": "unique selected proposal action types",
+        }
+    }
+    assert "actual arrays" in contract["guidance_requirements"][
+        "derived_request_rule"
+    ]
+    guidelines_schema = ai_functions.tool_catalog(names=["get_guidelines"])[0][
+        "input_schema"
+    ]
+    derived_samples = {
+        "field_types": ["input"],
+        "actions": ["create_page"],
+    }
+    for task, item in guidance_by_task.items():
+        assert task in guidelines_schema["properties"]["task"]["enum"]
+        result, parts = ai_functions.execute_registered_tool(
+            "get_guidelines",
+            item["request"],
+            actor,
+        )
+        assert result["task"] == task
+        assert parts == []
+        for argument, descriptor in item.get(
+            "derived_request_arguments", {}
+        ).items():
+            live_argument = guidelines_schema["properties"][argument]
+            assert descriptor["type"] == live_argument["type"] == "array"
+            assert descriptor["items"]["type"] == live_argument["items"]["type"]
+            selected, selected_parts = ai_functions.execute_registered_tool(
+                "get_guidelines",
+                {**item["request"], argument: derived_samples[argument]},
+                actor,
+            )
+            assert selected["filters"][argument] == derived_samples[argument]
+            assert selected_parts == []
     assert contract["payload_sizes"]["proposal_schema_bytes"] > 0
     assert contract["payload_sizes"]["contract_without_payload_sizes_bytes"] > 0
     assert any(
@@ -263,6 +344,7 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     ask_contract = external_api.plan_contract(
         SimpleNamespace(tool="ask", input_files=[]),
         actor,
+        submit_url="https://example.test/api/v1/plans/ask/submit",
     )
 
     assert ask_contract["tool"] == "ask"
@@ -294,6 +376,7 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     create_contract = external_api.plan_contract(
         SimpleNamespace(tool="create", input_files=[]),
         actor,
+        submit_url="https://example.test/api/v1/plans/create/submit",
     )
 
     assert create_contract["tool"] == "create"
@@ -335,6 +418,48 @@ def test_external_plan_tool_selection_is_provider_independent():
     assert external_api.normalize_plan_tool(" Ask ") == "ask"
     with pytest.raises(exceptions.ValidationError, match="ask, create, or organize"):
         external_api.normalize_plan_tool("email")
+
+
+# @source lagniappe/core/tools/ai/functions.py::tool_catalog
+# @matrix agent-api ai : provider-neutral-schema tool-catalog
+@pytest.mark.unit
+def test_external_tool_catalog_uses_id_for_subject_entity_references():
+    expected_required = {
+        "get_entity": {"id"},
+        "get_file": {"id"},
+        "get_category_pages": {"id"},
+        "get_category_forms": {"id"},
+        "get_page_details": {"id"},
+        "get_page_file_list": {"id"},
+        "get_page_tasks": {"id"},
+        "get_task_history": {"id"},
+        "get_category_details": {"id"},
+        "get_schema": {"id"},
+        "get_form_instances": {"id"},
+        "get_filter_schema": {"id"},
+        "query_workspace_filter": {"id", "conditions"},
+    }
+    forbidden_legacy_subject_arguments = {
+        "get_page_details": "page_id",
+        "get_page_file_list": "page_id",
+        "get_page_tasks": "page_id",
+        "get_task_history": "task_id",
+        "get_category_details": "category_id",
+        "get_form_instances": "form_id",
+        "get_filter_schema": "parent_id",
+        "query_workspace_filter": "parent_id",
+    }
+
+    catalog = {tool["name"]: tool for tool in ai_functions.tool_catalog()}
+    for tool_name, required in expected_required.items():
+        schema = catalog[tool_name]["input_schema"]
+        assert set(schema["required"]) == required
+        assert "id" in schema["properties"]
+    for tool_name, forbidden in forbidden_legacy_subject_arguments.items():
+        assert forbidden not in catalog[tool_name]["input_schema"]["properties"]
+
+    assert "form_id" in catalog["get_category_pages"]["input_schema"]["properties"]
+    assert "parent_id" in catalog["search_entities"]["input_schema"]["properties"]
 
 
 # @matrix agent-api ai : permission-context provider-neutral-dispatch provider-neutral-schema tool-catalog tool-registry
@@ -860,7 +985,11 @@ def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatc
         lambda _user=None: datetime(2026, 9, 2, tzinfo=timezone.utc),
     )
     report = SimpleNamespace(tool="organize", input_files=files, upload_manifest=None)
-    contract = external_api.plan_contract(report, actor)
+    contract = external_api.plan_contract(
+        report,
+        actor,
+        submit_url="https://example.test/api/v1/plans/report-key/submit",
+    )
     repeated_inventory = external_api.report_file_inventory(report)
 
     assert contract["upload_inventory"]["count"] == 7
