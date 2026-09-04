@@ -146,7 +146,7 @@ export class McpSetup {
 			`"${artifactUrl}#sha256=${digest}"`;
 		const configure =
 			`lagniappe-mcp configure codex --url "${origin}" ` +
-			'--profile personal --allowed-root "/path/the-user-approves"';
+			"--profile personal";
 		const diagnostic = "lagniappe-mcp check --profile personal";
 		this.target.querySelector("[data-role='mcp-install-command']").textContent =
 			install;

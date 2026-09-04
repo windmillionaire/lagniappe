@@ -35,10 +35,7 @@ from .limits import (
 from .url_security import quote_path_segment, validate_storage_url
 
 
-_DIRECTORY_FLAGS = (
-    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
-)
-_FILE_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0)
+_FILE_FLAGS = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0)
 _READ_BLOCK_BYTES = 64 * 1024
 _UPLOAD_BATCH_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 
@@ -67,71 +64,6 @@ def _file_error(
 ) -> FileBoundaryError:
     details = {"file_index": index} if index is not None else None
     return FileBoundaryError(code, message, details=details)
-
-
-# @testable false
-# @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/files.py::OpenedFileBatch
-def _absolute_components(
-    path: Path, *, root: bool, index: int | None = None
-) -> tuple[str, ...]:
-    """Parse a Linux absolute path without resolving it or accepting traversal."""
-    value = os.fspath(path)
-    if not value or "\x00" in value:
-        raise _file_error(
-            "invalid_local_path", "A local file path is empty or invalid.", index=index
-        )
-    candidate = Path(value)
-    parts = candidate.parts
-    if not candidate.is_absolute() or not parts or parts[0] != "/":
-        kind = "Allowed roots" if root else "Local file paths"
-        raise _file_error(
-            "invalid_local_path", f"{kind} must be absolute Linux paths.", index=index
-        )
-    components = tuple(parts[1:])
-    if any(part in {"", ".", ".."} for part in components):
-        raise _file_error(
-            "invalid_local_path", "Local path traversal is not allowed.", index=index
-        )
-    return components
-
-
-# @testable false
-# @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/files.py::OpenedFileBatch
-def _open_directory_components(components: tuple[str, ...]) -> int:
-    """Open one absolute directory through no-follow component handles."""
-    current = -1
-    try:
-        current = os.open("/", _DIRECTORY_FLAGS)
-        for component in components:
-            following = os.open(component, _DIRECTORY_FLAGS, dir_fd=current)
-            os.close(current)
-            current = following
-        metadata = os.fstat(current)
-        if not stat.S_ISDIR(metadata.st_mode):
-            raise OSError("not a directory")
-        return current
-    except (OSError, ValueError) as error:
-        if current >= 0:
-            os.close(current)
-        raise _file_error(
-            "unsafe_allowed_root",
-            "An allowed root is missing, symlinked, or not a directory.",
-        ) from error
-
-
-# @testable false
-# @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/files.py::OpenedFileBatch
-@dataclass(slots=True)
-class _OpenedRoot:
-    fd: int
-    components: tuple[str, ...] = field(repr=False)
-
-    # @testable false
-    # @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/files.py::OpenedFileBatch
-    def close(self) -> None:
-        if self.fd >= 0:
-            os.close(self.fd)
-            self.fd = -1
 
 
 # @testable false
@@ -219,11 +151,11 @@ async def _capture_descriptor_hashes(
 
 # @testable true
 # @pair mcp-adapter:product-contract
-# @tests clients/lagniappe_mcp/tests/test_files.py::test_opened_batch_rejects_unsafe_paths_and_duplicate_objects
+# @tests clients/lagniappe_mcp/tests/test_files.py::test_opened_batch_accepts_readable_regular_files
 # @tests clients/lagniappe_mcp/tests/test_files.py::test_replacing_path_after_open_still_uploads_the_open_descriptor
 # @tests clients/lagniappe_mcp/tests/test_files.py::test_open_descriptor_rejects_same_size_rewrite_with_restored_mtime
 # @tests clients/lagniappe_mcp/tests/test_files.py::test_unlinked_rewritten_descriptor_fails_content_identity_check
-# @matrix mcp-upload : nofollow roots components regular duplicate descriptor-lifetime mutation-snapshot byte-identity
+# @matrix mcp-upload : os-readable regular absolute parent-traversal symlink descriptor-lifetime mutation-snapshot byte-identity
 @dataclass(slots=True)
 class OpenedFile:
     """One regular file whose verified descriptor remains the byte authority."""
@@ -289,33 +221,27 @@ class OpenedFile:
 
 # @testable true
 # @pair mcp-adapter:product-contract
-# @tests clients/lagniappe_mcp/tests/test_files.py::test_opened_batch_rejects_unsafe_paths_and_duplicate_objects
-# @tests clients/lagniappe_mcp/tests/test_files.py::test_opened_batch_rejects_every_non_regular_or_unapproved_input
+# @tests clients/lagniappe_mcp/tests/test_files.py::test_opened_batch_rejects_duplicate_objects
+# @tests clients/lagniappe_mcp/tests/test_files.py::test_opened_batch_rejects_invalid_or_non_regular_inputs
+# @tests clients/lagniappe_mcp/tests/test_files.py::test_opened_batch_accepts_readable_regular_files
 # @tests clients/lagniappe_mcp/tests/test_files.py::test_upload_rejects_contract_count_before_opening_paths
 # @tests clients/lagniappe_mcp/tests/test_files.py::test_oversized_file_is_rejected_before_descriptor_read
 # @tests clients/lagniappe_mcp/tests/test_files.py::test_cancellation_during_byte_snapshot_closes_descriptors
-# @matrix mcp-upload : root-authorization batch-preflight cancellation cleanup regular missing empty traversal directory special byte-identity
+# @matrix mcp-upload : os-readable batch-preflight cancellation cleanup regular missing empty relative symlink directory special byte-identity duplicate invalid-path
 class OpenedFileBatch:
-    """Trusted root handles and files retained for one complete upload batch."""
+    """Explicit OS-readable regular files retained for one upload batch."""
 
-    def __init__(self, roots: list[_OpenedRoot], files: list[OpenedFile]) -> None:
-        self._roots = roots
+    def __init__(self, files: list[OpenedFile]) -> None:
         self.files = files
 
     @classmethod
     async def open(
         cls,
-        allowed_roots: Sequence[Path],
         file_items: object,
         *,
         max_file_bytes: int | None = None,
         max_total_bytes: int | None = None,
     ) -> OpenedFileBatch:
-        if not allowed_roots:
-            raise _file_error(
-                "no_allowed_roots",
-                "Local uploads require at least one explicitly configured allowed root.",
-            )
         if (
             not isinstance(file_items, list)
             or not file_items
@@ -329,16 +255,8 @@ class OpenedFileBatch:
                 "files must be a non-empty array of objects containing only path.",
             )
 
-        roots: list[_OpenedRoot] = []
         files: list[OpenedFile] = []
         try:
-            for configured in allowed_roots:
-                components = _absolute_components(Path(configured), root=True)
-                roots.append(
-                    _OpenedRoot(_open_directory_components(components), components)
-                )
-            roots.sort(key=lambda item: len(item.components), reverse=True)
-
             identities: set[tuple[int, int]] = set()
             total_bytes = 0
             for index, item in enumerate(file_items):
@@ -349,26 +267,21 @@ class OpenedFileBatch:
                         "Each local file requires a non-empty string path.",
                         index=index,
                     )
-                components = _absolute_components(
-                    Path(raw_path), root=False, index=index
-                )
-                selected = next(
-                    (
-                        root
-                        for root in roots
-                        if len(components) > len(root.components)
-                        and components[: len(root.components)] == root.components
-                    ),
-                    None,
-                )
-                if selected is None:
+                if "\x00" in raw_path:
                     raise _file_error(
-                        "outside_allowed_roots",
-                        "A selected local file is outside the configured allowed roots.",
+                        "invalid_local_path",
+                        "A local file path is empty or invalid.",
                         index=index,
                     )
-                relative = components[len(selected.components) :]
-                opened = cls._open_file(selected, relative, index=index)
+                try:
+                    selected_path = Path(raw_path).expanduser()
+                except (RuntimeError, ValueError) as error:
+                    raise _file_error(
+                        "invalid_local_path",
+                        "A local file path is empty or invalid.",
+                        index=index,
+                    ) from error
+                opened = cls._open_file(selected_path, index=index)
                 try:
                     identity = (opened.device, opened.inode)
                     if identity in identities:
@@ -425,26 +338,18 @@ class OpenedFileBatch:
                     raise
                 identities.add(identity)
                 files.append(opened)
-            return cls(roots, files)
+            return cls(files)
         except BaseException:
             for opened in files:
                 opened.close()
-            for opened_root in roots:
-                opened_root.close()
             raise
 
     @staticmethod
-    def _open_file(
-        root: _OpenedRoot, components: tuple[str, ...], *, index: int
-    ) -> OpenedFile:
-        parent_fd = os.dup(root.fd)
+    def _open_file(selected_path: Path, *, index: int) -> OpenedFile:
         descriptor = -1
         try:
-            for component in components[:-1]:
-                following = os.open(component, _DIRECTORY_FLAGS, dir_fd=parent_fd)
-                os.close(parent_fd)
-                parent_fd = following
-            descriptor = os.open(components[-1], _FILE_FLAGS, dir_fd=parent_fd)
+            descriptor = os.open(selected_path, _FILE_FLAGS)
+            filename = selected_path.name
             metadata = os.fstat(descriptor)
             if not stat.S_ISREG(metadata.st_mode):
                 raise _file_error(
@@ -458,7 +363,6 @@ class OpenedFileBatch:
                     "Empty local files cannot be uploaded.",
                     index=index,
                 )
-            filename = components[-1]
             content_type = mimetypes.guess_type(filename, strict=False)[0]
             return OpenedFile(
                 fd=descriptor,
@@ -482,38 +386,19 @@ class OpenedFileBatch:
                 os.close(descriptor)
             raise _file_error(
                 "unsafe_local_file",
-                "A selected local file is missing, symlinked, or inaccessible.",
+                "A selected local file is missing or inaccessible.",
                 index=index,
             ) from error
-        finally:
-            os.close(parent_fd)
 
     def close(self) -> None:
         for opened in self.files:
             opened.close()
-        for root in self._roots:
-            root.close()
 
     def __enter__(self) -> OpenedFileBatch:
         return self
 
     def __exit__(self, *_exc: object) -> None:
         self.close()
-
-
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests clients/lagniappe_mcp/tests/test_files.py::test_opened_batch_rejects_unsafe_paths_and_duplicate_objects
-def validate_allowed_roots(allowed_roots: Sequence[Path]) -> None:
-    """Revalidate configured roots without opening or naming any file beneath them."""
-    opened: list[int] = []
-    try:
-        for configured in allowed_roots:
-            components = _absolute_components(Path(configured), root=True)
-            opened.append(_open_directory_components(components))
-    finally:
-        for descriptor in opened:
-            os.close(descriptor)
 
 
 # @testable false
@@ -1136,7 +1021,6 @@ async def upload_local_files(
     *,
     plan_id: str,
     file_items: object,
-    allowed_roots: Sequence[Path],
     contract: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Upload one explicit batch and return final Plan state plus file inventory."""
@@ -1147,7 +1031,6 @@ async def upload_local_files(
                 rest,
                 plan_id=plan_id,
                 file_items=file_items,
-                allowed_roots=allowed_roots,
                 contract=contract,
                 deadline=deadline,
             )
@@ -1166,7 +1049,6 @@ async def _upload_local_files(
     *,
     plan_id: str,
     file_items: object,
-    allowed_roots: Sequence[Path],
     contract: Mapping[str, Any],
     deadline: float,
 ) -> dict[str, Any]:
@@ -1174,7 +1056,6 @@ async def _upload_local_files(
     _preflight_requested_count(contract, file_items)
     max_file_bytes, max_batch_bytes = _preflight_contract(contract, ())
     batch = await OpenedFileBatch.open(
-        allowed_roots,
         file_items,
         max_file_bytes=max_file_bytes,
         max_total_bytes=max_batch_bytes,

@@ -8,8 +8,6 @@ from contextlib import suppress
 from datetime import datetime, timezone
 import getpass
 import os
-from pathlib import Path
-import stat
 import sys
 from typing import Any
 import warnings
@@ -72,14 +70,12 @@ def _parser() -> argparse.ArgumentParser:
         source = command.add_mutually_exclusive_group(required=True)
         source.add_argument("--profile", type=validate_profile_name)
         source.add_argument("--from-env", action="store_true")
-        command.add_argument("--allowed-root", action="append", default=[])
 
     configure = commands.add_parser("configure")
     configure_clients = configure.add_subparsers(dest="client", required=True)
     codex = configure_clients.add_parser("codex")
     codex.add_argument("--url")
     codex.add_argument("--profile", required=True, type=validate_profile_name)
-    codex.add_argument("--allowed-root", action="append", default=[])
     codex.add_argument("--remove", action="store_true")
     codex.add_argument(
         "--trial-required",
@@ -107,56 +103,8 @@ def _parser() -> argparse.ArgumentParser:
 # @tests tests_unit/test_033_mcp_adapter.py::test_cli_source_modes_and_lowercase_profile_names_are_exact
 def _connection(args: argparse.Namespace) -> ConnectionConfig:
     if args.profile:
-        if args.allowed_root:
-            raise ConfigurationError(
-                "invalid_arguments",
-                "--allowed-root is accepted only with --from-env.",
-            )
         return connection_from_profile(args.profile)
-    roots = [_safe_root(value) for value in args.allowed_root]
-    if len(set(roots)) != len(roots):
-        raise ConfigurationError(
-            "duplicate_root", "Each allowed root may be configured only once."
-        )
-    return from_environment(roots)
-
-
-# @testable false
-# @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/cli.py::_configure_codex
-def _safe_root(raw: str) -> str:
-    candidate = Path(raw).expanduser()
-    if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
-    if any(part == ".." for part in candidate.parts):
-        raise ConfigurationError(
-            "unsafe_root", "Allowed roots cannot contain parent traversal."
-        )
-    candidate = Path(os.path.normpath(candidate))
-    current = Path(candidate.anchor)
-    try:
-        for part in candidate.parts[1:]:
-            current = current / part
-            details = current.lstat()
-            if stat.S_ISLNK(details.st_mode):
-                raise ConfigurationError(
-                    "unsafe_root", "Allowed roots cannot contain symbolic links."
-                )
-        details = candidate.stat(follow_symlinks=False)
-    except FileNotFoundError as error:
-        raise ConfigurationError(
-            "invalid_root", "Every allowed root must already exist."
-        ) from error
-    except ConfigurationError:
-        raise
-    except OSError as error:
-        raise ConfigurationError(
-            "unsafe_root", "An allowed root could not be inspected safely."
-        ) from error
-    if not stat.S_ISDIR(details.st_mode):
-        raise ConfigurationError(
-            "invalid_root", "Every allowed root must be a directory."
-        )
-    return str(candidate)
+    return from_environment()
 
 
 # @testable false
@@ -240,7 +188,7 @@ def _confirm(message: str) -> None:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_configure_rolls_back_new_codex_entry_when_profile_save_fails
-# @tests tests_unit/test_033_mcp_adapter.py::test_configure_idempotently_preserves_existing_allowed_roots
+# @tests tests_unit/test_033_mcp_adapter.py::test_configure_replaces_legacy_profile_without_file_roots
 # @tests tests_unit/test_033_mcp_adapter.py::test_configure_remove_falls_back_without_claiming_manual_removal
 # @tests tests_unit/test_033_mcp_adapter.py::test_configure_trial_required_uses_owned_required_entry
 # @tests tests_unit/test_033_mcp_adapter.py::test_configure_manual_fallback_preserves_a_changed_manual_identity
@@ -250,11 +198,10 @@ async def _configure_codex(args: argparse.Namespace) -> int:
     name = args.profile
     trial_required = bool(getattr(args, "trial_required", False))
     if args.remove:
-        if args.url or args.allowed_root or trial_required:
+        if args.url or trial_required:
             raise ConfigurationError(
                 "invalid_arguments",
-                "--remove cannot be combined with --url, --allowed-root, or "
-                "--trial-required.",
+                "--remove cannot be combined with --url or --trial-required.",
             )
         profile, profile_snapshot = load_profile_snapshot(name)
         client = (
@@ -354,14 +301,6 @@ async def _configure_codex(args: argparse.Namespace) -> int:
     user, credential = await _validate_key(
         authority.origin, key, expected_hash=expected_hash
     )
-    root_arguments = args.allowed_root
-    if existing is not None and not root_arguments:
-        root_arguments = list(existing["allowed_roots"])
-    roots = [_safe_root(value) for value in root_arguments]
-    if len(set(roots)) != len(roots):
-        raise ConfigurationError(
-            "duplicate_root", "Each allowed root may be configured only once."
-        )
     executable = console_executable()
     prior_client = (
         existing.get("client")
@@ -378,15 +317,12 @@ async def _configure_codex(args: argparse.Namespace) -> int:
         required=trial_required,
     )
     print(
-        f"Profile {name}: site={authority.origin}, allowed_roots={len(roots)}, "
+        f"Profile {name}: site={authority.origin}, "
         f"Codex server={server_name(name)}, credential_expires={credential['expires_at']}"
     )
-    print("Allowed roots:")
-    if roots:
-        for root in roots:
-            print(f"  - {root}")
-    else:
-        print("  (none)")
+    print(
+        "Local uploads may read any explicit regular file accessible to this account."
+    )
     print("Proposed user Codex entry:")
     print(block, end="")
     _confirm("Save the owner-only profile and update user Codex configuration?")
@@ -403,7 +339,6 @@ async def _configure_codex(args: argparse.Namespace) -> int:
         "name": name,
         "site_url": authority.origin,
         "api_key": key,
-        "allowed_roots": roots,
         "actor": {"name": user["name"], "hash": user["hash"]},
         "credential": {
             "expires_at": credential["expires_at"],
@@ -539,10 +474,7 @@ async def _run(args: argparse.Namespace) -> int:
             await serve(config)
             return 0
         await check(config)
-        print(
-            f"Lagniappe MCP {__version__}: compatible; actor=verified; "
-            f"roots={len(config.allowed_roots)}"
-        )
+        print(f"Lagniappe MCP {__version__}: compatible; actor=verified")
         return 0
     if args.command == "configure":
         return await _configure_codex(args)

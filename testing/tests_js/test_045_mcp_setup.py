@@ -122,7 +122,8 @@ vm.runInContext(source, context);
   }
   const configure = elements.get("[data-role='mcp-configure-command']").textContent;
   if (!configure.includes('--url "https://example.test"') ||
-      !configure.includes("--profile personal") || configure.includes(digest)) {
+      !configure.includes("--profile personal") || configure.includes("--allowed-root") ||
+      configure.includes(digest)) {
     throw new Error(`Invalid MCP configuration command: ${configure}`);
   }
   const diagnostic = elements.get(

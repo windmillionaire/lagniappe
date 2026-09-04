@@ -1522,8 +1522,17 @@ def load_release_ledger(repo_root=REPOSITORY_ROOT) -> dict:
 
 # @testable true
 # @tests tests_tooling/test_012b_mcp_artifact.py::test_historical_wheel_remains_valid_after_current_source_changes
-# @matrix mcp-package release : historical-wheel immutable-ledger source-versioning
-def _validate_durable_artifacts(repo_root: Path, ledger: dict) -> None:
+# @tests tests_tooling/test_012b_mcp_artifact.py::test_artifact_builder_promotes_new_source_over_historical_current
+# @matrix mcp-package release : historical-wheel immutable-ledger promotion source-versioning
+def _validate_durable_artifacts(
+    repo_root: Path,
+    ledger: dict,
+    *,
+    source_version: str | None = None,
+) -> None:
+    """Validate immutable wheels, matching source only for the selected version."""
+    if source_version is None:
+        source_version = ledger["current"]
     expected = {"releases.json"}
     for entry in ledger["releases"]:
         relative = _artifact_relative_path(entry["version"], entry["sha256"])
@@ -1546,7 +1555,7 @@ def _validate_durable_artifacts(repo_root: Path, ledger: dict) -> None:
             path,
             wheel_project,
             repo_root,
-            match_current_source=entry["version"] == ledger["current"],
+            match_current_source=entry["version"] == source_version,
         )
     releases_root = repo_root / MCP_RELEASES_RELATIVE
     entries = list(releases_root.rglob("*"))
@@ -1987,7 +1996,14 @@ def build_and_promote_release(repo_root=REPOSITORY_ROOT) -> dict:
         ledger_path = repo_root / MCP_LEDGER_RELATIVE
         if ledger_path.exists():
             ledger = load_release_ledger(repo_root)
-            _validate_durable_artifacts(repo_root, ledger)
+            # A version bump makes every ledger entry historical until the new
+            # wheel is appended. Do not compare the prior current wheel to the
+            # new package source while validating its immutable bytes.
+            _validate_durable_artifacts(
+                repo_root,
+                ledger,
+                source_version=project.version,
+            )
             if ledger["source_url"] != project.source_url or ledger["license"] != {
                 "expression": project.license_expression,
                 "url": project.license_url,

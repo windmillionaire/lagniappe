@@ -567,7 +567,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "upload_local_files",
-            "Upload explicit regular files beneath configured allowed roots to one Organize Plan, then finalize the batch. Paths appear in the MCP request transcript but never in results or upstream requests.",
+            "Upload explicit readable nonempty regular files to one Organize Plan, then finalize the batch. Relative paths resolve from the adapter working directory and symlinks follow normal operating-system resolution. Paths appear in the MCP request transcript but never in results or upstream requests.",
             {
                 "type": "object",
                 "required": ["plan_id", "files"],
@@ -580,7 +580,13 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
                         "items": {
                             "type": "object",
                             "required": ["path"],
-                            "properties": {"path": {"type": "string", "minLength": 1}},
+                            "properties": {
+                                "path": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "An absolute path or a path relative to the adapter working directory.",
+                                }
+                            },
                             "additionalProperties": False,
                         },
                     },

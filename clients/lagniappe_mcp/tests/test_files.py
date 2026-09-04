@@ -160,46 +160,18 @@ class _RESTClient:
         raise AssertionError(target)
 
 
-# @matrix mcp-upload : nofollow roots components regular duplicate root-authorization batch-preflight cleanup
+# @matrix mcp-upload : regular duplicate batch-preflight cleanup
 # @pair mcp-adapter:product-contract
-def test_opened_batch_rejects_unsafe_paths_and_duplicate_objects(
+def test_opened_batch_rejects_duplicate_objects(
     tmp_path: Path,
 ) -> None:
-    safe = tmp_path / "safe"
-    safe.mkdir()
-    original = safe / "original.txt"
+    original = tmp_path / "original.txt"
     original.write_text("content")
-
-    root_link = tmp_path / "root-link"
-    root_link.symlink_to(safe, target_is_directory=True)
-    with pytest.raises(FileBoundaryError, match="allowed root") as root_error:
-        asyncio.run(
-            OpenedFileBatch.open(
-                [root_link],
-                [{"path": str(root_link / original.name)}],
-            )
-        )
-    assert root_error.value.code == "unsafe_allowed_root"
-
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "other.txt").write_text("other")
-    (safe / "linked").symlink_to(outside, target_is_directory=True)
-    with pytest.raises(FileBoundaryError) as component_error:
-        asyncio.run(
-            OpenedFileBatch.open(
-                [safe],
-                [{"path": str(safe / "linked" / "other.txt")}],
-            )
-        )
-    assert component_error.value.code == "unsafe_local_file"
-
-    alias = safe / "alias.txt"
+    alias = tmp_path / "alias.txt"
     os.link(original, alias)
     with pytest.raises(FileBoundaryError) as duplicate_error:
         asyncio.run(
             OpenedFileBatch.open(
-                [safe],
                 [{"path": str(original)}, {"path": str(alias)}],
             )
         )
@@ -207,37 +179,103 @@ def test_opened_batch_rejects_unsafe_paths_and_duplicate_objects(
     assert str(tmp_path) not in duplicate_error.value.render()
 
 
-# @matrix mcp-upload : regular missing empty traversal directory special cleanup
+# @matrix mcp-upload : regular missing invalid-path empty directory special cleanup
 # @pair mcp-adapter:product-contract
-def test_opened_batch_rejects_every_non_regular_or_unapproved_input(
+def test_opened_batch_rejects_invalid_or_non_regular_inputs(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    safe = tmp_path / "safe"
-    safe.mkdir()
-    outside = tmp_path / "outside.txt"
-    outside.write_text("outside")
-    empty = safe / "empty.txt"
+    monkeypatch.chdir(tmp_path)
+    empty = tmp_path / "empty.txt"
     empty.touch()
-    directory = safe / "directory"
+    directory = tmp_path / "directory"
     directory.mkdir()
-    fifo = safe / "named-pipe"
+    fifo = tmp_path / "named-pipe"
     os.mkfifo(fifo)
 
     cases = (
-        ([], [{"path": str(outside)}], "no_allowed_roots"),
-        ([safe], [{"path": "relative.txt"}], "invalid_local_path"),
-        ([safe], [{"path": str(safe / ".." / "outside.txt")}], "invalid_local_path"),
-        ([safe], [{"path": str(outside)}], "outside_allowed_roots"),
-        ([safe], [{"path": str(safe / "missing.txt")}], "unsafe_local_file"),
-        ([safe], [{"path": str(empty)}], "empty_local_file"),
-        ([safe], [{"path": str(directory)}], "invalid_local_file"),
-        ([safe], [{"path": str(fifo)}], "invalid_local_file"),
+        ([{"path": ""}], "invalid_local_path"),
+        ([{"path": "invalid\x00path"}], "invalid_local_path"),
+        ([{"path": "~lagniappe-user-that-does-not-exist/file.txt"}], "invalid_local_path"),
+        ([{"path": "missing.txt"}], "unsafe_local_file"),
+        ([{"path": str(empty)}], "empty_local_file"),
+        ([{"path": str(directory)}], "invalid_local_file"),
+        ([{"path": str(fifo)}], "invalid_local_file"),
     )
-    for roots, items, code in cases:
+    for items, code in cases:
         with pytest.raises(FileBoundaryError) as caught:
-            asyncio.run(OpenedFileBatch.open(roots, items))
+            asyncio.run(OpenedFileBatch.open(items))
         assert caught.value.code == code
         assert str(tmp_path) not in caught.value.render()
+
+
+# @matrix mcp-upload : os-readable regular absolute relative parent-traversal symlink descriptor-lifetime
+# @pair mcp-adapter:product-contract
+def test_opened_batch_accepts_readable_regular_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    working = tmp_path / "working"
+    working.mkdir()
+    absolute = tmp_path / "absolute.txt"
+    absolute.write_text("absolute content")
+    relative = working / "relative.txt"
+    relative.write_text("relative content")
+    parent = tmp_path / "parent.txt"
+    parent.write_text("parent content")
+    home = tmp_path / "home"
+    home.mkdir()
+    home_file = home / "home.txt"
+    home_file.write_text("home content")
+    linked_target = tmp_path / "linked-target.txt"
+    linked_target.write_text("linked content")
+    linked = working / "linked.txt"
+    linked.symlink_to(linked_target)
+    linked_directory_target = tmp_path / "linked-directory-target"
+    linked_directory_target.mkdir()
+    through_link = linked_directory_target / "through-link.txt"
+    through_link.write_text("through linked directory")
+    linked_directory = working / "linked-directory"
+    linked_directory.symlink_to(linked_directory_target, target_is_directory=True)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.chdir(working)
+
+    with asyncio.Runner() as runner:
+        batch = runner.run(
+            OpenedFileBatch.open(
+                [
+                    {"path": str(absolute)},
+                    {"path": relative.name},
+                    {"path": "../parent.txt"},
+                    {"path": "~/home.txt"},
+                    {"path": linked.name},
+                    {"path": "linked-directory/through-link.txt"},
+                ]
+            )
+        )
+    try:
+        assert [opened.filename for opened in batch.files] == [
+            "absolute.txt",
+            "relative.txt",
+            "parent.txt",
+            "home.txt",
+            "linked.txt",
+            "through-link.txt",
+        ]
+        assert [
+            os.pread(opened.fd, opened.size, 0) for opened in batch.files
+        ] == [
+            b"absolute content",
+            b"relative content",
+            b"parent content",
+            b"home content",
+            b"linked content",
+            b"through linked directory",
+        ]
+        for index, opened in enumerate(batch.files):
+            opened.verify_unchanged(index=index)
+    finally:
+        batch.close()
 
 
 # @matrix mcp-upload : content-range 308 final-2xx preflight create-once upload-all finalize-once safe-result
@@ -263,7 +301,6 @@ def test_upload_honors_chunks_and_returns_authoritative_inventory(
             rest,
             plan_id="plan-1",
             file_items=[{"path": str(selected)}],
-            allowed_roots=[root],
             contract=_contract(),
         )
     )
@@ -312,7 +349,6 @@ def test_upload_rejects_contract_count_before_opening_paths(tmp_path: Path) -> N
                 rest,
                 plan_id="plan-1",
                 file_items=requested,
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -346,7 +382,6 @@ def test_upload_rejects_server_limits_above_frozen_local_ceilings_before_open(
                     rest,
                     plan_id="plan-1",
                     file_items=requested,
-                    allowed_roots=[root],
                     contract=contract,
                 )
             )
@@ -379,7 +414,6 @@ def test_upload_rejects_a_chunk_below_the_frozen_efficiency_floor(
                 rest,
                 plan_id="plan-1",
                 file_items=[{"path": str(selected)}],
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -412,7 +446,6 @@ def test_oversized_file_is_rejected_before_descriptor_read(
                 rest,
                 plan_id="plan-1",
                 file_items=[{"path": str(selected)}],
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -455,7 +488,6 @@ def test_cancellation_during_byte_snapshot_closes_descriptors(
                 rest,
                 plan_id="plan-1",
                 file_items=[{"path": str(selected)}],
-                allowed_roots=[root],
                 contract=contract,
             )
         )
@@ -495,7 +527,6 @@ def test_upload_recovers_only_after_a_verified_status_probe(tmp_path: Path) -> N
             rest,
             plan_id="plan-1",
             file_items=[{"path": str(selected)}],
-            allowed_roots=[root],
             contract=_contract(),
         )
     )
@@ -536,7 +567,6 @@ def test_upload_rejects_offset_regression_without_finalizing(tmp_path: Path) -> 
                 rest,
                 plan_id="plan-1",
                 file_items=[{"path": str(selected)}],
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -566,7 +596,6 @@ def test_upload_probe_cannot_skip_beyond_the_ambiguous_chunk(tmp_path: Path) -> 
                 rest,
                 plan_id="plan-1",
                 file_items=[{"path": str(selected)}],
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -606,7 +635,6 @@ def test_post_session_recovery_failures_are_not_retryable_as_whole_tool_calls(
                     rest,
                     plan_id="plan-1",
                     file_items=[{"path": str(selected)}],
-                    allowed_roots=[root],
                     contract=_contract(),
                 )
             )
@@ -642,7 +670,6 @@ def test_upload_uses_one_total_wall_clock_deadline(
                 rest,
                 plan_id="plan-1",
                 file_items=[{"path": str(selected)}],
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -671,7 +698,6 @@ def test_upload_cancellation_and_partial_failure_never_finalize(
                 cancelled,
                 plan_id="plan-1",
                 file_items=[{"path": str(first)}],
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -684,7 +710,6 @@ def test_upload_cancellation_and_partial_failure_never_finalize(
                 partial,
                 plan_id="plan-1",
                 file_items=[{"path": str(first)}, {"path": str(second)}],
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -746,7 +771,6 @@ def test_ambiguous_finalization_reads_plan_state_without_replaying(
             rest,
             plan_id="plan-1",
             file_items=[{"path": str(selected)}],
-            allowed_roots=[root],
             contract=_contract(),
         )
     )
@@ -774,7 +798,6 @@ def test_ambiguous_finalization_reads_plan_state_without_replaying(
                 missing,
                 plan_id="plan-1",
                 file_items=[{"path": str(selected)}],
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -846,7 +869,6 @@ def test_ambiguous_finalization_rejects_same_metadata_from_replaced_batch(
                 rest,
                 plan_id="plan-1",
                 file_items=[{"path": str(selected)}],
-                allowed_roots=[root],
                 contract=_contract(),
             )
         )
@@ -873,9 +895,7 @@ def test_replacing_path_after_open_still_uploads_the_open_descriptor(
     replacement.write_bytes(b"replaced")
     storage = _StorageClient([(200, {})])
 
-    with asyncio.run(
-        OpenedFileBatch.open([root], [{"path": str(selected)}])
-    ) as batch:
+    with asyncio.run(OpenedFileBatch.open([{"path": str(selected)}])) as batch:
         os.replace(replacement, selected)
         asyncio.run(
             ResumableUploader(storage).upload(
@@ -899,9 +919,7 @@ def test_open_descriptor_rejects_same_size_rewrite_with_restored_mtime(
     selected = root / "payload.bin"
     selected.write_bytes(b"original")
 
-    with asyncio.run(
-        OpenedFileBatch.open([root], [{"path": str(selected)}])
-    ) as batch:
+    with asyncio.run(OpenedFileBatch.open([{"path": str(selected)}])) as batch:
         opened = batch.files[0]
         metadata = os.fstat(opened.fd)
         selected.write_bytes(b"changed!")
@@ -929,9 +947,7 @@ def test_unlinked_rewritten_descriptor_fails_content_identity_check(
     replacement.write_bytes(b"new-path")
     storage = _StorageClient([(200, {})])
 
-    with asyncio.run(
-        OpenedFileBatch.open([root], [{"path": str(selected)}])
-    ) as batch:
+    with asyncio.run(OpenedFileBatch.open([{"path": str(selected)}])) as batch:
         opened = batch.files[0]
         metadata = os.fstat(opened.fd)
         selected.write_bytes(b"changed!")

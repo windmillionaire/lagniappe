@@ -88,9 +88,9 @@ the validated pipx 1.17.2 path, forcing pip and binary-only dependencies:
 
 ```bash
 pipx install --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
-  "https://example.test/mcp/releases/0.1.0/<sha256>/lagniappe_mcp-0.1.0-py3-none-any.whl#sha256=<sha256>"
+  "https://example.test/mcp/releases/0.1.1/<sha256>/lagniappe_mcp-0.1.1-py3-none-any.whl#sha256=<sha256>"
 lagniappe-mcp configure codex --url "https://example.test" \
-  --profile personal --allowed-root "/path/the-user-approves"
+  --profile personal
 lagniappe-mcp check --profile personal
 ```
 
@@ -122,9 +122,11 @@ pipx install --upgrade --python python3.14 --backend pip --pip-args='--only-bina
 lagniappe-mcp check --profile personal
 ```
 
-The initial public ledger contains only `0.1.0`, so no public downgrade is
-currently available. Never install an unadvertised predecessor or a release
-whose API/contract or platform metadata does not match the current site.
+Release `0.1.0` remains a historical, supported predecessor with its original
+root-gated upload interface. New installations and the local MCP trial use
+`0.1.1`; do not downgrade during a measured run. Never install an unadvertised
+predecessor or a release whose API/contract or platform metadata does not match
+the current site.
 
 Generate or rotate the shown-once API key only after installing. `configure`
 prompts without echo and stores it in the owner-only local profile; generated
@@ -143,15 +145,27 @@ file access can therefore obtain the saved key. The profile keeps the bearer out
 of client configuration, MCP arguments/results, and model-authored HTTP, but it
 does not isolate that bearer from the local user account.
 
+The adapter likewise does not impose a separate directory sandbox on local
+uploads. `upload_local_files` accepts explicit paths to any readable, nonempty
+regular file available to the OS account running the adapter. Relative paths are
+interpreted from the adapter process's working directory, and symbolic links use
+the operating system's normal resolution. Directories, special files, missing or
+empty files, and duplicate underlying objects are rejected. For every accepted
+file, the adapter opens one descriptor, verifies and snapshots its identity and
+bytes, and uses that same descriptor for the complete upload. Descriptor
+mutation checks, live file-size limits, exact resumable-session validation,
+storage-origin restrictions, redirect refusal, and bearer/cookie separation all
+remain enforced.
+
 For a secondary nonpersistent Codex registration, keep the URL and key in the
 Codex parent process environment and allowlist their names instead of writing a
-literal secret into `config.toml`. Replace the command and root placeholders
-with absolute paths:
+literal secret into `config.toml`. Replace the command placeholder with the
+absolute executable path:
 
 ```toml
 [mcp_servers.lagniappe-env]
 command = "/absolute/path/to/lagniappe-mcp"
-args = ["serve", "--from-env", "--allowed-root", "/path/the-user-approves"]
+args = ["serve", "--from-env"]
 env_vars = ["LAGNIAPPE_URL", "LAGNIAPPE_API_KEY"]
 startup_timeout_sec = 30
 tool_timeout_sec = 300
@@ -175,8 +189,7 @@ MCP-only for the candidate—and do not deploy, reinstall, upgrade, downgrade, o
 retune either environment between measured arms.
 
 Before freezing the isolated candidate configuration, rerun its configuration
-with the trial-only mandatory-server setting (and the same URL/profile; omitted
-roots retain the saved roots):
+with the trial-only mandatory-server setting and the same URL/profile:
 
 ```bash
 lagniappe-mcp configure codex --url "https://example.test" \

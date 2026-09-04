@@ -167,6 +167,9 @@
                       <p class="text-sm font-semibold text-delete-default">
                         The local profile is owner-only, but it is not a sandbox: an unrestricted process or shell running as the same OS user can read the saved API key. Configure it only in a trusted local account.
                       </p>
+                      <p class="text-sm text-base-medium">
+                        When you ask it to organize files, the adapter can read any explicit regular file available to this OS account. Relative paths start from the client's working directory, and symbolic links resolve normally.
+                      </p>
                     </div>
                     <p data-role="mcp-setup-error"
                        data-visible="false"

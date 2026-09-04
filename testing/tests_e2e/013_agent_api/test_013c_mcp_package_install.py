@@ -864,19 +864,12 @@ def _check_adapter(
     environment: dict[str, str],
     cwd: Path,
     origin: str,
-    allowed_root: Path,
     expected: int = 0,
 ) -> subprocess.CompletedProcess[str]:
     child = dict(environment)
     child.update({"LAGNIAPPE_URL": origin, "LAGNIAPPE_API_KEY": SYNTHETIC_KEY})
     result = _run(
-        [
-            str(executable),
-            "check",
-            "--from-env",
-            "--allowed-root",
-            str(allowed_root),
-        ],
+        [str(executable), "check", "--from-env"],
         environment=child,
         cwd=cwd,
         expected=expected,
@@ -1146,9 +1139,6 @@ def test_public_mcp_wheel_clean_home_installation_contract(
         fixture_origin,
         requests,
     ):
-        allowed_root = work / "allowed-files"
-        allowed_root.mkdir(mode=0o700)
-
         uv_executable = _uv_install(
             uv, install_url, environment=uv_environment, cwd=work
         )
@@ -1164,7 +1154,6 @@ def test_public_mcp_wheel_clean_home_installation_contract(
             environment=uv_environment,
             cwd=work,
             origin=fixture_origin,
-            allowed_root=allowed_root,
         )
         _run(
             [uv, "tool", "update-shell", "--no-config"],
@@ -1233,7 +1222,6 @@ def test_public_mcp_wheel_clean_home_installation_contract(
             environment=pipx_environment,
             cwd=work,
             origin=fixture_origin,
-            allowed_root=allowed_root,
         )
         ensurepath = _run(
             [pipx, "ensurepath", "--dry-run"],
@@ -1288,8 +1276,6 @@ def test_public_mcp_wheel_clean_home_installation_contract(
                 fixture_origin,
                 "--profile",
                 PROFILE_NAME,
-                "--allowed-root",
-                str(allowed_root),
             ],
             environment=configure_environment,
             cwd=work,
@@ -1309,6 +1295,8 @@ def test_public_mcp_wheel_clean_home_installation_contract(
         assert stat.S_IMODE(codex_backup.stat().st_mode) == 0o600
         assert codex_backup.read_text(encoding="utf-8") == unrelated_codex_config
         profile_value = json.loads(profile_path.read_text(encoding="utf-8"))
+        assert profile_value["schema_version"] == 2
+        assert "allowed_roots" not in profile_value
         assert profile_value["api_key"] == SYNTHETIC_KEY
         assert profile_value["client"]["registered"] is True
         codex_text = codex_config.read_text(encoding="utf-8")
@@ -1466,9 +1454,6 @@ def test_public_mcp_wheel_clean_home_installation_contract(
         assert _is_compatible(successor, api="v1", contract=contract)
         assert not _is_compatible(incompatible, api="v1", contract=contract)
 
-        fixture_root = work / "fixture-allowed-files"
-        fixture_root.mkdir(mode=0o700)
-
         def install_fixture(
             item: dict[str, Any], *, enforce_compatibility: bool = True
         ) -> Path:
@@ -1515,7 +1500,6 @@ def test_public_mcp_wheel_clean_home_installation_contract(
             environment=fixture_environment,
             cwd=work,
             origin=fixture_origin,
-            allowed_root=fixture_root,
         )
         fixture_executable = install_fixture(successor)
         _installed_environment(
@@ -1547,7 +1531,6 @@ def test_public_mcp_wheel_clean_home_installation_contract(
             environment=fixture_environment,
             cwd=work,
             origin=fixture_origin,
-            allowed_root=fixture_root,
             expected=1,
         )
         assert "incompatible_contract" in incompatible_check.stderr

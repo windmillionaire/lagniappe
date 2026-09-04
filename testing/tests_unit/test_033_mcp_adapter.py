@@ -99,11 +99,10 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "clients" / "lagniappe_mcp"
 
 def _profile_value() -> dict[str, Any]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "name": "personal",
         "site_url": "https://example.com",
         "api_key": "secret-key",
-        "allowed_roots": ["/tmp/approved"],
         "actor": {"name": "Person", "hash": "abcdefghijkl"},
         "credential": {
             "expires_at": "2099-01-01T00:00:00+00:00",
@@ -446,7 +445,6 @@ def test_profile_and_codex_config_reject_symlinked_directory_components(
 # @pair mcp-adapter:product-contract
 def test_manual_environment_configuration_is_explicit_and_validated() -> None:
     config = from_environment(
-        ["/tmp/approved"],
         environ={
             "LAGNIAPPE_URL": " https://example.com ",
             "LAGNIAPPE_API_KEY": " api-secret ",
@@ -455,16 +453,13 @@ def test_manual_environment_configuration_is_explicit_and_validated() -> None:
 
     assert config.authority.origin == "https://example.com"
     assert config.api_key == "api-secret"
-    assert config.allowed_roots == (Path("/tmp/approved"),)
     assert "api-secret" not in repr(config)
-    assert "/tmp/approved" not in repr(config)
     with pytest.raises(ConfigurationError) as missing:
-        from_environment([], environ={"LAGNIAPPE_URL": "https://example.com"})
+        from_environment(environ={"LAGNIAPPE_URL": "https://example.com"})
     assert missing.value.code == "missing_environment"
     assert "LAGNIAPPE_API_KEY" in missing.value.message
     with pytest.raises(ConfigurationError) as empty:
         from_environment(
-            [],
             environ={
                 "LAGNIAPPE_URL": "https://example.com",
                 "LAGNIAPPE_API_KEY": "   ",
@@ -473,12 +468,11 @@ def test_manual_environment_configuration_is_explicit_and_validated() -> None:
     assert empty.value.code == "empty_environment"
     assert "LAGNIAPPE_API_KEY" in empty.value.message
     with pytest.raises(ConfigurationError) as missing_url:
-        from_environment([], environ={"LAGNIAPPE_API_KEY": "api-secret"})
+        from_environment(environ={"LAGNIAPPE_API_KEY": "api-secret"})
     assert missing_url.value.code == "missing_environment"
     assert "LAGNIAPPE_URL" in missing_url.value.message
     with pytest.raises(ConfigurationError) as empty_url:
         from_environment(
-            [],
             environ={
                 "LAGNIAPPE_URL": "   ",
                 "LAGNIAPPE_API_KEY": "api-secret",
@@ -488,7 +482,6 @@ def test_manual_environment_configuration_is_explicit_and_validated() -> None:
     assert "LAGNIAPPE_URL" in empty_url.value.message
     with pytest.raises(ConfigurationError) as unsafe_url:
         from_environment(
-            [],
             environ={
                 "LAGNIAPPE_URL": "http://example.com",
                 "LAGNIAPPE_API_KEY": "key",
@@ -1005,7 +998,7 @@ def test_profile_and_codex_mutations_reject_changes_after_their_review(
     )
     profile_target = tmp_path / "profiles" / "profiles" / "personal.json"
     concurrent_profile = deepcopy(profile)
-    concurrent_profile["allowed_roots"] = ["/tmp/concurrent"]
+    concurrent_profile["actor"]["name"] = "Concurrent Person"
     concurrent_bytes = (
         json.dumps(
             concurrent_profile,
@@ -1016,7 +1009,7 @@ def test_profile_and_codex_mutations_reject_changes_after_their_review(
         + b"\n"
     )
     profile_target.write_bytes(concurrent_bytes)
-    profile["allowed_roots"] = ["/tmp/replacement"]
+    profile["actor"]["name"] = "Replacement Person"
 
     with pytest.raises(ConfigurationError) as profile_error:
         save_profile(
@@ -1078,12 +1071,34 @@ def test_profile_round_trip_is_strict_and_owner_only(tmp_path: Path) -> None:
     assert exposed_directory.value.code == "unsafe_permissions"
     os.chmod(tmp_path / "profiles", 0o700)
     malformed = dict(value)
-    malformed["allowed_roots"] = ["relative"]
-    with pytest.raises(ConfigurationError, match="allowed roots"):
+    malformed["unexpected"] = True
+    with pytest.raises(ConfigurationError, match="shape"):
         save_profile(malformed, environ=environ)
     delete_profile("personal", environ=environ)
     with pytest.raises(ConfigurationError, match="does not exist"):
         load_profile("personal", environ=environ)
+
+
+# @pair mcp-adapter:product-contract
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::load_profile
+def test_legacy_profile_discards_retired_allowed_roots(tmp_path: Path) -> None:
+    environ = {"LAGNIAPPE_MCP_CONFIG_HOME": str(tmp_path / "profiles")}
+    legacy = _profile_value()
+    legacy["schema_version"] = 1
+    legacy["allowed_roots"] = ["/tmp/retired"]
+    target = profile_path("personal", environ=environ)
+    atomic_write(
+        target,
+        json.dumps(legacy, sort_keys=True, separators=(",", ":")).encode() + b"\n",
+        private=True,
+    )
+
+    loaded = load_profile("personal", environ=environ)
+
+    assert loaded["schema_version"] == 2
+    assert "allowed_roots" not in loaded
+    connection = connection_from_profile("personal", environ=environ)
+    assert connection.authority.origin == "https://example.com"
 
 
 # @pair mcp-adapter:product-contract
@@ -1220,12 +1235,9 @@ def test_cli_source_modes_and_lowercase_profile_names_are_exact() -> None:
     profile_mode = parser.parse_args(["serve", "--profile", "personal"])
     assert profile_mode.profile == "personal"
     assert profile_mode.from_env is False
-    env_mode = parser.parse_args(
-        ["serve", "--from-env", "--allowed-root", "/tmp/approved"]
-    )
+    env_mode = parser.parse_args(["serve", "--from-env"])
     assert env_mode.profile is None
     assert env_mode.from_env is True
-    assert env_mode.allowed_root == ["/tmp/approved"]
 
     for command in ("serve", "check"):
         with pytest.raises(ConfigurationError) as missing_source:
@@ -1239,12 +1251,11 @@ def test_cli_source_modes_and_lowercase_profile_names_are_exact() -> None:
         with pytest.raises(ConfigurationError) as uppercase_profile:
             parser.parse_args([command, "--profile", "Personal"])
         assert uppercase_profile.value.code == "invalid_profile"
-
-    with pytest.raises(ConfigurationError) as profile_roots:
-        cli_module._connection(
-            SimpleNamespace(profile="personal", allowed_root=["/tmp/approved"])
-        )
-    assert profile_roots.value.code == "invalid_arguments"
+        with pytest.raises(ConfigurationError) as retired_root:
+            parser.parse_args(
+                [command, "--from-env", "--allowed-root", "/tmp/retired"]
+            )
+        assert retired_root.value.code == "invalid_arguments"
 
     with pytest.raises(ConfigurationError) as uppercase_configure:
         parser.parse_args(
@@ -1275,17 +1286,15 @@ def test_cli_source_modes_and_lowercase_profile_names_are_exact() -> None:
 
 # @pair mcp-adapter:product-contract
 @pytest.mark.parametrize(
-    ("url", "allowed_roots", "trial_required"),
+    ("url", "trial_required"),
     [
-        ("https://example.com", [], False),
-        (None, ["/tmp/approved"], False),
-        (None, [], True),
+        ("https://example.com", False),
+        (None, True),
     ],
-    ids=("url", "allowed-root", "trial-required"),
+    ids=("url", "trial-required"),
 )
 def test_configure_remove_rejects_configuration_arguments(
     url: str | None,
-    allowed_roots: list[str],
     trial_required: bool,
 ) -> None:
     from lagniappe_mcp import cli as cli_module
@@ -1297,7 +1306,6 @@ def test_configure_remove_rejects_configuration_arguments(
                     profile="personal",
                     remove=True,
                     url=url,
-                    allowed_root=allowed_roots,
                     trial_required=trial_required,
                 )
             )
@@ -1311,7 +1319,6 @@ def test_configure_remove_rejects_configuration_arguments(
                     profile="personal",
                     remove=False,
                     url=None,
-                    allowed_root=[],
                     trial_required=False,
                 )
             )
@@ -1413,7 +1420,6 @@ def test_configure_rolls_back_new_codex_entry_when_profile_save_fails(
         profile="personal",
         remove=False,
         url="https://example.com",
-        allowed_root=[],
     )
 
     with pytest.raises(ConfigurationError) as error:
@@ -1434,13 +1440,15 @@ def test_configure_rolls_back_new_codex_entry_when_profile_save_fails(
 
 
 # @pair mcp-adapter:product-contract
-def test_configure_idempotently_preserves_existing_allowed_roots(
+def test_configure_replaces_legacy_profile_without_file_roots(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     from lagniappe_mcp import cli as cli_module
 
     profile = _profile_value()
+    profile["schema_version"] = 1
+    profile["allowed_roots"] = ["/tmp/retired"]
     profile["client"].update(mode="manual", registered=False)
     saved: list[dict[str, Any]] = []
     installed: list[tuple[str, str, str | None, bool]] = []
@@ -1468,7 +1476,6 @@ def test_configure_idempotently_preserves_existing_allowed_roots(
         lambda: pytest.fail("existing same-site configuration must not prompt"),
     )
     monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(cli_module, "_safe_root", lambda value: value)
     monkeypatch.setattr(cli_module, "console_executable", lambda: "/usr/bin/tool")
     monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
     monkeypatch.setattr(
@@ -1491,18 +1498,18 @@ def test_configure_idempotently_preserves_existing_allowed_roots(
         profile="personal",
         remove=False,
         url="https://example.com",
-        allowed_root=[],
     )
 
     assert asyncio.run(cli_module._configure_codex(args)) == 0
     assert installed == [("personal", "/usr/bin/tool", "a" * 64, False)]
-    assert saved[0]["allowed_roots"] == ["/tmp/approved"]
+    assert saved[0]["schema_version"] == 2
+    assert "allowed_roots" not in saved[0]
     assert saved[0]["client"]["mode"] == "automatic"
     assert saved[0]["client"]["registered"] is True
     preview = capsys.readouterr().out
     assert "Proposed user Codex entry:" in preview
     assert "[mcp_servers.lagniappe-personal]" in preview
-    assert "Allowed roots:\n  - /tmp/approved\n" in preview
+    assert "any explicit regular file accessible to this account" in preview
     assert "secret-key" not in preview
 
 
@@ -1565,7 +1572,6 @@ def test_configure_trial_required_uses_owned_required_entry(
                     profile="personal",
                     remove=False,
                     url="https://example.com",
-                    allowed_root=[],
                     trial_required=True,
                 )
             )
@@ -1612,7 +1618,6 @@ def test_configure_manual_fallback_preserves_a_changed_manual_identity(
         lambda _name: (profile, object()),
     )
     monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(cli_module, "_safe_root", lambda value: value)
     monkeypatch.setattr(
         cli_module, "console_executable", lambda: "/opt/lagniappe-mcp"
     )
@@ -1641,7 +1646,6 @@ def test_configure_manual_fallback_preserves_a_changed_manual_identity(
                     profile="personal",
                     remove=False,
                     url="https://example.com",
-                    allowed_root=[],
                     trial_required=True,
                 )
             )
@@ -1698,7 +1702,6 @@ def test_configure_save_failure_restores_prior_required_entry(
         lambda _name: (deepcopy(profile), snapshot),
     )
     monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(cli_module, "_safe_root", lambda value: value)
     monkeypatch.setattr(
         cli_module, "console_executable", lambda: "/opt/lagniappe-mcp"
     )
@@ -1720,7 +1723,6 @@ def test_configure_save_failure_restores_prior_required_entry(
                     profile="personal",
                     remove=False,
                     url="https://example.com",
-                    allowed_root=[],
                     trial_required=False,
                 )
             )
@@ -1775,7 +1777,6 @@ def test_configure_manual_fallback_does_not_orphan_an_existing_owned_entry(
         lambda _name: (profile, snapshot),
     )
     monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(cli_module, "_safe_root", lambda value: value)
     monkeypatch.setattr(cli_module, "console_executable", lambda: new_executable)
     monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
 
@@ -1796,7 +1797,6 @@ def test_configure_manual_fallback_does_not_orphan_an_existing_owned_entry(
         profile="personal",
         remove=False,
         url="https://example.com",
-        allowed_root=[],
     )
 
     with pytest.raises(ConfigurationError) as caught:
@@ -2007,7 +2007,6 @@ def test_configure_remove_falls_back_without_claiming_manual_removal(
         profile="personal",
         remove=True,
         url=None,
-        allowed_root=[],
     )
 
     assert asyncio.run(cli_module._configure_codex(args)) == 0
@@ -2065,7 +2064,6 @@ def test_manual_configuration_converges_only_after_exact_entry_verification(
         profile="personal",
         remove=True,
         url=None,
-        allowed_root=[],
     )
 
     assert asyncio.run(cli_module._configure_codex(args)) == 0
@@ -3394,11 +3392,9 @@ def test_mcp_driver_persists_only_owner_only_bounded_privacy_findings(
     api_key = "lgn_driver_result_secret"
     csrf_token = "driver-csrf-secret"
     session_cookie = "driver-session-secret"
-    allowed_root = tmp_path / "private-root"
-    upload_path = allowed_root / "boundary-note.txt"
+    upload_path = tmp_path / "boundary-note.txt"
     signed_url = _signed_download_url()
     specification = {
-        "allowed_root": str(allowed_root),
         "upload_path": str(upload_path),
         "revoke": {
             "csrf_token": csrf_token,
@@ -3450,7 +3446,6 @@ def test_mcp_driver_persists_only_owner_only_bounded_privacy_findings(
         api_key,
         csrf_token,
         session_cookie,
-        str(allowed_root),
         str(upload_path),
         "storage.googleapis.com",
         "x-goog-",
@@ -3964,15 +3959,8 @@ def test_low_level_server_negotiates_modern_types_without_resources(
             return None
 
     async def exercise() -> None:
-        from lagniappe_mcp import files as files_module
         from lagniappe_mcp import server as server_module
 
-        checked_roots: list[tuple[Path, ...]] = []
-        monkeypatch.setattr(
-            files_module,
-            "validate_allowed_roots",
-            lambda roots: checked_roots.append(tuple(roots)),
-        )
         monkeypatch.setattr(server_module, "LagniappeAdapter", FakeAdapter)
         config = ConnectionConfig(
             normalize_site_url("https://example.com"), "api-secret"
@@ -3993,8 +3981,6 @@ def test_low_level_server_negotiates_modern_types_without_resources(
                 await client.call_tool("unknown", {})
             assert unknown.value.code == -32602
             assert unknown.value.data is None
-        assert checked_roots == [()]
-
     asyncio.run(exercise())
 
 

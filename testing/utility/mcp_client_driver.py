@@ -64,9 +64,6 @@ def _connection(specification: dict[str, Any]) -> tuple[Any, io.TextIOBase]:
     key = os.environ["LAGNIAPPE_API_KEY"]
     site_url = os.environ["LAGNIAPPE_URL"]
     arguments = ["-I", "-m", "lagniappe_mcp", "serve", "--from-env"]
-    allowed_root = specification.get("allowed_root")
-    if allowed_root:
-        arguments.extend(["--allowed-root", str(allowed_root)])
     parameters = StdioServerParameters(
         command=sys.executable,
         args=arguments,
@@ -423,7 +420,6 @@ def _sensitive_material(
             "local_path",
             (
                 specification.get("upload_path"),
-                specification.get("allowed_root"),
                 *extra_paths,
             ),
         ),

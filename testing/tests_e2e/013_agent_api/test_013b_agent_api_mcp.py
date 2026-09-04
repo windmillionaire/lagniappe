@@ -64,7 +64,7 @@ LIFECYCLE_SCHEMA_SHA256 = {
         "fd3504fe9f48b8e0c32932e9545e1e661a37db950f9c96a53dcd00d808db514e",
     ),
     "upload_local_files": (
-        "2d2d6ea716f7bde8be1583e3941c0768591743d955a02070578a657655968d8d",
+        "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
         "39dbca1f224f9221c330aa3f382dac6ec8db46d36f028d67b31cd06832a28d9c",
     ),
     "submit_plan": (
@@ -394,6 +394,7 @@ def _assert_setup_panel(owner) -> tuple[str, str]:
         assert "#sha256=" in install
         assert configure.startswith("lagniappe-mcp configure codex --url ")
         assert f'--url "{_origin(CONFIG.BASE_URL)}"' in configure
+        assert "--allowed-root" not in configure
         assert "LAGNIAPPE_API_KEY" not in configure
         assert diagnostic == "lagniappe-mcp check --profile personal"
         return install, configure
@@ -674,7 +675,6 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             mode="workflow",
             token=owner_token,
             specification={
-                "allowed_root": str(tmp_path),
                 "upload_path": str(upload_path),
                 "search_name": readable_page.entity.name,
                 "revoke": {

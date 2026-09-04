@@ -13,10 +13,10 @@ and CPython 3.14. Follow the install command shown by the site rather than
 installing an unadvertised wheel.
 
 `lagniappe-mcp configure codex --url URL --profile NAME` securely prompts for
-the existing API key and saves the URL, key, approved file roots, and actor
-metadata in an owner-only local profile. `--profile NAME` later selects that
-profile; it is not a place to pass the URL or key. The generated Codex entry
-contains only the absolute executable and `serve --profile NAME` arguments.
+the existing API key and saves the URL, key, and actor metadata in an owner-only
+local profile. `--profile NAME` later selects that profile; it is not a place to
+pass the URL or key. The generated Codex entry contains only the absolute
+executable and `serve --profile NAME` arguments.
 
 Owner-only storage does not sandbox the client from the credential. Codex, the
 adapter, and other processes running as the same OS user may have permission to
@@ -64,11 +64,21 @@ explicitly bounded array. An incompatible future schema therefore stops startup
 or the current Plan call instead of silently expanding the local validation
 surface.
 
+Local upload paths name files available to the adapter process. A relative path
+is interpreted from the adapter's working directory, and symbolic links follow
+the operating system's normal path resolution. The adapter may upload any
+explicit, readable, nonempty regular file available to the current OS account;
+it rejects directories, special files, missing files, empty files, and duplicate
+objects. Each accepted file is opened once, verified and byte-snapshotted through
+that descriptor, and streamed from the same descriptor so a later path change
+cannot silently change the uploaded bytes. Existing size, upload-session,
+storage-origin, redirect, and bearer-separation controls still apply.
+
 For a nonpersistent test harness or CI process, set `LAGNIAPPE_URL` and
 `LAGNIAPPE_API_KEY` in the parent process and launch:
 
 ```text
-lagniappe-mcp serve --from-env [--allowed-root /approved/path ...]
+lagniappe-mcp serve --from-env
 ```
 
 Run `lagniappe-mcp check --profile NAME` before enabling a saved registration.

@@ -395,7 +395,6 @@ class LagniappeAdapter:
             self.rest,
             plan_id=plan_id,
             file_items=arguments["files"],
-            allowed_roots=self.config.allowed_roots,
             contract=contract,
         )
         if not isinstance(raw, dict) or set(raw) != {"plan", "upload_inventory"}:

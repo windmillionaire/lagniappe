@@ -217,14 +217,9 @@ def create_server(config: ConnectionConfig) -> Server[LagniappeAdapter]:
     async def lifespan(
         _server: Server[LagniappeAdapter],
     ) -> AsyncIterator[LagniappeAdapter]:
-        from .files import validate_allowed_roots
-
         adapter = LagniappeAdapter(config)
         try:
             with telemetry_scope("startup", "bootstrap"):
-                # Consent is represented by already-openable no-follow roots.
-                # A replaced root fails before file-capable tools are published.
-                validate_allowed_roots(config.allowed_roots)
                 await adapter.initialize()
             yield adapter
         finally:
@@ -348,12 +343,9 @@ async def serve(config: ConnectionConfig) -> None:
 # @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.initialize
 async def check(config: ConnectionConfig) -> tuple[str, str]:
     """Validate startup compatibility without exposing catalog or credentials."""
-    from .files import validate_allowed_roots
-
     adapter = LagniappeAdapter(config)
     try:
         with telemetry_scope("startup", "check"):
-            validate_allowed_roots(config.allowed_roots)
             await adapter.initialize()
             await adapter.rest.check_openapi_compatibility()
         actor = adapter.actor or {}

@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "lagniappe-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local MCP adapter for a user's Lagniappe External Agent API"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"

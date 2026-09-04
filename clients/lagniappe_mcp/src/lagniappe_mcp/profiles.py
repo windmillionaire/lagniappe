@@ -26,7 +26,8 @@ from .errors import ConfigurationError
 from .url_security import normalize_site_url
 
 
-PROFILE_SCHEMA_VERSION = 1
+PROFILE_SCHEMA_VERSION = 2
+_LEGACY_PROFILE_SCHEMA_VERSION = 1
 PROFILE_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 _FINGERPRINT_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _MAX_CONFIG_BYTES = 2 * 1024 * 1024
@@ -1177,6 +1178,7 @@ def atomic_delete(
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_profile_round_trip_is_strict_and_owner_only
+# @tests tests_unit/test_033_mcp_adapter.py::test_legacy_profile_discards_retired_allowed_roots
 def load_profile(
     name: str, *, environ: Mapping[str, str] | None = None
 ) -> dict[str, Any]:
@@ -1218,8 +1220,50 @@ def load_profile_snapshot(
         raise ConfigurationError(
             "invalid_profile", "The saved profile is malformed."
         ) from error
-    _validate_profile(value, expected_name=name)
-    return value, loaded
+    migrated = _migrate_legacy_profile(value)
+    _validate_profile(migrated, expected_name=name)
+    return migrated, loaded
+
+
+# @testable false
+# @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::load_profile
+def _migrate_legacy_profile(value: object) -> object:
+    """Discard the retired file-root field from a valid 0.1.0 profile."""
+    if (
+        not isinstance(value, dict)
+        or value.get("schema_version") != _LEGACY_PROFILE_SCHEMA_VERSION
+    ):
+        return value
+    required = {
+        "schema_version",
+        "name",
+        "site_url",
+        "api_key",
+        "allowed_roots",
+        "actor",
+        "credential",
+        "client",
+    }
+    roots = value.get("allowed_roots")
+    if (
+        set(value) != required
+        or not isinstance(roots, list)
+        or any(
+            not isinstance(item, str)
+            or not item
+            or not Path(item).is_absolute()
+            or ".." in Path(item).parts
+            for item in roots
+        )
+        or len(set(roots)) != len(roots)
+    ):
+        raise ConfigurationError(
+            "invalid_profile", "The saved legacy profile is malformed."
+        )
+    migrated = dict(value)
+    migrated.pop("allowed_roots")
+    migrated["schema_version"] = PROFILE_SCHEMA_VERSION
+    return migrated
 
 
 # @testable false
@@ -1230,7 +1274,6 @@ def _validate_profile(value: object, *, expected_name: str | None = None) -> Non
         "name",
         "site_url",
         "api_key",
-        "allowed_roots",
         "actor",
         "credential",
         "client",
@@ -1253,21 +1296,6 @@ def _validate_profile(value: object, *, expected_name: str | None = None) -> Non
     ):
         raise ConfigurationError(
             "invalid_profile", "The saved credential value is malformed."
-        )
-    roots = value["allowed_roots"]
-    if (
-        not isinstance(roots, list)
-        or any(
-            not isinstance(item, str)
-            or not item
-            or not Path(item).is_absolute()
-            or ".." in Path(item).parts
-            for item in roots
-        )
-        or len(set(roots)) != len(roots)
-    ):
-        raise ConfigurationError(
-            "invalid_profile", "The saved allowed roots are malformed."
         )
     if not isinstance(value["site_url"], str):
         raise ConfigurationError("invalid_profile", "The saved site URL is malformed.")
@@ -1408,7 +1436,6 @@ def connection_from_profile(
     return ConnectionConfig(
         authority=normalize_site_url(value["site_url"]),
         api_key=value["api_key"],
-        allowed_roots=tuple(Path(item) for item in value["allowed_roots"]),
         profile_name=value["name"],
         actor_hash=actor.get("hash") if isinstance(actor.get("hash"), str) else None,
     )

@@ -405,6 +405,32 @@ def test_historical_wheel_remains_valid_after_current_source_changes(tmp_path):
         mcp_artifact._manifest(tmp_path, incompatible)
 
 
+# @matrix mcp-package release : historical-wheel immutable-ledger promotion source-versioning
+def test_artifact_builder_promotes_new_source_over_historical_current(
+    tmp_path, monkeypatch
+):
+    original = _prepare_release(tmp_path)["releases"][0]
+    _prepare_source(tmp_path, version="0.2.0", payload="fixture_v2 = True\n")
+
+    def build(_repo_root, output):
+        output.mkdir(parents=True)
+        path = output / mcp_artifact._wheel_filename("0.2.0")
+        _write(path, _wheel_bytes("0.2.0", payload="fixture_v2 = True\n"))
+        return path
+
+    monkeypatch.setattr(mcp_artifact, "_run_wheel_build", build)
+
+    promoted = mcp_artifact.build_and_promote_release(tmp_path)
+
+    assert promoted["current"] == "0.2.0"
+    assert [release["version"] for release in promoted["releases"]] == [
+        "0.1.0",
+        "0.2.0",
+    ]
+    assert promoted["releases"][0] == original
+    assert mcp_artifact.check_deployment_artifacts(tmp_path, require_git=False)
+
+
 # @matrix mcp-package : dependency-graph fail-closed immutable-ledger immutable-release locked-dependencies promotion release-validation reproducible-build url-policy
 def test_artifact_builder_rejects_rebinding_and_corruption(tmp_path, monkeypatch):
     ledger = _prepare_release(tmp_path)
