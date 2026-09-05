@@ -9,6 +9,7 @@ import re
 import threading
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
+from uuid import uuid4
 
 import pytest
 
@@ -18,15 +19,20 @@ from config.remote_mcp import (
     normalize_remote_mcp_config,
 )
 from lagniappe import CONFIG
+from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.auth import agent_api, remote_mcp as auth
+from lagniappe.core.tools import cache as cache_store
+from lagniappe.core.tools.cache import rate_limit as rate_limiter
+from lagniappe.core.tools.database import analytics as analytics_database, get as database_get
+from lagniappe.core.tools.email.notifications import presence
+from lagniappe.core.tools.services import identity_platform
 from lagniappe.web import app
-from lagniappe.web.routes.api import main as api_routes
-from lagniappe.web.routes.oauth import main as oauth_routes
 
 
 pytestmark = pytest.mark.e2e
 ISSUER = "https://lagniappe.test"
 VERIFIER = "v" * 43
+PENDING_COOKIE = "__Secure-lagniappe-mcp-pending"
 
 
 class Actor:
@@ -38,7 +44,10 @@ class Actor:
     is_authenticated = True
     is_active = True
     is_public = False
-    db = {"timezone": "UTC"}
+
+    def __init__(self, db=None):
+        self.db = db if db is not None else {"timezone": "UTC"}
+        self.page = SimpleNamespace(urlsafe_key="pilot-personal-page")
 
     def get_id(self):
         return self.urlsafe_key
@@ -64,8 +73,6 @@ def pilot(monkeypatch):
         lambda key, **kwargs: actor if key == actor.key else None,
     )
     monkeypatch.setattr(app.login_manager, "_user_callback", lambda _: actor)
-    monkeypatch.setattr(oauth_routes, "check_limit", lambda *args: {"allowed": True})
-    monkeypatch.setattr(api_routes, "_rate_limit", lambda *args: None)
     monkeypatch.setattr(auth, "client_metadata", lambda client_id: {})
 
     def atomic(operation):
@@ -83,7 +90,7 @@ def pilot(monkeypatch):
     monkeypatch.setattr(auth.store, "atomic", atomic)
     monkeypatch.setattr(auth.store, "read", lambda key: deepcopy(rows.get(key)))
     monkeypatch.setattr(
-        api_routes.external_api,
+        external_api,
         "personal_page_reference",
         lambda _: {
             "kind": "page",
@@ -109,9 +116,31 @@ def pilot(monkeypatch):
         .rstrip("="),
     }
     client = app.test_client()
-    return SimpleNamespace(
-        config=config, actor=actor, rows=rows, parameters=parameters, client=client
+    # Exercise the real route limiters with an isolated client, and remove only
+    # this fixture's counters so other HTTP tests keep their own rate-limit state.
+    address = uuid4().hex[:24]
+    client_ip = "2001:db8:" + ":".join(
+        address[offset:offset + 4] for offset in range(0, 24, 4)
     )
+    client.environ_base["REMOTE_ADDR"] = client_ip
+    limiter_keys = {
+        scope: cache_store.Keys.RATE_LIMIT.value.format(
+            scope, hashlib.sha256(identifier.encode()).hexdigest()[:16]
+        )
+        for scope, identifier in (
+            ("remote-mcp-oauth", client_ip),
+            ("remote-mcp-envelope", client_ip),
+            ("agent-api-general", f"{actor.urlsafe_key}:{client_ip}"),
+            ("google-signin", client_ip),
+        )
+    }
+    try:
+        yield SimpleNamespace(
+            config=config, actor=actor, rows=rows, parameters=parameters,
+            client=client, limiter_keys=limiter_keys,
+        )
+    finally:
+        rate_limiter.cache.redis.delete(*limiter_keys.values())
 
 
 def _login(pilot):
@@ -245,19 +274,13 @@ def test_oauth_consent_rejects_replaced_request_and_changed_account(pilot, monke
     r"ignore:datetime\.datetime\.utcnow\(\) is deprecated.*:DeprecationWarning:flask_login\.login_manager"
 )
 def test_oauth_pending_survives_google_callback_session_replacement(pilot, monkeypatch):
-    from lagniappe.web.routes.users import login as login_routes
-    from lagniappe.core.tools.email.notifications import presence
-
+    saved_users, login_events = [], []
     monkeypatch.setattr(CONFIG, "GOOGLE_SIGNIN_ENABLED", True)
     monkeypatch.setattr(CONFIG, "GOOGLE_LOGIN_URI", ISSUER + "/users/google-signin")
-    monkeypatch.setattr(
-        login_routes, "_enforce_auth_rate_limit", lambda *args, **kwargs: None
-    )
-    monkeypatch.setattr(login_routes.database_get, "user", lambda email: pilot.actor.db)
-    monkeypatch.setattr(
-        login_routes, "verify_user", lambda *args, **kwargs: pilot.actor
-    )
-    monkeypatch.setattr(login_routes, "record_login", lambda *args: None)
+    monkeypatch.setattr(CONFIG, "ANALYTICS", True)
+    monkeypatch.setattr(database_get, "user", lambda email: pilot.actor.db)
+    monkeypatch.setattr(Actor, "save", lambda user: saved_users.append(user), raising=False)
+    monkeypatch.setattr(analytics_database, "create_event", login_events.append)
     monkeypatch.setattr(presence, "record_site_activity", lambda *args: None)
     claims = {
         "email": pilot.actor.email,
@@ -265,23 +288,22 @@ def test_oauth_pending_survives_google_callback_session_replacement(pilot, monke
         "sub": "google-pilot-user",
     }
     monkeypatch.setattr(
-        login_routes.identity_platform, "verify_google_credential", lambda *args: claims
+        identity_platform, "verify_google_credential", lambda *args: claims
     )
     monkeypatch.setattr(
-        login_routes.identity_platform,
+        identity_platform,
         "exchange_google_credential",
         lambda *args: {"idToken": "provider-token"},
     )
     monkeypatch.setattr(
-        login_routes.identity_platform, "verify_identity_token", lambda *args: claims
+        identity_platform, "verify_identity_token", lambda *args: claims
     )
-    pilot.actor.page = SimpleNamespace(urlsafe_key="pilot-personal-page")
 
     started = _open(pilot, "GET", "/oauth/authorize", query_string=pilot.parameters)
     pending_header = next(
         value
         for value in started.headers.getlist("Set-Cookie")
-        if value.startswith(oauth_routes._PENDING_COOKIE + "=")
+        if value.startswith(PENDING_COOKIE + "=")
     )
     for attribute in (
         "Secure",
@@ -302,7 +324,7 @@ def test_oauth_pending_survives_google_callback_session_replacement(pilot, monke
         session["before_google_callback"] = True
     domain = urlsplit(ISSUER).hostname
     pending_cookie = pilot.client.get_cookie(
-        oauth_routes._PENDING_COOKIE, domain=domain, path="/oauth"
+        PENDING_COOKIE, domain=domain, path="/oauth"
     )
     assert pending_cookie is not None
     # Werkzeug does not enforce SameSite, so model the real cross-site POST by
@@ -322,13 +344,18 @@ def test_oauth_pending_survives_google_callback_session_replacement(pilot, monke
         headers={"Origin": "https://accounts.google.com"},
     )
     assert callback.status_code == 302 and callback.location == "/oauth/authorize"
+    assert len(saved_users) == 1 and saved_users[0].db is pilot.actor.db
+    assert saved_users[0].last_login is not None
+    assert len(login_events) == 1
+    assert login_events[0]["user_key"] == pilot.actor.urlsafe_key
+    assert login_events[0]["navigation_type"] == "identity-google"
     assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
     with pilot.client.session_transaction(base_url=ISSUER) as session:
         assert session["_user_id"] == pilot.actor.get_id()
         assert "before_google_callback" not in session
     assert (
         pilot.client.get_cookie(
-            oauth_routes._PENDING_COOKIE, domain=domain, path="/oauth"
+            PENDING_COOKIE, domain=domain, path="/oauth"
         ).value
         == pending_cookie.value
     )
@@ -345,7 +372,7 @@ def test_oauth_pending_survives_google_callback_session_replacement(pilot, monke
     ]
     assert (
         pilot.client.get_cookie(
-            oauth_routes._PENDING_COOKIE, domain=domain, path="/oauth"
+            PENDING_COOKIE, domain=domain, path="/oauth"
         )
         is None
     )
@@ -451,15 +478,8 @@ def test_oauth_token_api_envelope_and_browser_revocation(pilot, monkeypatch):
 # @matrix agent-api : rate-limit bearer-only
 # @source lagniappe/web/routes/api/main.py::authenticate_request
 def test_remote_mcp_rate_limit_precedes_workload_verification(pilot, monkeypatch):
-    calls = []
-
-    def limited(scope, identifier, limit, seconds):
-        calls.append((scope, identifier, limit, seconds))
-        raise api_routes.APIProblem(
-            "rate_limited", "Too many API requests.", 429, retry_after=17
-        )
-
-    monkeypatch.setattr(api_routes, "_rate_limit", limited)
+    key = pilot.limiter_keys["remote-mcp-envelope"]
+    rate_limiter.cache.redis.set(key, 60, ex=17)
     monkeypatch.setattr(
         auth,
         "authenticate_envelope",
@@ -477,9 +497,9 @@ def test_remote_mcp_rate_limit_precedes_workload_verification(pilot, monkeypatch
         },
     )
     assert result.status_code == 429 and result.json["error"]["code"] == "rate_limited"
-    assert result.headers["Retry-After"] == "17"
-    assert len(calls) == 1 and calls[0][0] == "remote-mcp-envelope"
-    assert calls[0][2:] == api_routes.GENERAL_RATE_LIMIT
+    assert 0 < int(result.headers["Retry-After"]) <= 17
+    assert int(rate_limiter.cache.redis.get(key)) == 61
+    assert rate_limiter.cache.redis.get(pilot.limiter_keys["agent-api-general"]) is None
 
 
 # @matrix mcp-oauth : consent loopback csrf client-isolation

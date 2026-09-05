@@ -144,15 +144,12 @@ def _allow_claimed_saves(monkeypatch, saved_reports=None):
 def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
     monkeypatch,
 ):
-    from lagniappe.web.routes.api import main as api_routes
-
     actor = Actor()
     report = _report(actor, tool="ask")
     report.urlsafe_key = f"rate-limit-plan-{uuid4().hex}"
     authorization = {"Authorization": "Bearer valid-key"}
     created = []
     dispatched = []
-    limiter_calls = []
     limiter_keys = []
     actor_ip = f"{actor.urlsafe_key}:127.0.0.1"
 
@@ -163,10 +160,6 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
     def dispatch(name, arguments, user, *, external):
         dispatched.append((name, arguments, user, external))
         return {"guidelines": "Provided guidance."}, []
-
-    def check_limit(scope, identifier, limit, window_seconds):
-        limiter_calls.append((scope, identifier, limit, window_seconds))
-        return rate_limiter.check_limit(scope, identifier, limit, window_seconds)
 
     def seed(scope, identifier, count, window_seconds):
         digest = hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:16]
@@ -181,7 +174,6 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
     monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
     monkeypatch.setattr(Entities, "fetch_one", lambda _identifier, request: report)
     monkeypatch.setattr(ai_functions, "execute_registered_tool", dispatch)
-    monkeypatch.setattr(api_routes, "check_limit", check_limit)
     client = app.test_client()
 
     try:
@@ -224,11 +216,9 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
         assert limited.status_code == 429
         assert limited.json["error"]["code"] == "rate_limited"
         assert 0 < int(limited.headers["Retry-After"]) <= 60
-        assert set(limiter_calls) == {
-            ("agent-api-general", actor_ip, 60, 60),
-            ("agent-api-plan-start", actor_ip, 100, 3600),
-            ("agent-api-plan-tools", report.urlsafe_key, 100, 31 * 24 * 60 * 60),
-        }
+        assert [
+            int(rate_limiter.cache.redis.get(key)) for key in limiter_keys[:3]
+        ] == [61, 101, 101]
     finally:
         if limiter_keys:
             rate_limiter.cache.redis.delete(*set(limiter_keys))
