@@ -18,6 +18,7 @@ def test_remote_mcp_configuration_is_opt_in_and_exact():
     }
     result = normalize_remote_mcp_config(valid)
     assert result["actors"] == ("pilot@example.com",)
+    assert normalize_remote_mcp_config({**valid, "actors": None})["actors"] is None
     assert result["client_id"] == CLIENT_ID
     assert result["redirect_uri"] == REDIRECT_URI
     # Discovery may be deployed before selecting the pilot user; nobody may
@@ -38,7 +39,7 @@ def test_remote_mcp_configuration_is_opt_in_and_exact():
         ("client_id", "https://attacker.test/oauth/client.json"),
         ("client_id", "https://chatgpt.com/arbitrary"),
         ("redirect_uri", "https://attacker.test/callback"),
-        ("actors", None),
+        ("actors", "not-a-list"),
         ("actors", ["A@example.com", "a@example.com"]),
         ("actors", ["bad"]),
         ("service_account", "human@example.com"),

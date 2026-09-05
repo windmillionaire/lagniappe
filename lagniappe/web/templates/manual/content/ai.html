@@ -47,7 +47,7 @@
       use the signed-in user's normal workspace permissions.
     </p>
   {% endcall %}
-  {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
+  {% if CONFIG.AI_ENABLED and CONFIG.AI_EMAIL_PUBLIC.enabled %}
     {{ heading("AI Reports by Email", icon="email", kind="form") }}
     {% call card() %}
       {% if current_user.is_authenticated %}
@@ -105,6 +105,42 @@
       {% endif %}
     {% endcall %}
   {% endif %}
+  {% call card() %}
+    <details data-role="external-ai-help">
+      <summary class="cursor-pointer text-page-default font-semibold">Use an external AI agent: MCP or skill</summary>
+      <div class="space-y-3 mt-3 text-base-medium">
+        <p>An installation can disable AI entirely, or allow built-in AI while
+          disabling external agents. External access covers both MCP and the API/skill.</p>
+        <p><strong>MCP:</strong> add the installation's MCP server URL to a compatible
+          agent, then sign in to Lagniappe and allow the connection. The server exposes
+          workspace tools directly. No local Lagniappe package is required.</p>
+        <p><strong>Skill:</strong> for an agent that can make HTTP requests, create an API
+          key under My Page → External agent API. Ask the agent to fetch the skill below
+          using that key and install it for itself. Keep the key in the agent's secret
+          settings; do not paste it into shared prompts or files.</p>
+        {% if current_user.is_authenticated and not current_user.is_public and CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED %}
+          <div data-role="external-ai-account-details" class="space-y-2">
+            {% if CONFIG.REMOTE_MCP.enabled %}
+              <p>MCP server: <code>{{ CONFIG.REMOTE_MCP.resource }}</code></p>
+            {% else %}
+              <p>Ask the installation Owner for the MCP server address once setup is complete.</p>
+            {% endif %}
+            {% set site_origin = ('https://' ~ CONFIG.CUSTOM_DOMAIN) if CONFIG.CUSTOM_DOMAIN else CONFIG.APP_URL %}
+            <p>Skill URL (requires the API key): <code>{{ site_origin.rstrip('/') }}/api/v1/client-skill.md</code></p>
+          </div>
+        {% else %}
+          <p data-role="external-ai-generic-details">Ask the installation Owner whether
+            external access is enabled and for its MCP server address. The skill URL is
+            <code>https://YOUR-LAGNIAPPE-SITE/api/v1/client-skill.md</code>; replace the
+            example host with the installation's website address.</p>
+        {% endif %}
+        <p>Both use the user's normal workspace permissions and the external agent's
+          model provider. Both can answer questions and prepare plans; workspace changes
+          still require review in Lagniappe. Either can be used on its own. If both are
+          installed, tell the agent which one to use to avoid duplicate work.</p>
+      </div>
+    </details>
+  {% endcall %}
   {{ heading("Permission-Scoped Context", icon="permissions", kind="user") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
@@ -128,7 +164,7 @@
   {{ heading("Privacy Model") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
-      AI requests go through your own Google Cloud project's Vertex AI
+      Built-in AI requests go through your own Google Cloud project's Vertex AI
       configuration. That is a meaningfully different posture from pasting
       private data into a consumer chatbot account, though it is still a cloud
       AI service: prompts, files, and generated output are sent to Google for
@@ -171,7 +207,8 @@
       search grounding, file processing, image generation, or run large Create
       or Organize requests, it is worth glancing at usage a little more often.
     </p>
-    <p class="text-base-medium">You can adjust AI settings at any time with:</p>
+    <p class="text-base-medium">Change models in Admin → Site Settings → AI Models.
+      The installer can change AI and external-agent access with:</p>
     {{ code("./setup.sh ai") }}
   {% endcall %}
   {{ heading("Good to Know") }}

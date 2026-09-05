@@ -1,4 +1,4 @@
-"""Opt-in configuration for the ChatGPT and Codex remote MCP pilot."""
+"""Opt-in configuration for the ChatGPT and Codex remote MCP service."""
 
 import re
 from urllib.parse import urlsplit
@@ -80,17 +80,17 @@ def normalize_remote_mcp_config(value):
     if urlsplit(redirect_uri).hostname != "chatgpt.com":
         raise ValueError("Remote MCP redirect must belong to ChatGPT")
     actors = value.get("actors")
-    if not isinstance(actors, (list, tuple)) or len(actors) > 10:
-        raise ValueError("Remote MCP requires an explicit pilot actor list")
+    if actors is not None and not isinstance(actors, (list, tuple)):
+        raise ValueError("Remote MCP actors must be a list when specified")
     if any(
         not isinstance(actor, str)
         or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", actor)
-        for actor in actors
+        for actor in (actors or ())
     ):
-        raise ValueError("Invalid remote MCP pilot actor")
-    actors = tuple(actor.casefold() for actor in actors)
-    if len(set(actors)) != len(actors):
-        raise ValueError("Duplicate remote MCP pilot actor")
+        raise ValueError("Invalid remote MCP service actor")
+    actors = tuple(actor.casefold() for actor in actors) if actors is not None else None
+    if actors is not None and len(set(actors)) != len(actors):
+        raise ValueError("Duplicate remote MCP service actor")
     service_account = value.get("service_account")
     if not isinstance(service_account, str) or not re.fullmatch(
         r"[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z][a-z0-9-]+\.iam\.gserviceaccount\.com",

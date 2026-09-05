@@ -121,9 +121,9 @@ def install():
         )
     else:
         optional.setup_error_monitoring()
-        optional.change_ai_model()
-        record_step("configure AI email submissions")
-        ai_email_config = ai_email.setup_ai_email()
+        if optional.configure_ai_features():
+            record_step("configure AI email submissions")
+            ai_email_config = ai_email.setup_ai_email()
 
     record_step("persist generated configuration")
     SETTINGS.save()
@@ -172,6 +172,9 @@ def install():
         print(f"4. Run: {format_command(app_command)}")
         print(f"After deployment, run: {setup_command('jobs')}")
         print(f"Then reconcile memory monitoring: {setup_command('monitoring')}")
+        from installer.mcp import requested
+        if requested(SETTINGS.APP):
+            print(f"Then publish MCP and its app configuration: {setup_command('mcp')}")
         if ai_email_config:
             print(
                 "Then activate the saved AI email configuration with: "

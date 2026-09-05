@@ -116,6 +116,20 @@ def expected_resource_lines(
         f"Redis endpoint: {_value(redis_endpoint)}",
         f"App Engine runtime: {_value(deploy.get('runtime'))}",
     ]
+    from config.ai_settings import normalize_ai_features
+    from installer.mcp import requested
+    features = normalize_ai_features(settings)
+    lines.append(f"AI features: {'enabled' if features['AI_ENABLED'] else 'disabled'}")
+    lines.append(f"External AI (MCP and API/skill): {'enabled' if features['EXTERNAL_AI_ENABLED'] else 'disabled'}")
+    if requested(settings):
+        remote = settings.get("REMOTE_MCP") or {}
+        lines.extend([
+            f"MCP URL: {_value(remote.get('resource'))}",
+            f"MCP desired version: {_value(settings.get('MCP_VERSION'))}",
+            f"MCP runtime account: {_value(remote.get('service_account'))}",
+            f"MCP build account: lagniappe-mcp-build@{project}.iam.gserviceaccount.com",
+            f"MCP build bucket: {project}-mcp-builds",
+        ])
     for kind, name in _bucket_names(settings).items():
         lines.append(f"{kind.title()} bucket: {name}")
     return lines
@@ -169,6 +183,15 @@ def install_summary_lines(
         _install_line("Target project", project),
         _install_line("gcloud configuration", gcloud_config.get("NAME")),
     ]
+    from config.ai_settings import normalize_ai_features
+    from installer.mcp import requested
+    features = normalize_ai_features(settings)
+    lines.append(_install_line("AI features", "enabled" if features["AI_ENABLED"] else "disabled"))
+    lines.append(_install_line("External AI (MCP and API/skill)", "enabled" if features["EXTERNAL_AI_ENABLED"] else "disabled"))
+    if requested(settings):
+        remote = settings.get("REMOTE_MCP") or {}
+        lines.append(_install_line("MCP server", remote.get("resource") or f"selected; finish with {setup_command('mcp')}"))
+        lines.append(_install_line("MCP desired version", settings.get("MCP_VERSION") or "pending"))
     if (
         installer
         and deployer

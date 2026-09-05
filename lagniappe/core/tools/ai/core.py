@@ -465,9 +465,11 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_search_json_generation_keeps_provider_response_unconstrained
     # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_tool_loop
     # @matrix ai : output-format provider-errors quota search tool-loop
-    # @matrix ai : empty-response-retry model-routing
+    # @matrix ai : empty-response-retry model-routing site-policy provider-boundary
     def generate_content(self, prompt, *, validator=None):
         """Generate and optionally validate text under one observable call boundary."""
+        if not CONFIG.AI_ENABLED:
+            raise exceptions.AIException("AI is disabled for this installation.")
         observer = GenerationObserver(prompt)
         token = observer.install()
         terminal_error = None
@@ -869,9 +871,11 @@ class GenAI:
     # @testable true
     # @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
     # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
-    # @matrix ai pages : image-generate
+    # @matrix ai pages : image-generate site-policy provider-boundary
     def generate_image(self, prompt, aspect_ratio=None):
         """Generate an image from a Prompt and return a BytesIO buffer."""
+        if not CONFIG.AI_ENABLED:
+            raise exceptions.AIException("AI is disabled for this installation.")
         model = runtime_ai_settings()["AI_IMAGE_MODEL"]
         if _is_imagen_model(model):
             return self._generate_imagen_image(prompt, model, aspect_ratio=aspect_ratio)

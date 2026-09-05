@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request, E as ENDPOINTS, c as captureError } from './foundation.js?v=ba683140';
-import './connectivity.js?v=ba683140';
-import { B as BaseElement } from './baseElement.js?v=ba683140';
-import './upstreamUnavailable.js?v=ba683140';
-import './styles.js?v=ba683140';
-import './icons.js?v=ba683140';
-import './primitives.js?v=ba683140';
+import { r as request, E as ENDPOINTS, c as captureError } from './foundation.js?v=bdd0711b';
+import './connectivity.js?v=bdd0711b';
+import { B as BaseElement } from './baseElement.js?v=bdd0711b';
+import './upstreamUnavailable.js?v=bdd0711b';
+import './styles.js?v=bdd0711b';
+import './icons.js?v=bdd0711b';
+import './primitives.js?v=bdd0711b';
 
 /**
  * @testable infrastructure

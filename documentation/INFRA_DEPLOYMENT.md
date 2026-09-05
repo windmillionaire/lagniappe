@@ -88,126 +88,119 @@ status, Flask routes requiring exact status must remain in the dynamic
 allowlist. Tooling checks keep route prefix constants aligned with blueprint
 registration.
 
-## Remote MCP pilot
+## Remote MCP service
 
-The hosted MCP adapter is a separate manual Cloud Run deployment. Its
-source is `mcp/src/lagniappe_mcp/`; its Dockerfile, Cloud Build
-definition, and upload allowlist live in `mcp/`.
-The image installs the complete service using its pinned Python, uv, and lock
-file, then removes its test/build dependencies. It runs as a non-root user.
-The dedicated build context includes only `mcp/src`, locked package inputs,
-and the container definition. Tests live under `testing/` and are not uploaded. It excludes application
-configuration, user profiles, and private workflow fixtures. The application
-continues to receive OAuth/authentication code through the ordinary App Engine
-deployment boundary.
+MCP is an optional component of the installation, managed by `installer/mcp.py`
+through the ordinary `runner.deploy.deploy` path. Select it in the AI section
+of setup, or later with `./setup.sh ai`. Selecting external AI enables both
+MCP and the direct API/skill; disabling external AI closes both. Disabling AI
+closes built-in generation and external access together.
 
-The local stdio client, public wheels, immutable release ledger and package
-release checks have been retired. Python package metadata remains an internal
-container installation detail. Its API adapter and remote protocol/attachment tests run
-through `run.py test`; application deploys no longer assemble or check MCP wheels.
-Runtime configuration is documented in
-[Infrastructure Configuration](INFRA_CONFIG.md#remote-mcp-pilot).
+### Installation and update order
 
-Activation has a deliberate bootstrap order: create the service disabled, read
-its canonical `status.url`, configure that exact URL plus `/mcp` in the main
-app, then enable the service with the same issuer/resource pair. Network
-invocation is public; application OAuth protects `/mcp`. The dedicated runtime
-service account needs no direct Datastore or Storage role because the main API
-owns token and permission checks and existing upload sessions grant access to
-individual uploads. Scale-to-zero, a small instance cap, low concurrency, and
-memory sized for ephemeral upload spools are pilot choices to verify in the
-deployed service. No custom domain or normal installer lifecycle is added.
+1. Validate the normal app build and generated configuration. If MCP is selected,
+   check the deployer's provisioning permissions and reconcile the dedicated
+   service/build accounts, Artifact Registry repository, private build-source
+   bucket, OAuth TTL and App Engine authorization-request log exclusion.
+2. Compute the MCP source fingerprint. Reuse a matching image or build it with
+   Cloud Build. On first installation, create a **disabled** Cloud Run service
+   and read its canonical `status.url`; this does not require a running app.
+3. Save that URL plus `/mcp`, the app's canonical issuer, runtime service account,
+   and desired `MCP_VERSION` in application settings. Publish App Engine normally.
+4. Only after App Engine succeeds, enable/update the Cloud Run revision and
+   verify its readiness, traffic, runtime identity, image version and environment.
+   An unchanged service skips both the build and revision deployment.
 
-Before inviting a user, verify public discovery and unauthenticated challenges,
-the live Google identity envelope, and login/consent on the configured issuer.
-The container's public health path is `/health`; avoid `/healthz`, which Cloud
-Run reserves before the request reaches the application. The canonical OAuth
-resource comes from the service's `status.url`, even if the deploy command also
-prints a different working Cloud Run hostname.
-Also configure platform log handling for `/oauth/authorize`: application
-redaction cannot remove the state and PKCE challenge in App Engine's initial
-request URL. Native TTL on the `mcp_oauth` kind's Datetime `expires_at` field
-supplies asynchronous record cleanup. Per-request expiry checks enforce
-authentication expiry before physical cleanup.
-The living [pilot implementation record](../todo/REMOTE_MCP_PILOT_IMPLEMENTATION.md)
-tracks actual resource names, deployment commands/results, retention/log
-configuration, and the manual ChatGPT web, Android, and desktop trials. An
-unfilled deployment entry is pending, not evidence of a working cloud service.
+This ordering is shared by normal installation, `setup.sh update`, source
+upgrade, recovery/repair, handoff, and `run.py deploy`. The main app is deployed
+once. Cloud Build builds an image; the installer then deploys that image. A
+failed app deployment leaves the prepared MCP service disabled, or the previous
+service revision in place. A failed MCP activation returns an error even though
+the app may already be available. Retry with `./setup.sh mcp`; completed resources
+and images are reused. That focused command also publishes the matching app
+configuration using the normal prebuilt-app path. If initial setup defers app
+deployment, its final instructions include this command after manual app setup.
 
-Revocation in `/oauth/connection` stops the selected client grant for the
-current user. Turning off
-the main app's `REMOTE_MCP.enabled` flag stops all remote authorization and
-envelope authentication; turning off `LAGNIAPPE_MCP_ENABLED` stops the Cloud Run
-endpoint. Retire the exact pilot service and resources explicitly after
-disconnecting pilot clients. Existing local API credentials remain independent.
+`MCP_VERSION` is a SHA-256 fingerprint (first 32 hexadecimal characters) of the
+service source, container/locked build inputs and managed runtime arguments. It is desired state,
+not a claim that deployment succeeded. Cloud Run's `lagniappe-mcp-version` label
+and current ready revision provide deployed state. App-only changes do not
+change this fingerprint. `setup.sh doctor` checks the selected endpoint and
+version without changing cloud resources. There is no wheel release or manual
+version bump.
 
-For the Codex extension, enable `REMOTE_MCP.codex_enabled` in private application
-settings and deploy the main app normally. Rebuild/redeploy Cloud Run to add
-the terminal upload tools; no new cloud resources or service-account roles are
-needed. Then configure the terminal client:
+### Resources, identity and build boundary
+
+The component runs in the owner's existing Google Cloud project and resource
+region. Standard resource names are:
+
+| Resource | Name / purpose |
+| --- | --- |
+| Cloud Run service | `lagniappe-mcp` |
+| Artifact Registry Docker repository | `lagniappe-mcp` |
+| Runtime account | `lagniappe-mcp@PROJECT.iam.gserviceaccount.com`; a saved exact account is preserved |
+| Build account | `lagniappe-mcp-build@PROJECT.iam.gserviceaccount.com` |
+| Private build-source bucket | `PROJECT-mcp-builds` |
+| Firestore TTL | `mcp_oauth.expires_at` |
+| `_Default` log-sink exclusion | `remote-mcp-oauth-query`; excludes App Engine OAuth request URLs |
+
+The installer uses the existing project Owner/delegated-installer convention.
+It checks the additional Cloud Run, Cloud Build, Artifact Registry, service
+account, bucket, logging and TTL provisioning permissions before creating
+resources. Scope `serviceAccountUser` to the two accounts, repository management
+to the image repository, bucket management to the build bucket, and Run
+management to the service. Owner handoff grants those exact resources to the
+permanent Owner and removes the installer's direct bindings before removing
+the installer's project role. No service-account keys are generated.
+
+The build account gets Artifact Registry writer and staging-bucket object viewer
+on those resources, plus project log writer. Cloud Build uses
+`CLOUD_LOGGING_ONLY`, as required for this
+[user-managed build identity](https://docs.cloud.google.com/build/docs/securing-builds/configure-user-specified-service-accounts).
+The runtime account needs no direct Datastore or Storage role: every request
+carries the user's OAuth token and the runtime Google identity to the main API,
+which checks both. Upload sessions authorize individual transfers.
+
+`mcp/gcloudignore` allows only the service source and build inputs into the
+build bucket; application settings, keys, tests, local environments and workflow
+fixtures are excluded. The container uses its locked Python/uv dependencies,
+runs as non-root, and strips test/build dependencies. It does not contain the
+Flask app or its configuration. The Cloud Run service scales to zero, with a
+maximum of two instances, concurrency four, and 1 GiB for temporary upload spools.
+It is publicly invokable at the network layer; application OAuth protects tools.
+Its health path is `/health`. Use the canonical `status.url` for OAuth even if
+another Cloud Run hostname also works.
+
+### Disabling and clients
+
+After the app is deployed with `AI_ENABLED: false` or
+`EXTERNAL_AI_ENABLED: false`, its API, API-key issuance, OAuth metadata and
+OAuth requests reject access, including previously issued credentials. The
+normal deploy then disables an existing Cloud Run endpoint. Resources and
+credentials are retained, so re-enabling can reuse them; use account-level
+revocation when credentials must remain revoked. Saved reports and ordinary
+workspace editing remain available within normal permissions.
+
+Users add the MCP URL shown in the signed-in AI manual, then authorize with an
+eligible Lagniappe account. The account's workspace permissions still apply;
+its email need not match the agent account. New installations permit eligible
+non-public users; an explicit older `actors` restriction is preserved. No local
+MCP package or upload helper is installed.
+
+For Codex, configure the server URL and fixed public client:
 
 ```bash
 codex mcp add lagniappe-remote --url https://YOUR-CLOUD-RUN-ORIGIN/mcp --oauth-client-id lagniappe-codex
 codex mcp login lagniappe-remote
 ```
 
-Use a `tool_timeout_sec` of 300 and `startup_timeout_sec` of 60 for the pilot.
-Set `required = true` under `[mcp_servers.lagniappe-remote]` while trialing it.
-Codex's initial catalog can omit an optional server that takes longer than its
-startup grace period, even if `/mcp` later shows the server connected. Making
-the pilot server required waits for its tools and reports a startup failure if
-it cannot initialize; it does not force the model to choose those tools.
-Remove any retired local MCP entry and restart the client session to refresh
-its tool catalog.
-Current Codex registration and callback behavior is documented in the
-[official MCP guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+A `tool_timeout_sec` of 300 and `startup_timeout_sec` of 60 accommodate uploads
+and startup. `required = true` makes missing initialization visible; it does not
+force the model to choose MCP tools. Restart a client after changing its tool
+catalog. See the [official MCP guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 
-### Current installation and update lifecycle
-
-Remote MCP remains an opt-in manual deployment; removing the local transport
-does not add Cloud Run provisioning to the installer. The pilot is disabled by
-default, accepts an explicit list of up to ten invited account emails, and has
-a separate Codex enable flag. Setup does not collect these values interactively.
-
-1. `setup.sh` installs/configures the main application. `setup.sh update`
-   regenerates the App Engine descriptor, indexes and other configuration outputs
-   from saved settings and the current templates, then publishes the prebuilt
-   application. Both use the ordinary App Engine deployment helper.
-2. Separately enable the needed Cloud Run / Cloud Build / Artifact Registry
-   services, create an image repository and dedicated MCP runtime service
-   account, and submit `mcp/cloudbuild.yaml` with an
-   explicit `_IMAGE` destination and its `gcloudignore` allowlist. Cloud Build
-   builds and pushes an image; this YAML does not deploy a service.
-3. Deploy that image to Cloud Run with MCP disabled. Read its canonical
-   `status.url`. Configure the main application's `REMOTE_MCP` issuer, exact
-   resource URL, runtime identity and allowed clients; regenerate configuration
-   and deploy the app. Then enable Cloud Run with the matching issuer/resource.
-4. Configure expiry cleanup and authorization-request log handling as described
-   above. Users add the remote URL in their MCP client and authorize through
-   their invited Lagniappe account. They do not install a Python package.
-
-The container contains the MCP libraries and their dependencies, not the Flask
-application, its saved settings, or its database. OAuth grants, permissions,
-Plans and persistent files remain owned by the main application. The Cloud Run
-service obtains its Google identity from its runtime account; it has no saved
-user API key. Each MCP request carries both the user's OAuth token and a Google
-identity envelope to the main API, where both are checked. File-upload sessions
-grant only the individual transfers; the adapter needs no direct database or
-Storage IAM role.
-
-| Change | Deployment needed today |
-| --- | --- |
-| Website, API, OAuth implementation or application configuration | App Engine; use `setup.sh update` when generated configuration changes. |
-| Shared adapter, remote tools, pinned dependencies or container | Build a new image and deploy a Cloud Run revision separately. |
-| A contract change spanning the API and adapter | Deploy both, in a compatible order, then verify discovery and a workflow. |
-| User groups, permissions or connection revocation | No code deployment; subsequent authenticated requests use the current permissions/grant. |
-
-`run.py deploy` neither builds nor updates Cloud Run. A successful application
-update can therefore leave the adapter at its previous revision. Cloud Run
-image tags/digests and App Engine versions must currently be recorded and rolled
-back separately. Automated provisioning, paired updates, recovery and teardown
-remain follow-up work; none is implied by the normal setup command. The service
-lives in the installation owner's Google Cloud project and is billed there.
+Historical trial outcomes remain in the
+[pilot implementation record](../todo/REMOTE_MCP_PILOT_IMPLEMENTATION.md).
 
 ## Scaling and runtime settings
 

@@ -151,13 +151,15 @@ def _rate_limit(scope, identifier, limit, window_seconds):
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
 # @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
-# @matrix agent-api : bearer-only body-limit entitlement-independent error-envelope public-user request-correlation request-recheck session-independent streaming
+# @matrix agent-api : site-policy bearer-only body-limit entitlement-independent error-envelope public-user request-correlation request-recheck session-independent streaming
 # @pairs agent-api:rate-limit
 @api.before_request
 def authenticate_request():
     """Authenticate only a bearer token; browser sessions are never a fallback."""
     g.NO_CACHE = True
     g.agent_api_request_id = _request_id()
+    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
+        return _error("external_ai_disabled", "External AI access is disabled.", 403)
     # ``Content-Length`` is not guaranteed (for example with chunked transfer).
     # Werkzeug's limited request stream enforces this cap while JSON is read as
     # well as rejecting an oversized declared length up front.
@@ -250,6 +252,8 @@ def handle_api_http_error(error):
     g.NO_CACHE = True
     if not getattr(g, "agent_api_request_id", None):
         g.agent_api_request_id = _request_id()
+    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
+        return _error("external_ai_disabled", "External AI access is disabled.", 403)
 
     status = error.code if isinstance(error, HTTPException) else 500
     code, message = {

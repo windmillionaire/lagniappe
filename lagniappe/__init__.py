@@ -181,7 +181,11 @@ class Config:
         self.CUSTOM_DOMAIN = str(
             getattr(self, "CUSTOM_DOMAIN", "") or ""
         ).strip()
+        from config.ai_settings import normalize_ai_features
         from config.remote_mcp import normalize_remote_mcp_config
+
+        for name, enabled in normalize_ai_features(vars(self)).items():
+            setattr(self, name, enabled)
 
         self.REMOTE_MCP = normalize_remote_mcp_config(
             getattr(self, "REMOTE_MCP", None)

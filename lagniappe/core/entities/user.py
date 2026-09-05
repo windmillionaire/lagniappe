@@ -127,11 +127,12 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009f_user_ai_access.py::test_user_access_is_independent_hierarchical_and_fail_closed
-    # @matrix ai-access : authentication hierarchy owner-no-bypass permissions-independent
+    # @matrix ai-access : authentication hierarchy owner-no-bypass permissions-independent site-policy
     def access(self, required):
         """Check this user's independent AI entitlement."""
         if (
-            not self.is_authenticated
+            not getattr(CONFIG, "AI_ENABLED", True)
+            or not self.is_authenticated
             or not isinstance(required, AI)
             or required is AI.NONE
         ):
@@ -140,11 +141,15 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009f_user_ai_access.py::test_authorization_fingerprint_tracks_ai_access
-    # @matrix ai-access cache : authorization-fingerprint entitlement permissions
+    # @matrix ai-access cache : authorization-fingerprint entitlement permissions site-policy
     @property
     def authorization_fingerprint(self):
         role = "owner" if self.is_owner else "admin" if self.is_admin else "user"
-        value = f"{role}:{self.permissions_fingerprint}:{self.ai_access}"
+        value = (
+            f"{role}:{self.permissions_fingerprint}:{self.ai_access}:"
+            f"{getattr(CONFIG, 'AI_ENABLED', True)}:"
+            f"{getattr(CONFIG, 'EXTERNAL_AI_ENABLED', True)}"
+        )
         return hashlib.md5(value.encode("utf-8")).hexdigest()
 
     @property

@@ -239,7 +239,7 @@ def _require_project_resource(value, name, project_id):
 # @tests tests_tooling/test_003_config.py::test_recovery_validates_and_normalizes_auth_email_smtp
 # @tests tests_tooling/test_003_config.py::test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config
 # @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
-# @matrix config : ai-email authentication-email current-schema messaging-removal project-identity project-number recovery-validation required-settings schema-upgrade secrets
+# @matrix config : site-policy ai-email authentication-email current-schema messaging-removal project-identity project-number recovery-validation required-settings schema-upgrade secrets
 def validate_recovery_document(settings):
     """Validate and normalize a canonical recovery document before provider access."""
     from config.locations import (
@@ -391,6 +391,17 @@ def validate_recovery_document(settings):
             "configuration, verified sender address, and sender name."
         )
     recovered["AUTH_EMAIL_CONFIG"] = normalized_auth_email
+
+    from config.ai_settings import normalize_ai_features
+    from config.remote_mcp import normalize_remote_mcp_config
+    try:
+        normalize_ai_features(recovered)
+        if recovered.get("REMOTE_MCP") is not None:
+            recovered["REMOTE_MCP"] = normalize_remote_mcp_config(recovered["REMOTE_MCP"])
+        if recovered.get("MCP_VERSION") is not None and not re.fullmatch(r"[a-f0-9]{32}", str(recovered["MCP_VERSION"])):
+            raise ValueError("MCP_VERSION must be a source fingerprint")
+    except ValueError as error:
+        raise RecoveryConfigurationError(f"AI configuration is invalid: {error}") from error
 
     ai_email_value = recovered.get("AI_EMAIL_CONFIG")
     if ai_email_value not in (None, ""):

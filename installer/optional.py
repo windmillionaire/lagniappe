@@ -321,62 +321,38 @@ def configure_ai_observability():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @matrix setup : ai-model ai-observability optional settings-save
-def change_ai_model():
-    """
-    Ask user for consent to change the AI model.
-    Returns True if user consents, False otherwise.
-    """
+# @matrix setup : ai-model ai-observability optional settings-save site-policy
+def configure_ai_features():
+    """Choose the installation's built-in and external AI access policy."""
     from config import SETTINGS
 
     f = FORMATTER.initialize()
-
-    print(f"\n{f.info('Change AI Model')}")
-    print(f"Currently using {SETTINGS.APP['AI_MODEL']}")
-    print(
-        "Available models: https://cloud.google.com/vertex-ai/generative-ai/docs/models#generally_available_models"
-    )
-
-    consent = input(f"\n{f.warning('Change AI model to use? [y/N]: ')}")
-    if consent.lower() == "y":
-        model = input(f"\n{f.warning('Enter the model name: ')}")
-        SETTINGS.APP["AI_MODEL"] = model
-        SETTINGS.APP["AI_LOCATION"] = constants.DEFAULT_AI_LOCATION
-        print(f.success(f"AI model changed to {model}."))
+    print(f"\n{f.info('AI Features')}")
+    previous = SETTINGS.APP.get("AI_ENABLED", True)
+    answer = input(f.info(f"Enable AI features? {'[Y/n]' if previous else '[y/N]'}: ")).strip().casefold()
+    enabled = answer in {"y", "yes"} if answer else previous
+    SETTINGS.APP["AI_ENABLED"] = enabled
+    if not enabled:
+        SETTINGS.APP["EXTERNAL_AI_ENABLED"] = False
+        SETTINGS.APP["AI_OBSERVABILITY"] = False
+        print(f.success("AI features and external AI access are disabled."))
     else:
-        print(f.success("AI model not changed."))
-
-    print(f"\n{f.info('Change AI Utility Model')}")
-    print(
-        f"Currently using {SETTINGS.APP.get('AI_UTILITY_MODEL', constants.DEFAULT_UTILITY_AI_MODEL)}"
-    )
-    print(
-        "Available models: https://cloud.google.com/vertex-ai/generative-ai/docs/models#generally_available_models"
-    )
-
-    consent = input(f"\n{f.warning('Change AI utility model to use? [y/N]: ')}")
-    if consent.lower() == "y":
-        model = input(f"\n{f.warning('Enter the model name: ')}")
-        SETTINGS.APP["AI_UTILITY_MODEL"] = model
-        SETTINGS.APP["AI_LOCATION"] = constants.DEFAULT_AI_LOCATION
-        print(f.success(f"AI utility model changed to {model}."))
-    else:
-        SETTINGS.APP["AI_UTILITY_MODEL"] = SETTINGS.APP.get(
-            "AI_UTILITY_MODEL",
-            constants.DEFAULT_UTILITY_AI_MODEL,
-        )
-
-    print(f"\n{f.info('Change AI Image Model')}")
-    print(f"Currently using {SETTINGS.APP['AI_IMAGE_MODEL']}")
-    print(
-        "Available models: https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/image-generation"
-    )
-
-    consent = input(f"\n{f.warning('Change AI image model to use? [y/N]: ')}")
-    if consent.lower() == "y":
-        model = input(f"\n{f.warning('Enter the model name: ')}")
-        SETTINGS.APP["AI_IMAGE_MODEL"] = model
-        print(f.success(f"AI image model changed to {model}."))
-
-    configure_ai_observability()
+        print(wrap_text(
+            f"AI models: {SETTINGS.APP.get('AI_MODEL', constants.DEFAULT_AI_MODEL)} "
+            f"(primary), {SETTINGS.APP.get('AI_UTILITY_MODEL', constants.DEFAULT_UTILITY_AI_MODEL)} "
+            f"(utility), {SETTINGS.APP.get('AI_IMAGE_MODEL', constants.DEFAULT_AI_IMAGE_MODEL)} "
+            "(images). You can change these in Admin → Site Settings → AI Models."
+        ))
+        print(wrap_text(
+            "External AI access lets users connect their own agents through MCP "
+            "or the API/skill. Those agents use their own model providers. "
+            "Leave this disabled to keep AI access within the site's configured provider."
+        ))
+        previous = SETTINGS.APP.get("EXTERNAL_AI_ENABLED", (SETTINGS.APP.get("REMOTE_MCP") or {}).get("enabled", False))
+        answer = input(f.info(
+            f"Enable external AI access and the MCP server? {'[Y/n]' if previous else '[y/N]'}: "
+        )).strip().casefold()
+        SETTINGS.APP["EXTERNAL_AI_ENABLED"] = answer in {"y", "yes"} if answer else previous
+        configure_ai_observability()
     SETTINGS.save()
+    return enabled

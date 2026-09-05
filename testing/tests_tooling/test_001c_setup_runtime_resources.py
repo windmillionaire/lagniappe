@@ -730,12 +730,14 @@ def test_ai_setup_mode_configures_observability(monkeypatch):
     monkeypatch.setattr(config, "SETTINGS", settings)
     monkeypatch.setattr(ai, "prepare_existing_installation", lambda: None)
     monkeypatch.setattr(ai, "FORMATTER", _fake_formatter())
-    answers = iter(["n", "y"])
+    answers = iter(["y", "n", "y", "n", "n"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
     assert ai.configure_ai() == 0
+    assert settings.APP["AI_ENABLED"] is True
+    assert settings.APP["EXTERNAL_AI_ENABLED"] is False
     assert settings.APP["AI_OBSERVABILITY"] is True
-    assert len(settings._saves) == 1
+    assert len(settings._saves) == 2
 
 
 # @matrix setup : credential-parsing redis validation
@@ -4660,22 +4662,12 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     )
     settings._saves.clear()
     answers = iter(
-        [
-            "n",
-            "n",
-            "y",
-            "gemini-new",
-            "y",
-            "gemini-utility-new",
-            "y",
-            "imagen-new",
-            "y",
-        ]
+        ["n", "n", "y", "y", "y"]
     )
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
     optional.setup_error_monitoring()
-    optional.change_ai_model()
+    optional.configure_ai_features()
     setup_output = capsys.readouterr().out
 
     assert settings.APP["CAPTURE_ERRORS"] == "False"
@@ -4685,10 +4677,12 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     assert "Recognized password, token, API-key, and private-key values" in setup_output
     assert "Reports are privacy-reduced, not guaranteed to be anonymous" in setup_output
     assert "the submitted fields may be included" not in setup_output
-    assert settings.APP["AI_MODEL"] == "gemini-new"
-    assert settings.APP["AI_UTILITY_MODEL"] == "gemini-utility-new"
-    assert settings.APP["AI_LOCATION"] == "global"
-    assert settings.APP["AI_IMAGE_MODEL"] == "imagen-new"
+    assert settings.APP["AI_MODEL"] == "gemini-old"
+    assert settings.APP["AI_UTILITY_MODEL"] == "gemini-utility-old"
+    assert settings.APP["AI_IMAGE_MODEL"] == "imagen-old"
+    assert settings.APP["AI_ENABLED"] is True
+    assert settings.APP["EXTERNAL_AI_ENABLED"] is True
+    assert "Admin → Site Settings → AI Models" in setup_output
     assert settings.APP["AI_OBSERVABILITY"] is True
     assert len(settings._saves) == 2
 

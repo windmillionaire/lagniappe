@@ -634,3 +634,27 @@ def test_codex_loopback_grants_coexist_and_cannot_cross_clients(oauth):
     oauth.config["codex_enabled"] = False
     with pytest.raises(auth.OAuthError):
         auth.begin_authorization(request)
+
+
+# @matrix mcp-oauth : site-policy existing-grants optional-actors
+# @source lagniappe/core/tools/auth/remote_mcp.py::authenticate_access
+# @source lagniappe/core/tools/auth/remote_mcp.py::eligible_user
+@pytest.mark.unit
+def test_site_policy_blocks_existing_oauth_grants_and_optional_actor_lists(oauth, monkeypatch):
+    tokens = auth.exchange_token(_code(oauth))
+    for flag in ("AI_ENABLED", "EXTERNAL_AI_ENABLED"):
+        with monkeypatch.context() as policy:
+            policy.setattr(auth.CONFIG, flag, False)
+            with pytest.raises(auth.OAuthError):
+                auth.authenticate_access(tokens["access_token"])
+            with pytest.raises(auth.OAuthError):
+                auth.begin_authorization(oauth.request)
+    assert auth.authenticate_access(tokens["access_token"])[0] is oauth.actor
+    monkeypatch.setitem(oauth.config, "actors", None)
+    oauth.actor.email = "new-user@example.test"
+    assert auth.eligible_user(oauth.actor)
+    oauth.actor.is_public = True
+    assert not auth.eligible_user(oauth.actor)
+    oauth.actor.is_public = False
+    monkeypatch.setitem(oauth.config, "actors", [])
+    assert not auth.eligible_user(oauth.actor)

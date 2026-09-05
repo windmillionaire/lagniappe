@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=ba683140';
-import { f as areEqual } from './foundation.js?v=ba683140';
-import { B as BaseElement } from './baseElement.js?v=ba683140';
-import { f as formatting } from './formatting.js?v=ba683140';
-import { p as primitives } from './primitives.js?v=ba683140';
-import './upstreamUnavailable.js?v=ba683140';
-import './connectivity.js?v=ba683140';
-import './icons.js?v=ba683140';
+import { STYLES } from './styles.js?v=bdd0711b';
+import { f as areEqual } from './foundation.js?v=bdd0711b';
+import { B as BaseElement } from './baseElement.js?v=bdd0711b';
+import { f as formatting } from './formatting.js?v=bdd0711b';
+import { p as primitives } from './primitives.js?v=bdd0711b';
+import './upstreamUnavailable.js?v=bdd0711b';
+import './connectivity.js?v=bdd0711b';
+import './icons.js?v=bdd0711b';
 
 /**
  * @testable infrastructure

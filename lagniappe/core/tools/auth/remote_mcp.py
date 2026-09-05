@@ -1,4 +1,4 @@
-"""ChatGPT and Codex OAuth pilot, using opaque secrets and current User permissions."""
+"""ChatGPT and Codex OAuth service, using opaque secrets and current User permissions."""
 
 import base64
 from datetime import datetime, timedelta, timezone
@@ -99,7 +99,7 @@ class OAuthError(ValueError):
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def settings():
     value = CONFIG.REMOTE_MCP
-    if not value.get("enabled"):
+    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED or not value.get("enabled"):
         raise OAuthError("temporarily_unavailable", 503)
     return value
 
@@ -147,7 +147,7 @@ def _bound(row, config):
 
 # @testable true
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_user_and_workload_identity_are_both_required
-# @matrix mcp-oauth : allowlist user-binding
+# @matrix mcp-oauth : allowlist user-binding site-policy optional-actors
 def eligible_user(user):
     config = settings()
     return bool(
@@ -155,7 +155,8 @@ def eligible_user(user):
         and user.is_authenticated
         and user.is_active
         and not user.is_public
-        and (user.email or "").casefold() in config["actors"]
+        and (config.get("actors") is None
+             or (user.email or "").casefold() in config["actors"])
     )
 
 
@@ -505,7 +506,7 @@ def exchange_token(parameters, *, now=None):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_user_and_workload_identity_are_both_required
-# @matrix mcp-oauth : authentication expiry revocation user-binding
+# @matrix mcp-oauth : authentication expiry revocation user-binding site-policy existing-grants
 def authenticate_access(token, *, now=None):
     config, now = settings(), _now(now)
     row = store.read(_name(token, "a"))

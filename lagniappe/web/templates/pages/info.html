@@ -47,7 +47,7 @@
         data-can-edit-name="{{ can_edit_name|yesno }}"
         data-can-edit-email="{{ (can_manage_user and not is_own_page and not page.user.is_owner)|yesno }}"
         data-can-edit-groups="{{ can_manage_user|yesno }}"
-        data-can-edit-ai="{{ can_manage_user|yesno }}"
+        data-can-edit-ai="{{ (CONFIG.AI_ENABLED and can_manage_user)|yesno }}"
         data-ai-access="{{ page.user.ai_access }}"
         data-notification-email-mode="{{ page.user.notification_email_mode }}"
         {% if is_own_page and not page.user.is_public %}
@@ -89,7 +89,7 @@
             </div>
           </div>
           {% if is_own_page and not page.user.is_public %}<div data-role="notification-email"></div>{% endif %}
-          {% if is_own_page and not page.user.is_public %}
+          {% if CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED and is_own_page and not page.user.is_public %}
             <fieldset data-role="api-key-settings"
                       data-kind="user"
                       class="rounded-md border border-user-default p-3">

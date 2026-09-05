@@ -426,7 +426,7 @@ def ensure_production_frontend_bundle(*, announce_progress=True):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
-# @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
+# @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version app-failure update-order
 def deploy(
     *,
     build_assets=True,
@@ -452,6 +452,10 @@ def deploy(
         expected_version=str(SETTINGS.APP["VERSION"]),
     )
     verify_generation_manifest()
+    from installer.mcp import prepare_deployment, finish_deployment
+
+    mcp_deployment = prepare_deployment(SETTINGS.APP)
+    SETTINGS.save()
     if announce_progress:
         print(
             "Deployment includes config/files/lagniappe_settings.yaml and, when "
@@ -475,6 +479,7 @@ def deploy(
         capture_output=capture_output,
     )
 
+    finish_deployment(mcp_deployment, SETTINGS.APP)
     if announce_completion:
         print("Deployment complete!")
     return True

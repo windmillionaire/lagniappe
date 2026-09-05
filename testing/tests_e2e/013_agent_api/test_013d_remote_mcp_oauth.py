@@ -353,7 +353,6 @@ def test_oauth_pending_survives_google_callback_session_replacement(pilot, monke
 
 # @matrix mcp-oauth : token revocation csrf-exemption csrf browser-settings
 # @matrix agent-api : bearer-only session-independent request-recheck
-# @source lagniappe/web/routes/api/main.py::authenticate_request
 def test_oauth_token_api_envelope_and_browser_revocation(pilot, monkeypatch):
     _login(pilot)
     form = _consent_page(pilot)
@@ -665,3 +664,95 @@ def test_codex_native_consent_reaches_loopback_and_shows_submit_progress(
         assert len(callbacks) == 1 and callbacks[0]["iss"] == [ISSUER]
         assert callbacks[0]["state"] == [pilot.parameters["state"]]
         assert len(callbacks[0]["code"]) == 1
+
+
+# @matrix mcp-oauth : site-policy discovery
+# @matrix agent-api : site-policy bearer-only
+# @source lagniappe/web/routes/oauth/main.py::metadata
+# @source lagniappe/web/routes/api/main.py::authenticate_request
+@pytest.mark.parametrize("flag", ["AI_ENABLED", "EXTERNAL_AI_ENABLED"])
+def test_site_policy_closes_oauth_discovery_and_external_routes(pilot, monkeypatch, flag):
+    monkeypatch.setattr(CONFIG, flag, False)
+    assert _open(pilot, "GET", "/.well-known/oauth-authorization-server").status_code == 404
+    assert _open(pilot, "GET", "/oauth/connection").status_code == 404
+    for path in ("/api/v1/", "/api/v1/client-skill.md", "/api/v1/actor"):
+        response = _open(pilot, "GET", path, headers={"Authorization": "Bearer previously-issued"})
+        assert response.status_code == 403
+        assert response.json["error"]["code"] == "external_ai_disabled"
+
+
+# @matrix manual : site-policy address-redaction anonymous-access ajax-section
+# @source lagniappe/web/responses.py::manual_content
+def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pilot, monkeypatch):
+    pilot.actor.access = lambda _: False
+    monkeypatch.setattr(CONFIG, "CUSTOM_DOMAIN", "workspace.example.test")
+    monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", True)
+    _login(pilot)
+    response = _open(pilot, "GET", "/manual/section/ai")
+    assert response.status_code == 200
+    text = response.text
+    assert 'data-role="external-ai-account-details"' in text
+    assert "https://pilot.run.app/mcp" in text
+    assert "https://workspace.example.test/api/v1/client-skill.md" in text
+    assert re.search(r'<details\s+data-role="external-ai-help">', text)
+    assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
+    for anonymous in (False, True):
+        pilot.actor.is_public = True
+        if anonymous:
+            with pilot.client.session_transaction(base_url=ISSUER) as session:
+                session.clear()
+        response = _open(pilot, "GET", "/manual/section/ai")
+        assert response.status_code == 200
+        assert 'data-role="external-ai-account-details"' not in response.text
+        assert 'data-role="external-ai-generic-details"' in response.text
+        assert "https://pilot.run.app/mcp" not in response.text
+        assert "https://workspace.example.test" not in response.text
+        assert "/api/v1/client-skill.md" in response.text
+    pilot.actor.is_public = False
+    _login(pilot)
+    monkeypatch.setattr(CONFIG, "EXTERNAL_AI_ENABLED", False)
+    response = _open(pilot, "GET", "/manual/section/ai")
+    assert response.status_code == 200
+    assert 'data-role="external-ai-account-details"' not in response.text
+
+
+# @matrix ai-access : site-policy
+# @source lagniappe/core/entities/user.py::User.access
+# @template pages/photo.html::image
+# @template home/site_settings.html::site_settings
+# @template home/categories.html::create
+# @template home/projects.html::create
+def test_disabled_ai_removes_provider_controls_from_rendered_views(monkeypatch):
+    from flask import render_template_string
+    from flask_login import login_user
+    from lagniappe.core.definitions import Resource
+    from types import MethodType
+    from lagniappe.core.entities.user import User
+
+    actor = Actor()
+    actor.ai_access = "CREATE"
+    actor.is_owner = False
+    actor.is_admin = True
+    actor.access = MethodType(User.access, actor)
+    monkeypatch.setattr(Resource, "allowed", lambda *args, **kwargs: False)
+    template = '''
+      {% from 'pages/photo.html' import image %}
+      {% from 'home/site_settings.html' import site_settings %}
+      {% from 'home/categories.html' import create as create_category %}
+      {% from 'home/projects.html' import create as create_project %}
+      {{ image(page) }}{{ site_settings() }}{{ create_category() }}{{ create_project() }}
+    '''
+    with app.test_request_context("/"):
+        login_user(actor)
+        enabled = render_template_string(template, page=SimpleNamespace(image=None))
+        assert 'data-ai-create="true"' in enabled
+        assert 'data-role="ai-settings"' in enabled
+        assert 'data-role="generate"' in enabled
+        monkeypatch.setattr(CONFIG, "AI_ENABLED", False)
+        disabled = render_template_string(template, page=SimpleNamespace(image=None))
+        assert 'data-ai-create="false"' in disabled
+        assert 'data-role="ai-settings"' not in disabled
+        assert 'data-role="generate"' not in disabled
+        assert 'data-widget="CreateCategory"' in disabled
+        assert 'data-widget="CreateProject"' in disabled
+        assert "drop image here" in disabled

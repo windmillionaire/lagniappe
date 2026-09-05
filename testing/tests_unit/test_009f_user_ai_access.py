@@ -179,3 +179,25 @@ def test_user_create_defaults_non_owner_to_none():
     assert user.is_admin is True
     assert user.ai_access == "NONE"
     assert user.db["ai_access"] == "NONE"
+
+
+# @matrix ai-access : site-policy authorization-fingerprint permissions-independent
+# @matrix cache : site-policy authorization-fingerprint
+# @source lagniappe/core/entities/user.py::User.access
+# @source lagniappe/core/entities/user.py::User.authorization_fingerprint
+@pytest.mark.unit
+def test_site_ai_policy_denies_generation_and_invalidates_cached_authorization(monkeypatch):
+    from lagniappe import CONFIG
+    user = TestEntities.get("USER", {"name": "AI Policy", "hash": "ai-policy", "permissions": {"models": "ALL"}})
+    user.ai_access = "CREATE"
+    before = user.authorization_fingerprint
+    assert user.access(AI.CREATE)
+    monkeypatch.setattr(CONFIG, "EXTERNAL_AI_ENABLED", False)
+    external_disabled = user.authorization_fingerprint
+    assert external_disabled != before
+    assert user.access(AI.CREATE)
+    monkeypatch.setattr(CONFIG, "AI_ENABLED", False)
+    assert not user.access(AI.ASK)
+    assert not user.access(AI.CREATE)
+    assert user.authorization_fingerprint != external_disabled
+    assert user.has_permission(Resource.MODELS, Action.CREATE)

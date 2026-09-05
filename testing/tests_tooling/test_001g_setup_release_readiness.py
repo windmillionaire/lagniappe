@@ -417,6 +417,7 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
             "state": "AVAILABLE",
             "details": {"policy": "current"},
         },
+        "mcp-service": {"state": "AVAILABLE", "details": {"message": "MCP is not selected."}},
     }
     assert calls == [
         (

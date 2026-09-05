@@ -78,7 +78,8 @@ Run after installation, recovery, or a manual configuration edit:
 `doctor` is read-only. It checks generated-file completeness and source marker,
 file permissions, saved gcloud/ADC identity, active operator permissions,
 required APIs/resources, runtime IAM, buckets, Identity Platform, Redis, and
-focused provider state, including the managed App Engine memory policy.
+focused provider state, including the managed App Engine memory policy and
+selected MCP endpoint/version.
 Independent provider checks still run when only local
 generated files have drifted. It returns nonzero for drift and prints the
 repair command.
@@ -147,3 +148,16 @@ The settings file does not contain application entities, documents, uploads,
 or Redis data. The recovery bucket and recovery-set workflow protect those
 assets. If both provider data and the recovery bucket are lost, configuration
 alone cannot reconstruct the application workspace.
+
+## Optional AI and MCP recovery
+
+Recovery retains and validates the site AI switches, exact MCP OAuth endpoint
+and runtime identity, and desired `MCP_VERSION`. An older snapshot without
+explicit external policy preserves REST access without silently opting into a
+new Cloud Run service. Normal repair/update prepares the selected service,
+publishes App Engine configuration, then activates or updates MCP. An unchanged
+service is reused. `./setup.sh mcp` retries interrupted component deployment.
+
+Delegated handoff also transfers the MCP runtime/build accounts, build bucket,
+Artifact Registry repository and Cloud Run service. The running MCP account
+never receives the main application's database or general Storage permissions.

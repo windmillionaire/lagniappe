@@ -1751,6 +1751,16 @@ def test_issue_authenticate_expire_and_revoke_credential(monkeypatch):
     assert token not in repr(rows)
     assert agent_auth.credential_status(user, now=now)["active"] is True
 
+    # A site policy change closes previously issued keys as well as new issuance.
+    for flag in ("AI_ENABLED", "EXTERNAL_AI_ENABLED"):
+        with monkeypatch.context() as policy:
+            policy.setattr(CONFIG, flag, False)
+            with pytest.raises(agent_auth.AgentAPICredentialError, match="disabled"):
+                agent_auth.authenticate_credential(token, now=now)
+            with pytest.raises(agent_auth.AgentAPICredentialError, match="disabled"):
+                agent_auth.issue_credential(user, now=now)
+        assert agent_auth.authenticate_credential(token, now=now)[0] is user
+
     with pytest.raises(agent_auth.AgentAPICredentialError, match="expired"):
         agent_auth.authenticate_credential(
             token,

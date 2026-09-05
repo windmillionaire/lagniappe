@@ -192,47 +192,58 @@ generated settings. Access is controlled by user AI eligibility, per-user
 credential revocation, and ordinary workspace permissions; it does not enable
 or invoke an AI provider.
 
-## Remote MCP pilot
+## AI policy and remote MCP
 
-`REMOTE_MCP` is a separate default-off dictionary in application settings,
-validated by `config/remote_mcp.py`. An absent value is equivalent to
-`REMOTE_MCP: {enabled: false}`. Enabled configuration has these fields:
+`AI_ENABLED` and `EXTERNAL_AI_ENABLED` are strict booleans in application
+settings. Disabling AI makes external access effectively false as well. The
+first controls built-in provider calls and AI controls throughout the UI,
+including Admin model selection and per-user AI settings. The second controls
+both MCP OAuth and direct API/skill access, including existing credentials.
+These are installer policy, separate from per-user AI entitlement and the
+live model selections in Admin → Site Settings → AI Models.
+
+Normal installation asks for AI first, then offers external AI/MCP (default
+no), and prints one informational line with the three default models. Existing
+choices are preserved by update/recovery. `./setup.sh ai` changes these choices
+and offers to deploy them. Legacy configurations lacking the flags retain their
+existing built-in and REST API behavior; missing external policy does **not**
+implicitly install a Cloud Run service. A previously enabled remote service
+continues to be selected. New installations always save explicit choices.
+
+`REMOTE_MCP` is the component configuration, validated by `config/remote_mcp.py`.
+Missing configuration means `{enabled: false}`. Normal setup fills these values
+from the selected project and verified Cloud Run service:
 
 | Field | Contract |
 | --- | --- |
-| `enabled` | Boolean pilot switch. |
-| `codex_enabled` | Optional boolean, default false. Enables the fixed `lagniappe-codex` public client and its loopback callback. |
-| `issuer` | Exact main-app HTTPS origin, without a trailing slash or path. |
+| `enabled` | Boolean component switch, also gated by both site AI flags. |
+| `codex_enabled` | Boolean; normal setup enables the fixed `lagniappe-codex` public client and loopback callback. |
+| `issuer` | Exact canonical main-app HTTPS origin, without trailing slash or path. |
 | `resource` | Exact canonical Cloud Run `status.url` plus `/mcp`, on a different origin. |
-| `client_id` | One exact ChatGPT CIMD URL; defaults to `https://chatgpt.com/oauth/client.json`. |
-| `redirect_uri` | One exact ChatGPT callback; defaults to `https://chatgpt.com/connector_platform_oauth_redirect`. |
-| `actors` | Explicit list of up to ten Lagniappe user email addresses, unique after case normalization. Empty denies access to every user. |
-| `service_account` | Exact dedicated Cloud Run runtime service-account email. |
+| `client_id` | Exact ChatGPT CIMD URL; default `https://chatgpt.com/oauth/client.json`. |
+| `redirect_uri` | Exact ChatGPT callback; default `https://chatgpt.com/connector_platform_oauth_redirect`. |
+| `actors` | Optional list of eligible Lagniappe login emails. Missing/null permits eligible active non-public users; `[]` permits none. Explicit existing restrictions are preserved. |
+| `service_account` | Exact MCP runtime identity in this project. |
 
-Enabled URLs reject credentials, query strings, fragments, ports, and
-noncanonical host spelling. The actual ChatGPT connection builder is the
-authority for client ID and callback. Changing issuer, resource, or client
-binding requires reconnecting. The Google ID-token audience and upstream API
-base are derived from `issuer + "/api/v1"`; the scope and token lifetimes are
-constants, which keeps related security values from drifting independently.
-The `actors` list grants pilot eligibility, while existing entity permissions
-continue to control data and plans. An explicit `actors: []` permits deployment
-and discovery checks before the pilot account is chosen while keeping grants
-and API envelope access closed to every user. Omitting `actors` is invalid for
-enabled configuration. Add the chosen Lagniappe login to the list before the
-first user connection; do not infer it from their ChatGPT/Codex email.
+URLs reject credentials, query strings, fragments, ports and noncanonical host
+spelling. Changing issuer, resource or client binding requires reconnection.
+The upstream API and Google ID-token audience derive from `issuer + "/api/v1"`.
+Workspace permissions always control data and proposed actions.
 
-Cloud Run reads only `LAGNIAPPE_MCP_ENABLED`, `LAGNIAPPE_MCP_ISSUER`, and
-`LAGNIAPPE_MCP_RESOURCE`. It obtains its Google identity from the runtime
-metadata service. There is no Cloud Run copy of application settings, an API
-key, a client secret, or a service-account key file. The service runs disabled
-unless `LAGNIAPPE_MCP_ENABLED` is exactly `true`, allowing its canonical URL to
-be obtained before completing the two deployments. This remains a manual
-pilot; it is not added to installer resource creation or normal updates.
+`MCP_VERSION` stores the desired 32-character hexadecimal source fingerprint.
+The installer compares the actual ready Cloud Run revision and its matching
+label, image and environment before deciding whether a redeploy is necessary.
+It does not equate a locally saved version with deployment success. Recovery
+validates and retains these settings; doctor reports component drift.
 
-See [Authentication](AUTHENTICATION.md#remote-chatgpt-mcp-pilot) for grant
-behavior and [Deployment](INFRA_DEPLOYMENT.md#remote-mcp-pilot) for the separate
-image and activation boundary.
+Cloud Run reads only `LAGNIAPPE_MCP_ENABLED`, `LAGNIAPPE_MCP_ISSUER` and
+`LAGNIAPPE_MCP_RESOURCE`; Google identity comes from runtime metadata. No app
+settings file, user API key, client secret or service-account key is copied
+there. Disabled bootstrap permits reading the canonical URL before publishing
+the app configuration and activating the service.
+
+See [Authentication](AUTHENTICATION.md#remote-mcp) and
+[Deployment](INFRA_DEPLOYMENT.md#remote-mcp-service) for authorization and lifecycle.
 
 ## Runtime-safe exports
 

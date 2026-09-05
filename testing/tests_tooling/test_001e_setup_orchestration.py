@@ -37,6 +37,7 @@ CLI_MODES = (
     pytest.param(["oauth"], "oauth", id="oauth"),
     pytest.param(["ai"], "ai", id="ai"),
     pytest.param(["ai-email"], "ai-email", id="ai-email"),
+    pytest.param(["mcp"], "mcp", id="mcp"),
     pytest.param(["security"], "security", id="security"),
     pytest.param(["jobs"], "jobs", id="jobs"),
     pytest.param(["monitoring"], "monitoring", id="monitoring"),
@@ -218,7 +219,7 @@ def _install_harness(
         setup_package,
         "optional",
         setup_error_monitoring=step("setup_error_monitoring"),
-        change_ai_model=step("change_ai_model"),
+        configure_ai_features=step("configure_ai_features", True),
     )
     ai_email_candidate = {"enabled": True} if with_ai_email else None
 
@@ -278,7 +279,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
         "setup_admin_and_oauth",
         "setup_redis",
         "setup_error_monitoring",
-        "change_ai_model",
+        "configure_ai_features",
         "setup_ai_email",
         "settings.save",
         "deploy_to_app_engine",
@@ -340,7 +341,7 @@ def test_recovery_install_skips_optional_reconfiguration(monkeypatch):
 
     assert install_module.install() == 0
     assert "setup_error_monitoring" not in events
-    assert "change_ai_model" not in events
+    assert "configure_ai_features" not in events
     assert "setup_ai_email" not in events
     assert "setup_redis" in events
     assert "settings.save" in events
@@ -1335,7 +1336,7 @@ REMOTE_MUTATION_BOUNDARIES = (
     "setup_admin_and_oauth",
     "setup_redis",
     "setup_error_monitoring",
-    "change_ai_model",
+    "configure_ai_features",
     "setup_ai_email",
     "deploy_to_app_engine",
     "create_deferred_job_reconciler",

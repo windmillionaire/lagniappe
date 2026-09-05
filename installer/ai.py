@@ -157,12 +157,21 @@ def configure_ai():
     prepare_existing_installation()
 
     from config import SETTINGS
-    from installer.optional import configure_ai_observability
+    from installer.optional import configure_ai_features
+    from installer.utils import deploy_to_app_engine
+    from runner.context import setup_command
 
     f = FORMATTER.initialize()
 
     print(f"\n{f.info('AI Configuration for Lagniappe')}")
     print("=" * 40)
+    enabled = configure_ai_features()
+    if not enabled:
+        if input(f.info("Deploy the AI access policy now? [Y/n]: ")).casefold() != "n":
+            deploy_to_app_engine()
+        else:
+            print(f"Saved locally. Apply the policy with {setup_command('update')}.")
+        return 0
     print("\nThis will configure Vertex AI data retention settings.")
     print(
         wrap_text(
@@ -186,6 +195,9 @@ def configure_ai():
     else:
         print(f.success("Vertex AI cache configuration unchanged."))
 
-    configure_ai_observability()
     SETTINGS.save()
+    if input(f.info("Deploy the AI access policy now? [Y/n]: ")).casefold() != "n":
+        deploy_to_app_engine()
+    else:
+        print(f"Saved locally. Apply the policy with {setup_command('update')}.")
     return 0

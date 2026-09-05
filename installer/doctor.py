@@ -253,6 +253,11 @@ def _default_provider_checker(settings, project):
     from installer.monitoring import inspect_memory_alert
 
     report["app-engine-memory-alert"] = inspect_memory_alert(settings, project)
+    from installer.mcp import inspect_deployment
+    try:
+        report["mcp-service"] = inspect_deployment(settings)
+    except Exception:
+        report["mcp-service"] = {"state": "UNAVAILABLE", "details": {}, "error": "MCP provider inspection failed."}
     return report
 
 

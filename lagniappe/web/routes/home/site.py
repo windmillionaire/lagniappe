@@ -358,7 +358,9 @@ def site_settings():
     else:
         site_image_response = None
 
-    ai_settings, ai_model_options = load_ai_settings_payload(config=CONFIG)
+    ai_settings, ai_model_options = (
+        load_ai_settings_payload(config=CONFIG) if CONFIG.AI_ENABLED else ({}, {})
+    )
 
     administrators, administrator_candidates = _administrator_payload()
     payload = {
@@ -455,6 +457,8 @@ def set_deployment_settings():
 @internal.route("/set-ai-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_ai_settings():
+    if not CONFIG.AI_ENABLED:
+        abort(403)
     data = request.form if request.form else request.get_json(silent=True) or {}
     current = runtime_ai_settings(config=CONFIG)
     _, model_options = load_ai_settings_payload(current, config=CONFIG)

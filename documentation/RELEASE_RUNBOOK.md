@@ -125,8 +125,9 @@ git status --short
 ```
 
 Review the complete authored tree before committing. Add any intentional new
-files explicitly. Remote MCP images are built and deployed separately; see
-[Deployment](INFRA_DEPLOYMENT.md#remote-mcp-pilot).
+files explicitly. Normal deployment also reconciles selected MCP services,
+building changed service inputs and activating them after App Engine; see
+[Deployment](INFRA_DEPLOYMENT.md#remote-mcp-service).
 Skip the commit if the canonical builds are already committed and the tree is
 clean.
 

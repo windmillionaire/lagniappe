@@ -505,7 +505,7 @@ def create_app(config, *, adapter_factory=None):
                 "authorization_servers": [config.issuer],
                 "bearer_methods_supported": ["header"],
                 "scopes_supported": [SCOPE],
-                "resource_name": "Lagniappe MCP pilot",
+                "resource_name": "Lagniappe MCP",
             }
         )
 
@@ -706,7 +706,7 @@ def main():
         # @testable false
         # @covered-by mcp/src/lagniappe_mcp/server.py::main
         async def unavailable(_request):
-            return JSONResponse({"status": "pilot_unavailable"}, 503)
+            return JSONResponse({"status": "unavailable"}, 503)
 
         app = Starlette(
             routes=[

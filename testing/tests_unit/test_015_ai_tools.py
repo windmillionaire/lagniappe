@@ -3815,3 +3815,29 @@ def test_ai_search_entity_filter_arguments(monkeypatch):
     schema = ai_search.SEARCH_ENTITIES.parameters.properties
     assert "kinds" in schema
     assert "limit" in schema
+
+
+# @matrix ai-access : site-policy validation
+@pytest.mark.unit
+def test_ai_feature_policy_is_boolean_and_disables_external_access_with_ai():
+    from config.ai_settings import ConfigAISettingsError, normalize_ai_features
+    assert normalize_ai_features({}) == {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}
+    assert normalize_ai_features({"AI_ENABLED": False}) == {"AI_ENABLED": False, "EXTERNAL_AI_ENABLED": False}
+    assert normalize_ai_features({"EXTERNAL_AI_ENABLED": False}) == {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": False}
+    for name in ("AI_ENABLED", "EXTERNAL_AI_ENABLED"):
+        for value in (None, "false", "true", 0, 1):
+            with pytest.raises(ConfigAISettingsError, match="booleans"):
+                normalize_ai_features({name: value})
+
+
+# @matrix ai : site-policy provider-boundary
+# @source lagniappe/core/tools/ai/core.py::GenAI.generate_content
+# @source lagniappe/core/tools/ai/core.py::GenAI.generate_image
+@pytest.mark.unit
+def test_disabled_ai_never_resolves_models_or_calls_provider(monkeypatch):
+    monkeypatch.setattr(ai_core.CONFIG, "AI_ENABLED", False)
+    monkeypatch.setattr(ai_core, "runtime_ai_settings", lambda: pytest.fail("disabled AI resolved models"))
+    generator = ai_core.GenAI()
+    for operation in (generator.generate_content, generator.generate_image):
+        with pytest.raises(ai_core.exceptions.AIException, match="disabled"):
+            operation(Prompt("No provider call"))

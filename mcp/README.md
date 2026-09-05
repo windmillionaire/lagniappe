@@ -24,10 +24,13 @@ Cloud Run and the production image does not contain pytest or the build backend.
 The internal Python build metadata is for reproducible container installation;
 there is no public wheel release, local server command or client installer.
 
-Build from the repository root with `mcp/cloudbuild.yaml` and its explicit
-`mcp/gcloudignore` upload allowlist. That build pushes an image; deploying a Cloud
-Run revision remains a separate manual step from deploying App Engine.
+Select external AI/MCP in normal setup or `./setup.sh ai`. Normal installation,
+update and deployment prepare its cloud resources, build only changed service
+inputs, publish App Engine, then activate the matching Cloud Run revision.
+`./setup.sh mcp` retries or reconciles that lifecycle. `MCP_VERSION` records the
+desired source fingerprint; actual Cloud Run readiness determines success.
+The Cloud Build context uses `mcp/gcloudignore` to exclude app settings and tests.
 
 See [API workflows](../documentation/AI_EXTERNAL_API.md),
-[deployment](../documentation/INFRA_DEPLOYMENT.md#remote-mcp-pilot), and
+[deployment](../documentation/INFRA_DEPLOYMENT.md#remote-mcp-service), and
 [the developer environment](../documentation/INFRA_RUNNER.md#mcp-service-environment).

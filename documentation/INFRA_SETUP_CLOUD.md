@@ -247,3 +247,15 @@ project, region, resource name, and relevant state. `doctor` uses the same
 expectations read-only. The opt-in setup provider tests exercise the runtime
 credential against its intended APIs and verify the absence of provisioning
 authority; see [TESTING.md](TESTING.md#provider-contracts).
+
+## Optional MCP provisioning
+
+Selecting external AI in setup enables Cloud Run, Cloud Build and Artifact
+Registry in the existing project. The normal project Owner/delegated-installer
+preflight is followed by an MCP-specific permission check; no extra human
+account or service-account key is required. The build account is separate from
+the runtime account. Exact scoped grants and owner handoff are documented in
+[the MCP deployment lifecycle](INFRA_DEPLOYMENT.md#remote-mcp-service).
+The component uses the saved resource region; setup does not ask for a second
+project or regional choice. Builds run in Cloud Build, so installers do not
+need Docker or a local MCP environment.

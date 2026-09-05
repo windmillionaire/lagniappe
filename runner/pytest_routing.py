@@ -32,6 +32,7 @@ SETUP_TEST_GROUPS = {
         "testing/tests_tooling/test_001g_setup_release_readiness.py",
         "testing/tests_tooling/test_001h_setup_ai_email.py",
         "testing/tests_tooling/test_001i_setup_monitoring.py",
+        "testing/tests_tooling/test_001j_setup_ai_mcp.py",
     ),
     "setup_drift": ("testing/tests_tooling/test_001d_setup_drift.py",),
     "setup_provider": (

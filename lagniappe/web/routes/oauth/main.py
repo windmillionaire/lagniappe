@@ -31,7 +31,11 @@ def guard():
     g.NO_CACHE = True
     request.max_content_length = 16 * 1024
     config = CONFIG.REMOTE_MCP
-    if not config.get("enabled") or request.host_url.rstrip("/") != config["issuer"]:
+    if (
+        not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED
+        or not config.get("enabled")
+        or request.host_url.rstrip("/") != config["issuer"]
+    ):
         abort(404)
     if request.content_length and request.content_length > 16 * 1024:
         abort(413)
@@ -67,12 +71,12 @@ def _parameters(values):
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_metadata_login_consent_and_csrf
-# @matrix mcp-oauth : discovery
+# @matrix mcp-oauth : discovery site-policy
 @oauth_metadata.route("/oauth-authorization-server")
 def metadata():
     config = CONFIG.REMOTE_MCP
     g.NO_CACHE = True
-    if not config.get("enabled"):
+    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED or not config.get("enabled"):
         abort(404)
     issuer = config["issuer"]
     return jsonify(

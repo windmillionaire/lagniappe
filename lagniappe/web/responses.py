@@ -1119,7 +1119,7 @@ def manual_index(section, index):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
-# @matrix manual : ajax-section noindex
+# @matrix manual : ajax-section noindex site-policy address-redaction anonymous-access
 def manual_content(section):
     response = make_response(
         smartypants(render_template(f"manual/content/{section}.html"))

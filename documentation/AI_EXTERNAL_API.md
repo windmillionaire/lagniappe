@@ -8,12 +8,14 @@ leave approval and application to the existing authenticated website controls.
 External plans never call Lagniappe's configured model, and the external API
 has no operation that applies a proposal to the workspace.
 
-The API is part of the application rather than a deployment-wide optional
-feature. Every authenticated non-public user may manage a key and use Ask,
-Create, and Organize, regardless of the user's site AI-access setting. That
-setting controls Lagniappe-funded model-provider calls; an external client uses
-its own model and tokens. Revoking the user's API key stops clients using that
-key. The optional remote MCP pilot has separately revocable ChatGPT and Codex OAuth grants.
+The API is part of the application and is gated by the installation's AI and
+external-AI policy. When enabled, authenticated non-public users may manage a
+key and use Ask, Create, and Organize within their workspace permissions,
+regardless of their per-user provider entitlement. That entitlement controls
+Lagniappe's built-in provider calls; an external client uses its own model and
+tokens. Revoking the user's API key stops clients using that
+key. The optional remote MCP service has separately revocable ChatGPT and Codex OAuth grants.
+Both MCP and direct API/skill access require the installation's AI and external-AI policy to be enabled.
 
 ## Security model
 
@@ -120,8 +122,8 @@ responsible for reading the same selected bytes it declared. This replaces the
 pilot's checkout-dependent `lagniappe-upload` helper; that helper is removed.
 ChatGPT web/app attachment uploads continue to use `upload_files`.
 
-See [Authentication](AUTHENTICATION.md#remote-chatgpt-mcp-pilot) and
-[Deployment](INFRA_DEPLOYMENT.md#remote-mcp-pilot) for this opt-in pilot.
+See [Authentication](AUTHENTICATION.md#remote-mcp) and
+[Deployment](INFRA_DEPLOYMENT.md#remote-mcp-service) for the installer-managed service.
 
 The remote service is the only supported MCP transport. The internal
 `mcp/` package supplies shared schemas, API mappings, result

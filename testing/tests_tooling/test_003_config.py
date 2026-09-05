@@ -1637,3 +1637,23 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         sys.modules.pop("runner.deploy", None)
         if original_runner_deploy is not None:
             sys.modules["runner.deploy"] = original_runner_deploy
+
+
+# @matrix config : recovery-validation site-policy
+# @source config/recovery.py::validate_recovery_document
+def test_recovery_preserves_ai_policy_without_implicitly_selecting_mcp():
+    from config import recovery
+    from installer.mcp import requested
+
+    snapshot = _valid_recovery_document()
+    legacy = recovery.validate_recovery_document(snapshot)
+    assert "EXTERNAL_AI_ENABLED" not in legacy
+    assert not requested(legacy)
+    snapshot.update(AI_ENABLED=False, EXTERNAL_AI_ENABLED=False, MCP_VERSION="a" * 32)
+    restored = recovery.validate_recovery_document(snapshot)
+    assert restored["AI_ENABLED"] is False
+    assert restored["EXTERNAL_AI_ENABLED"] is False
+    assert restored["MCP_VERSION"] == "a" * 32
+    for field, value in (("AI_ENABLED", "false"), ("EXTERNAL_AI_ENABLED", 1), ("MCP_VERSION", "manual-version")):
+        with pytest.raises(recovery.RecoveryConfigurationError, match="AI configuration"):
+            recovery.validate_recovery_document({**snapshot, field: value})

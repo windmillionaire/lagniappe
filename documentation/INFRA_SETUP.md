@@ -24,7 +24,8 @@ environment exists is `venv/bin/python -m installer ...`.
 | `url` | Configure an App Engine custom domain and DNS. |
 | `email` | Replace Gmail/Workspace or custom-domain authentication-email delivery. |
 | `oauth` | Configure the Google Sign-In Web client. |
-| `ai` | Configure AI models and observability choice. |
+| `ai` | Configure AI and external-agent policy, observability and optional provider cache settings; offer deployment. |
+| `mcp` | Build/reconcile the selected MCP component and publish its app configuration. |
 | `ai-email` | Configure Resend receiving and the AI email webhook. |
 | `security` | Configure verified Redis TLS. |
 | `jobs` | Reconcile deferred-job Cloud Scheduler infrastructure. |
@@ -82,10 +83,11 @@ The default flow is deliberately ordered:
 7. initialize Identity Platform and configure Google Sign-In (automatic for a
    delegated installation, optional otherwise);
 8. configure Redis and optional TLS;
-9. choose error reporting, AI models, and AI observability;
+9. choose error reporting, whether AI is enabled, external AI/MCP and AI observability;
+   show the default models once, with instructions to change them in Admin;
 10. write generated settings, indexes, and PWA metadata;
 11. optionally configure AI email when its prerequisites are present;
-12. deploy the prepared artifacts; and
+12. prepare optional MCP resources, deploy App Engine, then activate/update MCP; and
 13. create the deferred-job Scheduler contract after a successful deployment.
 
 Setup re-reads provider state after create/update calls and accepts success only
@@ -154,8 +156,8 @@ Developer onboarding is two-stage:
 
 The second command is additive and idempotent. It also provisions the
 repository-pinned, digest-verified `uv` executable used only for the standalone
-MCP package build/test environment; ordinary owner setup and deployment do not
-install MCP dependencies. Unsupported host tuples fail closed with WSL guidance
+MCP package build/test environment; ordinary owner setup and deployment build
+selected MCP images in Cloud Build without installing MCP dependencies locally. Unsupported host tuples fail closed with WSL guidance
 for Windows. See [INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md).
 
 ## Operator output

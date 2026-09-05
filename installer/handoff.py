@@ -314,6 +314,9 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
         f"{_role_list(iam.constants.RUNTIME_SERVICE_ACCOUNT_ROLES)}"
     )
     print(f"    remove installer: {_role_list(runtime_installer_roles)}")
+    if (settings.get("REMOTE_MCP") or {}).get("resource"):
+        print("  MCP runtime/build accounts, build bucket, image repository and service:")
+        print("    grant Owner scoped access; remove installer access after deployment")
     print("  Application configuration:")
     print(f"    set DEPLOYER_EMAIL: {owner_email}")
     print(f"    set saved gcloud account: {owner_email}")
@@ -328,6 +331,8 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
 
     record_step("grant permanent Owner managed-resource access")
     _grant_owner_resource_access(context, project_id, runtime_email, owner_email)
+    from installer.mcp import handoff_access
+    handoff_access(settings, owner=owner_email)
 
     record_step("deploy permanent Owner configuration")
     settings["DEPLOYER_EMAIL"] = owner_email
@@ -340,6 +345,8 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
     _remove_installer_resource_access(
         context, project_id, runtime_email, installer_email
     )
+
+    handoff_access(settings, remove_installer=installer_email)
 
     record_step("remove installer project IAM access")
     _remove_installer_project_access(

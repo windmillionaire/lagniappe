@@ -209,16 +209,15 @@ to a login cookie. The API has no separate deployment-wide feature gate;
 normal entity permissions remain authoritative. See [External Agent
 API](AI_EXTERNAL_API.md).
 
-## Remote ChatGPT MCP pilot
+## Remote MCP
 
-The separate Cloud Run pilot uses the existing browser login to authorize one
-configured ChatGPT CIMD client and, when enabled, one pre-registered public
-Codex client. `REMOTE_MCP` is opt-in and requires an explicit
-Lagniappe user allowlist; its settings are described in
-[Infrastructure Configuration](INFRA_CONFIG.md#remote-mcp-pilot). The Lagniappe
-login email does not have to match the user's ChatGPT account email. An empty
-explicit actor list supports deployment/discovery checks with user access
-closed until the pilot account is selected.
+The optional Cloud Run service uses existing browser login to authorize one
+configured ChatGPT CIMD client and one pre-registered public Codex client.
+Both site AI policy flags gate authorization and existing grants. Eligible
+active non-public Lagniappe users may connect; an optional explicit `actors`
+list can restrict them further (`[]` permits none). The login email need not
+match the agent account's email. See
+[Infrastructure Configuration](INFRA_CONFIG.md#ai-policy-and-remote-mcp).
 
 The main app serves authorization-server metadata at
 `/.well-known/oauth-authorization-server` and the `/oauth/authorize`,
@@ -276,4 +275,4 @@ authentication. Expiry and revocation are enforced during reads, independently
 of eventual expired-record cleanup. Application error reporting redacts opaque
 secrets and OAuth context. Platform request logs require separate deployment
 handling because the initial authorization URL contains query parameters; see
-the [pilot deployment notes](INFRA_DEPLOYMENT.md#remote-mcp-pilot).
+the [deployment lifecycle](INFRA_DEPLOYMENT.md#remote-mcp-service).

@@ -129,3 +129,16 @@ def apply_ai_settings(app_settings=None, updated_settings=None):
     normalized = normalize_ai_settings(settings, current_settings=current_settings)
     target.update(normalized)
     return target
+
+
+# @testable true
+# @tests tests_unit/test_015_ai_tools.py::test_ai_feature_policy_is_boolean_and_disables_external_access_with_ai
+# @matrix ai-access : site-policy validation
+def normalize_ai_features(settings):
+    """Preserve existing installations while enforcing explicit site switches."""
+    values = {name: settings.get(name, True)
+              for name in ("AI_ENABLED", "EXTERNAL_AI_ENABLED")}
+    if any(type(value) is not bool for value in values.values()):
+        raise ConfigAISettingsError("AI feature switches must be booleans.")
+    values["EXTERNAL_AI_ENABLED"] = values["AI_ENABLED"] and values["EXTERNAL_AI_ENABLED"]
+    return values

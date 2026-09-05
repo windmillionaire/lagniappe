@@ -39,7 +39,8 @@ def _parser():
         "oauth",
         help="Replace and verify Google Sign-In OAuth settings",
     )
-    commands.add_parser("ai", help="Configure AI")
+    commands.add_parser("ai", help="Configure and deploy AI access policy")
+    commands.add_parser("mcp", help="Build or reconcile the selected MCP service and app configuration")
     commands.add_parser(
         "ai-email",
         help="Configure, deploy, and activate Resend AI email submissions",
@@ -245,6 +246,10 @@ def _dispatch(args):
         from installer.ai import configure_ai
 
         return configure_ai()
+    if command == "mcp":
+        from installer.mcp import configure_mcp
+
+        return configure_mcp()
     if command == "ai-email":
         from installer.ai_email import configure_ai_email
 
