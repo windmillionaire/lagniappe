@@ -13,9 +13,40 @@ external-AI policy. When enabled, authenticated non-public users may manage a
 key and use Ask, Create, and Organize within their workspace permissions,
 regardless of their per-user provider entitlement. That entitlement controls
 Lagniappe's built-in provider calls; an external client uses its own model and
-tokens. Revoking the user's API key stops clients using that
-key. The optional remote MCP service has separately revocable ChatGPT and Codex OAuth grants.
-Both MCP and direct API/skill access require the installation's AI and external-AI policy to be enabled.
+tokens. Revoking the user's API key stops clients using that key. The optional
+remote MCP service has separately revocable ChatGPT and Codex OAuth grants.
+
+## Installation policy and access paths
+
+| Installation choice | Available AI entry points |
+| --- | --- |
+| `AI_ENABLED: false` | No built-in generation, external API/skill, or MCP access. |
+| `AI_ENABLED: true`, `EXTERNAL_AI_ENABLED: false` | Built-in AI under normal per-user entitlements; no external API/skill or MCP access. |
+| Both enabled | Built-in AI plus permission-bounded external access; normal setup manages the optional Cloud Run MCP service. |
+
+Normal setup asks about AI and then external AI/MCP. Change those choices with
+`./setup.sh ai` and deploy the resulting configuration. Model defaults are an
+informational line during setup; change models in Admin → Site Settings → AI
+Models. Saved reports and provider-free browser review, execution and undo
+remain available within normal permissions even when generation is disabled.
+
+Legacy settings without these flags preserve existing built-in and REST access.
+That compatibility default does not automatically provision MCP: normal
+deployment selects it only with an explicit external-AI choice or an already
+enabled `REMOTE_MCP` configuration. An existing explicit OAuth `actors` list
+remains restrictive; without a list, eligible non-public users may connect.
+
+Direct REST clients use a user API key; MCP clients use the installation's
+Cloud Run `/mcp` URL and authorize on the Lagniappe website. The skill is a thin
+REST bootstrap, not a prerequisite for MCP. Neither path executes proposals.
+Disabling external AI blocks existing credentials as well as new connections;
+it retains credentials and cloud resources, so re-enabling may restore access
+for unexpired credentials. Use explicit revocation to invalidate a credential.
+
+See [configuration](INFRA_CONFIG.md#ai-policy-and-remote-mcp),
+[deployment](INFRA_DEPLOYMENT.md#remote-mcp-service), and the
+[implementation overview](EXTERNAL_AI_IMPLEMENTATION.md) for ownership,
+installation order, and the evolution of these choices.
 
 ## Security model
 
@@ -66,10 +97,11 @@ Both MCP and direct API/skill access require the installation's AI and external-
 ## Remote MCP adapter
 
 The Cloud Run service in `mcp/src/lagniappe_mcp/` contains its HTTP server,
-API catalog, REST mappings, validation, result projections and file transfers. It
-replaces `upload_local_files` with `upload_files` for ChatGPT attachment
-objects and `prepare_file_uploads` / `finalize_file_uploads` for terminal clients. No remote argument selects a server filesystem
-path. All draft/review and permission rules above apply to MCP and direct REST access.
+API catalog, REST mappings, validation, result projections and file transfers.
+It exposes `upload_files` for ChatGPT attachment objects and
+`prepare_file_uploads` / `finalize_file_uploads` for terminal clients. No remote
+argument selects a server filesystem path. All draft/review and permission rules
+above apply to MCP and direct REST access.
 Terminal uploads send user-selected bytes directly to existing Google Storage
 resumable sessions, then finalize the exact batch through authenticated MCP.
 Only `prepare_file_uploads` exposes validated storage write URLs, in an explicit
@@ -118,9 +150,8 @@ Create temporary files privately from the outset (mode 600), do not follow
 redirects, and do not add authentication or cookies. For a regular file curl
 supplies Content-Length; inspect the command exit status and HTTP status before
 finalizing. Remove the temporary URL/config files after use. The terminal is
-responsible for reading the same selected bytes it declared. This replaces the
-pilot's checkout-dependent `lagniappe-upload` helper; that helper is removed.
-ChatGPT web/app attachment uploads continue to use `upload_files`.
+responsible for reading the same selected bytes it declared.
+ChatGPT web/app attachment uploads use `upload_files`.
 
 See [Authentication](AUTHENTICATION.md#remote-mcp) and
 [Deployment](INFRA_DEPLOYMENT.md#remote-mcp-service) for the installer-managed service.
@@ -129,6 +160,13 @@ The remote service is the only supported MCP transport. The internal
 `mcp/` package supplies shared schemas, API mappings, result
 validation and file transfer code. It has no user CLI, stdio entry point,
 credential profiles, public wheel distribution, or client installer.
+
+OAuth grants belong to the consenting Lagniappe user and client, independently
+of the browser session. Logging out or signing into a different browser account
+does not switch the MCP identity. ChatGPT and Codex connections can coexist;
+revoking or reconnecting one does not replace the other. Review links still
+require the report creator's browser session. See
+[Authentication](AUTHENTICATION.md#remote-mcp) for expiry, rotation and revocation.
 
 Starters bundle current workflow context; uploads return the finalized inventory
 and refreshed contract. `submit_plan` privately checks the current contract
@@ -141,8 +179,10 @@ For clients that prefer direct HTTP, the API-key workflow and downloadable
 
 ## Workflow
 
-All working endpoints are under `/api/v1` and require the bearer key, including
-the API index and OpenAPI document. `GET /api` identifies the current version;
+All working endpoints are under `/api/v1` and require authentication, including
+the API index and OpenAPI document. Direct REST clients send the bearer API key;
+the MCP service uses the separate workload-identity/user-token envelope described
+above. `GET /api` identifies the current version;
 `GET /api/v1` returns direct links to the OpenAPI document, actor, tool catalog,
 and plan collection. These small discovery responses do not duplicate the
 contract. The OpenAPI `info.description` and operation descriptions carry the
@@ -207,15 +247,23 @@ origin; an incoming HTTP `Host` header never selects their destination.
 
 The authenticated discovery response includes `client_skill_url`. Its Markdown
 response is the canonical short bootstrap for clients that support local
-skills. For Pi, install or refresh it with:
+skills, served at `https://YOUR-LAGNIAPPE-SITE/api/v1/client-skill.md`. Generate
+the key in your own My Page → Settings → External agent API panel, then make it
+available as `LAGNIAPPE_API_KEY` without putting the secret in a prompt or skill
+file. Use the intended site's origin for `LAGNIAPPE_URL`. For Pi, install or
+refresh the Markdown with:
 
 ```bash
 mkdir -p ~/.pi/agent/skills/lagniappe
 curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
-  https://lagniappe.site/api/v1/client-skill.md \
+  "$LAGNIAPPE_URL/api/v1/client-skill.md" \
   -o ~/.pi/agent/skills/lagniappe/SKILL.md
 ```
+
+The downloaded skill does not install an executable or upload helper. A client's
+existing HTTP script may remain useful, but must follow live contracts; it is
+not a dependency of the remote MCP service.
 
 The skill deliberately contains no action schemas, permission lists, or
 use-case-specific proposal instructions. It defines the general Ask/Create/
@@ -326,9 +374,12 @@ staged record and rejects a stale identity if another caller replaced the
 batch, even when both declarations have identical filenames, MIME types, and
 sizes. Plan responses retain the current or most recently finalized identity
 so a client can resolve a lost finalization response with one authoritative
-read instead of replaying the write. The MCP adapter validates this transport
-field privately and removes it from MCP results. Ask and Create reject these
-endpoints.
+read instead of replaying the write. Ordinary MCP Plan results omit this
+transport field; terminal `prepare_file_uploads` deliberately returns it in the
+upload manifest for the matching `finalize_file_uploads` call. Hosted
+`upload_files` handles the batch internally. After an ambiguous MCP finalization
+error, read the existing Plan and its current contract/inventory before deciding
+whether another upload is needed. Ask and Create reject these endpoints.
 
 Each finalization attempt keeps the stable per-batch File identity but copies
 the uploaded bytes to an internal, attempt-unique destination path. The copy is
@@ -493,11 +544,14 @@ not discarded by cURL's nonzero exit behavior.
 
 ## Organize cURL example
 
-Keep the key in an environment variable rather than putting it directly in
-shell history:
+For an interactive Bash session, read the key without echoing it or entering the
+secret in shell history. Keep shell tracing off and exclude credentials and
+upload responses from shared captures:
 
 ```bash
-export LAGNIAPPE_API_KEY='lgn_...'
+read -r -s -p 'Lagniappe API key: ' LAGNIAPPE_API_KEY
+printf '\n'
+export LAGNIAPPE_API_KEY
 export LAGNIAPPE_URL='https://your-app.example'
 
 curl --fail-with-body --silent --show-error \
@@ -524,11 +578,25 @@ curl --fail-with-body --silent --show-error \
   -H 'Content-Type: application/json' \
   -d '{"files":[{"filename":"records.pdf","content_type":"application/pdf","size":12345}]}' \
   "$LAGNIAPPE_URL/api/v1/plans/$PLAN_ID/uploads"
+```
 
-curl --fail-with-body --silent --show-error \
-  -X PUT -H 'Content-Type: application/pdf' \
-  --upload-file records.pdf "$UPLOAD_SESSION_URL"
+Store the returned session URL in a mode-600 curl config as described in
+[Remote MCP adapter](#remote-mcp-adapter); the same Storage transfer protocol
+applies to REST. Do not attach the API session's Authorization header to it:
 
+```bash
+curl --disable --proto '=https' --silent --show-error --fail \
+  --connect-timeout 10 --max-time 240 \
+  --request PUT --header 'Content-Type: application/pdf' \
+  --upload-file records.pdf --config /tmp/private-upload.curl \
+  --output /dev/null --write-out '%{http_code}\n'
+```
+
+Continue only after a successful transfer returning HTTP 200 or 201. An error,
+timeout or HTTP 308 leaves the batch pending. Remove the temporary curl config,
+then finalize the confirmed batch:
+
+```bash
 curl --fail-with-body --silent --show-error \
   -H "Authorization: Bearer $LAGNIAPPE_API_KEY" \
   -H 'Content-Type: application/json' \
@@ -621,40 +689,59 @@ base = os.environ["LAGNIAPPE_URL"].rstrip("/") + "/api/v1"
 session = requests.Session()
 session.headers["Authorization"] = f"Bearer {os.environ['LAGNIAPPE_API_KEY']}"
 
-plan = session.post(
+
+def api_json(method, url, **kwargs):
+    response = session.request(
+        method, url, timeout=(10, 240), allow_redirects=False, **kwargs
+    )
+    response.raise_for_status()
+    if not 200 <= response.status_code < 300:
+        raise RuntimeError("Unexpected API response; inspect before continuing.")
+    return response.json()
+
+
+plan = api_json(
+    "POST",
     f"{base}/plans",
     json={"tool": "organize", "instructions": "Organize these files."},
-).json()
+)
 
 path = Path("records.pdf")
-upload_batch = session.post(
+upload_batch = api_json(
+    "POST",
     f"{base}/plans/{plan['id']}/uploads",
     json={"files": [{
         "filename": path.name,
         "content_type": "application/pdf",
         "size": path.stat().st_size,
     }]},
-).json()
+)
 upload = upload_batch["uploads"][0]
 
 with path.open("rb") as source:
-    requests.put(
+    transfer = requests.put(
         upload["session_url"],
         data=source,
         headers={"Content-Type": "application/pdf"},
-    ).raise_for_status()
+        timeout=(10, 240),
+        allow_redirects=False,
+    )
+if transfer.status_code not in (200, 201):
+    raise RuntimeError("Upload incomplete; do not finalize this batch.")
 
-session.post(
+api_json(
+    "POST",
     f"{base}/plans/{plan['id']}/uploads/finalize",
     json={"upload_batch_id": upload_batch["upload_batch_id"]},
-).raise_for_status()
+)
 # Reuse this catalog for the rest of the run. Do not persist it as an HTTP cache.
-tools = session.get(f"{base}/tools").json()
-organize_guidelines = session.post(
+tools = api_json("GET", f"{base}/tools")
+organize_guidelines = api_json(
+    "POST",
     f"{base}/plans/{plan['id']}/tools/get_guidelines",
     json={"arguments": {"task": "organize"}},
-).json()["result"]
-contract = session.get(plan["contract_url"]).json()
+)["result"]
+contract = api_json("GET", plan["contract_url"])
 # Give the model the plan, tools, shared two-phase Organize guidelines, and
 # contract. Run requested reads; settle structure first; then apply form_autofill
 # and exact schemas to add final values before POSTing to plan["submit_url"].

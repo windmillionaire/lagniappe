@@ -199,8 +199,10 @@ and startup. `required = true` makes missing initialization visible; it does not
 force the model to choose MCP tools. Restart a client after changing its tool
 catalog. See the [official MCP guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 
-Historical trial outcomes remain in the
-[pilot implementation record](../todo/REMOTE_MCP_PILOT_IMPLEMENTATION.md).
+The [implementation overview](EXTERNAL_AI_IMPLEMENTATION.md) records the
+development history and remaining verification boundary; the
+[remote comparison](../testing_ai_workflows/comparisons/remote-mcp-pilot-20260905.md)
+preserves reviewed trial outcomes and measurements.
 
 ## Scaling and runtime settings
 

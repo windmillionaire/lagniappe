@@ -5,6 +5,12 @@ Organize workflows. Use it when a change can affect model behavior, external
 tool use, proposal quality, or the equivalence of the external API, on-site,
 and email entry points.
 
+Remote Streamable HTTP is the only maintained MCP transport. The direct REST
+API/skill remains an independent alternative. Local stdio MCP captures are
+historical baselines, not instructions to install or maintain a second server.
+The [implementation overview](EXTERNAL_AI_IMPLEMENTATION.md) records that
+transition and the principal findings.
+
 These evaluations complement deterministic unit and E2E tests. They answer a
 different question: can a real client and model reach a correct, reviewable
 result through the deployed product, and how much avoidable work does that
@@ -36,10 +42,18 @@ one run does not negate a clear reduction in rounds and tokens.
 | Recorded live case | Model interpretation, tool selection, multi-step recovery, evidence use, and provider/client behavior. |
 | Paired before/after evaluation | A deploy whose effect on correctness or interaction cost cannot be established from deterministic tests alone. |
 | Three-entry-point parity | A shared workflow or proposal change that must behave equivalently through external API, on-site, and email starts. |
+| Installation/client acceptance | Real cloud provisioning and IAM, upgrade/recovery, OAuth in supported clients, responsive presentation and device file transfer. |
 
 Do not make a live provider run prove mechanics that a deterministic test can
 prove more cheaply and precisely. Keep a small live case to prove that the
 pieces compose in practice.
+
+MCP unit tests live in `testing/tests_unit/test_033*.py`; the normal repo runner
+selects their isolated `mcp/.venv` automatically. Live application/API/OAuth
+tests live in `testing/tests_e2e/013_agent_api/`, with installer/provider-fake
+tests in `testing/tests_tooling/`. These tests are part of the normal testing
+stream and are not shipped to Cloud Run. Provider fakes and managed local E2E
+do not prove that a fresh customer's cloud permissions or client UI work.
 
 ## Design the cases
 
@@ -70,7 +84,8 @@ For a before/after comparison, keep these constant:
 - prompt and fixture bytes;
 - workspace seed or captured starting-state manifest;
 - user, permissions, base URL, and relevant feature settings;
-- client, client version, model, provider, and model settings;
+- client, client version, model, provider, model settings and approval policy;
+- available connectors/tools and actual direct-MCP versus imported-app route;
 - external skill or instruction source and its content hash; and
 - one fresh model session per case.
 
@@ -101,9 +116,8 @@ testing_ai_workflows/
 ```
 
 Track inspected/synthetic fixtures and reviewed result summaries, not raw chats,
-credentials, signed URLs or private screenshots. Preserve previous exports and
-keep prompts/fixtures unchanged between paired runs. The initial library copies
-the existing Desktop inputs/captures without moving or deleting their originals.
+credentials, signed URLs or private screenshots. Preserve evidence needed for
+the comparison and keep prompts/fixtures unchanged between paired runs.
 Historical cases with a revised natural prompt are reference evidence until
 they get a current matching baseline.
 
@@ -125,13 +139,16 @@ local transcripts to exist in a fresh checkout/CI.
 Give the model only the natural request from `PROMPT.md`, not the rubric or
 change-observation notes. Launch in a neutral working copy of `fixtures/`
 outside the application checkout: repository `AGENTS.md` would introduce coding
-instructions and a comparison confound. The existing Desktop fixture directories
-are retained for round 3; export back to the tracked library only after the
-task finishes. Use real copies rather than symlinks resolving into the checkout.
-The remote MCP pilot prefixes requests with `mcp:` to make transport selection
+instructions and a comparison confound. Prepare a new neutral fixture copy for
+each trial; export back to the library only after the task finishes. Use real
+copies rather than symlinks resolving into the checkout.
+Current MCP prompts prefix requests with `mcp:` to make transport selection
 explicit. Preserve that cue in the transcript and comparison controls; omit it
-for non-MCP arms and record the difference. Case 02 now specifies ratings 4 or
-5 directly instead of asking about a saved view unavailable through the MCP.
+for non-MCP arms and record the difference. A connected server does not guarantee
+that a model chooses its tools. Check the actual calls, and record steering or
+an unintended connector route instead of silently calling the run direct MCP.
+Case 02 specifies ratings 4 or 5 directly instead of asking about a saved view
+unavailable through MCP; the September 5 capture predates that prompt correction.
 Targeted notes should name a hoped-for improvement,
 a plausible regression, and an inconclusive/control-limited outcome. When
 several changes ship together, these observations help attribute results but
@@ -152,7 +169,16 @@ do not establish single-change causality.
 Record the exact deployed application version or build, not only its release
 number. Preserve request IDs for errors and Plan/report identifiers for later
 diagnosis. Temporary upload-session URLs are not useful durable evidence; keep
-the finalized file references and responses instead.
+the finalized file references and responses instead. For remote MCP, record the
+desired `MCP_VERSION` and actual ready Cloud Run revision/image when available;
+the local YAML fingerprint alone does not prove which version served a run.
+For a hosted client without a native export, use its conversation export or
+screenshots and receipts; mark unavailable timing/token/tool data unknown.
+
+Before a run, verify the intended actor, timezone, workspace permissions, and
+installation's AI/external-AI policy. External access does not require the
+user's site-funded Ask/Create entitlement. A restricted actor can correctly
+produce a narrower proposal or `needs_review`; that is not a transport failure.
 
 ## Mechanical run sequence
 
@@ -178,7 +204,8 @@ the finalized file references and responses instead.
 10. Compare semantic outcomes first, then reliability and efficiency. File any
     newly discovered issue separately from the change being evaluated.
 11. Save the comparison and promote reviewed captures using the library's
-    baseline/current rollover; leave unselected case/arm results untouched.
+    baseline/current rollover only when requested; leave unselected case/arm
+    results untouched. Comparison alone does not authorize replacing a baseline.
 
 Do not execute Create or Organize proposals unless execution is the behavior
 under test. A successful `ready` receipt is not a workspace mutation. Ask may
@@ -250,6 +277,12 @@ Use one of these outcome labels:
   one intended behavior.
 - **Failed**: a required user-facing or contract outcome failed.
 
+Record the operator's disposition separately from the rubric outcome. A useful
+but imperfect proposal may be accepted with a documented omission; acceptance
+does not erase the omission or require another special model rule. The remote
+trial's cases 08 and 13 were accepted on that basis, and 02 was deferred. They
+are not automatic release blockers or mandatory reruns for unrelated changes.
+
 ## Compare and interpret
 
 Compare actions and evidence use, not superficial prose. Normalize volatile
@@ -297,6 +330,12 @@ Exercise each entry-specific transport at least once when it changed. Shared
 unit tests should cover normalization, validation, persistence, execution, and
 cleanup beneath all three entry points. Record an external-only paired run as
 such; it does not by itself establish live email/on-site behavioral parity.
+
+MCP and skill/REST are two transports within the external entry point. Compare
+them when their own auth, discovery or file path changes. Likewise, direct CLI
+MCP and an imported app connector are distinct client routes; a successful app
+call does not prove the direct CLI OAuth flow. Client-specific attachment and
+media behavior needs an actual client smoke, not just shared API tests.
 
 ## Automation boundary
 
