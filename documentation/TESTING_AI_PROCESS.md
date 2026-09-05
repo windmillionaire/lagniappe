@@ -107,6 +107,12 @@ the existing Desktop inputs/captures without moving or deleting their originals.
 Historical cases with a revised natural prompt are reference evidence until
 they get a current matching baseline.
 
+The library also tracks the existing Codex
+[Export Chat skill and helper](../testing_ai_workflows/skills/export-chat/SKILL.md).
+It preserves the native JSONL/session-summary format; existing installations
+need no update. Load it only for the post-task export, not as part of the measured
+request. Pi sessions continue to use their own archive skill.
+
 Use separate artifact and latest-result entries for MCP, Pi/REST, native and
 email arms. After comparison, save its tracked note, update only selected
 case/arm summaries (including failures), archive the old local baseline without

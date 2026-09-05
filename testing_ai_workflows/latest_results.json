@@ -27,49 +27,60 @@
       },
       "latest_results": {
         "mcp": {
-          "run_id": "mcp-round-2",
+          "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/01-ask-known-page/artifacts/baseline/mcp",
+          "artifacts": "cases/01-ask-known-page/artifacts/current/mcp",
           "archive_file": "CODEX_ARCHIVE.jsonl",
-          "archive_sha256": "5eb8dedc87adbe869a66aff1849c3094c43fb3c68ae1721444a0fc5c067d2fb3",
-          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/01-ask-known-page/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
-          "comparison": "comparisons/mcp-round-2.md",
+          "archive_sha256": "f1e8178b04e1efaab0e500c73c95c0b606687eb3846cc4e30cdcaf8b5c397ef7",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/01-ask-known-page/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
           "model": "gpt-5.6-sol",
           "reasoning": "medium",
-          "adapter_version": "0.1.5",
-          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
-          "server_version": "20260904t190016",
-          "server_version_evidence": "Plan-start request logs",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Operator installation history and observed changed adapter/guideline text; exact running wheel digest not embedded in export",
+          "server_version": null,
+          "server_version_evidence": "Not embedded in this capture; no historical runtime log lookup performed",
           "input_snapshot": {
             "prompt_sha256": "2d2b2a0c2ea0f0527c69c46b8343929effb5f13b601ef6e2ff89b7d52ec6f050",
             "fixtures": {}
           },
           "inputs_match_current_case": true,
-          "outcome": "pass",
-          "summary": "Grounded answer and successful saved Ask; one candidate search.",
+          "outcome": "pass_with_caveats",
+          "summary": "Grounded saved explanation; fewer discovery rounds but more local reads/searches. Supplemental Ownership details are not separately cited.",
           "caveats": [
-            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+            "The Why Lagniappe? Page is unchanged, but billing/IAM/domain/deployment details came from an Ownership search snippet while only Why Lagniappe? is cited.",
+            "Two local fixture reads and three searches offset discovery savings.",
+            "Single paired run on a living workspace, not a reset or randomized experiment.",
+            "Exact installed wheel digest and per-run application build are not recorded in the archive."
           ],
           "metrics": {
-            "model_tool_rounds": 8,
-            "discovery_rounds": 4,
-            "task_seconds": 87.349,
+            "model_tool_rounds": 9,
+            "discovery_rounds": 3,
+            "task_seconds": 66.522,
             "task_turns": 1,
             "usage": {
-              "input_tokens": 275023,
-              "cached_input_tokens": 238720,
-              "output_tokens": 1219,
-              "reasoning_output_tokens": 173,
-              "total_tokens": 276242,
-              "uncached_input_tokens": 36303
+              "input_tokens": 299585,
+              "cached_input_tokens": 242816,
+              "output_tokens": 1617,
+              "reasoning_output_tokens": 406,
+              "total_tokens": 301202,
+              "uncached_input_tokens": 56769
             },
-            "mcp_calls": null,
+            "mcp_calls": 6,
+            "mcp_call_breakdown": {
+              "start_ask": 1,
+              "search_entities": 3,
+              "get_entity": 1,
+              "submit_plan": 1
+            },
+            "mcp_failed_calls": 0,
             "api_requests": null,
             "reported_cost_usd": null
-          }
+          },
+          "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
         }
       }
     },
@@ -81,51 +92,64 @@
       },
       "latest_results": {
         "mcp": {
-          "run_id": "mcp-round-2",
+          "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/02-ask-books-filter/artifacts/baseline/mcp",
+          "artifacts": "cases/02-ask-books-filter/artifacts/current/mcp",
           "archive_file": "CODEX_ARCHIVE.jsonl",
-          "archive_sha256": "f77cb76f9aed21343a5af303e9519fb0135d6d29321f6805359add51e8fabad1",
-          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/02-ask-books-filter/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
-          "comparison": "comparisons/mcp-round-2.md",
+          "archive_sha256": "09fc0b58008d4ca4192b57b6e6852492975b760c6fdbd53825fbfe60d1020cb5",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/02-ask-books-filter/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
           "model": "gpt-5.6-sol",
           "reasoning": "medium",
-          "adapter_version": "0.1.5",
-          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
-          "server_version": "20260904t190016",
-          "server_version_evidence": "Plan-start request logs",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Operator installation history and observed changed adapter/guideline text; exact running wheel digest not embedded in export",
+          "server_version": null,
+          "server_version_evidence": "Not embedded in this capture; no historical runtime log lookup performed",
           "input_snapshot": {
             "prompt_sha256": "d1fa728e1baea1b11b521407e2e24ee14275738498dc37541b0169727740b024",
             "fixtures": {}
           },
           "inputs_match_current_case": true,
           "outcome": "needs_fix",
-          "summary": "Correct eight-book list but two unnecessary surviving draft reports; saved-view definition asserted without reading it.",
+          "summary": "Correct eight-book list and successful one-Plan recovery/submission; the saved-view definition is still asserted without evidence.",
           "caveats": [
-            "Two earlier exact report IDs were deleted through website HTTP DELETE before their real 404s; deletion actor/intent unknown.",
-            "Successful complete query output was host-clipped; model created new Plans to re-query and submit.",
-            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+            "Both representations are printed, causing query output clipping and a same-Plan compact re-query.",
+            "The rendered answer still attributes 4/5-or-5/5 to a saved-view definition that was not retrieved.",
+            "Baseline external deletions/404s confound the headline efficiency comparison; the later unnecessary Plan starts are nevertheless absent here.",
+            "Single paired run on a living workspace, not a reset or randomized experiment.",
+            "Exact installed wheel digest and per-run application build are not recorded in the archive."
           ],
           "metrics": {
-            "model_tool_rounds": 14,
-            "discovery_rounds": 4,
-            "task_seconds": 127.55,
+            "model_tool_rounds": 12,
+            "discovery_rounds": 2,
+            "task_seconds": 107.512,
             "task_turns": 1,
             "usage": {
-              "input_tokens": 559702,
-              "cached_input_tokens": 506624,
-              "output_tokens": 3676,
-              "reasoning_output_tokens": 1256,
-              "total_tokens": 563378,
-              "uncached_input_tokens": 53078
+              "input_tokens": 572706,
+              "cached_input_tokens": 503040,
+              "output_tokens": 3233,
+              "reasoning_output_tokens": 1007,
+              "total_tokens": 575939,
+              "uncached_input_tokens": 69666
             },
-            "mcp_calls": null,
+            "mcp_calls": 8,
+            "mcp_call_breakdown": {
+              "start_ask": 1,
+              "list_workspace_resources": 1,
+              "get_filter_schema": 1,
+              "search_entities": 1,
+              "get_entity": 1,
+              "query_workspace_filter": 2,
+              "submit_plan": 1
+            },
+            "mcp_failed_calls": 0,
             "api_requests": null,
             "reported_cost_usd": null
-          }
+          },
+          "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
         }
       }
     },
@@ -427,22 +451,22 @@
       },
       "latest_results": {
         "mcp": {
-          "run_id": "mcp-round-2",
+          "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/08-organize-mixed-files/artifacts/baseline/mcp",
+          "artifacts": "cases/08-organize-mixed-files/artifacts/current/mcp",
           "archive_file": "CODEX_ARCHIVE.jsonl",
-          "archive_sha256": "47345ff459891c1754f4b7da7910b7e3acbdd49402e76ee482956974b93b83d1",
-          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/08-organize-mixed-files/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
-          "comparison": "comparisons/mcp-round-2.md",
+          "archive_sha256": "414ee833334d54ed23c1a7bb932022d9682017046b145f503679c24eb318603b",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/08-organize-mixed-files/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
           "model": "gpt-5.6-sol",
           "reasoning": "medium",
-          "adapter_version": "0.1.5",
-          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
-          "server_version": "20260904t190016",
-          "server_version_evidence": "Plan-start request logs",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Operator installation history and observed changed adapter/guideline text; exact running wheel digest not embedded in export",
+          "server_version": null,
+          "server_version_evidence": "Not embedded in this capture; no historical runtime log lookup performed",
           "input_snapshot": {
             "prompt_sha256": "bf70ec2f8d1c17b5dab7a37e361aa7d2ef74379abf5495c5bc9b96076066ce37",
             "fixtures": {
@@ -454,30 +478,48 @@
             }
           },
           "inputs_match_current_case": true,
-          "outcome": "pass_with_structure_tradeoff",
-          "summary": "All five complete files used; duplicate completed service merged, open work separate, final decision respected and embedded instructions ignored.",
+          "outcome": "pass_with_caveats",
+          "summary": "All five files preserved; completed service grouped, open gasket task reuses existing model/Form, drainage remains planning. Filename searches removed; repeat detail/local reads remain.",
           "caveats": [
-            "Open gasket task lacks baseline's maintenance work-type/Form linkage.",
-            "Fewer model rounds but more MCP retrievals batched inside calls; raw elapsed time and output increase.",
-            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+            "Files are read locally this round instead of through five MCP get_file calls, so fewer MCP calls are not solely attributable to duplicate-check guidance.",
+            "Partial initial log reading prompts provisional-name searches before the complete tail corrects the final proposal.",
+            "Same annual-service Task is returned by page details, task listing and a redundant entity read.",
+            "Uncategorized placement and drainage-file attachment to an open implementation Task are reviewable layout variance; source evidence is preserved.",
+            "Single paired run on a living workspace, not a reset or randomized experiment.",
+            "Exact installed wheel digest and per-run application build are not recorded in the archive."
           ],
           "metrics": {
-            "model_tool_rounds": 13,
-            "discovery_rounds": 5,
-            "task_seconds": 201.085,
+            "model_tool_rounds": 14,
+            "discovery_rounds": 3,
+            "task_seconds": 195.235,
             "task_turns": 1,
             "usage": {
-              "input_tokens": 616857,
-              "cached_input_tokens": 558976,
-              "output_tokens": 7167,
-              "reasoning_output_tokens": 2481,
-              "total_tokens": 624024,
-              "uncached_input_tokens": 57881
+              "input_tokens": 675779,
+              "cached_input_tokens": 600576,
+              "output_tokens": 7446,
+              "reasoning_output_tokens": 2506,
+              "total_tokens": 683225,
+              "uncached_input_tokens": 75203
             },
-            "mcp_calls": null,
+            "mcp_calls": 18,
+            "mcp_call_breakdown": {
+              "start_organize": 1,
+              "upload_local_files": 1,
+              "search_entities": 6,
+              "list_workspace_resources": 1,
+              "get_schema": 2,
+              "get_page_tasks": 1,
+              "get_page_details": 1,
+              "get_guidelines": 2,
+              "get_entity": 1,
+              "get_task_history": 1,
+              "submit_plan": 1
+            },
+            "mcp_failed_calls": 0,
             "api_requests": null,
             "reported_cost_usd": null
-          }
+          },
+          "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
         }
       }
     },
@@ -489,50 +531,59 @@
       },
       "latest_results": {
         "mcp": {
-          "run_id": "mcp-round-2",
+          "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/09-create-project/artifacts/baseline/mcp",
+          "artifacts": "cases/09-create-project/artifacts/current/mcp",
           "archive_file": "CODEX_ARCHIVE.jsonl",
-          "archive_sha256": "8622a4e3616f61f5acd81c5075460e7a633982c55d149f24324692de8554ade8",
-          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/09-create-project/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
-          "comparison": "comparisons/mcp-round-2.md",
+          "archive_sha256": "9e882e9a9f33b4c25ccdffc3153b38493ac03a2d9e3d49125b42e08cff7dd723",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/09-create-project/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
           "model": "gpt-5.6-sol",
           "reasoning": "medium",
-          "adapter_version": "0.1.5",
-          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
-          "server_version": "20260904t190016",
-          "server_version_evidence": "Plan-start request logs",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Operator installation history and observed changed adapter/guideline text; exact running wheel digest not embedded in export",
+          "server_version": null,
+          "server_version_evidence": "Not embedded in this capture; no historical runtime log lookup performed",
           "input_snapshot": {
             "prompt_sha256": "d7c1bfd30fee0c09b6ff728ff06c7d8f845f5006f45e6935dedbd41d88030bf3",
             "fixtures": {}
           },
           "inputs_match_current_case": true,
-          "outcome": "needs_fix",
-          "summary": "Project/Form/work-type graph valid, but required Needs attention checkbox prevents a negative answer at future completion.",
+          "outcome": "pass",
+          "summary": "Correct Project/Form/two-model-Task graph; required attention question now has explicit Yes/No radio values and no immediate Tasks.",
           "caveats": [
-            "Code-confirmed downstream semantic problem; no live task completion or proposal execution attempted.",
-            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+            "Negative-answer usability is verified from submitted schema, not live production task completion.",
+            "Neither run inspects prior Project seed state; the screenshot confirms the graph but collapses Form fields.",
+            "Single paired run on a living workspace, not a reset or randomized experiment.",
+            "Exact installed wheel digest and per-run application build are not recorded in the archive."
           ],
           "metrics": {
-            "model_tool_rounds": 7,
-            "discovery_rounds": 4,
-            "task_seconds": 55.31,
+            "model_tool_rounds": 6,
+            "discovery_rounds": 3,
+            "task_seconds": 48.488,
             "task_turns": 1,
             "usage": {
-              "input_tokens": 244554,
-              "cached_input_tokens": 213376,
-              "output_tokens": 1731,
-              "reasoning_output_tokens": 411,
-              "total_tokens": 246285,
-              "uncached_input_tokens": 31178
+              "input_tokens": 209619,
+              "cached_input_tokens": 174080,
+              "output_tokens": 1587,
+              "reasoning_output_tokens": 315,
+              "total_tokens": 211206,
+              "uncached_input_tokens": 35539
             },
-            "mcp_calls": null,
+            "mcp_calls": 5,
+            "mcp_call_breakdown": {
+              "start_create": 1,
+              "get_guidelines": 3,
+              "submit_plan": 1
+            },
+            "mcp_failed_calls": 0,
             "api_requests": null,
             "reported_cost_usd": null
-          }
+          },
+          "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
         }
       }
     },
@@ -599,51 +650,59 @@
       },
       "latest_results": {
         "mcp": {
-          "run_id": "mcp-round-2",
+          "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/11-ask-approximate-issue/artifacts/baseline/mcp",
+          "artifacts": "cases/11-ask-approximate-issue/artifacts/current/mcp",
           "archive_file": "CODEX_ARCHIVE.jsonl",
-          "archive_sha256": "9ec391220063c36cd5cc5d0e57f1bf064357c385939140e4e52d941149f7879a",
-          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/11-ask-approximate-issue/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
-          "comparison": "comparisons/mcp-round-2.md",
+          "archive_sha256": "77088608e3601ea3a7a2795d7ceef0fb495187dd76eadadc95aecb1ba2b485cd",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/11-ask-approximate-issue/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
           "model": "gpt-5.6-sol",
           "reasoning": "medium",
-          "adapter_version": "0.1.5",
-          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
-          "server_version": "20260904t190016",
-          "server_version_evidence": "Plan-start request logs",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Operator installation history and observed changed adapter/guideline text; exact running wheel digest not embedded in export",
+          "server_version": null,
+          "server_version_evidence": "Not embedded in this capture; no historical runtime log lookup performed",
           "input_snapshot": {
             "prompt_sha256": "2150047dd71a84631176d896adcbfaa268825c15fc3c2094612747703b26ed10",
             "fixtures": {}
           },
           "inputs_match_current_case": true,
-          "outcome": "pass_with_unequal_baseline_completion",
-          "summary": "One search finds correct issue and Ask is saved; baseline only answered in chat.",
+          "outcome": "pass",
+          "summary": "Same grounded completed-issue answer is persisted; discovery halves and rounds plus all input/output measures improve.",
           "caveats": [
-            "Six discovery rounds increase total time and rounds despite retrieval improvement.",
-            "Baseline did not do required submission work.",
-            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+            "Retrieved issue detail is unchanged; the detail read supports date, person and resolution claims.",
+            "Single paired run on a living workspace, not a reset or randomized experiment.",
+            "Exact installed wheel digest and per-run application build are not recorded in the archive."
           ],
           "metrics": {
-            "model_tool_rounds": 10,
-            "discovery_rounds": 6,
-            "task_seconds": 75.1,
+            "model_tool_rounds": 7,
+            "discovery_rounds": 3,
+            "task_seconds": 39.806,
             "task_turns": 1,
             "usage": {
-              "input_tokens": 328240,
-              "cached_input_tokens": 296704,
-              "output_tokens": 1426,
-              "reasoning_output_tokens": 380,
-              "total_tokens": 329666,
-              "uncached_input_tokens": 31536
+              "input_tokens": 212722,
+              "cached_input_tokens": 191232,
+              "output_tokens": 906,
+              "reasoning_output_tokens": 221,
+              "total_tokens": 213628,
+              "uncached_input_tokens": 21490
             },
-            "mcp_calls": null,
+            "mcp_calls": 4,
+            "mcp_call_breakdown": {
+              "start_ask": 1,
+              "search_entities": 1,
+              "get_entity": 1,
+              "submit_plan": 1
+            },
+            "mcp_failed_calls": 0,
             "api_requests": null,
             "reported_cost_usd": null
-          }
+          },
+          "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
         }
       }
     },

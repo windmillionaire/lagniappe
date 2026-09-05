@@ -5,6 +5,10 @@ email flows. Judge useful, grounded results first, then tool rounds and tokens.
 Time is recorded but is noisy; a modest increase does not cancel a clear
 round/token improvement. This is a case library, not a new harness.
 
+Latest review: [MCP round 3](comparisons/mcp-round-3.md), cases 01/02/08/09/11.
+The index records those current attempts; their raw round-2 baselines and
+round-3 captures remain in place pending operator review and rollover.
+
 ## Layout
 
 ```text
@@ -13,6 +17,7 @@ testing_ai_workflows/
   ROUND_3.md
   latest_results.json          # latest reviewed attempt for each case/arm
   comparisons/                # small, tracked comparison/decision notes
+  skills/export-chat/         # existing Codex exporter, including its helper
   cases/
     01-ask-known-page/
       PROMPT.md
@@ -65,6 +70,29 @@ instruction context on both sides of a comparison and verify input hashes.
 The tracked case is the authoritative input; the neutral directory is only its
 working copy. A changed directory/instruction context is a recorded control gap.
 
+## Export skill
+
+[skills/export-chat/SKILL.md](skills/export-chat/SKILL.md) bundles the existing
+local Codex export skill, its Python helper and UI metadata, copied unchanged
+on 2026-09-05. It produces `CODEX_ARCHIVE.jsonl` and `CODEX_SESSION.txt`; it does
+not add telemetry or change the capture format. The helper uses only Python's
+standard library and requires a local Codex transcript, not an API key.
+
+Your installed Export Chat skill still works; no change is needed for round 3.
+The tracked copy is not automatically installed. To use it directly, ask the
+agent **after the measured task finishes**:
+
+> Use the export skill at /absolute/path/to/lagniappe/testing_ai_workflows/skills/export-chat/SKILL.md to export this chat to /absolute/path/to/lagniappe/testing_ai_workflows/cases/<case>/artifacts/current/mcp.
+
+Keep the session in its neutral fixtures directory and supply the destination
+explicitly. The helper otherwise defaults to the working directory and replaces
+its two export files; use a fresh destination for a retry so the first attempt
+survives. Do not export this library's private captures into tracked folders.
+
+The readable summary covers the whole captured session. Comparison metrics
+still come from the native JSONL with export activity excluded. This is the
+Codex exporter; keep using Pi's own archive skill for Pi sessions.
+
 ## Comparison and baseline rollover
 
 `latest_results.json` means the **latest reviewed attempt**, not the latest
@@ -111,23 +139,26 @@ metrics afterward without another operator logging step.
 For Codex, use per-response `token_usage_record` events, task boundaries and
 the final answer timestamp. Do not sum cumulative token snapshots or count
 literal nested call names as actual request totals when code contains loops.
+When present, unique completed `McpToolCall` event-item IDs provide actual MCP
+call counts, including failed calls inside batches. Count each once within the
+measured task turn, separately from model rounds and unknown upstream requests.
 Interrupted/incomplete tasks remain explicitly incomplete, not zero-cost passes.
 
 ## Case selection
 
 | Case | Main stress | Current evidence |
 | --- | --- | --- |
-| [01 Grounded explanation](cases/01-ask-known-page/PROMPT.md) | Approximate discovery, source grounding, saved answer | MCP round 2 |
-| [02 Books/filter](cases/02-ask-books-filter/PROMPT.md) | Complete lists, filter interpretation, clipping, one report | MCP round 2, known lifecycle failure |
+| [01 Grounded explanation](cases/01-ask-known-page/PROMPT.md) | Approximate discovery, source grounding, saved answer | MCP round 3, citation qualification |
+| [02 Books/filter](cases/02-ask-books-filter/PROMPT.md) | Complete lists, filter interpretation, clipping, one report | MCP round 3, lifecycle fixed; saved-view attribution unresolved |
 | [03 One-time reminder](cases/03-create-personal-task/PROMPT.md) | Personal Page, timezone, no accidental recurrence | MCP round 2 |
 | [04 Related records](cases/04-create-related-records/PROMPT.md) | Form/Category/Page/Task references and dates | MCP round 2, rate-limit interruption |
 | [05 Revision](cases/05-revise-ready-create-plan/PROMPT.md) | Same report, targeted change, unaffected work retained | MCP round 2, prompt intervention |
 | [06 Contact](cases/06-organize-vcard/PROMPT.md) | Full file, grounded fields, reasonable follow-up/mapping | MCP round 2 |
 | [07 Screenshot](cases/07-organize-bug-screenshot/PROMPT.md) | Correct existing issue and preserved update content | MCP round 2, local image inspection |
-| [08 Mixed files](cases/08-organize-mixed-files/PROMPT.md) | Duplicate service, open work, late evidence, embedded instructions | MCP round 2 |
-| [09 Project](cases/09-create-project/PROMPT.md) | Reusable work types and usable negative-answer form | MCP round 2, known checkbox defect |
+| [08 Mixed files](cases/08-organize-mixed-files/PROMPT.md) | Duplicate service, open work, late evidence, embedded instructions | MCP round 3, structured repair restored; local-file reads |
+| [09 Project](cases/09-create-project/PROMPT.md) | Reusable work types and usable negative-answer form | MCP round 3, explicit Yes/No choice corrected |
 | [10 Recurring reminder](cases/10-create-recurring-reminder/PROMPT.md) | Three weeks after completion, not calendar repetition | MCP round 2 |
-| [11 Approximate issue](cases/11-ask-approximate-issue/PROMPT.md) | Ranked recall, status evidence, persisted answer | MCP round 2 |
+| [11 Approximate issue](cases/11-ask-approximate-issue/PROMPT.md) | Ranked recall, status evidence, persisted answer | MCP round 3, clean discovery gain |
 | 12 Several documents, one subject | One Page with complete attachments; checklist is not completed work | Historical Pi/REST reference; first MCP baseline needed |
 | 13 One task, several subjects | Respect requested task count and retain supporting file | Historical Pi/REST failure; first MCP baseline needed |
 

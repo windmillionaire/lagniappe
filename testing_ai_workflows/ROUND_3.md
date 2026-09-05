@@ -1,5 +1,9 @@
 # Targeted MCP round 3
 
+Completed and reviewed September 5, 2026: [comparison](comparisons/mcp-round-3.md).
+All five current captures are present; the preparation/operator notes below are
+retained as provenance, not instructions to rerun or overwrite this batch.
+
 Baseline: preserved round-2 MCP captures (0.1.5, Sol medium). Candidate: the
 next deployed server and **lagniappe-mcp 0.1.6**. The candidate is prepared
 locally; deployment and installed-client upgrade are operator steps.
@@ -50,6 +54,10 @@ When finished, ask “Export this chat to …” with the appropriate destinatio
 /home/swifty/lagniappe/testing_ai_workflows/cases/11-ask-approximate-issue/artifacts/current/mcp
 ```
 
+The existing installed Export Chat skill is unchanged. A reusable copy, including
+its helper, is now tracked in [skills/export-chat/](skills/export-chat/SKILL.md);
+see the [export instructions](README.md#export-skill) if it is not installed.
+
 Case 09's live boundary is still the reviewable proposal. Inspect the form's
 negative-answer semantics; do not execute a production proposal just to score
 it. A focused deterministic completion regression supplements this check.
@@ -77,4 +85,5 @@ After committing the source, new wheel/ledger and library, run
 `venv/bin/python run.py mcp-artifact check` before the normal deploy.
 The Git-aware check is deliberately post-commit. No production deployment,
 installed-profile change, live model run or full hosted/E2E suite was performed
-for this preparation; current captures remain empty.
+for that preparation. The subsequent operator runs and review are recorded in
+the comparison linked above.
