@@ -96,7 +96,10 @@
               <legend class="{{ styles.label.default }} px-1">External agent API</legend>
               <div class="space-y-3">
                 {% if CONFIG.REMOTE_MCP.enabled %}
-                  <p><a href="{{ url_for('oauth.connection') }}" class="underline">Manage ChatGPT connection</a></p>
+                  <p>
+                    <a href="{{ url_for('oauth.connection') }}"
+                       class="font-semibold text-page-default underline hover:text-page-dark">Manage AI connections</a>
+                  </p>
                 {% endif %}
                 <p class="text-sm text-base-medium">
                   Use another AI client to Ask questions or prepare Create and Organize plans within your workspace permissions. API plans never run automatically.

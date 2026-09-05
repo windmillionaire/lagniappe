@@ -22,10 +22,9 @@ Mystery/Thriller and Personal Rating 4 or 5, with eight Finished books:
 - Report the complete set, total eight, rating groups six/two, authors, and
   each observed reading status. Do not exclude a surprising title based on
   outside genre knowledge. Order and presentation may vary.
-- Explain the criteria actually used. Do not claim to have inspected a saved
-  view definition if the evidence only supports reconstructing its filter.
-  An explicit qualification is preferable to an invented attribution; a new
-  saved-view tool is not required to satisfy the useful filtering job.
+- Apply the requested Personal Rating values 4 or 5 and the stored
+  Mystery/Thriller genre values. Explain those criteria using the accessible
+  Book Form/schema and the returned records.
 - Save one complete Ask report, without changing books or leaving avoidable
   draft reports. A complete query does not need a new Plan for submission.
 
@@ -40,7 +39,10 @@ run is active; review exact report IDs after export, not titles alone.
 
 Round 2 returned the right eight rows but left two unnecessary drafts and
 overstated saved-view evidence. Two earlier genuine deletions/404s were a
-separate interruption. Prompt unchanged from the same-named Desktop case.
+separate interruption. The remote-pilot prompt now explicitly asks for ratings
+4 or 5 and omits the saved-view-definition request. Compare list completeness
+and report continuity with earlier runs; this is no longer an identical-prompt
+comparison for case 02. The shared `mcp:` prefix selects the intended transport.
 Check for dataset drift before treating this table as a fixed expected count;
 record drift rather than hiding it. No attachments. See
 [review](../../comparisons/mcp-round-2.md).

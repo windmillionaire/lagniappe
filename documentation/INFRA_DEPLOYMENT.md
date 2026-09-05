@@ -112,7 +112,7 @@ registration.
 
 ## Remote MCP pilot
 
-The hosted ChatGPT adapter is a separate manual Cloud Run deployment. Its
+The hosted MCP adapter is a separate manual Cloud Run deployment. Its
 source is `clients/lagniappe_mcp_remote/`; its Dockerfile, Cloud Build
 definition, and upload allowlist live in `runner/remote_mcp_container/`.
 The image installs the existing adapter using its pinned Python, uv, and lock
@@ -122,6 +122,11 @@ package inputs, and container definition. It excludes application
 configuration, user profiles, and private workflow fixtures. The application
 continues to receive OAuth/authentication code through the ordinary App Engine
 deployment boundary.
+
+The MCP deploy guard requires genuine release inputs to be committed. It
+ignores generated frontend metadata and only the generated `BUILD_ID` value
+in constants; other constant changes still require a commit. Build freshness
+and manifest consistency remain checked against the actual deployment bundle.
 
 Keep `clients/lagniappe_mcp/src/` under its existing immutable release rules.
 The remote module imports that package without changing a previously
@@ -156,11 +161,33 @@ tracks actual resource names, deployment commands/results, retention/log
 configuration, and the manual ChatGPT web, Android, and desktop trials. An
 unfilled deployment entry is pending, not evidence of a working cloud service.
 
-Revocation in `/oauth/connection` stops the current user's grant. Turning off
+Revocation in `/oauth/connection` stops the selected client grant for the
+current user. Turning off
 the main app's `REMOTE_MCP.enabled` flag stops all remote authorization and
 envelope authentication; turning off `LAGNIAPPE_MCP_ENABLED` stops the Cloud Run
 endpoint. Retire the exact pilot service and resources explicitly after
 disconnecting pilot clients. Existing local API credentials remain independent.
+
+For the Codex extension, enable `REMOTE_MCP.codex_enabled` in private application
+settings and deploy the main app normally. Rebuild/redeploy Cloud Run to add
+the terminal upload tools; no new cloud resources or service-account roles are
+needed. Then configure the terminal client:
+
+```bash
+codex mcp add lagniappe-remote --url https://YOUR-CLOUD-RUN-ORIGIN/mcp --oauth-client-id lagniappe-codex
+codex mcp login lagniappe-remote
+```
+
+Use a `tool_timeout_sec` of 300 and `startup_timeout_sec` of 60 for the pilot.
+Set `required = true` under `[mcp_servers.lagniappe-remote]` while trialing it.
+Codex's initial catalog can omit an optional server that takes longer than its
+startup grace period, even if `/mcp` later shows the server connected. Making
+the pilot server required waits for its tools and reports a startup failure if
+it cannot initialize; it does not force the model to choose those tools.
+Keep the working local entry until remote authorization is verified, then
+remove that entry and restart the client session to refresh its tool catalog.
+Current Codex registration and callback behavior is documented in the
+[official MCP guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 
 ## Scaling and runtime settings
 

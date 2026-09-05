@@ -56,7 +56,9 @@ class MutationPlanBuilder:
             return effect, cache_kind, _entity_key(entity)
         return effect, cache_kind, cache_key
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_full_page_save_wins_over_file_owner_touch_in_either_order
+    # @matrix mutations : full-root masked-touch instance-precedence
     def _merge_write(self, existing, incoming):
         if existing.property_mask is None or incoming.property_mask is None:
             property_mask = None
@@ -65,7 +67,13 @@ class MutationPlanBuilder:
         return MutationEffect(
             existing.effect,
             existing.phase,
-            entity=existing.entity,
+            # A dependency touch can arrive before the complete root save.
+            # Its shallow/stale relation copy must not become the full upsert.
+            entity=(
+                incoming.entity
+                if existing.property_mask is not None and incoming.property_mask is None
+                else existing.entity
+            ),
             property_mask=property_mask,
             property_updates=_unique(
                 (*existing.property_updates, *incoming.property_updates)
@@ -178,13 +186,20 @@ class MutationPlanBuilder:
         )
         self.cache_delete(entity, reason=reason)
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_full_page_save_wins_over_file_owner_touch_in_either_order
+    # @matrix mutations : full-root masked-touch instance-precedence cache
     def _add_entity_cache_effect(self, effect, entity, reason):
         if not getattr(entity, "key", None):
             return
         key = self._effect_key(effect, entity=entity)
         existing = self._effects.get(key)
         reasons = _unique((*(existing.reasons if existing else ()), reason))
+        write = self._effects.get(self._effect_key(MutationEffectType.UPSERT, entity=entity))
+        if write is not None and write.property_mask is None:
+            # Cache the same authoritative instance as the full durable write,
+            # even if a later dependency touch carries another copy.
+            entity = write.entity
         self._effects[key] = MutationEffect(
             effect,
             MutationPhase.POST_COMMIT,

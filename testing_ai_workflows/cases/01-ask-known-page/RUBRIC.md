@@ -26,7 +26,8 @@ recheck permissions already applied by search.
 ## Evidence and controls
 
 Round 2 passed with one useful search and a saved answer, but half its tool
-rounds were discovery. Prompt bytes are unchanged from
-`/home/swifty/Desktop/lagniappe-mcp-trial/01-ask-known-page/PROMPT.md`.
+rounds were discovery. The natural job text is unchanged from
+`/home/swifty/Desktop/lagniappe-mcp-trial/01-ask-known-page/PROMPT.md`; the remote
+pilot adds the shared `mcp:` routing cue.
 See [round-2 review](../../comparisons/mcp-round-2.md) and the
 library's latest results for measurements. No file attachments are needed.

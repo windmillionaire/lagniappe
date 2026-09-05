@@ -212,7 +212,8 @@ API](AI_EXTERNAL_API.md).
 ## Remote ChatGPT MCP pilot
 
 The separate Cloud Run pilot uses the existing browser login to authorize one
-configured ChatGPT CIMD client. `REMOTE_MCP` is opt-in and requires an explicit
+configured ChatGPT CIMD client and, when enabled, one pre-registered public
+Codex client. `REMOTE_MCP` is opt-in and requires an explicit
 Lagniappe user allowlist; its settings are described in
 [Infrastructure Configuration](INFRA_CONFIG.md#remote-mcp-pilot). The Lagniappe
 login email does not have to match the user's ChatGPT account email. An empty
@@ -239,9 +240,25 @@ Opaque codes and tokens have digest-addressed records in the `mcp_oauth`
 Datastore kind. Pending requests last ten minutes, codes five minutes, access
 tokens thirty minutes, and grants at most thirty days. Refresh rotates the
 token; reuse of an already-used refresh token revokes its grant family.
-There is one active grant per Lagniappe user, so a new successful connection
-replaces the previous grant. The signed-in user's **Manage ChatGPT connection**
-link in Settings opens `/oauth/connection`, where they can revoke it.
+There is one active grant per Lagniappe user **and client**. Reconnecting
+ChatGPT replaces that user's ChatGPT grant; reconnecting Codex replaces only
+Codex. Existing ChatGPT grants survive enabling Codex. **Manage AI connections**
+in Settings opens `/oauth/connection`, with separate revoke controls. Browser
+logout or switching the browser user does not revoke either connection.
+
+With `codex_enabled: true`, the pre-registered public client is
+`lagniappe-codex`. Its redirect is `http://127.0.0.1/callback`, allowing only
+an optional valid numeric port for Codex's local listener (RFC 8252). Host,
+path, query absence, and the actual callback reused at token exchange remain
+exact. No DNS callback, dynamic registration, client secret, or additional
+metadata fetch is introduced. Authorization responses include `iss`, as
+required by Codex's pre-registered-client flow. OAuth responses also allow the
+loopback callback in their CSP `form-action` directive when Codex is enabled:
+browsers apply that directive to the native consent POST's redirect chain.
+Other pages retain the ordinary same-origin policy. Consent and revocation use
+the shared login button spinner while preserving native POST values and CSRF.
+Disabling `codex_enabled` denies Codex authorizations and token use while
+preserving ChatGPT access.
 
 Cloud Run authenticates every MCP request through `/api/v1`, including requests
 such as ping that need no domain data. The API requires both the dedicated

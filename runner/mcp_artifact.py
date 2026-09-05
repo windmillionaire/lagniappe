@@ -1753,6 +1753,7 @@ def assemble_deployment_artifacts(repo_root=REPOSITORY_ROOT) -> dict:
 
 # @testable true
 # @tests tests_tooling/test_012b_mcp_artifact.py::test_artifact_git_boundary_rejects_staged_uncommitted_inputs
+# @tests tests_tooling/test_012b_mcp_artifact.py::test_artifact_git_boundary_ignores_generated_metadata_but_checks_real_constants
 # @matrix mcp-package release : deploy-preflight git-boundary
 def _git_release_input_issues(
     repo_root: Path,
@@ -1765,8 +1766,6 @@ def _git_release_input_issues(
         repo_root / OPENAPI_SOURCE_RELATIVE,
         repo_root / APPLICATION_CONTRACT_RELATIVE,
         repo_root / "package.json",
-        repo_root / "config/constants.py",
-        repo_root / FRONTEND_BUILD_RELATIVE,
         repo_root / MCP_LEDGER_RELATIVE,
         *(
             repo_root
@@ -1776,16 +1775,19 @@ def _git_release_input_issues(
         ),
     ]
     relative = [path.relative_to(repo_root).as_posix() for path in paths]
+    constants_relative = "config/constants.py"
     if git_cli is None or not Path(git_cli).is_absolute():
         return ["Git is unavailable for MCP release-input validation."]
     git = str(git_cli)
     try:
         tracked = subprocess.run(
-            [git, "-C", str(repo_root), "ls-files", "--error-unmatch", "--", *relative],
+            [git, "-C", str(repo_root), "ls-files", "--error-unmatch", "--", *relative, constants_relative],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
         )
+        if tracked.returncode != 0:
+            return ["MCP release inputs are not all tracked in ordinary Git."]
         dirty = subprocess.run(
             [git, "-C", str(repo_root), "diff", "--quiet", "--", *relative],
             stdout=subprocess.DEVNULL,
@@ -1807,14 +1809,29 @@ def _git_release_input_issues(
             stderr=subprocess.DEVNULL,
             check=False,
         )
-    except OSError:
+        # Generated frontend metadata is verified against this build by
+        # _application_metadata, not against Git. Only BUILD_ID is generated
+        # in constants.py; every other byte must still be committed.
+        constant_versions = [
+            subprocess.run(
+                [git, "-C", str(repo_root), "show", revision + constants_relative],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            ).stdout
+            for revision in ("HEAD:", ":")
+        ]
+        constant_versions.append((repo_root / constants_relative).read_bytes())
+        normalized = [
+            re.sub(rb'(?m)^BUILD_ID = "b[0-9a-f]{7}"$', b'BUILD_ID = "generated"', value)
+            for value in constant_versions
+        ]
+    except (OSError, subprocess.SubprocessError):
         return ["Git is unavailable for MCP release-input validation."]
     issues = []
-    if tracked.returncode != 0:
-        issues.append("MCP release inputs are not all tracked in ordinary Git.")
-    if dirty.returncode != 0:
+    if dirty.returncode != 0 or normalized[1] != normalized[2]:
         issues.append("MCP release inputs contain unstaged changes.")
-    if staged.returncode != 0:
+    if staged.returncode != 0 or normalized[0] != normalized[1]:
         issues.append("MCP release inputs contain staged but uncommitted changes.")
     return issues
 

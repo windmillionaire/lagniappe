@@ -14,9 +14,9 @@ import pytest
 from jinja2 import Undefined
 from markupsafe import Markup
 
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache
+from lagniappe.core.tools import ai, cache
 from lagniappe.core.tools.cache.core import cache as redis_cache
 from lagniappe.core.tools.cache.keys import Search
 from lagniappe.core.tools.database.core import DATA
@@ -156,6 +156,62 @@ def _assert_deleted(entity):
 def _assert_hash_cached(entity):
     details = cache.get_details_by_hash({entity.hash})
     assert details[entity.hash]["id"] == entity.urlsafe_key
+
+
+# @matrix ai-report : undo category-editor file-links created-entities
+def test_report_undo_preserves_category_editor_access_and_uploaded_file():
+    category = _create_category("undo-editor-category")
+    user = Entities.USER.create(
+        {"name": _name("undo-editor"), "email": f"undo-{uuid4().hex}@example.test"}
+    )
+    user.permissions = {category.hash: "EDIT", user.page.hash: "EDIT"}
+    Entities.save(user)
+    assert not user.is_admin
+    assert category.allowed(Action.EDIT, user=user)
+
+    file = Entities.FILE.create(data={"name": _name("undo-upload")}, report_user=user)
+    Entities.save(file)
+    report = Entities.REPORT.create({
+        "parent": user,
+        "user": user,
+        "name": _name("undo-contact"),
+        "status": "ready",
+        "pending": False,
+        "input_files": [file],
+        "proposal": {
+            "summary": "Create a contact with its original file and follow-up.",
+            "actions": [
+                {"id": "page", "type": "create_page", "data": {
+                    "name": _name("undo-contact-page"), "category": category.urlsafe_key,
+                }},
+                {"id": "attachment", "type": "attach_file_to_page", "data": {
+                    "page_action": "page", "file": file.urlsafe_key,
+                }},
+                {"id": "task", "type": "create_task", "data": {
+                    "name": _name("undo-follow-up"), "page_action": "page",
+                }},
+            ],
+        },
+    })
+    Entities.save(report)
+    ai.run_report(report, user)
+    assert report.status == "complete", report.error
+    actions = {action["id"]: action for action in report.result["actions"]}
+    page = Entities.fetch_one(actions["page"]["entity"]["id"], request=Fetch.direct())
+    task = Entities.fetch_one(actions["task"]["entity"]["id"], request=Fetch.direct())
+    assert page.allowed(Action.EDIT, user=user)
+    assert category.hash in page.requires
+
+    report = Entities.fetch_one(report.key, request=Fetch.direct())
+    ai.undo_report(report, user)
+    assert report.result["undo"]["status"] == "complete", report.error
+    _assert_deleted(page)
+    _assert_deleted(task)
+    remaining_file = Entities.fetch_one(file.key, request=Fetch.direct())
+    assert remaining_file is not None
+    assert page.key not in remaining_file.properties.pages.keys
+    assert remaining_file.allowed(Action.VIEW, user=user)
+    assert not remaining_file.searchable
 
 
 # @matrix entities : cache database dependent-owner process-state save

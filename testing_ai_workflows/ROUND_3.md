@@ -1,8 +1,10 @@
 # Targeted MCP round 3
 
 Completed and reviewed September 5, 2026: [comparison](comparisons/mcp-round-3.md).
-All five current captures are present; the preparation/operator notes below are
-retained as provenance, not instructions to rerun or overwrite this batch.
+All five captures were promoted to the flat `artifacts/baseline/` folders on
+September 5 before the remote pilot. The preparation/operator notes below are
+retained as provenance; their old export destinations are historical, not
+instructions to recreate nested folders or overwrite this batch.
 
 Baseline: preserved round-2 MCP captures (0.1.5, Sol medium). Candidate: the
 next deployed server and **lagniappe-mcp 0.1.6**. The candidate is prepared

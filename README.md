@@ -43,6 +43,10 @@ If you don't like the idea of hosting your data in GCP, don't want to be technic
 
 See the [release history](documentation/releases/) for version notes.
 
+## AI Integration
+
+AI integration can be fully disabled at installation time. If enabled you'll see the option anywhere it has been integrated, if not those options won't appear. If enabled it can be used inside the app itself, accessed via email (ai@<your-site>.com), and used via MCP in ChatGPT as a plugin and via the MCP or bearer authentication with a user-linked API key in terminal harnesses like Codex. Both on-site and email invocations use a flavor of Gemini that you can specify, and the MCP endpoint uses whichever model you have it hooked up to. Since both on-site and email invocations are billed directly to the site owner, invited users must be explicitly given access to those modes. AI can only retrieve site data that the invoking user can view, and no matter how it is used, cannot edit the site on its own, although it can create plans for site edits that the user must approve. More on how that all works [here](https://lagniappe.site/pages/public/9a10ae4c).
+
 ## Installation
 
 The guided installer supports Windows, macOS, and Linux. It walks through the required accounts and tools, cloud services, authentication, Redis, optional features, and deployment.

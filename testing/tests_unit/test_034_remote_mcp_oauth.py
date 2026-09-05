@@ -581,3 +581,56 @@ def test_oauth_secrets_are_redacted_from_diagnostics():
         "query-challenge",
     ):
         assert secret not in sanitized
+
+
+# @matrix mcp-oauth : authorization consent loopback token refresh revocation client-isolation
+def test_codex_loopback_grants_coexist_and_cannot_cross_clients(oauth):
+    from config.remote_mcp import CODEX_CLIENT_ID
+
+    request = {
+        **oauth.request,
+        "client_id": CODEX_CLIENT_ID,
+        "redirect_uri": "http://127.0.0.1:54321/callback",
+    }
+    with pytest.raises(auth.OAuthError):
+        auth.begin_authorization(request)
+    oauth.config["codex_enabled"] = True
+    chatgpt = auth.exchange_token(_code(oauth))
+    downloads_before = len(oauth.downloads)
+    pending = auth.begin_authorization(request)
+    target, response = auth.consent(pending, oauth.actor, allow=True)
+    assert target == request["redirect_uri"]
+    assert response["iss"] == oauth.config["issuer"]
+    assert len(oauth.downloads) == downloads_before  # pre-registered, no CIMD fetch
+    exchange = {
+        "grant_type": "authorization_code", "client_id": CODEX_CLIENT_ID,
+        "redirect_uri": target, "resource": oauth.config["resource"],
+        "code": response["code"], "code_verifier": VERIFIER,
+    }
+    for replacement in (
+        {"client_id": oauth.config["client_id"]},
+        {"redirect_uri": "http://127.0.0.1:54322/callback"},
+        {"code_verifier": "x" * 43},
+    ):
+        with pytest.raises(auth.OAuthError):
+            auth.exchange_token({**exchange, **replacement})
+    codex = auth.exchange_token(exchange)
+    for tokens in (chatgpt, codex):
+        assert auth.authenticate_access(tokens["access_token"])[0] is oauth.actor
+    assert auth.connection_status(oauth.actor)["active"]
+    assert auth.connection_status(oauth.actor, client_id=CODEX_CLIENT_ID)["active"]
+    # A wrong client's refresh or revoke must not affect either grant.
+    with pytest.raises(auth.OAuthError):
+        auth.exchange_token(_refresh(oauth, codex["refresh_token"]))
+    auth.revoke_token(codex["access_token"], oauth.config["client_id"])
+    assert auth.authenticate_access(codex["access_token"])[0] is oauth.actor
+    rotated = auth.exchange_token({
+        **_refresh(oauth, codex["refresh_token"]), "client_id": CODEX_CLIENT_ID,
+    })
+    auth.connection_status(oauth.actor, client_id=CODEX_CLIENT_ID, revoke=True)
+    with pytest.raises(auth.OAuthError):
+        auth.authenticate_access(rotated["access_token"])
+    assert auth.authenticate_access(chatgpt["access_token"])[0] is oauth.actor
+    oauth.config["codex_enabled"] = False
+    with pytest.raises(auth.OAuthError):
+        auth.begin_authorization(request)

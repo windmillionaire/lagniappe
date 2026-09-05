@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 
+from google.cloud import datastore
 import pytest
 
 from lagniappe.core.definitions import (
@@ -43,6 +44,36 @@ def _writes(plan):
         for effect in plan.effects
         if effect.effect in {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
     ]
+
+
+# @matrix mutations : full-root masked-touch instance-precedence cache
+@pytest.mark.parametrize("file_first", [True, False])
+def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first):
+    page = TestEntities.get("PAGE", {
+        "name": "Current contact", "hash": "root-contact",
+        "model": {"name": "Contacts", "hash": "root-contacts"},
+    })
+    category = page.model
+    old_page = TestEntities.get("PAGE", {"name": "Stale contact", "hash": page.hash})
+    record = datastore.Entity(key=datastore.Key("files", "contact-file", project="test-project"))
+    record.update(type="file", name="Contact card", hash="root-contact-file")
+    file = Entities.FILE(record)
+    file.properties.pages.value = [old_page]
+    roots = (file, page) if file_first else (page, file)
+
+    plan = plan_mutation(MutationOperation.SAVE, *roots, registry=Entities)
+    write = next(effect for effect in _writes(plan) if effect.entity.key == page.key)
+    refresh = next(
+        effect for effect in plan.effects
+        if effect.effect is MutationEffectType.CACHE_REFRESH and effect.entity.key == page.key
+    )
+    assert write.property_mask is None
+    assert "file-page-owner" in write.reasons
+    assert write.entity is page
+    assert refresh.entity is page
+    mutation_executor.prepare_durable_writes(plan)
+    assert category.hash in write.entity.requires
+    assert write.entity.name == "Current contact"
 
 
 # @matrix mutations task-scheduling : durable-first post-commit

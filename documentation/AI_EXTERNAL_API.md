@@ -13,7 +13,7 @@ feature. Every authenticated non-public user may manage a key and use Ask,
 Create, and Organize, regardless of the user's site AI-access setting. That
 setting controls Lagniappe-funded model-provider calls; an external client uses
 its own model and tokens. Revoking the user's API key stops clients using that
-key. The optional remote ChatGPT pilot has a separately revocable OAuth grant.
+key. The optional remote MCP pilot has separately revocable ChatGPT and Codex OAuth grants.
 
 ## Security model
 
@@ -65,11 +65,63 @@ key. The optional remote ChatGPT pilot has a separately revocable OAuth grant.
 
 The Cloud Run pilot in `clients/lagniappe_mcp_remote/` composes the local
 adapter's catalog, REST mappings, validation, and result projections. It
-replaces only `upload_local_files` with `upload_files`, whose inputs are
-ChatGPT attachment objects. No remote argument selects a server filesystem
+replaces `upload_local_files` with `upload_files` for ChatGPT attachment
+objects and `prepare_file_uploads` / `finalize_file_uploads` for terminal clients. No remote argument selects a server filesystem
 path. All draft/review and permission rules above apply to both transports.
 The hosted module is outside the immutable published local package source
 boundary; adding it does not silently rebuild a supported local wheel.
+Terminal uploads send user-selected bytes directly to existing Google Storage
+resumable sessions, then finalize the exact batch through authenticated MCP.
+Only `prepare_file_uploads` exposes validated storage write URLs, in an explicit
+upload manifest. This narrowly extends the local adapter's presentation rule;
+all ordinary results still reject private transport capabilities. OAuth and
+service identity tokens never enter upload instructions or storage requests.
+Treat the manifest as a temporary credential: save it mode 600, do not include
+it in answers or tracked captures, and remove it after transfer. Upload session
+URLs remain usable until storage expiry even if the OAuth grant is revoked;
+finalization still checks the live grant and Plan owner.
+
+Terminal clients need only their normal local file access and an HTTP client
+such as `curl`. They do not install a Lagniappe upload helper, local MCP
+package, source checkout, or Python environment:
+
+1. Inspect each user-selected regular file for its base filename, MIME type,
+   and exact byte size; pass that metadata and the existing `plan_id` to
+   `prepare_file_uploads`.
+2. Send each original file directly to its returned `uploads[index].session_url`
+   in a single HTTP `PUT`, with the declared content type and byte count. The
+   `chunk_size` field is a hint for optional chunked transfers, not a limit on
+   whole-file transfers.
+3. Require HTTP 200 or 201 for every file, then call `finalize_file_uploads`
+   with the unchanged `plan_id` and `upload_batch_id`. A timeout, failed request,
+   or HTTP 308 is not confirmation of completion; leave the batch pending.
+
+The server creates the Storage session using its own identity. The returned
+URL authorizes that upload without forwarding the client's OAuth token or
+requiring a Google account on the terminal. Google documents the
+[single-request upload protocol](https://docs.cloud.google.com/storage/docs/performing-resumable-uploads#upload_the_data).
+
+For example, after writing one URL as `url = "SESSION_URL"` in an owner-only
+curl config file, the terminal can transfer a selected file without placing
+that URL in command arguments or output:
+
+```bash
+curl --disable --proto '=https' --silent --show-error --fail \
+  --connect-timeout 10 --max-time 240 \
+  --request PUT --upload-file /absolute/file.vcf \
+  --header 'Content-Type: text/vcard' \
+  --config /tmp/private-upload.curl \
+  --output /dev/null --write-out '%{http_code}\n'
+```
+
+Create temporary files privately from the outset (mode 600), do not follow
+redirects, and do not add authentication or cookies. For a regular file curl
+supplies Content-Length; inspect the command exit status and HTTP status before
+finalizing. Remove the temporary URL/config files after use. The terminal is
+responsible for reading the same selected bytes it declared. This replaces the
+pilot's checkout-dependent `lagniappe-upload` helper; that helper is removed.
+ChatGPT web/app attachment uploads continue to use `upload_files`.
+
 See [Authentication](AUTHENTICATION.md#remote-chatgpt-mcp-pilot) and
 [Deployment](INFRA_DEPLOYMENT.md#remote-mcp-pilot) for this opt-in pilot.
 

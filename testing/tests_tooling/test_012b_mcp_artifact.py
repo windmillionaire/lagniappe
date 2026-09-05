@@ -805,3 +805,34 @@ def test_mcp_artifact_cli_checks_without_gcloud(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "Built MCP adapter 0.1.0" in output
     assert "adapter 0.1.0" in output
+
+
+# @matrix mcp-package release : deploy-preflight git-boundary
+def test_artifact_git_boundary_ignores_generated_metadata_but_checks_real_constants(tmp_path):
+    ledger = _prepare_release(tmp_path)
+    commands = (
+        ("init", "-b", "main"),
+        ("config", "user.name", "MCP Artifact Test"),
+        ("config", "user.email", "mcp-artifact@example.test"),
+        ("add", "."),
+        ("commit", "-m", "fixture"),
+    )
+    for command in commands:
+        subprocess.run(
+            ["git", "-C", str(tmp_path), *command],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    constants = tmp_path / "config/constants.py"
+    generated = 'BUILD_ID = "b7654321"\n'
+    _write(constants, generated)
+    _write(tmp_path / mcp_artifact.FRONTEND_BUILD_RELATIVE, "regenerated build metadata")
+    assert mcp_artifact._git_release_input_issues(tmp_path, ledger, git_cli=GIT_CLI) == []
+    # Staging the generated marker also remains harmless.
+    subprocess.run(["git", "-C", str(tmp_path), "add", "config/constants.py"], check=True)
+    assert mcp_artifact._git_release_input_issues(tmp_path, ledger, git_cli=GIT_CLI) == []
+    _write(constants, generated + 'RUNTIME = "changed"\n')
+    assert any("unstaged" in issue for issue in mcp_artifact._git_release_input_issues(tmp_path, ledger, git_cli=GIT_CLI))
+    subprocess.run(["git", "-C", str(tmp_path), "add", "config/constants.py"], check=True)
+    assert any("staged but uncommitted" in issue for issue in mcp_artifact._git_release_input_issues(tmp_path, ledger, git_cli=GIT_CLI))

@@ -211,6 +211,7 @@ validated by `config/remote_mcp.py`. It is independent of the local
 | Field | Contract |
 | --- | --- |
 | `enabled` | Boolean pilot switch. |
+| `codex_enabled` | Optional boolean, default false. Enables the fixed `lagniappe-codex` public client and its loopback callback. |
 | `issuer` | Exact main-app HTTPS origin, without a trailing slash or path. |
 | `resource` | Exact canonical Cloud Run `status.url` plus `/mcp`, on a different origin. |
 | `client_id` | One exact ChatGPT CIMD URL; defaults to `https://chatgpt.com/oauth/client.json`. |

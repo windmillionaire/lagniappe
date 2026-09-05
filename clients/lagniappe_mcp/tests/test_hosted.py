@@ -34,10 +34,11 @@ MODERN_META = {
 
 
 # @matrix mcp-remote : parity privacy
-# @matrix mcp-upload : remote cleanup partial-failure upload-all finalize-once
+# @matrix mcp-upload : remote terminal cleanup partial-failure upload-all finalize-once upload-batch-identity safe-result
 @pytest.mark.parametrize("storage_failure", [False, True])
+@pytest.mark.parametrize("terminal", [False, True])
 def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
-    monkeypatch, storage_failure
+    monkeypatch, storage_failure, terminal, tmp_path
 ):
     from lagniappe_mcp.limits import CONTRACT_VERSION_MAX, MIN_UPLOAD_CHUNK_BYTES
 
@@ -45,6 +46,10 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
         requests, revoked, downloads, storage_requests = [], set(), [], []
         declarations, finalized = [], False
         content = b"remote attachment bytes"
+        if terminal:
+            # An ordinary HTTP client may send the entire file in one PUT,
+            # even when it exceeds the manifest's optional chunk-size hint.
+            content = b"x" * (MIN_UPLOAD_CHUNK_BYTES + 1)
         batch_id = "batch-aaaaaaaaaaaaaaaa"
         session_url = "https://storage.googleapis.com/upload/storage/v1/b/bucket/o?uploadType=resumable&upload_id=private"
         attachment = {
@@ -105,8 +110,8 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                         "payload_sizes": {},
                         "limits": {
                             "max_files": 20,
-                            "max_file_bytes": 1024,
-                            "max_total_file_bytes": 1024,
+                            "max_file_bytes": len(content) + 1024,
+                            "max_total_file_bytes": len(content) + 1024,
                         },
                         "upload_inventory": {
                             "status": "finalized",
@@ -183,9 +188,14 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                 and "cookie" not in request.headers
             )
             assert hosted.USER_TOKEN_HEADER not in request.headers
+            assert request.method == "PUT"
+            if terminal:
+                assert "content-range" not in request.headers
+                assert int(request.headers["content-length"]) == len(content)
+                assert request.headers["content-type"] == "text/plain"
             if storage_failure:
                 return httpx.Response(403)
-            if request.headers["content-range"].startswith("bytes */"):
+            if request.headers.get("content-range", "").startswith("bytes */"):
                 return httpx.Response(308)
             assert data == content
             return httpx.Response(200)
@@ -196,22 +206,53 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
             app = hosted.create_app(
                 CONFIG,
                 adapter_factory=lambda token: _adapter(
-                    token, requests, revoked, override, storage=storage_client
+                    token, requests, revoked, override, proof="workload-proof", storage=storage_client
                 ),
             )
             async with app.router.lifespan_context(app):
                 async with httpx.AsyncClient(
                     transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
                 ) as client:
-                    response = await _rpc(
-                        client,
-                        "tools/call",
-                        params={
-                            "name": "upload_files",
-                            "arguments": {"plan_id": "plan-1", "files": [attachment]},
-                        },
-                    )
-                    result = response.json()["result"]
+                    if terminal:
+                        path = tmp_path / "notes.txt"
+                        path.write_bytes(content)
+                        metadata = {"files": [{
+                            "filename": path.name,
+                            "content_type": "text/plain",
+                            "size": path.stat().st_size,
+                        }]}
+                        prepared = await _rpc(client, "tools/call", params={
+                            "name": "prepare_file_uploads",
+                            "arguments": {"plan_id": "plan-1", **metadata},
+                        })
+                        assert not prepared.json()["result"]["isError"], prepared.text
+                        manifest = prepared.json()["result"]["structuredContent"]
+                        # Simulate a terminal's ordinary HTTP client, with no
+                        # Lagniappe helper or MCP client credential on Storage.
+                        uploaded = await storage_client.put(
+                            manifest["uploads"][0]["session_url"],
+                            content=path.read_bytes(),
+                            headers={"Content-Type": metadata["files"][0]["content_type"]},
+                        )
+                        if storage_failure:
+                            assert uploaded.status_code == 403
+                            response = prepared
+                            result = {"isError": True}
+                        else:
+                            assert uploaded.status_code == 200
+                            response = await _rpc(client, "tools/call", params={
+                                "name": "finalize_file_uploads",
+                                "arguments": {key: manifest[key] for key in ("plan_id", "upload_batch_id")},
+                            })
+                            result = response.json()["result"]
+                    else:
+                        response = await _rpc(
+                            client, "tools/call", params={
+                                "name": "upload_files",
+                                "arguments": {"plan_id": "plan-1", "files": [attachment]},
+                            },
+                        )
+                        result = response.json()["result"]
                     assert result["isError"] is storage_failure, response.text
                     if not storage_failure:
                         value = result["structuredContent"]
@@ -228,14 +269,14 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                         assert declarations and not finalized
                     assert (
                         TOKEN_A not in response.text
-                        and session_url not in response.text
+                        and (terminal and storage_failure or session_url not in response.text)
                         and attachment["download_url"] not in response.text
                     )
-        assert (
-            storage_requests
-            and downloads
-            and all(not path.exists() for path in downloads)
-        )
+        assert storage_requests
+        if terminal:
+            assert len(storage_requests) == 1
+        else:
+            assert downloads and all(not path.exists() for path in downloads)
         paths = [path for _, path in requests]
         assert paths.count("/api/v1/plans/plan-1/uploads") == 1
         assert paths.count("/api/v1/plans/plan-1/uploads/finalize") == (

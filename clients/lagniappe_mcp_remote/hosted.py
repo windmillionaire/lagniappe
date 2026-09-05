@@ -38,6 +38,8 @@ from lagniappe_mcp.configuration import ConnectionConfig
 from lagniappe_mcp.errors import AdapterError, ConfigurationError
 from lagniappe_mcp.files import _preflight_contract, _preflight_requested_count
 from .hosted_files import spool_attachments
+from . import terminal_files
+from lagniappe_mcp.schema import validate_value
 from lagniappe_mcp.limits import (
     MAX_REQUEST_FRAME_BYTES,
     MAX_REQUEST_ID_BYTES,
@@ -272,7 +274,26 @@ class HostedAdapter(LagniappeAdapter):
             input_schema=schema,
             description="Upload files attached to this ChatGPT conversation into the existing Organize Plan, then finalize them. Reuse plan_id. Files are prepared for browser review and never applied automatically. If an attachment link expires, ask the user to reattach it.",
         )
+        self.tools.update({tool.name: tool for tool in terminal_files.tool_definitions(local)})
         self._remote_initialized = True
+
+    # @testable false
+    # @covered-by clients/lagniappe_mcp_remote/terminal_files.py::prepare_uploads
+    # @covered-by clients/lagniappe_mcp_remote/terminal_files.py::finalize_uploads
+    async def execute(self, name, arguments):
+        if name not in {"prepare_file_uploads", "finalize_file_uploads"}:
+            return await super().execute(name, arguments)
+        definition = self.tools[name]
+        validate_value(definition.input_schema, arguments, phase="input")
+        operation = terminal_files.prepare_uploads if name == "prepare_file_uploads" else terminal_files.finalize_uploads
+        result = await operation(self, arguments)
+        if name == "prepare_file_uploads":
+            terminal_files.validate_manifest(result.value, bearer=self.config.api_key)
+        else:
+            _reject_private_model_data(result.value, bearer=self.config.api_key)
+        validate_value(definition.output_schema, result.value, phase="output")
+        self._enforce_result_limits(result)
+        return result
 
     # @testable false
     # @covered-by clients/lagniappe_mcp_remote/hosted.py::HostedAdapter
@@ -353,7 +374,10 @@ def create_app(config, *, adapter_factory=None):
             client = adapter.rest.client
             proof = getattr(client, "workload_token", None)
             if proof:
-                _reject_private_model_data(result.value, bearer=proof)
+                if params.name == "prepare_file_uploads":
+                    terminal_files.validate_manifest(result.value, bearer=proof)
+                else:
+                    _reject_private_model_data(result.value, bearer=proof)
                 _reject_private_model_data(
                     tuple(item.data for item in result.media), bearer=proof
                 )

@@ -96,8 +96,8 @@ testing_ai_workflows/
       RUBRIC.md
       fixtures/
       artifacts/              # ignored, not deployed
-        baseline/mcp/
-        current/mcp/
+        baseline/
+        current/
 ```
 
 Track inspected/synthetic fixtures and reviewed result summaries, not raw chats,
@@ -113,12 +113,14 @@ It preserves the native JSONL/session-summary format; existing installations
 need no update. Load it only for the post-task export, not as part of the measured
 request. Pi sessions continue to use their own archive skill.
 
-Use separate artifact and latest-result entries for MCP, Pi/REST, native and
-email arms. After comparison, save its tracked note, update only selected
-case/arm summaries (including failures), archive the old local baseline without
-overwriting it, and promote reviewed current captures. Never clear the baseline
-before its replacement is reviewed, silently replace a failure with a retry, or
-require ignored local transcripts to exist in a fresh checkout/CI.
+Keep exactly one baseline and one current run per case, with files directly
+inside those folders. Identify MCP, Pi/REST, native and email arms in the result
+index and comparison notes. After comparison and requested rollover, update the
+selected case/arm summaries (including failures), establish retention or disposal
+of the older evidence, and replace the baseline with the reviewed current run.
+Leave current empty for the next run; do not add arm or archive subfolders.
+Never silently replace an unreviewed failure with a retry or require ignored
+local transcripts to exist in a fresh checkout/CI.
 
 Give the model only the natural request from `PROMPT.md`, not the rubric or
 change-observation notes. Launch in a neutral working copy of `fixtures/`
@@ -126,6 +128,10 @@ outside the application checkout: repository `AGENTS.md` would introduce coding
 instructions and a comparison confound. The existing Desktop fixture directories
 are retained for round 3; export back to the tracked library only after the
 task finishes. Use real copies rather than symlinks resolving into the checkout.
+The remote MCP pilot prefixes requests with `mcp:` to make transport selection
+explicit. Preserve that cue in the transcript and comparison controls; omit it
+for non-MCP arms and record the difference. Case 02 now specifies ratings 4 or
+5 directly instead of asking about a saved view unavailable through the MCP.
 Targeted notes should name a hoped-for improvement,
 a plausible regression, and an inconclusive/control-limited outcome. When
 several changes ship together, these observations help attribute results but

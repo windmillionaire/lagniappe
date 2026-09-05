@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Latest reviewed attempt per case/arm, including failures. Raw exports are local-only. Current captures are not promoted until comparison review.",
+  "description": "Latest reviewed attempt per case/arm, including failures. Raw exports are local-only. Each case keeps one flat baseline and one flat current run; client/transport identity stays in this index and comparison notes.",
   "measured_priority": [
     "semantic outcome",
     "model/tool rounds",
@@ -11,18 +11,21 @@
     "unit": "One preserved natural-prompt case per arm; case 05 includes its requested revision.",
     "model_tool_round": "One top-level recorded function_call or custom_tool_call; an exec may contain several parallel or sequential MCP calls.",
     "discovery_round": "Metadata-only ALL_TOOLS inspection, classified from recorded call input; included in model_tool_rounds.",
-    "wall_time": "Sum of first task prompt to final assistant answer per task turn; excludes between-turn idle time, includes in-turn retries/waits and steering.",
+    "wall_time": "Sum of first task prompt to final assistant answer per task turn (or abort timestamp for interrupted turns); excludes between-turn idle time, includes in-turn retries/waits and steering.",
     "tokens": "Sum token_usage_record payload.usage for task turns before first export request; uncached_input=input-cached; reasoning_output is included in output, not added twice.",
     "export": "Native transcript remains immutable; export request, export tools, and export-token usage excluded.",
     "call_count_limit": "No aggregate MCP or upstream HTTP count inferred from literal call-name occurrences; loops/batches and adapter-internal reads make them different measures.",
     "cost": null,
-    "confidence": "Single practical pair per case; combined changes and mutable workspace, not randomized attribution or a performance SLA."
+    "confidence": "Single practical pair per case; combined changes and mutable workspace, not randomized attribution or a performance SLA.",
+    "mcp_tool_seconds": "Sum recorded durations of unique completed Lagniappe McpToolCall items, including imported app calls/errors; parallel durations may overlap and may exclude approval waits. Not elapsed time or isolated network latency.",
+    "confirmed_uploaded_files": "Unique files confirmed in finalization/authoritative Plan inventory, not attempted HTTP requests; zero when no upload was attempted.",
+    "remote_arm": "codex-remote records this remote pilot separately from local mcp history. Per-case transport and mcp_routes identify imported ChatGPT-app exceptions; do not infer every call used direct Codex OAuth."
   },
   "cases": [
     {
       "id": "01-ask-known-page",
       "current_inputs": {
-        "prompt_sha256": "2d2b2a0c2ea0f0527c69c46b8343929effb5f13b601ef6e2ff89b7d52ec6f050",
+        "prompt_sha256": "3d35a44030b9c44e8317dd3c3d8842f70b6e2af6bce60f42863e3c0aa7c001b0",
         "fixtures": {}
       },
       "latest_results": {
@@ -30,10 +33,10 @@
           "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/01-ask-known-page/artifacts/current/mcp",
+          "artifacts": "cases/01-ask-known-page/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "f1e8178b04e1efaab0e500c73c95c0b606687eb3846cc4e30cdcaf8b5c397ef7",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/01-ask-known-page/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/01-ask-known-page/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -47,7 +50,7 @@
             "prompt_sha256": "2d2b2a0c2ea0f0527c69c46b8343929effb5f13b601ef6e2ff89b7d52ec6f050",
             "fixtures": {}
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "pass_with_caveats",
           "summary": "Grounded saved explanation; fewer discovery rounds but more local reads/searches. Supplemental Ownership details are not separately cited.",
           "caveats": [
@@ -81,13 +84,104 @@
             "reported_cost_usd": null
           },
           "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/01-ask-known-page/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "3589eb990d78466caf64c2ec109642100b7a260cab4f7cb487bd95943f1e244b",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/01-ask-known-page/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp_after_imported_app_errors",
+          "input_snapshot": {
+            "prompt_sha256": "3d35a44030b9c44e8317dd3c3d8842f70b6e2af6bce60f42863e3c0aa7c001b0",
+            "fixtures": {},
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "248fc6d65598b2b6c193192345f1a19edc065a5469964b75f380199dae3e59d7"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass_with_caveats",
+          "report_status": "complete",
+          "summary": "Grounded complete Ask with source link; final reply omits the saved-report link.",
+          "caveats": [
+            "Imported app start fails instructions pattern validation before four direct MCP calls succeed; full timing includes the approval/detour.",
+            "Final source link is present but the returned saved-answer link is absent."
+          ],
+          "metrics": {
+            "task_seconds": 80.037,
+            "elapsed_seconds_with_between_turn_gaps": 80.037,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 10,
+            "discovery_rounds": 5,
+            "usage": {
+              "input_tokens": 365343,
+              "cached_input_tokens": 327168,
+              "output_tokens": 1782,
+              "reasoning_output_tokens": 578,
+              "total_tokens": 367125,
+              "uncached_input_tokens": 38175
+            },
+            "mcp_calls": 5,
+            "mcp_failed_calls": 1,
+            "mcp_call_breakdown": {
+              "lagniappe_remote.start_ask": 1,
+              "start_ask": 1,
+              "search_entities": 1,
+              "get_entity": 1,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "codex_apps": 1,
+              "lagniappe-remote": 4
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 7.444,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 0
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 81,
+                "end_line": 84,
+                "seconds": 80.037,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              75
+            ],
+            "failed_mcp_call_lines": [
+              35
+            ]
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "02-ask-books-filter",
       "current_inputs": {
-        "prompt_sha256": "d1fa728e1baea1b11b521407e2e24ee14275738498dc37541b0169727740b024",
+        "prompt_sha256": "d289818302033e5025eb1ae194662a961dd66a8960a7d41021120b36c5715cb3",
         "fixtures": {}
       },
       "latest_results": {
@@ -95,10 +189,10 @@
           "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/02-ask-books-filter/artifacts/current/mcp",
+          "artifacts": "cases/02-ask-books-filter/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "09fc0b58008d4ca4192b57b6e6852492975b760c6fdbd53825fbfe60d1020cb5",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/02-ask-books-filter/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/02-ask-books-filter/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -112,7 +206,7 @@
             "prompt_sha256": "d1fa728e1baea1b11b521407e2e24ee14275738498dc37541b0169727740b024",
             "fixtures": {}
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "needs_fix",
           "summary": "Correct eight-book list and successful one-Plan recovery/submission; the saved-view definition is still asserted without evidence.",
           "caveats": [
@@ -150,13 +244,111 @@
             "reported_cost_usd": null
           },
           "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/02-ask-books-filter/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "c637488cccf17eb9b326f7ae6a6c4468df0219b4a590d25e9c0d85ed420f292d",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/02-ask-books-filter/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp",
+          "input_snapshot": {
+            "prompt_sha256": null,
+            "fixtures": {},
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "adf61e09fba70f7198adcfeedc30243e7c7e12a992ae7fc466d255159690ff63"
+              }
+            ]
+          },
+          "inputs_match_current_case": false,
+          "input_match_evidence": "Actual old saved-view question plus mcp: is preserved at archive line 9 and hashed here. Original old PROMPT.md bytes are not preserved; today’s revised explicit-4/5 request was not used.",
+          "outcome": "needs_fix",
+          "report_status": "complete",
+          "summary": "Correct eight-book list and one saved Ask; still asserts an unverified saved-view definition. Revised canonical prompt was not used.",
+          "caveats": [
+            "Actual message asks the old saved-view question plus mcp:, unlike the current explicit-4/5 prompt.",
+            "Both saved answer and final reply attribute the threshold to a saved view without retrieving its definition.",
+            "One complete query; no new Plan or duplicate query needed for output recovery."
+          ],
+          "metrics": {
+            "task_seconds": 61.951,
+            "elapsed_seconds_with_between_turn_gaps": 61.951,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 7,
+            "discovery_rounds": 2,
+            "usage": {
+              "input_tokens": 261526,
+              "cached_input_tokens": 226560,
+              "output_tokens": 2066,
+              "reasoning_output_tokens": 576,
+              "total_tokens": 263592,
+              "uncached_input_tokens": 34966
+            },
+            "mcp_calls": 8,
+            "mcp_failed_calls": 0,
+            "mcp_call_breakdown": {
+              "start_ask": 1,
+              "list_workspace_resources": 1,
+              "search_entities": 2,
+              "get_filter_schema": 1,
+              "get_category_details": 1,
+              "query_workspace_filter": 1,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "lagniappe-remote": 8
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 17.185,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 0
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 66,
+                "end_line": 69,
+                "seconds": 61.951,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              62
+            ],
+            "failed_mcp_call_lines": []
+          },
+          "outcome_basis": "Recorded case-rubric assessment; operator pilot acceptance is recorded separately and does not rewrite the evidence.",
+          "operator_disposition": {
+            "status": "deferred",
+            "reason": "Operator defers this case for now; no immediate rerun or saved-view tool requested.",
+            "required_follow_up": false,
+            "source": "Operator follow-up to September 5 comparison"
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot prompt explicitly asks for ratings 4 or 5 and no longer asks about a saved-view definition; it also adds the mcp: routing cue."
     },
     {
       "id": "03-create-personal-task",
       "current_inputs": {
-        "prompt_sha256": "3787c377b0a8678f634728fbe1f6eeb69f1e6892f2dbc430bd4682ad63470443",
+        "prompt_sha256": "56041b37aff2e192975b07bba99cb57fcb52f17ebb9d478a13ab6f189c46c350",
         "fixtures": {}
       },
       "latest_results": {
@@ -164,7 +356,7 @@
           "run_id": "mcp-round-2",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/03-create-personal-task/artifacts/baseline/mcp",
+          "artifacts": "cases/03-create-personal-task/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "2ae371092d21eee31a82555f68b82288a0ee5ab54734942865c3b6814cf11f79",
           "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/03-create-personal-task/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
@@ -181,7 +373,7 @@
             "prompt_sha256": "3787c377b0a8678f634728fbe1f6eeb69f1e6892f2dbc430bd4682ad63470443",
             "fixtures": {}
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "pass",
           "summary": "Correct one-time personal reminder, no invalid schedule or submission repair.",
           "caveats": [
@@ -204,13 +396,96 @@
             "api_requests": null,
             "reported_cost_usd": null
           }
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/03-create-personal-task/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "323252e3a2b37c9777f2a7ff0406687c81b1ba9014f7b6983dc3b8bdcc9f26c4",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/03-create-personal-task/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp",
+          "input_snapshot": {
+            "prompt_sha256": "56041b37aff2e192975b07bba99cb57fcb52f17ebb9d478a13ab6f189c46c350",
+            "fixtures": {},
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "e51f0bb1ebbd8d48ceb6209fde2129a45010d480a4f8d162774cbf7539e5bb5f"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass",
+          "report_status": "ready",
+          "summary": "One open personal reminder due October 15 at 17:00 America/Los_Angeles, without recurrence.",
+          "caveats": [],
+          "metrics": {
+            "task_seconds": 39.668,
+            "elapsed_seconds_with_between_turn_gaps": 39.668,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 5,
+            "discovery_rounds": 2,
+            "usage": {
+              "input_tokens": 192129,
+              "cached_input_tokens": 164608,
+              "output_tokens": 906,
+              "reasoning_output_tokens": 268,
+              "total_tokens": 193035,
+              "uncached_input_tokens": 27521
+            },
+            "mcp_calls": 3,
+            "mcp_failed_calls": 0,
+            "mcp_call_breakdown": {
+              "start_create": 1,
+              "get_guidelines": 1,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "lagniappe-remote": 3
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 4.351,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 0
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 49,
+                "end_line": 52,
+                "seconds": 39.668,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              43
+            ],
+            "failed_mcp_call_lines": []
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "04-create-related-records",
       "current_inputs": {
-        "prompt_sha256": "56b5897ca7703a6584860505ec6a4f3f6d27964839a7f9836a7b35b8cb0bafc9",
+        "prompt_sha256": "2f93ea36e96a45fc1addd2f370e7d5e8eb7cd4e3f24cd397141e7ad907dad915",
         "fixtures": {}
       },
       "latest_results": {
@@ -218,7 +493,7 @@
           "run_id": "mcp-round-2",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/04-create-related-records/artifacts/baseline/mcp",
+          "artifacts": "cases/04-create-related-records/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "6ab9c2be528d2cb19c7d8e51cb7435e7690ade5ae187ca6ae05f915a3581f84a",
           "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/04-create-related-records/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
@@ -235,7 +510,7 @@
             "prompt_sha256": "56b5897ca7703a6584860505ec6a4f3f6d27964839a7f9836a7b35b8cb0bafc9",
             "fixtures": {}
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "pass_with_interruption",
           "summary": "Correct related records and one-time task; three rate-limited starts inflate raw time/rounds.",
           "caveats": [
@@ -259,13 +534,102 @@
             "api_requests": null,
             "reported_cost_usd": null
           }
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/04-create-related-records/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "1b668f68633b09dae66da0183ad0f5a9d66626c65c1f20d8b3ee53d8c49d19b5",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/04-create-related-records/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "imported_chatgpt_app",
+          "input_snapshot": {
+            "prompt_sha256": "2f93ea36e96a45fc1addd2f370e7d5e8eb7cd4e3f24cd397141e7ad907dad915",
+            "fixtures": {},
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "2a8aec817c39c44067658ae46b306c7c7d8e3641aed9d98c9e454804ba84642f"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass_with_caveats",
+          "report_status": "ready",
+          "summary": "Correct Form/Category/Page/Task graph and dates, entirely through the imported app connector.",
+          "caveats": [
+            "No direct lagniappe-remote calls: this current case does not establish direct Codex OAuth transport parity.",
+            "After instructions pattern rejection, app start uses dummy instructions x; the detailed proposal still contains the requested job.",
+            "Local baseline contains three rate-limit 429s, inflating its time."
+          ],
+          "metrics": {
+            "task_seconds": 73.74,
+            "elapsed_seconds_with_between_turn_gaps": 73.74,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 7,
+            "discovery_rounds": 3,
+            "usage": {
+              "input_tokens": 265985,
+              "cached_input_tokens": 228736,
+              "output_tokens": 2088,
+              "reasoning_output_tokens": 540,
+              "total_tokens": 268073,
+              "uncached_input_tokens": 37249
+            },
+            "mcp_calls": 7,
+            "mcp_failed_calls": 1,
+            "mcp_call_breakdown": {
+              "lagniappe_remote.start_create": 2,
+              "lagniappe_remote.get_guidelines": 4,
+              "lagniappe_remote.submit_plan": 1
+            },
+            "mcp_routes": {
+              "codex_apps": 7
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 19.626,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 0
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 67,
+                "end_line": 70,
+                "seconds": 73.74,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              61
+            ],
+            "failed_mcp_call_lines": [
+              35
+            ]
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "05-revise-ready-create-plan",
       "current_inputs": {
-        "prompt_sha256": "fc736297ca21954ad25b96da78e01799c1a50b6b116764e064ddce344105bdd1",
+        "prompt_sha256": "69f2891823be8300dd38bbd80a4cda3aff25f020945321fa091aa44ab4810b2e",
         "fixtures": {}
       },
       "latest_results": {
@@ -273,7 +637,7 @@
           "run_id": "mcp-round-2",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/05-revise-ready-create-plan/artifacts/baseline/mcp",
+          "artifacts": "cases/05-revise-ready-create-plan/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "66bf12a6c199500091b847781ebc04f23367e10549ac471f4c5818a6ac81b5f6",
           "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/05-revise-ready-create-plan/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
@@ -315,13 +679,110 @@
             "api_requests": null,
             "reported_cost_usd": null
           }
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/05-revise-ready-create-plan/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "fd16f2fe55566c435d2016c0ce4f7d700452664fd626691a9da779cbf4871f1b",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/05-revise-ready-create-plan/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp",
+          "input_snapshot": {
+            "prompt_sha256": "69f2891823be8300dd38bbd80a4cda3aff25f020945321fa091aa44ab4810b2e",
+            "fixtures": {},
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "32cbc06fbbf2d36200a7eaee251cd12864a74d5417adc18f7d76b7e5038be2b4"
+              },
+              {
+                "archive_line": 43,
+                "utf8_sha256": "64ba4b3621bb9fb6b7ef830f682a3e95c5705129fa7fc8eff0ccc75ceac62233"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass",
+          "report_status": "ready",
+          "summary": "Revises the same ready Plan: retains October 23 confirmation task and changes only order deadline from October 26 to 28.",
+          "caveats": [
+            "41.378 seconds sums two task turns; 61.087 seconds includes the user pause.",
+            "Historical local first message needed Lagniappe steering; current canonical messages explicitly name it and use mcp:."
+          ],
+          "metrics": {
+            "task_seconds": 41.378,
+            "elapsed_seconds_with_between_turn_gaps": 61.087,
+            "task_turns": 2,
+            "aborted_turns": 0,
+            "model_tool_rounds": 4,
+            "discovery_rounds": 1,
+            "usage": {
+              "input_tokens": 194353,
+              "cached_input_tokens": 166656,
+              "output_tokens": 1498,
+              "reasoning_output_tokens": 205,
+              "total_tokens": 195851,
+              "uncached_input_tokens": 27697
+            },
+            "mcp_calls": 3,
+            "mcp_failed_calls": 0,
+            "mcp_call_breakdown": {
+              "start_create": 1,
+              "submit_plan": 2
+            },
+            "mcp_routes": {
+              "lagniappe-remote": 3
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 5.513,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 0
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 36,
+                "end_line": 39,
+                "seconds": 25.995,
+                "aborted": false
+              },
+              {
+                "start_line": 43,
+                "answer_line": 55,
+                "end_line": 58,
+                "seconds": 15.383,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              30,
+              51
+            ],
+            "failed_mcp_call_lines": []
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "06-organize-vcard",
       "current_inputs": {
-        "prompt_sha256": "fba8fadd2c2968abf06ca86cc79412ce5d957cb0f17aacab8658fc12ed2569e9",
+        "prompt_sha256": "c1f9f95511bf75a82055bf50e399b2d2d3c19f0ab6bf9d9c3b835c24ad90a2f8",
         "fixtures": {
           "mara-ellison.vcf": "c3a6a692f005a3cc89fc23aa3f3e7ac44685da88723907286ca19318c236f9ac"
         }
@@ -331,7 +792,7 @@
           "run_id": "mcp-round-2",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/06-organize-vcard/artifacts/baseline/mcp",
+          "artifacts": "cases/06-organize-vcard/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "d36be695dec945f40624cb8890ce1b96fd17951f9296127b934b96e40151978f",
           "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/06-organize-vcard/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
@@ -350,7 +811,7 @@
               "mara-ellison.vcf": "c3a6a692f005a3cc89fc23aa3f3e7ac44685da88723907286ca19318c236f9ac"
             }
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "pass_with_mapping_tradeoff",
           "summary": "Complete contact evidence, attachment and useful follow-up preserved; work address is in prose, not Home Address field.",
           "caveats": [
@@ -374,13 +835,108 @@
             "api_requests": null,
             "reported_cost_usd": null
           }
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/06-organize-vcard/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "b3848f43efbbfe86486b8a1046ef156e43e1abca7c48d04c4c8c52eae3457e71",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/06-organize-vcard/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp",
+          "input_snapshot": {
+            "prompt_sha256": "c1f9f95511bf75a82055bf50e399b2d2d3c19f0ab6bf9d9c3b835c24ad90a2f8",
+            "fixtures": {
+              "mara-ellison.vcf": "c3a6a692f005a3cc89fc23aa3f3e7ac44685da88723907286ca19318c236f9ac"
+            },
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "170f6c82f7e1f9c4b38edc01148ae1784884386e4a9a5a3101988b9087fdb698"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass_with_caveats",
+          "report_status": "ready",
+          "summary": "Direct upload preserves the vCard on a Contacts/Person Page with grounded fields, summary and an open follow-up.",
+          "caveats": [
+            "Reminder chooses October 5 while retaining the source week-of language.",
+            "Existing Relationships/Networking/Follow-up mapping is reasonable variance.",
+            "Structured phone drops the leading plus; original file and summary retain it.",
+            "Local full-file inspection supplies evidence; this is not a test of remote get_file content delivery."
+          ],
+          "metrics": {
+            "task_seconds": 101.698,
+            "elapsed_seconds_with_between_turn_gaps": 101.698,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 11,
+            "discovery_rounds": 0,
+            "usage": {
+              "input_tokens": 446684,
+              "cached_input_tokens": 402944,
+              "output_tokens": 3714,
+              "reasoning_output_tokens": 1168,
+              "total_tokens": 450398,
+              "uncached_input_tokens": 43740
+            },
+            "mcp_calls": 10,
+            "mcp_failed_calls": 0,
+            "mcp_call_breakdown": {
+              "start_organize": 1,
+              "prepare_file_uploads": 1,
+              "finalize_file_uploads": 1,
+              "search_entities": 1,
+              "list_workspace_resources": 1,
+              "get_schema": 2,
+              "get_guidelines": 2,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "lagniappe-remote": 10
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 17.893,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 1
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 98,
+                "end_line": 101,
+                "seconds": 101.698,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              92
+            ],
+            "failed_mcp_call_lines": []
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "07-organize-bug-screenshot",
       "current_inputs": {
-        "prompt_sha256": "b72c52c157b05719a658957b799cc50ab10dad63b65042d591ccef3679b5ccb4",
+        "prompt_sha256": "257526216c7d433cccee9d45507a8190610e9103958ec8aeee36b79e6b1fa3f1",
         "fixtures": {
           "report-status-notification-mismatch.png": "af19e6daca77a3b512c3aa10b5541be58e04f221e65aae0c937a3066f82727d5"
         }
@@ -390,7 +946,7 @@
           "run_id": "mcp-round-2",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/07-organize-bug-screenshot/artifacts/baseline/mcp",
+          "artifacts": "cases/07-organize-bug-screenshot/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "36aa5f4f818a1ce6a3120f6f767e3f8dc134b16e5a0752edef13994e05c4329c",
           "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/07-organize-bug-screenshot/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
@@ -409,7 +965,7 @@
               "report-status-notification-mismatch.png": "af19e6daca77a3b512c3aa10b5541be58e04f221e65aae0c937a3066f82727d5"
             }
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "pass",
           "summary": "Correct existing issue, preserved repro steps plus requested addition and attachment.",
           "caveats": [
@@ -434,13 +990,116 @@
             "api_requests": null,
             "reported_cost_usd": null
           }
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/07-organize-bug-screenshot/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "f55d25dcae2b0bcd6b5ce6ca4392cdd987ab19b5f0d3cf08b1f2dd46800996fc",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/07-organize-bug-screenshot/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp",
+          "input_snapshot": {
+            "prompt_sha256": "257526216c7d433cccee9d45507a8190610e9103958ec8aeee36b79e6b1fa3f1",
+            "fixtures": {
+              "report-status-notification-mismatch.png": "af19e6daca77a3b512c3aa10b5541be58e04f221e65aae0c937a3066f82727d5"
+            },
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "581e68304f4d25252cce36ee6f90c2997d64e545ed5b6660935325af254b6684"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass_with_caveats",
+          "report_status": "ready",
+          "summary": "Uploads screenshot and targets the correct existing issue; repairs a field-update 422 and submits ready.",
+          "caveats": [
+            "Additional user routing instruction, local/browser discovery and sandbox network retry remain in measured time.",
+            "First update lacks per-update target references; second supplies them.",
+            "Current retrieved issue has no To Reproduce value, so preservation of an existing populated repro field is not demonstrated.",
+            "Completion and unrelated status fields are not changed; browser attempt and additional search after submission add work."
+          ],
+          "metrics": {
+            "task_seconds": 144.341,
+            "elapsed_seconds_with_between_turn_gaps": 144.341,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 21,
+            "discovery_rounds": 6,
+            "usage": {
+              "input_tokens": 844221,
+              "cached_input_tokens": 788352,
+              "output_tokens": 4787,
+              "reasoning_output_tokens": 1333,
+              "total_tokens": 849008,
+              "uncached_input_tokens": 55869
+            },
+            "mcp_calls": 10,
+            "mcp_failed_calls": 1,
+            "mcp_call_breakdown": {
+              "start_organize": 1,
+              "search_entities": 2,
+              "prepare_file_uploads": 1,
+              "finalize_file_uploads": 1,
+              "get_entity": 1,
+              "get_guidelines": 2,
+              "submit_plan": 2
+            },
+            "mcp_routes": {
+              "lagniappe-remote": 10
+            },
+            "mcp_other_calls": {
+              "cua_repl/js": 2
+            },
+            "mcp_tool_seconds": 16.882,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 1
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 166,
+                "end_line": 169,
+                "seconds": 144.341,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [
+              {
+                "archive_line": 53,
+                "text": "use the lagniappe mcp"
+              }
+            ],
+            "accepted_submission_lines": [
+              144
+            ],
+            "failed_mcp_call_lines": [
+              137
+            ]
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "08-organize-mixed-files",
       "current_inputs": {
-        "prompt_sha256": "bf70ec2f8d1c17b5dab7a37e361aa7d2ef74379abf5495c5bc9b96076066ce37",
+        "prompt_sha256": "be1e33ae7dbb159778041e015c810afeabbefcd3d9e4520ab2013798edbe812b",
         "fixtures": {
           "east-walk-site-log.md": "18208233a75356d67218823795f5be3338534ab6b67cb78ee12dad2d044dc1a9",
           "equipment-maintenance-note.json": "a03c7ce4cc8b6d2e68995e4270e844f3ba8116468de03d456114680c3950b4f6",
@@ -454,10 +1113,10 @@
           "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/08-organize-mixed-files/artifacts/current/mcp",
+          "artifacts": "cases/08-organize-mixed-files/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "414ee833334d54ed23c1a7bb932022d9682017046b145f503679c24eb318603b",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/08-organize-mixed-files/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/08-organize-mixed-files/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -477,7 +1136,7 @@
               "watershed-grant-decision.json": "d6504d3aba14bd9b2b81aaf8d41c90929b60696265eb4d99f2fcca82d4c31c4d"
             }
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "pass_with_caveats",
           "summary": "All five files preserved; completed service grouped, open gasket task reuses existing model/Form, drainage remains planning. Filename searches removed; repeat detail/local reads remain.",
           "caveats": [
@@ -520,13 +1179,126 @@
             "reported_cost_usd": null
           },
           "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/08-organize-mixed-files/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "f8b93ad08615fb30b364623ecdf59d94d8fe5919036b56e661b44a0ff89d3884",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/08-organize-mixed-files/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp",
+          "input_snapshot": {
+            "prompt_sha256": "be1e33ae7dbb159778041e015c810afeabbefcd3d9e4520ab2013798edbe812b",
+            "fixtures": {
+              "east-walk-site-log.md": "18208233a75356d67218823795f5be3338534ab6b67cb78ee12dad2d044dc1a9",
+              "equipment-maintenance-note.json": "a03c7ce4cc8b6d2e68995e4270e844f3ba8116468de03d456114680c3950b4f6",
+              "heating-service-receipt.md": "0f0ae3653574d583ae1593a4b720e15c846a36f692bfabfa35b34062bf172468",
+              "service-accounting-export.txt": "6d5c75d78703394bb169d8a1af2ff5b0760c0879599339c08029e2ce622ff4d4",
+              "watershed-grant-decision.json": "d6504d3aba14bd9b2b81aaf8d41c90929b60696265eb4d99f2fcca82d4c31c4d"
+            },
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "b0992fcab1124e10d748f7b2f5815727ac168fd63fbad88a16c93b8975aab607"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "needs_fix",
+          "report_status": "ready",
+          "summary": "All five files survive upload and ambiguous-finalization recovery; partial source reading loses Willow Court Rain Garden naming and late evidence.",
+          "caveats": [
+            "Reads only first 240 of 456 log lines, never retrieves the tail; final filing decision is at fixture lines 451–456.",
+            "Uses East Walk Drainage and summarizes through July 14 instead of the final Willow Court Rain Garden/planning decision.",
+            "finalize_file_uploads returns upload_finalization_unknown; get_plan_contract confirms all five finalized files and the same Plan is submitted.",
+            "The archive does not establish the cause of missing finalization confirmation.",
+            "Correct existing completed Boiler occurrence, separate open gasket work and conditional future grant are retained.",
+            "Generic gasket task loses the useful repair Form structure present in local round 3.",
+            "Shorter elapsed time is not an equal-quality improvement."
+          ],
+          "metrics": {
+            "task_seconds": 184.583,
+            "elapsed_seconds_with_between_turn_gaps": 184.583,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 15,
+            "discovery_rounds": 2,
+            "usage": {
+              "input_tokens": 689846,
+              "cached_input_tokens": 635776,
+              "output_tokens": 6913,
+              "reasoning_output_tokens": 1938,
+              "total_tokens": 696759,
+              "uncached_input_tokens": 54070
+            },
+            "mcp_calls": 16,
+            "mcp_failed_calls": 1,
+            "mcp_call_breakdown": {
+              "start_organize": 1,
+              "prepare_file_uploads": 1,
+              "finalize_file_uploads": 1,
+              "get_plan_contract": 1,
+              "search_entities": 5,
+              "get_page_details": 1,
+              "get_entity": 2,
+              "get_task_history": 1,
+              "get_guidelines": 2,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "lagniappe-remote": 16
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 35.571,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 5
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 134,
+                "end_line": 137,
+                "seconds": 184.583,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              128
+            ],
+            "failed_mcp_call_lines": [
+              71
+            ]
+          },
+          "outcome_basis": "Recorded case-rubric assessment; operator pilot acceptance is recorded separately and does not rewrite the evidence.",
+          "operator_disposition": {
+            "status": "accepted_with_caveats",
+            "reason": "Broadly useful result accepted for the pilot; isolated nondeterministic model choices do not justify accumulating specific rules.",
+            "required_follow_up": false,
+            "source": "Operator follow-up to September 5 comparison"
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "09-create-project",
       "current_inputs": {
-        "prompt_sha256": "d7c1bfd30fee0c09b6ff728ff06c7d8f845f5006f45e6935dedbd41d88030bf3",
+        "prompt_sha256": "ec772845501f1fa03ca53cc8d8adc5c48511d1ca3d04a9b49cfa78151c9a81af",
         "fixtures": {}
       },
       "latest_results": {
@@ -534,10 +1306,10 @@
           "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/09-create-project/artifacts/current/mcp",
+          "artifacts": "cases/09-create-project/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "9e882e9a9f33b4c25ccdffc3153b38493ac03a2d9e3d49125b42e08cff7dd723",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/09-create-project/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/09-create-project/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -551,7 +1323,7 @@
             "prompt_sha256": "d7c1bfd30fee0c09b6ff728ff06c7d8f845f5006f45e6935dedbd41d88030bf3",
             "fixtures": {}
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "pass",
           "summary": "Correct Project/Form/two-model-Task graph; required attention question now has explicit Yes/No radio values and no immediate Tasks.",
           "caveats": [
@@ -584,13 +1356,105 @@
             "reported_cost_usd": null
           },
           "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/09-create-project/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "3bc6f46358732d90d9bbf7adf9657b39efd5e87a40438cda5b4d1243ae6c8af2",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/09-create-project/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp_after_imported_app_errors",
+          "input_snapshot": {
+            "prompt_sha256": "ec772845501f1fa03ca53cc8d8adc5c48511d1ca3d04a9b49cfa78151c9a81af",
+            "fixtures": {},
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "d524e9ea539ddfb768159e0bacfe8a3670a68f41f2fe47607317925f519478ee"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass_with_caveats",
+          "report_status": "ready",
+          "summary": "Correct Project, Form and two reusable work types; required Yes/No choice remains usable for negative answers.",
+          "caveats": [
+            "Two app instructions-pattern errors before switching to direct MCP.",
+            "Schema checked in submitted JSON; future form completion is not exercised."
+          ],
+          "metrics": {
+            "task_seconds": 61.951,
+            "elapsed_seconds_with_between_turn_gaps": 61.951,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 10,
+            "discovery_rounds": 5,
+            "usage": {
+              "input_tokens": 415074,
+              "cached_input_tokens": 367744,
+              "output_tokens": 2050,
+              "reasoning_output_tokens": 544,
+              "total_tokens": 417124,
+              "uncached_input_tokens": 47330
+            },
+            "mcp_calls": 8,
+            "mcp_failed_calls": 2,
+            "mcp_call_breakdown": {
+              "lagniappe_remote.start_create": 2,
+              "start_create": 1,
+              "list_workspace_resources": 1,
+              "get_guidelines": 3,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "codex_apps": 2,
+              "lagniappe-remote": 6
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 16.985,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 0
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 86,
+                "end_line": 89,
+                "seconds": 61.951,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              80
+            ],
+            "failed_mcp_call_lines": [
+              35,
+              42
+            ]
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "10-create-recurring-reminder",
       "current_inputs": {
-        "prompt_sha256": "a2cea3adb96b4b75f89893105fe1b94f5fea7ee9655cc5a8fffb56a152ccdfd0",
+        "prompt_sha256": "ba1f86417af7b02a67ee8d726505c554547f9fcfd8d986a5c393794e19877e42",
         "fixtures": {}
       },
       "latest_results": {
@@ -598,7 +1462,7 @@
           "run_id": "mcp-round-2",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/10-create-recurring-reminder/artifacts/baseline/mcp",
+          "artifacts": "cases/10-create-recurring-reminder/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "c5e824202b00736a050fd5efdc1278532b23f8bdc3043e24bbee536fda306a5e",
           "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/10-create-recurring-reminder/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
@@ -615,7 +1479,7 @@
             "prompt_sha256": "a2cea3adb96b4b75f89893105fe1b94f5fea7ee9655cc5a8fffb56a152ccdfd0",
             "fixtures": {}
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "pass",
           "summary": "Correct initial date and three-week after-completion recurrence, first submission accepted.",
           "caveats": [
@@ -639,13 +1503,102 @@
             "api_requests": null,
             "reported_cost_usd": null
           }
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/10-create-recurring-reminder/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "fc58bc2ada6eb1d95aa9ba6fdc965acb8964e9b4b0d54aa3237c8a584e15c28a",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/10-create-recurring-reminder/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp_after_imported_app_errors",
+          "input_snapshot": {
+            "prompt_sha256": "ba1f86417af7b02a67ee8d726505c554547f9fcfd8d986a5c393794e19877e42",
+            "fixtures": {},
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "bcef952ed9fe39963e851821799a35e2a17601974d284b5c1885cfc94be59f46"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass_with_caveats",
+          "report_status": "ready",
+          "summary": "Correct open personal reminder due October 12, repeating three weeks after completion.",
+          "caveats": [
+            "One imported-app instructions-pattern error precedes two direct MCP calls.",
+            "Proposal schedule checked; future execution/recurrence is not exercised."
+          ],
+          "metrics": {
+            "task_seconds": 29.376,
+            "elapsed_seconds_with_between_turn_gaps": 29.376,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 5,
+            "discovery_rounds": 2,
+            "usage": {
+              "input_tokens": 179691,
+              "cached_input_tokens": 141568,
+              "output_tokens": 1059,
+              "reasoning_output_tokens": 362,
+              "total_tokens": 180750,
+              "uncached_input_tokens": 38123
+            },
+            "mcp_calls": 3,
+            "mcp_failed_calls": 1,
+            "mcp_call_breakdown": {
+              "lagniappe_remote.start_create": 1,
+              "start_create": 1,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "codex_apps": 1,
+              "lagniappe-remote": 2
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 3.349,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 0
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 49,
+                "end_line": 52,
+                "seconds": 29.376,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              43
+            ],
+            "failed_mcp_call_lines": [
+              29
+            ]
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "11-ask-approximate-issue",
       "current_inputs": {
-        "prompt_sha256": "2150047dd71a84631176d896adcbfaa268825c15fc3c2094612747703b26ed10",
+        "prompt_sha256": "7c2601ff55154eae826e57e96dce705a6f00166a3da357663ea8d399d3bf9e15",
         "fixtures": {}
       },
       "latest_results": {
@@ -653,10 +1606,10 @@
           "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/11-ask-approximate-issue/artifacts/current/mcp",
+          "artifacts": "cases/11-ask-approximate-issue/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "77088608e3601ea3a7a2795d7ceef0fb495187dd76eadadc95aecb1ba2b485cd",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/11-ask-approximate-issue/artifacts/current/mcp/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/11-ask-approximate-issue/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -670,7 +1623,7 @@
             "prompt_sha256": "2150047dd71a84631176d896adcbfaa268825c15fc3c2094612747703b26ed10",
             "fixtures": {}
           },
-          "inputs_match_current_case": true,
+          "inputs_match_current_case": false,
           "outcome": "pass",
           "summary": "Same grounded completed-issue answer is persisted; discovery halves and rounds plus all input/output measures improve.",
           "caveats": [
@@ -703,13 +1656,124 @@
             "reported_cost_usd": null
           },
           "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/11-ask-approximate-issue/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "e2171de84986dad57e8afea46473819110373688b56dce4d870305a82e38a365",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/11-ask-approximate-issue/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp",
+          "input_snapshot": {
+            "prompt_sha256": "7c2601ff55154eae826e57e96dce705a6f00166a3da357663ea8d399d3bf9e15",
+            "fixtures": {},
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "63e5b6b6bc4b8e1c8b4657586bcb85f375047981c669ba7b13c6b2d5e8ce1147"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass_with_caveats",
+          "report_status": "complete",
+          "summary": "Correct grounded issue status and saved/source links after routing steering and an interrupted first turn.",
+          "caveats": [
+            "77.937 seconds includes 30.581 seconds aborted work and 47.356 seconds after go ahead; full span is 81.174 seconds.",
+            "Two user routing corrections plus resource/browser/local discovery; four useful direct calls match the baseline."
+          ],
+          "metrics": {
+            "task_seconds": 77.937,
+            "elapsed_seconds_with_between_turn_gaps": 81.174,
+            "task_turns": 2,
+            "aborted_turns": 1,
+            "model_tool_rounds": 14,
+            "discovery_rounds": 5,
+            "usage": {
+              "input_tokens": 676850,
+              "cached_input_tokens": 614016,
+              "output_tokens": 2122,
+              "reasoning_output_tokens": 670,
+              "total_tokens": 678972,
+              "uncached_input_tokens": 62834
+            },
+            "mcp_calls": 4,
+            "mcp_failed_calls": 0,
+            "mcp_call_breakdown": {
+              "start_ask": 1,
+              "search_entities": 1,
+              "get_entity": 1,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "lagniappe-remote": 4
+            },
+            "mcp_other_calls": {
+              "codex/list_mcp_resource_templates": 1,
+              "codex/list_mcp_resources": 1,
+              "cua_repl/js": 1
+            },
+            "mcp_tool_seconds": 6.488,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 0
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": null,
+                "end_line": 75,
+                "seconds": 30.581,
+                "aborted": true
+              },
+              {
+                "start_line": 79,
+                "answer_line": 124,
+                "end_line": 127,
+                "seconds": 47.356,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [
+              {
+                "archive_line": 53,
+                "text": "in lagniappe"
+              },
+              {
+                "archive_line": 71,
+                "text": "no the lagniappe mcp"
+              },
+              {
+                "archive_line": 79,
+                "text": "go ahead"
+              }
+            ],
+            "accepted_submission_lines": [
+              120
+            ],
+            "failed_mcp_call_lines": []
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "12-create-page-from-documents",
       "current_inputs": {
-        "prompt_sha256": "f810f5775d78fab9bb84f9791823957c4a8381b11caca782eeaef484363976a1",
+        "prompt_sha256": "50c35073c81e3a9d6e49a0c9372ad412c242838180571dbd11bc0185d3df003b",
         "fixtures": {
           "cider-press-purchase-receipt.md": "e4cfa7f6f44142c5d5c257eb9d7da7c2665e9a639436695f42891f51281a4de7",
           "cider-press-setup-checklist.md": "24c3e77ed03e58cbb74bb4db2be01afdc2b189d23290614872544c725f802eb1",
@@ -721,7 +1785,7 @@
           "run_id": "file-use-after-2026-09-03",
           "reviewed": true,
           "run_date_utc": "2026-09-03",
-          "artifacts": "cases/12-create-page-from-documents/artifacts/baseline/pi-rest",
+          "artifacts": "cases/12-create-page-from-documents/artifacts/baseline",
           "archive_file": "transcript.jsonl",
           "archive_sha256": "4750842db179659d5f2c884e35a7809d5bf5be9c8e1c758abc94d831ec258aea",
           "source_local": "/home/swifty/Desktop/FILE_USE_AI_TEST/file-use-ai-after/02-page-from-documents/artifacts/transcript.jsonl",
@@ -763,13 +1827,109 @@
             "reported_cost_usd": 0.347
           },
           "measurement_source": "Preserved RESULTS.md and SESSION.txt; prompt/final timestamps checked against native Pi export."
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/12-create-page-from-documents/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "b85c63f2206ad8963f2beaa974c41a0a4ad9a8c0c241fff6bf7f95a0b727beac",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/12-create-page-from-documents/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp",
+          "input_snapshot": {
+            "prompt_sha256": "50c35073c81e3a9d6e49a0c9372ad412c242838180571dbd11bc0185d3df003b",
+            "fixtures": {
+              "cider-press-purchase-receipt.md": "e4cfa7f6f44142c5d5c257eb9d7da7c2665e9a639436695f42891f51281a4de7",
+              "cider-press-setup-checklist.md": "24c3e77ed03e58cbb74bb4db2be01afdc2b189d23290614872544c725f802eb1",
+              "cider-press-warranty-card.md": "2a4f1b8001d9d6d63f3604ee4b456bbd9ea5810b3e0a0882b0412816eeba7cc9"
+            },
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "edd676bae6de86ed1f45901c42011a93c628a5173f728ad66886b65714f29709"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "pass",
+          "report_status": "ready",
+          "summary": "One cider-press Home/Appliance Page, all three source attachments/summaries and grounded purchase/warranty fields; setup remains instructions.",
+          "caveats": [
+            "Historical baseline is Pi/OpenRouter/kimi-k3/high with a revised prompt; exclude from local MCP aggregate.",
+            "Three ordinary local-file HTTP uploads; no special Lagniappe uploader used."
+          ],
+          "metrics": {
+            "task_seconds": 147.47,
+            "elapsed_seconds_with_between_turn_gaps": 147.47,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 14,
+            "discovery_rounds": 2,
+            "usage": {
+              "input_tokens": 678590,
+              "cached_input_tokens": 615552,
+              "output_tokens": 5269,
+              "reasoning_output_tokens": 1568,
+              "total_tokens": 683859,
+              "uncached_input_tokens": 63038
+            },
+            "mcp_calls": 10,
+            "mcp_failed_calls": 0,
+            "mcp_call_breakdown": {
+              "start_organize": 1,
+              "prepare_file_uploads": 1,
+              "finalize_file_uploads": 1,
+              "list_workspace_resources": 1,
+              "search_entities": 1,
+              "get_category_pages": 1,
+              "get_schema": 1,
+              "get_guidelines": 2,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "lagniappe-remote": 10
+            },
+            "mcp_other_calls": {},
+            "mcp_tool_seconds": 21.79,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 3
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 121,
+                "end_line": 124,
+                "seconds": 147.47,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              115
+            ],
+            "failed_mcp_call_lines": []
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     },
     {
       "id": "13-create-one-task-from-note",
       "current_inputs": {
-        "prompt_sha256": "ee3d2e433e1b5ebe03d07c9148c354ebdc6572ceab048ba62450a9a92c56409d",
+        "prompt_sha256": "fb501511c7c52e53aaae5de4776d69cc78fc194f7674058ac4d22fcb849a8f1e",
         "fixtures": {
           "hive-inspection-note.md": "c825099827e3eaae863d0926b0ed7051dfb7a5cd3da8ce43b7254f32d72233d9"
         }
@@ -779,7 +1939,7 @@
           "run_id": "file-use-after-2026-09-03",
           "reviewed": true,
           "run_date_utc": "2026-09-03",
-          "artifacts": "cases/13-create-one-task-from-note/artifacts/baseline/pi-rest",
+          "artifacts": "cases/13-create-one-task-from-note/artifacts/baseline",
           "archive_file": "archive.jsonl",
           "archive_sha256": "fdd33e4c4184ff24deb644440c64d23df0c18ba1a2e6716b61cf7fda8e6abfd7",
           "source_local": "/home/swifty/Desktop/FILE_USE_AI_TEST/file-use-ai-after/05-apiary-task-create/artifacts/archive.jsonl",
@@ -822,8 +1982,109 @@
             "reported_cost_usd": 0.275
           },
           "measurement_source": "Preserved RESULTS.md and SESSION.txt; prompt/final timestamps checked against native Pi export."
+        },
+        "codex-remote": {
+          "run_id": "remote-mcp-pilot-20260905",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/13-create-one-task-from-note/artifacts/current",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "6482d8805f63bb7d038a9fbdb1baa29d0275fbe278fa4ef4362726bc1becf656",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/13-create-one-task-from-note/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "client": "Codex",
+          "client_version": "0.153.4",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.6",
+          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
+          "server_version": null,
+          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
+          "transport": "direct_remote_mcp",
+          "input_snapshot": {
+            "prompt_sha256": "fb501511c7c52e53aaae5de4776d69cc78fc194f7674058ac4d22fcb849a8f1e",
+            "fixtures": {
+              "hive-inspection-note.md": "c825099827e3eaae863d0926b0ed7051dfb7a5cd3da8ce43b7254f32d72233d9"
+            },
+            "recorded_task_prompts": [
+              {
+                "archive_line": 9,
+                "utf8_sha256": "48c673920f801417e2fe516e2de1db18f562951a2a019c458099f3d31110456a"
+              }
+            ]
+          },
+          "inputs_match_current_case": true,
+          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
+          "outcome": "needs_fix",
+          "report_status": "ready",
+          "summary": "One correct open winterization Task replaces historical four-task error, but the source note is never uploaded or attached.",
+          "caveats": [
+            "All five requested work items and no invented date/completion; file retention rubric still fails.",
+            "No prepare/finalize/upload/attachment/summary attempt: omission is workflow selection, not Storage rejection.",
+            "Legacy-helper searches and browser discovery add work; preview hash mistaken for opaque Plan ID causes a recovered 404.",
+            "Historical baseline is Pi/OpenRouter/kimi-k3/high with a revised prompt; exclude from local MCP aggregate."
+          ],
+          "metrics": {
+            "task_seconds": 78.489,
+            "elapsed_seconds_with_between_turn_gaps": 78.489,
+            "task_turns": 1,
+            "aborted_turns": 0,
+            "model_tool_rounds": 14,
+            "discovery_rounds": 2,
+            "usage": {
+              "input_tokens": 546285,
+              "cached_input_tokens": 461824,
+              "output_tokens": 2681,
+              "reasoning_output_tokens": 953,
+              "total_tokens": 548966,
+              "uncached_input_tokens": 84461
+            },
+            "mcp_calls": 4,
+            "mcp_failed_calls": 1,
+            "mcp_call_breakdown": {
+              "start_create": 1,
+              "get_guidelines": 2,
+              "submit_plan": 1
+            },
+            "mcp_routes": {
+              "lagniappe-remote": 4
+            },
+            "mcp_other_calls": {
+              "cua_repl/js": 1
+            },
+            "mcp_tool_seconds": 6.186,
+            "api_requests": null,
+            "reported_cost_usd": null,
+            "confirmed_uploaded_files": 0
+          },
+          "measurement_evidence": {
+            "task_turns": [
+              {
+                "start_line": 9,
+                "answer_line": 114,
+                "end_line": 117,
+                "seconds": 78.489,
+                "aborted": false
+              }
+            ],
+            "additional_user_messages": [],
+            "accepted_submission_lines": [
+              108
+            ],
+            "failed_mcp_call_lines": [
+              80
+            ]
+          },
+          "outcome_basis": "Recorded case-rubric assessment; operator pilot acceptance is recorded separately and does not rewrite the evidence.",
+          "operator_disposition": {
+            "status": "accepted_with_caveats",
+            "reason": "Broadly useful result accepted for the pilot; isolated nondeterministic model choices do not justify accumulating specific rules.",
+            "required_follow_up": false,
+            "source": "Operator follow-up to September 5 comparison"
+          }
         }
-      }
+      },
+      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
     }
   ]
 }

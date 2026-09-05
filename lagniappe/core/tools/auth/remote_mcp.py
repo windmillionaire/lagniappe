@@ -1,4 +1,4 @@
-"""Single-client OAuth pilot, using opaque secrets and current User permissions."""
+"""ChatGPT and Codex OAuth pilot, using opaque secrets and current User permissions."""
 
 import base64
 from datetime import datetime, timedelta, timezone
@@ -17,6 +17,9 @@ from google.oauth2 import id_token
 from config.remote_mcp import (
     ACCESS_SECONDS,
     CODE_SECONDS,
+    CODEX_CLIENT_ID,
+    client_allowed,
+    redirect_allowed,
     PENDING_SECONDS,
     REFRESH_SECONDS,
     SCOPE,
@@ -136,7 +139,8 @@ def _live(row, now):
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _bound(row, config):
     return (
-        all(row.get(key) == config[key] for key in ("issuer", "client_id", "resource"))
+        all(row.get(key) == config[key] for key in ("issuer", "resource"))
+        and client_allowed(config, row.get("client_id"))
         and row.get("scope") == SCOPE
     )
 
@@ -268,13 +272,15 @@ def client_metadata(client_id):
 
 
 # @testable true
+# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_authorization_requires_exact_bindings_state_and_s256
-# @matrix mcp-oauth : authorization validation
+# @matrix mcp-oauth : authorization validation loopback client-isolation
 def begin_authorization(parameters, *, now=None):
     config = settings()
     if (
-        parameters.get("client_id") != config["client_id"]
-        or parameters.get("redirect_uri") != config["redirect_uri"]
+        not redirect_allowed(
+            config, parameters.get("client_id"), parameters.get("redirect_uri")
+        )
     ):
         raise OAuthError("invalid_client")
     required = {
@@ -306,7 +312,8 @@ def begin_authorization(parameters, *, now=None):
         or any(ord(char) < 32 or ord(char) == 127 for char in state)
     ):
         raise OAuthError("invalid_request")
-    client_metadata(parameters["client_id"])
+    if parameters["client_id"] == config["client_id"]:
+        client_metadata(parameters["client_id"])
     now = _now(now)
     pending = _secret("p")
     row = {key: parameters[key] for key in required}
@@ -327,9 +334,10 @@ def pending_authorization(pending, *, now=None):
 
 
 # @testable true
+# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_code_is_single_use_and_refresh_replay_revokes_the_family
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_consent_deny_and_pending_replay_do_not_issue_tokens
-# @matrix mcp-oauth : consent transaction
+# @matrix mcp-oauth : consent transaction client-isolation
 def consent(pending, user, *, allow, now=None):
     if not eligible_user(user):
         raise OAuthError("access_denied", 403)
@@ -366,25 +374,28 @@ def consent(pending, user, *, allow, now=None):
             records.put(_name(code, "c"), code_row)
         result = {"state": row["state"], "iss": config["issuer"]}
         result.update({"code": code} if allow else {"error": "access_denied"})
-        return config["redirect_uri"], result
+        return row["redirect_uri"], result
 
     return store.atomic(transition)
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
-def _grant_name(user):
-    return "grant-" + credential_id(user)
+def _grant_name(user, client_id=None):
+    # Preserve existing ChatGPT grants across the pilot update.
+    suffix = "-codex" if client_id == CODEX_CLIENT_ID else ""
+    return "grant-" + credential_id(user) + suffix
 
 
 # @testable true
+# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_code_is_single_use_and_refresh_replay_revokes_the_family
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion
 # @matrix mcp-oauth : token pkce refresh replay transaction
 def exchange_token(parameters, *, now=None):
     config = settings()
     now = _now(now)
-    if parameters.get("client_id") != config["client_id"]:
+    if not client_allowed(config, parameters.get("client_id")):
         raise OAuthError("invalid_client")
     if parameters.get("resource") != config["resource"]:
         raise OAuthError("invalid_target")
@@ -397,10 +408,14 @@ def exchange_token(parameters, *, now=None):
     incoming = parameters.get("code" if is_code else "refresh_token")
     name = _name(incoming, "c" if is_code else "r")
     candidate = store.read(name)
-    if not _live(candidate, now) or not _bound(candidate, config):
+    if (
+        not _live(candidate, now)
+        or not _bound(candidate, config)
+        or candidate.get("client_id") != parameters["client_id"]
+    ):
         raise OAuthError()
     user = _user(candidate)
-    grant_name = _grant_name(user)
+    grant_name = _grant_name(user, candidate["client_id"])
     if is_code:
         verifier = parameters.get("code_verifier", "")
         if (
@@ -446,7 +461,7 @@ def exchange_token(parameters, *, now=None):
                 "generation": 1,
                 "expires_at": now + timedelta(seconds=REFRESH_SECONDS),
                 "issuer": config["issuer"],
-                "client_id": config["client_id"],
+                "client_id": candidate["client_id"],
                 "resource": config["resource"],
                 "scope": SCOPE,
             }
@@ -487,6 +502,7 @@ def exchange_token(parameters, *, now=None):
 
 
 # @testable true
+# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_user_and_workload_identity_are_both_required
 # @matrix mcp-oauth : authentication expiry revocation user-binding
@@ -501,10 +517,11 @@ def authenticate_access(token, *, now=None):
         or not _bound(grant, config)
         or grant.get("family") != row.get("family")
         or grant.get("user") != row.get("user")
+        or grant.get("client_id") != row.get("client_id")
     ):
         raise OAuthError()
     user = _user(row)
-    if _grant_name(user) != row["grant"]:
+    if _grant_name(user, row["client_id"]) != row["grant"]:
         raise OAuthError()
     return user, {
         "active": True,
@@ -545,11 +562,12 @@ def authenticate_envelope(workload_token, user_token):
 
 
 # @testable true
+# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_revocation_is_private_and_reconnect_replaces_only_the_old_family
 # @matrix mcp-oauth : revocation reconnect privacy
 def revoke_token(token, client_id):
     config = settings()
-    if client_id != config["client_id"]:
+    if not client_allowed(config, client_id):
         raise OAuthError("invalid_client")
     try:
         match = _TOKEN.fullmatch(token) if isinstance(token, str) else None
@@ -564,7 +582,7 @@ def revoke_token(token, client_id):
     # @reason private family revocation is exercised through token possession
     def transition(records):
         row = records.get(name)
-        if not row or not _bound(row, config):
+        if not row or not _bound(row, config) or row.get("client_id") != client_id:
             return
         grant = records.get(row["grant"])
         if grant and grant.get("family") == row["family"]:
@@ -574,10 +592,15 @@ def revoke_token(token, client_id):
 
 
 # @testable true
+# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_revocation_is_private_and_reconnect_replaces_only_the_old_family
 # @matrix mcp-oauth : revocation user-binding
-def connection_status(user, *, revoke=False, now=None):
-    name, now = _grant_name(user), _now(now)
+def connection_status(user, *, client_id=None, revoke=False, now=None):
+    config = settings()
+    client_id = client_id or config["client_id"]
+    if not client_allowed(config, client_id):
+        raise OAuthError("invalid_client")
+    name, now = _grant_name(user, client_id), _now(now)
 
     # @testable false
     # @covered-by lagniappe/core/tools/auth/remote_mcp.py::connection_status
@@ -590,7 +613,7 @@ def connection_status(user, *, revoke=False, now=None):
             grant = {**grant, "revoked": True}
             records.put(name, grant)
         return {
-            "active": _live(grant, now),
+            "active": _live(grant, now) and _bound(grant, config),
             "issued_at": grant["issued_at"],
             "expires_at": grant["expires_at"],
         }

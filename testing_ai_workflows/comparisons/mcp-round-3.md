@@ -69,9 +69,12 @@ telemetry or export format is needed.
 
 ## What worked, and what did not
 
-Archive references below are line numbers in each case's
-`artifacts/baseline/mcp/CODEX_ARCHIVE.jsonl` (B) or
-`artifacts/current/mcp/CODEX_ARCHIVE.jsonl` (C). Raw captures are local-only.
+Archive references below are line numbers in the preserved round-2 capture (B)
+at `/home/swifty/Desktop/lagniappe-mcp-trial/<case>/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl`
+or the round-3 capture (C), now at each case's
+`artifacts/baseline/CODEX_ARCHIVE.jsonl`. The September 5 rollover changed their
+library locations after this review; all archive bytes and line numbers are
+unchanged. Raw captures are local-only.
 
 ### 01 — Discovery improved, but the whole job did more work
 
@@ -228,7 +231,8 @@ evidence-based duplicate checking. The remaining concrete opportunities are:
    Codex-specific discovery behavior.
 
 No product changes, production reads/writes, report cleanup or artifact moves
-were performed in this review. The five current runs are recorded as the latest
-reviewed attempts in `latest_results.json`; raw baseline/current folders remain
-intact for operator review. After accepting the comparison, use the documented
-non-overwriting archive/rollover process for only these five case/arm pairs.
+were performed in this review. Subsequently, the operator requested promotion
+of these five reviewed attempts for the remote pilot. They are now in the flat
+baseline folders, the current folders are empty, and `latest_results.json`
+points to their new locations. The displaced round-2 copies were verified
+against their retained Desktop originals before removal from the library.

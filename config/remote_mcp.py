@@ -1,4 +1,4 @@
-"""Opt-in configuration for the single-client remote MCP pilot."""
+"""Opt-in configuration for the ChatGPT and Codex remote MCP pilot."""
 
 import re
 from urllib.parse import urlsplit
@@ -8,6 +8,7 @@ SCOPE = "mcp:use"
 USER_TOKEN_HEADER = "X-Lagniappe-MCP-Token"
 CLIENT_ID = "https://chatgpt.com/oauth/client.json"
 REDIRECT_URI = "https://chatgpt.com/connector_platform_oauth_redirect"
+CODEX_CLIENT_ID = "lagniappe-codex"
 ACCESS_SECONDS = 30 * 60
 CODE_SECONDS = 5 * 60
 PENDING_SECONDS = 10 * 60
@@ -56,11 +57,14 @@ def normalize_remote_mcp_config(value):
         "redirect_uri",
         "actors",
         "service_account",
+        "codex_enabled",
     }
     if not isinstance(value, dict) or set(value) - allowed:
         raise ValueError("Unknown remote MCP configuration field")
     if type(value.get("enabled", False)) is not bool:
         raise ValueError("Remote MCP enabled must be a boolean")
+    if type(value.get("codex_enabled", False)) is not bool:
+        raise ValueError("Remote MCP codex_enabled must be a boolean")
     if not value.get("enabled", False):
         return {**value, "enabled": False}
     issuer = https_url(value.get("issuer"), origin=True)
@@ -101,4 +105,34 @@ def normalize_remote_mcp_config(value):
         "redirect_uri": redirect_uri,
         "actors": actors,
         "service_account": service_account,
+        "codex_enabled": value.get("codex_enabled", False),
     }
+
+
+# @testable true
+# @tests tests_tooling/test_012c_remote_mcp_config.py::test_codex_client_requires_opt_in_and_exact_loopback_callback
+# @matrix mcp-oauth : configuration validation loopback
+def client_allowed(config, client_id):
+    return client_id == config["client_id"] or (
+        config.get("codex_enabled") is True and client_id == CODEX_CLIENT_ID
+    )
+
+
+# @testable true
+# @tests tests_tooling/test_012c_remote_mcp_config.py::test_codex_client_requires_opt_in_and_exact_loopback_callback
+# @matrix mcp-oauth : configuration validation loopback
+def redirect_allowed(config, client_id, redirect_uri):
+    if not client_allowed(config, client_id):
+        return False
+    if client_id == config["client_id"]:
+        return redirect_uri == config["redirect_uri"]
+    # RFC 8252 native clients bind an ephemeral port. Every other byte of the
+    # pre-registered loopback callback stays exact; localhost/DNS is not used.
+    if not isinstance(redirect_uri, str) or not re.fullmatch(
+        r"http://127\.0\.0\.1(?::[1-9][0-9]{0,4})?/callback", redirect_uri
+    ):
+        return False
+    try:
+        return urlsplit(redirect_uri).port != 0
+    except ValueError:
+        return False

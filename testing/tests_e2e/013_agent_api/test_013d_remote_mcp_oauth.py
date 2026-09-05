@@ -3,8 +3,10 @@
 import base64
 from copy import deepcopy
 import hashlib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import re
+import threading
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
@@ -479,3 +481,187 @@ def test_remote_mcp_rate_limit_precedes_workload_verification(pilot, monkeypatch
     assert result.headers["Retry-After"] == "17"
     assert len(calls) == 1 and calls[0][0] == "remote-mcp-envelope"
     assert calls[0][2:] == api_routes.GENERAL_RATE_LIMIT
+
+
+# @matrix mcp-oauth : consent loopback csrf client-isolation
+def test_codex_browser_consent_names_client_and_revokes_only_its_connection(pilot):
+    from config.remote_mcp import CODEX_CLIENT_ID
+
+    pilot.config["codex_enabled"] = True
+    _login(pilot)
+    # Establish ChatGPT first, then prove Codex does not replace it.
+    form = _consent_page(pilot)
+    allowed = _open(
+        pilot, "POST", "/oauth/authorize", data={**form, "decision": "allow"}
+    )
+    chatgpt_code = parse_qs(urlsplit(allowed.location).query)["code"][0]
+    chatgpt = _open(
+        pilot,
+        "POST",
+        "/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": pilot.config["client_id"],
+            "resource": pilot.config["resource"],
+            "redirect_uri": pilot.config["redirect_uri"],
+            "code": chatgpt_code,
+            "code_verifier": VERIFIER,
+        },
+    )
+    assert chatgpt.status_code == 200
+    pilot.parameters.update(
+        client_id=CODEX_CLIENT_ID, redirect_uri="http://127.0.0.1:54321/callback"
+    )
+    form = _consent_page(pilot)
+    page = _open(pilot, "GET", "/oauth/authorize")
+    assert "Connect Codex to Lagniappe" in page.text
+    allowed = _open(
+        pilot, "POST", "/oauth/authorize", data={**form, "decision": "allow"}
+    )
+    target = urlsplit(allowed.location)
+    assert target.scheme == "http" and target.netloc == "127.0.0.1:54321"
+    assert target.path == "/callback"
+    returned = parse_qs(target.query)
+    assert returned["iss"] == [ISSUER]
+    codex = _open(
+        pilot,
+        "POST",
+        "/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": CODEX_CLIENT_ID,
+            "resource": pilot.config["resource"],
+            "redirect_uri": pilot.parameters["redirect_uri"],
+            "code": returned["code"][0],
+            "code_verifier": VERIFIER,
+        },
+    )
+    assert codex.status_code == 200
+    page = _open(pilot, "GET", "/oauth/connection")
+    assert "Revoke ChatGPT access" in page.text and "Revoke Codex access" in page.text
+    revoked = _open(
+        pilot,
+        "POST",
+        "/oauth/connection",
+        data={
+            "csrf_token": form["csrf_token"],
+            "client_id": CODEX_CLIENT_ID,
+        },
+    )
+    assert revoked.status_code == 200
+    assert (
+        "Revoke ChatGPT access" in revoked.text
+        and "Codex is not connected" in revoked.text
+    )
+    with pytest.raises(auth.OAuthError):
+        auth.authenticate_access(codex.json["access_token"])
+    assert auth.authenticate_access(chatgpt.json["access_token"])[0] is pilot.actor
+
+
+@pytest.fixture
+def codex_loopback():
+    callbacks = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            target = urlsplit(self.path)
+            if target.path != "/callback":
+                self.send_error(404)
+                return
+            callbacks.append(parse_qs(target.query))
+            body = b"Codex callback received"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}/callback", callbacks
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=10)
+
+
+# @matrix mcp-oauth : consent loopback browser-callback submit-progress
+# @matrix web-headers : security
+def test_codex_native_consent_reaches_loopback_and_shows_submit_progress(
+    pilot, browser, codex_loopback
+):
+    from playwright.sync_api import expect
+    from config.remote_mcp import CODEX_CLIENT_ID
+
+    callback_url, callbacks = codex_loopback
+    pilot.config["codex_enabled"] = True
+    pilot.parameters.update(client_id=CODEX_CLIENT_ID, redirect_uri=callback_url)
+    _login(pilot)
+    _consent_page(pilot)
+    decisions, progress, browser_errors = [], [], []
+    with browser.new_context(service_workers="block") as context:
+        page = context.new_page()
+        page.on(
+            "console",
+            lambda message: (
+                browser_errors.append(message.text) if message.type == "error" else None
+            ),
+        )
+        page.on("requestfailed", lambda request: browser_errors.append(request.failure))
+        page.expose_function(
+            "recordConsentProgress", lambda value: progress.append(value)
+        )
+
+        def serve_application(route):
+            request = route.request
+            parsed = urlsplit(request.url)
+            if request.method == "POST" and parsed.path == "/oauth/authorize":
+                decisions.append(parse_qs(request.post_data)["decision"])
+            kwargs = {}
+            if request.post_data is not None:
+                kwargs.update(
+                    data=request.post_data,
+                    content_type=request.headers.get("content-type"),
+                )
+            response = _open(
+                pilot,
+                request.method,
+                parsed.path + ("?" + parsed.query if parsed.query else ""),
+                **kwargs,
+            )
+            try:
+                route.fulfill(
+                    status=response.status_code,
+                    headers=dict(response.headers),
+                    body=response.data,
+                )
+            finally:
+                response.close()
+
+        context.route(ISSUER + "/**", serve_application)
+        page.goto(ISSUER + "/oauth/authorize")
+        # The extra observer runs after the product's submit handler and
+        # records visible DOM state before the native navigation replaces it.
+        page.evaluate("""() => document.addEventListener('submit', () => {
+            const button = document.querySelector('button[value="allow"]');
+            const icon = button.querySelector('[data-role="icon"]');
+            window.recordConsentProgress({busy: button.getAttribute('aria-busy'),
+                visible: icon.getBoundingClientRect().width > 0,
+                icon: icon.textContent});
+        })""")
+        page.get_by_role("button", name="Allow", exact=True).click()
+        expect(page, str(browser_errors)).to_have_url(
+            re.compile("^" + re.escape(callback_url) + r"\?")
+        )
+        expect(page.locator("body")).to_have_text("Codex callback received")
+        assert decisions == [["allow"]]
+        assert len(progress) == 1 and progress[0]["busy"] == "true"
+        assert progress[0]["visible"] and progress[0]["icon"]
+        assert len(callbacks) == 1 and callbacks[0]["iss"] == [ISSUER]
+        assert callbacks[0]["state"] == [pilot.parameters["state"]]
+        assert len(callbacks[0]["code"]) == 1

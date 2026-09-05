@@ -115,10 +115,9 @@ def test_raw_workflow_captures_are_ignored_without_hiding_case_material(tmp_path
     }
     for case in _case_directories():
         prefix = case.relative_to(REPOSITORY_ROOT).as_posix()
-        for arm in ("mcp", "pi-rest", "native", "email"):
-            for area in ("baseline", "current", "archive/previous-run"):
-                for filename in ("session.jsonl", "SESSION.txt", "screenshot.png"):
-                    private_paths.add(f"{prefix}/artifacts/{area}/{arm}/{filename}")
+        for area in ("baseline", "current"):
+            for filename in ("session.jsonl", "SESSION.txt", "screenshot.png"):
+                private_paths.add(f"{prefix}/artifacts/{area}/{filename}")
         public_paths.update(f"{prefix}/{name}" for name in ("PROMPT.md", "RUBRIC.md"))
         public_paths.update(
             path.relative_to(REPOSITORY_ROOT).as_posix()

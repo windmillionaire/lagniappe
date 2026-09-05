@@ -147,10 +147,12 @@ def record_authenticated_site_activity(response):
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_mcp_public_artifact_headers
+# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_native_consent_reaches_loopback_and_shows_submit_progress
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
 # @matrix web-headers : conditional-request entity-revision etag missing-fingerprint security
 # @matrix mcp-package web-headers : build-marker immutable-cache no-store public-artifact
 # @pair login:logout
+# @matrix mcp-oauth : loopback browser-callback
 @app.after_request
 def add_lagniappe_headers(response):
     """Add security headers, ETag fingerprinting, and cache invalidation flag."""
@@ -176,8 +178,13 @@ def add_lagniappe_headers(response):
         # Cross-origin redirects to ChatGPT must not receive one.
         headers["Referrer-Policy"] = "same-origin"
         if CONFIG.REMOTE_MCP.get("enabled"):
+            destinations = "https://chatgpt.com"
+            if CONFIG.REMOTE_MCP.get("codex_enabled"):
+                # Browsers enforce form-action on the POST's redirect chain,
+                # including the native client's ephemeral loopback listener.
+                destinations += " http://127.0.0.1:*/callback"
             headers["Content-Security-Policy"] = CSP.replace(
-                "form-action 'self'", "form-action 'self' https://chatgpt.com"
+                "form-action 'self'", "form-action 'self' " + destinations
             )
     elif MCP_RELEASE_URL_RE.fullmatch(request.path):
         headers.update(

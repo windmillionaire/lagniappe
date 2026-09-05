@@ -19,6 +19,10 @@ entity-kind planner under `lagniappe/core/mutations/` and produces a
 Every entity passed directly to `Entities.save(*entities)` is a complete root
 write. Lifecycle properties, requirements, process serialization, and the full
 `exclude_from_indexes` set are prepared by the executor.
+If a dependency touch carries a different instance of the same entity, the
+complete root save supplies the authoritative instance for both the durable
+write and cache refresh, regardless of planning order. A shallow dependency
+copy must never replace the complete root's fields or permission requirements.
 
 An entity may declare `retired_fields` for obsolete stored keys. The executor
 discards those keys while preparing any otherwise-requested complete save,

@@ -13,7 +13,7 @@ from flask import (
 )
 from flask_login import current_user
 
-from config.remote_mcp import PENDING_SECONDS, SCOPE
+from config.remote_mcp import CODEX_CLIENT_ID, PENDING_SECONDS, SCOPE
 from lagniappe import CONFIG
 from lagniappe.core.tools.auth import remote_mcp as auth
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
@@ -91,10 +91,11 @@ def metadata():
 
 
 # @testable true
+# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_browser_consent_names_client_and_revokes_only_its_connection
 # @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_metadata_login_consent_and_csrf
 # @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_consent_rejects_replaced_request_and_changed_account
 # @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_pending_survives_google_callback_session_replacement
-# @matrix mcp-oauth : consent csrf login redirect
+# @matrix mcp-oauth : consent csrf login redirect loopback client-isolation
 # @pair mcp-oauth:consent-binding
 # @pair mcp-oauth:login-continuation
 @oauth.route("/authorize", methods=["GET", "POST"])
@@ -116,7 +117,7 @@ def authorize():
         )
         return response
     pending = request.cookies.get(_PENDING_COOKIE)
-    auth.pending_authorization(pending)
+    pending_request = auth.pending_authorization(pending)
     if not current_user.is_authenticated:
         return redirect(url_for("users.login", next=url_for("oauth.authorize")))
     user = current_user._get_current_object()
@@ -147,6 +148,7 @@ def authorize():
         consent=True,
         pending=pending,
         resource=CONFIG.REMOTE_MCP["resource"],
+        client_name="Codex" if pending_request["client_id"] == CODEX_CLIENT_ID else "ChatGPT",
     )
 
 
@@ -187,12 +189,25 @@ def revoke():
 
 
 # @testable true
+# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_browser_consent_names_client_and_revokes_only_its_connection
 # @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
-# @matrix mcp-oauth : revocation csrf browser-settings
+# @matrix mcp-oauth : revocation csrf browser-settings client-isolation
 @oauth.route("/connection", methods=["GET", "POST"])
 def connection():
     if not current_user.is_authenticated:
         return redirect(url_for("users.login", next=url_for("oauth.connection")))
     user = current_user._get_current_object()
-    status = auth.connection_status(user, revoke=request.method == "POST")
-    return render_template("oauth/connection.html", connection=status)
+    config = CONFIG.REMOTE_MCP
+    if request.method == "POST":
+        parameters = _parameters(request.form)
+        auth.connection_status(
+            user, client_id=parameters.get("client_id", config["client_id"]), revoke=True
+        )
+    clients = [(config["client_id"], "ChatGPT")]
+    if config.get("codex_enabled"):
+        clients.append((CODEX_CLIENT_ID, "Codex"))
+    connections = [
+        {"client_id": client_id, "name": name, **auth.connection_status(user, client_id=client_id)}
+        for client_id, name in clients
+    ]
+    return render_template("oauth/connection.html", connections=connections)

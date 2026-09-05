@@ -1,42 +1,77 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="h-full bg-white" lang="en">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title>ChatGPT connection · Lagniappe</title>
+    <title>AI connections · Lagniappe</title>
+    <link rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}">
+    <link rel="preload"
+          href="/fonts/source-sans-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossorigin>
     <link rel="stylesheet" href="/style.css?v={{ CONFIG.BUILD_ID }}">
   </head>
   <body class="bg-white text-base-dark">
-    <main class="mx-auto max-w-xl space-y-6 px-6 py-12">
-      <h1 class="text-2xl font-semibold">ChatGPT connection</h1>
-      {% if error %}
-        <p>This connection could not be authorized. Start again from ChatGPT, and sign in with your invited Lagniappe account.</p>
-      {% elif consent %}
-        <p>Connect ChatGPT to Lagniappe as <strong>{{ current_user.email }}</strong>?</p>
-        <p>ChatGPT can read workspace information within your permissions, upload files you choose, answer questions, and prepare Create and Organize plans. Workspace changes require your review in Lagniappe.</p>
-        <p class="break-all text-sm">Connection: {{ resource }}</p>
-        <p>You can revoke access from your Lagniappe Settings. Connecting again replaces this account's previous ChatGPT connection.</p>
-        <form method="post" action="{{ url_for('oauth.authorize') }}" class="flex gap-4">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="pending" value="{{ pending }}">
-          <input type="hidden" name="user_id" value="{{ current_user.get_id() }}">
-          <button name="decision" value="allow" class="rounded-md bg-user-default px-4 py-2 font-semibold text-white">Allow</button>
-          <button name="decision" value="deny" class="rounded-md border px-4 py-2">Cancel</button>
-        </form>
-      {% else %}
-        <p>Signed in as <strong>{{ current_user.email }}</strong>.</p>
-        {% if connection.active %}
-          <p>ChatGPT is connected. Revoking access stops subsequent requests from this connection on every device.</p>
-          <form method="post" action="{{ url_for('oauth.connection') }}">
+    <div class="flex justify-center mt-12 mb-6 sm:mt-24 sm:mb-12">
+      <img src="/images/logo-192x192.png?v={{ CONFIG.BUILD_ID }}"
+           width="192"
+           height="192"
+           alt="Lagniappe">
+    </div>
+    <main class="px-4 pb-12 sm:px-6 lg:px-8">
+      <div class="{{ styles.form.login }}">
+        <h1 class="{{ styles.login.heading }}">AI connections</h1>
+        {% if error %}
+          <div role="alert" class="{{ styles.login.error|replace(' hidden', '') }} text-center">
+            This connection could not be authorized.
+          </div>
+          <p class="{{ styles.login.guidance }}">Start again from your AI client, and sign in with your invited Lagniappe account.</p>
+        {% elif consent %}
+          <p class="{{ styles.login.guidance }}">
+            Connect {{ client_name }} to Lagniappe as<br>
+            <strong class="break-all text-base-dark">{{ current_user.email }}</strong>?
+          </p>
+          <div class="space-y-4 mb-6 text-sm leading-6">
+            <p>{{ client_name }} can read workspace information within your permissions, upload files you choose, answer questions, and prepare Create and Organize plans.</p>
+            <p class="font-semibold">Workspace changes require your review in Lagniappe.</p>
+            <p class="text-base-medium">You can revoke access from your Lagniappe Settings. Connecting again replaces this account's previous {{ client_name }} connection. Other AI clients stay connected.</p>
+          </div>
+          <form data-oauth-form method="post" action="{{ url_for('oauth.authorize') }}" class="space-y-3">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="rounded-md bg-user-default px-4 py-2 font-semibold text-white">Revoke ChatGPT access</button>
+            <input type="hidden" name="pending" value="{{ pending }}">
+            <input type="hidden" name="user_id" value="{{ current_user.get_id() }}">
+            <button type="submit" name="decision" value="allow"
+                    data-kind="user" class="{{ styles.button.submit }}"><span data-role="icon" data-visible="false" aria-hidden="true"></span><span data-role="text">Allow</span></button>
+            <button type="submit" name="decision" value="deny"
+                    data-kind="user"
+                    class="{{ styles.link.alternate }} w-full rounded-md border border-slate-300 px-3 py-2 text-base-dark hover:bg-slate-50 inline-flex items-center justify-center gap-2"><span data-role="icon" data-visible="false" aria-hidden="true"></span><span data-role="text">Cancel</span></button>
           </form>
         {% else %}
-          <p>ChatGPT is not connected. Start a connection from ChatGPT to grant access.</p>
+          <p class="{{ styles.login.guidance }}">Signed in as<br><strong class="break-all text-base-dark">{{ current_user.email }}</strong>.</p>
+          {% for connection in connections %}
+          {% if connection.active %}
+            <p class="{{ styles.login.guidance }}">{{ connection.name }} is connected. Revoking access stops subsequent requests from this connection on every device.</p>
+            <form data-oauth-form method="post" action="{{ url_for('oauth.connection') }}" class="mb-6">
+              <input type="hidden" name="client_id" value="{{ connection.client_id }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" data-kind="user" class="{{ styles.button.submit }}"><span data-role="icon" data-visible="false" aria-hidden="true"></span><span data-role="text">Revoke {{ connection.name }} access</span></button>
+            </form>
+          {% else %}
+            <p class="{{ styles.login.guidance }}">{{ connection.name }} is not connected. Start a connection from {{ connection.name }} to grant access.</p>
+          {% endif %}
+          {% endfor %}
         {% endif %}
-      {% endif %}
-      <p><a href="{{ url_for('home.home_page') }}" class="underline">Return to Lagniappe</a></p>
+        <p class="mt-6 text-center">
+          <a href="{{ url_for('home.home_page') }}"
+             class="{{ styles.link.alternate }} text-page-default underline hover:text-page-dark">Return to Lagniappe</a>
+        </p>
+      </div>
     </main>
+    <script type="module" src="/login.js?v={{ CONFIG.BUILD_ID }}"></script>
   </body>
 </html>

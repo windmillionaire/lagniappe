@@ -25,6 +25,7 @@ def test_remote_mcp_configuration_is_opt_in_and_exact():
     assert normalize_remote_mcp_config({**valid, "actors": []})["actors"] == ()
     for field, value in (
         ("enabled", "true"),
+        ("codex_enabled", "true"),
         ("issuer", "http://lagniappe.test"),
         ("issuer", "https://lagniappe.test/"),
         ("issuer", "https://lagniappe.test?"),
@@ -46,3 +47,30 @@ def test_remote_mcp_configuration_is_opt_in_and_exact():
             normalize_remote_mcp_config({**valid, field: value})
     with pytest.raises(ValueError):
         normalize_remote_mcp_config({**valid, "client_secret": "forbidden"})
+
+
+# @matrix mcp-oauth : configuration validation loopback
+@pytest.mark.tooling
+def test_codex_client_requires_opt_in_and_exact_loopback_callback():
+    from config.remote_mcp import CODEX_CLIENT_ID, client_allowed, redirect_allowed
+
+    config = {"client_id": CLIENT_ID, "redirect_uri": REDIRECT_URI}
+    assert client_allowed(config, CLIENT_ID)
+    assert redirect_allowed(config, CLIENT_ID, REDIRECT_URI)
+    assert not client_allowed(config, CODEX_CLIENT_ID)
+    assert not redirect_allowed(config, CODEX_CLIENT_ID, "http://127.0.0.1:54321/callback")
+    config["codex_enabled"] = True
+    for target in ("http://127.0.0.1/callback", "http://127.0.0.1:54321/callback"):
+        assert redirect_allowed(config, CODEX_CLIENT_ID, target)
+        assert not redirect_allowed(config, CLIENT_ID, target)
+    for target in (
+        "http://localhost:54321/callback", "http://127.0.0.2:54321/callback",
+        "http://127.0.0.1:0/callback", "http://127.0.0.1:65536/callback",
+        "http://127.0.0.1:00080/callback", "http://127.0.0.1:54321/callback/",
+        "http://127.0.0.1:54321/callback?", "http://127.0.0.1:54321/callback#",
+        "http://127.0.0.1:54321/callback/other", "http://user@127.0.0.1:54321/callback",
+        "http://127.0.0.1.attacker.test/callback", "https://127.0.0.1/callback",
+        "http://127.0.0.1:54321/callback\\evil", None,
+    ):
+        assert not redirect_allowed(config, CODEX_CLIENT_ID, target)
+    assert not client_allowed(config, "unregistered")

@@ -16,6 +16,8 @@ from .ledger import REPORT_LEDGER_VERSION
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_renames_entity_without_submission_and_undoes
 # @tests tests_unit/test_020h_ai_report_execution.py::test_undo_report_stops_before_compensation_when_initial_save_is_rejected
+# @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_report_undo_preserves_category_editor_access_and_uploaded_file
+# @matrix ai-report : undo category-editor file-links created-entities
 # @matrix ai-report : compensation completed-task created-entities delete-links deterministic-run failed-prefix file-links idempotency idempotent page-form recovery rename report-files reuse undo
 # @matrix agent-api ai-report : browser-review cas compensation delete undo
 def undo_report(report, user, *, save=None):
