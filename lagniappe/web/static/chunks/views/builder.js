@@ -1,22 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="de750a16-6ca8-41bf-a486-0a1336975c19",e._sentryDebugIdIdentifier="sentry-dbid-de750a16-6ca8-41bf-a486-0a1336975c19");}catch(e){}}();import"../search.js?v=b5de2c90";import"../entityMenu.js?v=b5de2c90";import"../foundation.js?v=b5de2c90";import"../connectivity.js?v=b5de2c90";import"../modal.js?v=b5de2c90";import{F as q}from"../builder.js?v=b5de2c90";import"../styles.js?v=b5de2c90";import"../remote.js?v=b5de2c90";import"../queryLifecycle.js?v=b5de2c90";import"../combobox.js?v=b5de2c90";import"../primitives.js?v=b5de2c90";import"../icons.js?v=b5de2c90";import"../results.js?v=b5de2c90";import"../storage.js?v=b5de2c90";import"../formatting.js?v=b5de2c90";import"../upstreamUnavailable.js?v=b5de2c90";import"../dropdown.js?v=b5de2c90";import"../baseForm.js?v=b5de2c90";import"../loader.js?v=b5de2c90";import"../facets.js?v=b5de2c90";import"../submitter.js?v=b5de2c90";export{q as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=b4fe5366';
-import '../entityMenu.js?v=b4fe5366';
-import '../foundation.js?v=b4fe5366';
-import '../connectivity.js?v=b4fe5366';
-import '../modal.js?v=b4fe5366';
-export { F as default } from '../builder.js?v=b4fe5366';
-import '../styles.js?v=b4fe5366';
-import '../remote.js?v=b4fe5366';
-import '../queryLifecycle.js?v=b4fe5366';
-import '../combobox.js?v=b4fe5366';
-import '../primitives.js?v=b4fe5366';
-import '../icons.js?v=b4fe5366';
-import '../results.js?v=b4fe5366';
-import '../storage.js?v=b4fe5366';
-import '../formatting.js?v=b4fe5366';
-import '../upstreamUnavailable.js?v=b4fe5366';
-import '../dropdown.js?v=b4fe5366';
-import '../baseForm.js?v=b4fe5366';
-import '../loader.js?v=b4fe5366';
-import '../facets.js?v=b4fe5366';
-import '../submitter.js?v=b4fe5366';
