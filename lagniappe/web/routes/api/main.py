@@ -50,15 +50,13 @@ UPLOAD_BATCH_ID_PATTERN = re.compile(external_api.UPLOAD_BATCH_ID_PATTERN)
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_uses_only_a_configured_request_origin
-# @matrix agent-api mcp-package : discovery origin-validation proposal-contract setup-command
+# @matrix agent-api : discovery origin-validation proposal-contract
 def _api_origin():
-    """Use the request origin only when it is an exact configured MCP origin."""
+    """Use the configured site origin, or the authenticated remote OAuth issuer."""
     if getattr(g, "remote_mcp_authenticated", False):
         return CONFIG.REMOTE_MCP["issuer"]
-    request_origin = request.host_url.rstrip("/")
-    allowed = tuple(getattr(CONFIG, "MCP_EVALUATION_ORIGINS", ()) or ())
-    if request_origin in allowed:
-        return request_origin
+    if CONFIG.hosted_e2e:
+        return CONFIG.BASE_URL.rstrip("/")
     return absolute_url("/").rstrip("/")
 
 

@@ -31,7 +31,7 @@ from urllib.request import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 PROJECT_VIRTUALENV = REPOSITORY_ROOT / "venv"
-BOOTSTRAP_MANIFEST = REPOSITORY_ROOT / "clients/lagniappe_mcp/uv-bootstrap.json"
+BOOTSTRAP_MANIFEST = REPOSITORY_ROOT / "mcp/uv-bootstrap.json"
 UV_TOOLS_ROOT = PROJECT_VIRTUALENV / "tools" / "uv"
 DOWNLOAD_TIMEOUT_SECONDS = 120
 _DOWNLOAD_CHUNK_SIZE = 64 * 1024
@@ -160,8 +160,8 @@ def _validate_member_name(name, *, directory=False):
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_manifest_and_managed_context_path
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_rejects_malformed_manifest
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_manifest_and_managed_context_path
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_rejects_malformed_manifest
 # @matrix mcp-package setup : bootstrap manifest platform-pin url-policy validation
 def load_manifest(path=BOOTSTRAP_MANIFEST):
     """Load and strictly validate the committed uv bootstrap manifest."""
@@ -314,9 +314,9 @@ def _host_platform_key(*, system=None, architecture=None, libc=None):
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_manifest_and_managed_context_path
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_rejects_unsupported_host
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_manifest_preserves_supported_macos_development_hosts
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_manifest_and_managed_context_path
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_rejects_unsupported_host
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_manifest_preserves_supported_macos_development_hosts
 # @matrix mcp-package setup : bootstrap macos platform-pin platform-selection portability wsl
 def select_artifact(manifest, *, system=None, architecture=None, libc=None):
     """Select the one declared artifact matching the current host tuple."""
@@ -334,7 +334,7 @@ def select_artifact(manifest, *, system=None, architecture=None, libc=None):
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_manifest_and_managed_context_path
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_manifest_and_managed_context_path
 # @matrix mcp-package setup : bootstrap managed-path version-pin
 def managed_uv_path(*, manifest_path=BOOTSTRAP_MANIFEST, virtualenv=PROJECT_VIRTUALENV):
     """Return the manifest-versioned managed uv path without consulting PATH."""
@@ -406,8 +406,8 @@ def _prepare_destination(virtualenv, version):
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_installs_idempotently_and_repairs_corrupt_copy
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_check_rejects_wrong_version_and_permissions
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_installs_idempotently_and_repairs_corrupt_copy
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_check_rejects_wrong_version_and_permissions
 # @matrix mcp-package setup : bootstrap executable-permissions version-verification
 def verify_uv(executable, version, expected_sha256, *, run=subprocess.run):
     """Verify ownership, mode, exact bytes, and version of managed uv."""
@@ -642,10 +642,10 @@ def _extract_executable(archive_path, artifact, destination):
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_installs_idempotently_and_repairs_corrupt_copy
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_preserves_existing_copy_on_download_or_replace_failure
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_rejects_unsafe_destination
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_rejects_unsafe_or_untrusted_archives_without_replacing
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_installs_idempotently_and_repairs_corrupt_copy
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_preserves_existing_copy_on_download_or_replace_failure
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_rejects_unsafe_destination
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_rejects_unsafe_or_untrusted_archives_without_replacing
 # @matrix mcp-package setup : atomic-install bootstrap digest download-bounds fail-closed idempotence managed-path repair tar-safety url-policy
 def install_uv(
     *,
@@ -733,8 +733,8 @@ def install_uv(
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_installs_idempotently_and_repairs_corrupt_copy
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_check_rejects_wrong_version_and_permissions
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_installs_idempotently_and_repairs_corrupt_copy
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_check_rejects_wrong_version_and_permissions
 # @matrix mcp-package setup : bootstrap diagnostics executable-digest executable-permissions version-verification
 def check_uv(
     *,
@@ -766,7 +766,7 @@ def check_uv(
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_uv_bootstrap_cli_is_noninteractive_and_actionable
+# @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_cli_is_noninteractive_and_actionable
 # @matrix mcp-package setup : bootstrap cli diagnostics non-interactive
 def main(arguments=None):
     """Run the explicit managed-uv install or read-only verification command."""

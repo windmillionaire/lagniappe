@@ -14,7 +14,13 @@ PYTEST_CONFIG = "testing/pytest.ini"
 TRACEABILITY_RESULTS_PLUGIN = "testing.utility.traceability_results"
 PYTEST_ROUTING_PLUGIN = "runner.pytest_routing"
 MCP_ADAPTER_TEST = "testing/tests_unit/test_033_mcp_adapter.py"
-MCP_PACKAGE_TEST_ROOT = "clients/lagniappe_mcp/tests"
+MCP_TEST_FILES = (
+    MCP_ADAPTER_TEST,
+    "testing/tests_unit/test_033b_mcp_files.py",
+    "testing/tests_unit/test_033c_mcp_server.py",
+    "testing/tests_unit/test_033d_mcp_attachments.py",
+    "testing/tests_unit/test_033e_mcp_terminal_files.py",
+)
 
 SETUP_TEST_GROUPS = {
     "ordinary": (
@@ -192,93 +198,46 @@ def targets_include_e2e(targets: tuple[str, ...], repository_root: Path) -> bool
 def partition_mcp_adapter_tests(
     invocation: PytestInvocation, repository_root: Path
 ) -> PytestPartitions:
-    """Split adapter collection from tests that run in the root environment."""
-    adapter_path = (repository_root / MCP_ADAPTER_TEST).resolve()
-    package_test_root = (repository_root / MCP_PACKAGE_TEST_ROOT).resolve()
-    collection_targets = invocation.collection_targets
+    """Run MCP unit tests in the service environment without collecting twice."""
+    paths = {
+        (repository_root / relative).resolve(): relative
+        for relative in MCP_TEST_FILES
+    }
+    targets = invocation.collection_targets
     pytest_args = invocation.pytest_args
-    target_count = len(collection_targets)
-    explicit_targets: tuple[str, ...] = ()
-    if (
-        target_count
-        and len(pytest_args) >= target_count
-        and tuple(pytest_args[-target_count:]) == collection_targets
-    ):
-        explicit_targets = collection_targets
-    passthrough = pytest_args[: len(pytest_args) - len(explicit_targets)]
-
-    broad_adapter_selection = False
-    broad_package_selection = False
-    exact_adapter_targets = []
-    exact_package_targets = []
+    explicit = bool(targets and tuple(pytest_args[-len(targets):]) == targets)
+    passthrough = pytest_args[:-len(targets)] if explicit else pytest_args
+    broad = set()
+    exact = {}
     root_targets = []
-    for target in collection_targets:
-        target_path = _target_path(target, repository_root)
-        if target_path == adapter_path:
-            if explicit_targets:
-                exact_adapter_targets.append(target)
+    for target in targets:
+        path = _target_path(target, repository_root)
+        if path in paths:
+            if explicit:
+                exact.setdefault(paths[path], []).append(target)
             else:
-                broad_adapter_selection = True
+                broad.add(paths[path])
             continue
-        if target_path == package_test_root or target_path.is_relative_to(
-            package_test_root
-        ):
-            if explicit_targets:
-                exact_package_targets.append(target)
-            else:
-                broad_package_selection = True
-            continue
-        if adapter_path.is_relative_to(target_path):
-            broad_adapter_selection = True
-        if package_test_root.is_relative_to(target_path):
-            broad_package_selection = True
-        if explicit_targets:
+        broad.update(relative for candidate, relative in paths.items()
+                     if candidate.is_relative_to(path))
+        if explicit:
             root_targets.append(target)
 
-    # The package-local transport tests are part of the unit/default MCP
-    # partition even though the root pytest configuration cannot collect them.
-    if broad_adapter_selection:
-        broad_package_selection = True
-
-    if not any(
-        (
-            broad_adapter_selection,
-            broad_package_selection,
-            exact_adapter_targets,
-            exact_package_targets,
-        )
-    ):
+    if not broad and not exact:
         return PytestPartitions(root_args=pytest_args, mcp_args=None)
-
-    adapter_targets = []
-    adapter_targets.extend(
-        [MCP_ADAPTER_TEST]
-        if broad_adapter_selection
-        else dict.fromkeys(exact_adapter_targets)
-    )
-    adapter_targets.extend(
-        [MCP_PACKAGE_TEST_ROOT]
-        if broad_package_selection
-        else dict.fromkeys(exact_package_targets)
-    )
-    adapter_args = (*passthrough, *adapter_targets)
-
-    if broad_adapter_selection or broad_package_selection:
-        ignored = []
-        if broad_adapter_selection:
-            ignored.append(f"--ignore={MCP_ADAPTER_TEST}")
-        if broad_package_selection:
-            ignored.append(f"--ignore={MCP_PACKAGE_TEST_ROOT}")
+    mcp_targets = []
+    for relative in MCP_TEST_FILES:
+        mcp_targets.extend([relative] if relative in broad
+                           else dict.fromkeys(exact.get(relative, [])))
+    if broad or root_targets:
         root_args = (
             *passthrough,
-            *ignored,
+            *(f"--ignore={relative}" for relative in MCP_TEST_FILES if relative in broad),
             *root_targets,
         )
-    elif root_targets:
-        root_args = (*passthrough, *root_targets)
     else:
         root_args = None
-    return PytestPartitions(root_args=root_args, mcp_args=adapter_args)
+    return PytestPartitions(root_args=root_args, mcp_args=(*passthrough, *mcp_targets))
 
 
 # @testable true

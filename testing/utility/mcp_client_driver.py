@@ -1,6 +1,6 @@
-"""Isolated official-SDK driver for the managed MCP boundary E2E test.
+"""Isolated shared-adapter driver for the live External Agent API boundary test.
 
-This file executes under the standalone package interpreter.  It deliberately
+This file executes under the remote adapter package interpreter.  It deliberately
 does not import the application or repository test process, and it receives the
 real API credential only through the child environment.
 """
@@ -8,18 +8,20 @@ real API credential only through the child environment.
 from __future__ import annotations
 
 import asyncio
-import io
 import json
 import os
 from pathlib import Path
 import re
 import sys
-import tempfile
 from typing import Any
 
 import httpx
-from mcp import Client
-from mcp.client.stdio import StdioServerParameters, stdio_client
+from contextlib import asynccontextmanager
+from lagniappe_mcp.adapter import LagniappeAdapter
+from lagniappe_mcp.configuration import ConnectionConfig
+from lagniappe_mcp.errors import AdapterError
+from lagniappe_mcp.presentation import _error_result, _success_result
+from lagniappe_mcp.url_security import normalize_site_url
 from lagniappe_mcp.errors import SchemaError
 from lagniappe_mcp.schema import validate_value
 
@@ -62,33 +64,24 @@ def _write_json(path: Path, value: Any) -> None:
         raise
 
 
-def _connection(specification: dict[str, Any]) -> tuple[Any, io.TextIOBase]:
-    key = os.environ["LAGNIAPPE_API_KEY"]
-    site_url = os.environ["LAGNIAPPE_URL"]
-    arguments = ["-I", "-m", "lagniappe_mcp", "serve", "--from-env"]
-    parameters = StdioServerParameters(
-        command=sys.executable,
-        args=arguments,
-        env={
-            "LAGNIAPPE_API_KEY": key,
-            "LAGNIAPPE_URL": site_url,
-        },
-    )
-    diagnostics = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
-    return stdio_client(parameters, errlog=diagnostics), diagnostics
-
-
-def _finish_diagnostics(diagnostics: io.TextIOBase) -> str:
+@asynccontextmanager
+async def _connection():
+    adapter = LagniappeAdapter(ConnectionConfig(
+        normalize_site_url(os.environ["LAGNIAPPE_URL"]),
+        os.environ["LAGNIAPPE_API_KEY"],
+    ))
     try:
-        diagnostics.flush()
-        diagnostics.seek(0)
-        return diagnostics.read()
+        await adapter.initialize()
+        yield adapter
     finally:
-        diagnostics.close()
+        await adapter.aclose()
 
 
-async def _call(client: Client, name: str, arguments: dict[str, Any]) -> dict:
-    return _dump(await client.call_tool(name, arguments))
+async def _call(client: LagniappeAdapter, name: str, arguments: dict[str, Any]) -> dict:
+    try:
+        return _dump(_success_result(await client.execute(name, arguments)))
+    except AdapterError as error:
+        return _dump(_error_result(error))
 
 
 def _structured(result: dict[str, Any]) -> Any:
@@ -214,14 +207,9 @@ async def _revoke_browser_key(specification: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]:
-    transport, diagnostics = _connection(specification)
     result: dict[str, Any] = {}
-    async with Client(transport, mode="auto", cache=None) as client:
-        result["protocol_version"] = client.protocol_version
-        result["server_info"] = _dump(client.server_info)
-        result["server_capabilities"] = _dump(client.server_capabilities)
-        result["instructions"] = client.instructions
-        result["tools"] = _dump(await client.list_tools())["tools"]
+    async with _connection() as client:
+        result["tools"] = [_dump(tool.as_mcp_tool()) for tool in client.tools.values()]
 
         actor_call = await _call(client, "get_actor", {})
         actor = _structured(actor_call)
@@ -455,18 +443,16 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
 
         result["revocation"] = await _revoke_browser_key(specification)
         result["revoked_call"] = await _call(client, "get_actor", {})
-    diagnostics_text = _finish_diagnostics(diagnostics)
+    diagnostics_text = ""
 
     return result, diagnostics_text
 
 
 async def _foreign_plan(specification: dict[str, Any]) -> tuple[dict[str, Any], str]:
-    transport, diagnostics = _connection(specification)
     try:
-        async with Client(transport, mode="auto", cache=None) as client:
+        async with _connection() as client:
             result = {
-                "protocol_version": client.protocol_version,
-                "tools": _dump(await client.list_tools())["tools"],
+                "tools": [_dump(tool.as_mcp_tool()) for tool in client.tools.values()],
                 "foreign_plan": await _call(
                     client,
                     "get_plan",
@@ -474,7 +460,7 @@ async def _foreign_plan(specification: dict[str, Any]) -> tuple[dict[str, Any], 
                 ),
             }
     finally:
-        diagnostics_text = _finish_diagnostics(diagnostics)
+        diagnostics_text = ""
     return result, diagnostics_text
 
 

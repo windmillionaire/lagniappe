@@ -234,11 +234,13 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
             rate_limiter.cache.redis.delete(*set(limiter_keys))
 
 
-# @matrix agent-api mcp-package : discovery origin-validation proposal-contract setup-command
+# @matrix agent-api : discovery origin-validation proposal-contract
 def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
     actor = Actor()
     report = _report(actor)
     allowed_origin = "https://version-dot-project.uc.r.appspot.com"
+    monkeypatch.setattr(CONFIG, "GOOGLE_LOGIN_URI", allowed_origin)
+    monkeypatch.setattr(CONFIG, "APP_URL", allowed_origin)
     authorization = {"Authorization": "Bearer valid-key"}
     monkeypatch.setattr(
         agent_auth,
@@ -247,8 +249,8 @@ def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
     )
     monkeypatch.setattr(
         CONFIG,
-        "MCP_EVALUATION_ORIGINS",
-        (allowed_origin,),
+        "BASE_URL",
+        allowed_origin,
     )
     monkeypatch.setattr(
         external_api,

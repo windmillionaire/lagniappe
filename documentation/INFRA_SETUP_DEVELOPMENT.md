@@ -18,7 +18,7 @@ resources or replaces application settings.
 
 The managed `uv` bootstrap is independent of the application virtualenv's
 packages. It downloads the fixed official archive declared in
-`clients/lagniappe_mcp/uv-bootstrap.json`, accepts redirects only to declared
+`mcp/uv-bootstrap.json`, accepts redirects only to declared
 release hosts, verifies its exact size and SHA-256 before extraction, and
 installs only the declared regular-file member after also verifying that
 member's own SHA-256. Every later check verifies the installed executable's
@@ -48,13 +48,13 @@ Ordinary install, recovery, update, and deploy support Linux/macOS terminals
 and native Windows PowerShell. Development, test-server, and E2E workflows on
 Windows use WSL2.
 
-The initial MCP package trial's managed development toolchain is pinned for
+The MCP service's managed development toolchain is pinned for
 Linux x86_64 with GNU libc (including matching WSL2 environments) and for Intel
 and Apple Silicon macOS. Each tuple has independently verified
 archive-size/archive-digest/member-digest evidence. Other tuples fail closed
-rather than downloading an unverified or ambient executable. This development
-bootstrap support does not expand the first user-installable MCP release's
-separate Linux x86_64 runtime support claim.
+rather than downloading an unverified or ambient executable. This toolchain
+is for service development and tests; MCP users connect by URL and install no
+Python package.
 
 On native Windows, `setup.cmd` selects a standalone Python and rejects Google
 Cloud CLI's bundled Python because its base packages can leak into child
@@ -73,8 +73,8 @@ passed as argument lists. Setup/config/report files use UTF-8 explicitly.
 | `requirements.txt` | App Engine/runtime dependencies. |
 | `requirements-dev.txt` | Runtime plus pytest, Playwright, Ruff, and local tooling. |
 | `package-lock.json` | Exact frontend direct and transitive dependency tree. |
-| `clients/lagniappe_mcp/uv-bootstrap.json` | Exact managed-uv archive/member digests and host policy. |
-| `clients/lagniappe_mcp/uv.lock` | Standalone adapter build/test dependency environment. |
+| `mcp/uv-bootstrap.json` | Exact managed-uv archive/member digests and host policy. |
+| `mcp/uv.lock` | MCP service runtime/build/test dependency environment. |
 
 Installer modes validate exact direct Python pins before importing provider
 clients, install all missing/mismatched pins in one transaction, recheck imports
@@ -92,7 +92,7 @@ accepted engine range. `npm ci` uses the committed lockfile.
 
 Adapter dependencies never enter `requirements.txt`,
 `requirements-dev.txt`, or the application virtualenv. Repository adapter
-commands synchronize `clients/lagniappe_mcp/.venv` from its own lock through
+commands synchronize `mcp/.venv` from its own lock through
 the managed `uv` executable.
 
 ## Local authentication

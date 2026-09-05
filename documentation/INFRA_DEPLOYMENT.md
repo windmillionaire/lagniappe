@@ -13,13 +13,10 @@ use one reviewed source/build generation.
 2. production frontend validation using the same source/artifact freshness
    checks as the test server, running `npm run build` only when the bundle is
    missing, incomplete, corrupt, non-production, or stale;
-3. MCP adapter deploy-tree assembly from the committed immutable release ledger,
-   followed by a separate check tied to the finished frontend build, plus
-   regeneration of the static manifest handler's matching build-marker header;
-4. source and artifact manifest validation for one complete production build;
-5. PWA manifest update;
-6. Datastore index deployment when requested; and
-7. `gcloud app deploy` with the generated descriptor.
+3. source and artifact manifest validation for one complete production build;
+4. PWA manifest update;
+5. Datastore index deployment when requested; and
+6. `gcloud app deploy` with the generated descriptor.
 
 When `SENTRY_AUTH_TOKEN` is set, production source maps are generated, uploaded,
 and removed from static output. Without it, no source maps or upload plugins are
@@ -41,26 +38,18 @@ Freeze the release tree, then create one canonical build:
 ```bash
 npm ci
 npm run build
-venv/bin/python run.py mcp-artifact build
 git add -A
 git commit -m "Release Candidate X.Y.Z"
-venv/bin/python run.py mcp-artifact check
 venv/bin/python run.py release-check --base origin/main
 ```
 
-Review and commit the complete source and generated release output before the
-artifact check; it requires every release input to be tracked, clean, and
-committed. `release-check`
+Review and commit the complete source and generated release output.
+`release-check`
 requires a `next/*` or `hotfix/*` candidate, rejects installation-local files,
 and checks that package metadata, lockfile, production build metadata,
 `BUILD_ID`, settings version, and release note agree on one `X.Y.Z` version.
 It computes source and artifact digests from the exact Git index, preventing an
 unstaged working-tree build from validating a different committed candidate.
-For candidates containing the standalone MCP project, this same indexed check
-reconstructs and validates the immutable ledger, current wheel, exact locked
-dependency graph, canonical frozen-OpenAPI digest, contract compatibility, and
-frontend build binding. A candidate predating the package has no MCP release
-inputs to validate.
 
 Hosted E2E exports that exact commit for both its App Engine version and Cloud
 Run runner image and never rebuilds it. `hosted-e2e create` runs source-quality,
@@ -73,23 +62,17 @@ cannot publish release attestation. See
 ## App Engine upload boundary
 
 `.gcloudignore` root-anchors local directories such as `/testing/`,
-`/installer/`, `/runner/`, `/testing_ai_workflows/`, and the standalone `/clients/` source tree. Keep
+`/installer/`, `/runner/`, `/testing_ai_workflows/`, and the MCP `/mcp/` source tree. Keep
 those patterns root-anchored so nested runtime packages are not excluded.
-The separately generated `lagniappe/web/static/mcp/` manifest and supported
-content-addressed wheels remain on the upload surface. `config/files/` is
+`config/files/` is
 excluded, then only `lagniappe_settings.yaml` and optional `redis_ca.pem` are
 included.
 
-Cloud Build images use their own explicit ignore files rather than the App
-Engine upload boundary. Both the ordinary hosted-E2E image and the dedicated
-MCP packaging image re-include `/clients/lagniappe_mcp/`, exclude its local
-`.venv` and cache, exclude private `testing_ai_workflows/cases/*/artifacts/`,
-and copy package metadata plus `uv.lock` before source so
-either kind of drift invalidates the correct build layer. The ordinary image
-copies only the resulting noneditable locked adapter environment into its final
-stage; uv and pipx are absent there. The packaging-only image pins its Python
-base, uv 0.12.9, pipx 1.17.2, and Codex CLI 0.153.0 to verified artifact
-digests for clean-home installation testing.
+Cloud Build images use their own explicit ignore files. The hosted-E2E image
+includes the shared adapter source and installs its locked environment; its final
+stage does not contain uv or pipx. The remote MCP image uses a smaller allowlist
+containing only the adapter libraries, package inputs, and container definition.
+Neither build context includes private workflow artifacts or application secrets.
 
 `config/constants.py` is the template source for App Engine handlers. Keep
 specific static handlers before broad ones:
@@ -98,11 +81,6 @@ specific static handlers before broad ones:
 - CSS with the correct UTF-8 content type;
 - PDF.js auxiliary assets before general JavaScript; and
 - registered dynamic blueprint/root prefixes before the terminal static 404.
-
-The exact `/mcp/manifest.json` handler is no-store JSON. The constrained MCP
-release-wheel handler uses an immutable one-year cache policy and
-`application/octet-stream`; both precede dynamic routes and the terminal
-catch-all. The service worker deliberately does not intercept `/mcp/`.
 
 The final unknown-path handler serves the authored no-store/no-index 404 page
 without starting Gunicorn. Because App Engine static handlers cannot set 404
@@ -113,26 +91,21 @@ registration.
 ## Remote MCP pilot
 
 The hosted MCP adapter is a separate manual Cloud Run deployment. Its
-source is `clients/lagniappe_mcp_remote/`; its Dockerfile, Cloud Build
-definition, and upload allowlist live in `runner/remote_mcp_container/`.
-The image installs the existing adapter using its pinned Python, uv, and lock
-file, then adds the hosted entry point. It runs as a non-root user. The
-dedicated build context includes only the two adapter source trees, locked
-package inputs, and container definition. It excludes application
+source is `mcp/src/lagniappe_mcp/`; its Dockerfile, Cloud Build
+definition, and upload allowlist live in `mcp/`.
+The image installs the complete service using its pinned Python, uv, and lock
+file, then removes its test/build dependencies. It runs as a non-root user.
+The dedicated build context includes only `mcp/src`, locked package inputs,
+and the container definition. Tests live under `testing/` and are not uploaded. It excludes application
 configuration, user profiles, and private workflow fixtures. The application
 continues to receive OAuth/authentication code through the ordinary App Engine
 deployment boundary.
 
-The MCP deploy guard requires genuine release inputs to be committed. It
-ignores generated frontend metadata and only the generated `BUILD_ID` value
-in constants; other constant changes still require a commit. Build freshness
-and manifest consistency remain checked against the actual deployment bundle.
-
-Keep `clients/lagniappe_mcp/src/` under its existing immutable release rules.
-The remote module imports that package without changing a previously
-published wheel's source or digest. Remote protocol and attachment tests live
-beside the local adapter tests and run through `run.py test` using their real
-paths. Runtime configuration is documented in
+The local stdio client, public wheels, immutable release ledger and package
+release checks have been retired. Python package metadata remains an internal
+container installation detail. Its API adapter and remote protocol/attachment tests run
+through `run.py test`; application deploys no longer assemble or check MCP wheels.
+Runtime configuration is documented in
 [Infrastructure Configuration](INFRA_CONFIG.md#remote-mcp-pilot).
 
 Activation has a deliberate bootstrap order: create the service disabled, read
@@ -184,10 +157,57 @@ Codex's initial catalog can omit an optional server that takes longer than its
 startup grace period, even if `/mcp` later shows the server connected. Making
 the pilot server required waits for its tools and reports a startup failure if
 it cannot initialize; it does not force the model to choose those tools.
-Keep the working local entry until remote authorization is verified, then
-remove that entry and restart the client session to refresh its tool catalog.
+Remove any retired local MCP entry and restart the client session to refresh
+its tool catalog.
 Current Codex registration and callback behavior is documented in the
 [official MCP guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+
+### Current installation and update lifecycle
+
+Remote MCP remains an opt-in manual deployment; removing the local transport
+does not add Cloud Run provisioning to the installer. The pilot is disabled by
+default, accepts an explicit list of up to ten invited account emails, and has
+a separate Codex enable flag. Setup does not collect these values interactively.
+
+1. `setup.sh` installs/configures the main application. `setup.sh update`
+   regenerates the App Engine descriptor, indexes and other configuration outputs
+   from saved settings and the current templates, then publishes the prebuilt
+   application. Both use the ordinary App Engine deployment helper.
+2. Separately enable the needed Cloud Run / Cloud Build / Artifact Registry
+   services, create an image repository and dedicated MCP runtime service
+   account, and submit `mcp/cloudbuild.yaml` with an
+   explicit `_IMAGE` destination and its `gcloudignore` allowlist. Cloud Build
+   builds and pushes an image; this YAML does not deploy a service.
+3. Deploy that image to Cloud Run with MCP disabled. Read its canonical
+   `status.url`. Configure the main application's `REMOTE_MCP` issuer, exact
+   resource URL, runtime identity and allowed clients; regenerate configuration
+   and deploy the app. Then enable Cloud Run with the matching issuer/resource.
+4. Configure expiry cleanup and authorization-request log handling as described
+   above. Users add the remote URL in their MCP client and authorize through
+   their invited Lagniappe account. They do not install a Python package.
+
+The container contains the MCP libraries and their dependencies, not the Flask
+application, its saved settings, or its database. OAuth grants, permissions,
+Plans and persistent files remain owned by the main application. The Cloud Run
+service obtains its Google identity from its runtime account; it has no saved
+user API key. Each MCP request carries both the user's OAuth token and a Google
+identity envelope to the main API, where both are checked. File-upload sessions
+grant only the individual transfers; the adapter needs no direct database or
+Storage IAM role.
+
+| Change | Deployment needed today |
+| --- | --- |
+| Website, API, OAuth implementation or application configuration | App Engine; use `setup.sh update` when generated configuration changes. |
+| Shared adapter, remote tools, pinned dependencies or container | Build a new image and deploy a Cloud Run revision separately. |
+| A contract change spanning the API and adapter | Deploy both, in a compatible order, then verify discovery and a workflow. |
+| User groups, permissions or connection revocation | No code deployment; subsequent authenticated requests use the current permissions/grant. |
+
+`run.py deploy` neither builds nor updates Cloud Run. A successful application
+update can therefore leave the adapter at its previous revision. Cloud Run
+image tags/digests and App Engine versions must currently be recorded and rolled
+back separately. Automated provisioning, paired updates, recovery and teardown
+remain follow-up work; none is implied by the normal setup command. The service
+lives in the installation owner's Google Cloud project and is billed there.
 
 ## Scaling and runtime settings
 

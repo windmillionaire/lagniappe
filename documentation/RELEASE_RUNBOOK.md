@@ -119,19 +119,14 @@ release preparation.
 ```bash
 npm ci
 npm run build
-venv/bin/python run.py mcp-artifact build
 git add -A
 git commit -m "Release Candidate X.Y.Z"
-venv/bin/python run.py mcp-artifact check
 git status --short
 ```
 
 Review the complete authored tree before committing. Add any intentional new
-files explicitly. The MCP artifact build must follow the final frontend build:
-its manifest records that build's digest. Run the check only after committing
-the reviewed candidate: it rejects untracked, unstaged, or staged-but-uncommitted
-adapter release inputs, a stale frontend binding, a changed wheel for an
-existing adapter version, or generated files outside the ledger-authorized set.
+files explicitly. Remote MCP images are built and deployed separately; see
+[Deployment](INFRA_DEPLOYMENT.md#remote-mcp-pilot).
 Skip the commit if the canonical builds are already committed and the tree is
 clean.
 

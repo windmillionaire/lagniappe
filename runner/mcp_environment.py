@@ -1,4 +1,4 @@
-"""Locked repository bridge into the standalone MCP package environment."""
+"""Locked repository bridge into the shared MCP library environment."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from runner.uv_bootstrap import (
 )
 
 
-MCP_PROJECT_RELATIVE = Path("clients/lagniappe_mcp")
+MCP_PROJECT_RELATIVE = Path("mcp")
 MCP_PROJECT = REPOSITORY_ROOT / MCP_PROJECT_RELATIVE
 MCP_ENVIRONMENT = MCP_PROJECT / ".venv"
 MCP_ENVIRONMENT_PYTHON = MCP_ENVIRONMENT / "bin" / "python"
@@ -92,7 +92,7 @@ raise SystemExit(pytest.main(sys.argv[1:], plugins=[traceability_results]))
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_rejects_unmanaged_uv_with_repair_command
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_rejects_unmanaged_uv_with_repair_command
 # @matrix mcp-package : bootstrap fail-closed managed-path repair-guidance
 class McpEnvironmentError(RuntimeError):
     """A fail-closed error from the repository-only package bridge."""
@@ -133,8 +133,8 @@ def _child_environment():
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_rejects_unmanaged_uv_with_repair_command
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_rejects_unmanaged_uv_with_repair_command
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
 # @matrix mcp-package : bootstrap fail-closed managed-path version-verification
 def verify_managed_uv(*, run=subprocess.run):
     """Verify that the bridge and manifest select the same managed uv binary."""
@@ -229,17 +229,17 @@ def _verify_environment_python(*, editable: bool, run=subprocess.run):
         adapter_origin
     ).resolve().is_relative_to(expected_adapter_root):
         raise _repair_error(
-            "The MCP adapter did not resolve from its expected standalone package location."
+            "The MCP adapter did not resolve from its expected shared adapter package location."
         )
     return MCP_ENVIRONMENT_PYTHON
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_sync_failure_is_actionable
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_sync_failure_is_actionable
 # @matrix mcp-package testing : environment-sync fail-closed locked-dependencies repair-guidance
 def sync_environment(*, run=subprocess.run):
-    """Synchronize the standalone package environment from its exact uv lock."""
+    """Synchronize the shared adapter package environment from its exact uv lock."""
     verify_managed_uv(run=run)
     command = [str(UV_CLI), *UV_SYNC_ARGUMENTS]
     try:
@@ -262,7 +262,7 @@ def sync_environment(*, run=subprocess.run):
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
 # @matrix mcp-package testing : environment-sync interpreter isolation
 def prepare_environment(*, run=subprocess.run):
     """Synchronize and verify the isolated package interpreter."""
@@ -271,7 +271,7 @@ def prepare_environment(*, run=subprocess.run):
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_checks_prebuilt_environment_without_uv
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_checks_prebuilt_environment_without_uv
 # @matrix hosted-e2e mcp-package testing : environment-check isolation
 def check_environment(*, run=subprocess.run):
     """Verify an already-synchronized package environment without invoking uv."""
@@ -284,7 +284,7 @@ def check_environment(*, run=subprocess.run):
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_builds_isolated_adapter_and_pytest_commands
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_builds_isolated_adapter_and_pytest_commands
 # @matrix mcp-package testing : command-bridge environment-sync isolation
 def run_python(arguments, *, prepared=False, run=subprocess.run):
     """Run arguments with isolated mode in the verified package interpreter."""
@@ -303,16 +303,8 @@ def run_python(arguments, *, prepared=False, run=subprocess.run):
 
 
 # @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_builds_isolated_adapter_and_pytest_commands
-# @matrix mcp-package : command-bridge dev-shim isolation
-def run_adapter(arguments, *, run=subprocess.run):
-    """Run the repository MCP development shim in the locked environment."""
-    return run_python(["-m", "lagniappe_mcp", *arguments], run=run)
-
-
-# @testable true
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_builds_isolated_adapter_and_pytest_commands
-# @tests tests_tooling/test_012_mcp_package.py::test_mcp_environment_builds_result_transport_command
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_builds_isolated_adapter_and_pytest_commands
+# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_builds_result_transport_command
 # @matrix mcp-package testing : command-bridge isolation pytest-config
 # @matrix mcp-package testing traceability : result-aggregation test-evidence
 def run_pytest(arguments, *, prepared=False, result_path=None, run=subprocess.run):

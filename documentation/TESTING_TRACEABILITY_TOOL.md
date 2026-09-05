@@ -313,13 +313,10 @@ suggestion filters. The annotation scan is intentionally broader than the
 inventory so annotated files accidentally omitted from configuration become
 findings.
 
-Test roots are relative to `testing/` by default, preserving the ordinary
-pytest nodeids such as `tests_unit/test_example.py`. A standalone client package
-may declare a repository-relative product-test root with the explicit
-`repo:clients/<package>/tests` form. Tests discovered there keep their full
-repository-relative nodeids (for example,
-`clients/<package>/tests/test_files.py::test_upload`); absolute paths, traversal,
-and repository-relative roots outside a client test directory are rejected.
+Test roots resolve within `testing/`, preserving ordinary pytest nodeids such
+as `tests_unit/test_example.py`. MCP service tests live there too, even though
+the runner executes them in the service's isolated dependency environment.
+Absolute paths, traversal and the retired `repo:` client-test roots are rejected.
 
 Suite placement remains independent of traceability:
 

@@ -43,9 +43,6 @@ def _infrastructure():
         service="e2e",
         job="lagniappe-e2e",
         runtime_email="runtime@project-1.iam.gserviceaccount.com",
-        mcp_package_runtime_email=(
-            "lagniappe-mcp-package-runtime@project-1.iam.gserviceaccount.com"
-        ),
         invoker_email="invoker@project-1.iam.gserviceaccount.com",
         artifact_repository="lagniappe-e2e",
         artifact_bucket="lagniappe-e2e-artifacts-example",
@@ -363,7 +360,7 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
     with pytest.raises(HostedE2EError, match="preflight stopped"):
         hosted_e2e.create(
             base_ref="release-base",
-            environment="mcp-package",
+            environment="standard",
         )
     assert events == [
         "source",
@@ -397,19 +394,6 @@ def test_hosted_setup_contract_rejects_stale_runtime_roles(tmp_path, monkeypatch
     )
     with pytest.raises(HostedE2EError, match="setup is stale.*rerun"):
         hosted_e2e._require_current_setup(infrastructure)
-
-
-# @matrix hosted-e2e mcp-package : iam identity setup-contract stale-state
-def test_mcp_package_identity_requirements_are_setup_fingerprinted(monkeypatch):
-    current = hosted_e2e._setup_contract_fingerprint()
-
-    monkeypatch.setattr(
-        hosted_e2e,
-        "MCP_PACKAGE_RESULT_BUCKET_ROLE",
-        "roles/storage.objectAdmin",
-    )
-
-    assert hosted_e2e._setup_contract_fingerprint() != current
 
 
 def _evidence(snapshot, paths, test_name, outcome="passed"):
@@ -670,7 +654,7 @@ def test_hosted_focused_targets_require_existing_e2e_nodeids():
     focused_command = hosted_e2e_job._pytest_command("focused", [target])
     assert target in focused_command
     assert focused_command[focused_command.index("-m") + 1] == (
-        "not unfinished and not mcp_package_install"
+        "not unfinished"
     )
     with pytest.raises(RuntimeError):
         hosted_e2e_job.validate_focused_targets([target, target])
@@ -697,183 +681,10 @@ def test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract():
         "tooling",
         "e2e",
         "-m",
-        "not unfinished and not mcp_package_install",
+        "not unfinished",
     ]
     with pytest.raises(RuntimeError):
         hosted_e2e_job._pytest_command("all", ["testing/tests_unit/"])
-
-
-# @matrix hosted-e2e mcp-package : deletion-safety environment-selection fail-closed image-boundary
-def test_mcp_package_environment_has_isolated_lifecycle_identity(
-    tmp_path,
-    monkeypatch,
-):
-    standard_state = tmp_path / "state.json"
-    monkeypatch.setattr(hosted_e2e, "STATE_ROOT", tmp_path)
-    monkeypatch.setattr(hosted_e2e, "STATE_PATH", standard_state)
-
-    standard = hosted_e2e._environment("standard")
-    package = hosted_e2e._environment("mcp-package")
-
-    assert standard.job == "lagniappe-e2e"
-    assert package.job == "lagniappe-mcp-package"
-    assert standard.state_path == standard_state
-    assert package.state_path == tmp_path / "mcp-package-state.json"
-    assert standard.result_root == tmp_path / "results"
-    assert package.result_root == tmp_path / "mcp-package-results"
-    assert standard.container_relative_root != package.container_relative_root
-    assert standard.image_base(_infrastructure()).endswith("/runner")
-    assert package.image_base(_infrastructure()).endswith("/mcp-package-runner")
-    with pytest.raises(HostedE2EError, match=r"standard\|mcp-package"):
-        hosted_e2e._environment("package")
-
-
-# @matrix hosted-e2e mcp-package : argument-injection environment-selection target-validation
-def test_mcp_package_environment_accepts_only_exact_target(monkeypatch):
-    package_target = hosted_e2e.MCP_PACKAGE_TARGET
-    ordinary_target = (
-        "testing/tests_e2e/001_site/test_001a_environment.py::test_database_setup"
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_activate",
-        lambda **_options: pytest.fail("invalid scope reached provider activation"),
-    )
-
-    invalid = (
-        {"environment": "mcp-package", "suite": "all", "targets": ()},
-        {
-            "environment": "mcp-package",
-            "suite": "focused",
-            "targets": (ordinary_target,),
-        },
-        {
-            "environment": "mcp-package",
-            "suite": "focused",
-            "targets": (f"{package_target}::test_other",),
-        },
-        {
-            "environment": "standard",
-            "suite": "focused",
-            "targets": (package_target,),
-        },
-    )
-    for options in invalid:
-        with pytest.raises(HostedE2EError):
-            hosted_e2e.execute(import_results=False, **options)
-
-    package_command = hosted_e2e_job._pytest_command(
-        "focused",
-        (package_target,),
-        environment="mcp-package",
-    )
-    assert package_command[package_command.index("-m") + 1] == ("mcp_package_install")
-    assert "--noconftest" in package_command
-    with pytest.raises(RuntimeError, match="exact packaging target"):
-        hosted_e2e_job._pytest_command(
-            "focused",
-            (ordinary_target,),
-            environment="mcp-package",
-        )
-    with pytest.raises(RuntimeError, match="requires the mcp-package job"):
-        hosted_e2e_job._pytest_command("focused", (package_target,))
-
-
-# @matrix hosted-e2e mcp-package : cloud-run environment-selection execution-name target-validation
-def test_mcp_package_execute_uses_only_package_job_and_state(monkeypatch):
-    package_target = hosted_e2e.MCP_PACKAGE_TARGET
-    calls = []
-    writes = []
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_state_ready",
-        lambda _infrastructure, **options: (
-            calls.append(("state", options)) or {"status": "ready"}
-        ),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_write_json",
-        lambda path, payload, **options: writes.append((path, payload, options)),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_assert_mcp_package_runtime_identity",
-        lambda infrastructure: calls.append(("identity", infrastructure)),
-    )
-
-    def gcloud(*arguments, **options):
-        calls.append((arguments, options))
-        return subprocess.CompletedProcess(
-            ["gcloud"],
-            returncode=0,
-            stdout=('{"metadata": {"name": "lagniappe-mcp-package-contract1"}}'),
-            stderr="",
-        )
-
-    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_wait_for_execution",
-        lambda *_arguments, **_options: ({"status": {}}, 0),
-    )
-
-    result = hosted_e2e.execute(
-        environment="mcp-package",
-        suite="focused",
-        targets=(package_target,),
-        import_results=False,
-        progress=False,
-    )
-
-    assert result["execution"] == "lagniappe-mcp-package-contract1"
-    assert calls[0] == ("state", {"environment": "mcp-package"})
-    assert calls[1] == ("identity", _infrastructure())
-    execute_call = next(call for call in calls if isinstance(call[0], tuple))
-    assert execute_call[0][3] == "lagniappe-mcp-package"
-    assert writes[0][0] == hosted_e2e._environment("mcp-package").state_path
-    assert (
-        hosted_e2e._execution_name(
-            {"metadata": {"name": "lagniappe-e2e-wrong1"}},
-            environment="mcp-package",
-        )
-        is None
-    )
-
-
-# @matrix hosted-e2e mcp-package : identity provider-status
-def test_mcp_package_status_surfaces_runtime_identity_drift(monkeypatch):
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_load_json",
-        lambda _path: {"status": "absent"},
-    )
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_assert_mcp_package_runtime_identity",
-        lambda _infrastructure: (_ for _ in ()).throw(
-            HostedE2EError("MCP package runtime identity drift: forbidden role")
-        ),
-    )
-
-    drifted = hosted_e2e.status(environment="mcp-package")
-
-    assert drifted["identity_valid"] is False
-    assert "identity drift" in drifted["identity_error"]
-
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_assert_mcp_package_runtime_identity",
-        lambda _infrastructure: None,
-    )
-    valid = hosted_e2e.status(environment="mcp-package")
-    assert valid["identity_valid"] is True
-    assert valid["identity_error"] is None
 
 
 # @matrix hosted-e2e : cloud-run focused-execution local-dispatch override
@@ -1186,82 +997,6 @@ def test_hosted_create_command_routes_preflight_base(monkeypatch, capsys):
     assert "Hosted E2E version ready" in capsys.readouterr().out
 
 
-# @matrix hosted-e2e mcp-package : cli-routing environment-selection target-validation
-def test_mcp_package_cli_routes_closed_environment(monkeypatch, capsys):
-    calls = []
-    monkeypatch.setattr(
-        hosted_e2e,
-        "create",
-        lambda **options: (
-            calls.append(("create", options))
-            or {"base_url": "https://package.example.test"}
-        ),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "execute",
-        lambda **options: (
-            calls.append(("execute", options))
-            or {
-                "execution": "lagniappe-mcp-package-example1",
-                "exit_status": 0,
-                "suite": "focused",
-            }
-        ),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "status",
-        lambda **options: calls.append(("status", options)) or {"status": "ready"},
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "teardown",
-        lambda **options: (
-            calls.append(("teardown", options)) or {"version": "e2e-abcdef1234567890"}
-        ),
-    )
-
-    environment = ["--environment", "mcp-package"]
-    assert hosted_e2e.run_hosted_e2e_command(["create", *environment]) == 0
-    assert (
-        hosted_e2e.run_hosted_e2e_command(
-            [
-                "execute",
-                *environment,
-                "--target",
-                hosted_e2e.MCP_PACKAGE_TARGET,
-                "--no-import-results",
-            ]
-        )
-        == 0
-    )
-    assert hosted_e2e.run_hosted_e2e_command(["status", *environment]) == 0
-    assert hosted_e2e.run_hosted_e2e_command(["teardown", *environment]) == 0
-
-    assert calls == [
-        (
-            "create",
-            {"base_ref": None, "environment": "mcp-package"},
-        ),
-        (
-            "execute",
-            {
-                "suite": "focused",
-                "targets": [hosted_e2e.MCP_PACKAGE_TARGET],
-                "import_results": False,
-                "environment": "mcp-package",
-            },
-        ),
-        ("status", {"environment": "mcp-package"}),
-        (
-            "teardown",
-            {"force": False, "environment": "mcp-package"},
-        ),
-    ]
-    assert "--environment mcp-package" in capsys.readouterr().out
-
-
 # @pair hosted-e2e:cli-routing
 def test_hosted_release_evidence_command_routes_validation(monkeypatch, capsys):
     candidate = "a" * 40
@@ -1423,98 +1158,6 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
     assert (
         f"Removed local hosted E2E artifacts: {result_root}" in capsys.readouterr().out
     )
-
-
-# @matrix hosted-e2e mcp-package : deletion-safety environment-selection local-artifacts teardown
-def test_mcp_package_teardown_cannot_delete_standard_lifecycle(
-    tmp_path,
-    monkeypatch,
-):
-    infrastructure = _infrastructure()
-    state_root = tmp_path / "reports/hosted-e2e"
-    standard_state = state_root / "state.json"
-    package_state = state_root / "mcp-package-state.json"
-    standard_results = state_root / "results/standard-execution"
-    package_results = state_root / "mcp-package-results/package-execution"
-    standard_results.mkdir(parents=True)
-    package_results.mkdir(parents=True)
-    standard_state.write_text('{"status": "ready"}\n', encoding="utf-8")
-    version = "e2e-mcp-abcdef1234567890"
-    state = {
-        "project": infrastructure.project,
-        "region": infrastructure.region,
-        "service": hosted_e2e.SERVICE,
-        "job": hosted_e2e.MCP_PACKAGE_JOB,
-        "environment": "mcp-package",
-        "artifact_bucket": infrastructure.artifact_bucket,
-        "version": version,
-        "base_url": "https://package.example.test",
-        "status": "ready",
-    }
-    hosted_e2e._write_json(package_state, state)
-    provider_calls = []
-
-    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
-    monkeypatch.setattr(hosted_e2e, "STATE_ROOT", state_root)
-    monkeypatch.setattr(hosted_e2e, "STATE_PATH", standard_state)
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", lambda: infrastructure)
-    monkeypatch.setattr(hosted_e2e, "_verify_soft_routing_guard", lambda _value: None)
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_describe",
-        lambda arguments: (
-            provider_calls.append(("describe", arguments))
-            or (
-                {"metadata": {}}
-                if arguments[:3] == ["run", "jobs", "describe"]
-                else None
-            )
-        ),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_active_job_executions",
-        lambda _infrastructure, **options: (
-            provider_calls.append(("executions", options)) or ()
-        ),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_acquire_cleanup_lease",
-        lambda: pytest.fail("package teardown must not touch shared test data"),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_version_url",
-        lambda _infrastructure, _version: state["base_url"],
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_change_test_bucket_cors",
-        lambda *_arguments, **_options: None,
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_gcloud",
-        lambda *arguments, **options: provider_calls.append(
-            ("gcloud", arguments, options)
-        ),
-    )
-
-    result = hosted_e2e.teardown(environment="mcp-package")
-
-    assert result["status"] == "torn-down"
-    assert standard_state.read_text(encoding="utf-8") == '{"status": "ready"}\n'
-    assert standard_results.is_dir()
-    assert not (state_root / "mcp-package-results").exists()
-    assert ("executions", {"job": hosted_e2e.MCP_PACKAGE_JOB}) in provider_calls
-    delete = next(
-        call[1]
-        for call in provider_calls
-        if call[0] == "gcloud" and call[1][:3] == ("run", "jobs", "delete")
-    )
-    assert delete[3] == hosted_e2e.MCP_PACKAGE_JOB
 
 
 # @matrix hosted-e2e traceability : evidence merge provenance
@@ -1745,7 +1388,6 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     request = workflow["jobs"]["request"]
     execute = workflow["jobs"]["execute"]
     quality = workflow["jobs"]["quality"]
-    mcp_package = workflow["jobs"]["mcp_package"]
     attest = workflow["jobs"]["attest"]
     assert workflow["permissions"] == {}
     assert request["permissions"] == {"pull-requests": "read"}
@@ -1757,10 +1399,6 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert quality["permissions"] == {
         "contents": "read",
         "pull-requests": "read",
-    }
-    assert mcp_package["permissions"] == {
-        "contents": "read",
-        "id-token": "write",
     }
     assert attest["permissions"] == {"statuses": "write"}
     assert request["name"] == "Resolve hosted release request"
@@ -1778,13 +1416,8 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "needs.request.outputs.execute == 'true'" in quality["if"]
     assert "evidence_changed != 'true'" in quality["if"]
     assert "inputs.mode == 'continuation'" in quality["if"]
-    assert mcp_package["needs"] == "quality"
-    assert "needs.quality.result == 'success'" in mcp_package["if"]
-    assert "inputs.mode == 'continuation'" in mcp_package["if"]
-    assert mcp_package["environment"] == "hosted-e2e"
-    assert attest["needs"] == ["quality", "mcp_package"]
+    assert attest["needs"] == ["quality"]
     assert "needs.quality.result == 'success'" in attest["if"]
-    assert "needs.mcp_package.result == 'success'" in attest["if"]
     assert "Publish current-head release status" in attest["name"]
     assert "ref: ${{ needs.request.outputs.candidate_sha }}" in workflow_text
     assert "ref: ${{ steps.context.outputs.evidence_sha }}" in workflow_text
@@ -1805,7 +1438,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert '--execution "$EXECUTION"' in workflow_text
     assert 'rm -f -- "$credentials_file"' in workflow_text
     assert "statuses/$EVIDENCE_SHA" in workflow_text
-    assert "Hosted evidence, package attestation, and release gates passed" in (
+    assert "Hosted evidence and release gates passed" in (
         workflow_text
     )
     assert "EVIDENCE_SHA: ${{ needs.quality.outputs.evidence_sha }}" in workflow_text
@@ -1820,17 +1453,6 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "gcloud" not in quality_text
     assert "run.py test" not in quality_text
 
-    package_text = yaml.dump(mcp_package, sort_keys=False)
-    assert "lagniappe-mcp-package" in package_text
-    assert hosted_e2e.MCP_PACKAGE_TARGET in package_text
-    assert "--suite=focused" in package_text
-    assert "LAGNIAPPE_MCP_IMAGE_DIGEST" in package_text
-    assert "mcp_image_contract_sha256" in package_text
-    assert "linux-x86_64-cpython-3.14" in package_text
-    assert "lagniappe-mcp-package-runtime@$E2E_PROJECT.iam.gserviceaccount.com" in (
-        package_text
-    )
-    assert "evidence.json" not in package_text
 
 
 def test_hosted_workflow_retains_results_before_reporting_and_guards_movement():
@@ -2115,57 +1737,11 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
     ) == (tmp_path / ".gcloudignore").read_text(encoding="utf-8")
 
 
-# @matrix hosted-e2e mcp-package : deployment-source environment-selection image-boundary
-def test_mcp_package_runner_selects_dedicated_image_definition(tmp_path, monkeypatch):
-    container_root = tmp_path / hosted_e2e.MCP_PACKAGE_CONTAINER_RELATIVE_ROOT
-    container_root.mkdir(parents=True)
-    (tmp_path / ".gcloudignore").write_text("/clients/\n", encoding="utf-8")
-    (container_root / "cloudbuild.yaml").write_text(
-        "steps: []\n",
-        encoding="utf-8",
-    )
-    (container_root / "gcloudignore").write_text(
-        "config/files/\n",
-        encoding="utf-8",
-    )
-    calls = []
-    cloud_build_id = "12345678-1234-1234-1234-123456789abc"
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_gcloud",
-        lambda *arguments, **options: (
-            calls.append((arguments, options))
-            or subprocess.CompletedProcess(
-                ["gcloud"],
-                returncode=0,
-                stdout=f'{{"id": "{cloud_build_id}"}}',
-                stderr="",
-            )
-        ),
-    )
-
-    image, returned_build_id = hosted_e2e._build_runner_image(
-        _infrastructure(),
-        "a" * 40,
-        tmp_path,
-        environment="mcp-package",
-    )
-
-    assert image.endswith("/mcp-package-runner:" + "a" * 40)
-    assert returned_build_id == cloud_build_id
-    arguments = calls[0][0]
-    assert f"--config={container_root / 'cloudbuild.yaml'}" in arguments
-    assert f"--ignore-file={container_root / 'gcloudignore'}" in arguments
-    assert (container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY).read_text(
-        encoding="utf-8"
-    ) == (tmp_path / ".gcloudignore").read_text(encoding="utf-8")
-
-
-# @matrix hosted-e2e mcp-package : deployment-source image-boundary symlink-safety
+# @matrix hosted-e2e : deployment-source image-boundary symlink-safety
 def test_runner_image_refuses_an_unsafe_staged_root_ignore(tmp_path, monkeypatch):
-    container_root = tmp_path / hosted_e2e.MCP_PACKAGE_CONTAINER_RELATIVE_ROOT
+    container_root = tmp_path / hosted_e2e.CONTAINER_RELATIVE_ROOT
     container_root.mkdir(parents=True)
-    (tmp_path / ".gcloudignore").write_text("/clients/\n", encoding="utf-8")
+    (tmp_path / ".gcloudignore").write_text("/mcp/\n", encoding="utf-8")
     (container_root / "cloudbuild.yaml").write_text("steps: []\n", encoding="utf-8")
     (container_root / "gcloudignore").write_text("config/files/\n", encoding="utf-8")
     staged_ignore = container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY
@@ -2183,97 +1759,7 @@ def test_runner_image_refuses_an_unsafe_staged_root_ignore(tmp_path, monkeypatch
             _infrastructure(),
             "a" * 40,
             tmp_path,
-            environment="mcp-package",
-        )
-
-
-# @matrix hosted-e2e mcp-package : image-boundary immutable-release platform-pin source-quality
-def test_mcp_package_image_contract_binds_platform_lock_and_tools(tmp_path):
-    container_root = tmp_path / hosted_e2e.MCP_PACKAGE_CONTAINER_RELATIVE_ROOT
-    package_root = tmp_path / "clients/lagniappe_mcp"
-    deploy_root = tmp_path / "lagniappe/web/static/mcp"
-    releases_root = package_root / "releases"
-    for directory in (container_root, deploy_root, releases_root):
-        directory.mkdir(parents=True)
-    for name in ("Dockerfile", "cloudbuild.yaml", "gcloudignore"):
-        source = hosted_e2e.MCP_PACKAGE_CONTAINER_ROOT / name
-        (container_root / name).write_text(
-            source.read_text(encoding="utf-8"),
-            encoding="utf-8",
-        )
-    (tmp_path / ".gcloudignore").write_text("/clients/\n", encoding="utf-8")
-    (package_root / "uv.lock").write_text("version = 1\n", encoding="utf-8")
-    (package_root / "pyproject.toml").write_text(
-        '[project]\nname = "lagniappe-mcp"\n',
-        encoding="utf-8",
-    )
-    (package_root / "uv-bootstrap.json").write_text("{}\n", encoding="utf-8")
-    (releases_root / "releases.json").write_text("{}\n", encoding="utf-8")
-    platform = {
-        **hosted_e2e.MCP_PACKAGE_PLATFORM,
-        "dependency_graph_sha256": "b" * 64,
-        "dependencies": [],
-    }
-    current = {
-        "version": "0.1.0",
-        "sha256": "a" * 64,
-        "platforms": [platform],
-    }
-    manifest_path = deploy_root / "manifest.json"
-    manifest_path.write_text(
-        json.dumps({"current": current, "releases": [current]}),
-        encoding="utf-8",
-    )
-
-    contract = hosted_e2e._mcp_package_image_contract(tmp_path)
-
-    assert contract["mcp_platform"] == "linux-x86_64-cpython-3.14"
-    assert contract["mcp_wheel_sha256"] == "a" * 64
-    assert contract["mcp_dependency_graph_sha256"] == "b" * 64
-    assert contract["uv_version"] == "0.12.9"
-    assert contract["pipx_version"] == "1.17.2"
-    assert contract["codex_version"] == "0.153.0"
-
-    platform["architecture"] = "arm64"
-    manifest_path.write_text(
-        json.dumps({"current": current, "releases": [current]}),
-        encoding="utf-8",
-    )
-    with pytest.raises(HostedE2EError, match="unadvertised platform"):
-        hosted_e2e._mcp_package_image_contract(tmp_path)
-
-    platform["architecture"] = "x86_64"
-    manifest_path.write_text(
-        json.dumps({"current": current, "releases": [current]}),
-        encoding="utf-8",
-    )
-    docker_path = container_root / "Dockerfile"
-    docker_path.write_text(
-        docker_path.read_text(encoding="utf-8").replace(" --locked", ""),
-        encoding="utf-8",
-    )
-    with pytest.raises(HostedE2EError, match="stale build boundary"):
-        hosted_e2e._mcp_package_image_contract(tmp_path)
-
-
-# @matrix hosted-e2e mcp-package : build-identity image-boundary immutable-release
-def test_mcp_package_image_digest_is_bound_to_build_output():
-    image = "us-central1-docker.pkg.dev/project/repository/package:source"
-    digest = "sha256:" + "c" * 64
-    payload = {"results": {"images": [{"name": image, "digest": digest}]}}
-
-    assert hosted_e2e._cloud_build_image_digest(payload, image) == digest
-    with pytest.raises(HostedE2EError, match="one exact"):
-        hosted_e2e._cloud_build_image_digest(
-            {
-                "results": {
-                    "images": [
-                        {"name": image, "digest": digest},
-                        {"name": image, "digest": digest},
-                    ]
-                }
-            },
-            image,
+            environment="standard",
         )
 
 
@@ -2527,451 +2013,6 @@ def test_hosted_runtime_identity_roles_include_deployer_signing(monkeypatch):
     ]
 
 
-# @matrix hosted-e2e mcp-package : identity least-privilege public-inputs secrets
-def test_mcp_package_runtime_identity_has_only_required_bindings(monkeypatch):
-    gcloud_calls = []
-    account_calls = []
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_gcloud",
-        lambda *arguments, **options: gcloud_calls.append((arguments, options)),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_service_account_role",
-        lambda account, member, role: account_calls.append((account, member, role)),
-    )
-    infrastructure = _infrastructure()
-    deployer_member = "user:operator@example.test"
-
-    hosted_e2e._grant_mcp_package_runtime_identity_roles(
-        infrastructure,
-        deployer_member,
-    )
-
-    package_member = f"serviceAccount:{infrastructure.mcp_package_runtime_email}"
-    cloud_run_agent = (
-        f"serviceAccount:service-{infrastructure.project_number}"
-        "@serverless-robot-prod.iam.gserviceaccount.com"
-    )
-    assert infrastructure.mcp_package_runtime_email != infrastructure.runtime_email
-    assert gcloud_calls == [
-        (
-            (
-                "storage",
-                "buckets",
-                "add-iam-policy-binding",
-                f"gs://{infrastructure.artifact_bucket}",
-                f"--member={package_member}",
-                "--role=roles/storage.objectCreator",
-                "--quiet",
-            ),
-            {},
-        )
-    ]
-    assert account_calls == [
-        (
-            infrastructure.mcp_package_runtime_email,
-            deployer_member,
-            "roles/iam.serviceAccountUser",
-        ),
-        (
-            infrastructure.mcp_package_runtime_email,
-            cloud_run_agent,
-            "roles/iam.serviceAccountTokenCreator",
-        ),
-    ]
-
-
-# @matrix hosted-e2e mcp-package : identity least-privilege reconciliation public-inputs secrets
-def test_mcp_package_runtime_reconciles_stale_direct_data_roles(monkeypatch):
-    infrastructure = _infrastructure()
-    package_member = f"serviceAccount:{infrastructure.mcp_package_runtime_email}"
-    mutations = []
-
-    def gcloud(*arguments, **options):
-        if "get-iam-policy" not in arguments:
-            mutations.append((arguments, options))
-            return subprocess.CompletedProcess(arguments, 0, stdout="", stderr="")
-        if arguments[0] == "projects":
-            role = "roles/editor"
-        elif arguments[0] == "storage" and any(
-            infrastructure.artifact_bucket in str(argument)
-            for argument in arguments
-        ):
-            payload = {
-                "bindings": [
-                    {
-                        "role": "roles/storage.objectCreator",
-                        "members": [package_member],
-                    },
-                    {
-                        "role": "roles/storage.objectViewer",
-                        "members": [package_member],
-                    },
-                ]
-            }
-            return subprocess.CompletedProcess(
-                arguments, 0, stdout=json.dumps(payload), stderr=""
-            )
-        elif arguments[0] == "storage":
-            role = "roles/storage.objectAdmin"
-        else:
-            role = "roles/secretmanager.secretAccessor"
-        payload = {"bindings": [{"role": role, "members": [package_member]}]}
-        return subprocess.CompletedProcess(
-            arguments, 0, stdout=json.dumps(payload), stderr=""
-        )
-
-    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
-    monkeypatch.setattr(hosted_e2e, "_test_bucket_names", lambda: ("test-bucket",))
-
-    hosted_e2e._reconcile_mcp_package_runtime_data_roles(infrastructure)
-
-    rendered = [call[0] for call in mutations]
-    assert (
-        "projects",
-        "remove-iam-policy-binding",
-        infrastructure.project,
-        f"--member={package_member}",
-        "--role=roles/editor",
-        "--condition=None",
-        "--quiet",
-    ) in rendered
-    assert any(
-        call[:4]
-        == (
-            "storage",
-            "buckets",
-            "remove-iam-policy-binding",
-            "gs://test-bucket",
-        )
-        and "--role=roles/storage.objectAdmin" in call
-        for call in rendered
-    )
-    assert any(
-        call[:4]
-        == (
-            "storage",
-            "buckets",
-            "remove-iam-policy-binding",
-            f"gs://{infrastructure.artifact_bucket}",
-        )
-        and "--role=roles/storage.objectViewer" in call
-        for call in rendered
-    )
-    assert not any(
-        "--role=roles/storage.objectCreator" in call for call in rendered
-    )
-    assert sum(call[:2] == ("secrets", "remove-iam-policy-binding") for call in rendered) == 2
-
-    def conditional_policy(*_arguments, **_options):
-        payload = {
-            "bindings": [
-                {
-                    "role": "roles/editor",
-                    "members": [package_member],
-                    "condition": {"title": "unexpected", "expression": "true"},
-                }
-            ]
-        }
-        return subprocess.CompletedProcess(
-            _arguments,
-            0,
-            stdout=json.dumps(payload),
-            stderr="",
-        )
-
-    monkeypatch.setattr(hosted_e2e, "_gcloud", conditional_policy)
-    with pytest.raises(hosted_e2e.HostedE2EError, match="conditional IAM"):
-        hosted_e2e._reconcile_mcp_package_runtime_data_roles(infrastructure)
-
-
-# @matrix hosted-e2e mcp-package : identity least-privilege reconciliation
-def test_mcp_package_runtime_reconciles_service_account_policy(monkeypatch):
-    infrastructure = _infrastructure()
-    cloud_run_agent = (
-        f"serviceAccount:service-{infrastructure.project_number}"
-        "@serverless-robot-prod.iam.gserviceaccount.com"
-    )
-    deployer = "user:operator@example.test"
-    stale = "user:former-operator@example.test"
-    mutations = []
-    policy = {
-        "bindings": [
-            {
-                "role": "roles/iam.serviceAccountTokenCreator",
-                "members": [cloud_run_agent],
-            },
-            {
-                "role": "roles/iam.serviceAccountUser",
-                "members": [deployer, stale],
-            },
-            {
-                "role": "roles/iam.serviceAccountTokenCreator",
-                "members": [stale],
-            },
-        ]
-    }
-
-    def gcloud(*arguments, **options):
-        if "get-iam-policy" in arguments:
-            return subprocess.CompletedProcess(
-                arguments,
-                0,
-                stdout=json.dumps(policy),
-                stderr="",
-            )
-        mutations.append((arguments, options))
-        return subprocess.CompletedProcess(arguments, 0, stdout="", stderr="")
-
-    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
-
-    hosted_e2e._reconcile_mcp_package_runtime_service_account_roles(
-        infrastructure,
-        deployer,
-    )
-
-    assert [arguments for arguments, _options in mutations] == [
-        (
-            "iam",
-            "service-accounts",
-            "remove-iam-policy-binding",
-            infrastructure.mcp_package_runtime_email,
-            f"--member={stale}",
-            "--role=roles/iam.serviceAccountUser",
-            "--condition=None",
-            f"--project={infrastructure.project}",
-            "--quiet",
-        ),
-        (
-            "iam",
-            "service-accounts",
-            "remove-iam-policy-binding",
-            infrastructure.mcp_package_runtime_email,
-            f"--member={stale}",
-            "--role=roles/iam.serviceAccountTokenCreator",
-            "--condition=None",
-            f"--project={infrastructure.project}",
-            "--quiet",
-        ),
-    ]
-
-    policy["bindings"] = [
-        {
-            "role": "roles/iam.serviceAccountUser",
-            "members": [deployer],
-            "condition": {"title": "stale", "expression": "true"},
-        }
-    ]
-    with pytest.raises(HostedE2EError, match="conditional IAM"):
-        hosted_e2e._reconcile_mcp_package_runtime_service_account_roles(
-            infrastructure,
-            deployer,
-        )
-
-
-# @matrix hosted-e2e mcp-package : identity least-privilege public-inputs secrets
-def test_mcp_package_runtime_live_identity_assertion_is_exact(monkeypatch):
-    infrastructure = _infrastructure()
-    package_member = f"serviceAccount:{infrastructure.mcp_package_runtime_email}"
-    deployer = "user:operator@example.test"
-    cloud_run_agent = (
-        f"serviceAccount:service-{infrastructure.project_number}"
-        "@serverless-robot-prod.iam.gserviceaccount.com"
-    )
-
-    def exact_policies():
-        return {
-            "project": {"bindings": []},
-            "test_bucket": {"bindings": []},
-            "artifact_bucket": {
-                "bindings": [
-                    {
-                        "role": "roles/storage.objectCreator",
-                        "members": [package_member],
-                    }
-                ]
-            },
-            "secret": {"bindings": []},
-            "account": {
-                "bindings": [
-                    {
-                        "role": "roles/iam.serviceAccountUser",
-                        "members": [deployer],
-                    },
-                    {
-                        "role": "roles/iam.serviceAccountTokenCreator",
-                        "members": [cloud_run_agent],
-                    },
-                ]
-            },
-        }
-
-    policies = exact_policies()
-    calls = []
-
-    def gcloud(*arguments, **options):
-        calls.append((arguments, options))
-        if arguments[:2] == ("projects", "get-iam-policy"):
-            key = "project"
-        elif arguments[:3] == ("storage", "buckets", "get-iam-policy"):
-            key = (
-                "artifact_bucket"
-                if arguments[3] == f"gs://{infrastructure.artifact_bucket}"
-                else "test_bucket"
-            )
-        elif arguments[:2] == ("secrets", "get-iam-policy"):
-            key = "secret"
-        else:
-            assert arguments[:3] == (
-                "iam",
-                "service-accounts",
-                "get-iam-policy",
-            )
-            key = "account"
-        return subprocess.CompletedProcess(
-            arguments,
-            0,
-            stdout=json.dumps(policies[key]),
-            stderr="",
-        )
-
-    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
-    monkeypatch.setattr(hosted_e2e, "_test_bucket_names", lambda: ("test-bucket",))
-    monkeypatch.setattr(hosted_e2e, "_deployer_member", lambda: deployer)
-
-    hosted_e2e._assert_mcp_package_runtime_identity(infrastructure)
-
-    assert calls
-    assert all("get-iam-policy" in arguments for arguments, _options in calls)
-    assert all(options == {"check": False} for _arguments, options in calls)
-
-    drift_cases = (
-        (
-            "project",
-            {"role": "roles/editor", "members": [package_member]},
-            "project roles",
-        ),
-        (
-            "test_bucket",
-            {
-                "role": "roles/storage.objectViewer",
-                "members": [package_member],
-            },
-            "test-bucket roles",
-        ),
-        (
-            "secret",
-            {
-                "role": "roles/secretmanager.secretAccessor",
-                "members": [package_member],
-            },
-            "Secret Manager roles",
-        ),
-        (
-            "account",
-            {
-                "role": "roles/iam.serviceAccountUser",
-                "members": ["user:unexpected@example.test"],
-            },
-            "service-account policy",
-        ),
-    )
-    for scope, binding, message in drift_cases:
-        policies = exact_policies()
-        policies[scope]["bindings"].append(binding)
-        with pytest.raises(HostedE2EError, match=message):
-            hosted_e2e._assert_mcp_package_runtime_identity(infrastructure)
-
-    policies = exact_policies()
-    policies["artifact_bucket"]["bindings"][0]["condition"] = {
-        "title": "unexpected",
-        "expression": "true",
-    }
-    with pytest.raises(HostedE2EError, match="unconditional objectCreator"):
-        hosted_e2e._assert_mcp_package_runtime_identity(infrastructure)
-
-
-# @matrix hosted-e2e mcp-package : identity setup-contract
-def test_hosted_setup_provisions_mcp_package_runtime_identity(monkeypatch):
-    infrastructure = _infrastructure()
-    service_accounts = []
-    package_grants = []
-    package_reconciliations = []
-    account_reconciliations = []
-    identity_assertions = []
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", lambda: infrastructure)
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: {})
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_gcloud",
-        lambda *_arguments, **_options: None,
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_ensure_service_account",
-        lambda _infrastructure, account, display_name: service_accounts.append(
-            (account, display_name)
-        ),
-    )
-    monkeypatch.setattr(hosted_e2e, "_project_role", lambda *_arguments: None)
-    monkeypatch.setattr(hosted_e2e, "_remove_project_role", lambda *_arguments: None)
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_grant_runtime_identity_roles",
-        lambda *_arguments: None,
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_grant_mcp_package_runtime_identity_roles",
-        lambda *arguments: package_grants.append(arguments),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_reconcile_mcp_package_runtime_data_roles",
-        lambda *arguments: package_reconciliations.append(arguments),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_reconcile_mcp_package_runtime_service_account_roles",
-        lambda *arguments: account_reconciliations.append(arguments),
-    )
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_assert_mcp_package_runtime_identity",
-        lambda infrastructure: identity_assertions.append(infrastructure),
-    )
-    monkeypatch.setattr(hosted_e2e, "_deployer_member", lambda: "user:owner@test")
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_cloud_build_service_account",
-        lambda _infrastructure: "cloud-build@project-1.iam.gserviceaccount.com",
-    )
-    monkeypatch.setattr(hosted_e2e, "_ensure_artifact_bucket", lambda *_args: None)
-    monkeypatch.setattr(hosted_e2e, "_grant_ci_result_access", lambda *_args: None)
-    monkeypatch.setattr(hosted_e2e, "_test_bucket_names", lambda: ())
-    monkeypatch.setattr(hosted_e2e, "_ensure_workload_identity", lambda *_args: None)
-    monkeypatch.setattr(hosted_e2e, "_ensure_anchor", lambda *_args: None)
-    monkeypatch.setattr(hosted_e2e, "_write_json", lambda *_args, **_kwargs: None)
-
-    payload = hosted_e2e.setup(github_repository="owner/repository")
-
-    assert service_accounts == [
-        ("lagniappe-e2e-runtime", "Lagniappe E2E runtime"),
-        ("lagniappe-mcp-package-runtime", "Lagniappe MCP package runtime"),
-        ("lagniappe-e2e-invoker", "Lagniappe E2E CI invoker"),
-    ]
-    assert package_grants == [(infrastructure, "user:owner@test")]
-    assert package_reconciliations == [(infrastructure,)]
-    assert account_reconciliations == [(infrastructure, "user:owner@test")]
-    assert identity_assertions == [infrastructure]
-    assert payload["mcp_package_runtime_email"] == (
-        "lagniappe-mcp-package-runtime@project-1.iam.gserviceaccount.com"
-    )
-
-
 # @matrix hosted-e2e : identity invocation-overrides least-privilege
 def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
     calls = []
@@ -3034,84 +2075,160 @@ def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
     assert "redis_ca.pem=lagniappe-e2e-redis-ca:latest" in secret_argument
 
 
-# @matrix hosted-e2e mcp-package : image-boundary immutable-release public-inputs secrets
-def test_mcp_package_job_receives_only_public_attested_inputs(monkeypatch):
+# @matrix hosted-e2e : environment-selection deletion-safety image-boundary fail-closed
+def test_hosted_environment_rejects_retired_lifecycle(
+    tmp_path,
+    monkeypatch,
+):
+    standard_state = tmp_path / "state.json"
+    monkeypatch.setattr(hosted_e2e, "STATE_ROOT", tmp_path)
+    monkeypatch.setattr(hosted_e2e, "STATE_PATH", standard_state)
+
+    standard = hosted_e2e._environment("standard")
+
+    assert standard.job == "lagniappe-e2e"
+    assert standard.state_path == standard_state
+    assert standard.result_root == tmp_path / "results"
+    assert standard.image_base(_infrastructure()).endswith("/runner")
+    with pytest.raises(HostedE2EError, match="standard"):
+        hosted_e2e._environment("mcp-package")
+
+
+
+# @matrix hosted-e2e : cli-routing environment-selection target-validation
+def test_hosted_cli_routes_closed_environment(monkeypatch, capsys):
     calls = []
-    events = []
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
-    monkeypatch.setattr(hosted_e2e, "_deployer_member", lambda: None)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "create",
+        lambda **options: (
+            calls.append(("create", options))
+            or {"base_url": "https://hosted.example.test"}
+        ),
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "execute",
+        lambda **options: (
+            calls.append(("execute", options))
+            or {
+                "execution": "lagniappe-e2e-example1",
+                "exit_status": 0,
+                "suite": "focused",
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "status",
+        lambda **options: calls.append(("status", options)) or {"status": "ready"},
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "teardown",
+        lambda **options: (
+            calls.append(("teardown", options)) or {"version": "e2e-abcdef1234567890"}
+        ),
+    )
 
-    def gcloud(*arguments, **options):
-        calls.append((arguments, options))
-        events.append(arguments)
+    environment = ["--environment", "standard"]
+    assert hosted_e2e.run_hosted_e2e_command(["create", *environment]) == 0
+    assert (
+        hosted_e2e.run_hosted_e2e_command(
+            [
+                "execute",
+                *environment,
+                "--target",
+                "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py",
+                "--no-import-results",
+            ]
+        )
+        == 0
+    )
+    assert hosted_e2e.run_hosted_e2e_command(["status", *environment]) == 0
+    assert hosted_e2e.run_hosted_e2e_command(["teardown", *environment]) == 0
 
+    assert calls == [
+        (
+            "create",
+            {"base_ref": None},
+        ),
+        (
+            "execute",
+            {
+                "suite": "focused",
+                "targets": ["testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py"],
+                "import_results": False,
+            },
+        ),
+        ("status", {}),
+        (
+            "teardown",
+            {"force": False},
+        ),
+    ]
+    assert "--environment mcp-package" not in capsys.readouterr().out
+
+
+
+# @matrix hosted-e2e : identity setup-contract
+def test_hosted_setup_provisions_only_supported_runtime_identities(monkeypatch):
+    infrastructure = _infrastructure()
+    service_accounts = []
+    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
+    monkeypatch.setattr(hosted_e2e, "_infrastructure", lambda: infrastructure)
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: {})
     monkeypatch.setattr(
         hosted_e2e,
         "_gcloud",
-        gcloud,
+        lambda *_arguments, **_options: None,
     )
     monkeypatch.setattr(
         hosted_e2e,
-        "_assert_mcp_package_runtime_identity",
-        lambda _infrastructure: events.append("identity"),
-    )
-    digest = "d" * 64
-    state = {
-        "job": hosted_e2e.MCP_PACKAGE_JOB,
-        "base_url": "https://version.example.test",
-        "version": "e2e-abcdef1234567890",
-        "source": "a" * 40,
-        "source_snapshot": "b" * 64,
-        "build_id": "b1234567",
-        "image": (
-            "us-central1-docker.pkg.dev/project-1/lagniappe-e2e/"
-            "mcp-package-runner:source"
+        "_ensure_service_account",
+        lambda _infrastructure, account, display_name: service_accounts.append(
+            (account, display_name)
         ),
-        "image_digest": "sha256:" + "c" * 64,
-        "mcp_platform": hosted_e2e.MCP_PACKAGE_PLATFORM["id"],
-        "mcp_image_contract_sha256": digest,
-        "mcp_lock_sha256": digest,
-        "mcp_manifest_sha256": digest,
-        "mcp_ledger_sha256": digest,
-        "mcp_wheel_sha256": digest,
-        "mcp_dependency_graph_sha256": digest,
-        **hosted_e2e.MCP_PACKAGE_TOOLCHAIN,
-    }
+    )
+    monkeypatch.setattr(hosted_e2e, "_project_role", lambda *_arguments: None)
+    monkeypatch.setattr(hosted_e2e, "_remove_project_role", lambda *_arguments: None)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_grant_runtime_identity_roles",
+        lambda *_arguments: None,
+    )
+    monkeypatch.setattr(hosted_e2e, "_deployer_member", lambda: "user:owner@test")
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_cloud_build_service_account",
+        lambda _infrastructure: "cloud-build@project-1.iam.gserviceaccount.com",
+    )
+    monkeypatch.setattr(hosted_e2e, "_ensure_artifact_bucket", lambda *_args: None)
+    monkeypatch.setattr(hosted_e2e, "_grant_ci_result_access", lambda *_args: None)
+    monkeypatch.setattr(hosted_e2e, "_test_bucket_names", lambda: ())
+    monkeypatch.setattr(hosted_e2e, "_ensure_workload_identity", lambda *_args: None)
+    monkeypatch.setattr(hosted_e2e, "_ensure_anchor", lambda *_args: None)
+    monkeypatch.setattr(hosted_e2e, "_write_json", lambda *_args, **_kwargs: None)
 
-    infrastructure = _infrastructure()
-    hosted_e2e._update_job(
-        infrastructure,
-        state,
-        environment="mcp-package",
-    )
+    payload = hosted_e2e.setup(github_repository="owner/repository")
 
-    job_create = next(
-        arguments
-        for arguments, _options in calls
-        if arguments[:3] == ("run", "jobs", "create")
-    )
-    assert job_create[3] == hosted_e2e.MCP_PACKAGE_JOB
-    assert events[events.index(job_create) - 1] == "identity"
-    assert f"--service-account={infrastructure.mcp_package_runtime_email}" in job_create
-    assert f"--service-account={infrastructure.runtime_email}" not in job_create
-    assert "--clear-secrets" in job_create
-    assert not any(value.startswith("--set-secrets=") for value in job_create)
-    assert (
-        "--image=us-central1-docker.pkg.dev/project-1/lagniappe-e2e/"
-        "mcp-package-runner@sha256:" + "c" * 64
-    ) in job_create
-    environment_argument = next(
-        value for value in job_create if value.startswith("--set-env-vars=")
-    )
-    assert "LAGNIAPPE_HOSTED_E2E_ENVIRONMENT=mcp-package" in environment_argument
-    assert "LAGNIAPPE_MCP_PLATFORM=linux-x86_64-cpython-3.14" in (environment_argument)
-    for forbidden in (
-        "BEARER",
-        "SESSION_KEY",
-        "CALLER_EMAIL",
-        "HOSTED_E2E_PREFIX",
-        "FLASK_ENV",
-        "lagniappe_settings.yaml",
-        "redis_ca.pem",
-    ):
-        assert forbidden not in environment_argument
+    assert service_accounts == [
+        ("lagniappe-e2e-runtime", "Lagniappe E2E runtime"),
+        ("lagniappe-e2e-invoker", "Lagniappe E2E CI invoker"),
+    ]
+    assert payload["runtime_email"] == infrastructure.runtime_email
+
+
+
+# @matrix hosted-e2e : provider-status
+def test_hosted_status_reads_only_the_supported_job(monkeypatch):
+    monkeypatch.setattr(hosted_e2e, "_activate", lambda **options: None)
+    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
+    monkeypatch.setattr(hosted_e2e, "_load_json", lambda path: {"status": "absent"})
+    requests = []
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda args: requests.append(args) or {})
+    result = hosted_e2e.status()
+    assert result["app_version_present"] is False
+    assert result["job_present"] is True
+    assert len(requests) == 1
+    assert requests[0][:4] == ["run", "jobs", "describe", "lagniappe-e2e"]

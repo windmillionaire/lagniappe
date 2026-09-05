@@ -1,2 +1,110 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="ffe09338-5e25-49d6-9897-aff0ded47787",e._sentryDebugIdIdentifier="sentry-dbid-ffe09338-5e25-49d6-9897-aff0ded47787");}catch(e){}}();import{B as l,u as t,U as o}from"./baseUpload.js?v=b5400af1";import{b as r}from"./buttons.js?v=b5400af1";import"./foundation.js?v=b5400af1";import"./connectivity.js?v=b5400af1";import{F as p}from"./facets.js?v=b5400af1";import"./styles.js?v=b5400af1";import"./icons.js?v=b5400af1";import"./dropdown.js?v=b5400af1";import"./combobox.js?v=b5400af1";import"./primitives.js?v=b5400af1";import"./upstreamUnavailable.js?v=b5400af1";import"./baseForm.js?v=b5400af1";import"./loader.js?v=b5400af1";import"./formatting.js?v=b5400af1";import"./remote.js?v=b5400af1";import"./queryLifecycle.js?v=b5400af1";import"./results.js?v=b5400af1";import"./storage.js?v=b5400af1";import"./submitter.js?v=b5400af1";const a="Drop file here, click to upload, or tap to choose camera/files";class n extends l{constructor(e){super(e),this.messages={submit:"Upload File",submitting:"Uploading File",submitted:"File Uploaded"},this.inputName="file-upload",this.multiple=!0,this.dropzone=t.dropzone({text:a}),this.processing=t.processing({aiCreate:this.target.dataset.aiCreate==="true"}),this.uploadType="file",this.menuOptions=["remove","replace","paste"],this.uploadMenu=new o(this),this.submitButton=r.submit({kind:"file",data:{visible:"false"}}),this.selectFile=t.selectFile(),this._select=null}get html(){return[this.selectFile.element,this.dropzone.element,this.processing.element]}async init(){this._select=new p(this.selectFile.element),this._select.init(),this.destroyables.push(this._select),await super.init()}onFileAttached(e,i){const s=this.fileInput?.element.files.length||0;this.toggleSelectFile(s<=1),this.processing.prefill({filename:i.filename,isTextFile:i.isTextFile,fileCount:s})}toggleSelectFile(e){this.selectFile.element.dataset.visible=e?"true":"false",!e&&(this._select?.clear(),this.selectFile.clear())}reset(){super.reset(),this.toggleSelectFile(!0),this._select.clear(),this.processing.clear()}created(){this._created=!0}postreconcile(){this._created&&this.reset()}}export{n as FileUpload};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=ba683140';
+import { b as buttons } from './buttons.js?v=ba683140';
+import './foundation.js?v=ba683140';
+import './connectivity.js?v=ba683140';
+import { F as FacetsBox } from './facets.js?v=ba683140';
+import './styles.js?v=ba683140';
+import './icons.js?v=ba683140';
+import './dropdown.js?v=ba683140';
+import './combobox.js?v=ba683140';
+import './primitives.js?v=ba683140';
+import './upstreamUnavailable.js?v=ba683140';
+import './baseForm.js?v=ba683140';
+import './loader.js?v=ba683140';
+import './formatting.js?v=ba683140';
+import './remote.js?v=ba683140';
+import './queryLifecycle.js?v=ba683140';
+import './results.js?v=ba683140';
+import './storage.js?v=ba683140';
+import './submitter.js?v=ba683140';
+
+const FILE_DROPZONE_TEXT =
+	"Drop file here, click to upload, or tap to choose camera/files";
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_file_to_page
+ * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_multiple_files_to_page_hides_existing_file_select
+ * @matrix pages : file-upload multi-file
+ */
+class FileUpload extends BaseUpload {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Upload File",
+			submitting: "Uploading File",
+			submitted: "File Uploaded",
+		};
+		this.inputName = "file-upload";
+		this.multiple = true;
+		this.dropzone = uploadElement.dropzone({ text: FILE_DROPZONE_TEXT });
+		this.processing = uploadElement.processing({
+			aiCreate: this.target.dataset.aiCreate === "true",
+		});
+		this.uploadType = "file";
+		this.menuOptions = ["remove", "replace", "paste"];
+		this.uploadMenu = new UploadMenu(this);
+		this.submitButton = buttons.submit({
+			kind: "file",
+			data: {
+				visible: "false",
+			},
+		});
+		this.selectFile = uploadElement.selectFile();
+		this._select = null;
+	}
+
+	get html() {
+		return [
+			this.selectFile.element,
+			this.dropzone.element,
+			this.processing.element,
+		];
+	}
+
+	async init() {
+		this._select = new FacetsBox(this.selectFile.element);
+		this._select.init();
+		this.destroyables.push(this._select);
+
+		await super.init();
+	}
+
+	onFileAttached(_file, context) {
+		const fileCount = this.fileInput?.element.files.length || 0;
+		this.toggleSelectFile(fileCount <= 1);
+		this.processing.prefill({
+			filename: context.filename,
+			isTextFile: context.isTextFile,
+			fileCount,
+		});
+	}
+
+	toggleSelectFile(visible) {
+		this.selectFile.element.dataset.visible = visible ? "true" : "false";
+		if (visible) return;
+
+		this._select?.clear();
+		this.selectFile.clear();
+	}
+
+	reset() {
+		super.reset();
+		this.toggleSelectFile(true);
+		this._select.clear();
+		this.processing.clear();
+	}
+
+	created() {
+		this._created = true;
+	}
+
+	postreconcile() {
+		if (this._created) {
+			this.reset();
+		}
+	}
+}
+
+export { FileUpload };

@@ -20,9 +20,7 @@ from lagniappe.core.definitions import AI
 from runner import mcp_environment
 from testing.definitions import Pages, SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
-from testing.resources import Page
 from testing.utility.network import browser_fetch
-from testing.utility.user_settings import go_to_my_page, open_user_settings
 
 
 pytestmark = pytest.mark.e2e
@@ -223,7 +221,6 @@ def _run_driver(
     assert status == 0, result.get("driver_error", "MCP SDK driver failed")
     assert "driver_error" not in result
     assert result["diagnostics"]["contains_sensitive_value"] is False
-    assert result["diagnostics"]["events"] > 0
     assert result["diagnostics"]["invalid_events"] == 0
     assert result["diagnostics"]["max_event_bytes"] <= 8 * 1024
     assert result["diagnostics"]["truncated"] is False
@@ -420,134 +417,6 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
     assert get_file["additionalProperties"] is False
 
 
-def _assert_setup_panel(owner) -> tuple[str, str]:
-    seen_manifest_requests = []
-
-    def capture(request):
-        if urlsplit(request.url).path == "/mcp/manifest.json":
-            seen_manifest_requests.append(request)
-
-    owner.page.on("request", capture)
-    go_to_my_page(owner)
-    owner_page = Page(user=owner, definition=owner.definition)
-    settings = open_user_settings(owner, owner_page)
-    panel = settings.locator("[data-role='mcp-setup']")
-    trial_authorized = (
-        CONFIG.MCP_EVALUATION_ENABLED
-        and owner.email.casefold() in CONFIG.MCP_EVALUATION_ACTORS
-    )
-    if trial_authorized:
-        expect(panel).to_be_visible()
-        expect(panel.locator("[data-role='mcp-setup-status']")).to_contain_text(
-            "Verified adapter"
-        )
-        expect(panel.locator("[data-role='mcp-setup-commands']")).to_be_visible()
-        assert seen_manifest_requests
-        manifest_request = seen_manifest_requests[-1]
-        assert manifest_request.method == "GET"
-        assert _origin(manifest_request.url) == _origin(CONFIG.BASE_URL)
-        headers = {
-            key.casefold(): value for key, value in manifest_request.headers.items()
-        }
-        assert "authorization" not in headers
-        assert "cookie" not in headers
-        allowed_origins = json.loads(panel.get_attribute("data-allowed-origins"))
-        assert allowed_origins == list(CONFIG.MCP_EVALUATION_ORIGINS)
-        assert _origin(CONFIG.BASE_URL) in allowed_origins
-        install = panel.locator("[data-role='mcp-install-command']").text_content()
-        configure = panel.locator("[data-role='mcp-configure-command']").text_content()
-        diagnostic = panel.locator(
-            "[data-role='mcp-diagnostic-command']"
-        ).text_content()
-        assert install.startswith("pipx install --python python3.14 --backend pip ")
-        assert "#sha256=" in install
-        assert configure.startswith("lagniappe-mcp configure codex --url ")
-        assert f'--url "{_origin(CONFIG.BASE_URL)}"' in configure
-        assert "--allowed-root" not in configure
-        assert "LAGNIAPPE_API_KEY" not in configure
-        assert diagnostic == "lagniappe-mcp check --profile personal"
-        return install, configure
-    else:
-        assert not trial_authorized
-        expect(panel).to_have_count(0)
-        return "", ""
-
-
-# @matrix mcp-package web-headers : build-marker content-addressing immutable-cache public-artifact
-def test_public_mcp_release_manifest_and_wheel_are_exact() -> None:
-    manifest_response = _request("GET", "/mcp/manifest.json")
-    assert manifest_response.status_code == 200
-    assert manifest_response.history == []
-    assert manifest_response.headers["Content-Type"] == (
-        "application/json; charset=utf-8"
-    )
-    assert manifest_response.headers["Cache-Control"] == "no-store"
-    assert manifest_response.headers["X-Lagniappe-Build-ID"] == CONFIG.BUILD_ID
-    manifest = manifest_response.json()
-    assert manifest_response.content == (
-        json.dumps(manifest, allow_nan=False, indent=2, sort_keys=True) + "\n"
-    ).encode("utf-8")
-    assert manifest["schema"] == 1
-    assert manifest["package"]["name"] == "lagniappe-mcp"
-    assert manifest["package"]["entry_point"] == "lagniappe-mcp"
-    assert manifest["application"]["build_id"] == CONFIG.BUILD_ID
-
-    releases = manifest["releases"]
-    assert releases and all(release["supported"] is True for release in releases)
-    assert len({release["version"] for release in releases}) == len(releases)
-    assert len({release["sha256"] for release in releases}) == len(releases)
-    matching = [
-        release
-        for release in releases
-        if release["version"] == manifest["current"]["version"]
-    ]
-    assert matching == [manifest["current"]]
-
-    for release in releases:
-        version = release["version"]
-        digest = release["sha256"]
-        filename = f"lagniappe_mcp-{version}-py3-none-any.whl"
-        expected_path = f"/mcp/releases/{version}/{digest}/{filename}"
-        assert release["filename"] == filename
-        assert release["artifact_path"] == expected_path
-        assert release["python_requirement"] == ">=3.14,<3.15"
-        assert len(release["platforms"]) == 1
-        platform = release["platforms"][0]
-        assert {
-            field: platform[field]
-            for field in ("id", "system", "architecture", "libc", "python")
-        } == {
-            "id": "linux-x86_64-cpython-3.14",
-            "system": "linux",
-            "architecture": "x86_64",
-            "libc": "glibc>=2.17",
-            "python": "3.14",
-        }
-        dependencies = platform["dependencies"]
-        assert dependencies
-        assert platform["dependency_graph_sha256"] == _canonical_file_sha256(
-            dependencies
-        )
-        dependency_fields = {
-            "name",
-            "version",
-            "filename",
-            "sha256",
-            "size",
-            "source_url",
-        }
-        assert all(set(dependency) == dependency_fields for dependency in dependencies)
-        response = _request("GET", expected_path)
-        assert response.status_code == 200
-        assert response.history == []
-        assert response.headers["Content-Type"] == "application/octet-stream"
-        assert response.headers["Cache-Control"] == (
-            "public, max-age=31536000, immutable"
-        )
-        assert len(response.content) == release["size"]
-        assert hashlib.sha256(response.content).hexdigest() == digest
-
-
 # @pairs agent-api:bearer-only agent-api:build-marker agent-api:contract
 # @pairs agent-api:create-revision agent-api:discovery agent-api:entitlement-independent
 # @pairs agent-api:origin-validation agent-api:plan-capability agent-api:plan-isolation
@@ -555,8 +424,8 @@ def test_public_mcp_release_manifest_and_wheel_are_exact() -> None:
 # @pairs agent-api:revoke agent-api:session-independent agent-api:submission
 # @pairs agent-api:tool-catalog agent-api:tool-dispatch agent-api:tool-selection
 # @pairs agent-api:uploads mcp-adapter:product-contract mcp-upload:safe-result
-# @pairs mcp-upload:upload-all mcp-package:origin-validation mcp-package:setup-command
-# @pairs user-settings:origin-validation user-settings:revoke user-settings:setup-command
+# @pairs mcp-upload:upload-all
+# @pair user-settings:revoke
 # @matrix agent-api task-scheduling : periodic recurring scheduled structured-output validation
 # @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_task_schedule_response_schema
 # @source lagniappe/web/routes/api/main.py::authenticate_request
@@ -575,9 +444,8 @@ def test_public_mcp_release_manifest_and_wheel_are_exact() -> None:
 # @source lagniappe/web/routes/api/main.py::submit_plan
 # @source lagniappe/web/routes/users/api_key.py::api_key
 # @source lagniappe/core/tools/email/notifications/links.py::origin
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/files.py::upload_local_files
-# @source src/script/widgets/mcpSetup.mjs::McpSetup
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
+# @source mcp/src/lagniappe_mcp/files.py::upload_local_files
 # @styles modal.wrapper modal.content modal.header modal.actions button.close label.default
 def test_managed_mcp_adapter_exercises_the_real_api_boundary(
     get_user,
@@ -587,7 +455,6 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
     _prepare_package_environment()
     owner = get_user(Users.OWNER)
     owner.go(SitePages.HOME)
-    install_command, configure_command = _assert_setup_panel(owner)
     readable_page = Pages.test_create_page.get(owner)
 
     suffix = uuid4().hex
@@ -603,7 +470,6 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
 
     owner_token = _issue_key(owner)
     intruder_token = _issue_key(intruder)
-    assert owner_token not in install_command + configure_command
     upload_path = tmp_path / "mcp-boundary-image.png"
     upload_path.write_bytes(MCP_BOUNDARY_PNG)
 
@@ -749,20 +615,6 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
                     "csrf_token": csrf_token,
                 },
             },
-        )
-        assert workflow["protocol_version"] == "2026-07-28"
-        assert workflow["server_info"] == {
-            "description": "Local typed adapter for the Lagniappe External Agent API.",
-            "name": "lagniappe",
-            "title": "Lagniappe",
-            "version": workflow["server_info"]["version"],
-        }
-        assert re.fullmatch(r"\d+\.\d+\.\d+", workflow["server_info"]["version"])
-        assert workflow["server_capabilities"].get("resources") is None
-        assert "Ask answers questions" in workflow["instructions"]
-        assert (
-            "Create/Organize prepare changes for browser review"
-            in workflow["instructions"]
         )
         _assert_catalog_matches_live_rest(workflow["tools"], catalog)
 
@@ -937,7 +789,6 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             token=intruder_token,
             specification={"plan_id": create_start["id"]},
         )
-        assert foreign["protocol_version"] == "2026-07-28"
         assert [tool["name"] for tool in foreign["tools"]] == [
             tool["name"] for tool in workflow["tools"]
         ]

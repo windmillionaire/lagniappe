@@ -10,10 +10,10 @@ ENV UV_LINK_MODE=copy \
 WORKDIR /workspace
 
 COPY --from=uv-runtime /uv /usr/local/bin/uv
-COPY clients/lagniappe_mcp/pyproject.toml clients/lagniappe_mcp/uv.lock clients/lagniappe_mcp/README.md clients/lagniappe_mcp/
-RUN uv sync --project clients/lagniappe_mcp --locked --group test --no-install-project --no-editable
-COPY clients/lagniappe_mcp/src clients/lagniappe_mcp/src
-RUN uv sync --project clients/lagniappe_mcp --locked --group test --no-editable --no-build-isolation --offline
+COPY mcp/pyproject.toml mcp/uv.lock mcp/README.md mcp/
+RUN uv sync --project mcp --locked --group test --no-install-project --no-editable
+COPY mcp/src mcp/src
+RUN uv sync --project mcp --locked --group test --no-editable --no-build-isolation --offline
 
 FROM python:3.14-slim-bookworm@sha256:9ab8d9c8514b44f90cf0029dd42fdd7e9e211e639c8b995304cc04568dee900f
 
@@ -41,7 +41,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
-COPY --from=mcp-builder /workspace/clients/lagniappe_mcp/.venv /workspace/clients/lagniappe_mcp/.venv
+COPY --from=mcp-builder /workspace/mcp/.venv /workspace/mcp/.venv
 COPY runner/hosted_e2e_container/root.gcloudignore .gcloudignore
 
 ENTRYPOINT ["/workspace/venv/bin/python", "-m", "testing.utility.hosted_e2e_job"]

@@ -61,19 +61,17 @@ key. The optional remote MCP pilot has separately revocable ChatGPT and Codex OA
   report does not invoke a model or execute workspace changes. Organize
   additionally allows 20 files per plan, 30 MiB per file, and 50 MiB total.
 
-## MCP evaluation adapter
+## Remote MCP adapter
 
-The Cloud Run pilot in `clients/lagniappe_mcp_remote/` composes the local
-adapter's catalog, REST mappings, validation, and result projections. It
+The Cloud Run service in `mcp/src/lagniappe_mcp/` contains its HTTP server,
+API catalog, REST mappings, validation, result projections and file transfers. It
 replaces `upload_local_files` with `upload_files` for ChatGPT attachment
 objects and `prepare_file_uploads` / `finalize_file_uploads` for terminal clients. No remote argument selects a server filesystem
-path. All draft/review and permission rules above apply to both transports.
-The hosted module is outside the immutable published local package source
-boundary; adding it does not silently rebuild a supported local wheel.
+path. All draft/review and permission rules above apply to MCP and direct REST access.
 Terminal uploads send user-selected bytes directly to existing Google Storage
 resumable sessions, then finalize the exact batch through authenticated MCP.
 Only `prepare_file_uploads` exposes validated storage write URLs, in an explicit
-upload manifest. This narrowly extends the local adapter's presentation rule;
+upload manifest. This is the sole upload-capability exception;
 all ordinary results still reject private transport capabilities. OAuth and
 service identity tokens never enter upload instructions or storage requests.
 Treat the manifest as a temporary credential: save it mode 600, do not include
@@ -96,7 +94,7 @@ package, source checkout, or Python environment:
    with the unchanged `plan_id` and `upload_batch_id`. A timeout, failed request,
    or HTTP 308 is not confirmation of completion; leave the batch pending.
 
-The server creates the Storage session using its own identity. The returned
+The main Lagniappe application creates the Storage session using its own identity. The returned
 URL authorizes that upload without forwarding the client's OAuth token or
 requiring a Google account on the terminal. Google documents the
 [single-request upload protocol](https://docs.cloud.google.com/storage/docs/performing-resumable-uploads#upload_the_data).
@@ -125,218 +123,19 @@ ChatGPT web/app attachment uploads continue to use `upload_files`.
 See [Authentication](AUTHENTICATION.md#remote-chatgpt-mcp-pilot) and
 [Deployment](INFRA_DEPLOYMENT.md#remote-mcp-pilot) for this opt-in pilot.
 
-The optional `lagniappe-mcp` process is a user-local stdio adapter over this
-REST API. It is not imported or executed by the site. Its public manifest is at
-`/mcp/manifest.json`; that no-store response identifies the application build,
-one current supported adapter release, its content-addressed wheel, Python
-range, proven platform, exact dependency-wheel graph, and API/contract range.
-Wheel URLs remain immutable for their declared support window and require no
-cookie, bearer key, signed URL, or OAuth exchange.
+The remote service is the only supported MCP transport. The internal
+`mcp/` package supplies shared schemas, API mappings, result
+validation and file transfer code. It has no user CLI, stdio entry point,
+credential profiles, public wheel distribution, or client installer.
 
-The `serve` command and its REST mapping are client-neutral: a conforming local
-stdio MCP harness can launch the same adapter. Automatic client-configuration
-mutation and the current interoperability evidence are specific to the pinned
-Codex trial client. Other CLI, IDE, desktop, or GUI clients remain unvalidated
-integrations until their own interoperability smokes pass; protocol
-compatibility alone is not an advertised support claim.
+Starters bundle current workflow context; uploads return the finalized inventory
+and refreshed contract. `submit_plan` privately checks the current contract
+before saving. Consume one complete result representation when the client
+provides both text and structured content. Legacy protocol clients receive an
+object wrapper for non-object results, with matching schemas and result paths.
 
-During the trial, setup instructions appear inside a signed-in user's existing
-**External agent API** Settings panel only when both the site evaluation flag
-and that user's explicit actor allowlist entry are present. The browser first
-requires its current origin to match configured `APP_URL`, `CUSTOM_DOMAIN`, or
-the explicit version-targeted evaluation origin. It then fetches the manifest
-with a literal same-origin path, omitted credentials, no-store cache mode, and
-redirect refusal. The service worker does not intercept `/mcp/`.
-
-The initial supported tuple is Linux x86_64 with glibc 2.17 or newer and
-CPython 3.14. The panel shows
-the validated pipx 1.17.2 path, forcing pip and binary-only dependencies:
-
-```bash
-pipx install --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
-  "https://example.test/mcp/releases/0.1.6/<sha256>/lagniappe_mcp-0.1.6-py3-none-any.whl#sha256=<sha256>"
-lagniappe-mcp configure codex --url "https://example.test" \
-  --profile personal
-lagniappe-mcp check --profile personal
-```
-
-Run `pipx ensurepath` when needed, open a fresh shell, and restart Codex. The
-explicit `--python python3.14` prevents pipx from choosing the interpreter that
-runs pipx when that interpreter cannot satisfy the adapter's Python 3.14 range.
-The wheel hash fragment and URL path bind the same release digest. A `uv tool`
-command is deliberately not shown: the pinned uv trial proved its direct-wheel
-URL fragment did not fail closed on a wrong digest. Public-index access remains
-necessary for the wheel's exact dependencies; the adapter lock controls only
-repository builds/tests, not this direct-wheel installation. Run the diagnostic
-after entering the key and before relying on the client registration.
-
-Reinstall the exact same content-addressed release by repeating the advertised
-command with `--force`:
-
-```bash
-pipx install --force --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
-  "https://example.test/mcp/releases/<version>/<sha256>/lagniappe_mcp-<version>-py3-none-any.whl#sha256=<sha256>"
-```
-
-When the site manifest advertises another compatible release, the same closed
-command shape performs either an upgrade or an intentional downgrade by naming
-that release's exact version, path, and digest:
-
-```bash
-pipx install --upgrade --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
-  "https://example.test/mcp/releases/<selected-version>/<selected-sha256>/lagniappe_mcp-<selected-version>-py3-none-any.whl#sha256=<selected-sha256>"
-lagniappe-mcp check --profile personal
-```
-
-Release `0.1.0` remains a historical, supported predecessor with its original
-root-gated upload interface, and immutable `0.1.1` remains in the release
-ledger as the first rootless local candidate. The first eight MCP baselines
-used `0.1.4`; the efficiency candidate is `0.1.5`. Capture any additional
-baseline cases before upgrading; do not downgrade during a measured run. Never install an
-unadvertised predecessor or a release whose API/contract or platform metadata
-does not match the current site.
-
-Release `0.1.3` fixes `Handler returned an invalid result` at Codex startup.
-Earlier releases could pass the API-only `check` diagnostic while failing the
-MCP `tools/list` response: handshake-era protocols require object-root output
-schemas, but `search_entities` returns an array. The adapter now advertises and
-returns `{"result": <value>}` for non-object output schemas on those protocols,
-with matching JSON text and result-path hints. Object results are unchanged;
-the `2026-07-28` protocol continues to use direct values. This is solely an MCP
-presentation change, not a REST API change. Upgrade the wheel and restart the
-client; keep the existing profile, key, and registration. Confirm the tools
-actually load in the client before starting a trial, not just that `check` or
-`codex mcp list` succeeds.
-
-Release `0.1.5` adds MCP-only lifecycle context without adding tools. Ask/Create
-starts retain their original Plan fields and add `context.contract`, including
-the personal Page, date/timezone, permissions and proposal schema. Organize
-starts add `context.guidelines`; finalized uploads add the current
-`context.contract` alongside their existing Plan and inventory. The schema
-pointer within `mcp_submission` is relative to its containing contract, not the
-outer start/upload result.
-
-Optional enrichment cannot convert a completed mutation into a retry: an
-unavailable, oversized or mismatched context produces `context.recovery` with
-the appropriate read and preserved successful Plan/upload. The adapter does
-not present a pending or changed file set as the completed batch's context.
-Clients should reuse supplied context; `submit_plan` still reads and validates
-the fresh contract privately. The MCP projection replaces REST-specific final
-refetch instructions, while direct REST clients retain their own workflow.
-There is no persistent domain cache or changed browser-execution authority.
-
-Consume one complete MCP result representation when both text and structured
-content are available. Preserve counts, continuation and serialization errors.
-The adapter keeps both wire representations, original media and complete file
-text; it adds no new bulk-file tool or inline-upload excerpts.
-
-Release `0.1.6` keeps the server-wide introduction short so client discovery
-excerpts expose individual tool purposes. Lifecycle descriptions and bundled
-submission context carry the detailed rules: each start creates a new report;
-reuse that Plan through investigation, clipped-output recovery, submission and
-revision. Reformat retained output or repeat only the necessary read with the
-same Plan. This changes MCP guidance, not the API's response shape or authority.
-
-Reusable natural-prompt evaluations and their latest reviewed results live in
-[`testing_ai_workflows/`](../testing_ai_workflows/README.md). Raw captures are
-local-only; the current targeted MCP round compares cases 01/02/08/09/11.
-
-Generate or rotate the shown-once API key only after installing. `configure`
-prompts without echo and stores it in the owner-only local profile; generated
-Codex configuration contains the absolute adapter executable and profile name,
-never the bearer. In `--profile personal`, `personal` is only the local profile
-name; the URL and key are read from that protected profile rather than placed in
-the MCP registration. Starting with `0.1.4`, the profile-only configuration
-command is sufficient:
-
-```bash
-lagniappe-mcp configure codex --profile project
-```
-
-For a new profile it prompts for the site URL and key; `--url` may still be
-supplied explicitly. For an existing profile it reuses both saved values and
-revalidates the same actor. A conflicting explicit URL is rejected before
-sending the saved credential anywhere. Configure another profile for another
-installation; ambient `LAGNIAPPE_URL`/`LAGNIAPPE_API_KEY` do not replace a
-named profile's values.
-
-Profiles `project` and `personal` register separate `lagniappe-project` and
-`lagniappe-personal` MCP servers. Configuring one does not disable the other.
-With both enabled, the user can name the intended installation in a request,
-but both remain accessible. The CLI's `/mcp` lists tools rather than switching
-profiles. For a project-only session with both registrations present, pass
-`-c 'mcp_servers.lagniappe-personal.enabled=false'` when launching Codex; use the
-opposite name for a personal-only session. A startup override does not mutate
-the adapter-owned fingerprinted registration.
-
-Uninstall in this order: revoke the site key, run
-`configure codex --remove --profile personal`, then `credentials remove
---profile personal`, `profile remove --profile personal`, and finally uninstall
-the isolated pipx tool.
-
-The owner-only profile is a credential-placement boundary, not a sandbox around
-the AI client. Codex, the adapter, and other processes running as the same OS
-user may have permission to read it; a client with unrestricted local shell or
-file access can therefore obtain the saved key. The profile keeps the bearer out
-of client configuration, MCP arguments/results, and model-authored HTTP, but it
-does not isolate that bearer from the local user account.
-
-The adapter likewise does not impose a separate directory sandbox on local
-uploads. `upload_local_files` accepts explicit paths to any readable, nonempty
-regular file available to the OS account running the adapter. Relative paths are
-interpreted from the adapter process's working directory, and symbolic links use
-the operating system's normal resolution. Directories, special files, missing or
-empty files, and duplicate underlying objects are rejected. For every accepted
-file, the adapter opens one descriptor, verifies and snapshots its identity and
-bytes, and uses that same descriptor for the complete upload. Descriptor
-mutation checks, live file-size limits, exact resumable-session validation,
-storage-origin restrictions, redirect refusal, and bearer/cookie separation all
-remain enforced.
-
-For a secondary nonpersistent Codex registration, keep the URL and key in the
-Codex parent process environment and allowlist their names instead of writing a
-literal secret into `config.toml`. Replace the command placeholder with the
-absolute executable path:
-
-```toml
-[mcp_servers.lagniappe-env]
-command = "/absolute/path/to/lagniappe-mcp"
-args = ["serve", "--from-env"]
-env_vars = ["LAGNIAPPE_URL", "LAGNIAPPE_API_KEY"]
-startup_timeout_sec = 30
-tool_timeout_sec = 300
-required = false
-default_tools_approval_mode = "writes"
-```
-
-This form persists only the variable names. Set `LAGNIAPPE_URL` and
-`LAGNIAPPE_API_KEY` in the environment that launches Codex; do not paste the
-key into the TOML file or a shell-history-bearing command. Environment
-forwarding is not general shell isolation either: the client process and other
-same-user processes may be able to inspect the ambient value. OAuth would
-replace this bearer with another local credential, such as a refresh token, but
-would not remove the same-user host trust boundary.
-
-For the manual evaluation, the REST Skill baseline and MCP candidate both use
-this same `/api/v1` contract. Freeze one application build and build marker,
-actor/key, permissions, workspace state, and client/model settings. Run the two
-arms in separate fresh sessions and configurations—Skill-only for the baseline,
-MCP-only for the candidate—and do not deploy, reinstall, upgrade, downgrade, or
-retune either environment between measured arms.
-
-Before freezing the isolated candidate configuration, rerun its configuration
-with the trial-only mandatory-server setting and the same URL/profile:
-
-```bash
-lagniappe-mcp configure codex --url "https://example.test" \
-  --profile personal --trial-required
-```
-
-This regenerates the owned fingerprinted block with `required = true`, so a
-startup failure cannot silently turn a candidate arm into a non-MCP run. The
-ordinary Settings command deliberately omits this flag and writes
-`required = false`. Do not hand-edit the TOML value: `required` participates in
-the entry ownership fingerprint.
+For clients that prefer direct HTTP, the API-key workflow and downloadable
+[client skill](#minimal-client-skill) remain independent of OAuth and MCP.
 
 ## Workflow
 

@@ -365,27 +365,6 @@ def test_common_security_headers():
     assert response.headers["Cache-Control"] == "private, no-cache"
 
 
-# @matrix mcp-package web-headers : build-marker immutable-cache no-store public-artifact
-def test_mcp_public_artifact_headers():
-    with app.test_request_context("/mcp/manifest.json"):
-        manifest = app.process_response(app.make_response("{}"))
-    assert manifest.headers["Cache-Control"] == "no-store"
-    assert manifest.headers["Content-Type"] == "application/json; charset=utf-8"
-    assert manifest.headers["X-Lagniappe-Build-ID"] == CONFIG.BUILD_ID
-
-    digest = "a" * 64
-    path = (
-        f"/mcp/releases/0.1.0/{digest}/"
-        "lagniappe_mcp-0.1.0-py3-none-any.whl"
-    )
-    with app.test_request_context(path):
-        wheel = app.process_response(app.make_response(b"wheel"))
-    assert wheel.headers["Cache-Control"] == (
-        "public, max-age=31536000, immutable"
-    )
-    assert wheel.headers["Content-Type"] == "application/octet-stream"
-
-
 # @matrix agent-api : bearer-only build-marker error-envelope no-store request-correlation session-independent
 @pytest.mark.parametrize("path", ("/api", "/api/v1"))
 def test_external_api_authentication_and_header_contract(monkeypatch, path):

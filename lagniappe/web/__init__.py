@@ -16,7 +16,6 @@ from flask import Flask, g, request, session
 from flask_wtf.csrf import CSRFProtect
 
 from lagniappe import CONFIG
-from config.constants import MCP_MANIFEST_URL, MCP_RELEASE_URL_PATTERN
 from lagniappe.core.exceptions.request import filter_sentry_event, sanitize_sentry_event
 from lagniappe.core.tools import cache
 
@@ -107,7 +106,6 @@ CSP = "; ".join(
         "form-action 'self'",
     ]
 )
-MCP_RELEASE_URL_RE = re.compile(MCP_RELEASE_URL_PATTERN)
 
 
 # @testable false
@@ -146,11 +144,9 @@ def record_authenticated_site_activity(response):
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_common_security_headers
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_mcp_public_artifact_headers
 # @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_native_consent_reaches_loopback_and_shows_submit_progress
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
 # @matrix web-headers : conditional-request entity-revision etag missing-fingerprint security
-# @matrix mcp-package web-headers : build-marker immutable-cache no-store public-artifact
 # @pair login:logout
 # @matrix mcp-oauth : loopback browser-callback
 @app.after_request
@@ -165,15 +161,7 @@ def add_lagniappe_headers(response):
         "Content-Security-Policy": CSP,
     }
 
-    if request.path == MCP_MANIFEST_URL:
-        headers.update(
-            {
-                "Cache-Control": "no-store",
-                "Content-Type": "application/json; charset=utf-8",
-                "X-Lagniappe-Build-ID": CONFIG.BUILD_ID,
-            }
-        )
-    elif request.blueprint in {"oauth", "oauth_metadata"}:
+    if request.blueprint in {"oauth", "oauth_metadata"}:
         # Flask-WTF verifies the HTTPS same-origin Referer on consent POSTs.
         # Cross-origin redirects to ChatGPT must not receive one.
         headers["Referrer-Policy"] = "same-origin"
@@ -186,13 +174,6 @@ def add_lagniappe_headers(response):
             headers["Content-Security-Policy"] = CSP.replace(
                 "form-action 'self'", "form-action 'self' " + destinations
             )
-    elif MCP_RELEASE_URL_RE.fullmatch(request.path):
-        headers.update(
-            {
-                "Cache-Control": "public, max-age=31536000, immutable",
-                "Content-Type": "application/octet-stream",
-            }
-        )
 
     if getattr(g, "fingerprint", False):
         headers["ETag"] = f'"{g.fingerprint}"'

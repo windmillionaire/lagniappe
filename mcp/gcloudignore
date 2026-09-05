@@ -1,0 +1,14 @@
+# Default deny: only the service source and its build inputs leave the repository.
+/*
+!mcp/
+/mcp/*
+!mcp/pyproject.toml
+!mcp/uv.lock
+!mcp/README.md
+!mcp/src/
+!mcp/src/**
+!mcp/Dockerfile
+!mcp/cloudbuild.yaml
+!mcp/gcloudignore
+**/__pycache__/
+**/*.pyc

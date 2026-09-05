@@ -4,35 +4,17 @@ from __future__ import annotations
 
 import ast
 import asyncio
-import builtins
-from contextlib import contextmanager, suppress
 from copy import deepcopy
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import io
 import json
-import os
 from pathlib import Path
-import select
-import socket
 import stat
-import subprocess
-import sys
-import threading
 import time
-import tomllib
-from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlencode
-import warnings
 
 import httpx
-from mcp import Client
-from mcp.shared.message import SessionMessage
-from mcp.shared.exceptions import MCPError
-from mcp_types import JSONRPCRequest
 import pytest
 
-from lagniappe_mcp._telemetry import classify_error, telemetry_scope
 from lagniappe_mcp import schema as schema_module
 from lagniappe_mcp.adapter import (
     AdapterResult,
@@ -47,13 +29,7 @@ from lagniappe_mcp.catalog import (
     get_file_output_schema,
     lifecycle_tools,
 )
-from lagniappe_mcp.codex_config import (
-    codex_config_path,
-    install_entry,
-    remove_entry,
-    render_entry,
-)
-from lagniappe_mcp.configuration import ConnectionConfig, from_environment
+from lagniappe_mcp.configuration import ConnectionConfig
 from lagniappe_mcp.errors import (
     AdapterError,
     ConfigurationError,
@@ -63,23 +39,9 @@ from lagniappe_mcp.errors import (
 from lagniappe_mcp.limits import (
     MAX_ERROR_BYTES,
     MAX_MEDIA_RAW_BYTES,
-    MAX_REQUEST_FRAME_BYTES,
-    MAX_STARTUP_DIAGNOSTIC_BYTES,
-    MAX_STDERR_BYTES,
     MAX_STRUCTURED_RESULT_BYTES,
 )
-from lagniappe_mcp.profiles import (
-    atomic_write,
-    connection_from_profile,
-    delete_profile,
-    load_profile,
-    load_profile_snapshot,
-    profile_path,
-    profile_fingerprint,
-    save_profile,
-    secure_read,
-)
-from lagniappe_mcp.rest import RESTClient, validate_openapi_compatibility
+from lagniappe_mcp.rest import RESTClient
 from lagniappe_mcp.schema import (
     compact_json,
     inject_plan_id,
@@ -87,9 +49,7 @@ from lagniappe_mcp.schema import (
     validate_value,
     wrap_result_schema,
 )
-from lagniappe_mcp.server import (
-    _bounded_stdin_lines,
-    _bounded_stdio_requests,
+from lagniappe_mcp.presentation import (
     _error_result,
     _success_result,
 )
@@ -97,30 +57,7 @@ from lagniappe_mcp.url_security import normalize_site_url, validate_storage_url
 from testing.utility import mcp_client_driver
 
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "clients" / "lagniappe_mcp"
-
-
-def _profile_value() -> dict[str, Any]:
-    return {
-        "schema_version": 2,
-        "name": "personal",
-        "site_url": "https://example.com",
-        "api_key": "secret-key",
-        "actor": {"name": "Person", "hash": "abcdefghijkl"},
-        "credential": {
-            "expires_at": "2099-01-01T00:00:00+00:00",
-            "display_prefix": "lag_1234…",
-            "generation": 1,
-        },
-        "client": {
-            "name": "lagniappe-personal",
-            "mode": "automatic",
-            "registered": True,
-            "fingerprint": "a" * 64,
-            "executable": "/usr/bin/lagniappe-mcp",
-            "required": False,
-        },
-    }
+PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "mcp"
 
 
 def _signed_download_url(**updates: str) -> str:
@@ -215,98 +152,6 @@ def _contract() -> dict[str, Any]:
     }
 
 
-def _compatible_openapi() -> dict[str, Any]:
-    methods = {
-        "/api/v1": "get",
-        "/api/v1/client-skill.md": "get",
-        "/api/v1/me": "get",
-        "/api/v1/tools": "get",
-        "/api/v1/plans": "post",
-        "/api/v1/plans/{plan_id}": "get",
-        "/api/v1/plans/{plan_id}/contract": "get",
-        "/api/v1/plans/{plan_id}/submit": "post",
-        "/api/v1/plans/{plan_id}/uploads": "post",
-        "/api/v1/plans/{plan_id}/uploads/finalize": "post",
-        "/api/v1/plans/{plan_id}/tools/{tool_name}": "post",
-    }
-    batch_schema = {"type": "string"}
-    version_schema = {"properties": {"contract_version": {"const": 6}}}
-    plan_schema = deepcopy(version_schema)
-    plan_schema["required"] = ["upload_batch_id"]
-    plan_schema["properties"]["upload_batch_id"] = {
-        "oneOf": [batch_schema, {"type": "null"}],
-    }
-    paths = {path: {method: {}} for path, method in methods.items()}
-    paths["/api/v1/plans/{plan_id}/uploads"]["post"] = {
-        "responses": {
-            "201": {
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": [
-                                "plan_id",
-                                "upload_batch_id",
-                                "uploads",
-                            ],
-                            "properties": {
-                                "plan_id": {"type": "string"},
-                                "upload_batch_id": batch_schema,
-                                "uploads": {"type": "array"},
-                            },
-                        }
-                    }
-                }
-            }
-        }
-    }
-    paths["/api/v1/plans/{plan_id}/uploads/finalize"]["post"] = {
-        "requestBody": {
-            "required": True,
-            "content": {
-                "application/json": {
-                    "schema": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": ["upload_batch_id"],
-                        "properties": {"upload_batch_id": batch_schema},
-                    }
-                }
-            },
-        }
-    }
-    return {
-        "openapi": "3.1.0",
-        "paths": paths,
-        "components": {
-            "schemas": {
-                "Plan": plan_schema,
-                "PlanContract": deepcopy(version_schema),
-                "SubmissionReceipt": deepcopy(version_schema),
-                "PlanSubmissionFormat": {
-                    "properties": {
-                        "contract_version": {"const": 6},
-                        "body": {
-                            "properties": {"contract_version": {"const": 6}}
-                        },
-                    }
-                },
-                "UploadFile": {
-                    "type": "object",
-                    "required": ["filename", "size"],
-                    "properties": {
-                        "filename": {"type": "string"},
-                        "content_type": {"type": "string"},
-                        "size": {"type": "integer"},
-                    },
-                    "additionalProperties": False,
-                },
-            }
-        },
-    }
-
-
 class _WorkflowREST:
     def __init__(self) -> None:
         self.requests: list[tuple[str, str, Any]] = []
@@ -382,1842 +227,6 @@ class _WorkflowREST:
 
 
 # @pair mcp-adapter:product-contract
-def test_profile_write_rejects_shared_private_directories(tmp_path: Path) -> None:
-    config_home = tmp_path / "profile-config"
-    config_home.mkdir(mode=0o700)
-    profiles = config_home / "profiles"
-    profiles.mkdir(mode=0o700)
-    os.chmod(config_home, 0o777)
-    environ = {"LAGNIAPPE_MCP_CONFIG_HOME": str(config_home)}
-
-    with pytest.raises(ConfigurationError) as error:
-        save_profile(_profile_value(), environ=environ)
-
-    assert error.value.code == "unsafe_permissions"
-    assert not (profiles / "personal.json").exists()
-
-
-# @pair mcp-adapter:product-contract
-def test_profile_paths_never_anchor_relative_config_roots_to_the_working_directory(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.chdir(tmp_path)
-    for variable in ("LAGNIAPPE_MCP_CONFIG_HOME", "XDG_CONFIG_HOME"):
-        with pytest.raises(ConfigurationError) as error:
-            profile_path("personal", environ={variable: "project-config"})
-        assert error.value.code == "unsafe_path"
-    with pytest.raises(ConfigurationError) as home_error:
-        profile_path("personal", environ={"HOME": "project-home"})
-    assert home_error.value.code == "unsafe_path"
-    assert not (tmp_path / "project-config").exists()
-    assert not (tmp_path / "project-home").exists()
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/codex_config.py::install_entry
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::save_profile
-def test_profile_and_codex_config_reject_symlinked_directory_components(
-    tmp_path: Path,
-) -> None:
-    actual = tmp_path / "actual"
-    actual.mkdir(mode=0o700)
-    redirected = tmp_path / "redirected"
-    redirected.symlink_to(actual, target_is_directory=True)
-
-    with pytest.raises(ConfigurationError) as profile_error:
-        save_profile(
-            _profile_value(),
-            environ={
-                "LAGNIAPPE_MCP_CONFIG_HOME": str(redirected / "profile-config")
-            },
-        )
-    assert profile_error.value.code == "unsafe_path"
-
-    with pytest.raises(ConfigurationError) as codex_error:
-        install_entry(
-            "personal",
-            "/usr/bin/lagniappe-mcp",
-            expected_fingerprint=None,
-            environ={"CODEX_HOME": str(redirected / "codex-config")},
-        )
-    assert codex_error.value.code == "unsafe_path"
-    assert list(actual.iterdir()) == []
-
-
-# @pair mcp-adapter:product-contract
-def test_manual_environment_configuration_is_explicit_and_validated() -> None:
-    config = from_environment(
-        environ={
-            "LAGNIAPPE_URL": " https://example.com ",
-            "LAGNIAPPE_API_KEY": " api-secret ",
-        },
-    )
-
-    assert config.authority.origin == "https://example.com"
-    assert config.api_key == "api-secret"
-    assert "api-secret" not in repr(config)
-    with pytest.raises(ConfigurationError) as missing:
-        from_environment(environ={"LAGNIAPPE_URL": "https://example.com"})
-    assert missing.value.code == "missing_environment"
-    assert "LAGNIAPPE_API_KEY" in missing.value.message
-    with pytest.raises(ConfigurationError) as empty:
-        from_environment(
-            environ={
-                "LAGNIAPPE_URL": "https://example.com",
-                "LAGNIAPPE_API_KEY": "   ",
-            },
-        )
-    assert empty.value.code == "empty_environment"
-    assert "LAGNIAPPE_API_KEY" in empty.value.message
-    with pytest.raises(ConfigurationError) as missing_url:
-        from_environment(environ={"LAGNIAPPE_API_KEY": "api-secret"})
-    assert missing_url.value.code == "missing_environment"
-    assert "LAGNIAPPE_URL" in missing_url.value.message
-    with pytest.raises(ConfigurationError) as empty_url:
-        from_environment(
-            environ={
-                "LAGNIAPPE_URL": "   ",
-                "LAGNIAPPE_API_KEY": "api-secret",
-            },
-        )
-    assert empty_url.value.code == "empty_environment"
-    assert "LAGNIAPPE_URL" in empty_url.value.message
-    with pytest.raises(ConfigurationError) as unsafe_url:
-        from_environment(
-            environ={
-                "LAGNIAPPE_URL": "http://example.com",
-                "LAGNIAPPE_API_KEY": "key",
-            },
-        )
-    assert unsafe_url.value.code == "invalid_url"
-
-
-# @pair mcp-adapter:product-contract
-def test_profile_atomic_write_detects_race_after_temp_fsync(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    target = tmp_path / "private" / "value.json"
-    target.parent.mkdir(mode=0o700)
-    atomic_write(target, b"before", private=True)
-    real_fsync = os.fsync
-    raced = False
-
-    def racing_fsync(descriptor: int) -> None:
-        nonlocal raced
-        details = os.fstat(descriptor)
-        if not raced and stat.S_ISREG(details.st_mode):
-            raced = True
-            target.write_bytes(b"concurrent")
-        real_fsync(descriptor)
-
-    monkeypatch.setattr("lagniappe_mcp.profiles.os.fsync", racing_fsync)
-    with pytest.raises(ConfigurationError) as error:
-        atomic_write(target, b"replacement", private=True)
-
-    assert error.value.code == "concurrent_change"
-    assert target.read_bytes() == b"concurrent"
-    assert not list(target.parent.glob(".value.json.*.tmp"))
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-def test_profile_write_post_compare_race_is_restored_without_clobbering_backup(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    directory = tmp_path / "codex"
-    directory.mkdir(mode=0o700)
-    target = directory / "config.toml"
-    backup = directory / "config.toml.lagniappe-mcp.bak"
-    target.write_bytes(b"reviewed")
-    backup.write_bytes(b"older-backup")
-    os.chmod(target, 0o600)
-    os.chmod(backup, 0o600)
-    real_exchange = profiles_module._rename_exchange
-    raced = False
-
-    def race_after_compare(
-        directory_fd: int, source: str, destination: str
-    ) -> None:
-        nonlocal raced
-        if destination == target.name and source.endswith(".tmp") and not raced:
-            raced = True
-            target.write_bytes(b"concurrent")
-        real_exchange(directory_fd, source, destination)
-
-    monkeypatch.setattr(profiles_module, "_rename_exchange", race_after_compare)
-    with pytest.raises(ConfigurationError) as error:
-        atomic_write(target, b"replacement", private=False, backup=True)
-
-    assert error.value.code == "concurrent_change"
-    assert target.read_bytes() == b"concurrent"
-    assert backup.read_bytes() == b"older-backup"
-    assert not list(directory.glob("*.recover"))
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-def test_client_config_rollback_never_displaces_a_newer_canonical_revision(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    directory = tmp_path / "codex"
-    directory.mkdir(mode=0o700)
-    target = directory / "config.toml"
-    backup = directory / "config.toml.lagniappe-mcp.bak"
-    target.write_bytes(b"reviewed")
-    backup.write_bytes(b"older-backup")
-    os.chmod(target, 0o600)
-    os.chmod(backup, 0o600)
-
-    def mutate_both_names_after_exchange(
-        directory_fd: int,
-        temporary: str,
-        filename: str,
-    ) -> None:
-        newer = f".{filename}.newer"
-        newer_fd = os.open(
-            newer,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-            0o600,
-            dir_fd=directory_fd,
-        )
-        try:
-            os.write(newer_fd, b"newer")
-            os.fsync(newer_fd)
-        finally:
-            os.close(newer_fd)
-        os.rename(
-            newer,
-            filename,
-            src_dir_fd=directory_fd,
-            dst_dir_fd=directory_fd,
-        )
-        displaced_fd = os.open(
-            temporary,
-            os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW,
-            dir_fd=directory_fd,
-        )
-        try:
-            os.write(displaced_fd, b"changed-displaced")
-            os.fsync(displaced_fd)
-        finally:
-            os.close(displaced_fd)
-
-    monkeypatch.setattr(
-        profiles_module,
-        "_after_exchange",
-        mutate_both_names_after_exchange,
-    )
-    with pytest.raises(ConfigurationError) as error:
-        atomic_write(target, b"replacement", private=False, backup=True)
-
-    assert error.value.code == "configuration_recovery_required"
-    assert target.read_bytes() == b"newer"
-    assert backup.read_bytes() == b"older-backup"
-    recoveries = list(directory.glob(".config.toml.*.recover"))
-    assert len(recoveries) == 1
-    assert recoveries[0].read_bytes() == b"changed-displaced"
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-def test_private_profile_replace_crash_leaves_no_old_credential_residue(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    class SimulatedCrash(BaseException):
-        pass
-
-    directory = tmp_path / "private"
-    directory.mkdir(mode=0o700)
-    target = directory / "value.json"
-    target.write_bytes(b"reviewed-old-key")
-    os.chmod(target, 0o600)
-    observed: list[tuple[bytes, tuple[str, ...]]] = []
-
-    def crash_after_replace(directory_fd: int, filename: str) -> None:
-        canonical_fd = os.open(
-            filename,
-            os.O_RDONLY | os.O_NOFOLLOW,
-            dir_fd=directory_fd,
-        )
-        try:
-            observed.append(
-                (os.read(canonical_fd, 64), tuple(sorted(os.listdir(directory_fd))))
-            )
-        finally:
-            os.close(canonical_fd)
-        raise SimulatedCrash()
-
-    monkeypatch.setattr(
-        profiles_module,
-        "_after_private_replace",
-        crash_after_replace,
-    )
-    with pytest.raises(SimulatedCrash):
-        atomic_write(target, b"replacement-new-key", private=True)
-
-    assert observed == [
-        (
-            b"replacement-new-key",
-            (".value.json.lagniappe-mcp.lock", "value.json"),
-        )
-    ]
-    assert target.read_bytes() == b"replacement-new-key"
-    assert not list(directory.glob(".value.json.*.tmp"))
-    assert not list(directory.glob(".value.json.*.recover"))
-    for entry in directory.iterdir():
-        if entry.is_file():
-            assert b"reviewed-old-key" not in entry.read_bytes()
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-def test_profile_post_replace_validation_preserves_a_newer_revision(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    directory = tmp_path / "private"
-    directory.mkdir(mode=0o700)
-    target = directory / "value.json"
-    target.write_bytes(b"reviewed")
-    os.chmod(target, 0o600)
-
-    def mutate_after_replace(directory_fd: int, filename: str) -> None:
-        replacement = f".{filename}.newer"
-        descriptor = os.open(
-            replacement,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-            0o600,
-            dir_fd=directory_fd,
-        )
-        try:
-            os.write(descriptor, b"newer")
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-        os.rename(
-            replacement,
-            filename,
-            src_dir_fd=directory_fd,
-            dst_dir_fd=directory_fd,
-        )
-
-    monkeypatch.setattr(
-        profiles_module,
-        "_after_private_replace",
-        mutate_after_replace,
-    )
-    with pytest.raises(ConfigurationError) as error:
-        atomic_write(target, b"replacement", private=True)
-
-    assert error.value.code == "concurrent_change"
-    assert target.read_bytes() == b"newer"
-    assert not list(directory.glob(".value.json.*.tmp"))
-    assert not list(directory.glob(".value.json.*.recover"))
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_delete
-def test_profile_delete_detects_a_precommit_revision_change(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    target = tmp_path / "private" / "value.json"
-    target.parent.mkdir(mode=0o700)
-    atomic_write(target, b"reviewed", private=True)
-    real_snapshot_matches = profiles_module._snapshot_matches
-    raced = False
-
-    def race_before_compare(
-        directory_fd: int,
-        filename: str,
-        original: Any,
-        *,
-        private: bool,
-    ) -> bool:
-        nonlocal raced
-        if filename == target.name and not raced:
-            raced = True
-            target.write_bytes(b"concurrent")
-        return real_snapshot_matches(
-            directory_fd,
-            filename,
-            original,
-            private=private,
-        )
-
-    monkeypatch.setattr(profiles_module, "_snapshot_matches", race_before_compare)
-    with pytest.raises(ConfigurationError) as error:
-        profiles_module.atomic_delete(target, private=True)
-
-    assert error.value.code == "concurrent_change"
-    assert target.read_bytes() == b"concurrent"
-    assert not list(target.parent.glob("*.recover"))
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_delete
-def test_private_profile_delete_crash_leaves_no_credential_residue(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    class SimulatedCrash(BaseException):
-        pass
-
-    target = tmp_path / "private" / "value.json"
-    target.parent.mkdir(mode=0o700)
-    atomic_write(target, b"old-key", private=True)
-    observed: list[tuple[str, ...]] = []
-
-    def crash_after_delete(directory_fd: int, filename: str) -> None:
-        assert filename == target.name
-        observed.append(tuple(os.listdir(directory_fd)))
-        raise SimulatedCrash()
-
-    monkeypatch.setattr(
-        profiles_module,
-        "_after_private_delete",
-        crash_after_delete,
-    )
-    with pytest.raises(SimulatedCrash):
-        profiles_module.atomic_delete(target, private=True)
-
-    assert len(observed) == 1
-    assert target.name not in observed[0]
-    assert not target.exists()
-    assert not list(target.parent.glob(".value.json.*.tmp"))
-    assert not list(target.parent.glob(".value.json.*.recover"))
-    for entry in target.parent.iterdir():
-        if entry.is_file():
-            assert b"old-key" not in entry.read_bytes()
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::secure_read
-@pytest.mark.parametrize("suffix", ["tmp", "recover"])
-def test_private_profile_access_cleans_abandoned_owner_only_transactions(
-    tmp_path: Path,
-    suffix: str,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    target = tmp_path / "private" / "value.json"
-    target.parent.mkdir(mode=0o700)
-    atomic_write(target, b"current-key", private=True)
-    abandoned = target.parent / f".value.json.999.deadbeefdeadbeef.{suffix}"
-    abandoned.write_bytes(b"abandoned-key")
-    os.chmod(abandoned, 0o600)
-
-    assert profiles_module.secure_read(target, private=True) == b"current-key"
-    assert not abandoned.exists()
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-def test_profile_create_post_compare_race_never_replaces_the_new_file(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    target = tmp_path / "private" / "value.json"
-    target.parent.mkdir(mode=0o700)
-    real_rename = profiles_module._rename_noreplace
-    raced = False
-
-    def race_after_compare(
-        directory_fd: int, source: str, destination: str
-    ) -> None:
-        nonlocal raced
-        if destination == target.name and source.endswith(".tmp") and not raced:
-            raced = True
-            target.write_bytes(b"concurrent-create")
-            os.chmod(target, 0o600)
-        real_rename(directory_fd, source, destination)
-
-    monkeypatch.setattr(profiles_module, "_rename_noreplace", race_after_compare)
-    with pytest.raises(ConfigurationError) as error:
-        atomic_write(target, b"created-by-adapter", private=True)
-
-    assert error.value.code == "concurrent_change"
-    assert target.read_bytes() == b"concurrent-create"
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-def test_codex_backup_failure_rolls_back_main_without_replacing_a_newer_edit(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    directory = tmp_path / "codex"
-    directory.mkdir(mode=0o700)
-    target = directory / "config.toml"
-    backup = directory / "config.toml.lagniappe-mcp.bak"
-    target.write_bytes(b"reviewed")
-    backup.write_bytes(b"older-backup")
-    os.chmod(target, 0o600)
-    os.chmod(backup, 0o600)
-    real_write = profiles_module._write_at
-
-    def fail_backup(
-        directory_fd: int,
-        filename: str,
-        data: bytes,
-        **kwargs: Any,
-    ):
-        if filename == backup.name:
-            raise ConfigurationError("save_failed", "injected backup failure")
-        return real_write(directory_fd, filename, data, **kwargs)
-
-    monkeypatch.setattr(profiles_module, "_write_at", fail_backup)
-    with pytest.raises(ConfigurationError) as error:
-        atomic_write(target, b"replacement", private=False, backup=True)
-
-    assert error.value.code == "save_failed"
-    assert target.read_bytes() == b"reviewed"
-    assert backup.read_bytes() == b"older-backup"
-
-    def fail_backup_after_newer_edit(
-        directory_fd: int,
-        filename: str,
-        data: bytes,
-        **kwargs: Any,
-    ):
-        if filename == backup.name:
-            target.write_bytes(b"newer-edit")
-            raise ConfigurationError("save_failed", "injected backup failure")
-        return real_write(directory_fd, filename, data, **kwargs)
-
-    monkeypatch.setattr(
-        profiles_module,
-        "_write_at",
-        fail_backup_after_newer_edit,
-    )
-    with pytest.raises(ConfigurationError) as raced_error:
-        atomic_write(target, b"replacement", private=False, backup=True)
-
-    assert raced_error.value.code == "configuration_rollback_failed"
-    assert target.read_bytes() == b"newer-edit"
-    assert backup.read_bytes() == b"older-backup"
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-@pytest.mark.parametrize("kind", ["symlink", "fifo"])
-def test_profile_mutations_reject_nonregular_targets_without_blocking(
-    tmp_path: Path,
-    kind: str,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    directory = tmp_path / "private"
-    directory.mkdir(mode=0o700)
-    target = directory / "value.json"
-    if kind == "symlink":
-        outside = tmp_path / "outside.json"
-        outside.write_bytes(b"outside")
-        target.symlink_to(outside)
-    else:
-        os.mkfifo(target)
-
-    with pytest.raises(ConfigurationError) as write_error:
-        atomic_write(target, b"replacement", private=True)
-    assert write_error.value.code == "unsafe_file"
-    with pytest.raises(ConfigurationError) as delete_error:
-        profiles_module.atomic_delete(target, private=True)
-    assert delete_error.value.code == "unsafe_file"
-    if kind == "symlink":
-        assert outside.read_bytes() == b"outside"
-    else:
-        assert stat.S_ISFIFO(target.lstat().st_mode)
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-def test_atomic_update_requires_kernel_no_clobber_support(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import profiles as profiles_module
-
-    def unsupported(_directory_fd: int, _source: str, _destination: str) -> None:
-        raise profiles_module._AtomicRenameUnavailable(
-            profiles_module.errno.ENOSYS,
-            "unsupported",
-        )
-
-    monkeypatch.setattr(profiles_module, "_rename_noreplace", unsupported)
-    monkeypatch.setattr(profiles_module, "_rename_exchange", unsupported)
-    private_target = tmp_path / "private" / "profile.json"
-    private_target.parent.mkdir(mode=0o700)
-    with pytest.raises(ConfigurationError) as profile_error:
-        atomic_write(private_target, b"profile", private=True)
-    assert profile_error.value.code == "atomic_update_unsupported"
-    assert "--from-env" in profile_error.value.message
-    assert not private_target.exists()
-
-    codex_target = tmp_path / "codex" / "config.toml"
-    codex_target.parent.mkdir(mode=0o700)
-    codex_target.write_bytes(b"existing")
-    os.chmod(codex_target, 0o600)
-    with pytest.raises(ConfigurationError) as codex_error:
-        atomic_write(codex_target, b"config", private=False)
-    assert codex_error.value.code == "manual_configuration_required"
-    assert "manual block" in codex_error.value.message
-    assert codex_target.read_bytes() == b"existing"
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-def test_profile_and_codex_mutations_reject_changes_after_their_review(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import codex_config as codex_module
-    from lagniappe_mcp import profiles as profiles_module
-
-    profile_environ = {"LAGNIAPPE_MCP_CONFIG_HOME": str(tmp_path / "profiles")}
-    save_profile(_profile_value(), environ=profile_environ)
-    profile, profile_snapshot = load_profile_snapshot(
-        "personal", environ=profile_environ
-    )
-    profile_target = tmp_path / "profiles" / "profiles" / "personal.json"
-    concurrent_profile = deepcopy(profile)
-    concurrent_profile["actor"]["name"] = "Concurrent Person"
-    concurrent_bytes = (
-        json.dumps(
-            concurrent_profile,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        + b"\n"
-    )
-    profile_target.write_bytes(concurrent_bytes)
-    profile["actor"]["name"] = "Replacement Person"
-
-    with pytest.raises(ConfigurationError) as profile_error:
-        save_profile(
-            profile,
-            environ=profile_environ,
-            expected_snapshot=profile_snapshot,
-        )
-
-    assert profile_error.value.code == "concurrent_change"
-    assert profile_target.read_bytes() == concurrent_bytes
-
-    codex_environ = {"CODEX_HOME": str(tmp_path / "codex")}
-    fingerprint = install_entry(
-        "personal",
-        "/usr/bin/lagniappe-mcp",
-        expected_fingerprint=None,
-        environ=codex_environ,
-    )
-    codex_target = tmp_path / "codex" / "config.toml"
-    real_atomic_write = profiles_module.atomic_write
-
-    def race_before_lock(path: Path, data: bytes, **kwargs: Any) -> None:
-        codex_target.write_text(
-            codex_target.read_text(encoding="utf-8") + "# concurrent edit\n",
-            encoding="utf-8",
-        )
-        real_atomic_write(path, data, **kwargs)
-
-    monkeypatch.setattr(codex_module, "atomic_write", race_before_lock)
-    with pytest.raises(ConfigurationError) as codex_error:
-        install_entry(
-            "personal",
-            "/opt/lagniappe-mcp",
-            expected_fingerprint=fingerprint,
-            environ=codex_environ,
-        )
-
-    assert codex_error.value.code == "concurrent_change"
-    assert codex_target.read_text(encoding="utf-8").endswith("# concurrent edit\n")
-
-
-# @pair mcp-adapter:product-contract
-def test_profile_round_trip_is_strict_and_owner_only(tmp_path: Path) -> None:
-    environ = {"LAGNIAPPE_MCP_CONFIG_HOME": str(tmp_path / "profiles")}
-    value = _profile_value()
-    save_profile(value, environ=environ)
-    loaded = load_profile("personal", environ=environ)
-    target = tmp_path / "profiles" / "profiles" / "personal.json"
-
-    assert loaded == value
-    connection = connection_from_profile("personal", environ=environ)
-    assert connection.authority.origin == value["site_url"]
-    assert connection.actor_hash == value["actor"]["hash"]
-    assert profile_fingerprint(value) == profile_fingerprint(loaded)
-    assert stat.S_IMODE(target.stat().st_mode) == 0o600
-    os.chmod(tmp_path / "profiles", 0o755)
-    with pytest.raises(ConfigurationError) as exposed_directory:
-        load_profile("personal", environ=environ)
-    assert exposed_directory.value.code == "unsafe_permissions"
-    os.chmod(tmp_path / "profiles", 0o700)
-    malformed = dict(value)
-    malformed["unexpected"] = True
-    with pytest.raises(ConfigurationError, match="shape"):
-        save_profile(malformed, environ=environ)
-    delete_profile("personal", environ=environ)
-    with pytest.raises(ConfigurationError, match="does not exist"):
-        load_profile("personal", environ=environ)
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::load_profile
-def test_legacy_profile_discards_retired_allowed_roots(tmp_path: Path) -> None:
-    environ = {"LAGNIAPPE_MCP_CONFIG_HOME": str(tmp_path / "profiles")}
-    legacy = _profile_value()
-    legacy["schema_version"] = 1
-    legacy["allowed_roots"] = ["/tmp/retired"]
-    target = profile_path("personal", environ=environ)
-    atomic_write(
-        target,
-        json.dumps(legacy, sort_keys=True, separators=(",", ":")).encode() + b"\n",
-        private=True,
-    )
-
-    loaded = load_profile("personal", environ=environ)
-
-    assert loaded["schema_version"] == 2
-    assert "allowed_roots" not in loaded
-    connection = connection_from_profile("personal", environ=environ)
-    assert connection.authority.origin == "https://example.com"
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/profiles.py::atomic_write
-def test_codex_config_accepts_owned_readable_directory_but_rejects_writable_one(
-    tmp_path: Path,
-) -> None:
-    codex_home = tmp_path / "codex"
-    codex_home.mkdir(mode=0o755)
-    environ = {"CODEX_HOME": str(codex_home)}
-
-    fingerprint = install_entry(
-        "personal",
-        "/usr/bin/lagniappe-mcp",
-        expected_fingerprint=None,
-        environ=environ,
-    )
-    target = codex_home / "config.toml"
-    assert fingerprint
-    assert stat.S_IMODE(codex_home.stat().st_mode) == 0o755
-    assert stat.S_IMODE(target.stat().st_mode) == 0o600
-
-    os.chmod(codex_home, 0o775)
-    with pytest.raises(ConfigurationError) as error:
-        secure_read(target, private=False)
-    assert error.value.code == "unsafe_permissions"
-
-
-# @pair mcp-adapter:product-contract
-def test_codex_owned_entry_rejects_table_modified_behind_marker(tmp_path: Path) -> None:
-    environ = {"CODEX_HOME": str(tmp_path / "codex")}
-    fingerprint = install_entry(
-        "personal",
-        "/usr/bin/lagniappe-mcp",
-        expected_fingerprint=None,
-        environ=environ,
-    )
-    target = tmp_path / "codex" / "config.toml"
-    original = target.read_text()
-    target.write_text(
-        original.replace("tool_timeout_sec = 300", "tool_timeout_sec = 301")
-    )
-
-    with pytest.raises(ConfigurationError) as error:
-        remove_entry(
-            "personal",
-            expected_fingerprint=fingerprint,
-            environ=environ,
-        )
-
-    assert error.value.code == "foreign_server"
-    assert "tool_timeout_sec = 301" in target.read_text()
-
-
-# @pair mcp-adapter:product-contract
-def test_codex_install_is_lossless_backed_up_and_idempotent(tmp_path: Path) -> None:
-    codex_home = tmp_path / "codex"
-    codex_home.mkdir(mode=0o700)
-    target = codex_home / "config.toml"
-    original = '# keep this comment\nmodel = "gpt-test"\n'
-    target.write_text(original)
-    os.chmod(target, 0o600)
-    environ = {"CODEX_HOME": str(codex_home)}
-
-    fingerprint = install_entry(
-        "personal",
-        "/usr/bin/lagniappe-mcp",
-        expected_fingerprint=None,
-        environ=environ,
-    )
-    installed_stat = target.stat()
-    backup = codex_home / "config.toml.lagniappe-mcp.bak"
-    assert target.read_text().startswith(original)
-    assert backup.read_text() == original
-    assert backup.stat().st_uid == os.getuid()
-    assert stat.S_IMODE(backup.stat().st_mode) == 0o600
-
-    repeated = install_entry(
-        "personal",
-        "/usr/bin/lagniappe-mcp",
-        expected_fingerprint=fingerprint,
-        environ=environ,
-    )
-    assert repeated == fingerprint
-    assert target.stat().st_ino == installed_stat.st_ino
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/codex_config.py::render_entry
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/codex_config.py::install_entry
-def test_codex_entry_required_mode_is_explicit_and_fingerprinted(
-    tmp_path: Path,
-) -> None:
-    ordinary_block, ordinary_fingerprint = render_entry(
-        "personal", "/usr/bin/lagniappe-mcp"
-    )
-    trial_block, trial_fingerprint = render_entry(
-        "personal", "/usr/bin/lagniappe-mcp", required=True
-    )
-
-    assert "required = false\n" in ordinary_block
-    assert "required = true\n" in trial_block
-    assert ordinary_fingerprint != trial_fingerprint
-
-    environ = {"CODEX_HOME": str(tmp_path / "codex")}
-    installed_ordinary = install_entry(
-        "personal",
-        "/usr/bin/lagniappe-mcp",
-        expected_fingerprint=None,
-        environ=environ,
-    )
-    assert installed_ordinary == ordinary_fingerprint
-    target = tmp_path / "codex" / "config.toml"
-    assert "required = false\n" in target.read_text(encoding="utf-8")
-
-    installed_trial = install_entry(
-        "personal",
-        "/usr/bin/lagniappe-mcp",
-        expected_fingerprint=installed_ordinary,
-        required=True,
-        environ=environ,
-    )
-    assert installed_trial == trial_fingerprint
-    configured = target.read_text(encoding="utf-8")
-    assert "required = true\n" in configured
-    assert "required = false\n" not in configured
-
-
-# @pair mcp-adapter:product-contract
-def test_cli_source_modes_and_lowercase_profile_names_are_exact() -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    parser = cli_module._parser()
-    profile_mode = parser.parse_args(["serve", "--profile", "personal"])
-    assert profile_mode.profile == "personal"
-    assert profile_mode.from_env is False
-    env_mode = parser.parse_args(["serve", "--from-env"])
-    assert env_mode.profile is None
-    assert env_mode.from_env is True
-
-    for command in ("serve", "check"):
-        with pytest.raises(ConfigurationError) as missing_source:
-            parser.parse_args([command])
-        assert missing_source.value.code == "invalid_arguments"
-        with pytest.raises(ConfigurationError) as duplicate_source:
-            parser.parse_args(
-                [command, "--profile", "personal", "--from-env"]
-            )
-        assert duplicate_source.value.code == "invalid_arguments"
-        with pytest.raises(ConfigurationError) as uppercase_profile:
-            parser.parse_args([command, "--profile", "Personal"])
-        assert uppercase_profile.value.code == "invalid_profile"
-        with pytest.raises(ConfigurationError) as retired_root:
-            parser.parse_args(
-                [command, "--from-env", "--allowed-root", "/tmp/retired"]
-            )
-        assert retired_root.value.code == "invalid_arguments"
-
-    with pytest.raises(ConfigurationError) as uppercase_configure:
-        parser.parse_args(
-            [
-                "configure",
-                "codex",
-                "--url",
-                "https://example.com",
-                "--profile",
-                "Personal",
-            ]
-        )
-    assert uppercase_configure.value.code == "invalid_profile"
-
-    controlled_trial = parser.parse_args(
-        [
-            "configure",
-            "codex",
-            "--url",
-            "https://example.com",
-            "--profile",
-            "personal",
-            "--trial-required",
-        ]
-    )
-    assert controlled_trial.trial_required is True
-    saved_profile = parser.parse_args(["configure", "codex", "--profile", "project"])
-    assert saved_profile.url is None
-    assert saved_profile.profile == "project"
-
-
-# @pair mcp-adapter:product-contract
-@pytest.mark.parametrize(
-    ("url", "trial_required"),
-    [
-        ("https://example.com", False),
-        (None, True),
-    ],
-    ids=("url", "trial-required"),
-)
-def test_configure_remove_rejects_configuration_arguments(
-    url: str | None,
-    trial_required: bool,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    with pytest.raises(ConfigurationError) as caught:
-        asyncio.run(
-            cli_module._configure_codex(
-                SimpleNamespace(
-                    profile="personal",
-                    remove=True,
-                    url=url,
-                    trial_required=trial_required,
-                )
-            )
-        )
-    assert caught.value.code == "invalid_arguments"
-
-
-# @pair mcp-adapter:product-contract
-def test_configure_named_profiles_reuses_saved_site_and_key(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    monkeypatch.setenv("LAGNIAPPE_MCP_CONFIG_HOME", str(tmp_path / "profiles"))
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
-    monkeypatch.setenv("LAGNIAPPE_URL", "https://unrelated.example")
-    monkeypatch.setenv("LAGNIAPPE_API_KEY", "unrelated-env-key")
-    monkeypatch.setattr(cli_module.sys, "stdin", SimpleNamespace(isatty=lambda: True))
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-    monkeypatch.setattr(cli_module, "console_executable", lambda: "/usr/bin/lagniappe-mcp")
-    sites = {
-        "project": ("https://project.example", "project-key", "project00001"),
-        "personal": ("https://personal.example", "personal-key", "personal0001"),
-    }
-    checked: list[tuple[str, str, str | None]] = []
-
-    async def validate_key(site_url: str, key: str, *, expected_hash: str | None = None):
-        checked.append((site_url, key, expected_hash))
-        _, expected_key, actor_hash = next(site for site in sites.values() if site[0] == site_url)
-        assert key == expected_key
-        assert expected_hash in {None, actor_hash}
-        actor = _actor()
-        actor["user"]["hash"] = actor_hash
-        return actor["user"], actor["credential"]
-
-    monkeypatch.setattr(cli_module, "_validate_key", validate_key)
-    for name, (url, key, _) in sites.items():
-        monkeypatch.setattr(builtins, "input", lambda _prompt: f"  {url}/  ")
-        monkeypatch.setattr(cli_module, "_prompt_key", lambda: key)
-        assert cli_module.main(["configure", "codex", "--profile", name]) == 0
-
-    monkeypatch.setattr(builtins, "input", lambda _prompt: pytest.fail("saved URL must be reused"))
-    monkeypatch.setattr(cli_module, "_prompt_key", lambda: pytest.fail("saved key must be reused"))
-    for name, (url, key, actor_hash) in sites.items():
-        other_name = next(other for other in sites if other != name)
-        other_before = profile_path(other_name).read_bytes()
-        assert cli_module.main(["configure", "codex", "--profile", name]) == 0
-        assert checked[-1] == (url, key, actor_hash)
-        saved = load_profile(name)
-        assert (saved["site_url"], saved["api_key"]) == (url, key)
-        assert profile_path(other_name).read_bytes() == other_before
-
-    registered = tomllib.loads(codex_config_path().read_text())["mcp_servers"]
-    assert set(registered) == {"lagniappe-project", "lagniappe-personal"}
-    for name in sites:
-        assert registered[f"lagniappe-{name}"]["args"] == ["serve", "--profile", name]
-
-    before_conflict = {name: profile_path(name).read_bytes() for name in sites}
-    configuration_before = codex_config_path().read_bytes()
-    assert cli_module.main([
-        "configure", "codex", "--profile", "project", "--url", sites["personal"][0],
-    ]) == 1
-    assert len(checked) == 4  # No bearer was sent to the conflicting site.
-    assert {name: profile_path(name).read_bytes() for name in sites} == before_conflict
-    assert codex_config_path().read_bytes() == configuration_before
-    captured = capsys.readouterr()
-    assert "profile_site_conflict" in captured.err
-    for key in ("project-key", "personal-key", "unrelated-env-key"):
-        assert key not in captured.out + captured.err
-
-
-# @pair mcp-adapter:product-contract
-@pytest.mark.parametrize("unavailable", ["noninteractive", "eof", "oserror"])
-def test_configure_new_profile_requires_an_explicit_or_interactive_site(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    unavailable: str,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    monkeypatch.setenv("LAGNIAPPE_MCP_CONFIG_HOME", str(tmp_path / "profiles"))
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
-    monkeypatch.setattr(
-        cli_module.sys, "stdin", SimpleNamespace(isatty=lambda: unavailable != "noninteractive")
-    )
-
-    def no_input(_prompt: str) -> str:
-        if unavailable == "noninteractive":
-            pytest.fail("noninteractive URL input must not be attempted")
-        raise EOFError() if unavailable == "eof" else OSError("terminal unavailable")
-
-    monkeypatch.setattr(builtins, "input", no_input)
-    monkeypatch.setattr(cli_module, "_prompt_key", lambda: pytest.fail("no site chosen"))
-    assert cli_module.main(["configure", "codex", "--profile", "project"]) == 1
-    assert "site_url_required" in capsys.readouterr().err
-    assert not profile_path("project").exists()
-    assert not codex_config_path().exists()
-
-
-# @pair mcp-adapter:product-contract
-@pytest.mark.parametrize("failure", ["warning", "eof", "oserror"])
-def test_api_key_prompt_fails_closed_when_no_echo_is_unavailable(
-    failure: str,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    def unavailable(_prompt: str) -> str:
-        if failure == "warning":
-            warnings.warn(
-                "echo fallback would expose echoed-secret",
-                cli_module.getpass.GetPassWarning,
-                stacklevel=2,
-            )
-            pytest.fail("the echoed fallback must never read a credential")
-        if failure == "eof":
-            raise EOFError("echoed-secret")
-        raise OSError("echoed-secret")
-
-    monkeypatch.setattr(cli_module.getpass, "getpass", unavailable)
-
-    with pytest.raises(ConfigurationError) as caught:
-        cli_module._prompt_key()
-
-    assert caught.value.code == "secure_prompt_unavailable"
-    assert "echoed-secret" not in caught.value.render()
-    captured = capsys.readouterr()
-    assert "echoed-secret" not in captured.out
-    assert "echoed-secret" not in captured.err
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/codex_config.py::install_entry
-def test_codex_config_never_anchors_a_relative_home_in_the_working_directory(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.chdir(tmp_path)
-    with pytest.raises(ConfigurationError) as error:
-        codex_config_path(environ={"CODEX_HOME": "project-codex"})
-    assert error.value.code == "unsafe_path"
-    with pytest.raises(ConfigurationError) as home_error:
-        codex_config_path(environ={"HOME": "project-home"})
-    assert home_error.value.code == "unsafe_path"
-    assert not (tmp_path / "project-codex").exists()
-    assert not (tmp_path / "project-home").exists()
-
-
-# @pair mcp-adapter:product-contract
-def test_configure_rolls_back_new_codex_entry_when_profile_save_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    removed: list[tuple[str, str]] = []
-
-    def missing_profile(_name: str):
-        raise ConfigurationError("profile_not_found", "missing")
-
-    async def valid_key(
-        _site_url: str, _key: str, *, expected_hash: str | None = None
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        assert expected_hash is None
-        return (
-            {"name": "Person", "hash": "abcdefghijkl"},
-            {"expires_at": "2099-01-01T00:00:00+00:00"},
-        )
-
-    monkeypatch.setattr(cli_module, "load_profile_snapshot", missing_profile)
-    monkeypatch.setattr(cli_module, "_prompt_key", lambda: "api-secret")
-    monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(cli_module, "console_executable", lambda: "/usr/bin/tool")
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-    monkeypatch.setattr(cli_module, "install_entry", lambda *_args, **_kwargs: "a" * 64)
-    monkeypatch.setattr(
-        cli_module,
-        "remove_entry",
-        lambda name, *, expected_fingerprint: removed.append(
-            (name, expected_fingerprint)
-        ),
-    )
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda _profile, **_kwargs: (_ for _ in ()).throw(
-            ConfigurationError("save_failed", "failed")
-        ),
-    )
-    args = SimpleNamespace(
-        profile="personal",
-        remove=False,
-        url="https://example.com",
-    )
-
-    with pytest.raises(ConfigurationError) as error:
-        asyncio.run(cli_module._configure_codex(args))
-
-    assert error.value.code == "save_failed"
-    assert removed == [("personal", "a" * 64)]
-
-    removed.clear()
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda _profile, **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt()),
-    )
-    with pytest.raises(KeyboardInterrupt):
-        asyncio.run(cli_module._configure_codex(args))
-    assert removed == [("personal", "a" * 64)]
-
-
-# @pair mcp-adapter:product-contract
-def test_configure_replaces_legacy_profile_without_file_roots(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    profile = _profile_value()
-    profile["schema_version"] = 1
-    profile["allowed_roots"] = ["/tmp/retired"]
-    profile["client"].update(mode="manual", registered=False)
-    saved: list[dict[str, Any]] = []
-    installed: list[tuple[str, str, str | None, bool]] = []
-
-    async def valid_key(
-        site_url: str, key: str, *, expected_hash: str | None = None
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        assert (site_url, key, expected_hash) == (
-            "https://example.com",
-            "secret-key",
-            "abcdefghijkl",
-        )
-        actor = _actor()
-        return actor["user"], actor["credential"]
-
-    snapshot = object()
-    monkeypatch.setattr(
-        cli_module,
-        "load_profile_snapshot",
-        lambda _name: (deepcopy(profile), snapshot),
-    )
-    monkeypatch.setattr(
-        cli_module,
-        "_prompt_key",
-        lambda: pytest.fail("existing same-site configuration must not prompt"),
-    )
-    monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(cli_module, "console_executable", lambda: "/usr/bin/tool")
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-    monkeypatch.setattr(
-        cli_module,
-        "install_entry",
-        lambda name, executable, *, expected_fingerprint, required=False: installed.append(
-            (name, executable, expected_fingerprint, required)
-        )
-        or "a" * 64,
-    )
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda value, *, expected_snapshot: (
-            expected_snapshot is snapshot or pytest.fail("stale profile snapshot")
-        )
-        and saved.append(value),
-    )
-    args = SimpleNamespace(
-        profile="personal",
-        remove=False,
-        url="https://example.com",
-    )
-
-    assert asyncio.run(cli_module._configure_codex(args)) == 0
-    assert installed == [("personal", "/usr/bin/tool", "a" * 64, False)]
-    assert saved[0]["schema_version"] == 2
-    assert "allowed_roots" not in saved[0]
-    assert saved[0]["client"]["mode"] == "automatic"
-    assert saved[0]["client"]["registered"] is True
-    preview = capsys.readouterr().out
-    assert "Proposed user Codex entry:" in preview
-    assert "[mcp_servers.lagniappe-personal]" in preview
-    assert "any explicit regular file accessible to this account" in preview
-    assert "secret-key" not in preview
-
-
-# @pair mcp-adapter:product-contract
-def test_configure_trial_required_uses_owned_required_entry(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    saved: list[dict[str, Any]] = []
-    installed: list[tuple[str, str, str | None, bool]] = []
-
-    def missing_profile(_name: str):
-        raise ConfigurationError("profile_not_found", "missing")
-
-    async def valid_key(
-        site_url: str,
-        key: str,
-        *,
-        expected_hash: str | None = None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        assert (site_url, key, expected_hash) == (
-            "https://example.com",
-            "api-secret",
-            None,
-        )
-        actor = _actor()
-        return actor["user"], actor["credential"]
-
-    monkeypatch.setattr(cli_module, "load_profile_snapshot", missing_profile)
-    monkeypatch.setattr(cli_module, "_prompt_key", lambda: "api-secret")
-    monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(cli_module, "console_executable", lambda: "/usr/bin/tool")
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-
-    def install(
-        name: str,
-        executable: str,
-        *,
-        expected_fingerprint: str | None,
-        required: bool = False,
-    ) -> str:
-        installed.append((name, executable, expected_fingerprint, required))
-        return "b" * 64
-
-    monkeypatch.setattr(cli_module, "install_entry", install)
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda value, *, expected_snapshot: (
-            expected_snapshot is None or pytest.fail("unexpected prior profile")
-        )
-        and saved.append(value),
-    )
-
-    assert (
-        asyncio.run(
-            cli_module._configure_codex(
-                SimpleNamespace(
-                    profile="personal",
-                    remove=False,
-                    url="https://example.com",
-                    trial_required=True,
-                )
-            )
-        )
-        == 0
-    )
-    assert installed == [("personal", "/usr/bin/tool", None, True)]
-    assert saved[0]["client"]["required"] is True
-    assert saved[0]["client"]["fingerprint"] == "b" * 64
-
-
-# @pair mcp-adapter:product-contract
-def test_configure_manual_fallback_preserves_a_changed_manual_identity(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    profile = _profile_value()
-    _old_block, old_fingerprint = cli_module.render_entry(
-        "personal", "/opt/lagniappe-mcp", required=False
-    )
-    profile["client"].update(
-        mode="manual",
-        registered=False,
-        fingerprint=old_fingerprint,
-        executable="/opt/lagniappe-mcp",
-        required=False,
-    )
-    original_client = deepcopy(profile["client"])
-
-    async def valid_key(
-        _site_url: str,
-        _key: str,
-        *,
-        expected_hash: str | None = None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        assert expected_hash == "abcdefghijkl"
-        actor = _actor()
-        return actor["user"], actor["credential"]
-
-    monkeypatch.setattr(
-        cli_module,
-        "load_profile_snapshot",
-        lambda _name: (profile, object()),
-    )
-    monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(
-        cli_module, "console_executable", lambda: "/opt/lagniappe-mcp"
-    )
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-    monkeypatch.setattr(
-        cli_module,
-        "install_entry",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            ConfigurationError(
-                "manual_configuration_required", "safe editing is unavailable"
-            )
-        ),
-    )
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda *_args, **_kwargs: pytest.fail(
-            "a changed manual identity must not replace the removal fingerprint"
-        ),
-    )
-
-    with pytest.raises(ConfigurationError) as caught:
-        asyncio.run(
-            cli_module._configure_codex(
-                SimpleNamespace(
-                    profile="personal",
-                    remove=False,
-                    url="https://example.com",
-                    trial_required=True,
-                )
-            )
-        )
-
-    assert caught.value.code == "managed_entry_update_requires_removal"
-    assert profile["client"] == original_client
-
-
-# @pair mcp-adapter:product-contract
-def test_configure_save_failure_restores_prior_required_entry(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    profile = _profile_value()
-    _old_block, old_fingerprint = cli_module.render_entry(
-        "personal", "/opt/lagniappe-mcp", required=True
-    )
-    profile["client"].update(
-        mode="automatic",
-        registered=True,
-        fingerprint=old_fingerprint,
-        executable="/opt/lagniappe-mcp",
-        required=True,
-    )
-    snapshot = object()
-    installed: list[tuple[str, str, str | None, bool]] = []
-    new_fingerprint = "c" * 64
-
-    async def valid_key(
-        _site_url: str,
-        _key: str,
-        *,
-        expected_hash: str | None = None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        assert expected_hash == "abcdefghijkl"
-        actor = _actor()
-        return actor["user"], actor["credential"]
-
-    def install(
-        name: str,
-        executable: str,
-        *,
-        expected_fingerprint: str | None,
-        required: bool = False,
-    ) -> str:
-        installed.append((name, executable, expected_fingerprint, required))
-        return new_fingerprint if len(installed) == 1 else old_fingerprint
-
-    monkeypatch.setattr(
-        cli_module,
-        "load_profile_snapshot",
-        lambda _name: (deepcopy(profile), snapshot),
-    )
-    monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(
-        cli_module, "console_executable", lambda: "/opt/lagniappe-mcp"
-    )
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-    monkeypatch.setattr(cli_module, "install_entry", install)
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda _profile, *, expected_snapshot: (
-            expected_snapshot is snapshot or pytest.fail("stale profile snapshot")
-        )
-        and (_ for _ in ()).throw(ConfigurationError("save_failed", "failed")),
-    )
-
-    with pytest.raises(ConfigurationError) as caught:
-        asyncio.run(
-            cli_module._configure_codex(
-                SimpleNamespace(
-                    profile="personal",
-                    remove=False,
-                    url="https://example.com",
-                    trial_required=False,
-                )
-            )
-        )
-
-    assert caught.value.code == "save_failed"
-    assert installed == [
-        ("personal", "/opt/lagniappe-mcp", old_fingerprint, False),
-        ("personal", "/opt/lagniappe-mcp", new_fingerprint, True),
-    ]
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/cli.py::_configure_codex
-@pytest.mark.parametrize(
-    "new_executable",
-    ["/opt/lagniappe-old", "/opt/lagniappe-new"],
-    ids=("same-fingerprint", "changed-fingerprint"),
-)
-def test_configure_manual_fallback_does_not_orphan_an_existing_owned_entry(
-    monkeypatch: pytest.MonkeyPatch,
-    new_executable: str,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    profile = _profile_value()
-    _old_block, old_fingerprint = cli_module.render_entry(
-        "personal", "/opt/lagniappe-old"
-    )
-    profile["client"].update(
-        mode="automatic",
-        registered=True,
-        fingerprint=old_fingerprint,
-        executable="/opt/lagniappe-old",
-    )
-    snapshot = object()
-
-    async def valid_key(
-        site_url: str, key: str, *, expected_hash: str | None = None
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        assert (site_url, key, expected_hash) == (
-            "https://example.com",
-            "secret-key",
-            "abcdefghijkl",
-        )
-        actor = _actor()
-        return actor["user"], actor["credential"]
-
-    monkeypatch.setattr(
-        cli_module,
-        "load_profile_snapshot",
-        lambda _name: (profile, snapshot),
-    )
-    monkeypatch.setattr(cli_module, "_validate_key", valid_key)
-    monkeypatch.setattr(cli_module, "console_executable", lambda: new_executable)
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-
-    def manual_required(*_args: Any, **_kwargs: Any) -> str:
-        raise ConfigurationError(
-            "manual_configuration_required", "safe editing is unavailable"
-        )
-
-    monkeypatch.setattr(cli_module, "install_entry", manual_required)
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda *_args, **_kwargs: pytest.fail(
-            "a failed identity change must not rewrite the owned profile"
-        ),
-    )
-    args = SimpleNamespace(
-        profile="personal",
-        remove=False,
-        url="https://example.com",
-    )
-
-    with pytest.raises(ConfigurationError) as caught:
-        asyncio.run(cli_module._configure_codex(args))
-
-    assert caught.value.code == "managed_entry_update_requires_removal"
-    assert "no profile or ownership metadata was changed" in caught.value.message
-    assert profile["client"] == {
-        "name": "lagniappe-personal",
-        "mode": "automatic",
-        "registered": True,
-        "fingerprint": old_fingerprint,
-        "executable": "/opt/lagniappe-old",
-        "required": False,
-    }
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/cli.py::_run
-def test_local_credential_and_profile_removal_are_distinct_state_transitions(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    profile = _profile_value()
-    saved: list[dict[str, Any]] = []
-    deleted: list[str] = []
-    snapshot = object()
-    monkeypatch.setattr(
-        cli_module,
-        "load_profile_snapshot",
-        lambda _name: (deepcopy(profile), snapshot),
-    )
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda value, *, expected_snapshot: (
-            expected_snapshot is snapshot or pytest.fail("stale profile snapshot")
-        )
-        and saved.append(value),
-    )
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-
-    remove_args = SimpleNamespace(
-        profile="personal",
-        credential_action="remove",
-    )
-    assert asyncio.run(cli_module._credentials(remove_args)) == 0
-    assert saved[-1]["api_key"] is None
-    assert saved[-1]["credential"] == {}
-    assert saved[-1]["client"] == profile["client"]
-
-    async def valid_replacement(
-        site_url: str, key: str, *, expected_hash: str | None = None
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        assert (site_url, key, expected_hash) == (
-            "https://example.com",
-            "replacement-key",
-            "abcdefghijkl",
-        )
-        actor = _actor()
-        actor["credential"]["generation"] = 2
-        return actor["user"], actor["credential"]
-
-    monkeypatch.setattr(cli_module, "_prompt_key", lambda: "replacement-key")
-    monkeypatch.setattr(cli_module, "_validate_key", valid_replacement)
-    set_args = SimpleNamespace(profile="personal", credential_action="set")
-    assert asyncio.run(cli_module._credentials(set_args)) == 0
-    assert saved[-1]["api_key"] == "replacement-key"
-    assert saved[-1]["credential"]["generation"] == 2
-    assert saved[-1]["actor"]["hash"] == "abcdefghijkl"
-
-    saved.clear()
-
-    async def invalid_replacement(*_args: Any, **_kwargs: Any):
-        raise ConfigurationError(
-            "actor_mismatch", "The replacement belongs to another actor."
-        )
-
-    monkeypatch.setattr(cli_module, "_validate_key", invalid_replacement)
-    with pytest.raises(ConfigurationError) as rejected:
-        asyncio.run(cli_module._credentials(set_args))
-    assert rejected.value.code == "actor_mismatch"
-    assert saved == []
-
-    monkeypatch.setattr(
-        cli_module,
-        "delete_profile",
-        lambda name, *, expected_snapshot: (
-            expected_snapshot is snapshot or pytest.fail("stale profile snapshot")
-        )
-        and deleted.append(name),
-    )
-    with pytest.raises(ConfigurationError) as registered:
-        cli_module._remove_profile("personal")
-    assert registered.value.code == "client_still_registered"
-    assert deleted == []
-
-    profile["client"]["registered"] = False
-    profile["client"]["fingerprint"] = None
-    assert cli_module._remove_profile("personal") == 0
-    assert deleted == ["personal"]
-
-
-# @pair mcp-adapter:product-contract
-@pytest.mark.parametrize(
-    ("failure", "expected_code"),
-    [
-        (AdapterError("unauthorized", "The key is invalid for this site.", status=401), "unauthorized"),
-        (ConfigurationError("invalid_credentials", "The API credential is inactive."), "invalid_credentials"),
-        (ConfigurationError("invalid_credentials", "The API credential is expired."), "invalid_credentials"),
-        (ConfigurationError("actor_mismatch", "The key belongs to another actor."), "actor_mismatch"),
-    ],
-    ids=("wrong-site-or-invalid", "inactive", "expired", "different-actor"),
-)
-def test_rejected_credential_replacement_preserves_the_saved_profile(
-    monkeypatch: pytest.MonkeyPatch,
-    failure: AdapterError,
-    expected_code: str,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    profile = _profile_value()
-    snapshot = object()
-    saved: list[dict[str, Any]] = []
-
-    async def reject(*_args: Any, **_kwargs: Any):
-        raise failure
-
-    monkeypatch.setattr(
-        cli_module,
-        "load_profile_snapshot",
-        lambda _name: (deepcopy(profile), snapshot),
-    )
-    monkeypatch.setattr(cli_module, "_prompt_key", lambda: "rejected-key")
-    monkeypatch.setattr(cli_module, "_validate_key", reject)
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda value, **_kwargs: saved.append(value),
-    )
-
-    with pytest.raises(AdapterError) as rejected:
-        asyncio.run(
-            cli_module._credentials(
-                SimpleNamespace(profile="personal", credential_action="set")
-            )
-        )
-
-    assert rejected.value.code == expected_code
-    assert saved == []
-    assert profile["api_key"] == "secret-key"
-    assert profile["credential"]["generation"] == 1
-
-
-# @pair mcp-adapter:product-contract
-def test_removed_local_credential_takes_effect_only_in_a_new_process(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    config_home = tmp_path / "lagniappe-mcp-config"
-    monkeypatch.setenv("LAGNIAPPE_MCP_CONFIG_HOME", str(config_home))
-    save_profile(_profile_value())
-    already_running = connection_from_profile("personal")
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-
-    assert asyncio.run(
-        cli_module._credentials(
-            SimpleNamespace(profile="personal", credential_action="remove")
-        )
-    ) == 0
-    assert already_running.api_key == "secret-key"
-    with pytest.raises(ConfigurationError) as restarted:
-        connection_from_profile("personal")
-    assert restarted.value.code == "missing_credentials"
-
-
-# @pair mcp-adapter:product-contract
-def test_configure_remove_falls_back_without_claiming_manual_removal(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    profile = _profile_value()
-    snapshot = object()
-    monkeypatch.setattr(
-        cli_module, "load_profile_snapshot", lambda _name: (profile, snapshot)
-    )
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-
-    def manual_required(*_args: Any, **_kwargs: Any) -> None:
-        raise ConfigurationError(
-            "manual_configuration_required", "manual editing required"
-        )
-
-    monkeypatch.setattr(cli_module, "remove_entry", manual_required)
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda _profile, **_kwargs: pytest.fail(
-            "unverified removal must not update the profile"
-        ),
-    )
-    args = SimpleNamespace(
-        profile="personal",
-        remove=True,
-        url=None,
-    )
-
-    assert asyncio.run(cli_module._configure_codex(args)) == 0
-    output = capsys.readouterr().out
-    assert "Remove this exact managed lagniappe-personal block" in output
-    assert "[mcp_servers.lagniappe-personal]" in output
-    assert profile["client"]["registered"] is True
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/cli.py::_configure_codex
-def test_manual_configuration_converges_only_after_exact_entry_verification(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    profile = _profile_value()
-    profile["client"].update(mode="manual", registered=False)
-    snapshot = object()
-    saved: list[dict[str, Any]] = []
-    removed: list[tuple[str, str]] = []
-    marker = object()
-    monkeypatch.setattr(
-        cli_module, "load_profile_snapshot", lambda _name: (profile, snapshot)
-    )
-    monkeypatch.setattr(
-        cli_module,
-        "inspect_entry",
-        lambda name, *, expected_fingerprint: (
-            "",
-            {},
-            marker,
-            None,
-        )
-        if (name, expected_fingerprint) == ("personal", "a" * 64)
-        else pytest.fail("manual ownership was not checked exactly"),
-    )
-    monkeypatch.setattr(
-        cli_module,
-        "remove_entry",
-        lambda name, *, expected_fingerprint: removed.append(
-            (name, expected_fingerprint)
-        ),
-    )
-    monkeypatch.setattr(
-        cli_module,
-        "save_profile",
-        lambda value, *, expected_snapshot: (
-            expected_snapshot is snapshot or pytest.fail("stale profile snapshot")
-        )
-        and saved.append(deepcopy(value)),
-    )
-    monkeypatch.setattr(cli_module, "_confirm", lambda _message: None)
-    args = SimpleNamespace(
-        profile="personal",
-        remove=True,
-        url=None,
-    )
-
-    assert asyncio.run(cli_module._configure_codex(args)) == 0
-    assert removed == [("personal", "a" * 64)]
-    assert saved[-1]["client"]["registered"] is False
-    assert saved[-1]["client"]["fingerprint"] is None
-
-    removed.clear()
-    saved.clear()
-    profile["client"].update(mode="manual", registered=False, fingerprint="a" * 64)
-    monkeypatch.setattr(
-        cli_module,
-        "inspect_entry",
-        lambda *_args, **_kwargs: ("", {}, None, None),
-    )
-    assert asyncio.run(cli_module._configure_codex(args)) == 0
-    assert removed == []
-    assert saved[-1]["client"]["fingerprint"] is None
-
-
-# @pair mcp-adapter:product-contract
-def test_cli_entrypoint_bounds_errors_and_routes_commands(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    from lagniappe_mcp import cli as cli_module
-
-    routed: list[str] = []
-
-    async def configured(args: SimpleNamespace) -> int:
-        routed.append(args.command)
-        return 7
-
-    monkeypatch.setattr(cli_module, "_configure_codex", configured)
-    assert asyncio.run(cli_module._run(SimpleNamespace(command="configure"))) == 7
-
-    async def rejected(args: SimpleNamespace) -> int:
-        routed.append(args.command)
-        raise ConfigurationError("invalid_credentials", "Bounded failure.")
-
-    monkeypatch.setattr(cli_module, "_run", rejected)
-    assert cli_module.main(["check", "--from-env"]) == 1
-    assert routed == ["configure", "check"]
-    assert "invalid_credentials" in capsys.readouterr().err
-
-    oversized_argument = "X" * (MAX_STDERR_BYTES * 2)
-    assert cli_module.main([oversized_argument]) == 1
-    parser_error = capsys.readouterr().err
-    assert len(parser_error.encode("utf-8")) <= MAX_STDERR_BYTES
-    assert oversized_argument not in parser_error
-    accidental_secret = "lgn_accidentally-pasted-secret"
-    assert cli_module.main(["check", "--api-key", accidental_secret]) == 1
-    assert accidental_secret not in capsys.readouterr().err
-
-    async def mixed_failure(_args: SimpleNamespace) -> int:
-        raise ExceptionGroup(
-            "mixed failure",
-            [BrokenPipeError(), RuntimeError("must remain visible")],
-        )
-
-    monkeypatch.setattr(cli_module, "_run", mixed_failure)
-    assert cli_module.main(["check", "--from-env"]) == 1
-    assert "adapter_failure" in capsys.readouterr().err
-
-
-# @pair mcp-adapter:product-contract
 def test_schema_rejects_dangling_refs_and_non_finite_json() -> None:
     with pytest.raises(SchemaError, match="dangling"):
         validate_schema_document(
@@ -2265,7 +274,7 @@ def test_schema_rejects_dangling_refs_and_non_finite_json() -> None:
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/schema.py::validate_schema_document
+# @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def test_untrusted_schema_work_is_rejected_before_general_validation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2327,7 +336,7 @@ def test_untrusted_schema_work_is_rejected_before_general_validation(
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/schema.py::validate_schema_document
+# @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def test_schema_subset_preserves_current_proposal_contract_features() -> None:
     schema = {
         "type": "object",
@@ -2399,7 +408,7 @@ def test_schema_subset_preserves_current_proposal_contract_features() -> None:
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/catalog.py::catalog_tools
+# @source mcp/src/lagniappe_mcp/catalog.py::catalog_tools
 def test_catalog_requires_complete_frozen_metadata_and_result_paths() -> None:
     catalog = asyncio.run(_WorkflowREST().startup())[2]
     converted = catalog_tools(catalog)
@@ -2718,81 +727,6 @@ def test_site_url_normalizes_only_canonical_https_or_loopback_origins() -> None:
             normalize_site_url(unsafe)
 
 
-# @pair mcp-adapter:product-contract
-def test_openapi_compatibility_check_is_exact_and_runs_only_for_check(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    document = _compatible_openapi()
-    validate_openapi_compatibility(document)
-
-    wrong_contract = deepcopy(document)
-    wrong_contract["components"]["schemas"]["PlanContract"]["properties"][
-        "contract_version"
-    ]["const"] = 5
-    with pytest.raises(TransportError) as contract_error:
-        validate_openapi_compatibility(wrong_contract)
-    assert contract_error.value.code == "incompatible_contract"
-
-    missing_route = deepcopy(document)
-    del missing_route["paths"]["/api/v1/plans/{plan_id}/submit"]
-    with pytest.raises(TransportError) as route_error:
-        validate_openapi_compatibility(missing_route)
-    assert route_error.value.code == "incompatible_openapi"
-
-    extra_route = deepcopy(document)
-    extra_route["paths"]["/api/v1/arbitrary"] = {"post": {}}
-    with pytest.raises(TransportError) as surface_error:
-        validate_openapi_compatibility(extra_route)
-    assert surface_error.value.code == "incompatible_openapi"
-
-    open_upload = deepcopy(document)
-    open_upload["components"]["schemas"]["UploadFile"][
-        "additionalProperties"
-    ] = True
-    with pytest.raises(TransportError) as upload_error:
-        validate_openapi_compatibility(open_upload)
-    assert upload_error.value.code == "incompatible_openapi"
-
-    unbound_finalize = deepcopy(document)
-    unbound_finalize["paths"]["/api/v1/plans/{plan_id}/uploads/finalize"][
-        "post"
-    ]["requestBody"]["content"]["application/json"]["schema"]["required"] = []
-    with pytest.raises(TransportError) as batch_error:
-        validate_openapi_compatibility(unbound_finalize)
-    assert batch_error.value.code == "incompatible_openapi"
-
-    from lagniappe_mcp import server as server_module
-
-    class FakeREST:
-        checked = False
-
-        async def check_openapi_compatibility(self) -> None:
-            self.checked = True
-
-    class FakeAdapter:
-        current: "FakeAdapter | None" = None
-
-        def __init__(self, _config: ConnectionConfig) -> None:
-            self.rest = FakeREST()
-            self.actor: dict[str, Any] | None = None
-            FakeAdapter.current = self
-
-        async def initialize(self) -> None:
-            # Normal server startup remains the latency-bounded three-resource
-            # bootstrap; only the explicit diagnostic adds OpenAPI retrieval.
-            assert self.rest.checked is False
-            self.actor = _actor()
-
-        async def aclose(self) -> None:
-            return None
-
-    monkeypatch.setattr(server_module, "LagniappeAdapter", FakeAdapter)
-    config = ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
-    actor_name, actor_hash = asyncio.run(server_module.check(config))
-    assert (actor_name, actor_hash) == ("Person", "abcdefghijkl")
-    assert FakeAdapter.current is not None
-    assert FakeAdapter.current.rest.checked is True
-
 
 class _CaptureTransport(httpx.AsyncBaseTransport):
     def __init__(self) -> None:
@@ -2836,7 +770,7 @@ def test_media_download_does_not_inherit_client_credentials_or_cookies() -> None
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
+# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
 def test_original_media_enforces_length_cap_status_and_redirect_boundaries() -> None:
     class MediaTransport(httpx.AsyncBaseTransport):
         def __init__(self, outcomes: list[tuple[int, dict[str, str], bytes]]) -> None:
@@ -2903,7 +837,7 @@ def test_original_media_enforces_length_cap_status_and_redirect_boundaries() -> 
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 @pytest.mark.parametrize(
     ("mime_type", "kind"),
     [("image/png", "image"), ("audio/mpeg", "audio")],
@@ -2952,7 +886,7 @@ def test_original_media_delivery_matches_the_emitted_content_index(
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 def test_original_media_rejects_unsupported_binary_after_safe_download() -> None:
     rest = _WorkflowREST()
 
@@ -3033,7 +967,7 @@ def test_api_request_uses_only_explicit_bearer_credentials() -> None:
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/errors.py::AdapterError
+# @source mcp/src/lagniappe_mcp/errors.py::AdapterError
 def test_bounded_error_rendering_remains_valid_json() -> None:
     error = AdapterError(
         "validation_failed",
@@ -3129,7 +1063,7 @@ def test_api_errors_redact_credentials_and_duplicate_json_is_rejected() -> None:
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
+# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 @pytest.mark.parametrize("status", [401, 403, 404, 409, 422, 429, 500, 503])
 def test_api_status_errors_remain_typed_text_only_and_are_never_retried(
     status: int,
@@ -3188,7 +1122,7 @@ def test_api_status_errors_remain_typed_text_only_and_are_never_retried(
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
+# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def test_api_transport_failures_are_bounded_distinct_and_never_retried() -> None:
     async def exercise() -> tuple[list[str], int]:
         outcomes: list[object] = [
@@ -3254,7 +1188,7 @@ def test_api_transport_failures_are_bounded_distinct_and_never_retried() -> None
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
+# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def test_api_retryability_distinguishes_safe_reads_from_ambiguous_posts() -> None:
     async def exercise(method: str, outcome: str) -> TransportError:
         async def handler(request: httpx.Request) -> httpx.Response:
@@ -3288,8 +1222,8 @@ def test_api_retryability_distinguishes_safe_reads_from_ambiguous_posts() -> Non
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
+# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
+# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
 def test_rest_operations_have_total_wall_clock_deadlines(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3336,7 +1270,7 @@ def test_rest_operations_have_total_wall_clock_deadlines(
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/server.py::_success_result
+# @source mcp/src/lagniappe_mcp/presentation.py::_success_result
 def test_structured_and_complete_frame_limits_fail_as_tool_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3345,7 +1279,7 @@ def test_structured_and_complete_frame_limits_fail_as_tool_errors(
         LagniappeAdapter._enforce_result_limits(oversized)
     assert structured.value.code == "result_too_large"
 
-    from lagniappe_mcp import server as server_module
+    from lagniappe_mcp import presentation as server_module
 
     monkeypatch.setattr(server_module, "MAX_COMPLETE_FRAME_BYTES", 128)
     with pytest.raises(TransportError) as frame:
@@ -3360,117 +1294,6 @@ def test_structured_and_complete_frame_limits_fail_as_tool_errors(
             server_info={"name": "lagniappe", "version": "test"},
         )
     assert request_id_frame.value.code == "result_too_large"
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/server.py::create_server
-def test_stdio_rejects_oversized_request_ids_without_reflecting_them() -> None:
-    oversized_id = "private-" + "x" * 512
-    unsafe_ids = (
-        oversized_id,
-        "white space",
-        "line\nbreak",
-        "unicode-é",
-        "../local/path",
-        '"quoted"',
-    )
-    normal = [
-        SessionMessage(
-            JSONRPCRequest(jsonrpc="2.0", id="bounded", method="ping", params={})
-        ),
-        SessionMessage(
-            JSONRPCRequest(
-                jsonrpc="2.0",
-                id="req-123:part_4.5",
-                method="ping",
-                params={},
-            )
-        ),
-        SessionMessage(
-            JSONRPCRequest(jsonrpc="2.0", id=7, method="ping", params={})
-        ),
-    ]
-
-    class ReadStream:
-        def __init__(self) -> None:
-            self.items = iter(
-                [
-                    *(
-                        SessionMessage(
-                            JSONRPCRequest(
-                                jsonrpc="2.0",
-                                id=request_id,
-                                method="ping",
-                                params={},
-                            )
-                        )
-                        for request_id in unsafe_ids
-                    ),
-                    *normal,
-                ]
-            )
-
-        def __aiter__(self):
-            return self
-
-        async def __anext__(self):
-            try:
-                return next(self.items)
-            except StopIteration:
-                raise StopAsyncIteration from None
-
-    class WriteStream:
-        def __init__(self) -> None:
-            self.items: list[SessionMessage] = []
-
-        async def send(self, item: SessionMessage) -> None:
-            self.items.append(item)
-
-    async def exercise() -> tuple[list[SessionMessage], list[SessionMessage]]:
-        output = WriteStream()
-        accepted = [
-            item
-            async for item in _bounded_stdio_requests(ReadStream(), output)
-        ]
-        return accepted, output.items
-
-    accepted, rejected = asyncio.run(exercise())
-    assert accepted == normal
-    assert len(rejected) == len(unsafe_ids)
-    for request_id, rejected_item in zip(unsafe_ids, rejected, strict=True):
-        error = rejected_item.message
-        assert error.id is None
-        assert error.error.code == -32600
-        assert request_id not in error.model_dump_json()
-
-
-# @pair mcp-adapter:product-contract
-def test_bounded_raw_stdio_input_discards_oversized_frame_and_resumes(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from lagniappe_mcp import server as server_module
-
-    private_value = b"private-frame-value"
-    valid_frame = b"{}\n"
-    requested_sizes: list[int] = []
-
-    class RecordingInput(io.BytesIO):
-        def readline(self, size: int = -1) -> bytes:
-            requested_sizes.append(size)
-            return super().readline(size)
-
-    source = RecordingInput(private_value * 10 + b"\n" + valid_frame)
-    monkeypatch.setattr(server_module, "MAX_REQUEST_FRAME_BYTES", 32)
-    monkeypatch.setattr(server_module, "_STDIO_DRAIN_CHUNK_BYTES", 16)
-
-    async def exercise() -> list[str]:
-        return [line async for line in _bounded_stdin_lines(source)]
-
-    frames = asyncio.run(exercise())
-    assert frames == ["{\n", valid_frame.decode()]
-    assert private_value.decode() not in "".join(frames)
-    assert requested_sizes
-    assert max(requested_sizes) <= 33
 
 
 def test_mcp_driver_persists_only_owner_only_bounded_privacy_findings(
@@ -3608,7 +1431,7 @@ def test_failed_concurrent_startup_cancels_sibling_requests() -> None:
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
+# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 def test_plan_start_rejects_whitespace_instructions_before_dispatch() -> None:
     async def exercise() -> list[tuple[str, str, Any]]:
         rest = _WorkflowREST()
@@ -3631,7 +1454,7 @@ def test_plan_start_rejects_whitespace_instructions_before_dispatch() -> None:
 
 @pytest.mark.parametrize(("status", "code"), [(401, "unauthorized"), (403, "forbidden")])
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 def test_published_tools_still_honor_next_request_revocation_or_permission_loss(
     status: int,
     code: str,
@@ -3695,7 +1518,6 @@ def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
             ConnectionConfig(
                 normalize_site_url("https://example.com"),
                 "api-secret",
-                actor_hash="abcdefghijkl",
             ),
             rest=rest,  # type: ignore[arg-type]
         )
@@ -3753,7 +1575,7 @@ def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_plan_start_rejects_a_valid_plan_for_the_wrong_requested_tool() -> None:
     async def exercise() -> None:
         rest = _WorkflowREST()
@@ -3779,7 +1601,7 @@ def test_plan_start_rejects_a_valid_plan_for_the_wrong_requested_tool() -> None:
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_read_arguments_and_results_are_validated_at_the_dispatch_boundary() -> None:
     async def exercise() -> None:
         rest = _WorkflowREST()
@@ -3817,7 +1639,7 @@ def test_read_arguments_and_results_are_validated_at_the_dispatch_boundary() -> 
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_lifecycle_transport_and_human_links_fail_closed() -> None:
     adapter = LagniappeAdapter(
         ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
@@ -3895,7 +1717,7 @@ def test_lifecycle_transport_and_human_links_fail_closed() -> None:
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_lifecycle_responses_reject_values_outside_the_frozen_contract() -> None:
     adapter = LagniappeAdapter(
         ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
@@ -4015,141 +1837,6 @@ def test_mcp_v2_results_use_direct_structured_values_and_complete_aliases() -> N
     assert dumped_error["resultType"] == "complete"
     assert dumped_error["isError"] is True
     assert "structuredContent" not in dumped_error
-
-
-# @pair mcp-adapter:product-contract
-def test_low_level_server_negotiates_modern_types_without_resources(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    actor = _actor()
-
-    class FakeAdapter:
-        def __init__(self, _config: ConnectionConfig) -> None:
-            self.tools = {
-                "get_actor": lifecycle_tools()[0],
-                "array_read": ToolDefinition(
-                    "array_read",
-                    "Return an array.",
-                    {"type": "object", "properties": {}, "additionalProperties": False},
-                    {"type": "array", "items": {"type": "integer"}},
-                    "read",
-                    READ_ANNOTATIONS,
-                ),
-            }
-
-        async def initialize(self) -> None:
-            return None
-
-        async def execute(self, _name: str, _arguments: Any) -> AdapterResult:
-            return AdapterResult(actor if _name == "get_actor" else [1, 2])
-
-        async def aclose(self) -> None:
-            return None
-
-    async def exercise() -> None:
-        from lagniappe_mcp import server as server_module
-
-        monkeypatch.setattr(server_module, "LagniappeAdapter", FakeAdapter)
-        config = ConnectionConfig(
-            normalize_site_url("https://example.com"), "api-secret"
-        )
-        server = server_module.create_server(config)
-        async with Client(server, mode="auto") as client:
-            assert client.protocol_version == "2026-07-28"
-            assert client.server_capabilities.resources is None
-            listed = await client.list_tools()
-            assert listed.result_type == "complete"
-            assert [tool.name for tool in listed.tools] == ["get_actor", "array_read"]
-            called = await client.call_tool("get_actor", {})
-            assert called.result_type == "complete"
-            assert called.structured_content == actor
-            array_result = await client.call_tool("array_read", {})
-            assert array_result.structured_content == [1, 2]
-            with pytest.raises(MCPError) as unknown:
-                await client.call_tool("unknown", {})
-            assert unknown.value.code == -32602
-            assert unknown.value.data is None
-    asyncio.run(exercise())
-
-
-# @pair mcp-adapter:product-contract
-@pytest.mark.parametrize("mode", ["auto", "legacy"])
-def test_server_presents_matching_schemas_and_values_for_each_protocol(
-    monkeypatch: pytest.MonkeyPatch, mode: str,
-) -> None:
-    referenced_schema = {
-        "$defs": {"item": {"type": "integer", "minimum": 0}},
-        "type": "array",
-        "items": {"$ref": "#/$defs/item"},
-    }
-    cases = {
-        "array_read": (referenced_schema, [1, 2]),
-        "empty_read": (referenced_schema, []),
-        "scalar_read": ({"type": "string"}, "hello"),
-        "nullable_object_read": ({"type": ["object", "null"]}, {"name": "hello"}),
-        "union_read": ({"anyOf": [{"type": "integer"}, {"type": "null"}]}, 7),
-        "object_read": ({"type": "object"}, {"result": [1, 2]}),
-    }
-    # The v2 SDK client treats a direct JSON null as missing structured content.
-    # A legacy wrapper must retain null; the live REST catalog has no null root.
-    if mode == "legacy":
-        cases["null_read"] = ({"type": ["object", "null"]}, None)
-    definitions = {
-        name: ToolDefinition(
-            name, "Read a fixture value.",
-            {"type": "object", "properties": {}, "additionalProperties": False},
-            validate_schema_document(schema), "read", READ_ANNOTATIONS,
-            result_paths={"primary_collection": "$", "pagination": None},
-        )
-        for name, (schema, _) in cases.items()
-    }
-    original_definitions = deepcopy(definitions)
-
-    class FakeAdapter:
-        def __init__(self, _config: ConnectionConfig) -> None:
-            self.tools = definitions
-
-        async def initialize(self) -> None:
-            return None
-
-        async def execute(self, name: str, _arguments: Any) -> AdapterResult:
-            return AdapterResult(cases[name][1])
-
-        async def aclose(self) -> None:
-            return None
-
-    async def exercise() -> None:
-        from lagniappe_mcp import server as server_module
-
-        monkeypatch.setattr(server_module, "LagniappeAdapter", FakeAdapter)
-        config = ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
-        server = server_module.create_server(config)
-        async with Client(server, mode=mode) as client:
-            assert client.protocol_version == (
-                "2025-11-25" if mode == "legacy" else "2026-07-28"
-            )
-            listed = await client.list_tools()
-            assert {tool.name for tool in listed.tools} == set(cases)
-            for tool in listed.tools:
-                raw_schema, raw_value = cases[tool.name]
-                wrapped = mode == "legacy" and raw_schema.get("type") != "object"
-                expected = {"result": raw_value} if wrapped else raw_value
-                if mode == "legacy":
-                    assert tool.output_schema["type"] == "object"
-                else:
-                    assert tool.output_schema == raw_schema
-                called = await client.call_tool(tool.name, {})
-                assert called.is_error is False
-                assert called.structured_content == expected
-                assert json.loads(called.content[0].text) == expected
-                validate_value(tool.output_schema, expected, phase="output")
-                assert tool.meta["lagniappe/resultPaths"] == {
-                    "primary_collection": "$.result" if wrapped else "$",
-                    "pagination": None,
-                }
-            assert definitions == original_definitions
-
-    asyncio.run(exercise())
 
 
 # @pair mcp-adapter:product-contract
@@ -4336,813 +2023,18 @@ def test_standalone_sources_have_no_application_imports() -> None:
     )
 
 
-class _StdioLifecycleAPI:
-    """Tiny loopback API whose second actor response stalls mid-body."""
-
-    def __init__(self, *, catalog: dict[str, Any] | None = None) -> None:
-        self.actor_calls = 0
-        self.actor_lock = threading.Lock()
-        self.request_started = threading.Event()
-        self.client_disconnected = threading.Event()
-        self.release_request = threading.Event()
-        state = self
-
-        class Handler(BaseHTTPRequestHandler):
-            protocol_version = "HTTP/1.1"
-
-            def log_message(self, _format: str, *_args: Any) -> None:
-                return None
-
-            def _send_json(self, value: Any) -> None:
-                body = json.dumps(value, separators=(",", ":")).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.send_header("Connection", "close")
-                self.end_headers()
-                self.wfile.write(body)
-                self.wfile.flush()
-
-            def _stall_actor_response(self) -> None:
-                body = json.dumps(_actor(), separators=(",", ":")).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.send_header("Connection", "close")
-                self.end_headers()
-                self.wfile.write(body[:1])
-                self.wfile.flush()
-                state.request_started.set()
-
-                deadline = time.monotonic() + 5
-                while not state.release_request.is_set() and time.monotonic() < deadline:
-                    readable, _, _ = select.select([self.connection], [], [], 0.05)
-                    if not readable:
-                        continue
-                    try:
-                        pending = self.connection.recv(1, socket.MSG_PEEK)
-                    except (ConnectionError, OSError):
-                        state.client_disconnected.set()
-                        return
-                    if not pending:
-                        state.client_disconnected.set()
-                        return
-                with suppress(BrokenPipeError, ConnectionError, OSError):
-                    self.wfile.write(body[1:])
-                    self.wfile.flush()
-
-            def do_GET(self) -> None:
-                if self.path == "/api/v1":
-                    origin = state.origin
-                    self._send_json(
-                        {
-                            "version": "v1",
-                            "base_url": f"{origin}/api/v1",
-                            "openapi_url": f"{origin}/api/v1/openapi.json",
-                            "actor_url": f"{origin}/api/v1/me",
-                            "tools_url": f"{origin}/api/v1/tools",
-                            "plans_url": f"{origin}/api/v1/plans",
-                            "client_skill_url": f"{origin}/api/v1/client-skill.md",
-                        }
-                    )
-                    return
-                if self.path == "/api/v1/tools":
-                    if catalog is not None:
-                        self._send_json(catalog)
-                        return
-                    self._send_json(
-                        {
-                            "tools": [],
-                            "view": "full",
-                            "selected_count": 0,
-                            "reference_format": "hash:<12-character-hash>",
-                            "execution_envelope": {
-                                "success": {
-                                    "result": "<value matching the selected output_schema>"
-                                },
-                                "failure": {
-                                    "error": {
-                                        "code": "tool_error",
-                                        "message": "<message>",
-                                    },
-                                    "request_id": "<request id>",
-                                },
-                            },
-                        }
-                    )
-                    return
-                if self.path == "/api/v1/me":
-                    with state.actor_lock:
-                        state.actor_calls += 1
-                        actor_call = state.actor_calls
-                    if actor_call == 1:
-                        self._send_json(_actor())
-                    else:
-                        self._stall_actor_response()
-                    return
-                self.send_error(404)
-
-        class Server(ThreadingHTTPServer):
-            daemon_threads = True
-
-        self.server = Server(("127.0.0.1", 0), Handler)
-        host, port = self.server.server_address[:2]
-        self.origin = f"http://{host}:{port}"
-        self.thread = threading.Thread(
-            target=self.server.serve_forever,
-            name="mcp-stdio-test-api",
-            daemon=True,
-        )
-
-    def __enter__(self) -> "_StdioLifecycleAPI":
-        self.thread.start()
-        return self
-
-    def __exit__(self, *_exc: object) -> None:
-        self.release_request.set()
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=2)
-
-
-@contextmanager
-def _stdio_adapter_process(api: _StdioLifecycleAPI):
-    """Launch the real console module with the isolated test interpreter."""
-    assert (Path(sys.prefix) / "pyvenv.cfg").is_file()
-    process = subprocess.Popen(
-        [sys.executable, "-I", "-m", "lagniappe_mcp", "serve", "--from-env"],
-        cwd=PACKAGE_ROOT,
-        env={
-            "LAGNIAPPE_API_KEY": "stdio-secret-key",
-            "LAGNIAPPE_URL": api.origin,
-            "PATH": os.environ.get("PATH", ""),
-        },
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        bufsize=0,
-        start_new_session=True,
-    )
-    try:
-        yield process
-    finally:
-        api.release_request.set()
-        if process.stdin is not None and not process.stdin.closed:
-            with suppress(BrokenPipeError, OSError):
-                process.stdin.close()
-        try:
-            process.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            process.terminate()
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=2)
-        for stream in (process.stdout, process.stderr):
-            if stream is not None and not stream.closed:
-                stream.close()
-
-
 _MODERN_META = {
     "io.modelcontextprotocol/protocolVersion": "2026-07-28",
     "io.modelcontextprotocol/clientInfo": {
-        "name": "lagniappe-stdio-test",
+        "name": "lagniappe-adapter-test",
         "version": "1",
     },
     "io.modelcontextprotocol/clientCapabilities": {},
 }
 
 
-def _write_stdio_frame(
-    process: subprocess.Popen[bytes],
-    *,
-    request_id: str | None,
-    method: str,
-    params: dict[str, Any] | None = None,
-    modern: bool = True,
-) -> None:
-    assert process.stdin is not None
-    body = dict(params or {})
-    if modern:
-        body["_meta"] = deepcopy(_MODERN_META)
-    frame = {
-        "jsonrpc": "2.0",
-        "method": method,
-        "params": body,
-    }
-    if request_id is not None:
-        frame["id"] = request_id
-    process.stdin.write(json.dumps(frame, separators=(",", ":")).encode() + b"\n")
-    process.stdin.flush()
-
-
-def _write_stdio_cancel(process: subprocess.Popen[bytes], request_id: str) -> None:
-    assert process.stdin is not None
-    frame = {
-        "jsonrpc": "2.0",
-        "method": "notifications/cancelled",
-        "params": {"requestId": request_id, "reason": "deterministic test cancel"},
-    }
-    process.stdin.write(json.dumps(frame, separators=(",", ":")).encode() + b"\n")
-    process.stdin.flush()
-
-
-def _read_stdio_frame(
-    process: subprocess.Popen[bytes], buffer: bytearray, *, timeout: float = 3
-) -> dict[str, Any]:
-    assert process.stdout is not None
-    deadline = time.monotonic() + timeout
-    while b"\n" not in buffer:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise AssertionError("Timed out waiting for an MCP stdout frame.")
-        readable, _, _ = select.select([process.stdout], [], [], remaining)
-        if not readable:
-            raise AssertionError("Timed out waiting for an MCP stdout frame.")
-        chunk = os.read(process.stdout.fileno(), 64 * 1024)
-        if not chunk:
-            raise AssertionError("MCP process closed stdout before the expected frame.")
-        buffer.extend(chunk)
-    line, _, remainder = buffer.partition(b"\n")
-    buffer[:] = remainder
-    value = json.loads(line)
-    assert isinstance(value, dict)
-    return value
-
-
-def _read_stdio_until(
-    process: subprocess.Popen[bytes],
-    buffer: bytearray,
-    request_id: str,
-    *,
-    timeout: float = 3,
-) -> list[dict[str, Any]]:
-    deadline = time.monotonic() + timeout
-    frames: list[dict[str, Any]] = []
-    while time.monotonic() < deadline:
-        frame = _read_stdio_frame(
-            process,
-            buffer,
-            timeout=max(0.01, deadline - time.monotonic()),
-        )
-        frames.append(frame)
-        if frame.get("id") == request_id:
-            return frames
-    raise AssertionError(f"MCP response {request_id!r} did not arrive.")
-
-
-def _stdio_diagnostics(process: subprocess.Popen[bytes]) -> str:
-    assert process.stderr is not None
-    diagnostic = process.stderr.read().decode("utf-8", errors="replace")
-    assert len(diagnostic.encode("utf-8")) <= MAX_STDERR_BYTES
-    assert "stdio-secret-key" not in diagnostic
-    assert "Traceback" not in diagnostic
-    assert "ExceptionGroup" not in diagnostic
-    return diagnostic
-
-
-def _stdio_telemetry(diagnostic: str) -> list[dict[str, Any]]:
-    lines = diagnostic.splitlines()
-    assert lines
-    assert all(len(line.encode("utf-8")) + 1 <= MAX_STDERR_BYTES for line in lines)
-    events = [json.loads(line) for line in lines]
-    assert all(
-        event.get("event")
-        in {"lagniappe_mcp_scope", "lagniappe_mcp_upstream"}
-        for event in events
-    )
-    return events
-
-
 # @pair mcp-adapter:product-contract
-@pytest.mark.parametrize(
-    "protocol_version",
-    ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25", "2026-07-28"],
-)
-def test_real_stdio_negotiates_catalog_and_actor_across_protocol_versions(
-    protocol_version: str,
-) -> None:
-    catalog = asyncio.run(_WorkflowREST().startup())[2]
-    modern = protocol_version == "2026-07-28"
-    with _StdioLifecycleAPI(catalog=catalog) as api, _stdio_adapter_process(api) as process:
-        api.release_request.set()
-        buffer = bytearray()
-        if not modern:
-            _write_stdio_frame(
-                process, request_id="initialize", method="initialize", modern=False,
-                params={
-                    "protocolVersion": protocol_version,
-                    "capabilities": {},
-                    "clientInfo": {"name": "handshake-client", "version": "1"},
-                },
-            )
-            initialized = _read_stdio_until(process, buffer, "initialize")[-1]
-            assert initialized["result"]["protocolVersion"] == protocol_version
-            _write_stdio_frame(
-                process, request_id=None, method="notifications/initialized", modern=False,
-            )
-        _write_stdio_frame(process, request_id="list", method="tools/list", modern=modern)
-        listed = _read_stdio_until(process, buffer, "list")[-1]
-        tools = {tool["name"]: tool for tool in listed["result"]["tools"]}
-        assert "get_actor" in tools
-        # The pinned SDK retains structured-output extension fields even for
-        # handshake versions that predate their standardization.
-        assert tools["search"]["outputSchema"]["type"] == (
-            "array" if modern else "object"
-        )
-        _write_stdio_frame(
-            process, request_id="actor", method="tools/call", modern=modern,
-            params={"name": "get_actor", "arguments": {}},
-        )
-        called = _read_stdio_until(process, buffer, "actor")[-1]["result"]
-        assert called["isError"] is False
-        assert json.loads(called["content"][0]["text"]) == _actor()
-        assert called["structuredContent"] == _actor()
-        process.stdin.close()
-        assert process.wait(timeout=3) == 0
-        _stdio_diagnostics(process)
-
-
-# @pair mcp-adapter:product-contract
-def test_real_stdio_subprocess_rejects_oversized_frame_and_resumes() -> None:
-    with _StdioLifecycleAPI() as api, _stdio_adapter_process(api) as process:
-        assert process.stdin is not None
-        private_marker = b"private-oversized-frame-marker"
-        padding_size = MAX_REQUEST_FRAME_BYTES + 1 - len(private_marker)
-        oversized = private_marker + (b"x" * padding_size) + b"\n"
-        remaining = memoryview(oversized)
-        while remaining:
-            written = process.stdin.write(remaining)
-            assert written is not None and written > 0
-            remaining = remaining[written:]
-        process.stdin.flush()
-
-        _write_stdio_frame(process, request_id="after-oversized", method="tools/list")
-        frames = _read_stdio_until(process, bytearray(), "after-oversized", timeout=5)
-
-        parse_errors = [
-            frame
-            for frame in frames
-            if frame.get("id") is None
-            and isinstance(frame.get("error"), dict)
-            and frame["error"].get("code") == -32700
-        ]
-        assert len(parse_errors) == 1
-        assert "result" in frames[-1]
-        assert private_marker.decode() not in json.dumps(frames)
-
-        process.stdin.close()
-        assert process.wait(timeout=3) == 0
-        _stdio_telemetry(_stdio_diagnostics(process))
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/server.py::create_server
-def test_real_stdio_subprocess_cancellation_emits_no_result_and_cleans_http() -> None:
-    with _StdioLifecycleAPI() as api, _stdio_adapter_process(api) as process:
-        buffer = bytearray()
-        _write_stdio_frame(process, request_id="ready", method="tools/list")
-        frames = _read_stdio_until(process, buffer, "ready")
-        assert "result" in frames[-1]
-
-        _write_stdio_frame(
-            process,
-            request_id="cancelled-call",
-            method="tools/call",
-            params={"name": "get_actor", "arguments": {}},
-        )
-        assert api.request_started.wait(timeout=2)
-        _write_stdio_cancel(process, "cancelled-call")
-        _write_stdio_frame(process, request_id="after-cancel", method="tools/list")
-        frames.extend(_read_stdio_until(process, buffer, "after-cancel"))
-
-        assert api.client_disconnected.wait(timeout=2)
-        _write_stdio_frame(process, request_id="settled", method="tools/list")
-        frames.extend(_read_stdio_until(process, buffer, "settled"))
-        assert all(frame.get("id") != "cancelled-call" for frame in frames)
-
-        assert process.stdin is not None
-        process.stdin.close()
-        assert process.wait(timeout=3) == 0
-        telemetry = _stdio_telemetry(_stdio_diagnostics(process))
-        summaries = [
-            event for event in telemetry if event["event"] == "lagniappe_mcp_scope"
-        ]
-        assert [(event["scope"], event["outcome"]) for event in summaries] == [
-            ("startup", "success"),
-            ("call", "cancelled"),
-        ]
-        assert summaries[-1]["error_kind"] == "client_cancelled"
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/server.py::create_server
-def test_real_stdio_subprocess_disconnect_cancels_inflight_call_and_shuts_down() -> None:
-    with _StdioLifecycleAPI() as api, _stdio_adapter_process(api) as process:
-        buffer = bytearray()
-        _write_stdio_frame(process, request_id="ready", method="tools/list")
-        frames = _read_stdio_until(process, buffer, "ready")
-        assert "result" in frames[-1]
-        _write_stdio_frame(
-            process,
-            request_id="in-flight",
-            method="tools/call",
-            params={"name": "get_actor", "arguments": {}},
-        )
-        assert api.request_started.wait(timeout=2)
-
-        assert process.stdin is not None
-        process.stdin.close()
-        assert api.client_disconnected.wait(timeout=2)
-        assert process.wait(timeout=3) == 0
-
-        assert process.stdout is not None
-        buffer.extend(process.stdout.read())
-        for line in buffer.splitlines():
-            frame = json.loads(line)
-            assert frame.get("jsonrpc") == "2.0"
-        telemetry = _stdio_telemetry(_stdio_diagnostics(process))
-        summaries = [
-            event for event in telemetry if event["event"] == "lagniappe_mcp_scope"
-        ]
-        assert [(event["scope"], event["outcome"]) for event in summaries] == [
-            ("startup", "success"),
-            ("call", "cancelled"),
-        ]
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/server.py::create_server
-def test_real_stdio_subprocess_broken_output_pipe_exits_without_diagnostics() -> None:
-    with _StdioLifecycleAPI() as api, _stdio_adapter_process(api) as process:
-        buffer = bytearray()
-        _write_stdio_frame(process, request_id="ready", method="tools/list")
-        frames = _read_stdio_until(process, buffer, "ready")
-        assert "result" in frames[-1]
-
-        assert process.stdout is not None
-        process.stdout.close()
-        _write_stdio_frame(process, request_id="broken-pipe", method="tools/list")
-        assert process.stdin is not None
-        process.stdin.close()
-        return_code = process.wait(timeout=3)
-        diagnostic = _stdio_diagnostics(process)
-        assert return_code == 0, diagnostic
-        telemetry = _stdio_telemetry(diagnostic)
-        summaries = [
-            event for event in telemetry if event["event"] == "lagniappe_mcp_scope"
-        ]
-        assert [(event["scope"], event["outcome"]) for event in summaries] == [
-            ("startup", "success"),
-        ]
-
-
-# @pair mcp-adapter:product-contract
-def test_telemetry_correlates_concurrent_calls_without_sensitive_values(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    api_key = "telemetry-secret-api-key"
-    captured_request_ids: list[str] = []
-
-    async def exercise() -> None:
-        arrived = 0
-        both_arrived = asyncio.Event()
-
-        async def handler(request: httpx.Request) -> httpx.Response:
-            nonlocal arrived
-            captured_request_ids.append(request.headers["x-request-id"])
-            arrived += 1
-            if arrived == 2:
-                both_arrived.set()
-            await asyncio.wait_for(both_arrived.wait(), timeout=1)
-            return httpx.Response(
-                200,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Request-ID": request.headers["x-request-id"],
-                    "X-Lagniappe-Build-ID": "deadbeef",
-                },
-                json={"ok": True},
-                request=request,
-            )
-
-        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-        rest = RESTClient(
-            ConnectionConfig(normalize_site_url("https://example.com"), api_key),
-            client=client,
-        )
-
-        async def one_call(plan_id: str, private_query: str) -> None:
-            with telemetry_scope("call", "read"):
-                await rest.request_json(
-                    "POST",
-                    f"plans/{plan_id}/tools/search",
-                    body={"arguments": {"query": private_query}},
-                )
-
-        try:
-            await asyncio.gather(
-                one_call("private-plan-alpha", "private argument alpha"),
-                one_call("private-plan-beta", "/private/local/path"),
-            )
-        finally:
-            await rest.aclose()
-            await client.aclose()
-
-    asyncio.run(exercise())
-    diagnostic = capsys.readouterr().err
-    lines = diagnostic.splitlines()
-    events = [json.loads(line) for line in lines]
-
-    assert len(events) == 4
-    assert all(len(line.encode("utf-8")) + 1 <= MAX_STDERR_BYTES for line in lines)
-    for forbidden in (
-        api_key,
-        "private-plan-alpha",
-        "private-plan-beta",
-        "private argument alpha",
-        "/private/local/path",
-        "https://",
-    ):
-        assert forbidden not in diagnostic
-
-    correlations = {event["correlation_id"] for event in events}
-    assert len(correlations) == 2
-    for correlation in correlations:
-        grouped = [event for event in events if event["correlation_id"] == correlation]
-        assert {event["event"] for event in grouped} == {
-            "lagniappe_mcp_scope",
-            "lagniappe_mcp_upstream",
-        }
-        request = next(
-            event for event in grouped if event["event"] == "lagniappe_mcp_upstream"
-        )
-        summary = next(
-            event for event in grouped if event["event"] == "lagniappe_mcp_scope"
-        )
-        assert request == {
-            **request,
-            "api_request_id": request["api_request_id"],
-            "operation": "read",
-            "outcome": "success",
-            "request_index": 1,
-            "scope": "call",
-            "status": 200,
-            "transport": "api",
-        }
-        assert request["api_request_id"] in captured_request_ids
-        assert request["api_request_id"].startswith(f"mcp-{correlation[:20]}-")
-        assert request["response_build_id"] == "deadbeef"
-        assert summary["operation"] == "read"
-        assert summary["outcome"] == "success"
-        assert summary["upstream_requests"] == 1
-        assert summary["api_requests"] == 1
-        assert summary["storage_requests"] == 0
-        assert summary["request_bytes"] == request["request_bytes"]
-        assert summary["response_bytes"] == request["response_bytes"]
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/_telemetry.py::TelemetryScope
-def test_telemetry_bounds_startup_without_dropping_later_call_events(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    startup_diagnostic = io.StringIO()
-    monkeypatch.setattr(sys, "stderr", startup_diagnostic)
-
-    for _index in range(128):
-        with telemetry_scope("startup", "bootstrap"):
-            pass
-
-    startup_rendered = startup_diagnostic.getvalue()
-    assert startup_rendered
-    assert (
-        len(startup_rendered.encode("utf-8"))
-        <= MAX_STARTUP_DIAGNOSTIC_BYTES
-    )
-    assert all(json.loads(line) for line in startup_rendered.splitlines())
-
-    call_diagnostic = io.StringIO()
-    monkeypatch.setattr(sys, "stderr", call_diagnostic)
-    for _index in range(128):
-        with telemetry_scope("call", "read"):
-            pass
-
-    call_lines = call_diagnostic.getvalue().splitlines()
-    assert len(call_lines) == 128
-    assert len(call_diagnostic.getvalue().encode("utf-8")) > MAX_STDERR_BYTES
-    assert all(len(line.encode("utf-8")) + 1 <= MAX_STDERR_BYTES for line in call_lines)
-    assert all(json.loads(line) for line in call_lines)
-
-
-# @pair mcp-adapter:product-contract
-def test_telemetry_separates_startup_and_records_storage_bytes(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    api_key = "startup-storage-api-secret"
-    upload_secret = "upload-private-session"
-    signature = "b" * 64
-
-    async def exercise() -> None:
-        async def api_handler(request: httpx.Request) -> httpx.Response:
-            origin = "https://example.com"
-            values: dict[str, Any]
-            if request.url.path == "/api/v1":
-                values = {
-                    "version": "v1",
-                    "base_url": f"{origin}/api/v1",
-                    "openapi_url": f"{origin}/api/v1/openapi.json",
-                    "actor_url": f"{origin}/api/v1/me",
-                    "tools_url": f"{origin}/api/v1/tools",
-                    "plans_url": f"{origin}/api/v1/plans",
-                    "client_skill_url": f"{origin}/api/v1/client-skill.md",
-                }
-            elif request.url.path == "/api/v1/me":
-                values = {"actor": "private actor value"}
-            else:
-                values = {"tools": []}
-            return httpx.Response(
-                200,
-                headers={"Content-Type": "application/json"},
-                json=values,
-                request=request,
-            )
-
-        async def storage_handler(request: httpx.Request) -> httpx.Response:
-            if request.method == "GET":
-                return httpx.Response(
-                    200,
-                    headers={"Content-Length": "3", "Content-Type": "image/png"},
-                    content=b"png",
-                    request=request,
-                )
-            status = 200 if request.headers["content-range"].startswith("bytes */") else 308
-            return httpx.Response(status, content=b"", request=request)
-
-        api_client = httpx.AsyncClient(transport=httpx.MockTransport(api_handler))
-        storage_client = httpx.AsyncClient(
-            transport=httpx.MockTransport(storage_handler)
-        )
-        rest = RESTClient(
-            ConnectionConfig(normalize_site_url("https://example.com"), api_key),
-            client=api_client,
-            storage_client=storage_client,
-        )
-        upload_url = (
-            "https://storage.googleapis.com/upload/storage/v1/b/private-bucket/o"
-            f"?uploadType=resumable&upload_id={upload_secret}"
-        )
-        try:
-            with telemetry_scope("startup", "bootstrap"):
-                await rest.startup()
-            with telemetry_scope("call", "upload"):
-                chunk = httpx.Request(
-                    "PUT",
-                    upload_url,
-                    headers={
-                        "Content-Length": "4",
-                        "Content-Range": "bytes 0-3/4",
-                    },
-                    content=b"data",
-                )
-                chunk_response = await rest.storage_client.send(
-                    chunk, stream=True, auth=None, follow_redirects=False
-                )
-                await chunk_response.aclose()
-                probe = httpx.Request(
-                    "PUT",
-                    upload_url,
-                    headers={
-                        "Content-Length": "0",
-                        "Content-Range": "bytes */4",
-                    },
-                    content=b"",
-                )
-                probe_response = await rest.storage_client.send(
-                    probe, stream=True, auth=None, follow_redirects=False
-                )
-                await probe_response.aclose()
-                await rest.download_media(
-                    _signed_download_url(**{"X-Goog-Signature": signature}),
-                    cap=16,
-                )
-        finally:
-            await rest.aclose()
-            await api_client.aclose()
-            await storage_client.aclose()
-
-    asyncio.run(exercise())
-    diagnostic = capsys.readouterr().err
-    lines = diagnostic.splitlines()
-    events = [json.loads(line) for line in lines]
-
-    assert len(events) == 8
-    for forbidden in (
-        api_key,
-        upload_secret,
-        signature,
-        "private-bucket",
-        "private actor value",
-        "storage.googleapis.com",
-        "upload_id",
-    ):
-        assert forbidden not in diagnostic
-    assert all(len(line.encode("utf-8")) + 1 <= MAX_STDERR_BYTES for line in lines)
-
-    summaries = [event for event in events if event["event"] == "lagniappe_mcp_scope"]
-    assert [(event["scope"], event["operation"]) for event in summaries] == [
-        ("startup", "bootstrap"),
-        ("call", "upload"),
-    ]
-    startup = summaries[0]
-    assert (startup["api_requests"], startup["storage_requests"]) == (3, 0)
-    assert startup["upstream_requests"] == 3
-    upload = summaries[1]
-    assert (upload["api_requests"], upload["storage_requests"]) == (0, 3)
-    assert upload["upstream_requests"] == 3
-
-    storage = [
-        event
-        for event in events
-        if event["event"] == "lagniappe_mcp_upstream"
-        and event["transport"] == "storage"
-    ]
-    assert [event["operation"] for event in storage] == [
-        "upload_chunk",
-        "upload_status",
-        "download",
-    ]
-    assert [event["request_bytes"] for event in storage] == [4, 0, 0]
-    assert [event["response_bytes"] for event in storage] == [0, 0, 3]
-    assert [event["status"] for event in storage] == [308, 200, 200]
-    assert all(event["outcome"] == "success" for event in storage)
-
-
-# @pair mcp-adapter:product-contract
-def test_telemetry_records_safe_api_error_status_and_retry(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    async def exercise() -> None:
-        async def handler(request: httpx.Request) -> httpx.Response:
-            request_id = request.headers["x-request-id"]
-            return httpx.Response(
-                429,
-                headers={
-                    "Content-Type": "application/json",
-                    "Retry-After": "17",
-                    "X-Lagniappe-Build-ID": "deadbeef",
-                    "X-Request-ID": request_id,
-                },
-                json={
-                    "error": {
-                        "code": "rate_limited",
-                        "message": "Wait before retrying.",
-                    },
-                    "request_id": request_id,
-                },
-                request=request,
-            )
-
-        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-        rest = RESTClient(
-            ConnectionConfig(
-                normalize_site_url("https://example.com"), "private-api-key"
-            ),
-            client=client,
-        )
-        try:
-            with telemetry_scope("call", "start_ask") as metric:
-                try:
-                    await rest.request_json("POST", "plans", body={"private": True})
-                except AdapterError as error:
-                    metric.complete("error", error_kind=classify_error(error))
-        finally:
-            await rest.aclose()
-            await client.aclose()
-
-    asyncio.run(exercise())
-    diagnostic = capsys.readouterr().err
-    assert "private-api-key" not in diagnostic
-    events = [json.loads(line) for line in diagnostic.splitlines()]
-    assert len(events) == 2
-    request = next(
-        event for event in events if event["event"] == "lagniappe_mcp_upstream"
-    )
-    summary = next(
-        event for event in events if event["event"] == "lagniappe_mcp_scope"
-    )
-    assert request["status"] == 429
-    assert request["outcome"] == "error"
-    assert request["error_kind"] == "api_domain"
-    assert request["retry_after_seconds"] == 17
-    assert request["response_build_id"] == "deadbeef"
-    assert summary["outcome"] == "error"
-    assert summary["error_kind"] == "api_domain"
-
-
-# @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/rest.py::RESTClient
+# @source mcp/src/lagniappe_mcp/rest.py::RESTClient
 def test_rest_rejects_encoded_or_over_cap_raw_bodies_before_buffering() -> None:
     class NeverRead(httpx.AsyncByteStream):
         def __init__(self) -> None:
@@ -5237,7 +2129,7 @@ def test_rest_rejects_encoded_or_over_cap_raw_bodies_before_buffering() -> None:
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
+# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def test_upstream_error_details_use_a_control_free_safe_key_allowlist() -> None:
     api_key = "error-detail-secret-key"
     hostile_url = _signed_download_url()
@@ -5379,7 +2271,7 @@ class _LifecycleContextREST(_WorkflowREST):
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 @pytest.mark.parametrize("tool", ["ask", "create", "organize"])
 def test_starters_bundle_current_context_without_an_actor_or_inventory_read(tool):
     async def exercise():
@@ -5420,7 +2312,7 @@ def test_starters_bundle_current_context_without_an_actor_or_inventory_read(tool
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 @pytest.mark.parametrize("failure", ["transport", "oversize", "private", "wrong_tool"])
 def test_failed_start_context_preserves_the_created_plan_and_offers_only_a_read(failure):
     async def exercise():
@@ -5444,7 +2336,7 @@ def test_failed_start_context_preserves_the_created_plan_and_offers_only_a_read(
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 @pytest.mark.parametrize("failure", [None, "transport", "pending", "different_files"])
 def test_upload_bundles_final_contract_without_replaying_successful_finalization(monkeypatch, failure):
     from lagniappe_mcp import files as files_module
@@ -5508,7 +2400,7 @@ def test_upload_bundles_final_contract_without_replaying_successful_finalization
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_context_enrichment_remains_cancellable():
     async def exercise():
         rest = _LifecycleContextREST(failure="cancel")
@@ -5524,7 +2416,7 @@ def test_context_enrichment_remains_cancellable():
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_mcp_contract_replaces_rest_refetch_steps_and_resolves_contract_relative_schema():
     class RestWorkflowRules(_LifecycleContextREST):
         async def request_json(self, method, target, **kwargs):
@@ -5565,23 +2457,18 @@ def test_mcp_contract_replaces_rest_refetch_steps_and_resolves_contract_relative
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/server.py::create_server
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
+# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow(monkeypatch):
     async def exercise():
-        from lagniappe_mcp import server as server_module
-
-        monkeypatch.setattr(
-            server_module,
-            "LagniappeAdapter",
-            lambda config: LagniappeAdapter(config, rest=_LifecycleContextREST()),
+        from lagniappe_mcp.limits import MCP_INSTRUCTIONS
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
+            rest=_LifecycleContextREST(),
         )
-        server = server_module.create_server(
-            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
-        )
-        async with Client(server, mode="auto") as client:
-            listed = await client.list_tools()
-            return client.instructions, {tool.name: tool for tool in listed.tools}
+        await adapter.initialize()
+        return MCP_INSTRUCTIONS, {
+            name: tool.as_mcp_tool() for name, tool in adapter.tools.items()
+        }
 
     instructions, tools = asyncio.run(exercise())
     # A host may prepend initialization instructions before a short description
@@ -5629,7 +2516,7 @@ def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow(monkeypatch):
 
 
 # @pair mcp-adapter:product-contract
-# @source clients/lagniappe_mcp/src/lagniappe_mcp/catalog.py::catalog_tools
+# @source mcp/src/lagniappe_mcp/catalog.py::catalog_tools
 def test_read_descriptions_localize_result_recovery_without_changing_catalog_schemas():
     catalog = asyncio.run(_WorkflowREST().startup())[2]
     template = catalog["tools"][0]
@@ -5685,3 +2572,59 @@ def test_read_descriptions_localize_result_recovery_without_changing_catalog_sch
     assert "Reuse attached Form schemas" in tools["get_entity"].description
     assert "not complete inspection" in tools["get_file"].description
     assert "include_original=true delivers only bounded supported image/audio" in tools["get_file"].description
+# @pair mcp-adapter:product-contract
+@pytest.mark.parametrize("mode", ["auto", "legacy"])
+def test_server_presents_matching_schemas_and_values_for_each_protocol(
+    mode: str,
+) -> None:
+    referenced_schema = {
+        "$defs": {"item": {"type": "integer", "minimum": 0}},
+        "type": "array",
+        "items": {"$ref": "#/$defs/item"},
+    }
+    cases = {
+        "array_read": (referenced_schema, [1, 2]),
+        "empty_read": (referenced_schema, []),
+        "scalar_read": ({"type": "string"}, "hello"),
+        "nullable_object_read": ({"type": ["object", "null"]}, {"name": "hello"}),
+        "union_read": ({"anyOf": [{"type": "integer"}, {"type": "null"}]}, 7),
+        "object_read": ({"type": "object"}, {"result": [1, 2]}),
+    }
+    # The v2 SDK client treats a direct JSON null as missing structured content.
+    # A legacy wrapper must retain null; the live REST catalog has no null root.
+    if mode == "legacy":
+        cases["null_read"] = ({"type": ["object", "null"]}, None)
+    definitions = {
+        name: ToolDefinition(
+            name, "Read a fixture value.",
+            {"type": "object", "properties": {}, "additionalProperties": False},
+            validate_schema_document(schema), "read", READ_ANNOTATIONS,
+            result_paths={"primary_collection": "$", "pagination": None},
+        )
+        for name, (schema, _) in cases.items()
+    }
+    original_definitions = deepcopy(definitions)
+
+    protocol = "2025-11-25" if mode == "legacy" else "2026-07-28"
+    for name, definition in definitions.items():
+        tool = definition.as_mcp_tool(protocol)
+        raw_schema, raw_value = cases[tool.name]
+        wrapped = mode == "legacy" and raw_schema.get("type") != "object"
+        expected = {"result": raw_value} if wrapped else raw_value
+        if mode == "legacy":
+            assert tool.output_schema["type"] == "object"
+        else:
+            assert tool.output_schema == raw_schema
+        called = _success_result(
+            AdapterResult(raw_value),
+            wrap_result=definition.requires_result_wrapper(protocol),
+        )
+        assert called.is_error is False
+        assert called.structured_content == expected
+        assert json.loads(called.content[0].text) == expected
+        validate_value(tool.output_schema, expected, phase="output")
+        assert tool.meta["lagniappe/resultPaths"] == {
+            "primary_collection": "$.result" if wrapped else "$",
+            "pagination": None,
+        }
+    assert definitions == original_definitions

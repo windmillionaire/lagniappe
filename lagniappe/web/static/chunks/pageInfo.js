@@ -1,2 +1,895 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"1.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="822cb32d-bf2b-4d83-a658-cdb5ba77f308",e._sentryDebugIdIdentifier="sentry-dbid-822cb32d-bf2b-4d83-a658-cdb5ba77f308");}catch(e){}}();import{F as w}from"./form2.js?v=b5400af1";import{InputElement as E}from"./input.js?v=b5400af1";import{RadioElement as S}from"./radio.js?v=b5400af1";import{s as _}from"./sections.js?v=b5400af1";import{S as g}from"./sectionToggle.js?v=b5400af1";import{TextareaElement as k}from"./textarea.js?v=b5400af1";import{r as m,c as v,w as A}from"./foundation.js?v=b5400af1";import"./connectivity.js?v=b5400af1";import{Modal as q}from"./modal.js?v=b5400af1";import{PagePermissions as P}from"./pagePermissions.js?v=b5400af1";import"./baseForm.js?v=b5400af1";import"./icons.js?v=b5400af1";import"./primitives.js?v=b5400af1";import"./styles.js?v=b5400af1";import"./loader.js?v=b5400af1";import"./baseElement.js?v=b5400af1";import"./formatting.js?v=b5400af1";import"./baseUpload.js?v=b5400af1";import"./buttons.js?v=b5400af1";import"./dropdown.js?v=b5400af1";import"./combobox.js?v=b5400af1";import"./upstreamUnavailable.js?v=b5400af1";import"./facets.js?v=b5400af1";import"./remote.js?v=b5400af1";import"./queryLifecycle.js?v=b5400af1";import"./results.js?v=b5400af1";import"./storage.js?v=b5400af1";import"./submitter.js?v=b5400af1";const C=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/,f=/^[0-9a-f]{64}$/,x=16*1024*1024,R="linux-x86_64-cpython-3.14";class I{constructor(e,{fetchManifest:i=globalThis.fetch}={}){this.target=e,this.fetchManifest=i,this.controller=null}init(){this.target&&(this.controller=new AbortController,this._load())}destroy(){this.controller?.abort(),this.controller=null}_allowedOrigin(){let e;try{e=JSON.parse(this.target.dataset.allowedOrigins||"[]")}catch{throw new Error("The MCP setup origin policy is invalid.")}if(!Array.isArray(e)||!e.length)throw new Error("The MCP setup origin policy is unavailable.");for(const i of e){let t;try{t=new URL(i)}catch{throw new Error("The MCP setup origin policy is invalid.")}if(typeof i!="string"||t.protocol!=="https:"||t.origin!==i||t.pathname!=="/"||t.search||t.hash)throw new Error("The MCP setup origin policy is invalid.")}if(!e.includes(window.location.origin))throw new Error("Open this page on its configured Lagniappe origin to install MCP.");return window.location.origin}_validateManifest(e,i){const t=e?.current,r=t?.version,a=t?.sha256,n=e?.application?.build_id,s=this.target.dataset.buildId,o=t?.compatibility,l=t?.platforms?.[0],c=Array.isArray(e?.releases)?e.releases.filter(d=>d?.version===r):[],u=`lagniappe_mcp-${r}-py3-none-any.whl`,h=`/mcp/releases/${r}/${a}/${u}`;if(e?.schema!==1||e?.package?.name!=="lagniappe-mcp"||e?.package?.entry_point!=="lagniappe-mcp"||!C.test(r||"")||!f.test(a||"")||t?.filename!==u||t?.artifact_path!==h||t?.supported!==!0||t?.python_requirement!==">=3.14,<3.15"||!Number.isSafeInteger(t?.size)||t.size<=0||t.size>x||!Array.isArray(t?.platforms)||t.platforms.length!==1||l?.id!==R||l?.system!=="linux"||l?.architecture!=="x86_64"||l?.libc!=="glibc>=2.17"||l?.python!=="3.14"||o?.api_min!=="v1"||o?.api_max!=="v1"||o?.contract_min!==6||o?.contract_max!==6||!f.test(o?.openapi_sha256||"")||!f.test(o?.contract_source_sha256||"")||c.length!==1||JSON.stringify(c[0])!==JSON.stringify(t)||!/^b[0-9a-f]{7}$/.test(n||"")||!/^b[0-9a-f]{7}$/.test(s||"")||!/^b[0-9a-f]{7}$/.test(i||"")||n!==s||i!==s)throw new Error("The MCP release manifest failed validation.");return{digest:a,path:h,version:r}}async _load(){try{const e=this._allowedOrigin(),i=await this.fetchManifest("/mcp/manifest.json",{method:"GET",credentials:"omit",cache:"no-store",redirect:"error",headers:{Accept:"application/json"},signal:this.controller?.signal});if(!i?.ok)throw new Error("The MCP release manifest is unavailable.");const t=i.headers?.get?.("X-Lagniappe-Build-ID"),r=this._validateManifest(await i.json(),t);this._render(e,r)}catch(e){e?.name!=="AbortError"&&this._error(e?.message)}}_render(e,{digest:i,path:t,version:r}){const n=`pipx install --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' "${new URL(t,e).href}#sha256=${i}"`,s=`lagniappe-mcp configure codex --url "${e}" --profile personal`,o="lagniappe-mcp check --profile personal";this.target.querySelector("[data-role='mcp-install-command']").textContent=n,this.target.querySelector("[data-role='mcp-configure-command']").textContent=s,this.target.querySelector("[data-role='mcp-diagnostic-command']").textContent=o,this.target.querySelector("[data-role='mcp-setup-status']").textContent=`Verified adapter ${r} is available.`,this.target.querySelector("[data-role='mcp-setup-commands']").dataset.visible="true",this._bindCopy("copy-mcp-install",n),this._bindCopy("copy-mcp-configure",s),this._bindCopy("copy-mcp-diagnostic",o)}_bindCopy(e,i){const t=this.target.querySelector(`[data-action='${e}']`);t?.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(i),t.textContent="Copied"}catch{t.textContent="Copy failed"}},{signal:this.controller?.signal})}_error(e){const i=this.target.querySelector("[data-role='mcp-setup-status']"),t=this.target.querySelector("[data-role='mcp-setup-error']"),r=this.target.querySelector("[data-role='mcp-setup-commands']");i&&(i.textContent="MCP setup is unavailable."),r&&(r.dataset.visible="false"),t&&(t.textContent=e||"The MCP release could not be verified.",t.dataset.visible="true")}}class y extends w{constructor(e){super(e),this.formSelect=null}get submitGroup(){return this.target.querySelector("[data-role='submit-group']")}get nameElement(){return this.schema?.find(e=>e.id==="name")?null:new E({kind:"page",readonly:this.readonly},{input:"text",id:"name",title:"Name",placeholder:"name this page..."},this.target.dataset.name||"").elt}get descriptionElement(){return this.schema?.find(e=>e.id==="description")?null:new k({kind:"page",readonly:this.readonly},{input:"textarea",id:"description",title:"Description",placeholder:"describe this page..."},this.target.dataset.description||"").elt}get formSelectElement(){return this._facetElement('[data-action="select-form"]')}get relatedFormsElement(){const e=this.target.querySelector('[data-role="related-forms"]');if(!e||this.readonly)return e;const i=new AbortController,t=i.signal,r=(a=null)=>{e.querySelectorAll("[data-role='related-form']").forEach(n=>{n.dataset.selected=(!!(a&&n.dataset.formId===a)).toString()})};return e.querySelectorAll("[data-role='related-form']").forEach(a=>{a.addEventListener("click",n=>{n.preventDefault(),n.stopPropagation();const s=this._relatedFormDetails(a);!s?.id||!this.formSelect||(this.formSelect.select?.values?.clear(),this.formSelect.addOption(s),r(s.id))},{signal:t})}),this.target.addEventListener("updated",a=>{if(a.detail?.name!=="form")return;const n=Object.values(a.detail.options||{})[0];r(n?.id||null)},{signal:t}),this.target.addEventListener("change",a=>{a.target?.name==="form"&&r(a.target.value||null)},{signal:t}),r(this.formSelect?.details?.id||null),this.destroyables.push({destroy:()=>i.abort()}),e}get photoPromptElement(){return _.photoPrompt(this)}get categoriesElement(){return this._facetElement('[data-role="categories"]')}get autofillElement(){return _.autofill(this)}get prepend(){return[this.photoPromptElement,this.nameElement,this.descriptionElement]}get append(){return[this.formSelectElement,this.categoriesElement,this.autofillElement]}_facetElement(e){const i=this.target.querySelector(e);if(!i)return null;const t=g.facet(this,i);return t.init(),this.destroyables.push(t),i.matches('[data-action="select-form"]')&&(this.formSelect=t),t.elt}_relatedFormDetails(e){try{return JSON.parse(e.dataset.details||"{}")}catch{return{}}}}class N extends y{constructor(e){super(e),this.messages={submit:"Update Page",submitting:"Updating Page",submitted:"Page Updated",queued:"Queued Sync"},this._changeForm=this._changeForm.bind(this)}async init(){await super.init(),this.target.addEventListener("updated",this._changeForm)}async prepareReset(e={}){const i=e.afterInit;await super.prepareReset({...e,afterInit:async t=>{await i?.(t),t.target.addEventListener("updated",t._changeForm)}})}async reset(){await this.prepareReset(),this.commitReset()}offline({data:e,method:i,route:t}){return{id:`update:page:${this.key}`,action:"update",kind:"page",method:i,route:t,target_key:this.key,data:e}}handleOfflineQueue({phase:e,record:i}){if(!(i?.kind!=="page"||i.target_key!==this.key))if(e==="queued")this.form?.queued(),this.setEntityMetadata();else{if(e==="conflict")return this._offlineConflict={record:i,response:i.conflictResponse},this.stageOfflineConflict();e==="replayed"&&(this.form?.success(),this.setEntityMetadata())}}async _changeForm(e){if(!e.target.closest("[data-role='form-select']"))return;e.stopPropagation();const i=this.initialTarget.querySelector("[data-action='select-form']"),t=JSON.parse(i?.dataset.preload||"{}"),r=Object.values(e.detail?.options||{})[0];if(!r?.id||r.id===t?.id)return;this.target.classList.add("opacity-50","pointer-events-none");const a=this.target.dataset.route,n=new URLSearchParams;n.set("form",r.id);const s=await m.get(a,n);if(!this.view.successfulResponse(s,this.component)){this.target.classList.remove("opacity-50","pointer-events-none"),v(new Error("Failed to replace form"),this.target,{requestedForm:r});return}this.schema=s.schema,this.submission=s.submission;const o=this.initialTarget.querySelector('[data-action="select-form"]');o.dataset.preload=JSON.stringify(r),await this.prepareReset(),await A(()=>{this.commitReset(),this.target.dataset.visible="true"},{label:"page-info:change-form"})}postreconcile(){super.postreconcile(),this.setEntityMetadata()}}class T extends y{constructor(e){super(e),this.messages={submit:"Create Page",submitting:"Creating Page",submitted:"Page Created"}}get html(){return[this.nameElement,this.descriptionElement,this.formSelectElement,this.relatedFormsElement,this.categoriesElement,this.autofillElement]}get prepend(){return[]}get append(){return[]}async prereconcile(){await super.prereconcile(),this._created&&await this.prepareReset()}postreconcile(){const e=this._created;e&&this.commitReset(),super.postreconcile(),e&&this.form?.resetSubmitButton();const i=this.target.querySelector("input[name='name']");this.visible&&i&&i.focus()}}class M extends P{constructor(e){super(e),this.messages={submit:"Update User Settings",submitting:"Updating User Settings",submitted:"User Settings Updated"},this._groupSelect=null}async reset(){this.destroy(),await this.init()}updated(e){const i=e.html?.querySelector(`[data-widget='${this.name}']`);i&&(this.initialTarget=i,this._updated=!0)}async init(){await super.init(),this._initGroups(),this._initPageSelect(),this._initRemovePage(),this._initApiKey(),this._initMcpSetup(),this.commitRevisionBaseline()}_initMcpSetup(){const e=this.target.querySelector("[data-role='mcp-setup']");if(!e)return;const i=new I(e);i.init(),this.destroyables.push(i)}_initApiKey(){const e=this.target.querySelector("[data-role='api-key-settings']"),i=this.target.dataset.apiKeyRoute;if(!e||!i)return;const t=new AbortController,r=t.signal;e.querySelector("[data-action='issue-api-key']")?.addEventListener("click",()=>{this._issueApiKey(e,i)},{signal:r}),e.querySelector("[data-action='revoke-api-key']")?.addEventListener("click",()=>{this._revokeApiKey(e,i)},{signal:r}),this.destroyables.push({destroy:()=>t.abort()}),m.get(i,null,{signal:r,replaceErrorPage:!1}).then(a=>{a.ok?this._renderApiKey(e,a.credential):this._apiKeyError(e,a.error)})}_renderApiKey(e,i={},t=null){const r=i?.active===!0,a=e.querySelector("[data-role='api-key-status']"),n=e.querySelector("[data-action='issue-api-key']"),s=e.querySelector("[data-action='revoke-api-key']"),o=e.querySelector("[data-role='api-key-secret']"),l=e.querySelector("[data-role='api-key-value']");if(a){const c=i?.expires_at?new Date(i.expires_at).toLocaleString():null;a.textContent=r?`${i.display_prefix||"API key"} \u2014 expires ${c}`:"No active API key."}n&&(n.textContent=r?"Regenerate API key":"Generate API key"),s&&(s.dataset.visible=r.toString()),o&&(o.dataset.visible=(!!t).toString()),l&&(l.textContent=t||""),this._apiKeyError(e,null)}_apiKeyError(e,i){const t=e.querySelector("[data-role='api-key-message']");t&&(t.textContent=i||"",t.dataset.visible=(!!i).toString())}async _confirmApiKeyAction(e,i,t){const a=e.querySelector("template[data-role='api-key-confirmation-template']")?.content?.querySelector("#modal")?.cloneNode(!0);if(!a)return v(new Error("API key confirmation template is missing."),i,this.view?.dataset),!1;a.querySelector("[data-role='confirmation-title']").textContent=t.title,a.querySelector("[data-role='confirmation-description']").textContent=t.description;const n=a.querySelector("[data-role='confirmation-confirm']");n.querySelector("[data-role='text']").textContent=t.label;const s=new q(this.view,i);let o=!1,l;const c=new Promise(d=>{l=b=>{o||(o=!0,d(b))}}),u=s.remove.bind(s);return s.remove=async()=>{const d=await u();return l(!1),d},n.addEventListener("click",async()=>{n.disabled=!0,await u(),l(!0)},{once:!0}),await s.attach(a)?n.focus():l(!1),c}async _issueApiKey(e,i){const t=e.querySelector("[data-action='issue-api-key']");if(t?.textContent?.includes("Regenerate")&&!await this._confirmApiKeyAction(e,t,{title:"Regenerate API key",description:"The current key will stop working immediately. Any client using it must be updated with the new key.",label:"Regenerate API key"}))return;t&&(t.disabled=!0);const a=await m.post(i,{});if(t&&(t.disabled=!1),!a.ok)return this._apiKeyError(e,a.error);this._renderApiKey(e,a.credential,a.token)}async _revokeApiKey(e,i){const t=e.querySelector("[data-action='revoke-api-key']");if(!await this._confirmApiKeyAction(e,t,{title:"Revoke API key",description:"This key will stop working immediately. Any client using it will lose access until a new key is generated.",label:"Revoke API key"}))return;t&&(t.disabled=!0);const r=await m.delete(i);if(t&&(t.disabled=!1),!r.ok)return this._apiKeyError(e,r.error);this._renderApiKey(e,r.credential)}_initGroups(){const e=this.target.querySelector("[data-role='user-groups'] [name='group']");!e||!this.canEditGroups||(this._groupSelect=g.facet(this,e.closest("[lp-select]")),this._groupSelect.init(),this.destroyables.push(this._groupSelect))}_initPageSelect(){const e=this.target.querySelector("[data-role='page-select'] [name='reassign-page']");e&&(this._pageSelect=g.facet(this,e.closest("[lp-select]")),this._pageSelect.init(),this.destroyables.push(this._pageSelect))}_initRemovePage(){const e=this.target.querySelector("[data-role='remove-page'] input[name='remove-user']");e&&e.addEventListener("change",i=>{i.target.checked&&this._pageSelect&&this._pageSelect.select.clear()})}get canEditGroups(){return this.target.dataset.canEditGroups==="true"}get canEditAi(){return this.target.dataset.canEditAi==="true"}get canEditName(){return this.target.dataset.canEditName==="true"}get nameElement(){const e=this.target.dataset.name||"",i=!this.readonly&&this.canEditName,t=new E({kind:"user",readonly:!i,mode:i?"edit":null},{input:"text",id:"name",title:"Name",placeholder:"name this user..."},e).elt;if(!t)return null;const r=t.matches("input")?t:t.querySelector("input");return r&&(r.value=e),t}get userEmailElement(){return this.target.querySelector("[data-role='user-email']")}get userAiAccessElement(){if(!this.canEditAi)return null;const e=new S(this,{name:"ai_access",label:"AI Access",required:!0,layout:"row",options:[{label:"None",value:"NONE"},{label:"Ask",value:"ASK"},{label:"Create",value:"CREATE"}]},this.target.dataset.aiAccess||"NONE").edit;return e.dataset.role="ai-access",e}get notificationEmailElement(){if(this.target.dataset.canEditNotificationEmail!=="true")return null;const e=new S(this,{name:"notification_email_mode",label:"Email Notifications",required:!0,layout:"column",options:[{label:"No email",value:"NONE"},{label:"Email after five minutes",value:"IMMEDIATE"},{label:"Daily digest at 8:00 AM local time",value:"DAILY"}]},this.target.dataset.notificationEmailMode||"DAILY").edit;return e.dataset.role="notification-email",e.className="space-y-0 rounded-md border border-user-default p-3",e.querySelector("legend")?.classList.add("px-1"),e}get userActionsElement(){return this.target.querySelector("[data-role='user-actions']")}get userGroupsElement(){return this.target.querySelector("[data-role='user-groups']")}get apiKeyElement(){return this.target.querySelector("[data-role='api-key-settings']")}get ownerInboundElement(){return this.target.querySelector("[data-role='owner-inbound']")}get userCardElement(){return this.target.querySelector("[data-role='user-card']")}get pageSelectElement(){return this.target.querySelector("[data-role='page-select']")}get removePageElement(){return this.target.querySelector("[data-role='remove-page']")}get html(){const e=this.userCardElement,i=e?.querySelector("[data-role='user-fields']"),t=this.target.querySelector("[data-role='public-email-consent']"),r=this.removePageElement?.closest("[data-role='user-page']")??this.pageSelectElement?.closest("[data-role='user-page']");return i?.replaceChildren(...[this.nameElement,this.userEmailElement,this.userGroupsElement,this.userAiAccessElement,this.notificationEmailElement,this.apiKeyElement,t,this.ownerInboundElement,r].filter(Boolean)),[this.visibleTo,this.restrictAccess,e].filter(Boolean)}get formData(){const e=new FormData,i=this.userCardElement,t=i?.querySelector("[name='name']"),r=i?.querySelector("[name='email']");(t?.value||this.target.dataset.name)&&e.set("name",t?.value||this.target.dataset.name),r&&!r.disabled&&e.set("email",r.value);const a=i?.querySelector("[name='ai_access']:checked");this.canEditAi&&a&&e.set("ai_access",a.value);const n=i?.querySelector("[name='notification_email_mode']:checked");if(this.target.dataset.canEditNotificationEmail==="true"&&n&&e.set("notification_email_mode",n.value),this.target.dataset.canEditPublicEmail==="true"){const s=i?.querySelector("[name='allow_site_email']");s&&e.set("allow_site_email",s.checked?"true":"false")}if(this._groupSelect&&Array.from(this._groupSelect.select.values).forEach(s=>{e.append("group",s)}),this._pageSelect&&Array.from(this._pageSelect.select.values).forEach(s=>{e.append("reassign-page",s)}),this.target.dataset.canEditOwnerInbound==="true")for(const s of["allow_messages_and_mentions","allow_task_assignments"]){const o=i?.querySelector(`[name='${s}']`);o&&e.set(s,o.checked?"true":"false")}return i?.querySelector("[name='remove-user']")?.checked&&e.set("remove-user","true"),e.set("role","user-settings"),e}postreconcile(){this._updated&&(this._updated=!1,this.commitReset(),this.target.dataset.visible="true",this._initGroups(),this._initPageSelect(),this._initRemovePage(),this._initApiKey(),this._initMcpSetup(),this.setEntityMetadata(),this._success&&(this.form?.success(),this._success=!1))}}export{T as CreatePage,y as PageForm,N as PageInfo,M as UserSettings};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormElement } from './form2.js?v=ba683140';
+import { InputElement } from './input.js?v=ba683140';
+import { RadioElement } from './radio.js?v=ba683140';
+import { s as sections } from './sections.js?v=ba683140';
+import { S as SectionToggle } from './sectionToggle.js?v=ba683140';
+import { TextareaElement } from './textarea.js?v=ba683140';
+import { r as request, c as captureError, w as withTransition } from './foundation.js?v=ba683140';
+import './connectivity.js?v=ba683140';
+import { Modal } from './modal.js?v=ba683140';
+import { PagePermissions } from './pagePermissions.js?v=ba683140';
+import './baseForm.js?v=ba683140';
+import './icons.js?v=ba683140';
+import './primitives.js?v=ba683140';
+import './styles.js?v=ba683140';
+import './loader.js?v=ba683140';
+import './baseElement.js?v=ba683140';
+import './formatting.js?v=ba683140';
+import './baseUpload.js?v=ba683140';
+import './buttons.js?v=ba683140';
+import './dropdown.js?v=ba683140';
+import './combobox.js?v=ba683140';
+import './upstreamUnavailable.js?v=ba683140';
+import './facets.js?v=ba683140';
+import './remote.js?v=ba683140';
+import './queryLifecycle.js?v=ba683140';
+import './results.js?v=ba683140';
+import './storage.js?v=ba683140';
+import './submitter.js?v=ba683140';
+
+/**
+ * @testable infrastructure
+ */
+class PageForm extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.formSelect = null;
+	}
+
+	get submitGroup() {
+		return this.target.querySelector("[data-role='submit-group']");
+	}
+
+	get nameElement() {
+		if (this.schema?.find((elt) => elt.id === "name")) return null;
+
+		return new InputElement(
+			{ kind: "page", readonly: this.readonly },
+			{
+				input: "text",
+				id: "name",
+				title: "Name",
+				placeholder: "name this page...",
+			},
+			this.target.dataset.name || "",
+		).elt;
+	}
+
+	get descriptionElement() {
+		if (this.schema?.find((elt) => elt.id === "description")) return null;
+
+		return new TextareaElement(
+			{ kind: "page", readonly: this.readonly },
+			{
+				input: "textarea",
+				id: "description",
+				title: "Description",
+				placeholder: "describe this page...",
+			},
+			this.target.dataset.description || "",
+		).elt;
+	}
+
+	get formSelectElement() {
+		return this._facetElement('[data-action="select-form"]');
+	}
+
+	get relatedFormsElement() {
+		const section = this.target.querySelector('[data-role="related-forms"]');
+		if (!section || this.readonly) return section;
+
+		const controller = new AbortController();
+		const signal = controller.signal;
+
+		const setSelected = (formId = null) => {
+			section
+				.querySelectorAll("[data-role='related-form']")
+				.forEach((badge) => {
+					badge.dataset.selected = Boolean(
+						formId && badge.dataset.formId === formId,
+					).toString();
+				});
+		};
+
+		section.querySelectorAll("[data-role='related-form']").forEach((badge) => {
+			badge.addEventListener(
+				"click",
+				(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+
+					const details = this._relatedFormDetails(badge);
+					if (!details?.id || !this.formSelect) return;
+
+					this.formSelect.select?.values?.clear();
+					this.formSelect.addOption(details);
+					setSelected(details.id);
+				},
+				{ signal },
+			);
+		});
+
+		this.target.addEventListener(
+			"updated",
+			(e) => {
+				if (e.detail?.name !== "form") return;
+
+				const details = Object.values(e.detail.options || {})[0];
+				setSelected(details?.id || null);
+			},
+			{ signal },
+		);
+		this.target.addEventListener(
+			"change",
+			(e) => {
+				if (e.target?.name !== "form") return;
+
+				setSelected(e.target.value || null);
+			},
+			{ signal },
+		);
+
+		setSelected(this.formSelect?.details?.id || null);
+
+		this.destroyables.push({
+			destroy: () => controller.abort(),
+		});
+
+		return section;
+	}
+
+	get photoPromptElement() {
+		return sections.photoPrompt(this);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
+	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_remove_category_from_page
+	 * @matrix pages : category-add category-remove
+	 */
+	get categoriesElement() {
+		return this._facetElement('[data-role="categories"]');
+	}
+
+	get autofillElement() {
+		return sections.autofill(this);
+	}
+
+	get prepend() {
+		return [this.photoPromptElement, this.nameElement, this.descriptionElement];
+	}
+
+	get append() {
+		return [
+			this.formSelectElement,
+			this.categoriesElement,
+			this.autofillElement,
+		];
+	}
+
+	_facetElement(selector) {
+		const target = this.target.querySelector(selector);
+		if (!target) return null;
+
+		const control = SectionToggle.facet(this, target);
+		control.init();
+		this.destroyables.push(control);
+		if (target.matches('[data-action="select-form"]')) {
+			this.formSelect = control;
+		}
+		return control.elt;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/pageInfo.mjs::CreatePage
+	 * @reason related-form badge parsing is private CreatePage UI plumbing
+	 */
+	_relatedFormDetails(badge) {
+		try {
+			return JSON.parse(badge.dataset.details || "{}");
+		} catch {
+			return {};
+		}
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
+ * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
+ * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
+ * @matrix pages : lp-offline permission-gates readonly
+ */
+class PageInfo extends PageForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: `Update Page`,
+			submitting: `Updating Page`,
+			submitted: `Page Updated`,
+			queued: "Queued Sync",
+		};
+		this._changeForm = this._changeForm.bind(this);
+	}
+
+	async init() {
+		await super.init();
+		this.target.addEventListener("updated", this._changeForm);
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/pageInfo.mjs::PageInfo
+	 * @reason detached page-info resets retain the form-selection listener
+	 */
+	async prepareReset(options = {}) {
+		const afterInit = options.afterInit;
+		await super.prepareReset({
+			...options,
+			afterInit: async (widget) => {
+				await afterInit?.(widget);
+				widget.target.addEventListener("updated", widget._changeForm);
+			},
+		});
+	}
+
+	async reset() {
+		await this.prepareReset();
+		this.commitReset();
+	}
+
+	offline({ data, method, route }) {
+		return {
+			id: `update:page:${this.key}`,
+			action: "update",
+			kind: "page",
+			method,
+			route,
+			target_key: this.key,
+			data,
+		};
+	}
+
+	handleOfflineQueue({ phase, record }) {
+		if (record?.kind !== "page" || record.target_key !== this.key) return;
+		if (phase === "queued") {
+			this.form?.queued();
+			this.setEntityMetadata();
+		} else if (phase === "conflict") {
+			this._offlineConflict = {
+				record,
+				response: record.conflictResponse,
+			};
+			return this.stageOfflineConflict();
+		} else if (phase === "replayed") {
+			this.form?.success();
+			this.setEntityMetadata();
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
+	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_clear_page_info_form_selector_keeps_widget_stable
+	 * @matrix pages : form-clear form-switch info-form
+	 */
+	async _changeForm(e) {
+		if (!e.target.closest("[data-role='form-select']")) return;
+
+		e.stopPropagation();
+
+		const formSelect = this.initialTarget.querySelector(
+			"[data-action='select-form']",
+		);
+		const preloadedForm = JSON.parse(formSelect?.dataset.preload || "{}");
+
+		const selectedForm = Object.values(e.detail?.options || {})[0];
+
+		if (!selectedForm?.id) return;
+		if (selectedForm.id === preloadedForm?.id) return;
+
+		this.target.classList.add("opacity-50", "pointer-events-none");
+		const route = this.target.dataset.route;
+		const params = new URLSearchParams();
+		params.set("form", selectedForm.id);
+
+		const response = await request.get(route, params);
+		if (!this.view.successfulResponse(response, this.component)) {
+			this.target.classList.remove("opacity-50", "pointer-events-none");
+			captureError(new Error("Failed to replace form"), this.target, {
+				requestedForm: selectedForm,
+			});
+			return;
+		}
+		this.schema = response.schema;
+		this.submission = response.submission;
+
+		const nextFormSelect = this.initialTarget.querySelector(
+			'[data-action="select-form"]',
+		);
+		nextFormSelect.dataset.preload = JSON.stringify(selectedForm);
+		await this.prepareReset();
+		await withTransition(
+			() => {
+				this.commitReset();
+				this.target.dataset.visible = "true";
+			},
+			{ label: "page-info:change-form" },
+		);
+	}
+
+	postreconcile() {
+		super.postreconcile();
+		this.setEntityMetadata();
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_from_category_index
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_related_form_badge_selects_form
+ * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filters_hide_create_page_tool
+ * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
+ * @matrix pages : category-index create mobile-tools related-forms tool-switch
+ * @pair deferred-jobs:hosted-e2e
+ */
+class CreatePage extends PageForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Create Page",
+			submitting: "Creating Page",
+			submitted: "Page Created",
+		};
+	}
+
+	get html() {
+		return [
+			this.nameElement,
+			this.descriptionElement,
+			this.formSelectElement,
+			this.relatedFormsElement,
+			this.categoriesElement,
+			this.autofillElement,
+		];
+	}
+
+	get prepend() {
+		return [];
+	}
+
+	get append() {
+		return [];
+	}
+
+	async prereconcile() {
+		await super.prereconcile();
+		if (this._created) await this.prepareReset();
+	}
+
+	postreconcile() {
+		const created = this._created;
+		if (created) this.commitReset();
+		super.postreconcile();
+
+		if (created) {
+			this.form?.resetSubmitButton();
+		}
+		const nameElement = this.target.querySelector("input[name='name']");
+		if (this.visible && nameElement) nameElement.focus();
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class UserSettings extends PagePermissions {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update User Settings",
+			submitting: "Updating User Settings",
+			submitted: "User Settings Updated",
+		};
+		this._groupSelect = null;
+	}
+
+	async reset() {
+		this.destroy();
+		await this.init();
+	}
+
+	updated(response) {
+		const updatedTarget = response.html?.querySelector(
+			`[data-widget='${this.name}']`,
+		);
+		if (updatedTarget) {
+			this.initialTarget = updatedTarget;
+			this._updated = true;
+		}
+	}
+
+	async init() {
+		await super.init();
+		this._initGroups();
+		this._initPageSelect();
+		this._initRemovePage();
+		this._initApiKey();
+		this.commitRevisionBaseline();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @matrix agent-api : copy-control expiry revoke rotate shown-once status
+	 */
+	_initApiKey() {
+		const section = this.target.querySelector("[data-role='api-key-settings']");
+		const route = this.target.dataset.apiKeyRoute;
+		if (!section || !route) return;
+
+		const controller = new AbortController();
+		const signal = controller.signal;
+		section
+			.querySelector("[data-action='issue-api-key']")
+			?.addEventListener(
+				"click",
+				() => void this._issueApiKey(section, route),
+				{ signal },
+			);
+		section
+			.querySelector("[data-action='revoke-api-key']")
+			?.addEventListener(
+				"click",
+				() => void this._revokeApiKey(section, route),
+				{ signal },
+			);
+		this.destroyables.push({
+			destroy: () => controller.abort(),
+		});
+		void request
+			.get(route, null, { signal, replaceErrorPage: false })
+			.then((response) => {
+				if (response.ok) this._renderApiKey(section, response.credential);
+				else this._apiKeyError(section, response.error);
+			});
+	}
+
+	_renderApiKey(section, credential = {}, token = null) {
+		const active = credential?.active === true;
+		const status = section.querySelector("[data-role='api-key-status']");
+		const issue = section.querySelector("[data-action='issue-api-key']");
+		const revoke = section.querySelector("[data-action='revoke-api-key']");
+		const secret = section.querySelector("[data-role='api-key-secret']");
+		const value = section.querySelector("[data-role='api-key-value']");
+		if (status) {
+			const expires = credential?.expires_at
+				? new Date(credential.expires_at).toLocaleString()
+				: null;
+			status.textContent = active
+				? `${credential.display_prefix || "API key"} — expires ${expires}`
+				: "No active API key.";
+		}
+		if (issue)
+			issue.textContent = active ? "Regenerate API key" : "Generate API key";
+		if (revoke) revoke.dataset.visible = active.toString();
+		if (secret) secret.dataset.visible = Boolean(token).toString();
+		if (value) value.textContent = token || "";
+		this._apiKeyError(section, null);
+	}
+
+	_apiKeyError(section, message) {
+		const target = section.querySelector("[data-role='api-key-message']");
+		if (!target) return;
+		target.textContent = message || "";
+		target.dataset.visible = Boolean(message).toString();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_without_provider_access_can_manage_external_agent_api_key
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_confirmation_uses_app_modal
+	 * @matrix agent-api user-settings : confirmation-modal revoke rotate
+	 */
+	async _confirmApiKeyAction(section, trigger, options) {
+		const template = section.querySelector(
+			"template[data-role='api-key-confirmation-template']",
+		);
+		const modalElement = template?.content
+			?.querySelector("#modal")
+			?.cloneNode(true);
+		if (!modalElement) {
+			captureError(
+				new Error("API key confirmation template is missing."),
+				trigger,
+				this.view?.dataset,
+			);
+			return false;
+		}
+
+		modalElement.querySelector("[data-role='confirmation-title']").textContent =
+			options.title;
+		modalElement.querySelector(
+			"[data-role='confirmation-description']",
+		).textContent = options.description;
+		const confirm = modalElement.querySelector(
+			"[data-role='confirmation-confirm']",
+		);
+		confirm.querySelector("[data-role='text']").textContent = options.label;
+
+		const modal = new Modal(this.view, trigger);
+		let settled = false;
+		let settle;
+		const confirmation = new Promise((resolve) => {
+			settle = (value) => {
+				if (settled) return;
+				settled = true;
+				resolve(value);
+			};
+		});
+		const remove = modal.remove.bind(modal);
+		modal.remove = async () => {
+			const result = await remove();
+			settle(false);
+			return result;
+		};
+		confirm.addEventListener(
+			"click",
+			async () => {
+				confirm.disabled = true;
+				await remove();
+				settle(true);
+			},
+			{ once: true },
+		);
+
+		const attached = await modal.attach(modalElement);
+		if (!attached) settle(false);
+		else confirm.focus();
+		return confirmation;
+	}
+
+	async _issueApiKey(section, route) {
+		const issue = section.querySelector("[data-action='issue-api-key']");
+		const isRotation = issue?.textContent?.includes("Regenerate");
+		if (
+			isRotation &&
+			!(await this._confirmApiKeyAction(section, issue, {
+				title: "Regenerate API key",
+				description:
+					"The current key will stop working immediately. Any client using it must be updated with the new key.",
+				label: "Regenerate API key",
+			}))
+		) {
+			return;
+		}
+		if (issue) issue.disabled = true;
+		const response = await request.post(route, {});
+		if (issue) issue.disabled = false;
+		if (!response.ok) return this._apiKeyError(section, response.error);
+		this._renderApiKey(section, response.credential, response.token);
+	}
+
+	async _revokeApiKey(section, route) {
+		const revoke = section.querySelector("[data-action='revoke-api-key']");
+		if (
+			!(await this._confirmApiKeyAction(section, revoke, {
+				title: "Revoke API key",
+				description:
+					"This key will stop working immediately. Any client using it will lose access until a new key is generated.",
+				label: "Revoke API key",
+			}))
+		) {
+			return;
+		}
+		if (revoke) revoke.disabled = true;
+		const response = await request.delete(route);
+		if (revoke) revoke.disabled = false;
+		if (!response.ok) return this._apiKeyError(section, response.error);
+		this._renderApiKey(section, response.credential);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
+	 * @matrix user-settings : edit-groups group-selector owner-other-page
+	 */
+	_initGroups() {
+		const groupInput = this.target.querySelector(
+			"[data-role='user-groups'] [name='group']",
+		);
+		if (!groupInput || !this.canEditGroups) return;
+
+		this._groupSelect = SectionToggle.facet(
+			this,
+			groupInput.closest("[lp-select]"),
+		);
+		this._groupSelect.init();
+		this.destroyables.push(this._groupSelect);
+	}
+
+	_initPageSelect() {
+		const pageInput = this.target.querySelector(
+			"[data-role='page-select'] [name='reassign-page']",
+		);
+		if (!pageInput) return;
+
+		this._pageSelect = SectionToggle.facet(
+			this,
+			pageInput.closest("[lp-select]"),
+		);
+		this._pageSelect.init();
+		this.destroyables.push(this._pageSelect);
+	}
+
+	_initRemovePage() {
+		const removePageInput = this.target.querySelector(
+			"[data-role='remove-page'] input[name='remove-user']",
+		);
+		if (!removePageInput) return;
+		removePageInput.addEventListener("change", (e) => {
+			if (e.target.checked && this._pageSelect) {
+				this._pageSelect.select.clear();
+			}
+		});
+	}
+
+	get canEditGroups() {
+		return this.target.dataset.canEditGroups === "true";
+	}
+
+	get canEditAi() {
+		return this.target.dataset.canEditAi === "true";
+	}
+
+	get canEditName() {
+		return this.target.dataset.canEditName === "true";
+	}
+
+	get nameElement() {
+		const name = this.target.dataset.name || "";
+		const canEdit = !this.readonly && this.canEditName;
+		const field = new InputElement(
+			{ kind: "user", readonly: !canEdit, mode: canEdit ? "edit" : null },
+			{
+				input: "text",
+				id: "name",
+				title: "Name",
+				placeholder: "name this user...",
+			},
+			name,
+		).elt;
+		if (!field) return null;
+		const input = field.matches("input") ? field : field.querySelector("input");
+		if (input) input.value = name;
+		return field;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
+	 * @matrix user-settings : editable-email owner-other-page owner-own-page personal-page readonly-email
+	 */
+	get userEmailElement() {
+		return this.target.querySelector("[data-role='user-email']");
+	}
+
+	get userAiAccessElement() {
+		if (!this.canEditAi) return null;
+		const field = new RadioElement(
+			this,
+			{
+				name: "ai_access",
+				label: "AI Access",
+				required: true,
+				layout: "row",
+				options: [
+					{ label: "None", value: "NONE" },
+					{ label: "Ask", value: "ASK" },
+					{ label: "Create", value: "CREATE" },
+				],
+			},
+			this.target.dataset.aiAccess || "NONE",
+		).edit;
+		field.dataset.role = "ai-access";
+		return field;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
+	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
+	 * @matrix notification-email : default-daily public-user user-only user-setting
+	 */
+	get notificationEmailElement() {
+		if (this.target.dataset.canEditNotificationEmail !== "true") return null;
+		const field = new RadioElement(
+			this,
+			{
+				name: "notification_email_mode",
+				label: "Email Notifications",
+				required: true,
+				layout: "column",
+				options: [
+					{ label: "No email", value: "NONE" },
+					{ label: "Email after five minutes", value: "IMMEDIATE" },
+					{ label: "Daily digest at 8:00 AM local time", value: "DAILY" },
+				],
+			},
+			this.target.dataset.notificationEmailMode || "DAILY",
+		).edit;
+		field.dataset.role = "notification-email";
+		field.className = "space-y-0 rounded-md border border-user-default p-3";
+		field.querySelector("legend")?.classList.add("px-1");
+		return field;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @matrix user-settings : owner-own-page personal-page sign-out
+	 */
+	get userActionsElement() {
+		return this.target.querySelector("[data-role='user-actions']");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @matrix user-settings : group-selector-hidden owner-own-page personal-page
+	 */
+	get userGroupsElement() {
+		return this.target.querySelector("[data-role='user-groups']");
+	}
+
+	get apiKeyElement() {
+		return this.target.querySelector("[data-role='api-key-settings']");
+	}
+
+	get ownerInboundElement() {
+		return this.target.querySelector("[data-role='owner-inbound']");
+	}
+
+	get userCardElement() {
+		return this.target.querySelector("[data-role='user-card']");
+	}
+
+	get pageSelectElement() {
+		return this.target.querySelector("[data-role='page-select']");
+	}
+
+	get removePageElement() {
+		return this.target.querySelector("[data-role='remove-page']");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
+	 * @pair user-settings:field-order
+	 */
+	get html() {
+		const card = this.userCardElement;
+		const fields = card?.querySelector("[data-role='user-fields']");
+		const publicEmailConsent = this.target.querySelector(
+			"[data-role='public-email-consent']",
+		);
+		const userPage =
+			this.removePageElement?.closest("[data-role='user-page']") ??
+			this.pageSelectElement?.closest("[data-role='user-page']");
+		fields?.replaceChildren(
+			...[
+				this.nameElement,
+				this.userEmailElement,
+				this.userGroupsElement,
+				this.userAiAccessElement,
+				this.notificationEmailElement,
+				this.apiKeyElement,
+				publicEmailConsent,
+				this.ownerInboundElement,
+				userPage,
+			].filter(Boolean),
+		);
+
+		return [this.visibleTo, this.restrictAccess, card].filter(Boolean);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
+	 * @pair public-users:email-consent
+	 */
+	get formData() {
+		const data = new FormData();
+		const card = this.userCardElement;
+		const name = card?.querySelector("[name='name']");
+		const email = card?.querySelector("[name='email']");
+
+		if (name?.value || this.target.dataset.name) {
+			data.set("name", name?.value || this.target.dataset.name);
+		}
+		if (email && !email.disabled) {
+			data.set("email", email.value);
+		}
+		const aiAccess = card?.querySelector("[name='ai_access']:checked");
+		if (this.canEditAi && aiAccess) {
+			data.set("ai_access", aiAccess.value);
+		}
+		const notificationEmail = card?.querySelector(
+			"[name='notification_email_mode']:checked",
+		);
+		if (
+			this.target.dataset.canEditNotificationEmail === "true" &&
+			notificationEmail
+		) {
+			data.set("notification_email_mode", notificationEmail.value);
+		}
+		if (this.target.dataset.canEditPublicEmail === "true") {
+			const allowSiteEmail = card?.querySelector("[name='allow_site_email']");
+			if (allowSiteEmail) {
+				data.set("allow_site_email", allowSiteEmail.checked ? "true" : "false");
+			}
+		}
+		if (this._groupSelect) {
+			Array.from(this._groupSelect.select.values).forEach((value) => {
+				data.append("group", value);
+			});
+		}
+		if (this._pageSelect) {
+			Array.from(this._pageSelect.select.values).forEach((value) => {
+				data.append("reassign-page", value);
+			});
+		}
+		if (this.target.dataset.canEditOwnerInbound === "true") {
+			for (const name of [
+				"allow_messages_and_mentions",
+				"allow_task_assignments",
+			]) {
+				const toggle = card?.querySelector(`[name='${name}']`);
+				if (toggle) data.set(name, toggle.checked ? "true" : "false");
+			}
+		}
+		card?.querySelector("[name='remove-user']")?.checked &&
+			data.set("remove-user", "true");
+		data.set("role", "user-settings");
+		return data;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
+	 * @matrix agent-api user-settings : poll-reconcile status
+	 */
+	postreconcile() {
+		const updated = this._updated;
+		if (!updated) return;
+
+		this._updated = false;
+		this.commitReset();
+		this.target.dataset.visible = "true";
+		this._initGroups();
+		this._initPageSelect();
+		this._initRemovePage();
+		this._initApiKey();
+		this.setEntityMetadata();
+		if (this._success) {
+			this.form?.success();
+			this._success = false;
+		}
+	}
+}
+
+export { CreatePage, PageForm, PageInfo, UserSettings };

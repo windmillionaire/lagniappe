@@ -22,40 +22,22 @@ from testing.utility import (
 pytestmark = pytest.mark.tooling
 
 
-def test_traceability_discovers_safe_repository_relative_client_tests(tmp_path):
+def test_traceability_discovers_unit_tests_within_testing_root(tmp_path):
     from testing.utility import traceability
 
-    internal = tmp_path / "testing/tests_unit/test_internal.py"
-    external = tmp_path / "clients/example/tests/test_external.py"
-    internal.parent.mkdir(parents=True)
-    external.parent.mkdir(parents=True)
-    internal.write_text("def test_internal():\n    pass\n", encoding="utf-8")
-    external.write_text("def test_external():\n    pass\n", encoding="utf-8")
-    roots = ["tests_unit", "repo:clients/example/tests"]
-
+    path = tmp_path / "testing/tests_unit/test_internal.py"
+    path.parent.mkdir(parents=True)
+    path.write_text("def test_internal():\n    pass\n", encoding="utf-8")
+    roots = ["tests_unit"]
+    nodeid = "tests_unit/test_internal.py::test_internal"
     discovered = traceability.discover_tests(tmp_path, roots)
-
-    assert set(discovered) == {
-        "tests_unit/test_internal.py::test_internal",
-        "clients/example/tests/test_external.py::test_external",
-    }
-    assert traceability.pytest_collect_root_args(roots) == [
-        "testing/tests_unit",
-        "clients/example/tests",
-    ]
-    assert traceability.test_path_from_nodeid(
-        "clients/example/tests/test_external.py::test_external",
-        tmp_path,
-    ) == external
-    assert [
-        test.nodeid
-        for test in traceability.changed_tests_for_paths(
-            discovered,
-            ["clients/example/tests/test_external.py"],
-        )
-    ] == ["clients/example/tests/test_external.py::test_external"]
-
-    for unsafe in ("repo:../outside/tests", "../outside"):
+    assert set(discovered) == {nodeid}
+    assert traceability.pytest_collect_root_args(roots) == ["testing/tests_unit"]
+    assert traceability.test_path_from_nodeid(nodeid, tmp_path) == path
+    assert [test.nodeid for test in traceability.changed_tests_for_paths(
+        discovered, ["testing/tests_unit/test_internal.py"]
+    )] == [nodeid]
+    for unsafe in ("repo:clients/example/tests", "../outside", "/outside"):
         with pytest.raises(ValueError, match="must stay within"):
             traceability.test_files_in_roots(tmp_path, [unsafe])
 
@@ -1071,11 +1053,10 @@ def test_partition_mcp_adapter_test_selection():
         unit, repository_root
     ) == pytest_routing.PytestPartitions(
         root_args=(
-            f"--ignore={adapter}",
-            f"--ignore={pytest_routing.MCP_PACKAGE_TEST_ROOT}",
+            *(f"--ignore={path}" for path in pytest_routing.MCP_TEST_FILES),
             "testing/tests_unit/",
         ),
-        mcp_args=(adapter, pytest_routing.MCP_PACKAGE_TEST_ROOT),
+        mcp_args=pytest_routing.MCP_TEST_FILES,
     )
 
     default = pytest_routing.normalize_pytest_invocation([], repository_root)
@@ -1083,16 +1064,12 @@ def test_partition_mcp_adapter_test_selection():
         default, repository_root
     )
     assert default_partitions.root_args == (
-        f"--ignore={adapter}",
-        f"--ignore={pytest_routing.MCP_PACKAGE_TEST_ROOT}",
+        *(f"--ignore={path}" for path in pytest_routing.MCP_TEST_FILES),
     )
-    assert default_partitions.mcp_args == (
-        adapter,
-        pytest_routing.MCP_PACKAGE_TEST_ROOT,
-    )
+    assert default_partitions.mcp_args == pytest_routing.MCP_TEST_FILES
 
     package_selector = (
-        f"{pytest_routing.MCP_PACKAGE_TEST_ROOT}/test_files.py::"
+        "testing/tests_unit/test_033b_mcp_files.py::"
         "test_upload_honors_chunks_and_returns_authoritative_inventory"
     )
     package_focused = pytest_routing.normalize_pytest_invocation(
@@ -1152,7 +1129,7 @@ def _transported_adapter_results(path, status=0):
     [
         f"{pytest_routing.MCP_ADAPTER_TEST}::test_catalog",
         (
-            f"{pytest_routing.MCP_PACKAGE_TEST_ROOT}/test_files.py::"
+            "testing/tests_unit/test_033b_mcp_files.py::"
             "test_upload_honors_chunks_and_returns_authoritative_inventory"
         ),
     ],
@@ -1243,18 +1220,14 @@ def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
 
     assert run.run_tests(["unit"]) == 0
     root_command = next(value for value in calls if value[0] == "root")[1]
-    assert root_command[-3:] == [
-        f"--ignore={pytest_routing.MCP_ADAPTER_TEST}",
-        f"--ignore={pytest_routing.MCP_PACKAGE_TEST_ROOT}",
+    assert root_command[-(len(pytest_routing.MCP_TEST_FILES) + 1):] == [
+        *(f"--ignore={path}" for path in pytest_routing.MCP_TEST_FILES),
         "testing/tests_unit/",
     ]
     assert calls.count(
         (
             "adapter",
-            [
-                pytest_routing.MCP_ADAPTER_TEST,
-                pytest_routing.MCP_PACKAGE_TEST_ROOT,
-            ],
+            list(pytest_routing.MCP_TEST_FILES),
             True,
         )
     ) == 1
@@ -1337,7 +1310,7 @@ def test_merge_mcp_test_evidence_validates_and_forwards_outcomes(
     _transported_adapter_results(result_path, status=5)
     payload = json.loads(result_path.read_text(encoding="utf-8"))
     payload["outcomes"][
-        "../clients/lagniappe_mcp/tests/test_files.py::test_upload_honors_chunks_and_returns_authoritative_inventory"
+        "../testing/tests_unit/test_033b_mcp_files.py::test_upload_honors_chunks_and_returns_authoritative_inventory"
     ] = {"outcome": "passed", "duration": 0.02}
     result_path.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.setattr(
@@ -1352,7 +1325,7 @@ def test_merge_mcp_test_evidence_validates_and_forwards_outcomes(
     assert writes[0][1] == ["run.py", "test"]
     assert set(writes[0][2]) == {
         "tests_unit/test_033_mcp_adapter.py::test_catalog",
-        "clients/lagniappe_mcp/tests/test_files.py::test_upload_honors_chunks_and_returns_authoritative_inventory",
+        "tests_unit/test_033b_mcp_files.py::test_upload_honors_chunks_and_returns_authoritative_inventory",
     }
     assert writes[0][3] == 0
 
@@ -2600,10 +2573,10 @@ def _release_check_repository(tmp_path: Path) -> Path:
                 Path(run.__file__).parent / "runner" / "uv_bootstrap.py"
             ).read_text(encoding="utf-8")
         ),
-        "clients/lagniappe_mcp/uv-bootstrap.json": (
+        "mcp/uv-bootstrap.json": (
             (
                 Path(run.__file__).parent
-                / "clients/lagniappe_mcp/uv-bootstrap.json"
+                / "mcp/uv-bootstrap.json"
             ).read_text(encoding="utf-8")
         ),
         "runner/process.py": (
@@ -2722,7 +2695,6 @@ def test_main_release_workflow_contract():
         "request",
         "execute",
         "quality",
-        "mcp_package",
         "attest",
     ]
     assert workflow["jobs"]["request"]["permissions"] == {
@@ -2730,13 +2702,8 @@ def test_main_release_workflow_contract():
     }
     assert "Source quality and traceability" in workflow["jobs"]["quality"]["name"]
     assert "Manual dispatch guard" in workflow["jobs"]["quality"]["name"]
-    assert workflow["jobs"]["mcp_package"]["needs"] == "quality"
-    assert workflow["jobs"]["mcp_package"]["permissions"] == {
-        "contents": "read",
-        "id-token": "write",
-    }
     assert workflow["jobs"]["attest"]["permissions"] == {"statuses": "write"}
-    assert workflow["jobs"]["attest"]["needs"] == ["quality", "mcp_package"]
+    assert workflow["jobs"]["attest"]["needs"] == ["quality"]
     assert '"next/**"' in workflow_text
     assert "next/*|hotfix/*" in workflow_text
     assert "npm run check" in workflow_text
@@ -2774,85 +2741,6 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     )
     assert result.returncode == 0
     assert "Release check passed against main" in result.stdout
-
-
-# @matrix mcp-package release : prospective-index release-validation
-def test_release_check_validates_indexed_mcp_inputs_not_worktree(
-    tmp_path,
-    monkeypatch,
-    capsys,
-):
-    from runner import mcp_artifact
-
-    repo = _release_check_repository(tmp_path)
-    _write_release_candidate(repo)
-    project = repo / run.RELEASE_MCP_PROJECT_PATH
-    project.parent.mkdir(parents=True, exist_ok=True)
-    project.write_text("staged MCP project\n", encoding="utf-8")
-    _git(repo, "add", str(project.relative_to(repo)))
-    project.write_text("unstaged MCP project\n", encoding="utf-8")
-    inspected = []
-
-    def validate(candidate_root):
-        inspected.append(
-            (Path(candidate_root) / run.RELEASE_MCP_PROJECT_PATH).read_text(
-                encoding="utf-8"
-            )
-        )
-        return {}
-
-    monkeypatch.setattr(mcp_artifact, "validate_release_inputs", validate)
-    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 0
-    assert inspected == ["staged MCP project\n"]
-    assert "Release check passed against main" in capsys.readouterr().out
-
-    def reject(_candidate_root):
-        raise mcp_artifact.McpArtifactError("release ledger is stale")
-
-    monkeypatch.setattr(mcp_artifact, "validate_release_inputs", reject)
-    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
-    assert "MCP release inputs are invalid: release ledger is stale" in (
-        capsys.readouterr().out
-    )
-
-
-# @matrix mcp-package release : immutable-release prospective-index
-@pytest.mark.parametrize("mutation", ["rebind", "remove", "reorder"])
-def test_release_check_preserves_every_published_mcp_ledger_binding(
-    tmp_path,
-    monkeypatch,
-    mutation,
-):
-    from runner import mcp_artifact
-
-    repo = _release_check_repository(tmp_path)
-    project = repo / run.RELEASE_MCP_PROJECT_PATH
-    project.parent.mkdir(parents=True, exist_ok=True)
-    project.write_text("MCP project\n", encoding="utf-8")
-    ledger_path = repo / run.RELEASE_MCP_LEDGER_PATH
-    ledger_path.parent.mkdir(parents=True, exist_ok=True)
-    releases = [
-        {"version": "0.1.0", "sha256": "a" * 64},
-        {"version": "0.2.0", "sha256": "b" * 64},
-    ]
-    ledger_path.write_text(json.dumps({"releases": releases}) + "\n", encoding="utf-8")
-    _git(repo, "add", str(project.relative_to(repo)), str(ledger_path.relative_to(repo)))
-    _git(repo, "commit", "-m", "Publish MCP releases")
-
-    candidate = json.loads(ledger_path.read_text(encoding="utf-8"))
-    if mutation == "rebind":
-        candidate["releases"][0]["sha256"] = "c" * 64
-    elif mutation == "remove":
-        candidate["releases"].pop(0)
-    else:
-        candidate["releases"].reverse()
-    ledger_path.write_text(json.dumps(candidate) + "\n", encoding="utf-8")
-    _git(repo, "add", str(ledger_path.relative_to(repo)))
-    monkeypatch.setattr(mcp_artifact, "validate_release_inputs", lambda _root: {})
-
-    issues = run._mcp_release_issues(repo, "HEAD")
-
-    assert any("previously published version-to-digest binding" in issue for issue in issues)
 
 
 def _write_candidate_migration(repo: Path, *, introduced_in: str) -> None:

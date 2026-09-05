@@ -14,7 +14,6 @@ LIBRARY_ROOT = REPOSITORY_ROOT / "testing_ai_workflows"
 CASES_ROOT = LIBRARY_ROOT / "cases"
 BUILD_IGNORE_FILES = (
     "runner/hosted_e2e_container/gcloudignore",
-    "runner/mcp_package_container/gcloudignore",
 )
 
 

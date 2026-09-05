@@ -2,8 +2,7 @@ source_roots:
   - build/publication.mjs
   - build/sentry.mjs
   - build/utility.mjs
-  - clients/lagniappe_mcp/src
-  - clients/lagniappe_mcp_remote
+  - mcp/src
   - lagniappe/core/definitions
   - lagniappe/core/entities
   - lagniappe/core/mixins
@@ -17,7 +16,6 @@ source_roots:
   - src/script
 
 test_roots:
-  - repo:clients/lagniappe_mcp/tests
   - testing/tests_unit
   - testing/tests_e2e
   - testing/tests_js
@@ -39,8 +37,7 @@ test_roots:
   - testing/tests_tooling/test_008_data_lifecycle.py
   - testing/tests_tooling/test_009_hosted_e2e.py
   - testing/tests_tooling/test_010_runtime_outbound_http.py
-  - testing/tests_tooling/test_012_mcp_package.py
-  - testing/tests_tooling/test_012b_mcp_artifact.py
+  - testing/tests_tooling/test_012_mcp_environment.py
   - testing/tests_tooling/test_012c_remote_mcp_config.py
   - testing/tests_tooling/test_icons.py
 
@@ -69,7 +66,6 @@ annotated_source_roots:
   - runner/gcloud.py
   - runner/icons.py
   - runner/mcp_environment.py
-  - runner/mcp_artifact.py
   - runner/process.py
   - runner/pytest_routing.py
   - runner/testing.py

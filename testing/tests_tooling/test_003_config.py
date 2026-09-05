@@ -155,7 +155,7 @@ def test_gcloudignore_uploads_only_canonical_runtime_config():
     assert "!/config/files/redis_ca.pem" in ignore
     assert "/installer/" in ignore
     assert "/runner/" in ignore
-    assert "/clients/" in ignore
+    assert "/mcp/" in ignore
     assert "/testing_ai_workflows/" in ignore
     assert "/setup/" not in ignore
     assert "**/gha-creds-*.json" in ignore
@@ -490,67 +490,6 @@ def test_app_engine_chunk_handler_uses_immutable_cache_before_general_js():
         "public, max-age=31536000, immutable"
     )
     assert "expiration" not in chunk_handler
-
-
-# @matrix mcp-package deploy : immutable-cache no-store public-artifact static-handlers
-def test_app_engine_mcp_handlers_are_exact_and_precede_dynamic_catchall():
-    constants_path = Path(__file__).resolve().parents[2] / "config" / "constants.py"
-    spec = importlib.util.spec_from_file_location(
-        "lagniappe_constants_under_test",
-        constants_path,
-    )
-    constants = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(constants)
-
-    handlers = constants.APP_HANDLERS
-    manifest_index = next(
-        index
-        for index, handler in enumerate(handlers)
-        if handler.get("url") == constants.MCP_MANIFEST_HANDLER_PATTERN
-    )
-    wheel_index = next(
-        index
-        for index, handler in enumerate(handlers)
-        if handler.get("url") == constants.MCP_RELEASE_URL_PATTERN
-    )
-    catchall_index = len(handlers) - 1
-    manifest = handlers[manifest_index]
-    wheel = handlers[wheel_index]
-
-    assert manifest_index < wheel_index < catchall_index
-    assert manifest["mime_type"] == "application/json; charset=utf-8"
-    assert manifest["expiration"] == "0s"
-    assert manifest["http_headers"] == {
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-        "X-Lagniappe-Build-ID": constants.BUILD_ID,
-    }
-    assert re.fullmatch(
-        constants.MCP_MANIFEST_HANDLER_PATTERN,
-        constants.MCP_MANIFEST_URL,
-    )
-    for near_miss in (
-        "/mcp/manifestXjson",
-        "/mcp/manifest.json/extra",
-        "/mcp/premanifest.json",
-    ):
-        assert not re.fullmatch(constants.MCP_MANIFEST_HANDLER_PATTERN, near_miss)
-    assert wheel["mime_type"] == "application/octet-stream"
-    assert wheel["http_headers"]["Cache-Control"] == (
-        "public, max-age=31536000, immutable"
-    )
-    valid_url = (
-        "/mcp/releases/0.1.0/"
-        f"{'a' * 64}/lagniappe_mcp-0.1.0-py3-none-any.whl"
-    )
-    assert re.fullmatch(wheel["url"], valid_url)
-    for invalid_url in (
-        "/mcp/releases/latest/" + "a" * 64 + "/lagniappe_mcp.whl",
-        "/mcp/releases/0.1.0/not-a-digest/lagniappe_mcp-0.1.0-py3-none-any.whl",
-        "/mcp/releases/0.1.0/" + "a" * 64 + "/../secret.whl",
-        "/mcp/releases/0.1.0/" + "a" * 64 + "/extra/file.whl",
-    ):
-        assert not re.fullmatch(wheel["url"], invalid_url)
 
 
 # @matrix deploy : app-yaml pdf-preview static-assets
@@ -1406,7 +1345,6 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
 
 # @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
 # @matrix frontend-build : freshness no-op rebuild
-# @matrix deploy frontend-build mcp-package : app-yaml build-identity static-handlers
 def test_deploy_modes_separate_dev_build_from_setup_publish(
     monkeypatch,
     tmp_path,
@@ -1470,17 +1408,8 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         build_versions = []
         frontend_inspections = []
         frontend_verifications = []
-        mcp_artifact_actions = []
         frontend_state = {"current": False}
-        manifest_handler = next(
-            handler
-            for handler in SETTINGS.DEPLOY["handlers"]
-            if handler.get("url")
-            == deployed_constants.MCP_MANIFEST_HANDLER_PATTERN
-        )
-        frontend_build_id = {
-            "value": manifest_handler["http_headers"]["X-Lagniappe-Build-ID"]
-        }
+        frontend_build_id = {"value": "b1234567"}
 
         def fake_preflight(app_dir=None):
             preflight_snapshots.append(
@@ -1519,18 +1448,6 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
                         ["Frontend build was created from different source inputs."],
                     )
                 )
-            ),
-        )
-        monkeypatch.setattr(
-            deploy_module,
-            "assemble_deployment_artifacts",
-            lambda app_dir: mcp_artifact_actions.append(("build", app_dir)),
-        )
-        monkeypatch.setattr(
-            deploy_module,
-            "check_deployment_artifacts",
-            lambda app_dir, **_kwargs: mcp_artifact_actions.append(
-                ("check", app_dir)
             ),
         )
 
@@ -1599,34 +1516,12 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
                 "expected_version": "1.23",
             }
         ]
-        assert mcp_artifact_actions == [("check", app_dir)]
 
-        manifest_handler = next(
-            handler
-            for handler in SETTINGS.DEPLOY["handlers"]
-            if handler.get("url")
-            == deployed_constants.MCP_MANIFEST_HANDLER_PATTERN
-        )
-        manifest_handler["http_headers"]["X-Lagniappe-Build-ID"] = "b0000000"
-        with pytest.raises(RuntimeError, match="manifest build marker is stale"):
-            deploy_app(
-                build_assets=False,
-                capture_output=True,
-                announce_progress=False,
-                announce_completion=False,
-            )
-        assert manifest_handler["http_headers"]["X-Lagniappe-Build-ID"] == (
-            "b0000000"
-        )
-        manifest_handler["http_headers"]["X-Lagniappe-Build-ID"] = (
-            frontend_build_id["value"]
-        )
 
         commands.clear()
         preflight_snapshots.clear()
         frontend_inspections.clear()
         frontend_verifications.clear()
-        mcp_artifact_actions.clear()
 
         assert deploy_app()
         assert preflight_snapshots == [
@@ -1646,16 +1541,6 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
                 "expected_version": "1.23",
             }
         ]
-        assert mcp_artifact_actions == [
-            ("build", app_dir),
-            ("check", app_dir),
-        ]
-        assert next(
-            handler
-            for handler in SETTINGS.DEPLOY["handlers"]
-            if handler.get("url")
-            == deployed_constants.MCP_MANIFEST_HANDLER_PATTERN
-        )["http_headers"]["X-Lagniappe-Build-ID"] == "b7654321"
         assert commands == [
             (
                 [deploy_module.NPM_CLI, "run", "build"],
@@ -1680,7 +1565,6 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         build_versions.clear()
         frontend_inspections.clear()
         frontend_verifications.clear()
-        mcp_artifact_actions.clear()
         frontend_state["current"] = True
 
         assert deploy_app(announce_completion=False)
@@ -1700,10 +1584,6 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
                 "expected_mode": "production",
                 "expected_version": "1.23",
             }
-        ]
-        assert mcp_artifact_actions == [
-            ("build", app_dir),
-            ("check", app_dir),
         ]
         assert commands == [
             (
