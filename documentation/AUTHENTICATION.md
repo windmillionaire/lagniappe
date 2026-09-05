@@ -208,3 +208,55 @@ persisted, rotation invalidates the previous key, and `/api/v1` never falls back
 to a login cookie. The API has no separate deployment-wide feature gate;
 normal entity permissions remain authoritative. See [External Agent
 API](AI_EXTERNAL_API.md).
+
+## Remote ChatGPT MCP pilot
+
+The separate Cloud Run pilot uses the existing browser login to authorize one
+configured ChatGPT CIMD client. `REMOTE_MCP` is opt-in and requires an explicit
+Lagniappe user allowlist; its settings are described in
+[Infrastructure Configuration](INFRA_CONFIG.md#remote-mcp-pilot). The Lagniappe
+login email does not have to match the user's ChatGPT account email. An empty
+explicit actor list supports deployment/discovery checks with user access
+closed until the pilot account is selected.
+
+The main app serves authorization-server metadata at
+`/.well-known/oauth-authorization-server` and the `/oauth/authorize`,
+`/oauth/token`, and `/oauth/revoke` endpoints. Only authorization code with PKCE
+S256 and rotating refresh tokens are supported. Client ID, redirect URI,
+issuer, resource, and the single `mcp:use` scope are checked exactly. There is
+no dynamic client registration or client secret. Login continuation stores the
+validated request in a short-lived server-side record, then uses the clean
+`/oauth/authorize` URL through login and consent. Only its opaque reference is
+held in a dedicated Secure, HttpOnly, SameSite=Lax cookie scoped to `/oauth`.
+Keeping this separate from the main session lets the pending authorization
+survive Google's cross-site sign-in POST creating a new session. Consent also
+binds its submitted pending reference and actor to the current request, so a
+stale form cannot authorize a different attempt or account. Consent and connection
+revocation use ordinary session authentication and CSRF protection; only token
+exchange and token-possession revocation are exempt views.
+
+Opaque codes and tokens have digest-addressed records in the `mcp_oauth`
+Datastore kind. Pending requests last ten minutes, codes five minutes, access
+tokens thirty minutes, and grants at most thirty days. Refresh rotates the
+token; reuse of an already-used refresh token revokes its grant family.
+There is one active grant per Lagniappe user, so a new successful connection
+replaces the previous grant. The signed-in user's **Manage ChatGPT connection**
+link in Settings opens `/oauth/connection`, where they can revoke it.
+
+Cloud Run authenticates every MCP request through `/api/v1`, including requests
+such as ping that need no domain data. The API requires both the dedicated
+service account's Google ID token in `Authorization` and the opaque access token
+in `X-Lagniappe-MCP-Token`. It verifies the Google signature, exact service
+identity, and audience `${REMOTE_MCP.issuer}/api/v1` before resolving the user
+token and current grant. Google's public verification certificates use a
+bounded five-minute cache; token signatures, claims, and current user grants
+are still verified on every request. Ordinary user permissions still apply.
+An OAuth token sent directly as a public API bearer key is rejected; API-key
+and OAuth grant revocation are independent.
+
+Disabling `REMOTE_MCP.enabled` stops the OAuth routes and envelope
+authentication. Expiry and revocation are enforced during reads, independently
+of eventual expired-record cleanup. Application error reporting redacts opaque
+secrets and OAuth context. Platform request logs require separate deployment
+handling because the initial authorization URL contains query parameters; see
+the [pilot deployment notes](INFRA_DEPLOYMENT.md#remote-mcp-pilot).

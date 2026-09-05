@@ -66,6 +66,7 @@ class KINDS(Enum):
     mention_markers = f"{PREFIX}mention_markers"
     email_deliveries = f"{PREFIX}email_deliveries"
     agent_api_credentials = f"{PREFIX}agent_api_credentials"
+    mcp_oauth = f"{PREFIX}mcp_oauth"
     agent_api_plan_operation_claims = f"{PREFIX}agent_api_plan_operation_claims"
 
     page = instances

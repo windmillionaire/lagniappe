@@ -201,6 +201,48 @@ queries, fragments, credentials, nonstandard ports, duplicate actors, and an
 enabled gate without any canonical origin fail configuration. This gate does
 not disable the REST API or grant any API/workspace capability.
 
+## Remote MCP pilot
+
+`REMOTE_MCP` is a separate default-off dictionary in application settings,
+validated by `config/remote_mcp.py`. It is independent of the local
+`MCP_EVALUATION_*` presentation gate. An absent value is equivalent to
+`REMOTE_MCP: {enabled: false}`. Enabled configuration has these fields:
+
+| Field | Contract |
+| --- | --- |
+| `enabled` | Boolean pilot switch. |
+| `issuer` | Exact main-app HTTPS origin, without a trailing slash or path. |
+| `resource` | Exact canonical Cloud Run `status.url` plus `/mcp`, on a different origin. |
+| `client_id` | One exact ChatGPT CIMD URL; defaults to `https://chatgpt.com/oauth/client.json`. |
+| `redirect_uri` | One exact ChatGPT callback; defaults to `https://chatgpt.com/connector_platform_oauth_redirect`. |
+| `actors` | Explicit list of up to ten Lagniappe user email addresses, unique after case normalization. Empty denies access to every user. |
+| `service_account` | Exact dedicated Cloud Run runtime service-account email. |
+
+Enabled URLs reject credentials, query strings, fragments, ports, and
+noncanonical host spelling. The actual ChatGPT connection builder is the
+authority for client ID and callback. Changing issuer, resource, or client
+binding requires reconnecting. The Google ID-token audience and upstream API
+base are derived from `issuer + "/api/v1"`; the scope and token lifetimes are
+constants, which keeps related security values from drifting independently.
+The `actors` list grants pilot eligibility, while existing entity permissions
+continue to control data and plans. An explicit `actors: []` permits deployment
+and discovery checks before the pilot account is chosen while keeping grants
+and API envelope access closed to every user. Omitting `actors` is invalid for
+enabled configuration. Add the chosen Lagniappe login to the list before the
+first user connection; do not infer it from their ChatGPT/Codex email.
+
+Cloud Run reads only `LAGNIAPPE_MCP_ENABLED`, `LAGNIAPPE_MCP_ISSUER`, and
+`LAGNIAPPE_MCP_RESOURCE`. It obtains its Google identity from the runtime
+metadata service. There is no Cloud Run copy of application settings, an API
+key, a client secret, or a service-account key file. The service runs disabled
+unless `LAGNIAPPE_MCP_ENABLED` is exactly `true`, allowing its canonical URL to
+be obtained before completing the two deployments. This remains a manual
+pilot; it is not added to installer resource creation or normal updates.
+
+See [Authentication](AUTHENTICATION.md#remote-chatgpt-mcp-pilot) for grant
+behavior and [Deployment](INFRA_DEPLOYMENT.md#remote-mcp-pilot) for the separate
+image and activation boundary.
+
 ## Runtime-safe exports
 
 Runtime code imports only configuration surfaces:

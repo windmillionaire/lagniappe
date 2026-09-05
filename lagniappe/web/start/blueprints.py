@@ -45,6 +45,8 @@ BLUEPRINT_REGISTRATIONS = (
     BlueprintRegistration("webhooks", "/webhooks"),
     BlueprintRegistration("api_family", "/api"),
     BlueprintRegistration("api", "/api/v1"),
+    BlueprintRegistration("oauth", "/oauth"),
+    BlueprintRegistration("oauth_metadata", "/.well-known"),
     BlueprintRegistration(
         "analytics",
         "/analytics",
@@ -54,6 +56,8 @@ BLUEPRINT_REGISTRATIONS = (
 
 
 CSRF_EXEMPTIONS = (
+    CSRFExemption("view", "oauth.token", "Public OAuth code/PKCE or refresh-token proof; browser sessions are not authentication"),
+    CSRFExemption("view", "oauth.revoke", "Opaque OAuth token possession; browser sessions are not authentication"),
     CSRFExemption(
         "blueprint",
         "process",
@@ -97,6 +101,8 @@ def _resolve_bindings(runtime_config):
     from lagniappe.web.routes import tasks, testing, tools, users
     from lagniappe.web.routes.api import api, api_family
     from lagniappe.web.routes.users.login import login_google
+    from lagniappe.web.routes.oauth import oauth, oauth_metadata
+    from lagniappe.web.routes.oauth.main import token, revoke
     from lagniappe.web.routes.webhooks import webhooks
 
     bindings = {
@@ -121,6 +127,10 @@ def _resolve_bindings(runtime_config):
         "webhooks": webhooks,
         "api_family": api_family,
         "api": api,
+        "oauth": oauth,
+        "oauth_metadata": oauth_metadata,
+        "oauth.token": token,
+        "oauth.revoke": revoke,
         "users.login_google": login_google,
     }
     if any(

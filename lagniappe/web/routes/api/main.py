@@ -53,6 +53,8 @@ UPLOAD_BATCH_ID_PATTERN = re.compile(external_api.UPLOAD_BATCH_ID_PATTERN)
 # @matrix agent-api mcp-package : discovery origin-validation proposal-contract setup-command
 def _api_origin():
     """Use the request origin only when it is an exact configured MCP origin."""
+    if getattr(g, "remote_mcp_authenticated", False):
+        return CONFIG.REMOTE_MCP["issuer"]
     request_origin = request.host_url.rstrip("/")
     allowed = tuple(getattr(CONFIG, "MCP_EVALUATION_ORIGINS", ()) or ())
     if request_origin in allowed:
@@ -150,6 +152,7 @@ def _rate_limit(scope, identifier, limit, window_seconds):
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_bounds_json_without_a_declared_content_length
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
+# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
 # @matrix agent-api : bearer-only body-limit entitlement-independent error-envelope public-user request-correlation request-recheck session-independent streaming
 # @pairs agent-api:rate-limit
 @api.before_request
@@ -169,7 +172,29 @@ def authenticate_request():
     if not separator or scheme.casefold() != "bearer" or not token.strip():
         return _error("unauthorized", "A bearer API key is required.", 401)
     try:
-        actor, credential = agent_auth.authenticate_credential(token.strip())
+        from config.remote_mcp import USER_TOKEN_HEADER
+        from lagniappe.core.tools.auth import remote_mcp as remote_auth
+
+        if USER_TOKEN_HEADER in request.headers:
+            try:
+                _rate_limit(
+                    "remote-mcp-envelope", client_ip(request), *GENERAL_RATE_LIMIT
+                )
+                actor, credential = remote_auth.authenticate_envelope(
+                    token.strip(), request.headers.get(USER_TOKEN_HEADER)
+                )
+                g.remote_mcp_authenticated = True
+            except remote_auth.OAuthError:
+                return _error("unauthorized", "The remote MCP connection is invalid or expired.", 401)
+            except APIProblem as problem:
+                return _error(
+                    problem.code,
+                    problem.message,
+                    problem.status,
+                    retry_after=problem.retry_after,
+                )
+        else:
+            actor, credential = agent_auth.authenticate_credential(token.strip())
     except agent_auth.AgentAPICredentialError:
         return _error("unauthorized", "The API key is invalid or expired.", 401)
 

@@ -171,6 +171,14 @@ def add_lagniappe_headers(response):
                 "X-Lagniappe-Build-ID": CONFIG.BUILD_ID,
             }
         )
+    elif request.blueprint in {"oauth", "oauth_metadata"}:
+        # Flask-WTF verifies the HTTPS same-origin Referer on consent POSTs.
+        # Cross-origin redirects to ChatGPT must not receive one.
+        headers["Referrer-Policy"] = "same-origin"
+        if CONFIG.REMOTE_MCP.get("enabled"):
+            headers["Content-Security-Policy"] = CSP.replace(
+                "form-action 'self'", "form-action 'self' https://chatgpt.com"
+            )
     elif MCP_RELEASE_URL_RE.fullmatch(request.path):
         headers.update(
             {

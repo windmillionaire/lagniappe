@@ -12,8 +12,8 @@ The API is part of the application rather than a deployment-wide optional
 feature. Every authenticated non-public user may manage a key and use Ask,
 Create, and Organize, regardless of the user's site AI-access setting. That
 setting controls Lagniappe-funded model-provider calls; an external client uses
-its own model and tokens. Revoking the user's API key is the external-agent
-operational shutoff.
+its own model and tokens. Revoking the user's API key stops clients using that
+key. The optional remote ChatGPT pilot has a separately revocable OAuth grant.
 
 ## Security model
 
@@ -24,8 +24,10 @@ operational shutoff.
   SHA-256 digest.
 - `/api` and `/api/v1` accept `Authorization: Bearer ...` only. A browser login
   cookie is not an authentication fallback, and the API blueprints are
-  CSRF-exempt for that reason.
-- API calls run as the key's user. Existing read-tool handlers enforce that
+  CSRF-exempt for that reason. The opt-in remote MCP envelope additionally
+  requires a verified Google workload identity and a dedicated user-token
+  header; an OAuth access token is never accepted as an ordinary API key.
+- API calls run as the authenticated user. Existing read-tool handlers enforce that
   user's normal entity permissions. Plan access is also bound to its creator.
 - External-plan capability never adds workspace permission. Proposal validation
   and browser execution use the same live resource checks as ordinary UI work,
@@ -60,6 +62,16 @@ operational shutoff.
   additionally allows 20 files per plan, 30 MiB per file, and 50 MiB total.
 
 ## MCP evaluation adapter
+
+The Cloud Run pilot in `clients/lagniappe_mcp_remote/` composes the local
+adapter's catalog, REST mappings, validation, and result projections. It
+replaces only `upload_local_files` with `upload_files`, whose inputs are
+ChatGPT attachment objects. No remote argument selects a server filesystem
+path. All draft/review and permission rules above apply to both transports.
+The hosted module is outside the immutable published local package source
+boundary; adding it does not silently rebuild a supported local wheel.
+See [Authentication](AUTHENTICATION.md#remote-chatgpt-mcp-pilot) and
+[Deployment](INFRA_DEPLOYMENT.md#remote-mcp-pilot) for this opt-in pilot.
 
 The optional `lagniappe-mcp` process is a user-local stdio adapter over this
 REST API. It is not imported or executed by the site. Its public manifest is at

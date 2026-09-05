@@ -110,6 +110,58 @@ status, Flask routes requiring exact status must remain in the dynamic
 allowlist. Tooling checks keep route prefix constants aligned with blueprint
 registration.
 
+## Remote MCP pilot
+
+The hosted ChatGPT adapter is a separate manual Cloud Run deployment. Its
+source is `clients/lagniappe_mcp_remote/`; its Dockerfile, Cloud Build
+definition, and upload allowlist live in `runner/remote_mcp_container/`.
+The image installs the existing adapter using its pinned Python, uv, and lock
+file, then adds the hosted entry point. It runs as a non-root user. The
+dedicated build context includes only the two adapter source trees, locked
+package inputs, and container definition. It excludes application
+configuration, user profiles, and private workflow fixtures. The application
+continues to receive OAuth/authentication code through the ordinary App Engine
+deployment boundary.
+
+Keep `clients/lagniappe_mcp/src/` under its existing immutable release rules.
+The remote module imports that package without changing a previously
+published wheel's source or digest. Remote protocol and attachment tests live
+beside the local adapter tests and run through `run.py test` using their real
+paths. Runtime configuration is documented in
+[Infrastructure Configuration](INFRA_CONFIG.md#remote-mcp-pilot).
+
+Activation has a deliberate bootstrap order: create the service disabled, read
+its canonical `status.url`, configure that exact URL plus `/mcp` in the main
+app, then enable the service with the same issuer/resource pair. Network
+invocation is public; application OAuth protects `/mcp`. The dedicated runtime
+service account needs no direct Datastore or Storage role because the main API
+owns token and permission checks and existing upload sessions grant access to
+individual uploads. Scale-to-zero, a small instance cap, low concurrency, and
+memory sized for ephemeral upload spools are pilot choices to verify in the
+deployed service. No custom domain or normal installer lifecycle is added.
+
+Before inviting a user, verify public discovery and unauthenticated challenges,
+the live Google identity envelope, and login/consent on the configured issuer.
+The container's public health path is `/health`; avoid `/healthz`, which Cloud
+Run reserves before the request reaches the application. The canonical OAuth
+resource comes from the service's `status.url`, even if the deploy command also
+prints a different working Cloud Run hostname.
+Also configure platform log handling for `/oauth/authorize`: application
+redaction cannot remove the state and PKCE challenge in App Engine's initial
+request URL. Native TTL on the `mcp_oauth` kind's Datetime `expires_at` field
+supplies asynchronous record cleanup. Per-request expiry checks enforce
+authentication expiry before physical cleanup.
+The living [pilot implementation record](../todo/REMOTE_MCP_PILOT_IMPLEMENTATION.md)
+tracks actual resource names, deployment commands/results, retention/log
+configuration, and the manual ChatGPT web, Android, and desktop trials. An
+unfilled deployment entry is pending, not evidence of a working cloud service.
+
+Revocation in `/oauth/connection` stops the current user's grant. Turning off
+the main app's `REMOTE_MCP.enabled` flag stops all remote authorization and
+envelope authentication; turning off `LAGNIAPPE_MCP_ENABLED` stops the Cloud Run
+endpoint. Retire the exact pilot service and resources explicitly after
+disconnecting pilot clients. Existing local API credentials remain independent.
+
 ## Scaling and runtime settings
 
 `config/deployment.py` normalizes values shared by setup-generated YAML and the

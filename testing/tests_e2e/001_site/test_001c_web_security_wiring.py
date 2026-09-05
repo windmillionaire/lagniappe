@@ -39,6 +39,9 @@ class RecorderApp:
 
     def register_blueprint(self, blueprint, **options):
         self.registrations.append((blueprint, options.get("url_prefix")))
+        if blueprint is self.bindings["oauth"]:
+            for name in ("oauth.token", "oauth.revoke"):
+                self.view_functions[name] = self.bindings[name]
         if blueprint is self.bindings["users"] and self.expose_google_endpoint:
             self.view_functions["users.login_google"] = self.bindings[
                 "users.login_google"
@@ -60,6 +63,8 @@ def _wiring_recorders(*, expose_google_endpoint=True):
         for registration in blueprint_start.BLUEPRINT_REGISTRATIONS
     }
     bindings["users.login_google"] = Sentinel("users.login_google")
+    bindings["oauth.token"] = Sentinel("oauth.token")
+    bindings["oauth.revoke"] = Sentinel("oauth.revoke")
     app_recorder = RecorderApp(
         bindings,
         expose_google_endpoint=expose_google_endpoint,
@@ -133,6 +138,8 @@ def test_blueprint_registration_and_csrf_exemption_policy(
         (exemption.target_kind, exemption.target, exemption.rationale)
         for exemption in blueprint_start.CSRF_EXEMPTIONS
     ] == [
+        ("view", "oauth.token", "Public OAuth code/PKCE or refresh-token proof; browser sessions are not authentication"),
+        ("view", "oauth.revoke", "Opaque OAuth token possession; browser sessions are not authentication"),
         (
             "blueprint",
             "process",

@@ -38,6 +38,8 @@ LIFECYCLE_TOOLS = (
     "upload_local_files",
     "submit_plan",
 )
+# Published 0.1.6 schemas include its revised submission guidance as a const in
+# contracts, start context, and upload context. Other schema shapes are unchanged.
 LIFECYCLE_SCHEMA_SHA256 = {
     "get_actor": (
         "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
@@ -45,15 +47,15 @@ LIFECYCLE_SCHEMA_SHA256 = {
     ),
     "start_ask": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "5b5852185db029b383431eb62db1718c876ebbf29c42ae06c21390e464931edd",
+        "80ec565606b88088c3f3928f1893b44527e0b7a29af209d664ad0bd1041344bd",
     ),
     "start_create": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "5b5852185db029b383431eb62db1718c876ebbf29c42ae06c21390e464931edd",
+        "80ec565606b88088c3f3928f1893b44527e0b7a29af209d664ad0bd1041344bd",
     ),
     "start_organize": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "5b5852185db029b383431eb62db1718c876ebbf29c42ae06c21390e464931edd",
+        "80ec565606b88088c3f3928f1893b44527e0b7a29af209d664ad0bd1041344bd",
     ),
     "get_plan": (
         "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
@@ -61,11 +63,11 @@ LIFECYCLE_SCHEMA_SHA256 = {
     ),
     "get_plan_contract": (
         "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
-        "98aa318b522b8c6cf62fc8d564d194182f01893148a5dc0a61b41e826af005f1",
+        "95c0c09b84f771d7a54fe6ddeafc19bd439105cdcc3d2820a2f5f7101336491e",
     ),
     "upload_local_files": (
         "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
-        "7290ea7efa36c1580f9141cf2db9369fa2ef904473d128086b80e27cda23d01b",
+        "99a7fd198da06a91e540cb09c999bcb24275bbd761fc344c880b400d26459f72",
     ),
     "submit_plan": (
         "beaa898006c4f48dcacd1966a2df136ac7cd95e09f01d1716d7e9e7817cc9662",
@@ -355,8 +357,24 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
         assert (
             _canonical_sha256(by_name[name]["inputSchema"]),
             _canonical_sha256(by_name[name]["outputSchema"]),
-        ) == expected_hashes
+        ) == expected_hashes, name
 
+    # The adapter preserves REST descriptions and adds transport-specific
+    # guidance for selected reads; these additions shipped in local 0.1.6.
+    description_guidance = {
+        "query_workspace_filter": (
+            "Preserve counts, continuation/truncation flags, and partial errors.",
+            "never start another Plan to change output formatting.",
+        ),
+        "search_entities": (
+            "Returned hits are view-authorized; reuse their evidence.",
+            "Load full details only for information missing from the results.",
+        ),
+        "get_entity": (
+            "Reuse attached Form schemas and other returned evidence;",
+            "fetch again only for missing information or relevant changes.",
+        ),
+    }
     for name, rest_tool in rest_by_name.items():
         published = by_name[name]
         assert published["inputSchema"] == _expected_catalog_input(
@@ -366,7 +384,14 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
             "lagniappe/resultPaths": rest_tool["result_paths"]
         }
         if name != "get_file":
-            assert published["description"] == rest_tool["description"]
+            if name in description_guidance:
+                assert published["description"].startswith(
+                    rest_tool["description"] + " "
+                )
+                for guidance in description_guidance[name]:
+                    assert guidance in published["description"]
+            else:
+                assert published["description"] == rest_tool["description"]
             assert published["outputSchema"] == rest_tool["output_schema"]
 
     get_file = by_name["get_file"]["outputSchema"]
@@ -734,7 +759,11 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         }
         assert re.fullmatch(r"\d+\.\d+\.\d+", workflow["server_info"]["version"])
         assert workflow["server_capabilities"].get("resources") is None
-        assert "never execute workspace changes" in workflow["instructions"]
+        assert "Ask answers questions" in workflow["instructions"]
+        assert (
+            "Create/Organize prepare changes for browser review"
+            in workflow["instructions"]
+        )
         _assert_catalog_matches_live_rest(workflow["tools"], catalog)
 
         actor = _structured(workflow["actor"])

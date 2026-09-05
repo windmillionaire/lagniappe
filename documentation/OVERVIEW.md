@@ -25,7 +25,7 @@ begin in the [README](../README.md).
 | [AI_CONTEXT.md](AI_CONTEXT.md) | Context assembly, prompt inputs, tool schemas, and privacy boundaries. |
 | [AI_WORKFLOWS.md](AI_WORKFLOWS.md) | Autofill, summarize, create, organize, and form-generation workflows. |
 | [AI_EMAIL.md](AI_EMAIL.md) | Inbound email webhooks, attachment retrieval, reports, review, and feedback. |
-| [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | REST API keys and permission-bounded external Ask, Create, and Organize plans. |
+| [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | REST API keys, local/remote MCP adapters, and permission-bounded external plans. |
 | [Reusable workflow cases](../testing_ai_workflows/README.md) | Natural prompts, fixtures, rubrics, latest live results and targeted comparisons. |
 
 ## Backend
@@ -46,7 +46,7 @@ begin in the [README](../README.md).
 | [BACKEND_INGRESS.md](BACKEND_INGRESS.md) | CSV staging, mapping, matching, processing, and progress. |
 | [BACKEND_WEB.md](BACKEND_WEB.md) | Flask startup, blueprints, Jinja, route responses, errors, and templates. |
 | [BACKEND_WEB_PERMISSIONS.md](BACKEND_WEB_PERMISSIONS.md) | Route authorization, fetch scope, ETags, collection state, and polling. |
-| [AUTHENTICATION.md](AUTHENTICATION.md) | Identity Platform, sessions, account rules, verification, and safe failures. |
+| [AUTHENTICATION.md](AUTHENTICATION.md) | Identity Platform, sessions, API keys, remote MCP OAuth, and safe failures. |
 | [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md) | Migration catalog, authoring, execution ledger, tests, and recovery. |
 
 ## Frontend

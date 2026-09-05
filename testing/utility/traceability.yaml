@@ -3,6 +3,7 @@ source_roots:
   - build/sentry.mjs
   - build/utility.mjs
   - clients/lagniappe_mcp/src
+  - clients/lagniappe_mcp_remote
   - lagniappe/core/definitions
   - lagniappe/core/entities
   - lagniappe/core/mixins
@@ -40,6 +41,7 @@ test_roots:
   - testing/tests_tooling/test_010_runtime_outbound_http.py
   - testing/tests_tooling/test_012_mcp_package.py
   - testing/tests_tooling/test_012b_mcp_artifact.py
+  - testing/tests_tooling/test_012c_remote_mcp_config.py
   - testing/tests_tooling/test_icons.py
 
 annotated_source_roots:
@@ -55,6 +57,7 @@ annotated_source_roots:
   - config/ai_settings.py
   - config/form_schema.py
   - config/public_pages.py
+  - config/remote_mcp.py
   - testing/utility/runtime_outbound_http.py
   - testing/utility/hosted_deferred_jobs.py
   - run.py

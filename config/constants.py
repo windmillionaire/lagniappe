@@ -661,6 +661,7 @@ SCREENSHOTS = [
 # this allowlist fall through to the final static 404 handler without starting
 # the application runtime.
 APP_BLUEPRINT_ROUTE_PREFIXES = (
+    ".well-known",
     "analytics",
     "api",
     "assets",
@@ -671,6 +672,7 @@ APP_BLUEPRINT_ROUTE_PREFIXES = (
     "l",
     "manual",
     "messages",
+    "oauth",
     "pages",
     "process",
     "projects",

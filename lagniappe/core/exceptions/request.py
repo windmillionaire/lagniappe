@@ -46,6 +46,9 @@ _DIRECT_SENSITIVE_KEYS = frozenset(
         "user",
         "user_id",
         "username",
+        "state",
+        "code_verifier",
+        "code_challenge",
     }
 )
 _SAFE_TOKEN_METADATA_KEYS = frozenset(
@@ -84,6 +87,7 @@ _PAYLOAD_KEYS = frozenset(
         "prompts",
         "query",
         "query_string",
+        "http_query",
         "request_body",
         "response_body",
         "vars",
@@ -94,6 +98,7 @@ _AUTH_VALUE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _JWT_PATTERN = re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
+_MCP_OAUTH_PATTERN = re.compile(r"\blgmo_[pcar]_[A-Za-z0-9_-]+\b")
 _SECRET_ASSIGNMENT_PATTERN = re.compile(
     r"""(?ix)
     (
@@ -101,7 +106,7 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
         (?:
             password|passwd|passphrase|secret|api[_-]?key|private[_-]?key|
             access[_-]?token|refresh[_-]?token|auth(?:orization)?|cookie|
-            session(?:id)?
+            session(?:id)?|state|code[_-]?verifier|code[_-]?challenge
         )
         ["']?
         \s*[:=]\s*
@@ -166,6 +171,7 @@ def _sanitize_text(value, *, limit=MAX_CONTEXT_STRING_LENGTH):
     text = _SECRET_ASSIGNMENT_PATTERN.sub(rf"\1{REDACTED}", text)
     text = _AUTH_VALUE_PATTERN.sub(REDACTED, text)
     text = _JWT_PATTERN.sub(REDACTED, text)
+    text = _MCP_OAUTH_PATTERN.sub(REDACTED, text)
     if len(text) > limit:
         return f"{text[:limit]}… [truncated]"
     return text
@@ -215,7 +221,7 @@ def _sanitize_url(value):
 # @covered-by lagniappe/core/exceptions/request.py::sanitize_error_context
 # @reason recursion details are owned by the public context sanitizer
 def _sanitize_value(value, *, key=None, depth=0):
-    if key is not None and _normalized_key(key) == "url":
+    if key is not None and _normalized_key(key) in {"url", "http_url", "url_full"}:
         return _sanitize_url(value)
     if key is not None and _is_sensitive_key(key):
         return REDACTED

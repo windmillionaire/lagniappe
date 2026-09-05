@@ -305,6 +305,11 @@ class Config:
             self.MCP_EVALUATION_ACTORS,
             self.MCP_EVALUATION_ORIGINS,
         ) = normalize_mcp_evaluation_config(self, constants)
+        from config.remote_mcp import normalize_remote_mcp_config
+
+        self.REMOTE_MCP = normalize_remote_mcp_config(
+            getattr(self, "REMOTE_MCP", None)
+        )
         self.CLOUDFLARE_ACCOUNT_ID = str(
             getattr(self, "CLOUDFLARE_ACCOUNT_ID", "") or ""
         ).strip()

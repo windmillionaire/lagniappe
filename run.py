@@ -173,6 +173,8 @@ def _merge_mcp_test_evidence(
         if not (
             test_path == "tests_unit/test_033_mcp_adapter.py"
             or test_path == "clients/lagniappe_mcp/tests/test_files.py"
+            or test_path == "clients/lagniappe_mcp/tests/test_hosted.py"
+            or test_path == "clients/lagniappe_mcp/tests/test_hosted_files.py"
         ) or canonical_nodeid in normalized_outcomes:
             raise RuntimeError(
                 "The MCP adapter test process returned unexpected test evidence."
