@@ -21,6 +21,17 @@ SEARCH_KIND_ALIASES.update(
 SEARCH_KIND_ALIASES["model"] = "model"
 ALLOWED_SEARCH_KINDS = tuple(sorted(SEARCH_KIND_ALIASES))
 SEARCH_MATCH_MODES = ("keywords", "exact_name")
+CANDIDATE_SEARCH_DESCRIPTION = (
+    "Find visible workspace candidates by keywords or an approximate name. "
+    "Returns bounded names, types, public references, parent context, matching "
+    "snippets, and cached Task completion state. Sparse multiword keyword searches "
+    "may include ranked any-term candidates; exact names and stronger matches "
+    "rank first. Use one short discriminating query and compare these candidates "
+    "before loading full content or schema only when needed. Results are already "
+    "view-authorized; visibility does not imply edit/create permission. "
+    "With kinds=[\"page\"], parent_id scopes candidates to a viewable Category. "
+    "Use match_mode=exact_name only when full-name equality is required."
+)
 
 
 # @testable true
@@ -141,7 +152,10 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
 # @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
 # @covered-by lagniappe/core/tools/ai/function_definitions/search.py::format_search_result
 # @matrix ai : search-filter search-limit
-def execute_search(args, user):
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_external_candidates_use_cached_context_without_entity_loading
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_scope_preserves_native_and_exact_modes
+# @matrix ai search : candidate-routing cached-details parent-scope
+def execute_search(args, user, *, candidate_search=False):
     query = args.get("query", "")
     restrictions = user.properties.restrictions.search
     belongs_to = user.properties.restrictions.belongs_to
@@ -163,10 +177,12 @@ def execute_search(args, user):
         }
     parent_hash = None
     if args.get("parent_id"):
-        if match_mode != "exact_name" or kinds != ["page"]:
+        if (match_mode != "exact_name" and not candidate_search) or kinds != ["page"]:
             return {
                 "error": (
-                    "parent_id is supported only for exact_name searches with "
+                    "parent_id is supported only for "
+                    + ("" if candidate_search else "exact_name ")
+                    + "searches with "
                     "kinds=[\"page\"]."
                 )
             }
@@ -187,6 +203,24 @@ def execute_search(args, user):
             limit=limit,
         )
         return _exact_results_with_permissions(results, user)
+
+    if candidate_search:
+        results = cache.candidate_search(
+            query,
+            restrictions,
+            belongs_to,
+            kinds=kinds,
+            parent_hash=parent_hash,
+            limit=limit,
+        )
+        formatted = []
+        for result in results:
+            item = format_search_result(result)
+            if result.get("kind") == "task":
+                # The existing cached details omit false values.
+                item["completed"] = result.get("details", {}).get("completed") is True
+            formatted.append(item)
+        return formatted
 
     results, _ = cache.search(
         query,

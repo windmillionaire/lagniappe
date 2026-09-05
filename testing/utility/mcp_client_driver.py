@@ -20,6 +20,8 @@ from typing import Any
 import httpx
 from mcp import Client
 from mcp.client.stdio import StdioServerParameters, stdio_client
+from lagniappe_mcp.errors import SchemaError
+from lagniappe_mcp.schema import validate_value
 
 
 _PRIVATE_TRANSPORT_MARKERS = (
@@ -97,6 +99,93 @@ def _structured(result: dict[str, Any]) -> Any:
     return result["structuredContent"]
 
 
+def _schedule_contract_checks(contract: dict[str, Any]) -> dict[str, bool]:
+    """Exercise real API schedule constraints in the isolated MCP validator."""
+    action = contract["proposal_schema"]["$defs"]["create_task"]
+    schema = action["properties"]["data"]["properties"]["schedule"]
+    cases = {
+        "recurring": ({"kind": "recurring", "interval": 2, "unit": "week"}, True),
+        "periodic": (
+            {
+                "kind": "periodic",
+                "interval": 1,
+                "unit": "month",
+                "description": "Inspect monthly",
+            },
+            True,
+        ),
+        "weekly": ({"kind": "scheduled", "mode": "weekly", "days": [0, 4]}, True),
+        "monthly": (
+            {
+                "kind": "scheduled",
+                "mode": "monthly",
+                "pattern_type": "specific_day",
+                "day": 15,
+                "description": "On the fifteenth",
+            },
+            True,
+        ),
+        "yearly": (
+            {
+                "kind": "scheduled",
+                "mode": "yearly",
+                "month": 9,
+                "pattern_type": "ordinal_weekday",
+                "ordinal": -1,
+                "weekday": 1,
+                "description": "Last Tuesday of September",
+            },
+            True,
+        ),
+        "missing_interval": ({"kind": "recurring", "unit": "week"}, False),
+        "zero_interval": ({"kind": "recurring", "unit": "week", "interval": 0}, False),
+        "missing_periodic_description": (
+            {"kind": "periodic", "interval": 1, "unit": "month"},
+            False,
+        ),
+        "missing_mode": ({"kind": "scheduled"}, False),
+        "empty_days": ({"kind": "scheduled", "mode": "weekly", "days": []}, False),
+        "invalid_weekday": (
+            {"kind": "scheduled", "mode": "weekly", "days": [7]},
+            False,
+        ),
+        "missing_month_day": (
+            {
+                "kind": "scheduled",
+                "mode": "monthly",
+                "pattern_type": "specific_day",
+                "description": "On the fifteenth",
+            },
+            False,
+        ),
+        "missing_year_month": (
+            {
+                "kind": "scheduled",
+                "mode": "yearly",
+                "pattern_type": "specific_day",
+                "day": 15,
+                "description": "Annual inspection",
+            },
+            False,
+        ),
+    }
+    results = {}
+    for name, (value, expected) in cases.items():
+        try:
+            validate_value(schema, value, phase="proposal")
+            accepted = True
+        except SchemaError as error:
+            if error.code != "proposal_validation_failed":
+                raise
+            accepted = False
+        if accepted != expected:
+            raise RuntimeError(
+                f"Live schedule schema produced an unexpected result: {name}"
+            )
+        results[name] = accepted
+    return results
+
+
 async def _revoke_browser_key(specification: dict[str, Any]) -> dict[str, Any]:
     revoke = specification["revoke"]
     site_url = os.environ["LAGNIAPPE_URL"].rstrip("/")
@@ -144,8 +233,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             {
                 "name": "MCP live Ask",
                 "instructions": (
-                    "Which workspace Page is named "
-                    f"{specification['search_name']}?"
+                    f"Which workspace Page is named {specification['search_name']}?"
                 ),
             },
         )
@@ -161,10 +249,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                 "limit": 10,
             },
         )
-        ask_contract = await _call(
-            client, "get_plan_contract", {"plan_id": ask["id"]}
-        )
-        ask_contract_value = _structured(ask_contract)
+        ask_contract_value = ask["context"]["contract"]
         ask_receipt = await _call(
             client,
             "submit_plan",
@@ -173,8 +258,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                 "contract_version": ask_contract_value["contract_version"],
                 "proposal": {
                     "summary": (
-                        "The authenticated actor can view the requested workspace "
-                        "Page."
+                        "The authenticated actor can view the requested workspace Page."
                     ),
                     "answer_markdown": (
                         f"The permitted workspace Page is "
@@ -189,7 +273,6 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         result["ask"] = {
             "start": ask_start,
             "search": search,
-            "contract": ask_contract,
             "receipt": ask_receipt,
             "get": ask_get,
         }
@@ -203,10 +286,8 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             },
         )
         create = _structured(create_start)
-        create_contract = await _call(
-            client, "get_plan_contract", {"plan_id": create["id"]}
-        )
-        create_contract_value = _structured(create_contract)
+        create_contract_value = create["context"]["contract"]
+        create_schedule_checks = _schedule_contract_checks(create_contract_value)
         create_proposal = {
             "summary": "Create a field guide Page.",
             "confidence": 1.0,
@@ -258,12 +339,10 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                 "proposal": replacement,
             },
         )
-        replacement_get = await _call(
-            client, "get_plan", {"plan_id": create["id"]}
-        )
+        replacement_get = await _call(client, "get_plan", {"plan_id": create["id"]})
         result["create"] = {
             "start": create_start,
-            "contract": create_contract,
+            "schedule_checks": create_schedule_checks,
             "receipt": create_receipt,
             "get": create_get,
             "replacement_receipt": replacement_receipt,
@@ -304,10 +383,8 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             },
         )
         upload_value = _structured(upload)
-        organize_contract = await _call(
-            client, "get_plan_contract", {"plan_id": organize["id"]}
-        )
-        organize_contract_value = _structured(organize_contract)
+        organize_contract_value = upload_value["context"]["contract"]
+        organize_schedule_checks = _schedule_contract_checks(organize_contract_value)
         file_ref = organize_contract_value["required_file_refs"][0]
         file_metadata = await _call(
             client,
@@ -361,16 +438,14 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                 "proposal": organize_proposal,
             },
         )
-        organize_get = await _call(
-            client, "get_plan", {"plan_id": organize["id"]}
-        )
+        organize_get = await _call(client, "get_plan", {"plan_id": organize["id"]})
         result["organize"] = {
             "start": organize_start,
             "contract_before_upload": organize_contract_before,
             "invalid_type": invalid_type,
             "invalid_field": invalid_field,
             "upload": upload,
-            "contract": organize_contract,
+            "schedule_checks": organize_schedule_checks,
             "file_metadata": file_metadata,
             "file_original": file_original,
             "receipt": organize_receipt,
@@ -449,11 +524,7 @@ def _finding_path(
     key_is_unsafe: bool = False,
     sensitive: list[tuple[str, str]],
 ) -> str:
-    if (
-        isinstance(key, str)
-        and not key_is_unsafe
-        and _SAFE_FINDING_KEY.fullmatch(key)
-    ):
+    if isinstance(key, str) and not key_is_unsafe and _SAFE_FINDING_KEY.fullmatch(key):
         candidate = f"{parent}.{key}"
     elif isinstance(key, int) and not isinstance(key, bool) and key >= 0:
         candidate = f"{parent}[{key}]"
@@ -642,9 +713,7 @@ def main(arguments: list[str]) -> int:
         message = _URL_RE.sub("[redacted URL]", message)
         encoded = message.encode("utf-8", errors="replace")
         if len(encoded) > 8 * 1024:
-            message = encoded[: 8 * 1024 - 3].decode(
-                "utf-8", errors="ignore"
-            ) + "..."
+            message = encoded[: 8 * 1024 - 3].decode("utf-8", errors="ignore") + "..."
         _write_json(target, {"driver_error": message})
         return 1
 

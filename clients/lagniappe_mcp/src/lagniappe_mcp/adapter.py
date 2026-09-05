@@ -29,6 +29,7 @@ from .limits import (
     MAX_MEDIA_RAW_BYTES,
     MAX_STRUCTURED_RESULT_BYTES,
     MAX_TEXT_FALLBACK_BYTES,
+    MCP_SUBMISSION_INSTRUCTIONS,
 )
 from .rest import RESTClient
 from .schema import compact_json, json_size, validate_schema_document, validate_value
@@ -288,7 +289,83 @@ class LagniappeAdapter:
         if "name" in arguments:
             body["name"] = arguments["name"]
         value, _request_id = await self.rest.request_json(method, route, body=body)
-        return AdapterResult(self._safe_plan(value, expected_tool=tool))
+        plan = self._safe_plan(value, expected_tool=tool)
+        return await self._with_lifecycle_context(
+            plan, plan_id=plan["id"], organize_guidelines=tool == "organize"
+        )
+
+    # @testable false
+    # @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+    async def _with_lifecycle_context(
+        self,
+        value: dict[str, Any],
+        *,
+        plan_id: str,
+        organize_guidelines: bool = False,
+    ) -> AdapterResult:
+        """Bundle a read without turning a successful mutation into a retry."""
+        tool = "get_guidelines" if organize_guidelines else "get_plan_contract"
+        arguments = {"plan_id": plan_id}
+        if organize_guidelines:
+            arguments["task"] = "organize"
+        try:
+            if organize_guidelines:
+                definition = self.tools.get(tool)
+                if definition is None:
+                    raise TransportError("missing_guidelines", "Guidelines unavailable.")
+                validate_value(definition.input_schema, arguments, phase="input")
+                result = await self._read_tool(definition, arguments)
+                if not isinstance(result.value, dict) or "error" in result.value:
+                    raise TransportError("invalid_guidelines", "Guidelines unavailable.")
+                context = {"guidelines": result.value}
+            else:
+                result = await self._get_contract_projection(plan_id)
+                expected_tool = value.get("tool") or value["plan"]["tool"]
+                if result.value["tool"] != expected_tool:
+                    raise TransportError(
+                        "invalid_response", "Context does not match the Plan tool."
+                    )
+                if "upload_inventory" in value:
+                    # A second caller can change the Plan between successful
+                    # finalization and this read. Keep the completed upload's
+                    # receipt, but do not bundle contradictory working context.
+                    finalized_files = value["upload_inventory"]
+                    inventory = result.value["upload_inventory"]
+                    if (
+                        not isinstance(inventory, dict)
+                        or inventory.get("status") != "finalized"
+                        or inventory.get("authoritative") is not True
+                        or type(inventory.get("count")) is not int
+                        or inventory["count"] != len(finalized_files)
+                        or inventory.get("files") != finalized_files
+                        or result.value["required_file_refs"]
+                        != [item["ref"] for item in finalized_files]
+                    ):
+                        raise TransportError(
+                            "context_changed", "Upload context no longer matches finalization."
+                        )
+                context = {"contract": result.value}
+            enriched = AdapterResult({**value, "context": context})
+            _reject_private_model_data(enriched.value, bearer=self.config.api_key)
+            self._enforce_result_limits(enriched)
+            return enriched
+        except AdapterError:
+            # Never reflect the failed read's body or error details. The Plan
+            # or finalized upload already exists, so recovery must be a read.
+            return AdapterResult({
+                **value,
+                "context": {
+                    "recovery": {
+                        "tool": tool,
+                        "arguments": arguments,
+                        "message": (
+                            "The operation succeeded, but its working context "
+                            "could not be included. Use this recovery read; "
+                            "do not repeat the start or upload."
+                        ),
+                    },
+                },
+            })
 
     # @testable false
     # @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
@@ -344,14 +421,28 @@ class LagniappeAdapter:
     async def _get_contract_projection(self, plan_id: str) -> AdapterResult:
         contract = await self._load_contract(plan_id)
         submission = contract.pop("submission_format")
+        # These contract-v6 clauses describe REST client orchestration. Keep
+        # their domain/review semantics, but present the MCP-owned equivalent
+        # rather than instructing the model to repeat the adapter's reads.
+        contract["workflow_rules"] = [
+            rule.replace(
+                "When an answer is ready, fetch the latest contract and submit it",
+                "When an answer is ready, call submit_plan",
+            ).replace(
+                "Fetch this contract after finalizing uploads and immediately "
+                "before constructing the proposal.",
+                "Use the current contract supplied in upload completion's "
+                "context.contract to construct the proposal. If that context "
+                "is unavailable or relevant state changes, use get_plan_contract. "
+                "submit_plan performs the final fresh-contract check.",
+            )
+            for rule in contract["workflow_rules"]
+        ]
         contract["mcp_submission"] = {
             "contract_version": submission["contract_version"],
             "proposal": {},
             "proposal_schema": "$.proposal_schema",
-            "instructions": (
-                "Call submit_plan with this plan_id, contract_version, and a "
-                "proposal matching proposal_schema."
-            ),
+            "instructions": MCP_SUBMISSION_INSTRUCTIONS,
         }
         validate_value(SAFE_CONTRACT_SCHEMA, contract, phase="output")
         return AdapterResult(contract)
@@ -406,7 +497,7 @@ class LagniappeAdapter:
             "upload_inventory": raw["upload_inventory"],
         }
         validate_value(UPLOAD_RESULT_SCHEMA, value, phase="upstream_output")
-        return AdapterResult(value)
+        return await self._with_lifecycle_context(value, plan_id=plan_id)
 
     # @testable false
     # @covered-by clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute

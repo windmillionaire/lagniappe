@@ -88,7 +88,7 @@ the validated pipx 1.17.2 path, forcing pip and binary-only dependencies:
 
 ```bash
 pipx install --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
-  "https://example.test/mcp/releases/0.1.4/<sha256>/lagniappe_mcp-0.1.4-py3-none-any.whl#sha256=<sha256>"
+  "https://example.test/mcp/releases/0.1.5/<sha256>/lagniappe_mcp-0.1.5-py3-none-any.whl#sha256=<sha256>"
 lagniappe-mcp configure codex --url "https://example.test" \
   --profile personal
 lagniappe-mcp check --profile personal
@@ -124,8 +124,9 @@ lagniappe-mcp check --profile personal
 
 Release `0.1.0` remains a historical, supported predecessor with its original
 root-gated upload interface, and immutable `0.1.1` remains in the release
-ledger as the first rootless local candidate. New installations and the local
-MCP trial use `0.1.4`; do not downgrade during a measured run. Never install an
+ledger as the first rootless local candidate. The first eight MCP baselines
+used `0.1.4`; the efficiency candidate is `0.1.5`. Capture any additional
+baseline cases before upgrading; do not downgrade during a measured run. Never install an
 unadvertised predecessor or a release whose API/contract or platform metadata
 does not match the current site.
 
@@ -140,6 +141,28 @@ presentation change, not a REST API change. Upgrade the wheel and restart the
 client; keep the existing profile, key, and registration. Confirm the tools
 actually load in the client before starting a trial, not just that `check` or
 `codex mcp list` succeeds.
+
+Release `0.1.5` adds MCP-only lifecycle context without adding tools. Ask/Create
+starts retain their original Plan fields and add `context.contract`, including
+the personal Page, date/timezone, permissions and proposal schema. Organize
+starts add `context.guidelines`; finalized uploads add the current
+`context.contract` alongside their existing Plan and inventory. The schema
+pointer within `mcp_submission` is relative to its containing contract, not the
+outer start/upload result.
+
+Optional enrichment cannot convert a completed mutation into a retry: an
+unavailable, oversized or mismatched context produces `context.recovery` with
+the appropriate read and preserved successful Plan/upload. The adapter does
+not present a pending or changed file set as the completed batch's context.
+Clients should reuse supplied context; `submit_plan` still reads and validates
+the fresh contract privately. The MCP projection replaces REST-specific final
+refetch instructions, while direct REST clients retain their own workflow.
+There is no persistent domain cache or changed browser-execution authority.
+
+Consume one complete MCP result representation when both text and structured
+content are available. Preserve counts, continuation and serialization errors.
+The adapter keeps both wire representations, original media and complete file
+text; it adds no new bulk-file tool or inline-upload excerpts.
 
 Generate or rotate the shown-once API key only after installing. `configure`
 prompts without echo and stores it in the owner-only local profile; generated
@@ -365,8 +388,11 @@ Ask response.
 
 Create is available to every eligible external-agent user. The client inspects existing workspace
 structure before proposing new forms, categories, projects, model tasks, pages,
-or tasks. It uses the same permission-filtered action schema and on-demand
-guidelines as internal Create. The proposal must contain at least one allowed
+or tasks. It shares action semantics and permissions with internal Create,
+while external schema/guidance composition describes client-owned completion.
+Reuse sufficient supplied workspace context and schemas; broader inventory or
+specialist guidance is needed only for information or rules still missing.
+The proposal must contain at least one allowed
 action or `needs_review`. Create does not accept plan uploads.
 
 `create_task` is always part of the Create and Organize action contracts because
@@ -379,13 +405,23 @@ concerning the authenticated user's own Page. Proposal submission rejects a
 Task without an executable Page reference, and the deterministic runner does not
 gain permission to write to any other Page.
 
-Ordinary `search_entities` calls retain the main full-text cache query used by
-the application. `match_mode: "exact_name"` selects a separate bounded cache
-lookup with a final case-insensitive full-name check. When `kinds` is exactly
-`["page"]`, `parent_id` may constrain that exact lookup to one viewable Category.
-Exact results include view/edit/create permissions so a verified target need not
-be loaded again solely to check editability. This addition does not change the
-main search query, ranking, snippets, or website search behavior.
+External `search_entities` uses ranked keyword candidates, with bounded OR fill
+when a multiword query has too few strict matches. Exact names and stronger name
+matches rank ahead of weak matches. Caller permissions and requested kind/parent
+scope apply to both queries. Cached parent, snippet and Task completion context
+helps target selection without loading every entity for extra permission flags.
+When `kinds` is exactly `["page"]`, `parent_id` may constrain keyword candidates
+or explicit exact lookup to one viewable Category. `match_mode: "exact_name"`
+retains its case-insensitive full-name equality and permission metadata. Built-in
+Gemini, automatic Organize retrieval and website search retain their existing
+full-text behavior; trusted API dispatch selects the candidate path.
+
+One-time Task reminders use `due_date` without `schedule`. Repeating schedules
+declare their interval/unit or calendar mode and its dependent fields. The
+external schema and field-addressed validation expose these requirements while
+Gemini retains its provider-compatible schema. For `create_task`, `model` or
+`model_action` selects a reusable work type; `task` or `task_action` overrides
+an exact completed occurrence and does not represent an open-task dependency.
 
 Optional page rich text is model-facing `document_markdown`. Proposal
 validation renders it through the same sanitized Markdown pipeline used by the
@@ -430,7 +466,8 @@ fails, the report retains the completed upload-manifest entry and finalization
 returns an error. A retry recognizes that completed entry and retries only the
 idempotent source cleanup instead of copying the file or creating another File.
 
-Before analyzing files, call `get_guidelines` with `task: organize`. Settle
+Before analyzing files, use the complete supplied Organize guidance or call
+`get_guidelines` with `task: organize` when it is absent. Settle
 structure and file placement first, then use the specialized form bundles and
 exact schemas to add final submission values. Fetch the contract after uploads
 and immediately before constructing the proposal. Include exactly one
@@ -439,16 +476,25 @@ retrieval terms, and normally `search: true`. The server does not call a model
 to repair form values or create file summaries.
 
 The contract's `guidance_requirements` makes those bundle decisions
-machine-readable. After selecting actions, request `task: report_actions` with
-the unique selected `actions`; when filling Forms, request `task: form_autofill`
+machine-readable. When action rules are not already clear from the current
+schema/context, request `task: report_actions` with the unique selected
+`actions`; when filling Forms, request `task: form_autofill`
 with the unique actual `field_types` from the exact schemas. Identical requests
-are fetched once per run. Each conditional entry's `request` is valid as written
+can reuse complete guidance already supplied for the same arguments. Each
+conditional entry's `request` is valid as written
 and retrieves the complete bundle. An optional `derived_request_arguments`
 descriptor says which actual array values may be added to request a smaller
 bundle; it is metadata, never a literal tool argument. Guideline responses report
 `content_bytes` and `section_count`; contracts report their major component byte
 sizes. Correlated API logs record tool-call sequence number, result bytes, and
 elapsed time.
+
+External Organize guidance is selected by the API route, not by a public client
+or workflow flag. On-site/email Gemini retains its separate server-managed
+summary, retrieval, structure-planning and form-completion stages. Those
+internal planning instructions must not tell an external client to omit final
+form values, and external no-server-model instructions must not replace the
+built-in pipeline's responsibilities.
 
 For Organize, `upload_inventory` is the authoritative finalized file scope even
 when natural-language instructions mention fewer filenames. Its deterministic

@@ -70,6 +70,27 @@ The REST API and its response validation are unchanged. Release `0.1.3` fixes
 the earlier tool-list startup failure for handshake-era clients; existing
 profiles and client registrations do not need to be recreated after upgrading.
 
+Release `0.1.5` bundles working context into the existing lifecycle results:
+Ask/Create starts include `context.contract`; Organize starts include
+`context.guidelines`; successful uploads include the finalized `context.contract`.
+Original Plan fields and the upload inventory remain in place. Contract paths
+are relative to the containing contract object, including when it is nested.
+If optional context cannot be included, `context.recovery` supplies a read to
+recover it without repeating the successful start/upload. A changed or pending
+inventory is not presented as the context of the completed upload.
+
+Reuse that context and relevant evidence already returned. `submit_plan` still
+fetches and validates the current contract internally; it never trusts an old
+search result as permission to write. MCP projection replaces REST-specific
+refetch instructions while preserving review, file and proposal requirements.
+No domain-result cache, new bulk operation or removed read tool is involved.
+
+When a host exposes both text and structured JSON for a result, consume one
+complete representation and retain pagination/partial-error metadata. Independent
+file reads may be batched by the host; neither a clipped excerpt nor a summary
+replaces complete evidence. The wire protocol continues to supply both required
+representations for compatible clients.
+
 Standard output is reserved for MCP frames. Standard error emits bounded JSONL
 evaluation records that join each startup or tool call to its API and storage
 request counts, status, byte totals, elapsed time, and outcome. Correlation IDs

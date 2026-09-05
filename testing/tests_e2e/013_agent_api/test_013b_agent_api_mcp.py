@@ -45,15 +45,15 @@ LIFECYCLE_SCHEMA_SHA256 = {
     ),
     "start_ask": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "a7a651527355d13929828b75165770e7efc4ed187d432a380b6327d5a76a89e8",
+        "5b5852185db029b383431eb62db1718c876ebbf29c42ae06c21390e464931edd",
     ),
     "start_create": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "a7a651527355d13929828b75165770e7efc4ed187d432a380b6327d5a76a89e8",
+        "5b5852185db029b383431eb62db1718c876ebbf29c42ae06c21390e464931edd",
     ),
     "start_organize": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "a7a651527355d13929828b75165770e7efc4ed187d432a380b6327d5a76a89e8",
+        "5b5852185db029b383431eb62db1718c876ebbf29c42ae06c21390e464931edd",
     ),
     "get_plan": (
         "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
@@ -61,11 +61,11 @@ LIFECYCLE_SCHEMA_SHA256 = {
     ),
     "get_plan_contract": (
         "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
-        "fd3504fe9f48b8e0c32932e9545e1e661a37db950f9c96a53dcd00d808db514e",
+        "98aa318b522b8c6cf62fc8d564d194182f01893148a5dc0a61b41e826af005f1",
     ),
     "upload_local_files": (
         "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
-        "39dbca1f224f9221c330aa3f382dac6ec8db46d36f028d67b31cd06832a28d9c",
+        "7290ea7efa36c1580f9141cf2db9369fa2ef904473d128086b80e27cda23d01b",
     ),
     "submit_plan": (
         "beaa898006c4f48dcacd1966a2df136ac7cd95e09f01d1716d7e9e7817cc9662",
@@ -123,9 +123,9 @@ def _canonical_sha256(value) -> str:
 
 
 def _canonical_file_sha256(value) -> str:
-    raw = (
-        json.dumps(value, allow_nan=False, indent=2, sort_keys=True) + "\n"
-    ).encode("utf-8")
+    raw = (json.dumps(value, allow_nan=False, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -260,16 +260,61 @@ def _assert_human_url(value: str, *, preview: bool) -> None:
     assert parsed.query == parsed.fragment == ""
 
 
-def _assert_safe_plan(result: dict, *, tool: str, status: str) -> dict:
+def _assert_no_private_transport(value: object) -> None:
+    if isinstance(value, dict):
+        assert not PRIVATE_TRANSPORT_FIELDS.intersection(value)
+        for child in value.values():
+            _assert_no_private_transport(child)
+    elif isinstance(value, list):
+        for child in value:
+            _assert_no_private_transport(child)
+    elif isinstance(value, str):
+        assert "storage.googleapis.com" not in value
+        assert "x-goog-" not in value.casefold()
+
+
+def _assert_safe_plan(
+    result: dict, *, tool: str, status: str, context: str | None = None
+) -> dict:
     value = _structured(result)
     assert isinstance(value, dict)
-    assert set(value) == PLAN_KEYS or set(value) == PLAN_KEYS - {"proposal"}
+    expected_keys = PLAN_KEYS | ({"context"} if context else set())
+    assert set(value) in (expected_keys, expected_keys - {"proposal"})
     assert value["tool"] == tool
     assert value["status"] == status
-    assert not PRIVATE_TRANSPORT_FIELDS.intersection(value)
+    _assert_no_private_transport(value)
+    if context:
+        assert set(value["context"]) == {context}
     _assert_human_url(value["preview_url"], preview=True)
     _assert_human_url(value["review_url"], preview=False)
     return value
+
+
+def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
+    _assert_no_private_transport(contract)
+    assert "submission_format" not in contract
+    assert contract["tool"] == tool
+    submission = contract["mcp_submission"]
+    assert set(submission) == {
+        "contract_version",
+        "proposal",
+        "proposal_schema",
+        "instructions",
+    }
+    assert submission["contract_version"] == contract["contract_version"] == 6
+    assert submission["proposal"] == {}
+    assert submission["proposal_schema"] == "$.proposal_schema"
+    assert submission["instructions"].startswith("Call submit_plan")
+    assert "to this contract object" in submission["instructions"]
+    assert "current contract again" in submission["instructions"]
+    workflow = "\n".join(contract["workflow_rules"])
+    assert "fetch the latest contract and submit it" not in workflow
+    assert "Fetch this contract after finalizing uploads" not in workflow
+    if tool == "ask":
+        assert "When an answer is ready, call submit_plan" in workflow
+    elif tool == "organize":
+        assert "context.contract" in workflow
+        assert "submit_plan performs the final fresh-contract check" in workflow
 
 
 def _assert_safe_receipt(result: dict, *, status: str) -> dict:
@@ -297,8 +342,7 @@ def _expected_catalog_input(schema: dict) -> dict:
 def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
     assert len(tools) <= 64
     assert (
-        len(json.dumps(tools, ensure_ascii=False).encode("utf-8"))
-        <= 12 * 1024 * 1024
+        len(json.dumps(tools, ensure_ascii=False).encode("utf-8")) <= 12 * 1024 * 1024
     )
     by_name = {tool["name"]: tool for tool in tools}
     rest_by_name = {tool["name"]: tool for tool in catalog["tools"]}
@@ -488,6 +532,8 @@ def test_public_mcp_release_manifest_and_wheel_are_exact() -> None:
 # @pairs agent-api:uploads mcp-adapter:product-contract mcp-upload:safe-result
 # @pairs mcp-upload:upload-all mcp-package:origin-validation mcp-package:setup-command
 # @pairs user-settings:origin-validation user-settings:revoke user-settings:setup-command
+# @matrix agent-api task-scheduling : periodic recurring scheduled structured-output validation
+# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_task_schedule_response_schema
 # @source lagniappe/web/routes/api/main.py::authenticate_request
 # @source lagniappe/web/routes/api/main.py::annotate_response
 # @source lagniappe/web/routes/api/main.py::api_index
@@ -578,8 +624,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert upload_schema["additionalProperties"] is False
         assert upload_schema["required"] == ["filename", "size"]
         assert {
-            name: schema["type"]
-            for name, schema in upload_schema["properties"].items()
+            name: schema["type"] for name, schema in upload_schema["properties"].items()
         } == {
             "filename": "string",
             "content_type": "string",
@@ -640,9 +685,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "Host": "credential-thief.invalid",
             "X-Forwarded-Host": "credential-thief.invalid",
         }
-        hostile = _request(
-            "GET", "/api/v1", token=owner_token, headers=hostile_headers
-        )
+        hostile = _request("GET", "/api/v1", token=owner_token, headers=hostile_headers)
         assert hostile.status_code == 200 or 400 <= hostile.status_code < 500
         assert "credential-thief.invalid" not in hostile.text
         forwarded = _json_response(
@@ -665,8 +708,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert "credential-thief.invalid" not in json.dumps(forwarded)
 
         browser_state = {
-            cookie["name"]: cookie["value"]
-            for cookie in owner.page.context.cookies()
+            cookie["name"]: cookie["value"] for cookie in owner.page.context.cookies()
         }
         csrf_token = owner.page.locator("#token").input_value()
         workflow = _run_driver(
@@ -706,7 +748,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert actor["credential"]["active"] is True
 
         ask_start = _assert_safe_plan(
-            workflow["ask"]["start"], tool="ask", status="draft"
+            workflow["ask"]["start"], tool="ask", status="draft", context="contract"
         )
         search = _structured(workflow["ask"]["search"])
         assert isinstance(search, list) and search
@@ -721,17 +763,9 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "can_edit": True,
             "can_create": True,
         }
-        ask_contract = _structured(workflow["ask"]["contract"])
-        assert "submission_format" not in ask_contract
-        assert ask_contract["mcp_submission"] == {
-            "contract_version": 6,
-            "proposal": {},
-            "proposal_schema": "$.proposal_schema",
-            "instructions": (
-                "Call submit_plan with this plan_id, contract_version, and a "
-                "proposal matching proposal_schema."
-            ),
-        }
+        ask_contract = ask_start["context"]["contract"]
+        _assert_mcp_contract(ask_contract, tool="ask")
+        assert ask_contract["required_file_refs"] == []
         ask_receipt = _assert_safe_receipt(
             workflow["ask"]["receipt"], status="complete"
         )
@@ -742,9 +776,13 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert ask_get["proposal"]["actions"] == []
 
         create_start = _assert_safe_plan(
-            workflow["create"]["start"], tool="create", status="draft"
+            workflow["create"]["start"],
+            tool="create",
+            status="draft",
+            context="contract",
         )
-        create_contract = _structured(workflow["create"]["contract"])
+        create_contract = create_start["context"]["contract"]
+        _assert_mcp_contract(create_contract, tool="create")
         assert "create_page" in create_contract["permissions"]["allowed_actions"]
         create_receipt = _assert_safe_receipt(
             workflow["create"]["receipt"], status="ready"
@@ -768,33 +806,67 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert replacement_get["proposal"]["summary"] == (
             "Create the revised field guide Page."
         )
-        assert "Revised before browser review." in replacement_get["proposal"][
-            "actions"
-        ][0]["data"]["document_markdown"]
+        assert (
+            "Revised before browser review."
+            in replacement_get["proposal"]["actions"][0]["data"]["document_markdown"]
+        )
 
         organize_start = _assert_safe_plan(
-            workflow["organize"]["start"], tool="organize", status="draft"
+            workflow["organize"]["start"],
+            tool="organize",
+            status="draft",
+            context="guidelines",
+        )
+        guidelines = organize_start["context"]["guidelines"]
+        assert guidelines["task"] == "organize"
+        assert (
+            "author the final summaries and form submissions or updates yourself"
+            in guidelines["guidelines"]
+        )
+        assert (
+            "No action contains submission-generation fields"
+            not in guidelines["guidelines"]
         )
         organize_contract_before = _structured(
             workflow["organize"]["contract_before_upload"]
         )
+        _assert_mcp_contract(organize_contract_before, tool="organize")
         assert organize_contract_before["required_file_refs"] == []
-        _error(
-            workflow["organize"]["invalid_type"], code="input_validation_failed"
-        )
-        _error(
-            workflow["organize"]["invalid_field"], code="input_validation_failed"
-        )
+        _error(workflow["organize"]["invalid_type"], code="input_validation_failed")
+        _error(workflow["organize"]["invalid_field"], code="input_validation_failed")
         upload = _structured(workflow["organize"]["upload"])
+        _assert_no_private_transport(upload)
+        assert set(upload) == {"plan", "upload_inventory", "context"}
+        assert set(upload["context"]) == {"contract"}
         assert workflow["organize"]["uploaded_count"] == 1
         assert upload["plan"]["files"] == upload["upload_inventory"]
         assert str(upload_path) not in json.dumps(upload)
-        organize_contract = _structured(workflow["organize"]["contract"])
+        organize_contract = upload["context"]["contract"]
+        _assert_mcp_contract(organize_contract, tool="organize")
         assert organize_contract["required_file_refs"] == [
             organize_contract["upload_inventory"]["files"][0]["ref"]
         ]
         assert organize_contract["upload_inventory"]["status"] == "finalized"
         assert organize_contract["permissions"]["allowed_actions"]
+        assert (
+            organize_contract["upload_inventory"]["files"] == upload["upload_inventory"]
+        )
+        for tool in ("create", "organize"):
+            assert workflow[tool]["schedule_checks"] == {
+                "recurring": True,
+                "periodic": True,
+                "weekly": True,
+                "monthly": True,
+                "yearly": True,
+                "missing_interval": False,
+                "zero_interval": False,
+                "missing_periodic_description": False,
+                "missing_mode": False,
+                "empty_days": False,
+                "invalid_weekday": False,
+                "missing_month_day": False,
+                "missing_year_month": False,
+            }
         file_metadata = _structured(workflow["organize"]["file_metadata"])
         assert file_metadata["delivery"] == {"kind": "none"}
         assert len(workflow["organize"]["file_metadata"]["content"]) == 1
@@ -856,8 +928,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             cookies=browser_state,
         )
         assert (
-            hostile_setup.status_code == 200
-            or 400 <= hostile_setup.status_code < 500
+            hostile_setup.status_code == 200 or 400 <= hostile_setup.status_code < 500
         )
         assert "credential-thief.invalid" not in hostile_setup.text
     finally:

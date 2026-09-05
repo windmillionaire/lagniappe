@@ -389,6 +389,108 @@ def _external_required_group_schema(fields):
     }
 
 
+# @testable true
+# @tests tests_unit/test_032d_external_guidance.py::test_external_schedule_schema_matches_repeating_schedule_requirements
+# @matrix agent-api task-scheduling : periodic recurring scheduled structured-output validation
+def external_task_schedule_response_schema():
+    """Add conditional public requirements without changing the Gemini schema."""
+    schema = _standard_json_schema(task_schedule_response_schema())
+    schema["description"] = (
+        "Repeating work only. A one-time reminder uses due_date without schedule. "
+        "The kind selects the required interval or calendar fields below."
+    )
+    schema["allOf"] = [
+        {
+            "if": {"properties": {"kind": {"enum": ["recurring", "periodic"]}}},
+            "then": {
+                "required": ["interval", "unit"],
+                "properties": {"interval": {"minimum": 1}},
+            },
+        },
+        {
+            "if": {"properties": {"kind": {"const": "periodic"}}},
+            "then": {
+                "required": ["description"],
+                "properties": {"description": {"minLength": 1}},
+            },
+        },
+        {
+            "if": {"properties": {"kind": {"const": "scheduled"}}},
+            "then": {"required": ["mode"]},
+        },
+        {
+            "if": {
+                "required": ["mode"],
+                "properties": {
+                    "kind": {"const": "scheduled"},
+                    "mode": {"const": "weekly"},
+                },
+            },
+            "then": {
+                "required": ["days"],
+                "properties": {
+                    "days": {
+                        "minItems": 1,
+                        "items": {"minimum": 0, "maximum": 6},
+                    }
+                },
+            },
+        },
+        {
+            "if": {
+                "required": ["mode"],
+                "properties": {
+                    "kind": {"const": "scheduled"},
+                    "mode": {"enum": ["monthly", "yearly"]},
+                },
+            },
+            "then": {
+                "required": ["pattern_type", "description"],
+                "properties": {"description": {"minLength": 1}},
+                "allOf": [
+                    {
+                        "if": {
+                            "required": ["pattern_type"],
+                            "properties": {"pattern_type": {"const": "specific_day"}},
+                        },
+                        "then": {
+                            "required": ["day"],
+                            "properties": {"day": {"minimum": 1, "maximum": 31}},
+                        },
+                    },
+                    {
+                        "if": {
+                            "required": ["pattern_type"],
+                            "properties": {"pattern_type": {"const": "ordinal_weekday"}},
+                        },
+                        "then": {
+                            "required": ["ordinal", "weekday"],
+                            "properties": {
+                                "ordinal": {"enum": [-1, 1, 2, 3, 4]},
+                                "weekday": {"minimum": 0, "maximum": 6},
+                            },
+                        },
+                    },
+                ],
+            },
+        },
+        {
+            "if": {
+                "required": ["mode"],
+                "properties": {
+                    "kind": {"const": "scheduled"},
+                    "mode": {"const": "yearly"},
+                },
+            },
+            "then": {
+                "required": ["month"],
+                "properties": {"month": {"minimum": 1, "maximum": 12}},
+            },
+        },
+    ]
+    return schema
+
+
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
 # @reason external action variants are asserted through the public transport schema
@@ -416,6 +518,23 @@ def _external_report_action_response_schema(
             _external_required_group_schema(group)
             for group in required_groups
         ]
+
+    if action_type == "create_task":
+        data_schema["properties"]["schedule"] = external_task_schedule_response_schema()
+        descriptions = {
+            "due_date": "One-time deadline or first due date. Omit schedule for a one-time reminder.",
+            "page": "Hash token of the editable destination Page; a Task or model-task reference cannot replace it.",
+            "page_action": "Id of an earlier create_page action for the editable destination Page.",
+            "model": "Hash token of the reusable model task describing this work type.",
+            "model_action": "Id of an earlier create_model_task action; use this for a reusable work type.",
+            "task": "Exact existing Task override for a completed occurrence, not a reusable model task or open-task dependency.",
+            "task_action": "Id of an earlier create_task action used as an exact completed-occurrence target; not model_action or an open-task dependency.",
+        }
+        for field, description in descriptions.items():
+            data_schema["properties"][field] = {
+                **data_schema["properties"][field],
+                "description": description,
+            }
 
     if action_type == "summarize_file":
         terms_schema = data_schema["properties"]["retrieval_terms"]

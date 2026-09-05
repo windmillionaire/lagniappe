@@ -21,6 +21,7 @@ from .limits import (
     MAX_TOOL_NAME_CHARS,
     MAX_TOTAL_SCHEMA_BYTES,
     MAX_UPLOAD_FILES,
+    MCP_SUBMISSION_INSTRUCTIONS,
 )
 from .schema import inject_plan_id, json_size, validate_schema_document, wrap_result_schema
 
@@ -272,9 +273,12 @@ SAFE_CONTRACT_SCHEMA = {
             "properties": {
                 "contract_version": {"type": "integer"},
                 "proposal": {"type": "object"},
-                "proposal_schema": {"const": "$.proposal_schema"},
+                "proposal_schema": {
+                    "const": "$.proposal_schema",
+                    "description": "Path relative to this contract object, not the enclosing lifecycle result.",
+                },
                 "instructions": {
-                    "const": "Call submit_plan with this plan_id, contract_version, and a proposal matching proposal_schema."
+                    "const": MCP_SUBMISSION_INSTRUCTIONS
                 },
             },
             "additionalProperties": False,
@@ -343,6 +347,51 @@ UPLOAD_RESULT_SCHEMA = {
         },
     },
     "additionalProperties": False,
+}
+
+LIFECYCLE_CONTEXT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "contract": SAFE_CONTRACT_SCHEMA,
+        "guidelines": {"type": "object"},
+        "recovery": {
+            "type": "object",
+            "required": ["tool", "arguments", "message"],
+            "properties": {
+                "tool": {"enum": ["get_plan_contract", "get_guidelines"]},
+                "arguments": {
+                    "type": "object",
+                    "required": ["plan_id"],
+                    "properties": {
+                        "plan_id": {"type": "string"},
+                        "task": {"const": "organize"},
+                    },
+                    "additionalProperties": False,
+                },
+                "message": {"type": "string"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    "oneOf": [
+        {"required": ["contract"]},
+        {"required": ["guidelines"]},
+        {"required": ["recovery"]},
+    ],
+    "additionalProperties": False,
+}
+START_RESULT_SCHEMA = {
+    **SAFE_PLAN_SCHEMA,
+    "required": [*SAFE_PLAN_SCHEMA["required"], "context"],
+    "properties": {**SAFE_PLAN_SCHEMA["properties"], "context": LIFECYCLE_CONTEXT_SCHEMA},
+}
+ENRICHED_UPLOAD_RESULT_SCHEMA = {
+    **UPLOAD_RESULT_SCHEMA,
+    "required": [*UPLOAD_RESULT_SCHEMA["required"], "context"],
+    "properties": {
+        **UPLOAD_RESULT_SCHEMA["properties"],
+        "context": LIFECYCLE_CONTEXT_SCHEMA,
+    },
 }
 
 
@@ -559,25 +608,25 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_ask",
-            "Start an Ask Plan for a question. Ask is read-only.",
+            "Start an Ask Plan for a question. Ask is read-only. Returns the working contract in context.contract; reuse it for the answer and submission.",
             _plan_input_schema(),
-            SAFE_PLAN_SCHEMA,
+            START_RESULT_SCHEMA,
             "start_ask",
             START_ANNOTATIONS,
         ),
         ToolDefinition(
             "start_create",
-            f"Start a Create Plan for a requested fileless workspace change. {common_start}",
+            f"Start a Create Plan for a requested fileless workspace change. Returns context.contract with the personal Page, date/timezone, permissions and proposal schema; no separate bootstrap read is needed. {common_start}",
             _plan_input_schema(),
-            SAFE_PLAN_SCHEMA,
+            START_RESULT_SCHEMA,
             "start_create",
             START_ANNOTATIONS,
         ),
         ToolDefinition(
             "start_organize",
-            f"Start an Organize Plan when one or more files must be inspected and placed. {common_start}",
+            f"Start an Organize Plan when files must be inspected and placed. Returns context.guidelines; upload_local_files supplies the finalized contract next. {common_start}",
             _plan_input_schema(),
-            SAFE_PLAN_SCHEMA,
+            START_RESULT_SCHEMA,
             "start_organize",
             START_ANNOTATIONS,
         ),
@@ -591,7 +640,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan_contract",
-            "Return the current safe MCP projection of the Plan contract. REST submission transport stays private; use submit_plan.",
+            "Refresh the working contract after relevant state changes, unavailable lifecycle context, or schema/permission errors. Reuse a contract already supplied by start/upload; submit_plan performs its own fresh check.",
             _plan_id_input(),
             SAFE_CONTRACT_SCHEMA,
             "get_plan_contract",
@@ -599,7 +648,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "upload_local_files",
-            "Upload explicit readable nonempty regular files to one Organize Plan, then finalize the batch. Relative paths resolve from the adapter working directory and symlinks follow normal operating-system resolution. Paths appear in the MCP request transcript but never in results or upstream requests.",
+            "Upload explicit readable nonempty regular files to one Organize Plan, then finalize the batch. Returns the finalized inventory and context.contract; do not separately refetch them. Relative paths resolve from the adapter working directory and symlinks follow normal operating-system resolution. Paths appear in the MCP request transcript but never in results or upstream requests.",
             {
                 "type": "object",
                 "required": ["plan_id", "files"],
@@ -625,7 +674,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
                 },
                 "additionalProperties": False,
             },
-            UPLOAD_RESULT_SCHEMA,
+            ENRICHED_UPLOAD_RESULT_SCHEMA,
             "upload",
             UPLOAD_ANNOTATIONS,
         ),

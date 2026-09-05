@@ -20,6 +20,9 @@ PRIMARY_NAME_KINDS = ("category", "project", "page")
 PRIMARY_NAME_BOOST = 4.0
 SEARCH_QUERY_DIALECT = 2
 EXACT_LOOKUP_CANDIDATE_LIMIT = 100
+CANDIDATE_SEARCH_LIMIT = 100
+CANDIDATE_RELAXATION_MAX_TERMS = 12
+CANDIDATE_MIN_STRICT_RESULTS = 3
 
 STOPWORDS = frozenset(
     {
@@ -459,3 +462,111 @@ def exact_name_search(
         == normalized_name.casefold()
     ]
     return exact[: max(1, int(limit or 1))]
+
+
+# @testable true
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_groups_relaxed_terms_inside_access_scope
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_ranks_exact_strict_and_name_coverage
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_skips_unnecessary_or_queries
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_keeps_default_search_and_stale_repair
+# @tests tests_e2e/009_search/test_009d_ai_candidate_search.py::test_candidate_search_keeps_redis_scope_and_ranks_partial_names
+# @matrix search : candidate-ranking term-relaxation permissions bounded-query cached-details
+def candidate_search(
+    user_query, required, belongs_to, *, kinds=None, parent_hash=None, limit=10
+):
+    """Return bounded AI candidates, relaxing sparse multiword searches once."""
+    if Restriction.is_denied(required):
+        return []
+
+    terms = list(dict.fromkeys(
+        term.casefold()
+        for term in SUBSTITUTE.sub(" ", str(user_query or "")).split()
+        if len(term) > 1 and term.casefold() not in STOPWORDS
+    ))
+    if not terms:
+        return []
+
+    limit = max(1, min(int(limit or 1), CANDIDATE_SEARCH_LIMIT))
+    pool_limit = min(CANDIDATE_SEARCH_LIMIT, max(limit * 4, 25))
+    term_list = _build_term_list(" ".join(terms), expanded=True)
+    scope = []
+    expanded_kinds = _expand_result_kinds(kinds)
+    if expanded_kinds:
+        scope.append(f"(@kind:{{ {' | '.join(expanded_kinds)} }})")
+    if parent_hash:
+        scope.append(_add_required([parent_hash]))
+    if not Restriction.is_unrestricted(required):
+        scope.append(_add_required(required))
+    scope.append(_add_restricted_to(belongs_to))
+
+    strict = _candidate_query(term_list + scope, pool_limit)
+    strict_ids = {result["id"] for result in strict}
+    normalized_name = " ".join(str(user_query or "").split()).casefold()
+    candidates = {result["id"]: result for result in strict}
+    if (
+        1 < len(terms) <= CANDIDATE_RELAXATION_MAX_TERMS
+        and len(strict) < min(limit, CANDIDATE_MIN_STRICT_RESULTS)
+        and not any(
+            " ".join(str(result.get("name") or "").split()).casefold()
+            == normalized_name
+            for result in strict
+        )
+    ):
+        # Keep the optional name boost and all access clauses outside the OR.
+        relaxed = ["(" + " | ".join(term_list[:len(terms)]) + ")"]
+        relaxed.extend(term_list[len(terms):])
+        for result in _candidate_query(relaxed + scope, pool_limit):
+            candidates.setdefault(result["id"], result)
+
+    ordered = sorted(
+        candidates.values(),
+        key=lambda result: _candidate_rank(result, normalized_name, terms, strict_ids),
+    )
+    for result in ordered:
+        result.pop("_candidate_score", None)
+    return ordered[:limit]
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/cache/query.py::candidate_search
+# @reason bounded Redis retrieval and cached hydration belong to candidate search
+def _candidate_query(clauses, limit):
+    redis_query = (
+        Query(" ".join(clauses))
+        .dialect(SEARCH_QUERY_DIALECT)
+        .with_scores()
+        .highlight(
+            fields=["desc", "doc", "values"],
+            tags=[HIGHLIGHT_OPEN, HIGHLIGHT_CLOSE],
+        )
+        .summarize(fields=["desc", "doc"], num_frags=1, context_len=25)
+        .paging(offset=0, num=limit)
+    )
+    results = cache.search(redis_query)
+    formatted = [
+        {
+            **_format_result(doc, snippets=True),
+            "_candidate_score": float(getattr(doc, "score", 0) or 0),
+        }
+        for doc in results.docs
+    ]
+    return _current_search_results(formatted)[0]
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/cache/query.py::candidate_search
+# @reason rank complete names and strict matches without treating snippets as full text
+def _candidate_rank(result, normalized_name, terms, strict_ids):
+    name = " ".join(str(result.get("name") or "").split()).casefold()
+    name_words = SUBSTITUTE.sub(" ", name).split()
+    name_coverage = sum(
+        any(word.startswith(term) for word in name_words) for term in terms
+    )
+    return (
+        name != normalized_name,
+        result["id"] not in strict_ids,
+        -name_coverage,
+        -result["_candidate_score"],
+        name,
+        result["id"],
+    )

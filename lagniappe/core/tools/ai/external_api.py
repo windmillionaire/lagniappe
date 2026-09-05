@@ -23,6 +23,7 @@ from .references import (
 )
 from .ask import ask_report_name, ask_response_schema, validate_ask_response
 from .create import CREATE_ACTION_TYPES
+from .guidelines import REPORT_TASK_SCHEDULING_GUIDELINES
 from .reporting.uploads import (
     CHECKPOINT_NOT_COMMITTED,
     finalize_report_upload_manifest,
@@ -274,7 +275,7 @@ def _guidance_requirements(tool):
             "request": {"task": "page_document"},
         },
         {
-            "when": {"actions_selected": True},
+            "when": {"actions_selected": True, "action_guidance_needed": True},
             "request": {
                 "task": "report_actions",
             },
@@ -294,7 +295,8 @@ def _guidance_requirements(tool):
         ),
         "conditional": conditional if tool in {"create", "organize"} else [],
         "deduplication": (
-            "Fetch each identical task/field_types/actions request once per run; "
+            "Use complete guidance already supplied for the same task/field_types/actions; "
+            "fetch it only when absent or when different rules are needed. "
             "the current plan contract remains authoritative."
         ),
         "derived_request_rule": (
@@ -454,6 +456,10 @@ def _schema_errors(value, schema, root, path):
 
     for child in schema.get("allOf") or []:
         errors.extend(_schema_errors(value, child, root, path))
+    if "if" in schema:
+        branch = "else" if _schema_errors(value, schema["if"], root, path) else "then"
+        if branch in schema:
+            errors.extend(_schema_errors(value, schema[branch], root, path))
     for keyword in ("anyOf", "oneOf"):
         choices = schema.get(keyword) or []
         if choices:
@@ -550,6 +556,19 @@ def _schema_errors(value, schema, root, path):
                 "message": "String is too long.",
                 "expected": {"maximum_length": maximum},
             })
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        for bound in ("minimum", "maximum"):
+            threshold = schema.get(bound)
+            if threshold is not None and (
+                (bound == "minimum" and value < threshold)
+                or (bound == "maximum" and value > threshold)
+            ):
+                errors.append({
+                    "code": bound,
+                    "path": path,
+                    "message": f"Number is outside the allowed {bound}.",
+                    "expected": {bound: threshold},
+                })
     return errors
 
 
@@ -652,10 +671,12 @@ def plan_contract(report, user, *, submit_url):
         if tool == "create":
             workflow_rules = [
                 "Use permission-bounded read tools while the plan is draft or ready.",
-                "Call list_workspace_resources early and inspect likely existing "
-                "structure before proposing new entities.",
+                "Reuse supplied personal Page, schema, and workspace context. "
+                "Inspect relevant existing structure when needed; use "
+                "list_workspace_resources when broader structure is unknown.",
                 "Use get_guidelines for category, project, page_form, task_form, "
-                "form_autofill, page_document, or report_actions when relevant.",
+                "form_autofill, page_document, or report_actions when relevant "
+                "rules are not already supplied by context or the current schema.",
                 "Return at least one permitted creation action or needs_review. "
                 "Create does not attach or organize uploaded files.",
                 "Write optional page rich text in document_markdown; trusted server "
@@ -688,9 +709,10 @@ def plan_contract(report, user, *, submit_url):
                 "Upload and finalize at least one file before submitting a proposal.",
                 "Read tools remain available while the plan is draft or ready so a "
                 "conversational follow-up can refine the proposal.",
-                "Before analyzing files, call get_guidelines with task=organize and "
-                "follow that shared end-to-end workflow; retrieve the specialized "
-                "guideline bundles it requires.",
+                "Before analyzing files, use the supplied complete Organize guidance "
+                "or call get_guidelines with task=organize if it is absent. "
+                "Retrieve specialized rules only when they are needed and not "
+                "already supplied.",
                 "Apply the organize guidance in two phases: settle structure and file "
                 "assignments first, then use the form_autofill bundle and exact schemas "
                 "to add final form submissions or updates before submission. The server "
@@ -728,6 +750,12 @@ def plan_contract(report, user, *, submit_url):
                 "using its report file reference.",
                 "Submission values must be final; server-side model repair is unavailable.",
             ]
+        workflow_rules.append(REPORT_TASK_SCHEDULING_GUIDELINES.strip())
+        reference_rules.append(
+            "For create_task, model/model_action selects a reusable work type. "
+            "task/task_action is an exact Task override for completed occurrences; "
+            "it does not link open tasks or select a model task."
+        )
     personal_page = personal_page_reference(user)
     workflow_rules.insert(
         0,

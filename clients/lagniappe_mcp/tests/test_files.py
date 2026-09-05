@@ -15,6 +15,10 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PACKAGE_ROOT / "src"))
 
 from lagniappe_mcp.errors import FileBoundaryError, TransportError  # noqa: E402
+from lagniappe_mcp.adapter import LagniappeAdapter  # noqa: E402
+from lagniappe_mcp.configuration import ConnectionConfig  # noqa: E402
+from lagniappe_mcp.server import _success_result  # noqa: E402
+from lagniappe_mcp.url_security import normalize_site_url  # noqa: E402
 import lagniappe_mcp.files as file_module  # noqa: E402
 from lagniappe_mcp.files import (  # noqa: E402
     OpenedFileBatch,
@@ -974,3 +978,49 @@ def test_unlinked_rewritten_descriptor_fails_content_identity_check(
 
     assert changed.value.code == "local_file_changed"
     assert storage.requests == []
+
+
+# @pair mcp-adapter:product-contract
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter._project_file_result
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/server.py::_success_result
+def test_complete_long_text_and_late_decision_survive_mcp_presentation():
+    early_note = "Initial note: use the western route.\n"
+    final_decision = "Final decision: use the eastern route — approved by Zoë.\n"
+    full_text = early_note + "Routine site observation; no final decision.\n" * 550
+    full_text += final_decision
+    raw = {
+        "hash": "hash:abcdefghijkl",
+        "filename": "site-log.md",
+        "mimetype": "text/markdown",
+        "summary": "Earlier summary recommends the western route.",
+        "content": full_text,
+        "original_file": {
+            "supported": False,
+            "attached": False,
+            "reason": "Text content is available directly.",
+        },
+    }
+    # Any unexpected original download fails: this boundary needs no transport
+    # operation when the complete extracted text is already present.
+    adapter = LagniappeAdapter(
+        ConnectionConfig(normalize_site_url("https://example.com"), "test-secret"),
+        rest=object(),
+    )
+
+    projected = asyncio.run(adapter._project_file_result(raw, {}))
+    rendered = _success_result(projected).model_dump(
+        mode="json", by_alias=True, exclude_none=True
+    )
+
+    structured = rendered["structuredContent"]
+    assert structured["hash"] == raw["hash"]
+    assert structured["content"] == full_text
+    assert structured["content"].endswith(final_decision)
+    assert structured["summary"] == raw["summary"]
+    assert structured["delivery"] == {"kind": "none"}
+    assert structured["original_file"]["attached"] is False
+    assert projected.media == ()
+    assert len(rendered["content"]) == 1
+    assert rendered["content"][0]["type"] == "text"
+    assert json.loads(rendered["content"][0]["text"]) == structured
+    assert raw["content"] == full_text

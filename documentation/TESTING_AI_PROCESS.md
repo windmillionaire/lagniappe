@@ -78,36 +78,43 @@ the prompt explicitly calls for that interaction.
 ## Evaluation folders
 
 Keep the working evidence outside the repository unless it is intended to be a
-durable fixture. A paired run should use parallel trees:
+durable fixture. Prefer case-first folders with one prompt/fixture set and
+separate artifacts/results for each round:
 
 ```text
-evaluation-name-before/
-  README.md
-  RUN_RECORD.md
+evaluation-name/
+  ROUND_2.md
   01-case-name/
     PROMPT.md
-    RESULTS.md
-    SESSION.txt
-    transcript.jsonl
-    transcript.html
+    RUBRIC.md
+    LOOK_FOR_IN_ROUND_2.md
+    fixtures/
     artifacts/
-
-evaluation-name-after/
-  README.md
-  RUN_RECORD.md
-  COMPARISON.md
-  01-case-name/
-    ...
+      mcp/
+      mcp_round_2/
+    results/
+      mcp_baseline.md
+      mcp_round_2.md
 ```
 
-Create both trees from the same source before the baseline. Do not edit the
-after prompts in response to baseline behavior.
+Create the new round's folders before the baseline. Preserve previous exports
+and keep prompts/fixtures unchanged between paired runs. Existing historical
+before/after trees remain valid evidence; do not reorganize them just to adopt
+this layout.
+
+Give the model only the natural request from `PROMPT.md`, not the rubric or
+`LOOK_FOR` note. Launching in `fixtures/` keeps analyst material separate from
+ordinary working inputs. Targeted notes should name a hoped-for improvement,
+a plausible regression, and an inconclusive/control-limited outcome. When
+several changes ship together, these observations help attribute results but
+do not establish single-change causality.
 
 ### Required evidence
 
 | Artifact | Purpose |
 | --- | --- |
-| `PROMPT.md` | Exact input and case-specific checks. |
+| `PROMPT.md` | Exact natural user input; no scoring or prescribed tool sequence. |
+| `RUBRIC.md`, `LOOK_FOR_IN_ROUND_2.md` | Operator-only outcome checks and focused change observations. |
 | `transcript.jsonl` | Machine-readable event, timing, usage, and tool-call record. |
 | `transcript.html` | Convenient human audit of the same session. |
 | `SESSION.txt` | Session ID, client/model/provider settings, tokens, and reported cost. |
@@ -127,7 +134,8 @@ the finalized file references and responses instead.
    asserted without a model.
 2. Seed or verify the starting workspace and record a manifest of the relevant
    entities, permissions, and fixture hashes.
-3. Create identical before and after folders, prompts, and blank result sheets.
+3. Keep one shared prompt/fixture set; create round-specific artifact folders
+   and blank result sheets before recording the baseline.
 4. Run every baseline case in a fresh session without intervention.
 5. Export both transcript formats and session details immediately. Preserve
    response bodies that the transcript alone would make awkward to compare.

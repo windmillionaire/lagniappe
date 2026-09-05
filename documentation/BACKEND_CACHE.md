@@ -48,6 +48,21 @@ equality after hydration. Do not fold this behavior into `search()`: the main
 full-text query, ranking, snippets, and website callers have a different
 contract.
 
+External AI keyword discovery uses `candidate_search()` without changing that
+shared full-text query. It retrieves a bounded strict candidate pool and, for
+two through twelve significant terms, performs at most one grouped OR query
+when fewer than three strict candidates remain (or the requested limit, if
+smaller). A normalized exact-name hit stops relaxation. Both queries retain
+the same caller/group, kind, and optional parent scope. Candidate pools are
+capped at 100 records per query; the AI response limit remains 25.
+
+The merged result ranks normalized exact names first, then known all-term
+matches, name-prefix coverage, and Redis relevance. It uses cached detail and
+parent hydration only, including stale-row removal; it does not fetch full
+entities to repeat visibility checks. Internal Gemini search, the automatic
+Organize retrieval prepass, browser search, and execution-time Page-name
+fallback retain their existing matching behavior.
+
 Saved filters use a separate Redis JSON projection keyed by parent and access
 scope. See [BACKEND_FILTERS.md](BACKEND_FILTERS.md).
 

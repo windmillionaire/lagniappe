@@ -42,12 +42,33 @@ SUPPORTED_SCHEMA_DIALECTS = frozenset(
     }
 )
 
+MCP_SUBMISSION_INSTRUCTIONS = (
+    "Call submit_plan with this plan_id, contract_version, and a proposal "
+    "matching proposal_schema. The adapter fetches the current contract again "
+    "before validating and submitting; do not add a separate final contract "
+    "read solely to repeat that check. Refresh context after relevant workspace "
+    "changes or a schema/permission error. The proposal_schema path is relative "
+    "to this contract object, including when it is returned in context.contract."
+)
+
 MCP_INSTRUCTIONS = (
     "Use start_ask for a question, start_organize when files must be placed, "
     "and start_create for a requested fileless workspace change. Create and "
     "Organize submissions only create a browser-reviewable report; they never "
     "execute workspace changes. Use the plan_id returned by the chosen starter "
-    "for reads, contracts, uploads, and submission. Inspect permitted evidence, "
-    "follow the current plan contract, and send the user the preview link for "
-    "authenticated review. Never claim a proposal was applied."
+    "for reads, contracts, uploads, and submission. Ask/Create starts include "
+    "the working contract in context.contract; Organize starts include its "
+    "guidelines and upload completion includes the finalized contract. Reuse "
+    "supplied context instead of fetching it again. If context is unavailable, "
+    "follow its recovery read without repeating the successful start/upload. "
+    "Use relevant evidence already returned: search hits are view-authorized, "
+    "get_entity includes attached Form schemas, and the contract identifies "
+    "the user's personal Page. Read full details only for missing information. "
+    "Inspect complete file evidence once; independent file reads can run in "
+    "parallel. A summary or clipped excerpt is not complete inspection. When "
+    "both text and structured content represent one result, inspect/print one "
+    "representation, preserving continuation and partial-error metadata. "
+    "submit_plan refreshes the contract internally. Follow the current contract "
+    "and send the user the preview link for authenticated review. Never claim "
+    "a proposal was applied."
 )

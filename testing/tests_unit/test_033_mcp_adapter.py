@@ -5301,3 +5301,257 @@ def test_upstream_error_details_use_a_control_free_safe_key_allowlist() -> None:
             }
         ],
     }
+
+
+class _LifecycleContextREST(_WorkflowREST):
+    """Deterministic REST boundary for post-write context reads."""
+
+    def __init__(self, tool="create", failure=None):
+        super().__init__()
+        self.tool = tool
+        self.failure = failure
+        self.files = []
+
+    async def startup(self):
+        discovery, actor, catalog = await super().startup()
+        catalog["tools"].append({
+            "name": "get_guidelines",
+            "description": "Get canonical workflow guidance.",
+            "input_schema": {
+                "type": "object",
+                "required": ["task"],
+                "properties": {"task": {"const": "organize"}},
+                "additionalProperties": False,
+            },
+            "output_schema": {
+                "type": "object",
+                "required": ["task", "guidelines"],
+                "properties": {
+                    "task": {"const": "organize"},
+                    "guidelines": {"type": "string"},
+                },
+                "additionalProperties": False,
+            },
+            "result_paths": {"primary_collection": None, "pagination": None},
+        })
+        catalog["selected_count"] += 1
+        return discovery, actor, catalog
+
+    async def request_json(self, method, target, *, body=None, **kwargs):
+        if target.endswith("/tools/get_guidelines"):
+            self.requests.append((method, target, body))
+            self._fail_context()
+            return {"result": {"task": "organize", "guidelines": "Full workflow."}}, "guidance"
+        if target.endswith("/contract"):
+            self.requests.append((method, target, body))
+            self._fail_context()
+            contract = _contract()
+            contract["tool"] = self.tool
+            contract["uploads_supported"] = self.tool == "organize"
+            if self.tool == "organize":
+                files = deepcopy(self.files)
+                if self.failure == "different_files":
+                    files[0]["ref"] = "hash:zyxwvutsrqpo"
+                contract["upload_inventory"] = {
+                    "status": "pending" if self.failure == "pending" else "finalized",
+                    "authoritative": True,
+                    "count": len(files),
+                    "files": files,
+                }
+                contract["required_file_refs"] = [item["ref"] for item in files]
+            if self.failure == "oversize":
+                contract["workflow_rules"] = ["x" * MAX_STRUCTURED_RESULT_BYTES]
+            if self.failure == "private":
+                contract["workflow_rules"] = ["api-secret"]
+            if self.failure == "wrong_tool":
+                contract["tool"] = "ask" if self.tool != "ask" else "create"
+            return contract, "contract"
+        result, request_id = await super().request_json(method, target, body=body, **kwargs)
+        if target == "plans":
+            result["tool"] = self.tool
+        return result, request_id
+
+    def _fail_context(self):
+        if self.failure == "transport":
+            raise TransportError("offline", "private upstream error api-secret")
+        if self.failure == "cancel":
+            raise asyncio.CancelledError()
+
+
+# @pair mcp-adapter:product-contract
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+@pytest.mark.parametrize("tool", ["ask", "create", "organize"])
+def test_starters_bundle_current_context_without_an_actor_or_inventory_read(tool):
+    async def exercise():
+        rest = _LifecycleContextREST(tool)
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
+            rest=rest,
+        )
+        await adapter.initialize()
+        result = await adapter.execute(f"start_{tool}", {"instructions": "A natural request."})
+        return result.value, rest.requests
+
+    value, requests = asyncio.run(exercise())
+    assert value["id"] == "abcdefghijkl"
+    assert len(requests) == 2
+    assert requests[0][0:2] == ("POST", "plans")
+    assert "submission_format" not in compact_json(value)
+    if tool == "organize":
+        assert value["context"] == {
+            "guidelines": {"task": "organize", "guidelines": "Full workflow."}
+        }
+        assert requests[1][2] == {"arguments": {"task": "organize"}}
+    else:
+        contract = value["context"]["contract"]
+        assert contract["current_date"] == "2026-09-04"
+        assert contract["timezone"] == "UTC"
+        assert contract["tool"] == tool
+        assert contract["proposal_schema"] == _contract()["proposal_schema"]
+        assert "personal_page" in contract
+        assert "do not add a separate final contract read" in contract["mcp_submission"]["instructions"]
+
+
+# @pair mcp-adapter:product-contract
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+@pytest.mark.parametrize("failure", ["transport", "oversize", "private", "wrong_tool"])
+def test_failed_start_context_preserves_the_created_plan_and_offers_only_a_read(failure):
+    async def exercise():
+        rest = _LifecycleContextREST(failure=failure)
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"), rest=rest,
+        )
+        await adapter.initialize()
+        result = await adapter.execute("start_create", {"instructions": "Create a reminder."})
+        return result.value, rest.requests
+
+    value, requests = asyncio.run(exercise())
+    assert value["status"] == "draft"
+    assert value["id"] == "abcdefghijkl"
+    recovery = value["context"]["recovery"]
+    assert recovery["tool"] == "get_plan_contract"
+    assert recovery["arguments"] == {"plan_id": value["id"]}
+    assert "do not repeat" in recovery["message"]
+    assert "api-secret" not in compact_json(value)
+    assert sum(target == "plans" for _, target, _ in requests) == 1
+
+
+# @pair mcp-adapter:product-contract
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+@pytest.mark.parametrize("failure", [None, "transport", "pending", "different_files"])
+def test_upload_bundles_final_contract_without_replaying_successful_finalization(monkeypatch, failure):
+    from lagniappe_mcp import files as files_module
+
+    uploads = []
+    finalized_files = [{
+        "ref": "hash:mnopqrstuvwx",
+        "name": "Fixture",
+        "filename": "fixture.txt",
+        "mimetype": "text/plain",
+        "size": 17,
+    }]
+
+    async def uploaded(rest, *, plan_id, file_items, contract):
+        uploads.append((plan_id, file_items))
+        assert contract["upload_inventory"]["status"] == "finalized"
+        assert contract["upload_inventory"]["files"] == []
+        plan = _plan()
+        plan["tool"] = "organize"
+        plan["files"] = deepcopy(finalized_files)
+        rest.files = deepcopy(finalized_files)
+        rest.failure = failure
+        return {"plan": plan, "upload_inventory": deepcopy(finalized_files)}
+
+    monkeypatch.setattr(files_module, "upload_local_files", uploaded)
+
+    async def exercise():
+        rest = _LifecycleContextREST("organize")
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"), rest=rest,
+        )
+        await adapter.initialize()
+        result = await adapter.execute("upload_local_files", {
+            "plan_id": "abcdefghijkl", "files": [{"path": "/private/fixture.txt"}],
+        })
+        return result.value, rest.requests
+
+    value, requests = asyncio.run(exercise())
+    assert len(uploads) == 1
+    assert value["plan"]["id"] == "abcdefghijkl"
+    assert value["plan"]["files"] == finalized_files
+    assert value["plan"]["uploads_pending"] is False
+    assert value["upload_inventory"] == finalized_files
+    assert "/private/fixture.txt" not in compact_json(value)
+    assert len(requests) == 2  # Existing upload preflight, then finalized context.
+    if failure:
+        recovery = value["context"]["recovery"]
+        assert recovery["tool"] == "get_plan_contract"
+        assert recovery["arguments"] == {"plan_id": "abcdefghijkl"}
+        assert "do not repeat" in recovery["message"]
+        assert "contract" not in value["context"]
+        assert "hash:zyxwvutsrqpo" not in compact_json(value)
+    else:
+        contract = value["context"]["contract"]
+        assert contract["tool"] == "organize"
+        assert contract["upload_inventory"]["status"] == "finalized"
+        assert contract["upload_inventory"]["authoritative"] is True
+        assert contract["upload_inventory"]["count"] == 1
+        assert contract["upload_inventory"]["files"] == finalized_files
+        assert contract["required_file_refs"] == ["hash:mnopqrstuvwx"]
+
+
+# @pair mcp-adapter:product-contract
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+def test_context_enrichment_remains_cancellable():
+    async def exercise():
+        rest = _LifecycleContextREST(failure="cancel")
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"), rest=rest,
+        )
+        await adapter.initialize()
+        with pytest.raises(asyncio.CancelledError):
+            await adapter.execute("start_create", {"instructions": "Make a reminder."})
+        assert len(rest.requests) == 2
+
+    asyncio.run(exercise())
+
+
+# @pair mcp-adapter:product-contract
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+def test_mcp_contract_replaces_rest_refetch_steps_and_resolves_contract_relative_schema():
+    class RestWorkflowRules(_LifecycleContextREST):
+        async def request_json(self, method, target, **kwargs):
+            result, request_id = await super().request_json(method, target, **kwargs)
+            if target.endswith("/contract"):
+                result["workflow_rules"] = [
+                    "When an answer is ready, fetch the latest contract and submit it without "
+                    "waiting for separate save confirmation. Submission only saves the "
+                    "read-only answer report; it does not modify workspace records. Then give "
+                    "the user the answer and preview_url.",
+                    "Fetch this contract after finalizing uploads and immediately before "
+                    "constructing the proposal.",
+                    "Every uploaded file still requires a grounded summary.",
+                ]
+            return result, request_id
+
+    async def exercise():
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
+            rest=RestWorkflowRules(),
+        )
+        await adapter.initialize()
+        started = await adapter.execute("start_create", {"instructions": "A natural request."})
+        direct = await adapter.execute("get_plan_contract", {"plan_id": started.value["id"]})
+        return started.value["context"]["contract"], direct.value
+
+    bundled, direct = asyncio.run(exercise())
+    for contract in (bundled, direct):
+        rules = "\n".join(contract["workflow_rules"])
+        assert "fetch the latest contract" not in rules
+        assert "Fetch this contract after finalizing" not in rules
+        assert "does not modify workspace records" in rules
+        assert "Every uploaded file still requires a grounded summary." in rules
+        assert "submit_plan performs the final fresh-contract check" in rules
+        pointer = contract["mcp_submission"]["proposal_schema"]
+        assert contract[pointer.removeprefix("$.")] == _contract()["proposal_schema"]
+        assert "relative to this contract object" in contract["mcp_submission"]["instructions"]

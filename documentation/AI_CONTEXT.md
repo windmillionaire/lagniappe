@@ -67,10 +67,15 @@ direct handler value; REST preserves its `{result: ...}` success envelope. Exter
 catalog selection can return exact definitions or names only, but it never
 creates a second handler registry.
 
-`search_entities` defaults to the unchanged full-text search. Its optional
-exact-name mode invokes a separate bounded cache query and can scope exact Page
-matches to a Category. Both internal Gemini and external clients reach the same
-declaration and handler, so provider entry point does not change lookup results.
+Internal `search_entities` defaults to the unchanged full-text search. The
+external API selects bounded candidate discovery through trusted dispatch:
+sparse multiword queries may receive ranked OR matches in the same tool result,
+with cached parent/snippet and Task completion context. This does not load every
+candidate again to attach edit/create permissions. The automatic Organize
+retrieval prepass retains native full-text matching. Both paths preserve the
+explicit `exact_name` mode; external Page candidates can also use the existing
+Category `parent_id` scope. The model cannot select the internal/external
+dispatch context through tool arguments.
 
 ## Structured output
 
@@ -109,6 +114,19 @@ the contract. External plan contracts publish required/conditional bundle
 arguments. The guideline tool can restrict Form value rules to actual schema
 field types and action rules to selected action types; filtered and full calls
 remain different arguments in the normal exact-call cache.
+
+The API route selects external dispatch through server-owned context, never a
+model-supplied argument. In particular, `get_guidelines(task="organize")`
+has separate compositions. Built-in Gemini receives structural-planning rules:
+the server already prepared summaries/retrieval terms and will complete form
+values afterward. External clients receive full inspection, summary-authoring
+and final-submission responsibilities. Shared domain guidance remains reusable;
+MCP lifecycle names and REST submission instructions do not belong in built-in
+provider prompts. The external schedule schema adds conditional requirements
+without changing Gemini's provider-compatible schema.
+The external `form_autofill` bundle permits grounded corrections and emits only
+selected field updates; built-in Autofill retains its blank-only completion
+policy and preserves non-empty partial values.
 
 `get_category_pages` returns at most ten Pages per call. Its response separates
 the caller's `requested_limit`, the enforced `effective_limit`, and

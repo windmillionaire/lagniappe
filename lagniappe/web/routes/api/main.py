@@ -2226,6 +2226,7 @@ def execute_tool(plan_id, tool_name):
             tool_name,
             arguments,
             g.agent_api_user,
+            external=True,
         )
         result = _original_file_download(tool_name, arguments, result)
         safe_result = _json_safe(result)

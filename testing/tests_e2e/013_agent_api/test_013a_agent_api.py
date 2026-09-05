@@ -916,8 +916,21 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert finalized.json["uploads_pending"] is False
     assert finalized.json["upload_batch_id"] == upload_batch_id
 
-    def execute(name, arguments, user):
-        seen.update(name=name, arguments=arguments, user=user)
+    guidance = client.post(
+        "/api/v1/plans/report-key/tools/get_guidelines",
+        headers={"Authorization": "Bearer valid-key"},
+        json={"arguments": {"task": "organize"}},
+    )
+    assert guidance.status_code == 200, guidance.get_data(as_text=True)
+    assert "author the final summaries and form submissions or updates yourself" in (
+        guidance.json["result"]["guidelines"]
+    )
+    assert "No action contains submission-generation fields" not in (
+        guidance.json["result"]["guidelines"]
+    )
+
+    def execute(name, arguments, user, *, external=False):
+        seen.update(name=name, arguments=arguments, user=user, external=external)
         return {"items": [{"hash": "pagehash1234"}]}, []
 
     monkeypatch.setattr(ai_functions, "execute_registered_tool", execute)
@@ -932,12 +945,13 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "name": "search_entities",
         "arguments": {"query": "records"},
         "user": actor,
+        "external": True,
     }
 
     monkeypatch.setattr(
         ai_functions,
         "execute_registered_tool",
-        lambda name, arguments, user: (
+        lambda name, arguments, user, **_context: (
             {
                 "error": "id is required",
                 "required": ["id"],
@@ -991,7 +1005,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     monkeypatch.setattr(
         ai_functions,
         "execute_registered_tool",
-        lambda name, arguments, user: (
+        lambda name, arguments, user, **_context: (
             {
                 "filename": "person.vcf",
                 "original_file": {
@@ -1645,7 +1659,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     monkeypatch.setattr(
         ai_functions,
         "execute_registered_tool",
-        lambda tool_name, arguments, user: (
+        lambda tool_name, arguments, user, **_context: (
             {"tool": tool_name, "query": arguments.get("query")},
             [],
         ),
