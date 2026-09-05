@@ -57,9 +57,13 @@ const context = {
   CustomEvent: class {
     constructor(type, options) { this.type = type; this.detail = options.detail; }
   },
-  createIcon() { return {}; },
+  createIcon() { return { setAttribute() {} }; },
   withTransition(callback) { return callback(); },
   document: {
+    createElement() {
+      return { dataset: {}, children: [], setAttribute() {},
+        append(...children) { this.children.push(...children); } };
+    },
     querySelectorAll(selector) {
       return selector === "[data-operation]" ? nodes : [];
     },
@@ -176,6 +180,55 @@ const manager = new context.DeferredOperationManager(view).init();
     throw new Error("An out-of-order operation revision was accepted");
   }
 
+  const newer = operationNode("operation-a");
+  Object.assign(newer.dataset, {
+    operationRevision: "5", operationStatus: "retry_wait",
+    operationPhase: "using_tools", operationPhaseLabel: "Checking context",
+    operationRecovering: "true", operationElapsed: "80",
+  });
+  const older = operationNode("operation-a");
+  Object.assign(older.dataset, {
+    operationRevision: "2", operationStatus: "running",
+    operationPhase: "generating", operationPhaseLabel: "Generating",
+  });
+  nodes.push(newer, older);
+  manager.scan();
+  for (const node of [nodes[0], newer, older]) {
+    if (node.phase.textContent !== "Checking context. Automatic recovery is active." ||
+        node.dataset.operationRevision !== "5") {
+      throw new Error("An older sibling snapshot replaced the shared latest status");
+    }
+  }
+  manager.scan();
+  await subscriptions.get("operation:operation-a").onResult({ status: "unchanged" });
+  if (older.phase.textContent !== newer.phase.textContent ||
+      manager.operations.get("operation-a").status.phase_label !== "Checking context") {
+    throw new Error("Rescanning rendered progress lost the cached phase metadata");
+  }
+  manager.nudge("operation-a");
+  if (manager.operations.get("operation-a").revision !== 5) {
+    throw new Error("A cursorless nudge erased the shared operation revision");
+  }
+  manager.track("operation-replacement", { node: newer, immediate: false });
+  if (!subscriptions.has("operation:operation-a") || older.dataset.operation !== "operation-a") {
+    throw new Error("Reusing one target retired a job still owned by another target");
+  }
+
+  const owner = operationNode("operation-owned");
+  owner.querySelector = (selector) => owner.progress?.children.find(
+    (child) => selector === "[data-role='deferred-phase']" && child.dataset?.role === "deferred-phase",
+  );
+  owner.append = (progress) => { owner.progress = progress; };
+  nodes.push(owner);
+  manager.track("operation-owned", { node: owner, immediate: false });
+  if (!owner.progress || owner.progress.dataset.operation) {
+    throw new Error("Generated progress became a second operation owner");
+  }
+  manager.track("operation-next", { node: owner, immediate: false });
+  if (subscriptions.has("operation:operation-owned") || owner.dataset.operation !== "operation-next") {
+    throw new Error("Generated progress kept a replaced operation subscribed");
+  }
+
   manager.destroy();
   if (manager.operations.size || subscriptions.size) {
     throw new Error("Destroy did not clear operation state");
@@ -188,7 +241,7 @@ const manager = new context.DeferredOperationManager(view).init();
     )
 
 
-# @pair deferred-jobs:terminal-ownership
+# @matrix deferred-jobs : terminal-ownership revision
 def test_deferred_operation_manager_reconciles_server_rendered_terminal_status(
     run_node,
 ):
@@ -222,6 +275,7 @@ const node = {
   querySelectorAll() { return []; },
 };
 const subscriptions = new Map();
+const triggers = [];
 const events = [];
 const reconciled = [];
 const expectedCompletions = [];
@@ -252,10 +306,11 @@ vm.runInContext(source, context);
 
 const view = {
   PollingCoordinator: {
-    subscribe(descriptor) {
-      subscriptions.set(descriptor.id, descriptor);
+    subscribe(descriptor, hooks) {
+      subscriptions.set(descriptor.id, { descriptor, ...hooks });
       return () => subscriptions.delete(descriptor.id);
     },
+    trigger(ids) { triggers.push(ids); },
     reschedule() {},
   },
   EditWatcher: {
@@ -263,26 +318,50 @@ const view = {
       expectedCompletions.push({ key, operation });
     },
   },
-  async reconcileChange(change) { reconciled.push(change); },
+  async reconcileChange(change) {
+    reconciled.push(change);
+    if (reconciled.length === 1) throw new Error("Replacement temporarily unavailable");
+  },
 };
 
 (async () => {
   const manager = new context.DeferredOperationManager(view).init();
   manager.scan();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  const subscription = subscriptions.get("operation:operation-complete");
+  if (events.length || reconciled.length || subscriptions.size !== 1 ||
+      subscription.descriptor.revision >= 7 || triggers.length !== 2) {
+    throw new Error("Terminal HTML bypassed the authoritative operation poll");
+  }
+  const result = {
+    status: "changed",
+    payload: {
+      key: "operation-complete", revision: 7, status: "succeeded",
+      phase: "complete", phase_label: "Complete", terminal: true,
+      entity_key: "authoritative-report", source_widget: "CreateToolReport",
+      destination: "tools:ToolReportList",
+    },
+  };
+  if (await subscription.onResult(result) !== false || subscriptions.size !== 1) {
+    throw new Error("Failed terminal replacement was acknowledged instead of retried");
+  }
+  if (await subscription.onResult(result) !== true) {
+    throw new Error("Terminal replacement could not recover at the same revision");
+  }
 
   if (
-    events.length !== 1 ||
+    events.length !== 2 ||
     events[0].type !== "deferred-operation" ||
     events[0].detail.key !== "operation-complete" ||
-    events[0].detail.entity_key !== "report-ready"
+    events[0].detail.entity_key !== "authoritative-report"
   ) {
     throw new Error("Server-rendered terminal status was not published to its view owner");
   }
   if (
-    reconciled.length !== 1 ||
+    reconciled.length !== 2 ||
     reconciled[0].type !== "deferred-complete" ||
-    reconciled[0].key !== "report-ready" ||
+    reconciled[0].key !== "authoritative-report" ||
+    reconciled[0].destination !== "tools:ToolReportList" ||
+    reconciled[0].source_widget !== "CreateToolReport" ||
     expectedCompletions[0]?.operation !== "operation-complete"
   ) {
     throw new Error("Server-rendered terminal status was not reconciled");

@@ -17,7 +17,8 @@ from testing.definitions import SitePages, Uploads, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements import Buttons, List, Modal
 from testing.resources import Report
-from testing.utility.network import browser_fetch
+from testing.utility.network import browser_fetch, expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 pytestmark = pytest.mark.e2e
 
@@ -843,6 +844,113 @@ def test_text_only_organize_uses_ask(get_user):
     assert report.tool == "ask"
     assert report.instructions == question
     assert report.input_files == []
+
+
+# @matrix deferred-jobs : polling progress terminal-ownership
+# @template home/tools.html::report_item
+# @template notifications.html::item
+@pytest.mark.parametrize("surface", ["home", "report"])
+def test_open_pending_report_converges_with_notification(get_user, surface):
+    user = get_user(Users.OWNER)
+    owner = _owner(user)
+    suffix = _suffix()
+    report = Entities.REPORT.create(
+        {
+            "parent": owner,
+            "user": owner,
+            "name": f"Report convergence {suffix}",
+            "tool": "organize",
+            "status": "pending",
+            "pending": True,
+        }
+    )
+    job = Entities.DEFERRED_JOB.create(
+        {
+            "actor": owner,
+            "job_type": DeferredJobType.REPORT_ORGANIZE.value,
+            "idempotency_key": f"report-convergence-{suffix}",
+            "status": "running",
+            "dispatch_state": "dispatched",
+            "status_revision": 4,
+            "inputs": {},
+            "client": {
+                "key": report.urlsafe_key,
+                "source_widget": "CreateToolReport",
+                "destination": "tools:ToolReportList",
+            },
+            "progress": {"phase": "using_tools"},
+        }
+    )
+    report.deferred_job = {"key": job.urlsafe_key, "revision": 4}
+    notification = Entities.NOTIFICATION.create(
+        {
+            "parent": owner,
+            "target": report,
+            "body": "Organize report is running.",
+            "pending": True,
+        }
+    )
+    Entities.save(report, job, notification)
+
+    if surface == "home":
+        home = user.go(SitePages.HOME)
+        user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+        target = user.locate(home.TOOL_REPORT_LIST).locator(
+            f"li[data-key='{report.urlsafe_key}']"
+        )
+    else:
+        user.go(Report.for_entity(user, report))
+        target = user.locate(Report.VIEW)
+
+    expect(target).to_have_attribute("data-pending", "true")
+    expect(target.locator("[data-icon='spinner']")).to_be_visible()
+    expect(target.locator("[data-role='deferred-phase']")).to_have_text(
+        "Checking context"
+    )
+    notification_button = user.locate("[data-role='notifications']")
+    notification_button.click()
+    option = user.page.locator(
+        f"[role='listbox'][data-visible='true'] [role='option'][data-key='{notification.urlsafe_key}']"
+    )
+    expect(option).to_contain_text("Organize report is running.")
+
+    report.properties.process.set_proposal(
+        {"summary": f"Ready proposal {suffix}", "actions": []}
+    )
+    report.deferred_job = None
+    job.status = "succeeded"
+    job.dispatch_state = "complete"
+    job.status_revision = 5
+    job.progress = {"phase": "complete"}
+    notification.body = "Organize report is ready."
+    notification.pending = False
+    completion = (
+        expect_poll_result(
+            user.page,
+            subscription_id=f"operation:{job.urlsafe_key}",
+            timeout=35_000,
+        )
+        if surface == "home"
+        else expect_successful_response(
+            user.page,
+            method="GET",
+            path=f"/tools/reports/{report.urlsafe_key}",
+            timeout=35_000,
+        )
+    )
+    with completion:
+        Entities.save(report, job, notification)
+
+    expect(target).to_have_attribute("data-pending", "false")
+    expect(target).to_contain_text(f"Ready proposal {suffix}")
+    expect(target.locator("[data-icon='spinner']")).not_to_be_attached()
+    expect(target.locator("[data-role='deferred-phase']")).not_to_be_attached()
+    if surface == "report":
+        # Terminal report reconciliation navigates to authoritative full HTML.
+        Report.for_entity(user, report).wait_for_interaction_readiness()
+        notification_button.click()
+    expect(option).to_contain_text("Organize report is ready.")
+    expect(option.locator("[data-icon='spinner']")).not_to_be_attached()
 
 
 # @matrix ai-report : http-boundary upload validation

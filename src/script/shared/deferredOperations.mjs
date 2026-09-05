@@ -59,6 +59,7 @@ function operationNodeVisible(node) {
  * @testable true
  * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_batches_orders_and_renders_status
  * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_reconciles_server_rendered_terminal_status
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification
  * @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-visibility revision status teardown terminal-ownership timing visible-blur
  */
 export class DeferredOperationManager {
@@ -67,7 +68,6 @@ export class DeferredOperationManager {
 		this.operations = new Map();
 		this.destroyed = false;
 		this.ignored = new Set();
-		this.receivingTerminals = new Set();
 		this.unsubscribers = new Map();
 	}
 
@@ -79,11 +79,10 @@ export class DeferredOperationManager {
 	scan(root = document) {
 		const nodes = Array.from(root.querySelectorAll?.("[data-operation]") || []);
 		if (root.matches?.("[data-operation]")) nodes.unshift(root);
-		const terminalStatuses = new Map();
+		const terminalKeys = new Set();
+		const scannedKeys = new Set();
 		for (const node of nodes) {
 			const revision = operationRevision(node.dataset.operationRevision);
-			const entityKey =
-				node.dataset.key || node.closest?.("[data-key]")?.dataset?.key;
 			const status = node.dataset.operationStatus
 				? {
 						key: node.dataset.operation,
@@ -94,7 +93,6 @@ export class DeferredOperationManager {
 						elapsed_seconds: Number(node.dataset.operationElapsed) || 0,
 						recovering: node.dataset.operationRecovering === "true",
 						terminal: node.dataset.operationTerminal === "true",
-						...(entityKey ? { entity_key: entityKey } : {}),
 						...(node.dataset.operationError
 							? { error: node.dataset.operationError }
 							: {}),
@@ -106,28 +104,20 @@ export class DeferredOperationManager {
 				immediate: false,
 				status,
 			});
-			if (
-				tracked &&
-				status?.terminal &&
-				!this.receivingTerminals.has(status.key)
-			) {
-				this.receivingTerminals.add(status.key);
-				terminalStatuses.set(status.key, status);
+			if (tracked) {
+				scannedKeys.add(node.dataset.operation);
+				if (status?.terminal) terminalKeys.add(status.key);
 			}
 		}
-		// A render can capture an older entity snapshot alongside a terminal
-		// operation projection. Process that projection now: polling starts from
-		// the rendered revision and will otherwise correctly report no change.
-		for (const status of terminalStatuses.values()) {
-			void this.receive(status)
-				.catch((error) => {
-					captureError(error, this.view.elt, {
-						context: "server-rendered-terminal-operation",
-					});
-				})
-				.finally(() => {
-					this.receivingTerminals.delete(status.key);
-				});
+		// Finish reading every marker before painting: sibling fragments can have
+		// different revisions, and the newest status must reach all of them.
+		this._refreshCachedStatuses(scannedKeys);
+		// HTML contains presentation state, not the complete destination contract.
+		// Ask for the authoritative terminal payload before retiring the job.
+		if (terminalKeys.size) {
+			this.view.PollingCoordinator?.trigger(
+				Array.from(terminalKeys, (key) => `operation:${key}`),
+			);
 		}
 	}
 
@@ -139,19 +129,30 @@ export class DeferredOperationManager {
 		const decorationNode =
 			node?.dataset?.deferredStatus === "false" ? null : node;
 		const previous = decorationNode?.dataset?.operation;
-		if (previous && previous !== key) {
+		if (
+			previous &&
+			previous !== key &&
+			!operationNodes(previous).some((node) => node !== decorationNode)
+		) {
 			this.operations.delete(previous);
 			this.unsubscribers.get(previous)?.();
 			this.unsubscribers.delete(previous);
 			this._ignore(previous);
 		}
-		if (decorationNode) {
+		if (decorationNode) decorationNode.dataset.operation = key;
+		if (
+			decorationNode &&
+			decorationNode.dataset.pending !== "false" &&
+			!status?.terminal
+		) {
 			void withTransition(() => this.decorate(decorationNode, key), {
 				label: "deferred-operation:decorate",
 			});
 		}
 		const current = this.operations.get(key);
-		const incomingRevision = operationRevision(revision);
+		const incomingRevision = operationRevision(
+			revision ?? current?.revision ?? 0,
+		);
 		const resolvedRevision = Number.isInteger(incomingRevision)
 			? Math.max(
 					Number.isInteger(current?.revision) ? current.revision : 0,
@@ -161,7 +162,9 @@ export class DeferredOperationManager {
 		this.operations.set(key, {
 			...current,
 			revision: resolvedRevision,
-			...(status ? { status: { ...status }, receivedAt: Date.now() } : {}),
+			...(status && (!current?.status || incomingRevision > current.revision)
+				? { status: { ...status }, receivedAt: Date.now() }
+				: {}),
 		});
 		const polling = this.view.PollingCoordinator;
 		if (this.view.hidden && this.view.blurred) {
@@ -174,7 +177,11 @@ export class DeferredOperationManager {
 					id: `operation:${key}`,
 					type: "operation",
 					key,
-					revision: this.operations.get(key)?.revision,
+					// A terminal HTML seed is not an acknowledgement of destination
+					// reconciliation. Keep its cursor behind until receive succeeds.
+					revision: status?.terminal
+						? Math.max(resolvedRevision - 1, 0)
+						: resolvedRevision,
 				},
 				{
 					mode: "periodic",
@@ -233,7 +240,6 @@ export class DeferredOperationManager {
 		const autofillTarget = (autofill && submitGroup) || autofillSubmitGroup;
 		const progress = document.createElement("p");
 		progress.dataset.role = "deferred-progress";
-		progress.dataset.operation = key;
 		progress.className = autofillTarget
 			? "flex min-h-10 items-center justify-center gap-2 rounded-md bg-kind-default px-4 py-2 text-sm font-semibold text-white shadow-sm"
 			: "mt-2 text-sm text-base-medium";
@@ -346,6 +352,11 @@ export class DeferredOperationManager {
 			node.dataset.operationRevision = String(status.revision);
 			node.dataset.operationStatus = status.status || "unknown";
 			node.dataset.operationPhase = status.phase || "unknown";
+			node.dataset.operationPhaseLabel = status.phase_label || "Working";
+			node.dataset.operationElapsed = String(elapsedSeconds || 0);
+			node.dataset.operationRecovering = status.recovering ? "true" : "false";
+			if (status.error) node.dataset.operationError = status.error;
+			else delete node.dataset.operationError;
 			node.dataset.operationTerminal = status.terminal ? "true" : "false";
 			const phase = node.querySelector("[data-role='deferred-phase']");
 			if (phase) {
@@ -394,6 +405,5 @@ export class DeferredOperationManager {
 		this.unsubscribers.clear();
 		this.operations.clear();
 		this.ignored.clear();
-		this.receivingTerminals.clear();
 	}
 }

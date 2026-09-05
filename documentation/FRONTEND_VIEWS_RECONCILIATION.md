@@ -88,6 +88,19 @@ locally started operation requests an immediate check. The coordinator uses
 adaptive backoff and rejects a status revision older than the one already
 seen.
 
+Operation markers may live on the view root (Report detail) or inside a loaded
+widget (Home AI Reports). Startup checks both. All markers for one job share
+one subscription and the newest observed status, including when a later HTML
+fragment carries an older revision. Notifications have their own aggregate
+cursor and focused list fetch; they do not subscribe to individual jobs.
+
+A terminal HTML seed requests an immediate operation poll with a cursor behind
+that revision. HTML presentation attributes do not contain the full destination
+contract, so they cannot acknowledge completion. The authoritative terminal
+payload advances the poll cursor only after reconciliation succeeds; a failed
+replacement remains retryable at the same revision. Pending report spinners
+remain until the report/list replacement installs authoritative content.
+
 Terminal status causes `DeferredOperationManager` to locate the declared source
 and destination and fetch authoritative replacement state. It never applies
 model output from the poll payload. Destination identity includes the mounted

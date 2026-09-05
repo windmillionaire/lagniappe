@@ -178,6 +178,8 @@ const settleServices = async (view, promises, context) => {
  *
  * @testable infrastructure
  * @tests tests_js/test_029_core_startup.py::test_initial_replay_is_scheduled_after_view_readiness
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification
+ * @pair deferred-jobs:polling
  */
 export const initializeCoreServices = (view) => {
 	if (view._servicesInitialized) return view.servicesReady;
@@ -222,7 +224,10 @@ export const initializeCoreServices = (view) => {
 		if (document.querySelector("[data-role='notifications']")) {
 			warmers.push(ensureNotifications(view));
 		}
-		if (view.elt.querySelector("[data-operation]")) {
+		if (
+			view.elt.matches("[data-operation]") ||
+			view.elt.querySelector("[data-operation]")
+		) {
 			warmers.push(ensureDeferredOperations(view));
 		}
 		if (view.elt.querySelector("[lp-edited-marker]")) {
