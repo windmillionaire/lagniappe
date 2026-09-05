@@ -5409,7 +5409,14 @@ def test_starters_bundle_current_context_without_an_actor_or_inventory_read(tool
         assert contract["tool"] == tool
         assert contract["proposal_schema"] == _contract()["proposal_schema"]
         assert "personal_page" in contract
-        assert "do not add a separate final contract read" in contract["mcp_submission"]["instructions"]
+        instructions = contract["mcp_submission"]["instructions"]
+        assert "do not add a separate final contract read" in instructions
+        assert "Keep this plan_id for investigation, submission, and revisions" in instructions
+        assert "starting again creates another report" in instructions
+        assert "one complete text or structured representation" in instructions
+        assert "counts, continuation/truncation flags, and partial errors" in instructions
+        assert "re-render the retained result in smaller sections" in instructions
+        assert "repeat only the necessary read with the same plan_id" in instructions
 
 
 # @pair mcp-adapter:product-contract
@@ -5555,3 +5562,126 @@ def test_mcp_contract_replaces_rest_refetch_steps_and_resolves_contract_relative
         pointer = contract["mcp_submission"]["proposal_schema"]
         assert contract[pointer.removeprefix("$.")] == _contract()["proposal_schema"]
         assert "relative to this contract object" in contract["mcp_submission"]["instructions"]
+
+
+# @pair mcp-adapter:product-contract
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/server.py::create_server
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
+def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow(monkeypatch):
+    async def exercise():
+        from lagniappe_mcp import server as server_module
+
+        monkeypatch.setattr(
+            server_module,
+            "LagniappeAdapter",
+            lambda config: LagniappeAdapter(config, rest=_LifecycleContextREST()),
+        )
+        server = server_module.create_server(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
+        )
+        async with Client(server, mode="auto") as client:
+            listed = await client.list_tools()
+            return client.instructions, {tool.name: tool for tool in listed.tools}
+
+    instructions, tools = asyncio.run(exercise())
+    # A host may prepend initialization instructions before a short description
+    # excerpt. Each purpose must still be visible in the 180-character excerpts
+    # used by the trial's discovery calls, not hidden behind a common workflow.
+    assert instructions is not None
+    assert len(instructions) <= 96
+    purposes = {
+        "get_actor": "Return the current actor",
+        "start_ask": "Start an Ask Plan for a question",
+        "start_create": "Start a Create Plan for a requested fileless workspace change",
+        "start_organize": "Start an Organize Plan when files must be inspected and placed",
+        "get_plan": "Return current Plan state",
+        "get_plan_contract": "Refresh the working contract",
+        "upload_local_files": "Upload explicit readable nonempty regular files",
+        "submit_plan": "Save an Ask answer or Create/Organize proposal",
+        "search": "Search within the current Plan",
+    }
+    for name, purpose in purposes.items():
+        description = tools[name].description
+        assert description.startswith(purpose)
+        assert purpose in f"{instructions}\n{description}"[:180]
+
+    for name in ("start_ask", "start_create", "start_organize"):
+        tool = tools[name]
+        assert tool.annotations.idempotent_hint is False
+        assert "Each call creates a new report" in tool.description
+        assert "Reuse the returned id as plan_id" in tool.description
+        assert "Never restart to recover clipped output" in tool.description
+        assert "recovery read without repeating the successful start" in tool.description
+
+    assert "submit_plan to save the answer report" in tools["start_ask"].description
+    for name in ("start_create", "start_organize"):
+        assert "never executes workspace changes" in tools[name].description
+    for name in ("start_organize", "upload_local_files"):
+        assert "complete file evidence" in tools[name].description
+        assert "not complete inspection" in tools[name].description
+    assert "without repeating the successful upload" in tools["upload_local_files"].description
+    submit = tools["submit_plan"].description
+    assert "existing plan_id" in submit
+    assert "Reuse that Plan for revisions" in submit
+    assert "never executes workspace changes" in submit
+    assert "no separate final contract read" in submit
+    assert "preview_url for authenticated review" in submit
+
+
+# @pair mcp-adapter:product-contract
+# @source clients/lagniappe_mcp/src/lagniappe_mcp/catalog.py::catalog_tools
+def test_read_descriptions_localize_result_recovery_without_changing_catalog_schemas():
+    catalog = asyncio.run(_WorkflowREST().startup())[2]
+    template = catalog["tools"][0]
+    catalog["tools"] = []
+    for name, purpose in (
+        ("search_entities", "Search for matching workspace records."),
+        ("query_workspace_filter", "Query records using workspace filters."),
+        ("get_entity", "Load full details and attached Form schemas."),
+        ("get_file", "Read file metadata and extracted text."),
+    ):
+        entry = deepcopy(template)
+        entry.update(name=name, description=purpose)
+        if name == "get_file":
+            entry["output_schema"] = {
+                "type": "object",
+                "properties": {
+                    "content": {"type": "string"},
+                    "original_file": {
+                        "type": "object",
+                        "properties": {
+                            "supported": {"type": "boolean"},
+                            "attached": {"type": "boolean"},
+                        },
+                    },
+                },
+            }
+        catalog["tools"].append(entry)
+    catalog["selected_count"] = len(catalog["tools"])
+    original = deepcopy(catalog)
+    tools = {tool.name: tool for tool in catalog_tools(catalog)}
+
+    assert catalog == original  # MCP notes never mutate the native/REST catalog.
+    assert set(tools) == {entry["name"] for entry in original["tools"]}
+    for entry in original["tools"]:
+        tool = tools[entry["name"]]
+        published = tool.as_mcp_tool()
+        assert published.description.startswith(entry["description"])
+        assert tool.input_schema == inject_plan_id(entry["input_schema"])
+        assert tool.rest_output_schema == entry["output_schema"]
+        assert tool.result_paths == entry["result_paths"]
+        if entry["name"] != "get_file":
+            assert tool.output_schema == entry["output_schema"]
+
+    for name in ("query_workspace_filter", "get_file"):
+        description = tools[name].description
+        assert "one complete text or structured representation" in description
+        assert "separately delivered media" in description
+        assert "counts, continuation/truncation flags, and partial errors" in description
+        assert "re-render the retained result in smaller sections" in description
+        assert "same plan_id; never start another Plan" in description
+    assert "view-authorized; reuse their evidence" in tools["search_entities"].description
+    assert "only for information missing" in tools["search_entities"].description
+    assert "Reuse attached Form schemas" in tools["get_entity"].description
+    assert "not complete inspection" in tools["get_file"].description
+    assert "include_original=true delivers only bounded supported image/audio" in tools["get_file"].description

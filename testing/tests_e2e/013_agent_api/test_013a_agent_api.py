@@ -1,6 +1,7 @@
 """HTTP contract coverage for external-agent API and key management."""
 
 from types import SimpleNamespace
+import hashlib
 import re
 from uuid import uuid4
 
@@ -16,6 +17,7 @@ from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools import cache as cache_store
+from lagniappe.core.tools.cache import rate_limit as rate_limiter
 from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import get as database_get
@@ -133,6 +135,103 @@ def _allow_claimed_saves(monkeypatch, saved_reports=None):
         "update_owner_projection",
         lambda *_entities, **_options: None,
     )
+
+
+# @matrix agent-api : rate-limit
+# @source lagniappe/web/routes/api/main.py::authenticate_request
+# @source lagniappe/web/routes/api/main.py::create_plan
+# @source lagniappe/web/routes/api/main.py::execute_tool
+def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
+    monkeypatch,
+):
+    from lagniappe.web.routes.api import main as api_routes
+
+    actor = Actor()
+    report = _report(actor, tool="ask")
+    report.urlsafe_key = f"rate-limit-plan-{uuid4().hex}"
+    authorization = {"Authorization": "Bearer valid-key"}
+    created = []
+    dispatched = []
+    limiter_calls = []
+    limiter_keys = []
+    actor_ip = f"{actor.urlsafe_key}:127.0.0.1"
+
+    def create_report(user, **_arguments):
+        created.append(user)
+        return report
+
+    def dispatch(name, arguments, user, *, external):
+        dispatched.append((name, arguments, user, external))
+        return {"guidelines": "Provided guidance."}, []
+
+    def check_limit(scope, identifier, limit, window_seconds):
+        limiter_calls.append((scope, identifier, limit, window_seconds))
+        return rate_limiter.check_limit(scope, identifier, limit, window_seconds)
+
+    def seed(scope, identifier, count, window_seconds):
+        digest = hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:16]
+        key = cache_store.Keys.RATE_LIMIT.value.format(scope, digest)
+        limiter_keys.append(key)
+        rate_limiter.cache.redis.set(key, count, ex=window_seconds)
+
+    monkeypatch.setattr(
+        agent_auth, "authenticate_credential", lambda _token: (actor, {"active": True})
+    )
+    monkeypatch.setattr(external_api, "create_plan", create_report)
+    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
+    monkeypatch.setattr(Entities, "fetch_one", lambda _identifier, request: report)
+    monkeypatch.setattr(ai_functions, "execute_registered_tool", dispatch)
+    monkeypatch.setattr(api_routes, "check_limit", check_limit)
+    client = app.test_client()
+
+    try:
+        seed("agent-api-general", actor_ip, 0, 60)
+        seed("agent-api-plan-start", actor_ip, 99, 3600)
+        seed("agent-api-plan-tools", report.urlsafe_key, 99, 31 * 24 * 60 * 60)
+
+        allowed = client.post(
+            "/api/v1/plans", headers=authorization,
+            json={"tool": "ask", "instructions": "Check the plan-start boundary."},
+        )
+        limited = client.post(
+            "/api/v1/plans", headers=authorization,
+            json={"tool": "ask", "instructions": "Check the plan-start boundary."},
+        )
+        assert allowed.status_code == 201
+        assert allowed.json["id"] == report.urlsafe_key
+        assert created == [actor]
+        assert limited.status_code == 429
+        assert limited.json["error"]["code"] == "rate_limited"
+        assert 0 < int(limited.headers["Retry-After"]) <= 3600
+
+        tool_path = f"/api/v1/plans/{report.urlsafe_key}/tools/get_guidelines"
+        allowed = client.post(
+            tool_path, headers=authorization, json={"arguments": {"task": "organize"}}
+        )
+        limited = client.post(
+            tool_path, headers=authorization, json={"arguments": {"task": "organize"}}
+        )
+        assert allowed.status_code == 200
+        assert dispatched == [("get_guidelines", {"task": "organize"}, actor, True)]
+        assert limited.status_code == 429
+        assert limited.json["error"]["code"] == "rate_limited"
+        assert 0 < int(limited.headers["Retry-After"]) <= 31 * 24 * 60 * 60
+
+        seed("agent-api-general", actor_ip, 59, 60)
+        allowed = client.get("/api/v1/me", headers=authorization)
+        limited = client.get("/api/v1/me", headers=authorization)
+        assert allowed.status_code == 200
+        assert limited.status_code == 429
+        assert limited.json["error"]["code"] == "rate_limited"
+        assert 0 < int(limited.headers["Retry-After"]) <= 60
+        assert set(limiter_calls) == {
+            ("agent-api-general", actor_ip, 60, 60),
+            ("agent-api-plan-start", actor_ip, 100, 3600),
+            ("agent-api-plan-tools", report.urlsafe_key, 100, 31 * 24 * 60 * 60),
+        }
+    finally:
+        if limiter_keys:
+            rate_limiter.cache.redis.delete(*set(limiter_keys))
 
 
 # @matrix agent-api mcp-package : discovery origin-validation proposal-contract setup-command

@@ -91,6 +91,14 @@ file reads may be batched by the host; neither a clipped excerpt nor a summary
 replaces complete evidence. The wire protocol continues to supply both required
 representations for compatible clients.
 
+Release `0.1.6` shortens the server-wide introduction and places detailed rules
+at the tools and lifecycle context that need them. A `start_*` call creates a
+new report: keep its Plan ID through reads, output recovery and submission.
+If a host clips a result, reformat the retained value or repeat the necessary
+read with that same Plan; do not start a replacement merely to print less data.
+Preserve counts, continuation and partial errors when choosing a representation.
+No tool, response schema, wire representation or permission check is removed.
+
 Standard output is reserved for MCP frames. Standard error emits bounded JSONL
 evaluation records that join each startup or tool call to its API and storage
 request counts, status, byte totals, elapsed time, and outcome. Correlation IDs

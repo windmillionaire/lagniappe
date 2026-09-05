@@ -1,0 +1,15 @@
+{
+  "project_code": "MC-SW-26-041",
+  "application_title": "East Walk Stormwater Improvement",
+  "decision_date": "2026-08-28",
+  "decision": "approved",
+  "maximum_award_usd": 4200,
+  "authorized_future_costs": [
+    "soil amendment",
+    "native plants",
+    "delivery"
+  ],
+  "reimbursement_requires_completed_work_evidence": true,
+  "construction_completed": false,
+  "installation_completed": false
+}

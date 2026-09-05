@@ -73,7 +73,7 @@ cannot publish release attestation. See
 ## App Engine upload boundary
 
 `.gcloudignore` root-anchors local directories such as `/testing/`,
-`/installer/`, `/runner/`, and the standalone `/clients/` source tree. Keep
+`/installer/`, `/runner/`, `/testing_ai_workflows/`, and the standalone `/clients/` source tree. Keep
 those patterns root-anchored so nested runtime packages are not excluded.
 The separately generated `lagniappe/web/static/mcp/` manifest and supported
 content-addressed wheels remain on the upload surface. `config/files/` is
@@ -83,7 +83,8 @@ included.
 Cloud Build images use their own explicit ignore files rather than the App
 Engine upload boundary. Both the ordinary hosted-E2E image and the dedicated
 MCP packaging image re-include `/clients/lagniappe_mcp/`, exclude its local
-`.venv` and cache, and copy package metadata plus `uv.lock` before source so
+`.venv` and cache, exclude private `testing_ai_workflows/cases/*/artifacts/`,
+and copy package metadata plus `uv.lock` before source so
 either kind of drift invalidates the correct build layer. The ordinary image
 copies only the resulting noneditable locked adapter environment into its final
 stage; uv and pipx are absent there. The packaging-only image pins its Python

@@ -53,9 +53,11 @@ operational shutoff.
 - API responses are `no-store` and include the non-secret
   `X-Lagniappe-Build-ID` marker; no CORS policy is added. Original-file URLs,
   when explicitly requested through `get_file`, are signed for five minutes.
-- Limits are 60 general requests per minute per user/IP, 10 new plans per hour,
-  100 tool calls per plan, and 100 proposal actions. Organize additionally
-  allows 20 files per plan, 30 MiB per file, and 50 MiB total.
+- Limits are 60 general requests per minute and 100 Plan-start attempts per
+  hour per user/IP, 100 tool calls per plan, and 100 proposal actions. The
+  Plan-start allowance is shared across Ask, Create, and Organize; starting a
+  report does not invoke a model or execute workspace changes. Organize
+  additionally allows 20 files per plan, 30 MiB per file, and 50 MiB total.
 
 ## MCP evaluation adapter
 
@@ -88,7 +90,7 @@ the validated pipx 1.17.2 path, forcing pip and binary-only dependencies:
 
 ```bash
 pipx install --python python3.14 --backend pip --pip-args='--only-binary=:all: --no-cache-dir' \
-  "https://example.test/mcp/releases/0.1.5/<sha256>/lagniappe_mcp-0.1.5-py3-none-any.whl#sha256=<sha256>"
+  "https://example.test/mcp/releases/0.1.6/<sha256>/lagniappe_mcp-0.1.6-py3-none-any.whl#sha256=<sha256>"
 lagniappe-mcp configure codex --url "https://example.test" \
   --profile personal
 lagniappe-mcp check --profile personal
@@ -163,6 +165,17 @@ Consume one complete MCP result representation when both text and structured
 content are available. Preserve counts, continuation and serialization errors.
 The adapter keeps both wire representations, original media and complete file
 text; it adds no new bulk-file tool or inline-upload excerpts.
+
+Release `0.1.6` keeps the server-wide introduction short so client discovery
+excerpts expose individual tool purposes. Lifecycle descriptions and bundled
+submission context carry the detailed rules: each start creates a new report;
+reuse that Plan through investigation, clipped-output recovery, submission and
+revision. Reformat retained output or repeat only the necessary read with the
+same Plan. This changes MCP guidance, not the API's response shape or authority.
+
+Reusable natural-prompt evaluations and their latest reviewed results live in
+[`testing_ai_workflows/`](../testing_ai_workflows/README.md). Raw captures are
+local-only; the current targeted MCP round compares cases 01/02/08/09/11.
 
 Generate or rotate the shown-once API key only after installing. `configure`
 prompts without echo and stores it in the owner-only local profile; generated
@@ -395,6 +408,13 @@ specialist guidance is needed only for information or rules still missing.
 The proposal must contain at least one allowed
 action or `needs_review`. Create does not accept plan uploads.
 
+Task-form authoring rules are shared with on-site/email Gemini: a required
+checkbox is an affirmative acknowledgement and must be checked for completion.
+When No is a valid answer to a required question, use radio or single-select
+Yes/No options with distinct non-empty string values; an optional checkbox may
+remain unchecked. This is guidance for choosing fields, not a change to existing
+form schemas or task-completion validation.
+
 `create_task` is always part of the Create and Organize action contracts because
 every user has an editable personal Page. The coarse capability projection does
 not expose a redundant `can_create_tasks` flag. A Task proposal must still name
@@ -505,6 +525,13 @@ attachment and exactly one summary for every listed file and rejects unknown
 file references or pending uploads. Inspection and duplicate judgment are model
 work rather than server-observable facts, so the contract requires them while
 the executable attachment/summary outcomes are enforced directly.
+
+The external checklist's `duplicate_check` requires an evidence comparison,
+not one search per filename. Compare the complete batch and already-read
+destination/task evidence; one comparison may resolve several related files.
+Search when an identity or occurrence question remains unresolved. A similar
+filename or topic alone does not establish a duplicate. This clarification does
+not change the native pipeline's automatic retrieval or permission checks.
 
 Finalization creates durable report evidence so the draft can be resumed, but
 does not publish those Files into ordinary workspace search. Exact references

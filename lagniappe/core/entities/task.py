@@ -211,7 +211,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         return self.db.get("postponed_from")
 
     # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_raises_when_required_submission_missing
     # @matrix submission task-completion : required-fields validation
     def _check_required(self):
         """Return visible required fields that have no value."""
@@ -226,7 +225,9 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
+    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_raises_when_required_submission_missing
     # @matrix task-completion : assignee complete completed-by no-schedule
+    # @matrix submission task-completion : required-fields validation
     def complete(self):
         incomplete = self._check_required() if self.form else []
         if incomplete:

@@ -1,0 +1,770 @@
+{
+  "version": 1,
+  "description": "Latest reviewed attempt per case/arm, including failures. Raw exports are local-only. Current captures are not promoted until comparison review.",
+  "measured_priority": [
+    "semantic outcome",
+    "model/tool rounds",
+    "tokens",
+    "wall time (noisy secondary)"
+  ],
+  "measurement_notes": {
+    "unit": "One preserved natural-prompt case per arm; case 05 includes its requested revision.",
+    "model_tool_round": "One top-level recorded function_call or custom_tool_call; an exec may contain several parallel or sequential MCP calls.",
+    "discovery_round": "Metadata-only ALL_TOOLS inspection, classified from recorded call input; included in model_tool_rounds.",
+    "wall_time": "Sum of first task prompt to final assistant answer per task turn; excludes between-turn idle time, includes in-turn retries/waits and steering.",
+    "tokens": "Sum token_usage_record payload.usage for task turns before first export request; uncached_input=input-cached; reasoning_output is included in output, not added twice.",
+    "export": "Native transcript remains immutable; export request, export tools, and export-token usage excluded.",
+    "call_count_limit": "No aggregate MCP or upstream HTTP count inferred from literal call-name occurrences; loops/batches and adapter-internal reads make them different measures.",
+    "cost": null,
+    "confidence": "Single practical pair per case; combined changes and mutable workspace, not randomized attribution or a performance SLA."
+  },
+  "cases": [
+    {
+      "id": "01-ask-known-page",
+      "current_inputs": {
+        "prompt_sha256": "2d2b2a0c2ea0f0527c69c46b8343929effb5f13b601ef6e2ff89b7d52ec6f050",
+        "fixtures": {}
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/01-ask-known-page/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "5eb8dedc87adbe869a66aff1849c3094c43fb3c68ae1721444a0fc5c067d2fb3",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/01-ask-known-page/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "2d2b2a0c2ea0f0527c69c46b8343929effb5f13b601ef6e2ff89b7d52ec6f050",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass",
+          "summary": "Grounded answer and successful saved Ask; one candidate search.",
+          "caveats": [
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 8,
+            "discovery_rounds": 4,
+            "task_seconds": 87.349,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 275023,
+              "cached_input_tokens": 238720,
+              "output_tokens": 1219,
+              "reasoning_output_tokens": 173,
+              "total_tokens": 276242,
+              "uncached_input_tokens": 36303
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "02-ask-books-filter",
+      "current_inputs": {
+        "prompt_sha256": "d1fa728e1baea1b11b521407e2e24ee14275738498dc37541b0169727740b024",
+        "fixtures": {}
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/02-ask-books-filter/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "f77cb76f9aed21343a5af303e9519fb0135d6d29321f6805359add51e8fabad1",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/02-ask-books-filter/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "d1fa728e1baea1b11b521407e2e24ee14275738498dc37541b0169727740b024",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": true,
+          "outcome": "needs_fix",
+          "summary": "Correct eight-book list but two unnecessary surviving draft reports; saved-view definition asserted without reading it.",
+          "caveats": [
+            "Two earlier exact report IDs were deleted through website HTTP DELETE before their real 404s; deletion actor/intent unknown.",
+            "Successful complete query output was host-clipped; model created new Plans to re-query and submit.",
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 14,
+            "discovery_rounds": 4,
+            "task_seconds": 127.55,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 559702,
+              "cached_input_tokens": 506624,
+              "output_tokens": 3676,
+              "reasoning_output_tokens": 1256,
+              "total_tokens": 563378,
+              "uncached_input_tokens": 53078
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "03-create-personal-task",
+      "current_inputs": {
+        "prompt_sha256": "3787c377b0a8678f634728fbe1f6eeb69f1e6892f2dbc430bd4682ad63470443",
+        "fixtures": {}
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/03-create-personal-task/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "2ae371092d21eee31a82555f68b82288a0ee5ab54734942865c3b6814cf11f79",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/03-create-personal-task/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "3787c377b0a8678f634728fbe1f6eeb69f1e6892f2dbc430bd4682ad63470443",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass",
+          "summary": "Correct one-time personal reminder, no invalid schedule or submission repair.",
+          "caveats": [
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 3,
+            "discovery_rounds": 1,
+            "task_seconds": 24.079,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 103145,
+              "cached_input_tokens": 77440,
+              "output_tokens": 696,
+              "reasoning_output_tokens": 130,
+              "total_tokens": 103841,
+              "uncached_input_tokens": 25705
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "04-create-related-records",
+      "current_inputs": {
+        "prompt_sha256": "56b5897ca7703a6584860505ec6a4f3f6d27964839a7f9836a7b35b8cb0bafc9",
+        "fixtures": {}
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/04-create-related-records/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "6ab9c2be528d2cb19c7d8e51cb7435e7690ade5ae187ca6ae05f915a3581f84a",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/04-create-related-records/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "56b5897ca7703a6584860505ec6a4f3f6d27964839a7f9836a7b35b8cb0bafc9",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_with_interruption",
+          "summary": "Correct related records and one-time task; three rate-limited starts inflate raw time/rounds.",
+          "caveats": [
+            "Raw measurements retain 429 retries and waits; server limit increase was not deployed during measured batch.",
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 12,
+            "discovery_rounds": 3,
+            "task_seconds": 140.79,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 410458,
+              "cached_input_tokens": 352896,
+              "output_tokens": 2936,
+              "reasoning_output_tokens": 834,
+              "total_tokens": 413394,
+              "uncached_input_tokens": 57562
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "05-revise-ready-create-plan",
+      "current_inputs": {
+        "prompt_sha256": "fc736297ca21954ad25b96da78e01799c1a50b6b116764e064ddce344105bdd1",
+        "fixtures": {}
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/05-revise-ready-create-plan/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "66bf12a6c199500091b847781ebc04f23367e10549ac471f4c5818a6ac81b5f6",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/05-revise-ready-create-plan/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "fc736297ca21954ad25b96da78e01799c1a50b6b116764e064ddce344105bdd1",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": false,
+          "outcome": "pass_with_prompt_deviation",
+          "summary": "Requested due-date revision preserves the same Plan and unaffected task.",
+          "caveats": [
+            "Initial round-2 prompt omitted 'in Lagniappe'; user supplied it as an in-turn follow-up.",
+            "Two measured task turns; between-turn idle gap excluded.",
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 5,
+            "discovery_rounds": 2,
+            "task_seconds": 47.825,
+            "task_turns": 2,
+            "usage": {
+              "input_tokens": 197488,
+              "cached_input_tokens": 174208,
+              "output_tokens": 1560,
+              "reasoning_output_tokens": 226,
+              "total_tokens": 199048,
+              "uncached_input_tokens": 23280
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "06-organize-vcard",
+      "current_inputs": {
+        "prompt_sha256": "fba8fadd2c2968abf06ca86cc79412ce5d957cb0f17aacab8658fc12ed2569e9",
+        "fixtures": {
+          "mara-ellison.vcf": "c3a6a692f005a3cc89fc23aa3f3e7ac44685da88723907286ca19318c236f9ac"
+        }
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/06-organize-vcard/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "d36be695dec945f40624cb8890ce1b96fd17951f9296127b934b96e40151978f",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/06-organize-vcard/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "fba8fadd2c2968abf06ca86cc79412ce5d957cb0f17aacab8658fc12ed2569e9",
+            "fixtures": {
+              "mara-ellison.vcf": "c3a6a692f005a3cc89fc23aa3f3e7ac44685da88723907286ca19318c236f9ac"
+            }
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_with_mapping_tradeoff",
+          "summary": "Complete contact evidence, attachment and useful follow-up preserved; work address is in prose, not Home Address field.",
+          "caveats": [
+            "Fixture address is explicitly WORK; populating Home Address is not unambiguously preferable.",
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 10,
+            "discovery_rounds": 4,
+            "task_seconds": 92.209,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 377402,
+              "cached_input_tokens": 338432,
+              "output_tokens": 3050,
+              "reasoning_output_tokens": 697,
+              "total_tokens": 380452,
+              "uncached_input_tokens": 38970
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "07-organize-bug-screenshot",
+      "current_inputs": {
+        "prompt_sha256": "b72c52c157b05719a658957b799cc50ab10dad63b65042d591ccef3679b5ccb4",
+        "fixtures": {
+          "report-status-notification-mismatch.png": "af19e6daca77a3b512c3aa10b5541be58e04f221e65aae0c937a3066f82727d5"
+        }
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/07-organize-bug-screenshot/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "36aa5f4f818a1ce6a3120f6f767e3f8dc134b16e5a0752edef13994e05c4329c",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/07-organize-bug-screenshot/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "b72c52c157b05719a658957b799cc50ab10dad63b65042d591ccef3679b5ccb4",
+            "fixtures": {
+              "report-status-notification-mismatch.png": "af19e6daca77a3b512c3aa10b5541be58e04f221e65aae0c937a3066f82727d5"
+            }
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass",
+          "summary": "Correct existing issue, preserved repro steps plus requested addition and attachment.",
+          "caveats": [
+            "Both arms inspect local image; finalized MCP original-image delivery remains untested.",
+            "Search still takes two empty exact lookups and several additional keyword calls.",
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 15,
+            "discovery_rounds": 4,
+            "task_seconds": 116.494,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 622203,
+              "cached_input_tokens": 576768,
+              "output_tokens": 3090,
+              "reasoning_output_tokens": 519,
+              "total_tokens": 625293,
+              "uncached_input_tokens": 45435
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "08-organize-mixed-files",
+      "current_inputs": {
+        "prompt_sha256": "bf70ec2f8d1c17b5dab7a37e361aa7d2ef74379abf5495c5bc9b96076066ce37",
+        "fixtures": {
+          "east-walk-site-log.md": "18208233a75356d67218823795f5be3338534ab6b67cb78ee12dad2d044dc1a9",
+          "equipment-maintenance-note.json": "a03c7ce4cc8b6d2e68995e4270e844f3ba8116468de03d456114680c3950b4f6",
+          "heating-service-receipt.md": "0f0ae3653574d583ae1593a4b720e15c846a36f692bfabfa35b34062bf172468",
+          "service-accounting-export.txt": "6d5c75d78703394bb169d8a1af2ff5b0760c0879599339c08029e2ce622ff4d4",
+          "watershed-grant-decision.json": "d6504d3aba14bd9b2b81aaf8d41c90929b60696265eb4d99f2fcca82d4c31c4d"
+        }
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/08-organize-mixed-files/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "47345ff459891c1754f4b7da7910b7e3acbdd49402e76ee482956974b93b83d1",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/08-organize-mixed-files/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "bf70ec2f8d1c17b5dab7a37e361aa7d2ef74379abf5495c5bc9b96076066ce37",
+            "fixtures": {
+              "east-walk-site-log.md": "18208233a75356d67218823795f5be3338534ab6b67cb78ee12dad2d044dc1a9",
+              "equipment-maintenance-note.json": "a03c7ce4cc8b6d2e68995e4270e844f3ba8116468de03d456114680c3950b4f6",
+              "heating-service-receipt.md": "0f0ae3653574d583ae1593a4b720e15c846a36f692bfabfa35b34062bf172468",
+              "service-accounting-export.txt": "6d5c75d78703394bb169d8a1af2ff5b0760c0879599339c08029e2ce622ff4d4",
+              "watershed-grant-decision.json": "d6504d3aba14bd9b2b81aaf8d41c90929b60696265eb4d99f2fcca82d4c31c4d"
+            }
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_with_structure_tradeoff",
+          "summary": "All five complete files used; duplicate completed service merged, open work separate, final decision respected and embedded instructions ignored.",
+          "caveats": [
+            "Open gasket task lacks baseline's maintenance work-type/Form linkage.",
+            "Fewer model rounds but more MCP retrievals batched inside calls; raw elapsed time and output increase.",
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 13,
+            "discovery_rounds": 5,
+            "task_seconds": 201.085,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 616857,
+              "cached_input_tokens": 558976,
+              "output_tokens": 7167,
+              "reasoning_output_tokens": 2481,
+              "total_tokens": 624024,
+              "uncached_input_tokens": 57881
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "09-create-project",
+      "current_inputs": {
+        "prompt_sha256": "d7c1bfd30fee0c09b6ff728ff06c7d8f845f5006f45e6935dedbd41d88030bf3",
+        "fixtures": {}
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/09-create-project/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "8622a4e3616f61f5acd81c5075460e7a633982c55d149f24324692de8554ade8",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/09-create-project/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "d7c1bfd30fee0c09b6ff728ff06c7d8f845f5006f45e6935dedbd41d88030bf3",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": true,
+          "outcome": "needs_fix",
+          "summary": "Project/Form/work-type graph valid, but required Needs attention checkbox prevents a negative answer at future completion.",
+          "caveats": [
+            "Code-confirmed downstream semantic problem; no live task completion or proposal execution attempted.",
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 7,
+            "discovery_rounds": 4,
+            "task_seconds": 55.31,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 244554,
+              "cached_input_tokens": 213376,
+              "output_tokens": 1731,
+              "reasoning_output_tokens": 411,
+              "total_tokens": 246285,
+              "uncached_input_tokens": 31178
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "10-create-recurring-reminder",
+      "current_inputs": {
+        "prompt_sha256": "a2cea3adb96b4b75f89893105fe1b94f5fea7ee9655cc5a8fffb56a152ccdfd0",
+        "fixtures": {}
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/10-create-recurring-reminder/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "c5e824202b00736a050fd5efdc1278532b23f8bdc3043e24bbee536fda306a5e",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/10-create-recurring-reminder/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "a2cea3adb96b4b75f89893105fe1b94f5fea7ee9655cc5a8fffb56a152ccdfd0",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass",
+          "summary": "Correct initial date and three-week after-completion recurrence, first submission accepted.",
+          "caveats": [
+            "Future completion/rescheduling not exercised live.",
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 3,
+            "discovery_rounds": 1,
+            "task_seconds": 27.867,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 112953,
+              "cached_input_tokens": 72704,
+              "output_tokens": 710,
+              "reasoning_output_tokens": 163,
+              "total_tokens": 113663,
+              "uncached_input_tokens": 40249
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "11-ask-approximate-issue",
+      "current_inputs": {
+        "prompt_sha256": "2150047dd71a84631176d896adcbfaa268825c15fc3c2094612747703b26ed10",
+        "fixtures": {}
+      },
+      "latest_results": {
+        "mcp": {
+          "run_id": "mcp-round-2",
+          "reviewed": true,
+          "run_date_utc": "2026-09-05",
+          "artifacts": "cases/11-ask-approximate-issue/artifacts/baseline/mcp",
+          "archive_file": "CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "9ec391220063c36cd5cc5d0e57f1bf064357c385939140e4e52d941149f7879a",
+          "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/11-ask-approximate-issue/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
+          "comparison": "comparisons/mcp-round-2.md",
+          "client": "Codex",
+          "client_version": "0.153.2",
+          "model": "gpt-5.6-sol",
+          "reasoning": "medium",
+          "adapter_version": "0.1.5",
+          "adapter_version_evidence": "Trial installation history; exact running wheel digest not embedded in export",
+          "server_version": "20260904t190016",
+          "server_version_evidence": "Plan-start request logs",
+          "input_snapshot": {
+            "prompt_sha256": "2150047dd71a84631176d896adcbfaa268825c15fc3c2094612747703b26ed10",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_with_unequal_baseline_completion",
+          "summary": "One search finds correct issue and Ask is saved; baseline only answered in chat.",
+          "caveats": [
+            "Six discovery rounds increase total time and rounds despite retrieval improvement.",
+            "Baseline did not do required submission work.",
+            "Workspace not reset or frozen; copied fixtures preserve bytes but local paths change."
+          ],
+          "metrics": {
+            "model_tool_rounds": 10,
+            "discovery_rounds": 6,
+            "task_seconds": 75.1,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 328240,
+              "cached_input_tokens": 296704,
+              "output_tokens": 1426,
+              "reasoning_output_tokens": 380,
+              "total_tokens": 329666,
+              "uncached_input_tokens": 31536
+            },
+            "mcp_calls": null,
+            "api_requests": null,
+            "reported_cost_usd": null
+          }
+        }
+      }
+    },
+    {
+      "id": "12-create-page-from-documents",
+      "current_inputs": {
+        "prompt_sha256": "f810f5775d78fab9bb84f9791823957c4a8381b11caca782eeaef484363976a1",
+        "fixtures": {
+          "cider-press-purchase-receipt.md": "e4cfa7f6f44142c5d5c257eb9d7da7c2665e9a639436695f42891f51281a4de7",
+          "cider-press-setup-checklist.md": "24c3e77ed03e58cbb74bb4db2be01afdc2b189d23290614872544c725f802eb1",
+          "cider-press-warranty-card.md": "2a4f1b8001d9d6d63f3604ee4b456bbd9ea5810b3e0a0882b0412816eeba7cc9"
+        }
+      },
+      "latest_results": {
+        "pi-rest": {
+          "run_id": "file-use-after-2026-09-03",
+          "reviewed": true,
+          "run_date_utc": "2026-09-03",
+          "artifacts": "cases/12-create-page-from-documents/artifacts/baseline/pi-rest",
+          "archive_file": "transcript.jsonl",
+          "archive_sha256": "4750842db179659d5f2c884e35a7809d5bf5be9c8e1c758abc94d831ec258aea",
+          "source_local": "/home/swifty/Desktop/FILE_USE_AI_TEST/file-use-ai-after/02-page-from-documents/artifacts/transcript.jsonl",
+          "client": "Pi",
+          "client_version": null,
+          "model": "moonshotai/kimi-k3",
+          "provider": "OpenRouter",
+          "reasoning": "high",
+          "adapter_version": null,
+          "server_version": "20260903t114028",
+          "server_version_evidence": "Preserved historical comparison/run record; not a current deployment assertion",
+          "input_snapshot": null,
+          "inputs_match_current_case": false,
+          "outcome": "pass_with_control_gap",
+          "summary": "One cider-press Page, all three attachments/summaries, unchecked setup checklist; no completed setup claim.",
+          "caveats": [
+            "Historical reference only; no current MCP baseline.",
+            "Canonical prompt removes historical absolute paths.",
+            "Historical request named the before-tree fixtures; bytes match.",
+            "Pi usage/API counts retain historical recorded definitions; do not aggregate with Codex model tool rounds."
+          ],
+          "metrics": {
+            "model_tool_rounds": null,
+            "client_tool_calls": 23,
+            "discovery_rounds": null,
+            "task_seconds": 186.65,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 222315,
+              "cached_input_tokens": 161792,
+              "uncached_input_tokens": 60523,
+              "output_tokens": 7817,
+              "reasoning_output_tokens": null,
+              "total_tokens": 230132
+            },
+            "mcp_calls": null,
+            "api_requests": 18,
+            "storage_upload_puts": 3,
+            "reported_cost_usd": 0.347
+          },
+          "measurement_source": "Preserved RESULTS.md and SESSION.txt; prompt/final timestamps checked against native Pi export."
+        }
+      }
+    },
+    {
+      "id": "13-create-one-task-from-note",
+      "current_inputs": {
+        "prompt_sha256": "ee3d2e433e1b5ebe03d07c9148c354ebdc6572ceab048ba62450a9a92c56409d",
+        "fixtures": {
+          "hive-inspection-note.md": "c825099827e3eaae863d0926b0ed7051dfb7a5cd3da8ce43b7254f32d72233d9"
+        }
+      },
+      "latest_results": {
+        "pi-rest": {
+          "run_id": "file-use-after-2026-09-03",
+          "reviewed": true,
+          "run_date_utc": "2026-09-03",
+          "artifacts": "cases/13-create-one-task-from-note/artifacts/baseline/pi-rest",
+          "archive_file": "archive.jsonl",
+          "archive_sha256": "fdd33e4c4184ff24deb644440c64d23df0c18ba1a2e6716b61cf7fda8e6abfd7",
+          "source_local": "/home/swifty/Desktop/FILE_USE_AI_TEST/file-use-ai-after/05-apiary-task-create/artifacts/archive.jsonl",
+          "client": "Pi",
+          "client_version": null,
+          "model": "moonshotai/kimi-k3",
+          "provider": "OpenRouter",
+          "reasoning": "high",
+          "adapter_version": null,
+          "server_version": "20260903t114028",
+          "server_version_evidence": "Preserved historical comparison/run record; not a current deployment assertion",
+          "input_snapshot": null,
+          "inputs_match_current_case": false,
+          "outcome": "failed",
+          "summary": "Four per-hive Tasks instead of one requested Task; supporting note never uploaded or attached.",
+          "caveats": [
+            "Historical reference only; no current MCP baseline.",
+            "Canonical prompt removes historical absolute paths.",
+            "Canonical prompt now explicitly names Lagniappe.",
+            "Historical skill/routing and MIME issues may since have changed; failure is not evidence of today's implementation.",
+            "Pi usage/API counts retain historical recorded definitions; do not aggregate with Codex model tool rounds."
+          ],
+          "metrics": {
+            "model_tool_rounds": null,
+            "client_tool_calls": 24,
+            "discovery_rounds": null,
+            "task_seconds": 123.667,
+            "task_turns": 1,
+            "usage": {
+              "input_tokens": 282436,
+              "cached_input_tokens": 260608,
+              "uncached_input_tokens": 21828,
+              "output_tokens": 8771,
+              "reasoning_output_tokens": null,
+              "total_tokens": 291207
+            },
+            "mcp_calls": null,
+            "api_requests": 23,
+            "storage_upload_puts": 0,
+            "reported_cost_usd": 0.275
+          },
+          "measurement_source": "Preserved RESULTS.md and SESSION.txt; prompt/final timestamps checked against native Pi export."
+        }
+      }
+    }
+  ]
+}

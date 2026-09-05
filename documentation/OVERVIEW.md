@@ -26,6 +26,7 @@ begin in the [README](../README.md).
 | [AI_WORKFLOWS.md](AI_WORKFLOWS.md) | Autofill, summarize, create, organize, and form-generation workflows. |
 | [AI_EMAIL.md](AI_EMAIL.md) | Inbound email webhooks, attachment retrieval, reports, review, and feedback. |
 | [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | REST API keys and permission-bounded external Ask, Create, and Organize plans. |
+| [Reusable workflow cases](../testing_ai_workflows/README.md) | Natural prompts, fixtures, rubrics, latest live results and targeted comparisons. |
 
 ## Backend
 

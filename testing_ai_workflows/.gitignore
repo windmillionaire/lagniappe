@@ -1,0 +1,4 @@
+# Native chats/screenshots may contain private workspace data or credentials.
+# Track only reviewed summaries, prompts, rubrics and inspected fixtures.
+/cases/*/artifacts/*
+!/cases/*/artifacts/.gitkeep

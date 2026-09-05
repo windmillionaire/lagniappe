@@ -42,7 +42,7 @@ LOGGER = logging.getLogger(__name__)
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
 MAX_JSON_BODY_BYTES = external_api.MAX_PROPOSAL_BYTES + 64 * 1024
 GENERAL_RATE_LIMIT = (60, 60)
-PLAN_START_RATE_LIMIT = (10, 60 * 60)
+PLAN_START_RATE_LIMIT = (100, 60 * 60)
 PLAN_TOOL_RATE_WINDOW = 31 * 24 * 60 * 60
 UPLOAD_INPUT_NAME = "agent-api-files"
 UPLOAD_BATCH_ID_PATTERN = re.compile(external_api.UPLOAD_BATCH_ID_PATTERN)
@@ -151,6 +151,7 @@ def _rate_limit(scope, identifier, limit, window_seconds):
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
 # @matrix agent-api : bearer-only body-limit entitlement-independent error-envelope public-user request-correlation request-recheck session-independent streaming
+# @pairs agent-api:rate-limit
 @api.before_request
 def authenticate_request():
     """Authenticate only a bearer token; browser sessions are never a fallback."""
@@ -1657,6 +1658,7 @@ def tools():
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
 # @matrix agent-api : entitlement-independent plan-session tool-selection
+# @pairs agent-api:rate-limit
 @api.post("/plans")
 @_route
 def create_plan():
@@ -2188,6 +2190,7 @@ def _original_file_download(tool_name, arguments, result):
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
 # @matrix agent-api : tool-dispatch
 # @pairs agent-api:ask-refinement agent-api:create-revision agent-api:organize-revision agent-api:envelope-validation
+# @pairs agent-api:rate-limit
 @api.post("/plans/<plan_id>/tools/<tool_name>")
 @_route
 def execute_tool(plan_id, tool_name):

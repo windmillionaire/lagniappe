@@ -20,7 +20,6 @@ from lagniappe.core.tools.ai.guidelines import (
     PROJECT_COMPLEXITY_GUIDELINES,
     PROJECT_GENERATION_GUIDELINES,
     REPORT_OUTPUT_REQUIREMENTS,
-    REPORT_PREFLIGHT_CHECKS,
     REPORT_TASK_SCHEDULING_GUIDELINES,
     SCHEMA_TYPE_GUIDELINES,
     SCHEMA_EVOLUTION_GUIDELINES,
@@ -171,6 +170,11 @@ EXTERNAL_ORGANIZE_WORKFLOW = """
   Compare names, parent context and snippets, including approximate names. Read
   full details/schema when the decision or proposed values need them. Reuse an
   editable Page for the same subject; a nearby topic alone is not a match.
+- Check each file for duplicate records or occurrences using the complete batch
+  and already-read destination/task evidence. One comparison can cover related
+  files; duplicate_check does not require a separate filename search per file.
+  Search only when that evidence leaves an unresolved identity or occurrence
+  question. Do not treat a similar filename or topic alone as proof of a match.
 - Choose a reusable collection when justified, or an Uncategorized Page for a
   one-off subject. Do not create one Page per artifact or a category-level
   catch-all. A category default form fits only a homogeneous collection of one

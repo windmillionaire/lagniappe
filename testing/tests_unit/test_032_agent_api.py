@@ -915,6 +915,19 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
             "summary": "exactly_one",
         }
     ]
+    duplicate_rule = next(
+        rule
+        for rule in contract["workflow_rules"]
+        if rule.startswith("file_checklist.duplicate_check")
+    )
+    assert "an evidence comparison, not a required tool call" in duplicate_rule
+    assert (
+        "complete batch and already-read destination/task evidence" in duplicate_rule
+    )
+    assert "one comparison may cover related files" in duplicate_rule
+    assert "unresolved identity or occurrence question" in duplicate_rule
+    assert "not once per filename" in duplicate_rule
+    assert "does not establish a duplicate" in duplicate_rule
     assert contract["guidance_requirements"]["required_before_analysis"] == [
         {"task": "organize"}
     ]

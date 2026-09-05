@@ -32,6 +32,7 @@ venv/
 /runner/
 /src/
 /testing/
+/testing_ai_workflows/
 /README.md
 /LICENSE
 /run.py

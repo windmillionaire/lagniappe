@@ -162,6 +162,11 @@ TASK_FORM_REQUIREMENTS = """
   records that are meaningful to completing the task, beyond the task's own
   page/project/model-task relationships.
 - Add `required`: Boolean for fields needed before task completion
+- A required checkbox must be checked to complete the task; use it only for
+  mandatory affirmative acknowledgements, not questions where No is valid.
+  For a required Yes/No answer (for example, "Needs attention?"), use `radio`
+  or single `select` with distinct non-empty string option values such as
+  `yes` and `no`. An optional checkbox may remain unchecked.
 - Focus on action-specific data that helps complete, review, or filter the task.
 """
 

@@ -21,6 +21,7 @@ from .limits import (
     MAX_TOOL_NAME_CHARS,
     MAX_TOTAL_SCHEMA_BYTES,
     MAX_UPLOAD_FILES,
+    MCP_RESULT_INSTRUCTIONS,
     MCP_SUBMISSION_INSTRUCTIONS,
 )
 from .schema import inject_plan_id, json_size, validate_schema_document, wrap_result_schema
@@ -596,7 +597,13 @@ SUBMIT_ANNOTATIONS = ToolAnnotations(
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 # @tests tests_unit/test_033_mcp_adapter.py::test_low_level_server_negotiates_modern_types_without_resources
 def lifecycle_tools() -> tuple[ToolDefinition, ...]:
-    common_start = "Submission creates a browser-reviewable report and never executes workspace changes."
+    common_start = (
+        "Each call creates a new report. Reuse the returned id as plan_id for "
+        "reads, uploads, submission, and revisions of this request. Never restart "
+        "to recover clipped output. If context is unavailable, follow its "
+        "recovery read without repeating the successful start."
+    )
+    review_only = "Submission saves a browser-reviewable proposal; it never executes workspace changes."
     return (
         ToolDefinition(
             "get_actor",
@@ -608,7 +615,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_ask",
-            "Start an Ask Plan for a question. Ask is read-only. Returns the working contract in context.contract; reuse it for the answer and submission.",
+            f"Start an Ask Plan for a question without changing workspace records. {common_start} Returns context.contract; reuse it, then submit_plan to save the answer report.",
             _plan_input_schema(),
             START_RESULT_SCHEMA,
             "start_ask",
@@ -616,7 +623,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_create",
-            f"Start a Create Plan for a requested fileless workspace change. Returns context.contract with the personal Page, date/timezone, permissions and proposal schema; no separate bootstrap read is needed. {common_start}",
+            f"Start a Create Plan for a requested fileless workspace change. {common_start} Returns context.contract with the personal Page, date/timezone, permissions and proposal schema; no separate bootstrap read is needed. {review_only}",
             _plan_input_schema(),
             START_RESULT_SCHEMA,
             "start_create",
@@ -624,7 +631,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_organize",
-            f"Start an Organize Plan when files must be inspected and placed. Returns context.guidelines; upload_local_files supplies the finalized contract next. {common_start}",
+            f"Start an Organize Plan when files must be inspected and placed. {common_start} Returns context.guidelines; upload_local_files supplies the finalized contract next. Inspect complete file evidence once; a summary or clipped excerpt is not complete inspection. Independent file reads can run in parallel. {review_only}",
             _plan_input_schema(),
             START_RESULT_SCHEMA,
             "start_organize",
@@ -632,7 +639,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan",
-            "Return current Plan state and its round-trippable proposal when present.",
+            "Return current Plan state and its round-trippable proposal when present. Use the existing plan_id to recover state or revise that report, without creating another Plan.",
             _plan_id_input(),
             SAFE_PLAN_SCHEMA,
             "get_plan",
@@ -648,7 +655,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "upload_local_files",
-            "Upload explicit readable nonempty regular files to one Organize Plan, then finalize the batch. Returns the finalized inventory and context.contract; do not separately refetch them. Relative paths resolve from the adapter working directory and symlinks follow normal operating-system resolution. Paths appear in the MCP request transcript but never in results or upstream requests.",
+            "Upload explicit readable nonempty regular files to the existing Organize Plan, then finalize the batch. Returns the finalized inventory and context.contract; reuse them. If context is unavailable, follow its recovery read without repeating the successful upload. Inspect complete file evidence before filing; summaries and clipped excerpts are not complete inspection. Relative paths resolve from the adapter working directory and symlinks follow normal operating-system resolution. Paths appear in the MCP request transcript but never in results or upstream requests.",
             {
                 "type": "object",
                 "required": ["plan_id", "files"],
@@ -680,7 +687,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "submit_plan",
-            "Validate a complete proposal against the freshly fetched contract, then publish a browser-reviewable result. This replaces any prior saved proposal but never executes it.",
+            "Save an Ask answer or Create/Organize proposal to the existing plan_id. Reuse that Plan for revisions; this replaces its prior saved proposal, never executes workspace changes, and needs no new start. Validates against a freshly fetched contract internally; no separate final contract read is needed. Give the user preview_url for authenticated review; never claim a proposal was applied.",
             {
                 "type": "object",
                 "required": ["plan_id", "contract_version", "proposal"],
@@ -801,7 +808,22 @@ def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
             description = (
                 description
                 + " MCP projects signed transport fields out of the result. "
-                "include_original=true delivers only bounded supported image/audio content."
+                "include_original=true delivers only bounded supported image/audio content. "
+                "Inspect complete file evidence once; a summary or clipped excerpt "
+                "is not complete inspection. Independent file reads can run in parallel. "
+                + MCP_RESULT_INSTRUCTIONS
+            )
+        elif name == "query_workspace_filter":
+            description += " " + MCP_RESULT_INSTRUCTIONS
+        elif name == "search_entities":
+            description += (
+                " Returned hits are view-authorized; reuse their evidence. "
+                "Load full details only for information missing from the results."
+            )
+        elif name == "get_entity":
+            description += (
+                " Reuse attached Form schemas and other returned evidence; "
+                "fetch again only for missing information or relevant changes."
             )
         for schema in (input_schema, output_schema):
             size = json_size(schema)

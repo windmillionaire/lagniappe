@@ -156,6 +156,7 @@ def test_gcloudignore_uploads_only_canonical_runtime_config():
     assert "/installer/" in ignore
     assert "/runner/" in ignore
     assert "/clients/" in ignore
+    assert "/testing_ai_workflows/" in ignore
     assert "/setup/" not in ignore
     assert "**/gha-creds-*.json" in ignore
     for local_only in (

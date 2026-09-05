@@ -722,6 +722,12 @@ def plan_contract(report, user, *, submit_url):
                 "Include exactly one summarize_file action for every uploaded file. "
                 "Write the summary and two retrieval terms from the file content you "
                 "already inspected; the server will not call another model.",
+                "file_checklist.duplicate_check is an evidence comparison, not a "
+                "required tool call. Compare the file with the complete batch and "
+                "already-read destination/task evidence; one comparison may cover "
+                "related files. Search only for an unresolved identity or occurrence "
+                "question, not once per filename. A similar filename or topic alone "
+                "does not establish a duplicate.",
                 "Write optional page rich text in document_markdown; trusted server "
                 "code renders sanitized editor-compatible HTML.",
                 "Submission validates and saves a ready report for browser review; "

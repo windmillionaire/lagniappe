@@ -24,6 +24,10 @@ user still receives a clean result. It becomes important when it changes the
 answer, defeats the intended test control, causes repeated failures, exposes
 unrelated state, or materially increases latency and cost.
 
+With equivalent useful outcomes, prioritize fewer model/tool rounds and fewer
+tokens. Wall time is a noisy secondary observation; a modest time increase in
+one run does not negate a clear reduction in rounds and tokens.
+
 ## Choose the smallest faithful layer
 
 | Layer | Use it for |
@@ -70,41 +74,53 @@ For a before/after comparison, keep these constant:
 - external skill or instruction source and its content hash; and
 - one fresh model session per case.
 
-The deployed build should be the only intended changed variable. If the
+The server/client changes under evaluation should be the only intended changed
+variables; record both when an MCP release accompanies a server deployment. If the
 workspace cannot be reset exactly, use unique fixture names, record the drift,
 and distinguish it from the product result. Do not coach or repair a run unless
 the prompt explicitly calls for that interaction.
 
 ## Evaluation folders
 
-Keep the working evidence outside the repository unless it is intended to be a
-durable fixture. Prefer case-first folders with one prompt/fixture set and
-separate artifacts/results for each round:
+The tracked reusable library is
+[`testing_ai_workflows/`](../testing_ai_workflows/README.md). Keep one shared
+prompt/fixture set per case, a concise rubric, and local-only raw captures:
 
 ```text
-evaluation-name/
-  ROUND_2.md
-  01-case-name/
-    PROMPT.md
-    RUBRIC.md
-    LOOK_FOR_IN_ROUND_2.md
-    fixtures/
-    artifacts/
-      mcp/
-      mcp_round_2/
-    results/
-      mcp_baseline.md
-      mcp_round_2.md
+testing_ai_workflows/
+  latest_results.json
+  comparisons/
+  cases/
+    01-case-name/
+      PROMPT.md
+      RUBRIC.md
+      fixtures/
+      artifacts/              # ignored, not deployed
+        baseline/mcp/
+        current/mcp/
 ```
 
-Create the new round's folders before the baseline. Preserve previous exports
-and keep prompts/fixtures unchanged between paired runs. Existing historical
-before/after trees remain valid evidence; do not reorganize them just to adopt
-this layout.
+Track inspected/synthetic fixtures and reviewed result summaries, not raw chats,
+credentials, signed URLs or private screenshots. Preserve previous exports and
+keep prompts/fixtures unchanged between paired runs. The initial library copies
+the existing Desktop inputs/captures without moving or deleting their originals.
+Historical cases with a revised natural prompt are reference evidence until
+they get a current matching baseline.
+
+Use separate artifact and latest-result entries for MCP, Pi/REST, native and
+email arms. After comparison, save its tracked note, update only selected
+case/arm summaries (including failures), archive the old local baseline without
+overwriting it, and promote reviewed current captures. Never clear the baseline
+before its replacement is reviewed, silently replace a failure with a retry, or
+require ignored local transcripts to exist in a fresh checkout/CI.
 
 Give the model only the natural request from `PROMPT.md`, not the rubric or
-`LOOK_FOR` note. Launching in `fixtures/` keeps analyst material separate from
-ordinary working inputs. Targeted notes should name a hoped-for improvement,
+change-observation notes. Launch in a neutral working copy of `fixtures/`
+outside the application checkout: repository `AGENTS.md` would introduce coding
+instructions and a comparison confound. The existing Desktop fixture directories
+are retained for round 3; export back to the tracked library only after the
+task finishes. Use real copies rather than symlinks resolving into the checkout.
+Targeted notes should name a hoped-for improvement,
 a plausible regression, and an inconclusive/control-limited outcome. When
 several changes ship together, these observations help attribute results but
 do not establish single-change causality.
@@ -114,14 +130,12 @@ do not establish single-change causality.
 | Artifact | Purpose |
 | --- | --- |
 | `PROMPT.md` | Exact natural user input; no scoring or prescribed tool sequence. |
-| `RUBRIC.md`, `LOOK_FOR_IN_ROUND_2.md` | Operator-only outcome checks and focused change observations. |
-| `transcript.jsonl` | Machine-readable event, timing, usage, and tool-call record. |
-| `transcript.html` | Convenient human audit of the same session. |
-| `SESSION.txt` | Session ID, client/model/provider settings, tokens, and reported cost. |
-| `RESULTS.md` | Scored checks, IDs, raw failures, outcome, and control deviations. |
-| `RUN_RECORD.md` | Phase-wide environment and one summary row per case. |
-| `COMPARISON.md` | Aggregate before/after findings, caveats, and decision. |
-| `artifacts/` | Relevant contracts, request bodies, receipts, GET projections, and response bodies. |
+| `RUBRIC.md` | Operator-only outcome checks, prerequisites and focused change observations. |
+| Native JSONL export | Machine-readable event, timing, usage, and tool-call record; keep the existing export skill's filename. |
+| Existing readable export/session summary | Convenient human audit/settings/cost where the client already supplies them; no new export format requirement. |
+| `latest_results.json` | Latest reviewed attempt per case/arm, input/archive hashes, known settings/build, metrics, outcome and control deviations. |
+| `comparisons/<run-id>.md` | Selected before/after findings, caveats and decision. |
+| Local `artifacts/` | Native exports and any screenshots/receipts needed beyond their contents. |
 
 Record the exact deployed application version or build, not only its release
 number. Preserve request IDs for errors and Plan/report identifiers for later
@@ -132,24 +146,27 @@ the finalized file references and responses instead.
 
 1. Add deterministic regression coverage for every server behavior that can be
    asserted without a model.
-2. Seed or verify the starting workspace and record a manifest of the relevant
-   entities, permissions, and fixture hashes.
-3. Keep one shared prompt/fixture set; create round-specific artifact folders
-   and blank result sheets before recording the baseline.
-4. Run every baseline case in a fresh session without intervention.
-5. Export both transcript formats and session details immediately. Preserve
+2. Verify the rubric's starting workspace facts and record relevant drift.
+   Seed or reset only when separately authorized; a mandatory reset rig is not
+   required for practical comparisons.
+3. Keep one shared prompt/fixture set; prepare current artifact folders. Reuse
+   a preserved baseline where inputs and relevant state still match.
+4. Run any missing baseline in a fresh session without intervention.
+5. Use the existing client export skill immediately. Preserve
    response bodies that the transcript alone would make awkward to compare.
 6. Score the run as it happened. Record model mistakes and invalid controls;
    do not rerun merely to obtain a prettier baseline.
-7. Delete only test-owned reports and uploads through the ordinary product
-   path once their evidence is exported. Preserve workspace fixtures needed by
-   both phases.
+7. If cleanup is requested, delete only exact test-owned reports/uploads through
+   the ordinary product path after export. Never clean up active reports during
+   a run. Preserve workspace fixtures needed by both phases.
 8. Deploy once, record the exact build, and verify the intended version is
    serving.
 9. Run the unchanged after cases, again in fresh sessions, and capture the same
    evidence.
 10. Compare semantic outcomes first, then reliability and efficiency. File any
     newly discovered issue separately from the change being evaluated.
+11. Save the comparison and promote reviewed captures using the library's
+    baseline/current rollover; leave unselected case/arm results untouched.
 
 Do not execute Create or Organize proposals unless execution is the behavior
 under test. A successful `ready` receipt is not a workspace mutation. Ask may
@@ -170,6 +187,8 @@ Use four separate dimensions:
 - exact destinations, entity types, and permissions;
 - complete evidence inspection and grounded summaries;
 - correct duplicate grouping and completion state;
+- meaningful negative answers in authored Forms: a required Yes/No question
+  must accept No, whereas a required checkbox is a mandatory affirmation;
 - no invented dates or claims unsupported by content;
 - all required files attached and summarized; and
 - correct public review state, with no claim that ready actions were executed.
@@ -195,11 +214,18 @@ Use four separate dimensions:
 Record at least:
 
 - prompt-to-final duration;
-- client tool calls and API HTTP requests separately;
+- model tool rounds, individual MCP calls and API HTTP requests separately;
 - timeouts, retries, and corrective validation cycles;
 - contract and guideline response sizes where relevant;
 - total, cached, uncached, and output tokens when available; and
-- reported model cost.
+- reported model cost when available, otherwise unknown.
+
+Exclude export activity. For multi-turn jobs, sum task-turn durations and keep
+between-turn gaps separate; retain in-turn waits/retries in the raw time. One
+Codex `exec` can perform several MCP calls, and adapter context bundling moves
+some reads inside that operation. Do not infer fewer HTTP requests from fewer
+model rounds. Sum per-response usage, not repeated cumulative snapshots;
+uncached input is input minus cached, and reasoning is a subset of output.
 
 Define a retry as a repeated intent following an error, bad request shape, or
 result-parsing mistake. Do not count a deliberate invalid submission as a
@@ -267,7 +293,7 @@ tool, but judgment should remain visible.
 
 Good automation candidates:
 
-- copy and hash prompts and fixtures into both phases;
+- hash the shared prompts/fixtures and associate those bytes with each run;
 - validate the run manifest and deployment identifiers;
 - export session metadata and transcripts;
 - calculate duration, tool calls, token use, cost, and aggregate deltas;

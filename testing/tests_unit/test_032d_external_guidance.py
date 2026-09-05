@@ -81,6 +81,51 @@ def test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow():
     assert "exact schema field ids" in external_form["guidelines"]
 
 
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
+# @matrix ai agent-api : guidelines tool-dispatch
+@pytest.mark.unit
+@pytest.mark.parametrize("task", ["project", "task_form"])
+def test_task_form_guidance_preserves_negative_answers_for_both_workflows(task):
+    actor = SimpleNamespace()
+    internal = get_guidelines.execute_get_guidelines({"task": task}, actor)
+    external = get_guidelines.execute_external_get_guidelines({"task": task}, actor)
+
+    assert internal == external
+    guidance = internal["guidelines"]
+    assert "A required checkbox must be checked to complete the task" in guidance
+    assert "mandatory affirmative acknowledgements" in guidance
+    assert "not questions where No is valid" in guidance
+    assert "required Yes/No answer" in guidance
+    assert "distinct non-empty string option values" in guidance
+    assert "An optional checkbox may remain unchecked" in guidance
+    assert "submit_plan" not in guidance
+    assert "/submit" not in guidance
+
+
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
+# @matrix ai agent-api : guidelines tool-dispatch
+@pytest.mark.unit
+def test_external_duplicate_check_reuses_evidence_without_a_filename_search_ritual():
+    actor = SimpleNamespace()
+    external = get_guidelines.execute_external_get_guidelines(
+        {"task": "organize"}, actor
+    )["guidelines"]
+    internal = get_guidelines.execute_get_guidelines({"task": "organize"}, actor)[
+        "guidelines"
+    ]
+
+    assert "Check each file for duplicate records or occurrences" in external
+    assert "already-read destination/task evidence" in external
+    assert "One comparison can cover related" in external
+    assert "does not require a separate filename search per file" in external
+    assert "unresolved identity or occurrence" in external
+    assert "similar filename or topic alone as proof of a match" in external
+    assert "duplicate_check" not in internal
+    assert "server performs focused form completion afterward" in internal
+
+
 # @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
 def test_external_search_dispatch_selects_candidates_without_changing_provider_default(
