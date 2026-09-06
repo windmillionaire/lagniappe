@@ -28,6 +28,7 @@ pytestmark = pytest.mark.e2e
 
 DRIVER = Path("testing/utility/mcp_client_driver.py")
 LIFECYCLE_TOOLS = (
+    "answer_question",
     "get_actor",
     "start_ask",
     "start_create",
@@ -37,39 +38,43 @@ LIFECYCLE_TOOLS = (
     "upload_local_files",
     "submit_plan",
 )
-# Published 0.1.6 schemas include its revised submission guidance as a const in
-# contracts, start context, and upload context. Other schema shapes are unchanged.
+# Reviewed conversational contracts: plan-free context, optional brief revisions,
+# execution receipts, and compact/selected schemas in starter/upload context.
 LIFECYCLE_SCHEMA_SHA256 = {
+    "answer_question": (
+        "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+        "f6adb29d9eb84fc5920b6c8a7bae19d4b4690f7a90003a4f076aaba06131e61d",
+    ),
     "get_actor": (
         "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
         "6ab4edef619a8f1857fa1a097319ba5b7d81d1358bd59644e762cb91a257805e",
     ),
     "start_ask": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "80ec565606b88088c3f3928f1893b44527e0b7a29af209d664ad0bd1041344bd",
+        "8477e535a1018480128e7ffe4d28dc5734b452a6665880842fb695e7bd5bba12",
     ),
     "start_create": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "80ec565606b88088c3f3928f1893b44527e0b7a29af209d664ad0bd1041344bd",
+        "8477e535a1018480128e7ffe4d28dc5734b452a6665880842fb695e7bd5bba12",
     ),
     "start_organize": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "80ec565606b88088c3f3928f1893b44527e0b7a29af209d664ad0bd1041344bd",
+        "8477e535a1018480128e7ffe4d28dc5734b452a6665880842fb695e7bd5bba12",
     ),
     "get_plan": (
         "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
-        "a7a651527355d13929828b75165770e7efc4ed187d432a380b6327d5a76a89e8",
+        "eb650c1830bbe181518f23cde1dc0b724e70357784ff79443395ee5efa5df521",
     ),
     "get_plan_contract": (
-        "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
-        "95c0c09b84f771d7a54fe6ddeafc19bd439105cdcc3d2820a2f5f7101336491e",
+        "c183e46d7c63a1c8404b9771f52157c163ae7cdf016e8ab22119da62985be01b",
+        "45ad484593d9579fdd91106dc22efc577ddafd9f5d4ddcfcadc63a4f4feb5fd3",
     ),
     "upload_local_files": (
         "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
-        "99a7fd198da06a91e540cb09c999bcb24275bbd761fc344c880b400d26459f72",
+        "43a9ad79ba7b1003ca4cfe28d919e27c4e42adf7cbf7976aa7c5444b75ad77c9",
     ),
     "submit_plan": (
-        "beaa898006c4f48dcacd1966a2df136ac7cd95e09f01d1716d7e9e7817cc9662",
+        "18e44236fd78c5fa56314d6df698b339be168781d967947a7ac9efcfee57a9ef",
         "a5511c1c4827ad0c8a1aee2f3be5f66636b59fe630ec659036ee802c60c9965e",
     ),
 }
@@ -285,7 +290,7 @@ def _assert_safe_plan(
 ) -> dict:
     value = _structured(result)
     assert isinstance(value, dict)
-    expected_keys = PLAN_KEYS | ({"context"} if context else set())
+    expected_keys = PLAN_KEYS | {"original_brief"} | ({"execution"} if tool != "ask" else set()) | ({"context"} if context else set())
     assert set(value) in (expected_keys, expected_keys - {"proposal"})
     assert value["tool"] == tool
     assert value["status"] == status
@@ -318,8 +323,8 @@ def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
     assert "fetch the latest contract and submit it" not in workflow
     assert "Fetch this contract after finalizing uploads" not in workflow
     if tool == "ask":
-        assert "When an answer is ready, call submit_plan" in workflow
-    elif tool == "organize":
+        assert "only after the user requests saving" in workflow
+    elif tool == "organize" and contract["required_file_refs"]:
         assert "context.contract" in workflow
         assert "submit_plan performs the final fresh-contract check" in workflow
 
@@ -340,9 +345,9 @@ def _expected_catalog_input(schema: dict) -> dict:
         "type": "string",
         "minLength": 1,
         "maxLength": 2048,
-        "description": "Opaque Plan ID returned by a start_* tool.",
+        "description": "Optional existing Plan ID for report-scoped work. Omit for ordinary questions, task lookups and workspace reads; no Plan is created.",
     }
-    result.setdefault("required", []).append("plan_id")
+    result.setdefault("required", [])
     return result
 
 
@@ -512,6 +517,8 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         )
         assert openapi["openapi"] == "3.1.0"
         expected_methods = {
+            "/api/v1/answer-context": "get",
+            "/api/v1/tools/{tool_name}": "post",
             "/api/v1": "get",
             "/api/v1/client-skill.md": "get",
             "/api/v1/me": "get",
@@ -629,6 +636,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             specification={
                 "upload_path": str(upload_path),
                 "search_name": readable_page.entity.name,
+                "page_ref": f"hash:{readable_page.entity.hash}",
                 "revoke": {
                     "cookies": browser_state,
                     "csrf_token": csrf_token,
@@ -646,6 +654,8 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "organize": True,
         }
         assert actor["credential"]["active"] is True
+        assert _structured(workflow["answer_context"])["report_created"] is False
+        assert any(item.get("hash") == f"hash:{readable_page.entity.hash}" for item in _structured(workflow["plan_free_search"]))
 
         ask_start = _assert_safe_plan(
             workflow["ask"]["start"], tool="ask", status="draft", context="contract"
@@ -684,6 +694,10 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         create_contract = create_start["context"]["contract"]
         _assert_mcp_contract(create_contract, tool="create")
         assert "create_page" in create_contract["permissions"]["allowed_actions"]
+        assert create_contract["proposal_schema"] is None and create_contract["schema_scope"] == "summary"
+        selected_contract = _structured(workflow["create"]["selected_contract"])
+        assert selected_contract["schema_scope"] == "selected"
+        assert set(selected_contract["proposal_schema"]["$defs"]) == {"create_page", "create_task"}
         create_receipt = _assert_safe_receipt(
             workflow["create"]["receipt"], status="ready"
         )
@@ -706,18 +720,52 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert replacement_get["proposal"]["summary"] == (
             "Create the revised field guide Page."
         )
+        assert replacement_get["name"] == "MCP revised Create"
+        assert replacement_get["instructions"] == "Prepare the revised field guide Page for browser review."
+        assert replacement_get["original_brief"]["name"] == "MCP live Create"
         assert (
             "Revised before browser review."
             in replacement_get["proposal"]["actions"][0]["data"]["document_markdown"]
+        )
+
+        update_start = _assert_safe_plan(
+            workflow["update"]["start"],
+            tool="organize",
+            status="draft",
+            context="contract",
+        )
+        update_context = update_start["context"]["contract"]
+        assert update_context["proposal_schema"] is None
+        assert not update_context["guidance_requirements"]["required_before_analysis"]
+        update_contract = _structured(workflow["update"]["contract"])
+        _assert_mcp_contract(update_contract, tool="organize")
+        assert update_contract["required_file_refs"] == []
+        assert set(update_contract["proposal_schema"]["$defs"]) == {
+            "rename_entity",
+            "complete_task",
+        }
+        assert "create_task" not in update_contract["permissions"]["allowed_actions"]
+        _assert_safe_receipt(workflow["update"]["receipt"], status="ready")
+        update_get = _assert_safe_plan(
+            workflow["update"]["get"], tool="organize", status="ready"
+        )
+        assert (
+            update_get["proposal"]["actions"][0]["data"]["entity"]
+            == f"hash:{readable_page.entity.hash}"
+        )
+        assert (
+            update_get["proposal"]["actions"][0]["data"]["name"]
+            == "Proposed MCP Page name"
         )
 
         organize_start = _assert_safe_plan(
             workflow["organize"]["start"],
             tool="organize",
             status="draft",
-            context="guidelines",
+            context="contract",
         )
-        guidelines = organize_start["context"]["guidelines"]
+        assert organize_start["context"]["contract"]["proposal_schema"] is None
+        guidelines = _structured(workflow["organize"]["guidelines"])
         assert guidelines["task"] == "organize"
         assert (
             "author the final summaries and form submissions or updates yourself"
@@ -743,6 +791,13 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert str(upload_path) not in json.dumps(upload)
         organize_contract = upload["context"]["contract"]
         _assert_mcp_contract(organize_contract, tool="organize")
+        assert organize_contract["proposal_schema"] is None
+        assert organize_contract["schema_scope"] == "summary"
+        organize_selected = _structured(workflow["organize"]["selected_contract"])
+        assert organize_selected["schema_scope"] == "selected"
+        assert set(organize_selected["proposal_schema"]["$defs"]) == {
+            "create_task", "attach_file_to_page", "summarize_file"
+        }
         assert organize_contract["required_file_refs"] == [
             organize_contract["upload_inventory"]["files"][0]["ref"]
         ]

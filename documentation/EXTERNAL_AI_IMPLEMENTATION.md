@@ -34,6 +34,17 @@ recoverable upload batches made it possible for clients to correct mistakes
 through the public interface. Existing application logic remained authoritative
 instead of duplicating an execution engine for external agents.
 
+The September usability pass separated conversation from persistence. An agent
+can now retrieve and answer without a Plan; `answer_question` supplies context
+and instructions, not another model invocation. Ask remains the explicit-save
+workflow. Create/Organize still require browser review, but their report title
+and current brief can evolve while the original brief is retained. Permission-
+checked execution receipts identify the resulting records after browser execution.
+Compact starter contracts, selected action schemas, scoped inventories and
+name-only Page browsing reduce response size without introducing an exact-name
+search prerequisite or weakening full submission validation. The current API
+reference describes the additional schema-fetch tradeoff and fallback.
+
 ## Add a small skill, then trial local MCP
 
 The skill gave an agent a short way into that API: where to connect, how to use
@@ -65,13 +76,13 @@ stages, whereas external clients must author the complete proposal themselves.
 
 ## Move the adapter to Cloud Run
 
-The remote pilot reused the adapter behind Streamable HTTP on Cloud Run. OAuth
+The remote service reused the adapter behind Streamable HTTP on Cloud Run. OAuth
 authorization stayed in the main Lagniappe application. Requests carry both
 the service's Google workload identity and the consenting user's token back
 to the API. The runtime does not need direct database access, a user's API key,
 or a service-account key file.
 
-The pilot began with ChatGPT web and then added a separate Codex client grant.
+Remote client testing began with ChatGPT web and then added a separate Codex client grant.
 Connections belong to the consenting Lagniappe account, independently of a
 browser login session. ChatGPT and Codex can be connected and revoked
 separately. This made remote access usable across more client environments
@@ -148,8 +159,8 @@ follow the existing setup conventions.
 That integration passed focused configuration, provider-fake provisioning,
 auth/API, browser, upload and shared-template regression checks, together with
 build, template-contract and traceability checks. At the time of this overview,
-the earlier remote pilot had live deployment evidence, but the new managed
+the earlier remote-service testing had live deployment evidence, but the new managed
 installation lifecycle had not yet had a clean installation or real-cloud
 upgrade trial. Android/desktop behavior, refresh over time, cold starts and
 operating effort likewise need actual use. Those are release acceptance checks,
-not outcomes implied by the automated suite or the earlier pilot.
+not outcomes implied by the automated suite or earlier client testing.

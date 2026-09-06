@@ -27,6 +27,7 @@ from .references import (
     _resolve_report_file,
 )
 from .forms import _resolve_submission_update_entity, _submission_previous_value
+from .task_completion import _completion_state
 from .completed_tasks import (
     _capture_completed_task_before,
     _completed_event_belongs_in_history,
@@ -35,6 +36,7 @@ from .completed_tasks import (
     _should_archive_live_completion,
     _snapshot_entity,
     _task_state_fingerprint,
+    _task_checkpoint_state,
     _value_fingerprint,
 )
 
@@ -91,6 +93,9 @@ def _allocate_action_output_key(action, created, context):
 def _capture_action_before(action, report, user, created, context=None):
     action_type = action.get("type")
     data = _data(action)
+    if action_type == "complete_task":
+        task = _resolve_entity(data.get("task"), created, expected=Entities.TASK)
+        return {"entity": _entity_result(task), "completion_state": _completion_state(task), "task": _task_checkpoint_state(task)}
     if action_type == "create_task" and _is_completed_task_event(data):
         return _capture_completed_task_before(
             action,
@@ -223,6 +228,13 @@ def _prepare_action_checkpoint(action, report, user, created, context, record):
         context,
     )
     output_key = None
+    if action.get("type") == "complete_task":
+        task = _load_result_entity(record["before"].get("entity"))
+        history_key = database_utility.create_key("task_history", task)
+        record["history_output_key"] = database_get.urlsafe_key(history_key)
+        context.setdefault("prepared_keys", {})[
+            f"{record['idempotency_key']}:history"
+        ] = history_key
     if action.get("type") == "create_task" and _is_completed_task_event(_data(action)):
         before = record["before"]
         target_reference = _first_data_reference(_data(action), "task")
@@ -324,6 +336,7 @@ def _record_action_result(record, action, entity, to_save, metadata, created, co
         "previous_schema",
         "manual",
         "task_state_fingerprint",
+        "completion_state",
     ):
         if key in metadata:
             record[key] = metadata[key]

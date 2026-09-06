@@ -50,5 +50,6 @@ TASK_ACTION_DISPLAYS = (
             InheritedProposalDetail(("model",), "Form", ("form",)),
         ),
     ),
+    ProposalActionDisplay("complete_task", "Complete Task", task_details),
     ProposalActionDisplay("move_task", "Move Task", move_task_details),
 )

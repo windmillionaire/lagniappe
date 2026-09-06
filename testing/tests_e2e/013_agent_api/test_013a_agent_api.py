@@ -102,9 +102,7 @@ def _report(actor, tool="organize"):
         result=None,
         error=None,
         deferred_job=None,
-        agent_manifest={
-            "contract_version": external_api.CONTRACT_VERSION
-        },
+        agent_manifest={"contract_version": external_api.CONTRACT_VERSION},
         origin="api",
         parent=None,
         user=None,
@@ -134,6 +132,66 @@ def _allow_claimed_saves(monkeypatch, saved_reports=None):
         cache_store,
         "update_owner_projection",
         lambda *_entities, **_options: None,
+    )
+
+
+# @pair agent-api:answer-context
+# @source lagniappe/web/routes/api/main.py::execute_tool
+def test_plan_free_reads_and_answer_context_do_not_create_reports(monkeypatch):
+    actor = Actor()
+    headers = {"Authorization": "Bearer valid-key"}
+    monkeypatch.setattr(
+        agent_auth, "authenticate_credential", lambda _token: (actor, {"active": True})
+    )
+    monkeypatch.setattr(
+        external_api,
+        "create_plan",
+        lambda *_args, **_kwargs: pytest.fail("A read created a Plan"),
+    )
+    monkeypatch.setattr(
+        Entities,
+        "save",
+        lambda *_args, **_kwargs: pytest.fail("A read saved an entity"),
+    )
+    client = app.test_client()
+    context = client.get("/api/v1/answer-context", headers=headers)
+    assert context.status_code == 200
+    assert context.json["report_created"] is False
+    assert context.json["personal_page"]["name"] == "External Planner"
+    result = client.post(
+        "/api/v1/tools/get_guidelines",
+        headers=headers,
+        json={"arguments": {"task": "page_document"}},
+    )
+    assert result.status_code == 200
+    assert result.json["result"]["task"] == "page_document"
+    assert result.headers["Cache-Control"] == "no-store"
+    assert (
+        client.post(
+            "/api/v1/tools/get_guidelines",
+            json={"arguments": {"task": "page_document"}},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/api/v1/tools/not_registered", headers=headers, json={"arguments": {}}
+        ).status_code
+        == 404
+    )
+
+    def revoked(_token):
+        raise agent_auth.AgentAPICredentialError("revoked")
+
+    monkeypatch.setattr(agent_auth, "authenticate_credential", revoked)
+    assert client.get("/api/v1/answer-context", headers=headers).status_code == 401
+    assert (
+        client.post(
+            "/api/v1/tools/get_guidelines",
+            headers=headers,
+            json={"arguments": {"task": "page_document"}},
+        ).status_code
+        == 401
     )
 
 
@@ -182,11 +240,13 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
         seed("agent-api-plan-tools", report.urlsafe_key, 99, 31 * 24 * 60 * 60)
 
         allowed = client.post(
-            "/api/v1/plans", headers=authorization,
+            "/api/v1/plans",
+            headers=authorization,
             json={"tool": "ask", "instructions": "Check the plan-start boundary."},
         )
         limited = client.post(
-            "/api/v1/plans", headers=authorization,
+            "/api/v1/plans",
+            headers=authorization,
             json={"tool": "ask", "instructions": "Check the plan-start boundary."},
         )
         assert allowed.status_code == 201
@@ -216,9 +276,11 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
         assert limited.status_code == 429
         assert limited.json["error"]["code"] == "rate_limited"
         assert 0 < int(limited.headers["Retry-After"]) <= 60
-        assert [
-            int(rate_limiter.cache.redis.get(key)) for key in limiter_keys[:3]
-        ] == [61, 101, 101]
+        assert [int(rate_limiter.cache.redis.get(key)) for key in limiter_keys[:3]] == [
+            61,
+            101,
+            101,
+        ]
     finally:
         if limiter_keys:
             rate_limiter.cache.redis.delete(*set(limiter_keys))
@@ -318,9 +380,7 @@ def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
         headers=authorization,
     )
     assert contract.status_code == 200
-    assert contract.json["submission_format"]["url"].startswith(
-        f"{allowed_origin}/"
-    )
+    assert contract.json["submission_format"]["url"].startswith(f"{allowed_origin}/")
 
     hostile = client.get(
         "/api/v1",
@@ -360,9 +420,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
                 },
             )
             if token == "valid-key"
-            else (_ for _ in ()).throw(
-                agent_auth.AgentAPICredentialError("invalid")
-            )
+            else (_ for _ in ()).throw(agent_auth.AgentAPICredentialError("invalid"))
         ),
     )
 
@@ -408,9 +466,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert family.status_code == 200
     assert family.json["current_version"] == "v1"
-    assert family.json["versions"][0]["openapi_url"].endswith(
-        "/api/v1/openapi.json"
-    )
+    assert family.json["versions"][0]["openapi_url"].endswith("/api/v1/openapi.json")
 
     index = client.get(
         "/api/v1",
@@ -465,19 +521,18 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert hostile_host_openapi.status_code == 200
     assert hostile_host_openapi.json["servers"] == openapi.json["servers"]
-    assert "credential-thief.invalid" not in hostile_host_openapi.json["servers"][0][
-        "url"
-    ]
+    assert (
+        "credential-thief.invalid" not in hostile_host_openapi.json["servers"][0]["url"]
+    )
     assert "/api/v1" in openapi.json["paths"]
     assert "/api/v1/client-skill.md" in openapi.json["paths"]
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
     assert "/api/v1/plans/{plan_id}/execute" not in openapi.json["paths"]
-    assert "external API never applies those proposals" in openapi.json["info"][
-        "description"
-    ]
-    assert "website Execute control is the only" in openapi.json["info"][
-        "description"
-    ]
+    assert (
+        "external API never applies those proposals"
+        in openapi.json["info"]["description"]
+    )
+    assert "website Execute control is the only" in openapi.json["info"]["description"]
     assert "task=organize" in openapi.json["info"]["description"]
     assert "two-phase workflow" in openapi.json["info"]["description"]
     assert "does not call a model" in openapi.json["info"]["description"]
@@ -501,9 +556,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "create",
         "organize",
     ]
-    create_description = openapi.json["paths"]["/api/v1/plans"]["post"][
-        "description"
-    ]
+    create_description = openapi.json["paths"]["/api/v1/plans"]["post"]["description"]
     assert "Follow the returned contract_url, submit_url, and status_url" in (
         create_description
     )
@@ -519,9 +572,9 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "upload_batch_id",
         "uploads",
     ]
-    finalize_schema = openapi.json["paths"][
-        "/api/v1/plans/{plan_id}/uploads/finalize"
-    ]["post"]["requestBody"]
+    finalize_schema = openapi.json["paths"]["/api/v1/plans/{plan_id}/uploads/finalize"][
+        "post"
+    ]["requestBody"]
     assert finalize_schema["required"] is True
     assert finalize_schema["content"]["application/json"]["schema"]["required"] == [
         "upload_batch_id"
@@ -540,15 +593,16 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert "ready Create or Organize plans" in execute_tool_operation["description"]
     assert "top-level arguments object" in execute_tool_operation["description"]
     assert "error.code=tool_error" in execute_tool_operation["description"]
-    assert execute_tool_operation["responses"]["422"]["content"][
-        "application/json"
-    ]["schema"] == {"$ref": "#/components/schemas/Error"}
+    assert execute_tool_operation["responses"]["422"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/Error"}
     submit_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/submit"]["post"]
-    assert "Organize also requires at least one finalized file" in submit_operation[
-        "description"
-    ]
+    assert (
+        "Organize can update existing records without files"
+        in submit_operation["description"]
+    )
     assert "never executes actions" in submit_operation["description"]
-    assert "without separate save confirmation" in submit_operation["description"]
+    assert "only after the user requests saving" in submit_operation["description"]
     assert "Create/Organize proposal replaces" in submit_operation["description"]
     assert "submit it again" in submit_operation["description"]
     assert "authenticated website" in submit_operation["description"]
@@ -562,18 +616,17 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert submit_operation["responses"]["422"]["content"]["application/json"][
         "schema"
     ] == {"$ref": "#/components/schemas/Error"}
-    assert "error.details.errors" in submit_operation["responses"]["422"][
-        "description"
-    ]
+    assert "error.details.errors" in submit_operation["responses"]["422"]["description"]
     assert "ValidationErrorDetail" in openapi.json["components"]["schemas"]
     contract_response_schema = openapi.json["paths"][
         "/api/v1/plans/{plan_id}/contract"
     ]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    assert contract_response_schema == {
-        "$ref": "#/components/schemas/PlanContract"
-    }
+    assert contract_response_schema == {"$ref": "#/components/schemas/PlanContract"}
     plan_contract_schema = openapi.json["components"]["schemas"]["PlanContract"]
     expected_contract_fields = {
+        "schema_scope",
+        "schema_actions",
+        "schema_instructions",
         "contract_version",
         "tool",
         "current_date",
@@ -613,7 +666,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "format": "uri",
     }
     assert "execute_url" not in plan_schema["properties"]
-    assert "execution" not in plan_schema["properties"]
+    assert plan_schema["properties"]["execution"]["type"] == ["object", "null"]
+    assert "execution" not in plan_schema["required"]
     assert "Execution" not in openapi.json["components"]["schemas"]
     receipt_schema = openapi.json["components"]["schemas"]["SubmissionReceipt"]
     assert "proposal" not in receipt_schema["properties"]
@@ -734,11 +788,9 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert created.json["id"] == report.urlsafe_key
     assert created.json["status"] == "draft"
     assert created.json["status_url"].endswith("/api/v1/plans/report-key")
-    assert created.json["submit_url"].endswith(
-        "/api/v1/plans/report-key/submit"
-    )
+    assert created.json["submit_url"].endswith("/api/v1/plans/report-key/submit")
     assert "execute_url" not in created.json
-    assert "execution" not in created.json
+    assert created.json["execution"] is None
     assert created.json["preview_url"].endswith("/tools/api-plan/reporthash12")
 
     monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
@@ -855,11 +907,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     redundant_alias = client.post(
         "/api/v1/plans/report-key/uploads",
         headers={"Authorization": "Bearer valid-key"},
-        json={
-            "files": [
-                {"filename": "records.pdf", "size": 100, "size_bytes": 100}
-            ]
-        },
+        json={"files": [{"filename": "records.pdf", "size": 100, "size_bytes": 100}]},
     )
     assert redundant_alias.status_code == 422
     assert redundant_alias.json["error"]["code"] == "unsupported_field"
@@ -919,11 +967,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     invalid_content_type = client.post(
         "/api/v1/plans/report-key/uploads",
         headers={"Authorization": "Bearer valid-key"},
-        json={
-            "files": [
-                {"filename": "records.pdf", "content_type": 7, "size": 100}
-            ]
-        },
+        json={"files": [{"filename": "records.pdf", "content_type": 7, "size": 100}]},
     )
     assert invalid_content_type.status_code == 422
     assert invalid_content_type.json["error"]["details"] == {
@@ -994,9 +1038,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         json={},
     )
     assert missing_batch_identity.status_code == 422
-    assert missing_batch_identity.json["error"]["code"] == (
-        "invalid_upload_batch_id"
-    )
+    assert missing_batch_identity.json["error"]["code"] == ("invalid_upload_batch_id")
     assert report.upload_manifest
     finalized = client.post(
         "/api/v1/plans/report-key/uploads/finalize",
@@ -1013,11 +1055,13 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         json={"arguments": {"task": "organize"}},
     )
     assert guidance.status_code == 200, guidance.get_data(as_text=True)
-    assert "author the final summaries and form submissions or updates yourself" in (
-        guidance.json["result"]["guidelines"]
+    assert (
+        "author the final summaries and form submissions or updates yourself"
+        in (guidance.json["result"]["guidelines"])
     )
-    assert "No action contains submission-generation fields" not in (
-        guidance.json["result"]["guidelines"]
+    assert (
+        "No action contains submission-generation fields"
+        not in (guidance.json["result"]["guidelines"])
     )
 
     def execute(name, arguments, user, *, external=False):
@@ -1112,8 +1156,9 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     monkeypatch.setattr(
         storage_assets,
         "get_signed_url",
-        lambda path, expires_in: signed.append((path, expires_in))
-        or "https://storage.example/download",
+        lambda path, expires_in: (
+            signed.append((path, expires_in)) or "https://storage.example/download"
+        ),
     )
 
     original_available = client.post(
@@ -1164,7 +1209,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     monkeypatch.setattr(
         external_api,
         "_external_allowed_report_actions",
-        lambda user, tool="organize": (
+        lambda user, tool="organize", report=None: (
             ("needs_review", "summarize_file") if tool == "organize" else ()
         ),
     )
@@ -1194,7 +1239,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
             "proposal": proposal,
         },
     )
-    assert submitted.status_code == 200
+    assert submitted.status_code == 200, submitted.json
     assert submitted.json["status"] == "ready"
     assert submitted.json["proposal_fingerprint"] == "normalized-proposal"
     assert "proposal" not in submitted.json
@@ -1389,12 +1434,8 @@ def test_upload_batch_identity_rejects_a_same_metadata_last_writer(monkeypatch):
     assert re.fullmatch(r"[A-Za-z0-9_-]{16,128}", second.json["upload_batch_id"])
     assert first.json["upload_batch_id"] != second.json["upload_batch_id"]
     assert first_record["token"] != second_record["token"]
-    assert {
-        key: first_record[key]
-        for key in ("filename", "content_type", "size")
-    } == {
-        key: second_record[key]
-        for key in ("filename", "content_type", "size")
+    assert {key: first_record[key] for key in ("filename", "content_type", "size")} == {
+        key: second_record[key] for key in ("filename", "content_type", "size")
     }
 
     finalized_batches = []
@@ -1433,9 +1474,7 @@ def test_upload_batch_identity_rejects_a_same_metadata_last_writer(monkeypatch):
         json={"upload_batch_id": second.json["upload_batch_id"]},
     )
     assert competing_finalizer.status_code == 409
-    assert competing_finalizer.json["error"]["code"] == (
-        "plan_operation_in_progress"
-    )
+    assert competing_finalizer.json["error"]["code"] == ("plan_operation_in_progress")
     assert finalized_batches == []
 
     claim_outcomes["finalize"] = agent_api_store.PLAN_OPERATION_CLAIMED
@@ -1660,6 +1699,7 @@ def test_external_plan_resources_hide_other_users_plans(monkeypatch):
     intruder.key = "other-user-key"
     intruder.urlsafe_key = "other-user-url-key"
     report = _report(owner)
+
     def authenticate(token):
         actor = owner if token == "owner-key" else intruder
         return actor, {"active": True, "generation": 1}
@@ -1682,10 +1722,14 @@ def test_external_plan_resources_hide_other_users_plans(monkeypatch):
         headers={"Authorization": "Bearer intruder-key"},
     )
     assert foreign.status_code == missing.status_code == 404
-    assert foreign.json["error"] == missing.json["error"] == {
-        "code": "not_found",
-        "message": "Plan not found.",
-    }
+    assert (
+        foreign.json["error"]
+        == missing.json["error"]
+        == {
+            "code": "not_found",
+            "message": "Plan not found.",
+        }
+    )
 
     owned = client.get(
         "/api/v1/plans/report-key",
@@ -1888,8 +1932,9 @@ def test_api_plan_preview_redirect_is_session_and_creator_bound(monkeypatch):
     monkeypatch.setattr(
         database_get,
         "ai_report_by_hash",
-        lambda user_key, report_hash: looked_up.append((user_key, report_hash))
-        or "raw-report",
+        lambda user_key, report_hash: (
+            looked_up.append((user_key, report_hash)) or "raw-report"
+        ),
     )
     monkeypatch.setattr(
         Entities,
@@ -2070,8 +2115,7 @@ def test_api_report_browser_mutations_reject_fenced_state_without_side_effects(
     assert [call[0] for call in guarded_calls] == ["save", "delete"]
     assert all(call[1] is report for call in guarded_calls)
     assert all(
-        call[2] == {"proposal": "authoritative-api-proposal"}
-        for call in guarded_calls
+        call[2] == {"proposal": "authoritative-api-proposal"} for call in guarded_calls
     )
 
 
@@ -2156,9 +2200,10 @@ def test_api_report_undo_delete_first_fence_stops_before_compensation(monkeypatc
     )
 
     assert response.status_code == 422, response.get_data(as_text=True)
-    assert "plan changed while undo was in progress" in response.get_data(
-        as_text=True
-    ).lower()
+    assert (
+        "plan changed while undo was in progress"
+        in response.get_data(as_text=True).lower()
+    )
     assert len(undo_calls) == 1
     assert undo_calls[0][:2] == (report, actor)
     assert guarded_calls == [(report, {"process": "complete-api-report"})]

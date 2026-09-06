@@ -21,6 +21,38 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
+
+# @source lagniappe/core/tools/ai/organize.py::organize_prompt
+# @source lagniappe/core/tools/ai/organize.py::revise_organize_prompt
+# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_proposal_repair_prompt
+# @matrix ai-report : remote-update prompt tools revision repair
+@pytest.mark.unit
+def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance():
+    from lagniappe.core.tools.ai.reporting.proposals.repair import _proposal_repair_prompt
+    user = _test_user("remote-prompt-owner")
+    report = TestEntities.get("REPORT", {
+        "name": "Update task", "hash": "remote-update-prompt", "parent": user, "user": user,
+        "origin": "email", "tool": "organize", "instructions": "Complete CLI and add notes",
+        "proposal": {"summary": "Update CLI", "confidence": 1, "actions": []},
+    })
+    report.origin = "email"
+    report.tool = "organize"
+    initial = organize.organize_prompt(report, user)
+    revised = organize.revise_organize_prompt(report, user, "Use the newer notes")
+    repaired = _proposal_repair_prompt(initial, report.proposal, ValueError("bad reference"), "Organize")
+    for prompt in (initial, revised, repaired):
+        schemas = _response_action_schemas(prompt)
+        assert {"complete_task", "update_submission_fields"} <= set(schemas)
+        assert "create_task" not in schemas
+        assert "attach_file_to_task" not in schemas
+        assert "updates" in schemas["update_submission_fields"]["properties"]["data"]["properties"]
+        assert "search_entities" in prompt.tools
+        text = str(prompt.preview())
+        assert "normal completion rules" in text
+        assert "Do not preserve or generate data.submission" not in text
+        assert "A separate completion stage fills" not in text
+    assert "Use the newer notes" in _prompt_context(revised, "User Feedback")
+
 # @matrix ai-report : files iteration-limit prompt tools
 @pytest.mark.unit
 def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkeypatch):

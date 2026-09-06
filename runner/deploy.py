@@ -454,7 +454,7 @@ def deploy(
     verify_generation_manifest()
     from installer.mcp import prepare_deployment, finish_deployment
 
-    mcp_deployment = prepare_deployment(SETTINGS.APP)
+    mcp_deployment = prepare_deployment(SETTINGS.APP, announce_progress=announce_progress)
     SETTINGS.save()
     if announce_progress:
         print(
@@ -479,7 +479,7 @@ def deploy(
         capture_output=capture_output,
     )
 
-    finish_deployment(mcp_deployment, SETTINGS.APP)
+    finish_deployment(mcp_deployment, SETTINGS.APP, announce_progress=announce_progress)
     if announce_completion:
         print("Deployment complete!")
     return True

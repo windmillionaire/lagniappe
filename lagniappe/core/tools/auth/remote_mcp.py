@@ -383,7 +383,7 @@ def consent(pending, user, *, allow, now=None):
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _grant_name(user, client_id=None):
-    # Preserve existing ChatGPT grants across the pilot update.
+    # Preserve existing ChatGPT grants when adding independent Codex grants.
     suffix = "-codex" if client_id == CODEX_CLIENT_ID else ""
     return "grant-" + credential_id(user) + suffix
 

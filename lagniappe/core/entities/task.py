@@ -226,9 +226,10 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_raises_when_required_submission_missing
+    # @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_retries_and_undoes
     # @matrix task-completion : assignee complete completed-by no-schedule
     # @matrix submission task-completion : required-fields validation
-    def complete(self):
+    def complete(self, *, user=None, history_key=None):
         incomplete = self._check_required() if self.form else []
         if incomplete:
             titles = [s.label for s in incomplete]
@@ -238,10 +239,13 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
         self.completed = True
         self.completed_on = datetime.now(timezone.utc)
-        self.completed_by = current_user
+        self.completed_by = user if user is not None else current_user
 
         if self.schedule:
-            self._complete_active_schedule()
+            if history_key is None:
+                self._complete_active_schedule()
+            else:
+                self._complete_active_schedule(history_key=history_key)
         else:
             self.due_date = None
 
@@ -250,9 +254,12 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_repeats_when_completed
     # @matrix task-scheduling : complete next-due-date recurring schedule-queue
     # @pair task-completion:next-due-date
-    def _complete_active_schedule(self):
+    def _complete_active_schedule(self, *, history_key=None):
         self.properties.schedule.set_next_due_date()
-        scheduling.add_uncomplete_task_to_queue(self)
+        if history_key is None:
+            scheduling.add_uncomplete_task_to_queue(self)
+        else:
+            scheduling.add_uncomplete_task_to_queue(self, history_key=history_key)
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete

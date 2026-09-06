@@ -203,7 +203,12 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
             app = hosted.create_app(
                 CONFIG,
                 adapter_factory=lambda token: _adapter(
-                    token, requests, revoked, override, proof="workload-proof", storage=storage_client
+                    token,
+                    requests,
+                    revoked,
+                    override,
+                    proof="workload-proof",
+                    storage=storage_client,
                 ),
             )
             async with app.router.lifespan_context(app):
@@ -213,15 +218,23 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                     if terminal:
                         path = tmp_path / "notes.txt"
                         path.write_bytes(content)
-                        metadata = {"files": [{
-                            "filename": path.name,
-                            "content_type": "text/plain",
-                            "size": path.stat().st_size,
-                        }]}
-                        prepared = await _rpc(client, "tools/call", params={
-                            "name": "prepare_file_uploads",
-                            "arguments": {"plan_id": "plan-1", **metadata},
-                        })
+                        metadata = {
+                            "files": [
+                                {
+                                    "filename": path.name,
+                                    "content_type": "text/plain",
+                                    "size": path.stat().st_size,
+                                }
+                            ]
+                        }
+                        prepared = await _rpc(
+                            client,
+                            "tools/call",
+                            params={
+                                "name": "prepare_file_uploads",
+                                "arguments": {"plan_id": "plan-1", **metadata},
+                            },
+                        )
                         assert not prepared.json()["result"]["isError"], prepared.text
                         manifest = prepared.json()["result"]["structuredContent"]
                         # Simulate a terminal's ordinary HTTP client, with no
@@ -229,7 +242,9 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                         uploaded = await storage_client.put(
                             manifest["uploads"][0]["session_url"],
                             content=path.read_bytes(),
-                            headers={"Content-Type": metadata["files"][0]["content_type"]},
+                            headers={
+                                "Content-Type": metadata["files"][0]["content_type"]
+                            },
                         )
                         if storage_failure:
                             assert uploaded.status_code == 403
@@ -237,16 +252,28 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                             result = {"isError": True}
                         else:
                             assert uploaded.status_code == 200
-                            response = await _rpc(client, "tools/call", params={
-                                "name": "finalize_file_uploads",
-                                "arguments": {key: manifest[key] for key in ("plan_id", "upload_batch_id")},
-                            })
+                            response = await _rpc(
+                                client,
+                                "tools/call",
+                                params={
+                                    "name": "finalize_file_uploads",
+                                    "arguments": {
+                                        key: manifest[key]
+                                        for key in ("plan_id", "upload_batch_id")
+                                    },
+                                },
+                            )
                             result = response.json()["result"]
                     else:
                         response = await _rpc(
-                            client, "tools/call", params={
+                            client,
+                            "tools/call",
+                            params={
                                 "name": "upload_files",
-                                "arguments": {"plan_id": "plan-1", "files": [attachment]},
+                                "arguments": {
+                                    "plan_id": "plan-1",
+                                    "files": [attachment],
+                                },
                             },
                         )
                         result = response.json()["result"]
@@ -266,7 +293,11 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                         assert declarations and not finalized
                     assert (
                         TOKEN_A not in response.text
-                        and (terminal and storage_failure or session_url not in response.text)
+                        and (
+                            terminal
+                            and storage_failure
+                            or session_url not in response.text
+                        )
                         and attachment["download_url"] not in response.text
                     )
         assert storage_requests
@@ -833,5 +864,29 @@ def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
                     httpx.Request("GET", "https://attacker.test/api/v1/me"), auth=None
                 )
             assert len(seen) == 1
+            for query in (
+                "view=summary",
+                "actions=create_page%2Ccreate_task",
+                "view=full&actions=create_task",
+            ):
+                await client.send(
+                    httpx.Request(
+                        "GET", CONFIG.audience + "/plans/plan/contract?" + query
+                    ),
+                    auth=None,
+                )
+            assert len(seen) == 4
+            for method, path in (
+                ("GET", "/plans/plan/contract?redirect=https://attacker.test"),
+                ("GET", "/plans/plan/contract?view=summary&view=full"),
+                ("GET", "/plans/plan/contract?actions="),
+                ("GET", "/me?view=summary"),
+                ("POST", "/plans/plan/contract?view=summary"),
+            ):
+                with pytest.raises(Exception):
+                    await client.send(
+                        httpx.Request(method, CONFIG.audience + path), auth=None
+                    )
+            assert len(seen) == 4
 
     asyncio.run(scenario())

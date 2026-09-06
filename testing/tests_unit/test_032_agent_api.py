@@ -19,6 +19,93 @@ from lagniappe.core.tools.ai import references as ai_references
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.database import agent_api as credential_store
 from testing.utility.ai_report_fakes import _patch_fake_keys, _test_file, _test_user
+from testing.utility.test_entities import TestEntities
+
+
+# @source lagniappe/core/tools/ai/external_api.py::plan_contract
+# @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal
+# @source lagniappe/core/tools/ai/external_api.py::submit_plan
+# @matrix agent-api ai-report : remote-update transport-boundary proposal-contract proposal-validation ready-state
+@pytest.mark.unit
+def test_remote_organize_update_contract_and_submission(monkeypatch):
+    from lagniappe.core.tools.ai.reporting.contracts.workflows import (
+        is_remote_organize_update,
+    )
+
+    _patch_fake_keys(monkeypatch)
+    actor = _test_user("update-actor")
+    saved = []
+    monkeypatch.setattr(
+        external_api.Entities, "save", lambda *items: saved.extend(items)
+    )
+    report = external_api.create_plan(actor, instructions="Complete the CLI task")
+    task = TestEntities.get("TASK", {"name": "CLI", "hash": "updatetask01"})
+    task.page = actor.page
+    monkeypatch.setattr(
+        external_api.cache,
+        "get_details_by_hash",
+        lambda hashes: {
+            "updatetask01": {"id": task.urlsafe_key, "name": task.name, "kind": "task"}
+        },
+    )
+    monkeypatch.setattr(external_api.Entities, "fetch", lambda *ids, request: [task])
+    kwargs = {"submit_url": "https://example.test/submit"}
+    summary = external_api.plan_contract(report, actor, view="summary", **kwargs)
+    selected = external_api.plan_contract(
+        report, actor, actions=["complete_task", "update_submission_fields"], **kwargs
+    )
+    assert summary["proposal_schema"] is None
+    assert "complete_task" in summary["permissions"]["allowed_actions"]
+    assert "create_task" not in summary["permissions"]["allowed_actions"]
+    assert "summarize_file" not in summary["permissions"]["allowed_actions"]
+    assert not summary["guidance_requirements"]["required_before_analysis"]
+    assert "page_document" not in {
+        item["request"]["task"]
+        for item in summary["guidance_requirements"]["conditional"]
+    }
+    assert summary["file_checklist"] == summary["required_file_refs"] == []
+    assert summary["uploads_supported"]
+    assert set(selected["proposal_schema"]["$defs"]) == {
+        "complete_task",
+        "update_submission_fields",
+    }
+    assert "### Task Scheduling" not in "\n".join(selected["workflow_rules"])
+    proposal = {
+        "summary": "Propose completing CLI",
+        "confidence": 1,
+        "actions": [
+            {
+                "id": "finish",
+                "type": "complete_task",
+                "data": {"task": "hash:updatetask01"},
+            }
+        ],
+    }
+    envelope = {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal}
+    assert external_api.submission_validation_errors(envelope, report, actor) == []
+    external_api.submit_plan(
+        report, actor, proposal, contract_version=external_api.CONTRACT_VERSION
+    )
+    assert report.status == "ready"
+    assert report.proposal["actions"][0]["data"]["task"] == task.urlsafe_key
+    assert not task.completed  # Submission is only a plan, never execution.
+    assert saved[-1] is report
+    with pytest.raises(exceptions.AIException, match="at least one action"):
+        external_api.validate_external_proposal(
+            {**proposal, "actions": []}, report, actor
+        )
+    for origin, expected in (("api", True), ("email", True), ("web", False)):
+        report.origin = origin
+        assert is_remote_organize_update(report) is expected
+    report.origin = "api"
+    report.input_files = [_test_file("uploaded.txt", "text/plain")]
+    file_contract = external_api.plan_contract(report, actor, view="summary", **kwargs)
+    assert not is_remote_organize_update(report)
+    assert "summarize_file" in file_contract["permissions"]["allowed_actions"]
+    assert len(file_contract["file_checklist"]) == 1
+    assert file_contract["guidance_requirements"]["required_before_analysis"] == [
+        {"task": "organize"}
+    ]
 
 
 def _contract_actor():
@@ -28,7 +115,7 @@ def _contract_actor():
         url="/pages/personal-page",
         allowed=lambda action, user=None: True,
     )
-    return SimpleNamespace(page=page)
+    return SimpleNamespace(page=page, is_authenticated=True, db={"timezone": "UTC"})
 
 
 # @matrix agent-api : bootstrap discovery secret-handling tool-envelope
@@ -67,7 +154,9 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch):
         "External plan creation consulted provider entitlement"
     )
     saved = []
-    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+    monkeypatch.setattr(
+        external_api.Entities, "save", lambda *items: saved.extend(items)
+    )
 
     report = external_api.create_plan(
         user,
@@ -283,13 +372,16 @@ def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
         [{"upload_batch_id": creator["operation_id"]}]
     )
     finalize_token = "c" * 32
-    assert credential_store.claim_plan_operation(
-        report_key,
-        phase="finalize",
-        operation_id=creator["operation_id"],
-        claim_token=finalize_token,
-        now=now,
-    ) == credential_store.PLAN_OPERATION_CLAIMED
+    assert (
+        credential_store.claim_plan_operation(
+            report_key,
+            phase="finalize",
+            operation_id=creator["operation_id"],
+            claim_token=finalize_token,
+            now=now,
+        )
+        == credential_store.PLAN_OPERATION_CLAIMED
+    )
     assert not credential_store.release_plan_operation(
         report_key,
         **creator,
@@ -353,31 +445,40 @@ def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
         "operation_id": "batch-cccccccccccccccc",
         "claim_token": "f" * 32,
     }
-    assert credential_store.claim_plan_operation(
-        report_key,
-        **next_creator,
-        now=now,
-    ) == credential_store.PLAN_OPERATION_CLAIMED
-    assert credential_store.claim_plan_operation(
-        report_key,
-        phase="finalize",
-        operation_id=creator["operation_id"],
-        claim_token="1" * 32,
-        now=now,
-    ) == credential_store.PLAN_OPERATION_COMPLETE
+    assert (
+        credential_store.claim_plan_operation(
+            report_key,
+            **next_creator,
+            now=now,
+        )
+        == credential_store.PLAN_OPERATION_CLAIMED
+    )
+    assert (
+        credential_store.claim_plan_operation(
+            report_key,
+            phase="finalize",
+            operation_id=creator["operation_id"],
+            claim_token="1" * 32,
+            now=now,
+        )
+        == credential_store.PLAN_OPERATION_COMPLETE
+    )
     assert rows[claim_key]["phase"] == "create"
     assert rows[claim_key]["operation_id"] == next_creator["operation_id"]
     assert rows[claim_key]["claim_token"] == next_creator["claim_token"]
 
     # Submission participates in the same report claim and cannot race a
     # creator before that creator's report-side checkpoint is durable.
-    assert credential_store.claim_plan_operation(
-        report_key,
-        phase="submit",
-        operation_id="submit-aaaaaaaaaaaaaaaa",
-        claim_token="2" * 32,
-        now=now,
-    ) == credential_store.PLAN_OPERATION_BUSY
+    assert (
+        credential_store.claim_plan_operation(
+            report_key,
+            phase="submit",
+            operation_id="submit-aaaaaaaaaaaaaaaa",
+            claim_token="2" * 32,
+            now=now,
+        )
+        == credential_store.PLAN_OPERATION_BUSY
+    )
 
     # Existing ready/complete status does not prove that an in-flight
     # replacement submission committed. Its active lease remains exclusive.
@@ -393,31 +494,40 @@ def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
             }
         }
     )
-    assert credential_store.claim_plan_operation(
-        report_key,
-        phase="submit",
-        operation_id="submit-blockedbyjob",
-        claim_token="2" * 32,
-        now=now,
-    ) == credential_store.PLAN_OPERATION_INVALID
+    assert (
+        credential_store.claim_plan_operation(
+            report_key,
+            phase="submit",
+            operation_id="submit-blockedbyjob",
+            claim_token="2" * 32,
+            now=now,
+        )
+        == credential_store.PLAN_OPERATION_INVALID
+    )
     report_row["process"] = json.dumps({"report": {"status": "ready"}})
     submitter = {
         "phase": "submit",
         "operation_id": "submit-aaaaaaaaaaaaaaaa",
         "claim_token": "2" * 32,
     }
-    assert credential_store.claim_plan_operation(
-        report_key,
-        **submitter,
-        now=now,
-    ) == credential_store.PLAN_OPERATION_CLAIMED
-    assert credential_store.claim_plan_operation(
-        report_key,
-        phase="submit",
-        operation_id="submit-bbbbbbbbbbbbbbbb",
-        claim_token="3" * 32,
-        now=now,
-    ) == credential_store.PLAN_OPERATION_BUSY
+    assert (
+        credential_store.claim_plan_operation(
+            report_key,
+            **submitter,
+            now=now,
+        )
+        == credential_store.PLAN_OPERATION_CLAIMED
+    )
+    assert (
+        credential_store.claim_plan_operation(
+            report_key,
+            phase="submit",
+            operation_id="submit-bbbbbbbbbbbbbbbb",
+            claim_token="3" * 32,
+            now=now,
+        )
+        == credential_store.PLAN_OPERATION_BUSY
+    )
 
 
 # @matrix agent-api mcp-upload : atomic-checkpoint cas claim fencing transaction
@@ -503,30 +613,40 @@ def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
     # token. The stale worker cannot write its report snapshot.
     rows[claim_key] = DatastoreEntity(key=claim_key)
     rows[claim_key].update({**claim_row, "claim_token": "b" * 32})
-    assert credential_store.commit_plan_operation(
-        report_key,
-        **options,
-    ) == credential_store.PLAN_OPERATION_LOST
+    assert (
+        credential_store.commit_plan_operation(
+            report_key,
+            **options,
+        )
+        == credential_store.PLAN_OPERATION_LOST
+    )
     assert "upload_manifest" not in rows[report_key]
 
     # A non-claim writer changing the report after the route's authoritative
     # reload is detected by the raw-state compare-and-set.
     rows[claim_key] = claim_row
     rows[report_key]["concurrent_change"] = True
-    assert credential_store.commit_plan_operation(
-        report_key,
-        **options,
-    ) == credential_store.PLAN_OPERATION_STALE
+    assert (
+        credential_store.commit_plan_operation(
+            report_key,
+            **options,
+        )
+        == credential_store.PLAN_OPERATION_STALE
+    )
     assert "upload_manifest" not in rows[report_key]
 
     rows[report_key].pop("concurrent_change")
-    assert credential_store.commit_plan_operation(
-        report_key,
-        **options,
-    ) == credential_store.PLAN_OPERATION_COMMITTED
-    assert json.loads(rows[report_key]["upload_manifest"])[0][
-        "upload_batch_id"
-    ] == "batch-aaaaaaaaaaaaaaaa"
+    assert (
+        credential_store.commit_plan_operation(
+            report_key,
+            **options,
+        )
+        == credential_store.PLAN_OPERATION_COMMITTED
+    )
+    assert (
+        json.loads(rows[report_key]["upload_manifest"])[0]["upload_batch_id"]
+        == "batch-aaaaaaaaaaaaaaaa"
+    )
     assert rows[claim_key]["claim_token"] == "a" * 32
     assert rows[claim_key]["expires_at"] > options["now"]
 
@@ -655,28 +775,37 @@ def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
         "now": now,
     }
 
-    assert credential_store.commit_plan_mutation_if_idle(
-        report_key,
-        **options,
-    ) == credential_store.PLAN_OPERATION_BUSY
+    assert (
+        credential_store.commit_plan_mutation_if_idle(
+            report_key,
+            **options,
+        )
+        == credential_store.PLAN_OPERATION_BUSY
+    )
     assert rows[report_key]["proposal"] == expected["proposal"]
     assert file_key in rows
     assert applied == []
 
     rows[claim_key]["expires_at"] = now - timedelta(seconds=1)
     rows[report_key]["proposal"] = json.dumps({"summary": "Newer API proposal"})
-    assert credential_store.commit_plan_mutation_if_idle(
-        report_key,
-        **options,
-    ) == credential_store.PLAN_OPERATION_STALE
+    assert (
+        credential_store.commit_plan_mutation_if_idle(
+            report_key,
+            **options,
+        )
+        == credential_store.PLAN_OPERATION_STALE
+    )
     assert rows[report_key]["proposal"] != browser_report["proposal"]
     assert file_key in rows
 
     rows[report_key]["proposal"] = expected["proposal"]
-    assert credential_store.commit_plan_mutation_if_idle(
-        report_key,
-        **options,
-    ) == credential_store.PLAN_OPERATION_COMMITTED
+    assert (
+        credential_store.commit_plan_mutation_if_idle(
+            report_key,
+            **options,
+        )
+        == credential_store.PLAN_OPERATION_COMMITTED
+    )
     assert rows[report_key]["proposal"] == browser_report["proposal"]
     assert claim_key not in rows
     assert file_key not in rows
@@ -686,15 +815,18 @@ def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
 
     # The expired API owner cannot publish even if it reloads the browser's
     # latest Report revision after losing the shared claim key.
-    assert credential_store.commit_plan_operation(
-        report_key,
-        phase="submit",
-        operation_id="submit-aaaaaaaaaaaaaaaa",
-        claim_token="a" * 32,
-        expected_report=dict(rows[report_key]),
-        writes=[(SimpleNamespace(db=browser_report, key=report_key), None)],
-        now=now,
-    ) == credential_store.PLAN_OPERATION_LOST
+    assert (
+        credential_store.commit_plan_operation(
+            report_key,
+            phase="submit",
+            operation_id="submit-aaaaaaaaaaaaaaaa",
+            claim_token="a" * 32,
+            expected_report=dict(rows[report_key]),
+            writes=[(SimpleNamespace(db=browser_report, key=report_key), None)],
+            now=now,
+        )
+        == credential_store.PLAN_OPERATION_LOST
+    )
 
 
 # @matrix agent-api ai-report : browser-review cas delete file-cleanup save
@@ -733,12 +865,15 @@ def test_external_browser_plan_save_and_delete_use_idle_transaction(monkeypatch)
         lambda _plan: ([], []),
     )
 
-    assert external_operations.save_plan_if_idle(
-        report,
-        expected,
-        file,
-        report,
-    ) == credential_store.PLAN_OPERATION_COMMITTED
+    assert (
+        external_operations.save_plan_if_idle(
+            report,
+            expected,
+            file,
+            report,
+        )
+        == credential_store.PLAN_OPERATION_COMMITTED
+    )
     writes = calls[-1][1]["writes"]
     masks = {entity.key: mask for entity, mask in writes}
     assert masks[report.key] is None
@@ -748,12 +883,15 @@ def test_external_browser_plan_save_and_delete_use_idle_transaction(monkeypatch)
 
     calls.clear()
     expected = external_operations.report_snapshot(report)
-    assert external_operations.delete_plan_if_idle(
-        report,
-        expected,
-        report,
-        file,
-    ) == credential_store.PLAN_OPERATION_COMMITTED
+    assert (
+        external_operations.delete_plan_if_idle(
+            report,
+            expected,
+            report,
+            file,
+        )
+        == credential_store.PLAN_OPERATION_COMMITTED
+    )
     assert calls[-1][1]["writes"] == []
     assert {entity.key for entity in calls[-1][1]["deletes"]} == {
         report.key,
@@ -801,9 +939,7 @@ def test_external_proposal_schema_has_named_discriminated_actions():
     summary_data = schema["$defs"]["summarize_file"]["properties"]["data"]
     assert "retrieval_terms" in summary_data["required"]
     assert summary_data["properties"]["retrieval_terms"]["uniqueItems"] is True
-    assert summary_data["properties"]["retrieval_terms"]["items"][
-        "maxLength"
-    ] == 80
+    assert summary_data["properties"]["retrieval_terms"]["items"]["maxLength"] == 80
 
 
 # @matrix agent-api ai-report : file-placement file-summary permissions proposal-contract
@@ -845,6 +981,9 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     )
 
     assert set(contract) == {
+        "schema_scope",
+        "schema_actions",
+        "schema_instructions",
         "contract_version",
         "tool",
         "current_date",
@@ -921,9 +1060,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         if rule.startswith("file_checklist.duplicate_check")
     )
     assert "an evidence comparison, not a required tool call" in duplicate_rule
-    assert (
-        "complete batch and already-read destination/task evidence" in duplicate_rule
-    )
+    assert "complete batch and already-read destination/task evidence" in duplicate_rule
     assert "one comparison may cover related files" in duplicate_rule
     assert "unresolved identity or occurrence question" in duplicate_rule
     assert "not once per filename" in duplicate_rule
@@ -935,9 +1072,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         item["request"]["task"]: item
         for item in contract["guidance_requirements"]["conditional"]
     }
-    assert guidance_by_task["form_autofill"]["request"] == {
-        "task": "form_autofill"
-    }
+    assert guidance_by_task["form_autofill"]["request"] == {"task": "form_autofill"}
     assert guidance_by_task["form_autofill"]["derived_request_arguments"] == {
         "field_types": {
             "type": "array",
@@ -945,9 +1080,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
             "source": "unique type values from the exact target schemas",
         }
     }
-    assert guidance_by_task["report_actions"]["request"] == {
-        "task": "report_actions"
-    }
+    assert guidance_by_task["report_actions"]["request"] == {"task": "report_actions"}
     assert guidance_by_task["report_actions"]["derived_request_arguments"] == {
         "actions": {
             "type": "array",
@@ -955,9 +1088,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
             "source": "unique selected proposal action types",
         }
     }
-    assert "actual arrays" in contract["guidance_requirements"][
-        "derived_request_rule"
-    ]
+    assert "actual arrays" in contract["guidance_requirements"]["derived_request_rule"]
     guidelines_schema = ai_functions.tool_catalog(names=["get_guidelines"])[0][
         "input_schema"
     ]
@@ -974,9 +1105,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         )
         assert result["task"] == task
         assert parts == []
-        for argument, descriptor in item.get(
-            "derived_request_arguments", {}
-        ).items():
+        for argument, descriptor in item.get("derived_request_arguments", {}).items():
             live_argument = guidelines_schema["properties"][argument]
             assert descriptor["type"] == live_argument["type"] == "array"
             assert descriptor["items"]["type"] == live_argument["items"]["type"]
@@ -998,12 +1127,9 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         for rule in contract["workflow_rules"]
     )
     assert any("two phases" in rule for rule in contract["workflow_rules"])
+    assert any("will not call a model" in rule for rule in contract["workflow_rules"])
     assert any(
-        "will not call a model" in rule for rule in contract["workflow_rules"]
-    )
-    assert any(
-        "exactly one summarize_file" in rule
-        for rule in contract["workflow_rules"]
+        "exactly one summarize_file" in rule for rule in contract["workflow_rules"]
     )
     assert any("never applies" in rule for rule in contract["workflow_rules"])
     assert any(
@@ -1047,9 +1173,12 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
     assert "propertyOrdering" not in ask_contract["proposal_schema"]
     assert "answer_markdown" in ask_contract["proposal_schema"]["properties"]
     assert ask_contract["proposal_schema"]["properties"]["actions"]["maxItems"] == 0
-    assert any("separate Create or Organize plan" in rule for rule in ask_contract["workflow_rules"])
     assert any(
-        "without waiting for separate save confirmation" in rule
+        "separate Create or Organize plan" in rule
+        for rule in ask_contract["workflow_rules"]
+    )
+    assert any(
+        "only after the user requests saving" in rule
         for rule in ask_contract["workflow_rules"]
     )
     assert any(
@@ -1081,9 +1210,7 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
         "create_task",
         "needs_review",
     ]
-    action_items = create_contract["proposal_schema"]["properties"]["actions"][
-        "items"
-    ]
+    action_items = create_contract["proposal_schema"]["properties"]["actions"]["items"]
     assert set(action_items["discriminator"]["mapping"]) == {
         "create_page",
         "create_task",
@@ -1104,6 +1231,143 @@ def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
         and "page_name is display context only" in rule
         for rule in create_contract["reference_rules"]
     )
+
+
+# @pair agent-api:answer-context
+@pytest.mark.unit
+def test_answer_context_is_plan_free(monkeypatch):
+    monkeypatch.setattr(
+        external_api.Entities,
+        "save",
+        lambda *_: pytest.fail("Answer context must not persist anything"),
+    )
+    context = external_api.answer_context(_contract_actor())
+    assert context["report_created"] is False
+    assert "plan_id" not in context
+    assert context["personal_page"]["kind"] == "page"
+    assert any(
+        "Only after" in rule and "save" in rule for rule in context["workflow_rules"]
+    )
+
+
+# @pair agent-api:proposal-contract
+# @source lagniappe/core/tools/ai/external_api.py::plan_contract
+@pytest.mark.unit
+def test_contract_selection_preserves_permissions_and_full_validation(monkeypatch):
+    actor = _contract_actor()
+    monkeypatch.setattr(
+        external_api,
+        "allowed_report_actions",
+        lambda _: ("create_page", "create_task", "needs_review"),
+    )
+    monkeypatch.setattr(
+        external_api,
+        "report_action_permission_context",
+        lambda _, allowed: {"allowed_actions": list(allowed)},
+    )
+    report = SimpleNamespace(tool="create", input_files=[])
+    kwargs = {"submit_url": "https://example.test/api/v1/plans/create/submit"}
+    full = external_api.plan_contract(report, actor, **kwargs)
+    selected = external_api.plan_contract(
+        report, actor, actions=["create_task"], **kwargs
+    )
+    summary = external_api.plan_contract(report, actor, view="summary", **kwargs)
+    assert full["permissions"] == selected["permissions"] == summary["permissions"]
+    assert set(selected["proposal_schema"]["$defs"]) == {"create_task"}
+    assert summary["proposal_schema"] is None
+    assert summary["schema_scope"] == "summary"
+    assert (
+        selected["payload_sizes"]["contract_without_payload_sizes_bytes"]
+        < full["payload_sizes"]["contract_without_payload_sizes_bytes"]
+    )
+    with pytest.raises(exceptions.ValidationError, match="allowed action"):
+        external_api.plan_contract(report, actor, actions=["delete_page"], **kwargs)
+
+
+# @pair agent-api:execution-receipt
+@pytest.mark.unit
+def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
+    visible = SimpleNamespace(
+        urlsafe_key="visible-key",
+        hash="visible12345",
+        entity_kind="task",
+        name="Current task title",
+        url="/tasks/visible-key",
+        _ai_url=lambda: "/tasks/hash:visible12345",
+        allowed=lambda *_args, **_kwargs: True,
+    )
+    hidden = SimpleNamespace(
+        urlsafe_key="hidden-key", allowed=lambda *_args, **_kwargs: False
+    )
+    history = SimpleNamespace(
+        urlsafe_key="history-key",
+        hash="history12345",
+        entity_kind="task_history",
+        allowed=lambda *_args, **_kwargs: True,
+    )
+    reads = []
+
+    def fetch(*identifiers, request):
+        reads.append(identifiers)
+        return [visible, hidden, history]
+
+    monkeypatch.setattr(external_api.Entities, "fetch", fetch)
+    report = SimpleNamespace(
+        tool="create",
+        status="complete",
+        result={
+            "status": "complete",
+            "actions": [
+                {
+                    "id": "first",
+                    "type": "create_task",
+                    "status": "complete",
+                    "entity": {"id": "visible-key", "name": "Stale title"},
+                    "prepared": True,
+                    "error": "private diagnostic",
+                },
+                {
+                    "id": "second",
+                    "type": "create_page",
+                    "status": "complete",
+                    "entity": {"id": "hidden-key", "name": "Secret name"},
+                },
+                {
+                    "id": "third",
+                    "type": "create_page",
+                    "status": "complete",
+                    "entity": {"id": "deleted-key", "name": "Deleted name"},
+                    "undo": {"status": "complete"},
+                },
+                {
+                    "id": "fourth",
+                    "type": "record_completed_task",
+                    "status": "complete",
+                    "entity": {"id": "history-key"},
+                },
+            ],
+        },
+    )
+    result = external_api.public_execution_receipt(report, object())
+    assert reads == [("visible-key", "hidden-key", "deleted-key", "history-key")]
+    assert result["actions"][0]["entity"] == {
+        "hash": "hash:visible12345",
+        "kind": "task",
+        "name": "Current task title",
+        "url": "/tasks/hash:visible12345",
+    }
+    assert result["actions"][1]["entity"] is None
+    assert result["actions"][2]["entity"] is None
+    assert result["actions"][2]["undo_status"] == "complete"
+    assert result["actions"][3]["entity"] == {
+        "hash": "hash:history12345", "kind": "task_history", "name": None, "url": None
+    }
+    assert result["returned_count"] == 4
+    assert "visible-key" not in json.dumps(result)
+    assert not result["has_more"]
+    assert "Secret" not in json.dumps(result) and "private" not in json.dumps(result)
+    report.tool = "ask"
+    assert external_api.public_execution_receipt(report, object()) is None
 
 
 # @matrix agent-api : ask create organize tool-selection
@@ -1161,7 +1425,9 @@ def test_external_tool_catalog_uses_id_for_subject_entity_references():
 def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
     names = [tool["name"] for tool in ai_functions.tool_catalog()]
     assert names == list(ai_functions.DECLARATIONS)
-    assert all(tool["input_schema"]["type"] == "object" for tool in ai_functions.tool_catalog())
+    assert all(
+        tool["input_schema"]["type"] == "object" for tool in ai_functions.tool_catalog()
+    )
     assert all("output_schema" in tool for tool in ai_functions.tool_catalog())
     assert all("result_paths" in tool for tool in ai_functions.tool_catalog())
     search_definition = ai_functions.TOOL_DEFINITIONS["search_entities"]
@@ -1174,8 +1440,7 @@ def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
         names=["get_entity", "search_entities"], names_only=True
     ) == ["get_entity", "search_entities"]
     assert [
-        tool["name"]
-        for tool in ai_functions.tool_catalog(names=["get_entity"])
+        tool["name"] for tool in ai_functions.tool_catalog(names=["get_entity"])
     ] == ["get_entity"]
     with pytest.raises(ValueError, match="Unknown tool names"):
         ai_functions.tool_catalog(names=["invented_tool"])
@@ -1233,7 +1498,9 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
         captured.update(options)
         return proposal
 
-    monkeypatch.setattr(external_api, "allowed_report_actions", lambda user: ("create_page",))
+    monkeypatch.setattr(
+        external_api, "allowed_report_actions", lambda user: ("create_page",)
+    )
     monkeypatch.setattr(external_api, "validate_proposal", validate)
 
     proposal = {
@@ -1300,6 +1567,27 @@ def test_external_submission_validation_collects_independent_field_errors():
     assert by_path["$.proposal.summary"]["code"] == "required"
     assert by_path["$.proposal.confidence"]["code"] == "required"
 
+    valid_wrapper = {
+        "contract_version": external_api.CONTRACT_VERSION,
+        "proposal": {"summary": "An answer", "confidence": 1, "actions": []},
+    }
+    for field, values in (
+        ("name", (None, 3, "   ", "n" * 121)),
+        ("instructions", (None, [], "\n", "é" * (external_api.MAX_INSTRUCTIONS_BYTES // 2 + 1))),
+    ):
+        for value in values:
+            brief_errors = external_api.submission_validation_errors(
+                {**valid_wrapper, field: value}, report, object()
+            )
+            assert any(
+                error["path"] == f"$.{field}" and error["code"] == "invalid_brief"
+                for error in brief_errors
+            )
+    assert external_api.submission_validation_errors(
+        {**valid_wrapper, "name": "Revised title", "instructions": "Agreed scope"},
+        report, object(),
+    ) == []
+
     missing_wrapper = external_api.submission_validation_errors(
         {
             "summary": "This is a raw proposal, not the submission wrapper.",
@@ -1342,6 +1630,8 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
     report = SimpleNamespace(
         tool="organize",
         status="draft",
+        name="Original title",
+        instructions="Original brief",
         pending=False,
         proposal=None,
         summary=None,
@@ -1364,7 +1654,9 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
         "validate_external_proposal",
         lambda value, current_report, user, **_options: value,
     )
-    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+    monkeypatch.setattr(
+        external_api.Entities, "save", lambda *items: saved.extend(items)
+    )
 
     submitted = external_api.submit_plan(
         report,
@@ -1390,6 +1682,39 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
     assert report.proposal["summary"] == "Create a different page."
     assert report.agent_manifest["proposal_fingerprint"]
     assert saved == [report, report]
+    external_api.submit_plan(
+        report,
+        object(),
+        report.proposal,
+        contract_version=external_api.CONTRACT_VERSION,
+        name="Expanded title",
+        instructions="Expanded brief",
+    )
+    assert report.name == "Expanded title" and report.instructions == "Expanded brief"
+    assert report.agent_manifest["original_brief"] == {
+        "name": "Original title",
+        "instructions": "Original brief",
+    }
+    assert len(saved) == 3
+    external_api.submit_plan(
+        report,
+        object(),
+        report.proposal,
+        contract_version=external_api.CONTRACT_VERSION,
+        name="Expanded title",
+        instructions="Expanded brief",
+    )
+    assert len(saved) == 3
+    report.status = "running"
+    with pytest.raises(exceptions.ValidationError, match="draft"):
+        external_api.submit_plan(
+            report,
+            object(),
+            report.proposal,
+            contract_version=external_api.CONTRACT_VERSION,
+            name="Too late",
+        )
+    assert report.name == "Expanded title"
 
 
 # @pairs agent-api:ask agent-api:ask-revision ai-report:answer-only
@@ -1422,7 +1747,9 @@ def test_external_ask_submission_completes_without_files_or_execution(monkeypatc
 
     report.properties = SimpleNamespace(process=Process())
     saved = []
-    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+    monkeypatch.setattr(
+        external_api.Entities, "save", lambda *items: saved.extend(items)
+    )
 
     submitted = external_api.submit_plan(
         report,
@@ -1463,9 +1790,7 @@ def test_external_ask_submission_allows_hash_token_in_named_link_destination(
     monkeypatch.setattr(
         ai_references.cache,
         "get_details_by_hash",
-        lambda hashes: {
-            "8328b23bef92": {"id": "canonical-cypress-page-key"}
-        },
+        lambda hashes: {"8328b23bef92": {"id": "canonical-cypress-page-key"}},
     )
     report = SimpleNamespace(tool="ask")
     proposal = {
@@ -1548,7 +1873,9 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
         lambda user: ("create_page", "needs_review"),
     )
     saved = []
-    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+    monkeypatch.setattr(
+        external_api.Entities, "save", lambda *items: saved.extend(items)
+    )
 
     submitted = external_api.submit_plan(
         report,
@@ -1687,9 +2014,9 @@ def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatc
     repeated_inventory = external_api.report_file_inventory(report)
 
     assert contract["upload_inventory"]["count"] == 7
-    assert repeated_inventory["fingerprint"] == contract["upload_inventory"][
-        "fingerprint"
-    ]
+    assert (
+        repeated_inventory["fingerprint"] == contract["upload_inventory"]["fingerprint"]
+    )
     assert len(contract["required_file_refs"]) == 7
     assert [item["file"] for item in contract["file_checklist"]] == (
         contract["required_file_refs"]
@@ -1804,7 +2131,9 @@ def test_authenticate_rejects_tampered_and_mismatched_credentials(monkeypatch):
         "expires_at": now + timedelta(days=1),
     }
     monkeypatch.setattr(credential_store, "get_credential", lambda identifier: row)
-    monkeypatch.setattr(agent_auth.Entities, "fetch_one", lambda identifier, request: user)
+    monkeypatch.setattr(
+        agent_auth.Entities, "fetch_one", lambda identifier, request: user
+    )
 
     with pytest.raises(agent_auth.AgentAPICredentialError):
         agent_auth.authenticate_credential(f"{token[:-1]}x", now=now)

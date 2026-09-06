@@ -223,6 +223,7 @@ def test_ai_report_process_state_stores_report_metadata(monkeypatch):
 @pytest.mark.unit
 def test_ai_report_display_registry_covers_action_contracts():
     assert set(ACTION_DISPLAY_REGISTRY) == ALLOWED_ACTIONS
+    assert ACTION_DISPLAY_REGISTRY["complete_task"].prefix == "Complete Task"
 
 
 # @matrix ai-report : classification details feedback proposal

@@ -49,7 +49,7 @@ AI integration can be fully disabled at installation time. If enabled you'll see
 
 Both on-site and email invocations use a flavor of Gemini that you can specify, while external clients use their own model. Since these uses are billed directly to the site owner, invited users must be explicitly given access to those modes. 
 
-AI is only able to retrieve site data that the invoking user can view, and cannot modify the site without explicit user action. Permitted context is still sent to the model provider, which is worth keeping in mind especially if you enable the MCP. More on how that all works [here](https://lagniappe.site/pages/public/9a10ae4c).
+AI is only able to retrieve site data that the invoking user can view, and cannot modify the site without explicit user action. Models invoked remotely (such as via MCP or email) submit plans which the user must execute on the application itself. Permitted context is still sent to the model provider, which is worth keeping in mind especially if you enable the MCP. More on how that all works [here](https://lagniappe.site/pages/public/9a10ae4c).
 
 ## Installation
 

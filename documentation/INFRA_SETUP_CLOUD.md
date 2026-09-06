@@ -129,7 +129,9 @@ impersonation grant.
 
 All managed IAM reconciliation preserves unrelated members and conditional
 bindings, uses policy version 3 and provider etags, and skips no-op writes.
-Unexpected conditional broad grants are reported for manual review.
+Runtime project reconciliation manages only the current role list. Historical
+role-removal migrations are retired; existing unrelated grants, including
+conditional grants, remain operator-owned and are not automatically removed.
 
 ## Storage buckets
 
@@ -176,6 +178,9 @@ additional instances do not inflate the per-instance signal, then warns after
 two one-minute samples above 80% of the configured instance-class memory
 envelope. The policy documentation records the class, worker count, threshold,
 remediation, and a Monitoring chart link.
+The MQL threshold literal is explicitly measured in bytes (`'By'`); Monitoring
+rejects an alert-policy comparison between byte-valued usage and a unitless
+threshold even when the time-series query endpoint accepts it with a warning.
 
 The envelopes come from Google's [App Engine instance-class limits](https://docs.cloud.google.com/appengine/docs/standard/overview#instance_classes).
 Both [App Engine system metrics](https://docs.cloud.google.com/monitoring/api/metrics_gcp_a_b#appengine)
@@ -239,6 +244,9 @@ action callback and Google OAuth origin/callback instructions.
 Deployment waits for App Engine to report an active managed certificate before
 claiming custom-domain completion. A certificate timeout leaves the App Engine
 deployment available at its default URL and exits with DNS/CAA/rerun guidance.
+Only a fresh installation prints the successful TLS/propagation guidance.
+Updates, recovery and focused deployments still verify TLS and report pending
+or failed certificates, but an already-active certificate is silent.
 
 ## Validation
 

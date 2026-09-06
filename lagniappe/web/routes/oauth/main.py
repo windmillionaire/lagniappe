@@ -1,4 +1,4 @@
-"""Small browser-consent and public-client OAuth boundary for the MCP pilot."""
+"""Browser-consent and public-client OAuth boundary for remote MCP."""
 
 from urllib.parse import urlencode
 

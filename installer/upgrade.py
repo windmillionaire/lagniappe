@@ -197,9 +197,7 @@ def _apply_update(
             print_post_upgrade_maintenance_steps(f)
         return 0 if recovery_ready else 1
 
-    print(f.success(f"Remember to deploy when ready: {setup_command()}"))
-    print(f"After deployment, run: {setup_command('jobs')}")
-    print(f"Then reconcile memory monitoring: {setup_command('monitoring')}")
+    print(f.success(f"Deploy when ready: {setup_command('update')}"))
     if maintenance_required:
         print("The currently deployed application was not changed.")
         print_post_upgrade_maintenance_steps(f)

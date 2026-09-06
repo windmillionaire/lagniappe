@@ -137,7 +137,7 @@ def test_memory_policy_payload_uses_per_instance_query_and_actionable_documentat
     assert "resource.version_id, resource.zone" in query
     assert "val(0) / val(1)" in query
     assert "sum(value.instance_count)" in query
-    assert "condition val() > 644245094.4" in query
+    assert query.splitlines()[-1] == "| condition val() > 644245094.4 'By'"
 
     documentation = payload["documentation"]["content"]
     for expected in (

@@ -8,7 +8,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import re
 from typing import Any
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from .catalog import (
     ACTOR_SCHEMA,
@@ -64,15 +64,13 @@ def _query_has_private_storage_parameter(query: str) -> bool:
     """Recognize a bounded query that carries a nonempty storage capability."""
     if not query or len(query) > _MAX_PRIVATE_QUERY_CHARS:
         return any(
-            f"{field}=" in query.casefold()
-            for field in _PRIVATE_STORAGE_QUERY_FIELDS
+            f"{field}=" in query.casefold() for field in _PRIVATE_STORAGE_QUERY_FIELDS
         )
     try:
         pairs = parse_qsl(query, keep_blank_values=True, max_num_fields=64)
     except ValueError:
         return any(
-            f"{field}=" in query.casefold()
-            for field in _PRIVATE_STORAGE_QUERY_FIELDS
+            f"{field}=" in query.casefold() for field in _PRIVATE_STORAGE_QUERY_FIELDS
         )
     return any(
         name.casefold() in _PRIVATE_STORAGE_QUERY_FIELDS and bool(parameter)
@@ -131,10 +129,7 @@ def _reject_private_model_data(value: Any, *, bearer: str) -> None:
             unsafe = (
                 bearer in current
                 or _has_private_transport_shape(current)
-                or (
-                    field in _PRIVATE_TRANSPORT_FIELDS
-                    and bool(current.strip())
-                )
+                or (field in _PRIVATE_TRANSPORT_FIELDS and bool(current.strip()))
             )
         elif isinstance(current, bytes):
             encoded_bytes = base64.b64encode(current)
@@ -228,14 +223,23 @@ class LagniappeAdapter:
         validate_value(definition.input_schema, value, phase="input")
 
         try:
-            if definition.kind == "actor":
+            if definition.kind == "answer_context":
+                context, _request_id = await self.rest.request_json(
+                    "GET", "answer-context"
+                )
+                result = AdapterResult(context)
+            elif definition.kind == "actor":
                 result = await self._get_actor()
             elif definition.kind.startswith("start_"):
                 result = await self._start_plan(definition.kind, value)
             elif definition.kind == "get_plan":
                 result = await self._get_plan(value["plan_id"])
             elif definition.kind == "get_plan_contract":
-                result = await self._get_contract_projection(value["plan_id"])
+                result = await self._get_contract_projection(
+                    value["plan_id"],
+                    actions=value.get("actions"),
+                    view=value.get("view", "full"),
+                )
             elif definition.kind == "submit":
                 result = await self._submit_plan(value)
             elif definition.kind == "upload":
@@ -277,9 +281,7 @@ class LagniappeAdapter:
             body["name"] = arguments["name"]
         value, _request_id = await self.rest.request_json(method, route, body=body)
         plan = self._safe_plan(value, expected_tool=tool)
-        return await self._with_lifecycle_context(
-            plan, plan_id=plan["id"], organize_guidelines=tool == "organize"
-        )
+        return await self._with_lifecycle_context(plan, plan_id=plan["id"])
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
@@ -299,14 +301,18 @@ class LagniappeAdapter:
             if organize_guidelines:
                 definition = self.tools.get(tool)
                 if definition is None:
-                    raise TransportError("missing_guidelines", "Guidelines unavailable.")
+                    raise TransportError(
+                        "missing_guidelines", "Guidelines unavailable."
+                    )
                 validate_value(definition.input_schema, arguments, phase="input")
                 result = await self._read_tool(definition, arguments)
                 if not isinstance(result.value, dict) or "error" in result.value:
-                    raise TransportError("invalid_guidelines", "Guidelines unavailable.")
+                    raise TransportError(
+                        "invalid_guidelines", "Guidelines unavailable."
+                    )
                 context = {"guidelines": result.value}
             else:
-                result = await self._get_contract_projection(plan_id)
+                result = await self._get_contract_projection(plan_id, view="summary")
                 expected_tool = value.get("tool") or value["plan"]["tool"]
                 if result.value["tool"] != expected_tool:
                     raise TransportError(
@@ -329,7 +335,8 @@ class LagniappeAdapter:
                         != [item["ref"] for item in finalized_files]
                     ):
                         raise TransportError(
-                            "context_changed", "Upload context no longer matches finalization."
+                            "context_changed",
+                            "Upload context no longer matches finalization.",
                         )
                 context = {"contract": result.value}
             enriched = AdapterResult({**value, "context": context})
@@ -339,20 +346,22 @@ class LagniappeAdapter:
         except AdapterError:
             # Never reflect the failed read's body or error details. The Plan
             # or finalized upload already exists, so recovery must be a read.
-            return AdapterResult({
-                **value,
-                "context": {
-                    "recovery": {
-                        "tool": tool,
-                        "arguments": arguments,
-                        "message": (
-                            "The operation succeeded, but its working context "
-                            "could not be included. Use this recovery read; "
-                            "do not repeat the start or upload."
-                        ),
+            return AdapterResult(
+                {
+                    **value,
+                    "context": {
+                        "recovery": {
+                            "tool": tool,
+                            "arguments": arguments,
+                            "message": (
+                                "The operation succeeded, but its working context "
+                                "could not be included. Use this recovery read; "
+                                "do not repeat the start or upload."
+                            ),
+                        },
                     },
-                },
-            })
+                }
+            )
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
@@ -367,21 +376,46 @@ class LagniappeAdapter:
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-    async def _load_contract(self, plan_id: str) -> dict[str, Any]:
+    async def _load_contract(
+        self, plan_id: str, *, actions=None, view="full"
+    ) -> dict[str, Any]:
         encoded = quote_path_segment(plan_id)
         method, route, _tool = PLAN_ROUTES["get_plan_contract"]
         value, _request_id = await self.rest.request_json(
             method,
-            route.format(plan_id=encoded),
+            route.format(plan_id=encoded)
+            + (
+                "?"
+                + urlencode(
+                    {
+                        **(
+                            {"actions": ",".join(actions)}
+                            if actions is not None
+                            else {}
+                        ),
+                        **({"view": view} if view != "full" else {}),
+                    }
+                )
+                if actions is not None or view != "full"
+                else ""
+            ),
         )
         if not isinstance(value, dict):
             raise TransportError(
                 "invalid_response", "Plan contract must be a JSON object."
             )
         validate_value(REST_CONTRACT_SCHEMA, value, phase="contract")
-        proposal_schema = validate_schema_document(
-            value["proposal_schema"], input_root=True
+        proposal_schema = (
+            validate_schema_document(value["proposal_schema"], input_root=True)
+            if value["proposal_schema"] is not None
+            else None
         )
+        if proposal_schema is None and (
+            view != "summary" or value.get("schema_scope") != "summary"
+        ):
+            raise TransportError(
+                "invalid_response", "A full contract must include its proposal schema."
+            )
         submission = value["submission_format"]
         if (
             value["contract_version"] != CONTRACT_VERSION_MAX
@@ -405,21 +439,26 @@ class LagniappeAdapter:
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-    async def _get_contract_projection(self, plan_id: str) -> AdapterResult:
-        contract = await self._load_contract(plan_id)
+    async def _get_contract_projection(
+        self, plan_id: str, *, actions=None, view="full"
+    ) -> AdapterResult:
+        contract = await self._load_contract(plan_id, actions=actions, view=view)
         submission = contract.pop("submission_format")
         # These contract-v6 clauses describe REST client orchestration. Keep
         # their domain/review semantics, but present the MCP-owned equivalent
         # rather than instructing the model to repeat the adapter's reads.
         contract["workflow_rules"] = [
             rule.replace(
-                "When an answer is ready, fetch the latest contract and submit it",
-                "When an answer is ready, call submit_plan",
+                "When an answer is ready, fetch the latest contract and submit it "
+                "without waiting for separate save confirmation.",
+                "Only when the user asks to save the answer, call submit_plan.",
             ).replace(
                 "Fetch this contract after finalizing uploads and immediately "
                 "before constructing the proposal.",
                 "Use the current contract supplied in upload completion's "
-                "context.contract to construct the proposal. If that context "
+                "context.contract for current file references and permissions. "
+                "If proposal_schema is null, use get_plan_contract with the "
+                "selected actions before constructing the proposal. If that context "
                 "is unavailable or relevant state changes, use get_plan_contract. "
                 "submit_plan performs the final fresh-contract check.",
             )
@@ -451,6 +490,9 @@ class LagniappeAdapter:
         submission = contract["submission_format"]
         body = deepcopy(submission["body"])
         body["proposal"] = deepcopy(arguments["proposal"])
+        for field in ("name", "instructions"):
+            if field in arguments:
+                body[field] = arguments[field]
         value, _request_id = await self.rest.request_json(
             submission["method"],
             submission["url"],
@@ -494,8 +536,12 @@ class LagniappeAdapter:
         arguments: dict[str, Any],
     ) -> AdapterResult:
         rest_arguments = deepcopy(arguments)
-        plan_id = rest_arguments.pop("plan_id")
-        route = f"plans/{quote_path_segment(plan_id)}/tools/{definition.name}"
+        plan_id = rest_arguments.pop("plan_id", None)
+        route = (
+            f"plans/{quote_path_segment(plan_id)}/tools/{definition.name}"
+            if plan_id is not None
+            else f"tools/{definition.name}"
+        )
         envelope, _request_id = await self.rest.request_json(
             "POST",
             route,
@@ -530,7 +576,10 @@ class LagniappeAdapter:
             "original_file",
             *GET_FILE_PRIVATE_FIELDS,
         }
-        if any(not isinstance(field, str) or field not in known_fields for field in raw_value):
+        if any(
+            not isinstance(field, str) or field not in known_fields
+            for field in raw_value
+        ):
             raise TransportError(
                 "unsafe_transport_extension",
                 "get_file returned an unrecognized transport or metadata field.",

@@ -208,7 +208,6 @@ def save_images(sp, images_dict=None):
                 )
                 continue
             staged_targets.append(target)
-            sp.write(f.info(f"Staged {provider_key}"))
 
         if not staged_targets:
             sp.write(

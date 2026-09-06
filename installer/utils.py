@@ -160,6 +160,7 @@ def deploy_to_app_engine(
     *,
     print_final_summary=True,
     upgrade_notice_handled=False,
+    first_install=False,
 ):
     from config import SETTINGS
     from installer import FORMATTER
@@ -198,6 +199,13 @@ def deploy_to_app_engine(
             raise
         spinner.ok(f.ok_glyph)
 
+    from installer.mcp import requested
+
+    if requested(SETTINGS.APP):
+        print(f"{f.ok_glyph} {f.success('MCP server is ready')}")
+    elif (SETTINGS.APP.get("REMOTE_MCP") or {}).get("resource"):
+        print("External AI access is disabled.")
+
     from installer.monitoring import reconcile_memory_alert_after_deploy
 
     reconcile_memory_alert_after_deploy()
@@ -208,7 +216,7 @@ def deploy_to_app_engine(
         from installer.state import record_step
 
         record_step("verify custom-domain TLS certificate")
-        wait_for_managed_certificate(custom_domain)
+        wait_for_managed_certificate(custom_domain, announce_ready=first_install)
 
     if print_final_summary:
         print("Deployment complete!")

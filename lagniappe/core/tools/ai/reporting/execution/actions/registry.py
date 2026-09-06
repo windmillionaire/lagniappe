@@ -45,6 +45,7 @@ from .compensation import (
     _undo_summarize_file,
 )
 from .tasks import _create_task
+from .task_completion import _complete_task, _undo_complete_task
 
 REPORT_ACTION_ADAPTERS = {
     adapter.action_type: adapter
@@ -58,6 +59,7 @@ REPORT_ACTION_ADAPTERS = {
             _compensate_created,
         ),
         ReportActionAdapter("create_page", _create_page, _compensate_created),
+        ReportActionAdapter("complete_task", _complete_task, _undo_complete_task, uses_context=True),
         ReportActionAdapter(
             "create_task",
             _create_task,

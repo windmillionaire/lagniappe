@@ -182,6 +182,10 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "fields": ("page", "page_name", "task", "task_name", "updates"),
         "required": ("updates",),
     },
+    "complete_task": {
+        "fields": ("task", "task_name"),
+        "required": ("task",),
+    },
     "attach_file_to_page": {
         "fields": ("page", "page_action", "page_name", "file", "display_name"),
         "required": ("file",),

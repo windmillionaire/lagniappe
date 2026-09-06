@@ -156,12 +156,16 @@ def _install_harness(
         "create_config",
         set_application_defaults=set_application_defaults,
     )
+    def deploy_to_app_engine(**kwargs):
+        settings._deploy_options = kwargs
+        return step("deploy_to_app_engine")()
+
     _module(
         monkeypatch,
         setup_package,
         "utils",
         check_gcloud_cli=step("check_gcloud_cli"),
-        deploy_to_app_engine=step("deploy_to_app_engine"),
+        deploy_to_app_engine=deploy_to_app_engine,
     )
     gcloud_module = _module(
         monkeypatch,
@@ -263,6 +267,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
 
     assert install_module.install() == 0
     assert settings.APP["APP_NAME"] == "Lagniappe"
+    assert settings._deploy_options == {"print_final_summary": False, "first_install": True}
     assert events == [
         "ensure_pip_is_available",
         "check_gcloud_cli",
@@ -336,7 +341,7 @@ def test_default_install_activates_ai_email_after_deploy_and_jobs(
 
 
 def test_recovery_install_skips_optional_reconfiguration(monkeypatch):
-    install_module, settings, events = _install_harness(monkeypatch)
+    install_module, settings, events = _install_harness(monkeypatch, deploy=True)
     settings.RECOVERY_MODE = True
 
     assert install_module.install() == 0
@@ -345,6 +350,7 @@ def test_recovery_install_skips_optional_reconfiguration(monkeypatch):
     assert "setup_ai_email" not in events
     assert "setup_redis" in events
     assert "settings.save" in events
+    assert settings._deploy_options == {"print_final_summary": False, "first_install": False}
 
 
 # @matrix setup : failure-isolation recovery

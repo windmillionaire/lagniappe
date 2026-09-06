@@ -45,12 +45,13 @@ SCHEMA_FIELD_TYPES = (
     "todo",
 )
 ACTION_GUIDELINES = {
+    "complete_task": "Check off one exact existing Task via data.task. No name-based matching, replacement submission, or historical completed_on override. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_submission_fields first and list its action id in depends_on when completing with details. An already-completed Task is a no-op. Undo reverses only this completion, not a reopen/reset of its form.",
     "create_form": "Create forms before actions that reference them; use the matching page_form or task_form bundle.",
     "create_category": "Create a category only for a durable collection; reference an earlier default page-form action only when the collection is homogeneous.",
     "create_project": "Create a project before its model tasks and use it for a durable area of goal-directed work.",
     "create_model_task": "Create a model task after its Project and optional task Form; model tasks describe reusable work types.",
     "create_page": "Choose the stable subject, compare plausible existing Pages, use an executable Category/Form reference, and include grounded final submission values when the workflow requires them.",
-    "create_task": "Use an editable Page or earlier page action, a stable work name, task Forms only, and a source-backed completed_on date only for completed evidence.",
+    "create_task": "Use an editable Page or earlier page action, a stable work name, task Forms only, and a source-backed completed_on date only for completed evidence. To check off an existing Task while preserving its details use complete_task, not historical-occurrence import.",
     "add_form_to_page": "Reference one editable existing Page and one page Form; this does not require a Category.",
     "add_category": "Reference both the editable existing Page and additional existing Category; readable names are not executable references.",
     "update_form_schema": "Use additive fields or select/radio options only and place the schema update before actions that use it.",

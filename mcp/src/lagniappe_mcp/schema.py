@@ -644,7 +644,7 @@ def inject_plan_id(schema: Any) -> dict[str, Any]:
         "type": "string",
         "minLength": 1,
         "maxLength": 2048,
-        "description": "Opaque Plan ID returned by a start_* tool.",
+        "description": "Optional existing Plan ID for report-scoped work. Omit for ordinary questions, task lookups and workspace reads; no Plan is created.",
     }
     required = projected.setdefault("required", [])
     if not isinstance(required, list) or any(
@@ -653,8 +653,6 @@ def inject_plan_id(schema: Any) -> dict[str, Any]:
         raise SchemaError(
             "invalid_schema", "Tool schema required must be a string array."
         )
-    if "plan_id" not in required:
-        required.append("plan_id")
     return projected
 
 

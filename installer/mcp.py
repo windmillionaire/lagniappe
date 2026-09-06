@@ -136,7 +136,26 @@ def describe(target, arguments, *, optional=False):
     if result.returncode:
         error = (result.stderr or "").casefold()
         denied = any(token in error for token in ("permission", "forbidden", "unauthorized", "403"))
-        if optional and not denied and any(token in error for token in ("not_found", "httperror 404", "cannot find service")):
+        # Storage uses a different absence message from Run/IAM. Match the
+        # exact requested bucket, not an arbitrary 404 from a provider failure.
+        missing_bucket = (
+            arguments[:3] == ["storage", "buckets", "describe"]
+            and len(arguments) >= 4
+            and re.fullmatch(
+                rf"error: \(gcloud\.storage\.buckets\.describe\) {re.escape(arguments[3].casefold())} not found: 404\.?",
+                error.strip(),
+            ) is not None
+        )
+        # Artifact Registry translates HttpNotFoundError into this diagnostic,
+        # followed by image-reference help rather than a numeric status code.
+        missing_image = (
+            arguments[:4] == ["artifacts", "docker", "images", "describe"]
+            and error.strip().partition("\n")[0].strip()
+            == "error: (gcloud.artifacts.docker.images.describe) image not found."
+        )
+        if optional and not denied and (missing_bucket or missing_image or any(
+            token in error for token in ("not_found", "httperror 404", "cannot find service")
+        )):
             return None
         raise SetupError(f"MCP provider discovery failed: {(result.stderr or '').strip()}")
     try:
@@ -227,15 +246,19 @@ def reconcile_resources(target, deployer):
     if repository.get("format") != "DOCKER":
         raise SetupError("The MCP image repository is not a Docker repository.")
     bucket_url = f"gs://{target.bucket}"
-    bucket = describe(target, ["storage", "buckets", "describe", bucket_url], optional=True)
+    # The default gcloud projection omits projectNumber; ownership requires
+    # the raw Storage API metadata, including on the post-create read.
+    bucket = describe(target, ["storage", "buckets", "describe", bucket_url, "--raw"], optional=True)
     if bucket is None:
         _run(target, ["storage", "buckets", "create", bucket_url,
                       f"--location={target.region}", "--uniform-bucket-level-access",
                       "--public-access-prevention"])
-        bucket = describe(target, ["storage", "buckets", "describe", bucket_url])
+        bucket = describe(target, ["storage", "buckets", "describe", bucket_url, "--raw"])
     project = describe(target, ["projects", "describe", target.project])
     bucket_project = bucket.get("project_number", bucket.get("projectNumber"))
-    if not bucket_project or not project.get("projectNumber") or str(bucket_project) != str(project["projectNumber"]):
+    if not bucket_project or not project.get("projectNumber"):
+        raise SetupError("The MCP build bucket ownership could not be verified: project number missing.")
+    if str(bucket_project) != str(project["projectNumber"]):
         raise SetupError("The MCP build bucket belongs to a different project.")
     if str(bucket.get("location", "")).casefold() != target.region:
         raise SetupError("The MCP build bucket is in a different region.")
@@ -312,11 +335,12 @@ def _resource(service):
 # @testable false
 # @covered-by installer/mcp.py::prepare_deployment
 # @reason image discovery makes interrupted builds resumable without rebuilding
-def _build(target):
+def _build(target, *, announce_progress=True):
     image = describe(target, ["artifacts", "docker", "images", "describe", target.image], optional=True)
     if image is not None:
         return
-    print(f"Building MCP service {target.version} in Cloud Build...")
+    if announce_progress:
+        print(f"Building MCP service {target.version} in Cloud Build...")
     _run(target, [
         "builds", "submit", str(REPOSITORY_ROOT), f"--region={target.region}",
         f"--config={REPOSITORY_ROOT / 'mcp/cloudbuild.yaml'}",
@@ -387,7 +411,7 @@ def _deploy_service(target, resource, *, enabled):
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_unchanged_update_skips_build_and_revision
 # @matrix mcp-install : bootstrap configuration source-version update-order
-def prepare_deployment(settings=None):
+def prepare_deployment(settings=None, *, announce_progress=True):
     """Prepare the optional service and configuration before publishing App Engine."""
     settings = SETTINGS.APP if settings is None else settings
     if not requested(settings):
@@ -409,9 +433,9 @@ def prepare_deployment(settings=None):
         if not saved.get("resource") and service.get("metadata", {}).get("labels", {}).get("managed-by") != "lagniappe":
             raise SetupError("An unmanaged Cloud Run service already uses the MCP service name.")
         if not _matches(service, target, resource):
-            _build(target)
+            _build(target, announce_progress=announce_progress)
     else:
-        _build(target)
+        _build(target, announce_progress=announce_progress)
         # Disabled startup does not contact the main app or use this placeholder.
         _deploy_service(target, "https://unconfigured.invalid/mcp", enabled=False)
         service = _service(target)
@@ -436,7 +460,7 @@ def prepare_deployment(settings=None):
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_unchanged_update_skips_build_and_revision
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_disable_and_failed_activation_do_not_claim_success
 # @matrix mcp-install : disable failure-recovery update-order verification
-def finish_deployment(target=None, settings=None):
+def finish_deployment(target=None, settings=None, *, announce_progress=True):
     """Activate only after the main app accepts the matching OAuth configuration."""
     settings = SETTINGS.APP if settings is None else settings
     if not requested(settings):
@@ -457,20 +481,27 @@ def finish_deployment(target=None, settings=None):
                 if verified is None or _enabled(verified):
                     raise SetupError(f"MCP disable could not be verified. Retry with {setup_command('mcp')}.")
                 record_mutation("MCP disable", action="disabled", resource="Cloud Run service", identifier=SERVICE)
-        print("External AI access is disabled.")
+        if announce_progress:
+            print("External AI access is disabled.")
         return
     if target is None:
         raise SetupError(f"MCP deployment was not prepared. Run {setup_command('mcp')}.")
     resource = settings["REMOTE_MCP"]["resource"]
     if _matches(_service(target), target, resource):
-        print(f"MCP service {target.version} is unchanged; no new revision needed.")
+        if announce_progress:
+            print(f"MCP service {target.version} is unchanged; no new revision needed.")
         return
     record_step("deploy MCP service after application")
-    print(f"Deploying MCP service {target.version}...")
+    if announce_progress:
+        print(f"Deploying MCP service {target.version}...")
     _deploy_service(target, resource, enabled=True)
     if not _matches(_service(target), target, resource):
         raise SetupError(f"MCP revision did not become ready. Retry with {setup_command('mcp')}.")
-    print(f"MCP is ready: {resource}")
+    if announce_progress:
+        from installer import FORMATTER
+
+        f = FORMATTER.initialize()
+        print(f"{f.ok_glyph} {f.success('MCP server is ready')}")
 
 
 # @testable false

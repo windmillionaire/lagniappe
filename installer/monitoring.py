@@ -94,7 +94,7 @@ def _memory_query(settings):
             "  }",
             "| join",
             "| value [memory_per_instance: val(0) / val(1)]",
-            f"| condition val() > {threshold:.1f}",
+            f"| condition val() > {threshold:.1f} 'By'",
         ]
     )
 

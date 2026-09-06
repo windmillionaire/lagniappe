@@ -577,28 +577,6 @@ RUNTIME_SERVICE_ACCOUNT_ROLES = [
     "roles/iam.serviceAccountTokenCreator",
 ]
 
-REMOVED_RUNTIME_PROJECT_ROLES = [
-    "roles/appengine.deployer",
-    "roles/iam.serviceAccountUser",
-    "roles/cloudbuild.builds.editor",
-    "roles/storage.admin",
-    "roles/storage.objectCreator",
-    "roles/storage.objectViewer",
-    "roles/firebase.admin",
-    "roles/firebaseauth.admin",
-    "roles/firebasecloudmessaging.admin",
-    "roles/firebasemessagingcampaigns.admin",
-    "roles/serviceusage.serviceUsageAdmin",
-    "roles/cloudtasks.admin",
-]
-
-REMOVED_RUNTIME_PROJECT_STORAGE_ROLES = [
-    "roles/storage.admin",
-    "roles/storage.objectCreator",
-    "roles/storage.objectViewer",
-]
-
-
 REQUIRED_GOOGLE_CLOUD_APIS = {
     "cloudbuild.googleapis.com": "Cloud Build",
     "appengine.googleapis.com": "App Engine Admin",

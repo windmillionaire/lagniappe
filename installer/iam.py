@@ -352,11 +352,11 @@ def require_installer_bucket_permissions(bucket):
     raise RuntimeError("\n".join(lines))
 
 
-# @testable false
-# @covered-by installer/gcloud.py::configure_service_account
-# @reason provider client composition over the tested policy reconciler
-def reconcile_runtime_project_policy(project_id, runtime_email, removed_roles=None):
-    """Apply runtime project roles and remove prior broad Lagniappe grants."""
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_runtime_project_policy_preserves_unmanaged_bindings_and_is_idempotent
+# @matrix iam setup : idempotence operator-preservation
+def reconcile_runtime_project_policy(project_id, runtime_email):
+    """Apply current runtime project roles without changing unmanaged grants."""
     install_if_missing(
         "google.cloud.resourcemanager_v3",
         "Google Resource Manager API",
@@ -374,36 +374,11 @@ def reconcile_runtime_project_policy(project_id, runtime_email, removed_roles=No
         }
     )
     member = f"serviceAccount:{runtime_email}"
-    removed_roles = set(
-        constants.REMOVED_RUNTIME_PROJECT_ROLES
-        if removed_roles is None
-        else removed_roles
-    )
-    blocked_conditions = sorted(
-        {
-            _binding_value(binding, "role")
-            for binding in policy.bindings
-            if _binding_value(binding, "role")
-            in removed_roles
-            and _is_conditional(binding)
-            and member in (_binding_value(binding, "members", ()) or ())
-        }
-    )
-    if blocked_conditions:
-        raise RuntimeError(
-            "Runtime service account has conditional broad-role bindings that "
-            "setup will preserve but cannot safely reconcile: "
-            + ", ".join(blocked_conditions)
-        )
-
     changed = reconcile_member_roles(
         policy,
         member,
         desired_roles=constants.RUNTIME_PROJECT_ROLES,
-        managed_roles=(
-            set(constants.RUNTIME_PROJECT_ROLES)
-            | removed_roles
-        ),
+        managed_roles=constants.RUNTIME_PROJECT_ROLES,
         binding_factory=lambda role, members: policy_pb2.Binding(
             role=role, members=members
         ),

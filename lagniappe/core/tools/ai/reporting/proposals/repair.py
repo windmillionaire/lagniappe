@@ -807,7 +807,7 @@ def _proposal_repair_prompt(source_prompt, proposal, error, report_label):
     prompt.set_allowed_actions(allowed_actions)
     prompt.set_response_schema(
         getattr(source_prompt, "response_schema", None)
-        if report_label == "Ask"
+        if report_label == "Ask" or getattr(source_prompt, "_organize_update_only", False)
         else report_proposal_response_schema(
             allowed_actions,
             require_issues=report_label == "Organize",
@@ -830,6 +830,17 @@ def _proposal_repair_prompt(source_prompt, proposal, error, report_label):
     prompt.add_context("validation_error", str(error))
     prompt.add_context("allowed_actions", list(allowed_actions))
     prompt.add_context("invalid_proposal_json", proposal)
+    if getattr(source_prompt, "_organize_update_only", False):
+        from ..contracts.workflows import ORGANIZE_UPDATE_GUIDELINES
+
+        prompt._organize_update_only = True
+        prompt.add_instructions(ORGANIZE_UPDATE_GUIDELINES)
+        prompt.add_instructions(
+            "Repair the validation error and return the complete replacement "
+            "proposal, preserving correct actions and grounded final field patches. "
+            "Do not defer submission values to a file-completion stage."
+        )
+        return prompt
     prompt.add_instructions(
         f"""
 Return a complete replacement {report_label} proposal JSON object.

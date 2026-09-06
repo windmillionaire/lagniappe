@@ -212,6 +212,7 @@ def _listed_domain_mapping(mappings, project_id, domain):
 def wait_for_managed_certificate(
     domain,
     *,
+    announce_ready=False,
     sleep=time.sleep,
     poll_delays=MANAGED_CERTIFICATE_POLL_DELAYS,
 ):
@@ -302,12 +303,13 @@ def wait_for_managed_certificate(
 
         if active_id:
             last_status = "ACTIVE"
-            print(
-                f.success(
-                    f"Managed TLS certificate active for https://{domain}. "
-                    "It may take up to an hour before the domain opens over HTTPS."
+            if announce_ready:
+                print(
+                    f.success(
+                        f"Managed TLS certificate active for https://{domain}. "
+                        "It may take up to an hour before the domain opens over HTTPS."
+                    )
                 )
-            )
             return True
         elif pending_id:
             certificate = retry_provider_call(

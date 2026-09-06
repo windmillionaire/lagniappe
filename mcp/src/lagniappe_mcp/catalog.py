@@ -24,7 +24,12 @@ from .limits import (
     MCP_RESULT_INSTRUCTIONS,
     MCP_SUBMISSION_INSTRUCTIONS,
 )
-from .schema import inject_plan_id, json_size, validate_schema_document, wrap_result_schema
+from .schema import (
+    inject_plan_id,
+    json_size,
+    validate_schema_document,
+    wrap_result_schema,
+)
 
 
 TOOL_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -121,6 +126,8 @@ SAFE_PLAN_SCHEMA = {
         "preview_url": {"type": "string"},
         "review_url": {"type": "string"},
         "proposal": {"type": ["object", "null"]},
+        "execution": {"type": ["object", "null"]},
+        "original_brief": {"type": ["object", "null"]},
     },
     "additionalProperties": False,
 }
@@ -252,7 +259,10 @@ SAFE_CONTRACT_SCHEMA = {
         "current_date": {"type": "string", "format": "date"},
         "timezone": {"type": "string"},
         "personal_page": {"type": "object"},
-        "proposal_schema": {"type": "object"},
+        "proposal_schema": {"type": ["object", "null"]},
+        "schema_scope": {"enum": ["full", "selected", "summary"]},
+        "schema_actions": {"type": "array", "items": {"type": "string"}},
+        "schema_instructions": {"type": "string"},
         "permissions": {"type": "object"},
         "required_file_refs": {"type": "array", "items": {"type": "string"}},
         "upload_inventory": {"type": ["object", "null"]},
@@ -278,9 +288,7 @@ SAFE_CONTRACT_SCHEMA = {
                     "const": "$.proposal_schema",
                     "description": "Path relative to this contract object, not the enclosing lifecycle result.",
                 },
-                "instructions": {
-                    "const": MCP_SUBMISSION_INSTRUCTIONS
-                },
+                "instructions": {"const": MCP_SUBMISSION_INSTRUCTIONS},
             },
             "additionalProperties": False,
         },
@@ -384,7 +392,10 @@ LIFECYCLE_CONTEXT_SCHEMA = {
 START_RESULT_SCHEMA = {
     **SAFE_PLAN_SCHEMA,
     "required": [*SAFE_PLAN_SCHEMA["required"], "context"],
-    "properties": {**SAFE_PLAN_SCHEMA["properties"], "context": LIFECYCLE_CONTEXT_SCHEMA},
+    "properties": {
+        **SAFE_PLAN_SCHEMA["properties"],
+        "context": LIFECYCLE_CONTEXT_SCHEMA,
+    },
 }
 ENRICHED_UPLOAD_RESULT_SCHEMA = {
     **UPLOAD_RESULT_SCHEMA,
@@ -535,14 +546,17 @@ class ToolDefinition:
         wrapped = self.requires_result_wrapper(protocol_version)
         result_paths = (
             _wrap_result_paths(self.result_paths)
-            if wrapped else deepcopy(self.result_paths)
+            if wrapped
+            else deepcopy(self.result_paths)
         )
         return Tool(
             name=self.name,
             description=self.description,
             input_schema=self.input_schema,
             output_schema=(
-                wrap_result_schema(self.output_schema) if wrapped else self.output_schema
+                wrap_result_schema(self.output_schema)
+                if wrapped
+                else self.output_schema
             ),
             annotations=self.annotations,
             meta=(
@@ -604,6 +618,31 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
     review_only = "Submission saves a browser-reviewable proposal; it never executes workspace changes."
     return (
         ToolDefinition(
+            "answer_question",
+            "Get lightweight guidance and personal Page context for answering or retrieving tasks without saving a report. The client model answers using plan-free read tools; this does not call a server model or create a Plan. Answer in chat first and offer to save afterward. Only when the user wants to save, use start_ask then submit_plan. Reuse this context during the conversation.",
+            {"type": "object", "properties": {}, "additionalProperties": False},
+            {
+                "type": "object",
+                "required": [
+                    "current_date",
+                    "timezone",
+                    "personal_page",
+                    "report_created",
+                    "workflow_rules",
+                ],
+                "properties": {
+                    "current_date": {"type": "string"},
+                    "timezone": {"type": "string"},
+                    "personal_page": {"type": "object"},
+                    "report_created": {"const": False},
+                    "workflow_rules": {"type": "array", "items": {"type": "string"}},
+                },
+                "additionalProperties": False,
+            },
+            "answer_context",
+            READ_ANNOTATIONS,
+        ),
+        ToolDefinition(
             "get_actor",
             "Return the current actor, capabilities, timezone, and personal Page.",
             {"type": "object", "properties": {}, "additionalProperties": False},
@@ -613,7 +652,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_ask",
-            f"Start an Ask Plan for a question without changing workspace records. {common_start} Returns context.contract; reuse it, then submit_plan to save the answer report.",
+            f"Start a durable Ask report only when the user requests saving an answer. For ordinary questions and task lookups use answer_question and plan-free reads first. {common_start} Returns context.contract; submit the already-agreed answer without regenerating it.",
             _plan_input_schema(),
             START_RESULT_SCHEMA,
             "start_ask",
@@ -621,7 +660,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_create",
-            f"Start a Create Plan for a requested fileless workspace change. {common_start} Returns context.contract with the personal Page, date/timezone, permissions and proposal schema; no separate bootstrap read is needed. {review_only}",
+            f"Start a Create Plan to create pages, tasks, or workspace structure without uploads. Use start_organize to update existing records, including completing tasks or patching submissions. {common_start} Returns a compact context.contract with permissions and all allowed action names. Fetch get_plan_contract with selected actions for exact submission schemas, or view=full for all schemas. {review_only}",
             _plan_input_schema(),
             START_RESULT_SCHEMA,
             "start_create",
@@ -629,7 +668,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_organize",
-            f"Start an Organize Plan when files must be inspected and placed. {common_start} Returns context.guidelines; finalized uploads supply context.contract. Inspect complete file evidence once; a summary or clipped excerpt is not complete inspection. Independent file reads can run in parallel. {review_only}",
+            f"Start an Organize Plan to update existing records (complete tasks, patch submissions, rename or move records) or inspect and place uploaded files. Remote updates do not require a file. {common_start} Returns compact context.contract with allowed action names; fetch get_plan_contract(actions=[...]) for selected details. Discover exact targets with read tools before proposing updates. For uploads, read get_guidelines(task=organize), inspect complete evidence, and summarize and place every finalized file. {review_only}",
             _plan_input_schema(),
             START_RESULT_SCHEMA,
             "start_organize",
@@ -637,7 +676,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan",
-            "Return current Plan state and its round-trippable proposal when present. Use the existing plan_id to recover state or revise that report, without creating another Plan.",
+            "Return current Plan state, current/original brief, round-trippable proposal, and bounded execution outcomes with currently viewable result entities. Use the existing plan_id to recover or revise; do not create another Plan. Entity null means unavailable, not proof an action never ran.",
             _plan_id_input(),
             SAFE_PLAN_SCHEMA,
             "get_plan",
@@ -645,8 +684,20 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan_contract",
-            "Refresh the working contract after relevant state changes, unavailable lifecycle context, or schema/permission errors. Reuse a contract already supplied by start/upload; submit_plan performs its own fresh check.",
-            _plan_id_input(),
+            "Load exact schemas for selected allowed actions; full view without actions returns all schemas. summary view omits proposal_schema while retaining all allowed names. Reuse complete selected schemas; refresh for changed actions/state/permissions. submit_plan independently validates against the full current contract.",
+            {
+                **_plan_id_input(),
+                "properties": {
+                    **_plan_id_input()["properties"],
+                    "actions": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "items": {"type": "string"},
+                    },
+                    "view": {"enum": ["full", "summary"]},
+                },
+            },
             SAFE_CONTRACT_SCHEMA,
             "get_plan_contract",
             READ_ANNOTATIONS,
@@ -685,7 +736,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "submit_plan",
-            "Save an Ask answer or Create/Organize proposal to the existing plan_id. Reuse that Plan for revisions; this replaces its prior saved proposal, never executes workspace changes, and needs no new start. Validates against a freshly fetched contract internally; no separate final contract read is needed. Give the user preview_url for authenticated review; never claim a proposal was applied.",
+            "Save an explicitly requested Ask answer or a Create/Organize proposal to the existing plan_id. Reuse for revisions: optional name and instructions update the current brief atomically with the complete proposal; original_brief is retained. Never executes workspace changes. Validates against the fresh full contract; no separate final contract read is needed. Give preview_url for authenticated review, never claim a proposal was applied.",
             {
                 "type": "object",
                 "required": ["plan_id", "contract_version", "proposal"],
@@ -693,6 +744,12 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
                     "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048},
                     "contract_version": {"type": "integer"},
                     "proposal": {"type": "object"},
+                    "name": {"type": "string", "minLength": 1, "maxLength": 120},
+                    "instructions": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 65536,
+                    },
                 },
                 "additionalProperties": False,
             },
@@ -720,7 +777,8 @@ def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
         },
     }
     if (
-        set(catalog) != {
+        set(catalog)
+        != {
             "tools",
             "view",
             "selected_count",

@@ -30,6 +30,12 @@ rejected. Every App Engine deploy command also names the saved target project
 explicitly. Interactive setup replaces gcloud's verbose successful-deployment
 transcript with one long-running progress line, retains the provider output on
 failure, and finishes with Lagniappe's exact saved application URL.
+MCP build/deploy messages respect that quiet progress mode; its ready/disabled
+summary is printed only after the deployment spinner has finished. Success is
+a standard green checked “MCP server is ready” line, without the endpoint URL;
+connection details remain available in the app's external-AI instructions. Routine
+service-account reconciliation and individual restored-image filenames are
+silent; provider retries and restore warnings remain visible.
 
 ## Release preparation
 
@@ -130,6 +136,15 @@ version without changing cloud resources. There is no wheel release or manual
 version bump.
 
 ### Resources, identity and build boundary
+
+An existing MCP service may predate the managed build-source bucket and build
+identity. A normal upgrade provisions missing build resources without changing
+the canonical MCP endpoint. A confirmed bucket-not-found response is eligible
+for creation; permission failures and ambiguous provider errors stop deployment.
+The running service uses its deployed image, not the build-source bucket.
+Bucket ownership checks request raw Storage API metadata because gcloud's
+default display omits the project number. Missing ownership metadata stops
+deployment separately from a confirmed project mismatch.
 
 The component runs in the owner's existing Google Cloud project and resource
 region. Standard resource names are:
@@ -264,6 +279,10 @@ missing runtime requirement or excluded local import stops an update before it
 changes remote resources.
 
 Use it for maintained forks and local source changes.
+Declining deployment after update or upgrade prints
+`Deploy when ready: ./setup.sh update`. That managed deployment includes jobs and monitoring;
+separate follow-up commands are only needed for a manual publish or a reported
+reconciliation failure.
 
 ## Source upgrade
 

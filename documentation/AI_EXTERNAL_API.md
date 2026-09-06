@@ -1,8 +1,10 @@
 # External Agent API
 
 Lagniappe exposes a versioned, REST-first API that lets a user run the same
-permission-bounded read tools as the built-in AI workflows. An external client
-chooses `ask`, `create`, or `organize` for each durable plan. Ask publishes a
+permission-bounded read tools as the built-in AI workflows. Ordinary questions
+and task lookups use plan-free reads and are answered in the conversation. Only
+when the user requests saving an answer does the client create an `ask` Plan.
+For requested changes it chooses `create` or `organize`. Ask publishes a
 read-only answer; Create and Organize publish proposals for browser review and
 leave approval and application to the existing authenticated website controls.
 External plans never call Lagniappe's configured model, and the external API
@@ -168,8 +170,18 @@ revoking or reconnecting one does not replace the other. Review links still
 require the report creator's browser session. See
 [Authentication](AUTHENTICATION.md#remote-mcp) for expiry, rotation and revocation.
 
-Starters bundle current workflow context; uploads return the finalized inventory
-and refreshed contract. `submit_plan` privately checks the current contract
+`answer_question` returns lightweight answering guidance, date/timezone, and
+personal Page context; it does not call a model, create a session, or save a
+report. Read tools accept an optional `plan_id`: omit it for ordinary retrieval.
+The client model answers first and offers to save afterward; `start_ask` is the
+explicit-save path, not the read bootstrap. Normal request/security logging
+still applies; this is not a promise that the external model retains nothing.
+
+Starters bundle current workflow context; Create, Organize and completed uploads use a
+compact contract summary. It retains all allowed action names and permissions,
+but `proposal_schema` is null and `schema_scope` is `summary`. Fetch
+`get_plan_contract(actions=[...])` for the selected schemas, or `view=full`
+without actions for all schemas. `submit_plan` privately checks the full current contract
 before saving. Consume one complete result representation when the client
 provides both text and structured content. Legacy protocol clients receive an
 object wrapper for non-object results, with matching schemas and result paths.
@@ -216,17 +228,25 @@ still be fetched after uploads and immediately before submission.
    to retrieve selected definitions, or `view=names` for only exact registered names.
    `list_workspace_resources` includes the personal Page alongside the
    permission-filtered workspace inventory.
-5. `POST /plans` creates a provider-free draft with `tool` set to `ask`,
+5. For ordinary questions, get `/answer-context` and run permitted reads with
+   `POST /tools/{tool_name}` using the same `{"arguments": {...}}` envelope.
+   No Plan or answer is saved, and the general request rate limit still applies.
+   Answer in the conversation and offer to save afterward.
+6. Only for an explicitly requested saved answer or proposed change,
+   `POST /plans` creates a provider-free draft with `tool` set to `ask`,
    `create`, or `organize`. The returned Plan includes canonical `contract_url`,
    `submit_url`, and `status_url` links so callers do not construct paths.
-6. Run permitted reads with `POST /plans/{id}/tools/{tool_name}` while the plan
+   For report-scoped work, use `POST /plans/{id}/tools/{tool_name}` while the plan
    is a draft. Reads remain available after a saved Ask answer and while a
    Create or Organize proposal remains ready for browser review.
 7. `GET /plans/{id}/contract` returns the selected tool's authoritative output
    schema, submission wrapper, machine-readable guidance requirements, workflow
    and reference rules, permissions, payload sizes, limits, actor timezone,
    personal Page reference, timezone-aware `current_date`, and top-level
-   `contract_version`. Its `submission_format` gives the exact `POST` method,
+   `contract_version`. Optional `view=summary` omits the schema; optional
+   comma-separated `actions` selects exact action schemas without changing
+   permissions. Default `view=full` without `actions` preserves the complete
+   contract. Its `submission_format` gives the exact `POST` method,
    URL, and wrapper body shape. Organize also returns the authoritative
    finalized-upload inventory and per-file checklist.
 8. `POST /plans/{id}/submit` validates and publishes the final result. It returns
@@ -279,6 +299,38 @@ contain the exact ID of an earlier proposal action that creates the referenced
 entity. Existing workspace entities instead use their documented
 `hash:<12-character-hash>` references.
 
+### Context size and conversational revisions
+
+Compact contracts reduce model-visible schema bytes, not authorization checks.
+All allowed action names remain visible so the client can discover capabilities;
+selection never silently infers a restricted action set from the user's prompt.
+A client pays an extra read when it needs a new action schema, but can reuse
+complete selected schemas within the same unchanged context. Complex planning
+can request the full contract once. Submission always validates against fresh
+full permissions, independently of which subset the client previously read.
+Summary and selected/full responses advertise their scope explicitly; a summary
+is not a permissive schema that can be submitted against.
+
+`list_workspace_resources` accepts known `category_id` and/or `project_id`
+references to omit unrelated collections; unscoped calls retain the broad
+inventory. `get_category_pages(names_only=true)` returns just name, hash, kind,
+and URL, with a default/maximum of 100 per page and the existing permission and
+cursor semantics. Full/compact detail calls remain bounded to 10. Prefer ranked
+keyword discovery and compare candidate context; an abbreviation such as MCP
+need not equal a Page's full name. Name-only browsing is an optional way to
+recognize a subject, not a required exact-name search or exhaustive scan.
+
+Submission may include optional `name` and `instructions` alongside
+`contract_version` and the complete `proposal`. These update the current report
+brief atomically under the existing submission fence; `original_brief` retains
+the initial title/instructions. Omitted fields are preserved. Executing reports
+cannot be revised. A Plan GET includes the round-trippable proposal and, for
+Create/Organize, a bounded `execution` receipt with action IDs/types/statuses and
+currently viewable resulting entity names, hash references, and URLs. Missing or
+no-longer-viewable entities are null; stored ledger names, recovery snapshots,
+private diagnostics and internal entity keys are not exposed. An unavailable
+entity does not mean its action never ran. Ask has no execution receipt.
+
 ### Ask
 
 Ask is read-only. The client answers the specific
@@ -298,9 +350,11 @@ is not stored in the human-facing link. The external submission accepts the
 advertised Ask fields only; clients cannot submit pre-rendered `answer_html` or
 bypass the shared Markdown sanitizer.
 
-When an Ask answer is ready, the client fetches the latest contract and submits
-it without asking for separate save permission, then returns the answer and
-`preview_url` to the user. Saving this report does not modify workspace records.
+Answer directly using plan-free reads, then offer to save the answer. Do not
+start a Plan merely to retrieve a task or answer a question. If the user requests
+saving (either initially or after the answer), create an Ask Plan and submit the
+agreed answer, without an unnecessary second generation. Return `preview_url`
+as the saved report link. Saving this report does not modify workspace records.
 The same completed Ask plan remains available for permission-bounded reads, and
 a later valid submission replaces its saved answer so conversational
 clarifications can refine the report. A ready Create proposal is also revisable
@@ -328,7 +382,7 @@ Yes/No options with distinct non-empty string values; an optional checkbox may
 remain unchecked. This is guidance for choosing fields, not a change to existing
 form schemas or task-completion validation.
 
-`create_task` is always part of the Create and Organize action contracts because
+`create_task` is always part of Create and file-backed Organize contracts because
 every user has an editable personal Page. The coarse capability projection does
 not expose a redundant `can_create_tasks` flag. A Task proposal must still name
 an editable target in `data.page`, or use `data.page_action` when an earlier
@@ -426,7 +480,7 @@ sizes. Correlated API logs record tool-call sequence number, result bytes, and
 elapsed time.
 
 External Organize guidance is selected by the API route, not by a public client
-or workflow flag. On-site/email Gemini retains its separate server-managed
+or workflow flag. File-backed on-site/email Gemini retains its separate server-managed
 summary, retrieval, structure-planning and form-completion stages. Those
 internal planning instructions must not tell an external client to omit final
 form values, and external no-server-model instructions must not replace the
@@ -455,7 +509,7 @@ in the contract and report remain usable for analysis and review. A File enters
 search only after browser execution attaches it to a Page or Task; deleting or
 undoing that last attachment hides report-only evidence again.
 
-The external Organize contract remains permission-scoped and adds the
+The file-backed external Organize contract remains permission-scoped and adds the
 external-only `summarize_file` action without inferring a narrower action set
 from the request. Its proposal schema uses standard JSON Schema `$defs` and
 `oneOf` references, plus an OpenAPI-compatible `type` discriminator mapping and
@@ -464,6 +518,28 @@ adapter; Gemini's provider-compatible structured-output schema remains
 unchanged.
 
 ### Publication and browser approval
+
+Fileless API/MCP Organize drafts expose an existing-record update subset:
+completion, submission patches, additive schema changes, rename/move and
+category/form attachment. `needs_review` handles ambiguous or unsupported work.
+Trusted API/email origin and the absence of uploads select this shared profile;
+there is no new UI tool or client-controlled authorization flag. UI Organize
+continues to require files (instruction-only UI requests still become Ask).
+
+Start Organize and use the compact action list, then request
+`get_plan_contract(actions=["update_submission_fields", "complete_task"])`
+for exact shapes. Use read tools to identify the intended record and inspect its
+current schema. Put final field patches before `complete_task`, with the patch's
+id in completion's `depends_on`. Failed/skipped required updates prevent completion.
+The completion action uses only `data.task` and optional `task_name`; it never
+uses name-based matching or historical replacement semantics. Normal required
+fields, recurrence, permissions, retry and undo still apply. Existing document
+editing and file-tool consolidation remain separate follow-up work.
+
+Uploading files switches back to the file-backed contract, including mandatory
+summaries and placements for every file; pending uploads always block submission.
+New-record creation belongs in Create when there are no uploaded artifacts.
+No upload is necessary just to complete a Task or correct submission details.
 
 Create and Organize submission saves a `ready` report and returns a compact
 receipt with the full `review_url`, shorter creator-session `preview_url`,

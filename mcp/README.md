@@ -11,6 +11,19 @@ Lagniappe website. Terminal uploads use the remote preparation and finalization
 tools plus an ordinary HTTP client. No local MCP package or helper is required.
 The direct REST API and its downloadable skill remain available separately.
 
+Questions and task retrieval use `answer_question` guidance and plan-free read
+tools. `start_ask` is reserved for a user-requested saved answer. Create/Organize
+retain browser approval; their compact contracts advertise all allowed actions
+and load selected schemas through `get_plan_contract`. `get_plan` returns
+permission-rechecked execution receipts, and submission can revise the current
+title/brief while retaining the original. See the API guide for exact shapes.
+
+Create is for new content; Organize handles existing-record updates as well as
+uploaded files. Remote updates need no file, unlike UI Organize. The Organize
+starter returns a compact contract, with selected action schemas fetched on
+demand. `complete_task` is a reviewed plan action, not a top-level MCP tool.
+When files are uploaded, every file still needs inspection, summary and placement.
+
 Tests live in `testing/tests_unit/test_033*.py`; live API and OAuth workflows
 live in `testing/tests_e2e/013_agent_api/`. The normal repository runner selects
 the isolated service environment automatically for the MCP unit tests:

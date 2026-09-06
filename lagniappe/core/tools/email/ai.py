@@ -807,13 +807,10 @@ def _preflight_submission(message, tool, user, config):
             "attachment_contract",
             "Create email does not accept attachments. Send files to the Organize address.",
         )
-    if tool == "organize" and not submitted:
-        raise AIEmailRejection(
-            "attachment_contract", "Organize email requires at least one attachment."
-        )
-
     instructions = _instructions(message.subject, message.text_body)
-    if tool in {"ask", "create"} and not (message.subject or message.text_body):
+    if (tool in {"ask", "create"} or (tool == "organize" and not submitted)) and not (
+        message.subject or message.text_body
+    ):
         raise AIEmailRejection(
             "body_required", f"{tool.title()} email requires a subject or message body."
         )

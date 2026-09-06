@@ -92,8 +92,20 @@ exact target. If repair cannot produce complete safe coverage, the result is a
 review-only proposal. Large or unreadable Files remain represented by metadata
 and visible issues so the proposal does not silently drop evidence.
 
-An instruction-only Organize request uses Ask because no file placement stage
-is needed.
+UI Organize remains file-backed; its instruction-only fallback remains Ask.
+API/MCP and email Organize also support a fileless existing-record update
+profile. Trusted intake origin and the absence of uploads select that profile;
+clients cannot opt a UI report into it. The email classifier can choose
+Organize for an update without attachments, but does not discover targets itself.
+The planner discovers exact editable records, reads relevant schemas, and
+proposes bounded updates for the same browser approval and execution pipeline.
+No additional toolbar option or top-level completion command is introduced.
+
+The update profile omits upload summaries, retrieval prepasses, and secondary
+form completion. Its planner authors final field patches directly, including
+on revision or validation repair. Once uploads are supplied, normal file
+coverage and completion obligations apply. External starters return a compact
+action contract; clients request selected schemas and guidance on demand.
 
 ## Autofill
 
@@ -157,6 +169,7 @@ Supported action families include:
 - adding a Category or Form to a Page;
 - renaming one exact entity;
 - updating exact existing submission fields;
+- completing one exact existing Task with `complete_task`;
 - adding fields or missing options to a Form schema; and
 - recording a manual Page-deletion suggestion instead of deleting it directly.
 
@@ -169,6 +182,18 @@ entities/links. Interrupted undo resumes from its own checkpoints.
 Task actions with completion evidence may reuse exactly one matching editable
 Task; the newest event stays on the live Task and earlier dates become history.
 Ambiguous matches remain separate.
+
+`complete_task` is distinct from historical `create_task` occurrences: it calls
+normal Task completion with the executing actor and validates required fields.
+It preserves submission values, descriptions, assignments and attachments,
+except that normal recurrence may archive the completed occurrence and reset
+the next occurrence immediately. Its completion history key is preallocated for
+retry safety. Put field updates before completion and make it depend on them.
+The existing scheduling policy is unchanged: near-term tasks reopen immediately
+so the next occurrence appears on the homepage; other production completions
+retain their midnight reopening job. Nonproduction still reopens immediately.
+Already-completed Tasks are unchanged. Undo restores the prior task without
+ordinary reopening's form/file reset and refuses conflicting later changes.
 
 ## Workspace semantics
 

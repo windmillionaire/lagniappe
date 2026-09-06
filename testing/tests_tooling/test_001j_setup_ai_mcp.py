@@ -12,6 +12,13 @@ from installer.errors import SetupError
 
 pytestmark = pytest.mark.tooling
 
+IMAGE_NOT_FOUND = """ERROR: (gcloud.artifacts.docker.images.describe) Image not found.
+
+A valid container image can be referenced by tag or digest, has the format of
+  LOCATION-docker.DOMAIN/PROJECT-ID/REPOSITORY-ID/IMAGE:tag
+  LOCATION-docker.DOMAIN/PROJECT-ID/REPOSITORY-ID/IMAGE@sha256:digest
+"""
+
 
 def settings():
     return {
@@ -84,10 +91,17 @@ class Cloud:
                 output = self.repository
                 missing = output is None
         elif args[:3] == ["storage", "buckets", "create"]:
-            self.bucket = {"project_number": "123", "location": "US-CENTRAL1"}
+            self.bucket = {"projectNumber": "123", "location": "US-CENTRAL1"}
         elif args[:3] == ["storage", "buckets", "describe"]:
-            output = self.bucket
+            output = deepcopy(self.bucket)
+            if output is not None and "--raw" not in arguments:
+                output.pop("projectNumber", None)
             missing = output is None
+            if missing:
+                return SimpleNamespace(
+                    returncode=1, stdout="",
+                    stderr=f"ERROR: (gcloud.storage.buckets.describe) {args[3]} not found: 404.",
+                )
         elif args[:2] == ["projects", "describe"]:
             output = {"projectNumber": "123"}
         elif args[:3] == ["firestore", "fields", "ttls"]:
@@ -102,6 +116,8 @@ class Cloud:
         elif args[:3] == ["artifacts", "docker", "images"]:
             output = self.image
             missing = output is None
+            if missing:
+                return SimpleNamespace(returncode=1, stdout="", stderr=IMAGE_NOT_FOUND)
         elif args[:2] == ["builds", "submit"]:
             self.image = {"image_summary": {"digest": "sha256:abc"}}
         elif args[:3] == ["run", "services", "describe"]:
@@ -172,6 +188,38 @@ def test_mcp_discovery_distinguishes_absence_from_unavailable_state(monkeypatch)
             mcp.describe(target, ["run", "services", "describe"], optional=True)
     monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr="NOT_FOUND"))
     assert mcp.describe(target, ["run", "services", "describe"], optional=True) is None
+    bucket = f"gs://{target.bucket}"
+    arguments = ["storage", "buckets", "describe", bucket]
+    storage_error = f"ERROR: (gcloud.storage.buckets.describe) {bucket} not found: 404."
+    monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=storage_error))
+    assert mcp.describe(target, arguments, optional=True) is None
+    with pytest.raises(SetupError, match="discovery failed"):
+        mcp.describe(target, arguments)
+    for error in (
+        storage_error + " Permission denied.",
+        storage_error.replace("404", "403"),
+        storage_error.replace(bucket, "gs://another-bucket"),
+        "network timeout contacting gs://demo-project-mcp-builds",
+        "HTTP 404: service API disabled",
+    ):
+        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        with pytest.raises(SetupError, match="discovery failed"):
+            mcp.describe(target, arguments, optional=True)
+    arguments = ["artifacts", "docker", "images", "describe", target.image]
+    monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=IMAGE_NOT_FOUND))
+    assert mcp.describe(target, arguments, optional=True) is None
+    with pytest.raises(SetupError, match="discovery failed"):
+        mcp.describe(target, arguments)
+    with pytest.raises(SetupError, match="discovery failed"):
+        mcp.describe(target, ["run", "services", "describe"], optional=True)
+    for error in (
+        IMAGE_NOT_FOUND + "Permission denied.",
+        "ERROR: (gcloud.artifacts.docker.images.describe) Invalid Docker image.",
+        "ERROR: (gcloud.artifacts.docker.images.describe) network timeout",
+    ):
+        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        with pytest.raises(SetupError, match="discovery failed"):
+            mcp.describe(target, arguments, optional=True)
     monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="[]"))
     with pytest.raises(SetupError, match="unexpected resource"):
         mcp.describe(target, ["run", "services", "describe"])
@@ -221,12 +269,21 @@ def test_mcp_resources_use_separate_build_identity_and_scoped_roles(cloud):
     cloud.calls.clear()
     mcp.reconcile_resources(cloud.target, "owner@example.test")
     assert not any("create" in call or "set-iam-policy" in call or "update" in call for call in cloud.calls)
+    for project_number, message in (
+        (None, "ownership could not be verified"),
+        ("456", "different project"),
+    ):
+        cloud.bucket["projectNumber"] = project_number
+        cloud.calls.clear()
+        with pytest.raises(SetupError, match=message):
+            mcp.reconcile_resources(cloud.target, "owner@example.test")
+        assert not any("set-iam-policy" in call for call in cloud.calls)
 
 
 # @matrix mcp-install : bootstrap configuration source-version update-order
-def test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app(cloud):
+def test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app(cloud, capsys):
     config = settings()
-    prepared = mcp.prepare_deployment(config)
+    prepared = mcp.prepare_deployment(config, announce_progress=False)
     assert prepared.version == config["MCP_VERSION"]
     assert config["REMOTE_MCP"]["resource"] == "https://lagniappe-demo.run.app/mcp"
     assert config["REMOTE_MCP"]["actors"] is None
@@ -234,21 +291,58 @@ def test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app(clo
     assert not mcp._matches(cloud.service, prepared, config["REMOTE_MCP"]["resource"])
     assert any("--gcs-source-staging-dir=gs://demo-project-mcp-builds/source" in call for call in cloud.calls)
     assert all("LAGNIAPPE_MCP_ENABLED=true" not in " ".join(call) for call in cloud.calls)
-    mcp.finish_deployment(prepared, config)
+    mcp.finish_deployment(prepared, config, announce_progress=False)
     assert mcp._matches(cloud.service, prepared, config["REMOTE_MCP"]["resource"])
+    assert capsys.readouterr().out == ""
+    mcp.finish_deployment(prepared, config, announce_progress=False)
+    config["AI_ENABLED"] = False
+    mcp.finish_deployment(None, config, announce_progress=False)
+    assert capsys.readouterr().out == ""
 
 
 # @matrix mcp-install : source-version update-order verification
-def test_mcp_unchanged_update_skips_build_and_revision(cloud):
+def test_mcp_unchanged_update_skips_build_and_revision(cloud, capsys, monkeypatch):
+    import installer
+
+    monkeypatch.setattr(installer, "FORMATTER", SimpleNamespace(initialize=lambda: SimpleNamespace(
+        ok_glyph="✔", success=lambda message: f"<green>{message}</green>",
+    )))
     config = settings()
     prepared = mcp.prepare_deployment(config)
+    capsys.readouterr()
     mcp.finish_deployment(prepared, config)
+    output = capsys.readouterr().out
+    assert output.endswith("✔ <green>MCP server is ready</green>\n")
+    assert config["REMOTE_MCP"]["resource"] not in output
     cloud.calls.clear()
     prepared = mcp.prepare_deployment(config)
     mcp.finish_deployment(prepared, config)
     assert not any(call[:2] in (["builds", "submit"], ["run", "deploy"]) for call in cloud.calls)
     cloud.service["status"]["traffic"][0]["percent"] = 50
     assert not mcp._matches(cloud.service, prepared, config["REMOTE_MCP"]["resource"])
+
+
+# @matrix mcp-install : source-version update-order verification
+# @source installer/mcp.py::prepare_deployment
+# @source installer/mcp.py::finish_deployment
+def test_mcp_changed_source_update_builds_then_activates_new_image(cloud, monkeypatch):
+    config = settings()
+    previous = mcp.prepare_deployment(config, announce_progress=False)
+    mcp.finish_deployment(previous, config, announce_progress=False)
+    old_image = cloud.service["spec"]["template"]["spec"]["containers"][0]["image"]
+    cloud.calls.clear()
+    cloud.image = None  # The new source's image is not present in the registry.
+    monkeypatch.setattr(mcp, "source_version", lambda: "new-source-fingerprint")
+    prepared = mcp.prepare_deployment(config, announce_progress=False)
+    assert prepared.version == config["MCP_VERSION"] == "new-source-fingerprint"
+    assert prepared.image != old_image
+    assert sum(call[:2] == ["builds", "submit"] for call in cloud.calls) == 1
+    assert not any(call[:2] == ["run", "deploy"] for call in cloud.calls)
+    assert cloud.service["spec"]["template"]["spec"]["containers"][0]["image"] == old_image
+    mcp.finish_deployment(prepared, config, announce_progress=False)
+    assert sum(call[:2] == ["run", "deploy"] for call in cloud.calls) == 1
+    assert cloud.service["spec"]["template"]["spec"]["containers"][0]["image"] == prepared.image
+    assert mcp._matches(cloud.service, prepared, config["REMOTE_MCP"]["resource"])
 
 
 # @matrix mcp-install : disable failure-recovery update-order verification
@@ -258,7 +352,7 @@ def test_mcp_disable_and_failed_activation_do_not_claim_success(cloud, capsys):
     cloud.fail_activation = True
     with pytest.raises(SetupError, match="Retry with ./setup.sh mcp"):
         mcp.finish_deployment(prepared, config)
-    assert "MCP is ready" not in capsys.readouterr().out
+    assert "MCP server is ready" not in capsys.readouterr().out
     cloud.fail_activation = False
     mcp.finish_deployment(mcp.prepare_deployment(config), config)
     config["EXTERNAL_AI_ENABLED"] = False
@@ -310,22 +404,26 @@ def test_focused_mcp_command_uses_normal_deployment_path(monkeypatch):
 # @source runner/deploy.py::deploy
 def test_app_failure_never_activates_mcp(monkeypatch):
     from runner import deploy
+    announce_progress = False
     events = []
     monkeypatch.setattr(deploy, "verify_runtime_deploy_surface", lambda: None)
     monkeypatch.setattr(deploy, "verify_frontend_build", lambda **k: None)
     monkeypatch.setattr(deploy, "verify_generation_manifest", lambda: None)
     monkeypatch.setattr(deploy.SETTINGS, "APP", {"VERSION": "test"})
     monkeypatch.setattr(deploy.SETTINGS, "save", lambda: events.append("save"))
-    monkeypatch.setattr(mcp, "prepare_deployment", lambda settings: events.append("prepare") or "target")
-    monkeypatch.setattr(mcp, "finish_deployment", lambda target, settings: events.append("activate"))
+    monkeypatch.setattr(mcp, "prepare_deployment", lambda settings, **kwargs: events.append(("prepare", kwargs)) or "target")
+    monkeypatch.setattr(mcp, "finish_deployment", lambda target, settings, **kwargs: events.append(("activate", kwargs)))
     monkeypatch.setattr(deploy, "_deploy_app_yaml", lambda *a, **k: (_ for _ in ()).throw(SetupError("app failed")))
     with pytest.raises(SetupError, match="app failed"):
-        deploy.deploy(build_assets=False)
-    assert events == ["prepare", "save"]
+        deploy.deploy(build_assets=False, announce_progress=announce_progress)
+    assert events == [("prepare", {"announce_progress": announce_progress}), "save"]
     monkeypatch.setattr(deploy, "_deploy_app_yaml", lambda *a, **k: events.append("app"))
     events.clear()
-    deploy.deploy(build_assets=False)
-    assert events == ["prepare", "save", "app", "activate"]
+    deploy.deploy(build_assets=False, announce_progress=announce_progress)
+    assert events == [
+        ("prepare", {"announce_progress": announce_progress}), "save", "app",
+        ("activate", {"announce_progress": announce_progress}),
+    ]
 
 
 # @matrix setup : optional site-policy settings-save

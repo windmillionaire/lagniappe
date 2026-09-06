@@ -256,164 +256,165 @@ def configure_service_account():
 
     f = FORMATTER.initialize()
 
-    with f.yaspin(text=f.success("Configuring service account")) as sp:
-        install_if_missing(
-            "google.cloud.iam_admin_v1",
-            "Google IAM Admin API",
-            package_name="google-cloud-iam",
+    install_if_missing(
+        "google.cloud.iam_admin_v1",
+        "Google IAM Admin API",
+        package_name="google-cloud-iam",
+    )
+    from google.cloud import iam_admin_v1
+
+    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    project_name = SETTINGS.GCLOUD_CONFIG.get("NAME") or re.sub(
+        r"[^a-z0-9]", "-", project_id.lower()
+    )
+    runtime_email = str(
+        SETTINGS.APP.get("RUNTIME_SERVICE_ACCOUNT_EMAIL")
+        or f"{project_name}@{project_id}.iam.gserviceaccount.com"
+    ).strip().casefold()
+    if not runtime_email.endswith(
+        f"@{project_id}.iam.gserviceaccount.com"
+    ):
+        raise RuntimeError(
+            "RUNTIME_SERVICE_ACCOUNT_EMAIL must identify a service "
+            "account in the configured Google Cloud project."
         )
-        from google.cloud import iam_admin_v1
+    deployer_email = SETTINGS.APP.get(
+        "DEPLOYER_EMAIL"
+    ) or SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
+    if not deployer_email:
+        raise RuntimeError("A deployer Google account is required.")
 
-        project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
-        project_name = SETTINGS.GCLOUD_CONFIG.get("NAME") or re.sub(
-            r"[^a-z0-9]", "-", project_id.lower()
-        )
-        runtime_email = str(
-            SETTINGS.APP.get("RUNTIME_SERVICE_ACCOUNT_EMAIL")
-            or f"{project_name}@{project_id}.iam.gserviceaccount.com"
-        ).strip().casefold()
-        if not runtime_email.endswith(
-            f"@{project_id}.iam.gserviceaccount.com"
-        ):
-            raise RuntimeError(
-                "RUNTIME_SERVICE_ACCOUNT_EMAIL must identify a service "
-                "account in the configured Google Cloud project."
-            )
-        deployer_email = SETTINGS.APP.get(
-            "DEPLOYER_EMAIL"
-        ) or SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
-        if not deployer_email:
-            raise RuntimeError("A deployer Google account is required.")
+    iam_admin_client = iam_admin_v1.IAMClient()
+    resource = f"projects/{project_id}"
 
-        iam_admin_client = iam_admin_v1.IAMClient()
-        resource = f"projects/{project_id}"
-
-        def retry_iam(operation, description):
-            def wait_for_retry(delay):
-                sp.write(
-                    f.info(
-                        "Google IAM is still becoming available; "
-                        f"retrying in {delay} seconds..."
-                    )
+    # @testable false
+    # @covered-by installer/gcloud.py::configure_service_account
+    # @reason bounded IAM retry is exercised through account provisioning
+    def retry_iam(operation, description):
+        # @testable false
+        # @covered-by installer/gcloud.py::configure_service_account
+        # @reason retry feedback and delays are exercised through IAM propagation
+        def wait_for_retry(delay):
+            print(
+                f.info(
+                    "Google IAM is still becoming available; "
+                    f"retrying in {delay} seconds..."
                 )
-                time.sleep(delay)
-
-            return retry_provider_call(
-                operation,
-                description=description,
-                attempts=GCLOUD_API_PROPAGATION_ATTEMPTS,
-                delays=GCLOUD_API_PROPAGATION_DELAYS,
-                sleep=wait_for_retry,
             )
+            time.sleep(delay)
 
-        def apply_iam_policy(email):
-            iam_access.reconcile_runtime_project_policy(
-                project_id,
-                email,
-                removed_roles=(
-                    set(constants.REMOVED_RUNTIME_PROJECT_ROLES)
-                    - set(constants.REMOVED_RUNTIME_PROJECT_STORAGE_ROLES)
-                ),
-            )
-            iam_access.reconcile_runtime_service_account_policy(
-                project_id,
-                email,
-                deployer_email,
-            )
+        return retry_provider_call(
+            operation,
+            description=description,
+            attempts=GCLOUD_API_PROPAGATION_ATTEMPTS,
+            delays=GCLOUD_API_PROPAGATION_DELAYS,
+            sleep=wait_for_retry,
+        )
 
-        name = f"projects/{project_id}/serviceAccounts/{runtime_email}"
-        request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
+    # @testable false
+    # @covered-by installer/gcloud.py::configure_service_account
+    # @reason exact runtime and service-account grants belong to provisioning
+    def apply_iam_policy(email):
+        iam_access.reconcile_runtime_project_policy(
+            project_id,
+            email,
+        )
+        iam_access.reconcile_runtime_service_account_policy(
+            project_id,
+            email,
+            deployer_email,
+        )
+
+    name = f"projects/{project_id}/serviceAccounts/{runtime_email}"
+    request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
+    try:
+        account = retry_iam(
+            lambda: iam_admin_client.get_service_account(request=request),
+            f"Discover service account {name}",
+        )
+        record_mutation(
+            "reconcile service account",
+            action="existing",
+            resource="service-account",
+            identifier=account.email,
+        )
+    except ProviderTransientError as e:
+        message = (
+            "Google IAM is enabled but did not become ready in time. "
+            "Run setup again to resume."
+        )
+        print(f.error(message))
+        raise ProviderTransientError(message) from e
+    except ProviderNotFound:
         try:
+            request = iam_admin_v1.types.CreateServiceAccountRequest()
+            request.account_id = runtime_email.split("@", 1)[0]
+            request.name = resource
+
+            new_service_account = iam_admin_v1.types.ServiceAccount()
+            new_service_account.display_name = SETTINGS.APP["APP_NAME"]
+            request.service_account = new_service_account
+
             account = retry_iam(
-                lambda: iam_admin_client.get_service_account(request=request),
-                f"Discover service account {name}",
+                lambda: iam_admin_client.create_service_account(request=request),
+                f"Create service account {name}",
             )
-            sp.write(f.info("Using existing service account..."))
             record_mutation(
                 "reconcile service account",
-                action="existing",
+                action="created",
                 resource="service-account",
                 identifier=account.email,
             )
-        except ProviderTransientError as e:
+        except Exception as e:
+            classified = classify_provider_error(e)
+            if isinstance(classified, ProviderTransientError):
+                message = (
+                    "Google IAM is enabled but did not become ready in "
+                    "time. Run setup again to resume."
+                )
+                print(f.error(message))
+                raise ProviderTransientError(message) from e
+            print(f.error("Failed to create service account."))
+            raise classify_provider_error(
+                e,
+                message="Failed to create service account.",
+            ) from e
+
+    # @testable false
+    # @covered-by installer/gcloud.py::configure_service_account
+    # @reason provider readback is exercised through account provisioning
+    def wait_for_service_account(name):
+        active, count = False, 0
+        while not active:
+            try:
+                request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
+                iam_admin_client.get_service_account(request=request)
+                break
+            except Exception as e:
+                count += 1
+                if count > 9:
+                    raise e
+                time.sleep(1)
+
+    try:
+        wait_for_service_account(account.name)
+        apply_iam_policy(account.email)
+    except Exception as e:
+        classified = classify_provider_error(e)
+        if isinstance(classified, ProviderTransientError):
             message = (
                 "Google IAM is enabled but did not become ready in time. "
                 "Run setup again to resume."
             )
-            sp.write(f.error(message))
-            sp.fail(f.fail_glyph)
+            print(f.error(message))
             raise ProviderTransientError(message) from e
-        except ProviderNotFound:
-            sp.write(f.info("Creating new service account..."))
-            try:
-                request = iam_admin_v1.types.CreateServiceAccountRequest()
-                request.account_id = runtime_email.split("@", 1)[0]
-                request.name = resource
+        print(f.error("Failed to reconcile the service account."))
+        raise classify_provider_error(
+            e,
+            message="Failed to reconcile the keyless runtime service account.",
+        ) from e
 
-                new_service_account = iam_admin_v1.types.ServiceAccount()
-                new_service_account.display_name = SETTINGS.APP["APP_NAME"]
-                request.service_account = new_service_account
-
-                account = retry_iam(
-                    lambda: iam_admin_client.create_service_account(request=request),
-                    f"Create service account {name}",
-                )
-                record_mutation(
-                    "reconcile service account",
-                    action="created",
-                    resource="service-account",
-                    identifier=account.email,
-                )
-            except Exception as e:
-                sp.fail(f.fail_glyph)
-                classified = classify_provider_error(e)
-                if isinstance(classified, ProviderTransientError):
-                    message = (
-                        "Google IAM is enabled but did not become ready in "
-                        "time. Run setup again to resume."
-                    )
-                    sp.write(f.error(message))
-                    raise ProviderTransientError(message) from e
-                sp.write(f.error("Failed to create service account."))
-                raise classify_provider_error(
-                    e,
-                    message="Failed to create service account.",
-                ) from e
-
-        def wait_for_service_account(name):
-            active, count = False, 0
-            while not active:
-                try:
-                    request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
-                    iam_admin_client.get_service_account(request=request)
-                    break
-                except Exception as e:
-                    count += 1
-                    if count > 9:
-                        raise e
-                    time.sleep(1)
-
-        try:
-            wait_for_service_account(account.name)
-            apply_iam_policy(account.email)
-        except Exception as e:
-            sp.fail(f.fail_glyph)
-            classified = classify_provider_error(e)
-            if isinstance(classified, ProviderTransientError):
-                message = (
-                    "Google IAM is enabled but did not become ready in time. "
-                    "Run setup again to resume."
-                )
-                sp.write(f.error(message))
-                raise ProviderTransientError(message) from e
-            sp.write(f.error("Failed to reconcile the service account."))
-            raise classify_provider_error(
-                e,
-                message="Failed to reconcile the keyless runtime service account.",
-            ) from e
-
-        sp.ok(f.ok_glyph)
-        return {"client_email": account.email}
+    return {"client_email": account.email}
 
 
 # @testable true

@@ -16,6 +16,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.ai import external_operations
+from lagniappe.core.tools.ai.reporting.contracts.workflows import is_remote_organize_update
 from lagniappe.core.tools.database import agent_api as agent_api_store
 
 from .base import DeferredJobAdapter
@@ -170,6 +171,7 @@ class ReportAdapter(DeferredJobAdapter):
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_prepare_stops_before_report_save_after_cancellation
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_resumes_plan_checkpoint_without_second_planning_call
 # @matrix ai-report : plan-resume submission-completion
+# @matrix ai-report : remote-update transport-boundary
 # @matrix deferred-jobs : cancellation checkpoint quota retry service-tier
 class OrganizeReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_ORGANIZE
@@ -218,6 +220,15 @@ class OrganizeReportAdapter(ReportAdapter):
             )
             stage_index = 1
 
+        update_only = is_remote_organize_update(report)
+        if not report.input_files and not update_only:
+            raise exceptions.ValidationError("Organize requires at least one uploaded file in the UI.")
+        if update_only and stage_index < 2:
+            context.checkpoint_stage(
+                "summaries_ready", phase=DeferredJobPhase.PREPARING_INPUTS.value
+            )
+            stage_index = 2
+
         if stage_index < 2:
             context.set_phase(DeferredJobPhase.SUMMARIZING)
             summary_options = {
@@ -239,9 +250,13 @@ class OrganizeReportAdapter(ReportAdapter):
 
         if stage_index < 3:
             context.set_phase(DeferredJobPhase.GENERATING)
-            retrieval_context = ai.prepare_organize_retrieval_context(
-                report,
-                actor,
+            retrieval_context = (
+                {}
+                if update_only
+                else ai.prepare_organize_retrieval_context(
+                    report,
+                    actor,
+                )
             )
             if context.parameters.get("mode") == "revise":
                 prompt = ai.revise_organize_prompt(
@@ -266,12 +281,13 @@ class OrganizeReportAdapter(ReportAdapter):
 
         if stage_index < 4:
             context.set_phase(DeferredJobPhase.FINALIZING)
-            proposal = ai.complete_organize_submissions(
-                proposal,
-                report,
-                actor,
-                service_tier=service_tier,
-            )
+            if not update_only:
+                proposal = ai.complete_organize_submissions(
+                    proposal,
+                    report,
+                    actor,
+                    service_tier=service_tier,
+                )
             context.ensure_active()
             context.checkpoint_stage(
                 "ready_to_apply",

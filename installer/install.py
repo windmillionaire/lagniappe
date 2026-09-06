@@ -64,6 +64,7 @@ def install():
     from installer import FORMATTER
 
     f = FORMATTER.initialize()
+    first_install = not SETTINGS.APP.get("GOOGLE_CLOUD_PROJECT") and not SETTINGS.APP.get("APP_URL")
 
     from installer.create_config import set_application_defaults
 
@@ -132,7 +133,10 @@ def install():
     consent = input(f.info("Would you like to deploy the app now? [y/N]: "))
     if consent.lower() == "y":
         record_step("deploy application")
-        utils.deploy_to_app_engine(print_final_summary=False)
+        utils.deploy_to_app_engine(
+            print_final_summary=False,
+            first_install=first_install and not getattr(SETTINGS, "RECOVERY_MODE", False),
+        )
         from installer.upgrade import _configure_deferred_job_recovery
 
         print(f"\n{f.info('Wrapping up installation...')}")

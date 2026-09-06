@@ -29,11 +29,22 @@ LIST_WORKSPACE_RESOURCES = types.FunctionDeclaration(
         "ordinary workspace search; use the returned reference for the user's own "
         "notes and Tasks even though its public hash is shared with the User. "
         "Model-task "
-        "forms include a schema_ref handle for get_schema without inlining schemas."
+        "forms include a schema_ref handle for get_schema without inlining schemas. "
+        "Supply category_id and/or project_id when their references are already known "
+        "to omit unrelated resources; without a scope, return the full inventory."
     ),
     parameters={
         "type": "object",
-        "properties": {},
+        "properties": {
+            "category_id": {
+                "type": "string",
+                "description": "Known Category hash reference to include.",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Known Project hash reference to include.",
+            },
+        },
     },
 )
 
@@ -41,19 +52,40 @@ LIST_WORKSPACE_RESOURCES = types.FunctionDeclaration(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
 # @matrix ai : redis-cache resource-inventory
-def execute_list_workspace_resources(_args, user):
+def execute_list_workspace_resources(args, user):
     """Return a cached, permission-filtered inventory of model resources."""
     cache_key = _resource_cache_key(user)
     cached = redis_cache.get(cache_key)
     if cached:
-        return json.loads(cached)
-
-    inventory = build_workspace_resource_inventory(user)
-    redis_cache.redis.set(
-        cache_key,
-        json.dumps(inventory, default=str),
-        ex=RESOURCE_CACHE_TTL,
-    )
+        inventory = json.loads(cached)
+    else:
+        inventory = build_workspace_resource_inventory(user)
+        redis_cache.redis.set(
+            cache_key,
+            json.dumps(inventory, default=str),
+            ex=RESOURCE_CACHE_TTL,
+        )
+    if args.get("category_id") or args.get("project_id"):
+        selected = {
+            "personal_page": inventory["personal_page"],
+            "categories": [],
+            "projects": [],
+            "standalone_forms": [],
+        }
+        for argument, kind, collection in (
+            ("category_id", Entities.CATEGORY, "categories"),
+            ("project_id", Entities.PROJECT, "projects"),
+        ):
+            if identifier := args.get(argument):
+                entity = Entities.fetch_one(identifier, request=Fetch.direct())
+                if not isinstance(entity, kind) or not _can_list(entity, user):
+                    return {"error": "Requested workspace scope is unavailable"}
+                selected[collection] = [
+                    item
+                    for item in inventory[collection]
+                    if item["hash"] == hash_reference(entity)
+                ]
+        return selected
     return inventory
 
 

@@ -156,7 +156,11 @@ def normalize_site_url(value: str) -> SiteAuthority:
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 # @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper
 def validate_api_url(
-    authority: SiteAuthority, value: str, *, expected_path: str | None = None
+    authority: SiteAuthority,
+    value: str,
+    *,
+    expected_path: str | None = None,
+    allow_contract_query: bool = False,
 ) -> str:
     """Require an exact configured origin and an allowed versioned API path."""
     try:
@@ -168,7 +172,33 @@ def validate_api_url(
     candidate_origin = urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
     if parsed.username or parsed.password or candidate_origin != authority.origin:
         raise TransportError("incompatible_url", "Upstream API URL changed authority.")
-    if parsed.query or parsed.fragment:
+    if parsed.query and allow_contract_query:
+        pairs = parse_qsl(parsed.query, keep_blank_values=True)
+        if (
+            len(parsed.query) > 8192
+            or not re.fullmatch(r"/api/v1/plans/[^/]+/contract", parsed.path)
+            or not pairs
+            or len({key for key, _ in pairs}) != len(pairs)
+            or any(
+                not (
+                    key == "view"
+                    and item in {"full", "summary"}
+                    or key == "actions"
+                    and 1 <= len(item.split(",")) <= 100
+                    and all(
+                        re.fullmatch(r"[a-z][a-z0-9_]{0,63}", action)
+                        for action in item.split(",")
+                    )
+                )
+                for key, item in pairs
+            )
+        ):
+            raise TransportError("incompatible_url", "Unexpected contract query.")
+    elif parsed.query:
+        raise TransportError(
+            "incompatible_url", "Upstream API URL has an unexpected query."
+        )
+    if parsed.fragment:
         raise TransportError(
             "incompatible_url", "Upstream API URL has an unexpected query or fragment."
         )
@@ -276,10 +306,7 @@ def validate_storage_url(value: str, *, upload: bool) -> str:
             values.get("uploadType") != "resumable"
             or not values.get("upload_id")
             or ("name" in values and not values["name"])
-            or (
-                "ifGenerationMatch" in values
-                and values["ifGenerationMatch"] != "0"
-            )
+            or ("ifGenerationMatch" in values and values["ifGenerationMatch"] != "0")
         ):
             raise TransportError(
                 "unsafe_storage_url", "Storage upload URL is not resumable."

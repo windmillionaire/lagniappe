@@ -185,7 +185,11 @@ def authenticate_request():
                 )
                 g.remote_mcp_authenticated = True
             except remote_auth.OAuthError:
-                return _error("unauthorized", "The remote MCP connection is invalid or expired.", 401)
+                return _error(
+                    "unauthorized",
+                    "The remote MCP connection is invalid or expired.",
+                    401,
+                )
             except APIProblem as problem:
                 return _error(
                     problem.code,
@@ -578,6 +582,11 @@ def _plan_payload(report, *, include_proposal=True):
     }
     if include_proposal:
         payload["proposal"] = external_api.public_plan_proposal(report)
+        if report.tool != "ask":
+            payload["execution"] = external_api.public_execution_receipt(
+                report, g.agent_api_user
+            )
+        payload["original_brief"] = (report.agent_manifest or {}).get("original_brief")
     return _json_safe(payload)
 
 
@@ -658,15 +667,12 @@ def _discovery_payload():
         "name": "Lagniappe External Agent API",
         "version": "v1",
         "base_url": _api_absolute_url(url_for("agent_api.api_index")).rstrip("/"),
-        "openapi_url": _api_absolute_url(
-            url_for("agent_api.openapi_document")
-        ),
+        "openapi_url": _api_absolute_url(url_for("agent_api.openapi_document")),
         "actor_url": _api_absolute_url(url_for("agent_api.me")),
         "tools_url": _api_absolute_url(url_for("agent_api.tools")),
         "plans_url": _api_absolute_url(url_for("agent_api.create_plan")),
-        "client_skill_url": _api_absolute_url(
-            url_for("agent_api.client_skill")
-        ),
+        "answer_context_url": _api_absolute_url(url_for("agent_api.answer_context")),
+        "client_skill_url": _api_absolute_url(url_for("agent_api.client_skill")),
         "authentication": "Authorization: Bearer <user API key>",
         "instructions": (
             "Read openapi_url before using or guessing resource paths, then call "
@@ -793,9 +799,7 @@ def openapi_document():
                 "responses": {
                     "200": {
                         "description": "Canonical minimal client skill.",
-                        "content": {
-                            "text/markdown": {"schema": {"type": "string"}}
-                        },
+                        "content": {"text/markdown": {"schema": {"type": "string"}}},
                     },
                     "default": error_response,
                 },
@@ -882,12 +886,17 @@ def openapi_document():
                                         "type": "array",
                                         "items": {
                                             "oneOf": [
-                                                {"$ref": "#/components/schemas/ToolDefinition"},
+                                                {
+                                                    "$ref": "#/components/schemas/ToolDefinition"
+                                                },
                                                 {"type": "string"},
                                             ]
                                         },
                                     },
-                                    "view": {"type": "string", "enum": ["full", "names"]},
+                                    "view": {
+                                        "type": "string",
+                                        "enum": ["full", "names"],
+                                    },
                                     "selected_count": {"type": "integer"},
                                     "reference_format": {"type": "string"},
                                     "execution_envelope": {"type": "object"},
@@ -992,9 +1001,7 @@ def openapi_document():
                 "responses": {
                     "200": {
                         "description": "Current proposal and permission contract.",
-                        **json_content(
-                            {"$ref": "#/components/schemas/PlanContract"}
-                        ),
+                        **json_content({"$ref": "#/components/schemas/PlanContract"}),
                     },
                     "default": error_response,
                 },
@@ -1173,9 +1180,10 @@ def openapi_document():
                 "summary": "Validate and publish the final proposal",
                 "description": (
                     "Requires the current tool-specific contract and no pending "
-                    "uploads; Organize also requires at least one finalized file. A "
+                    "uploads. Remote Organize can update existing records without "
+                    "files; uploaded files still require summaries and placement. A "
                     "valid Ask response becomes a completed read-only report and "
-                    "should be submitted without separate save confirmation. A valid "
+                    "is saved only after the user requests saving the answer. A valid "
                     "Create or Organize proposal becomes ready for review and returns "
                     "preview_url. Submission itself never executes actions. Repeating "
                     "the identical normalized result is accepted. While the report "
@@ -1238,6 +1246,58 @@ def openapi_document():
             }
         },
     }
+    # The plan-free endpoint has exactly the same argument and result boundary,
+    # but no report lifecycle, owner lookup, or per-Plan budget.
+    plan_free = deepcopy(paths["/api/v1/plans/{plan_id}/tools/{tool_name}"]["post"])
+    plan_free.update(
+        operationId="readWorkspaceTool",
+        parameters=[tool_parameter],
+        description="Run a permission-bounded read without creating a Plan or saving an answer. Use the same arguments/result envelope as Plan-scoped reads. Normal authentication, revocation, and general rate limits apply on every call.",
+    )
+    paths["/api/v1/tools/{tool_name}"] = {"post": plan_free}
+    paths["/api/v1/answer-context"] = {
+        "get": {
+            "operationId": "answerQuestion",
+            "summary": "Get plan-free answering guidance",
+            "description": "The client model answers using authorized read tools, then offers to save. This endpoint creates no report/session and invokes no model. Start an Ask Plan only after save consent.",
+            "tags": ["Tools"],
+            "responses": {
+                "200": {
+                    "description": "Current date, timezone, personal Page, report_created=false and workflow_rules.",
+                    **json_content({"type": "object"}),
+                },
+                "default": error_response,
+            },
+        }
+    }
+    paths["/api/v1/plans/{plan_id}/contract"]["get"]["parameters"].extend(
+        [
+            {
+                "name": "view",
+                "in": "query",
+                "schema": {"enum": ["full", "summary"], "default": "full"},
+                "description": "summary omits the proposal schema; all allowed action names remain visible.",
+            },
+            {
+                "name": "actions",
+                "in": "query",
+                "schema": {"type": "string"},
+                "description": "Comma-separated allowed action names for selected schemas. Omit for all schemas. This is context selection, not a permission change.",
+            },
+        ]
+    )
+    paths["/api/v1/plans/{plan_id}/submit"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]["properties"].update(
+        {
+            "name": {"type": "string", "minLength": 1, "maxLength": 120},
+            "instructions": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Updated current brief, at most 65536 UTF-8 bytes. Original brief is retained; updates are atomic with proposal submission.",
+            },
+        }
+    )
     return {
         "openapi": "3.1.0",
         "info": {
@@ -1249,16 +1309,19 @@ def openapi_document():
                 "plan and may create a different plan as the conversation changes. "
                 "Verify the actor, create a draft, use permitted read tools, fetch the "
                 "tool-specific plan contract, and submit a conforming final result. "
-                "Organize additionally uploads files and follows the get_guidelines "
-                "task=organize two-phase workflow, including one summary and two "
-                "retrieval terms per file. Ask publishes a read-only answer. Create "
+                "Use Create for new content and Organize for existing-record updates "
+                "or file organization. Remote updates do not require uploads. Fetch "
+                "selected action contracts for details. With uploads, follow the "
+                "get_guidelines task=organize two-phase workflow, including one summary "
+                "and two retrieval terms per file. Ask publishes a read-only answer. Create "
                 "and Organize publish proposals for authenticated browser review. "
                 "The external API never applies those proposals; direct the user to "
                 "preview_url, where the existing website Execute control is the only "
                 "approval and application path. The server does not call a model to "
                 "choose the tool, complete, repair, or summarize the result. When an "
-                "Ask answer is ready, submit it without separate save confirmation, "
-                "then answer the user with the returned preview_url; Ask submission "
+                "question is asked, use answer-context and plan-free tools and answer "
+                "in the conversation; offer to save afterward. Only if the user wants "
+                "to save, create an Ask Plan and submit the agreed answer; Ask submission "
                 "is read-only and later valid answers may replace it. Ready Create and "
                 "Organize proposals may likewise be revised and submitted again until "
                 "browser execution starts."
@@ -1417,6 +1480,14 @@ def openapi_document():
                                 "be edited and submitted again."
                             ),
                         },
+                        "execution": {
+                            "type": ["object", "null"],
+                            "description": "Create/Organize action outcomes and permission-rechecked result entity references; no private ledger data. Absent for Ask.",
+                        },
+                        "original_brief": {
+                            "type": ["object", "null"],
+                            "description": "Initial name/instructions, retained when the current brief is revised.",
+                        },
                     },
                 },
                 "PlanSubmissionFormat": {
@@ -1462,6 +1533,9 @@ def openapi_document():
                         "personal_page",
                         "submission_format",
                         "proposal_schema",
+                        "schema_scope",
+                        "schema_actions",
+                        "schema_instructions",
                         "permissions",
                         "required_file_refs",
                         "upload_inventory",
@@ -1488,7 +1562,13 @@ def openapi_document():
                         "submission_format": {
                             "$ref": "#/components/schemas/PlanSubmissionFormat"
                         },
-                        "proposal_schema": {"type": "object"},
+                        "proposal_schema": {"type": ["object", "null"]},
+                        "schema_scope": {"enum": ["full", "selected", "summary"]},
+                        "schema_actions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "schema_instructions": {"type": "string"},
                         "permissions": {"type": "object"},
                         "required_file_refs": {
                             "type": "array",
@@ -1682,6 +1762,15 @@ def tools():
 
 
 # @testable true
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_plan_free_reads_and_answer_context_do_not_create_reports
+# @pair agent-api:answer-context
+@api.get("/answer-context")
+@_route
+def answer_context():
+    return external_api.answer_context(g.agent_api_user)
+
+
+# @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
 # @matrix agent-api : entitlement-independent plan-session tool-selection
@@ -1728,9 +1817,7 @@ def create_plan():
             },
         )
     name = data.get("name")
-    if "name" in data and (
-        not isinstance(name, str) or len(name) > 120
-    ):
+    if "name" in data and (not isinstance(name, str) or len(name) > 120):
         raise APIProblem(
             "invalid_name",
             '"name" must be a string of at most 120 characters.',
@@ -1765,6 +1852,12 @@ def get_plan(plan_id):
 @_route
 def get_plan_contract(plan_id):
     report = _load_plan(plan_id)
+    actions = [
+        name.strip()
+        for value in request.args.getlist("actions")
+        for name in value.split(",")
+        if name.strip()
+    ] or None
     contract = external_api.plan_contract(
         report,
         g.agent_api_user,
@@ -1774,6 +1867,8 @@ def get_plan_contract(plan_id):
                 plan_id=report.urlsafe_key,
             )
         ),
+        **({"actions": actions} if actions is not None else {}),
+        **({"view": request.args["view"]} if "view" in request.args else {}),
     )
     LOGGER.info(
         "agent_api_contract request_id=%s user_hash=%s plan=%s "
@@ -1852,9 +1947,7 @@ def create_uploads(plan_id):
     for index, item in enumerate(requested):
         if not isinstance(item, dict):
             raise APIProblem("invalid_files", "Each file must be an object.", 422)
-        unsupported_fields = sorted(
-            set(item) - {"filename", "content_type", "size"}
-        )
+        unsupported_fields = sorted(set(item) - {"filename", "content_type", "size"})
         if unsupported_fields:
             details = {
                 "path": f"$.files[{index}]",
@@ -2060,9 +2153,8 @@ def finalize_uploads(plan_id):
             },
         )
     upload_batch_id = data.get("upload_batch_id")
-    if (
-        not isinstance(upload_batch_id, str)
-        or not UPLOAD_BATCH_ID_PATTERN.fullmatch(upload_batch_id)
+    if not isinstance(upload_batch_id, str) or not UPLOAD_BATCH_ID_PATTERN.fullmatch(
+        upload_batch_id
     ):
         raise APIProblem(
             "invalid_upload_batch_id",
@@ -2164,10 +2256,9 @@ def _original_file_download(tool_name, arguments, result):
     if tool_name != "get_file" or not isinstance(arguments, dict):
         return result
     include_original = arguments.get("include_original")
-    include_original = (
-        include_original is True
-        or str(include_original).strip().casefold() in {"1", "true", "yes", "on"}
-    )
+    include_original = include_original is True or str(
+        include_original
+    ).strip().casefold() in {"1", "true", "yes", "on"}
     original_file = result.get("original_file") if isinstance(result, dict) else None
     if (
         not include_original
@@ -2178,9 +2269,8 @@ def _original_file_download(tool_name, arguments, result):
 
     normalized = normalize_hash_references(arguments)
     entity = Entities.fetch_one(normalized.get("id"), request=Fetch.direct())
-    if (
-        not isinstance(entity, Entities.FILE)
-        or not entity.allowed(Action.VIEW, user=g.agent_api_user)
+    if not isinstance(entity, Entities.FILE) or not entity.allowed(
+        Action.VIEW, user=g.agent_api_user
     ):
         return result
     asset = entity.properties.file.value
@@ -2216,20 +2306,27 @@ def _original_file_download(tool_name, arguments, result):
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
 # @matrix agent-api : tool-dispatch
+# @pair agent-api:answer-context
 # @pairs agent-api:ask-refinement agent-api:create-revision agent-api:organize-revision agent-api:envelope-validation
 # @pairs agent-api:rate-limit
+@api.post("/tools/<tool_name>", defaults={"plan_id": None})
 @api.post("/plans/<plan_id>/tools/<tool_name>")
 @_route
 def execute_tool(plan_id, tool_name):
-    report = _load_plan(plan_id)
-    _require_tools_available(report)
+    report = _load_plan(plan_id) if plan_id is not None else None
+    if report is not None:
+        _require_tools_available(report)
     if tool_name not in ai_functions.TOOL_DEFINITIONS:
         raise APIProblem("tool_not_found", "Tool not found.", 404)
-    rate_state = _rate_limit(
-        "agent-api-plan-tools",
-        report.urlsafe_key,
-        external_api.MAX_PLAN_TOOL_CALLS,
-        PLAN_TOOL_RATE_WINDOW,
+    rate_state = (
+        _rate_limit(
+            "agent-api-plan-tools",
+            report.urlsafe_key,
+            external_api.MAX_PLAN_TOOL_CALLS,
+            PLAN_TOOL_RATE_WINDOW,
+        )
+        if report is not None
+        else {"count": 0}
     )
     data = _json_body()
     unsupported = sorted(set(data) - {"arguments"})
@@ -2293,7 +2390,7 @@ def execute_tool(plan_id, tool_name):
             "outcome=%s call_number=%d result_bytes=%d elapsed_ms=%d",
             g.agent_api_request_id,
             g.agent_api_user.hash,
-            report.hash,
+            report.hash if report is not None else "none",
             tool_name,
             outcome,
             rate_state["count"],
@@ -2374,6 +2471,11 @@ def submit_plan(plan_id):
                 data.get("proposal"),
                 contract_version=data.get("contract_version"),
                 save=save,
+                **{
+                    field: data[field]
+                    for field in ("name", "instructions")
+                    if field in data
+                },
             )
         except exceptions.ValidationError as error:
             if report.status == reusable_status:

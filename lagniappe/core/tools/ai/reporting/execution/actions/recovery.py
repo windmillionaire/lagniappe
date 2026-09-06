@@ -21,6 +21,7 @@ from .references import (
     _load_result_entity,
 )
 from .forms import _submission_previous_value
+from .task_completion import _completion_state
 from .completed_tasks import (
     _is_completed_task_event,
     _task_state_fingerprint,
@@ -41,6 +42,9 @@ def _expected_action_state(action, record):
         "entity": (record.get("entity") or {}).get("id"),
         "target": (record.get("target") or {}).get("id"),
     }
+    if action_type == "complete_task":
+        expected["completion_state"] = record.get("completion_state")
+        expected["task_state_fingerprint"] = record.get("task_state_fingerprint")
     if action_type == "update_submission_fields":
         applied = {
             item.get("index"): item
@@ -200,6 +204,10 @@ def _inspect_action_applied(action, report, user, record):
         return ACTION_DRIFTED
     if action_type == "rename_entity":
         return ACTION_APPLIED if entity.name == expected.get("name") else ACTION_DRIFTED
+    if action_type == "complete_task":
+        if expected.get("task_state_fingerprint") and _task_state_fingerprint(entity) != expected["task_state_fingerprint"]:
+            return ACTION_DRIFTED
+        return ACTION_APPLIED if _completion_state(entity) == expected.get("completion_state") else ACTION_DRIFTED
     if action_type == "update_submission_fields":
         for update in expected.get("updates") or []:
             target_entity = _fetch_report_entity(update.get("entity"))
@@ -267,6 +275,22 @@ def _inspect_action_compensated(record, report, user):
     entity = _load_result_entity(record.get("entity"))
     if entity is None:
         return ACTION_DRIFTED
+    if action_type == "complete_task":
+        if not _recovery_entity_allowed(entity, user):
+            return ACTION_DRIFTED
+        if record.get("created_histories") and (
+            _task_state_fingerprint(entity) != _value_fingerprint(before.get("task"))
+            or any(
+                _load_result_entity(history) is not None
+                for history in record["created_histories"]
+            )
+        ):
+            return ACTION_NOT_APPLIED
+        return (
+            ACTION_APPLIED
+            if _completion_state(entity) == before.get("completion_state")
+            else ACTION_NOT_APPLIED
+        )
     if action_type == "add_form_to_page":
         previous_id = (before.get("form") or {}).get("id")
         return (

@@ -278,18 +278,20 @@ def due_in_home_task_window(due_date):
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_near_term_schedule_uncompletes_immediately
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
+# @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_retries_and_undoes
 # @matrix task-completion task-scheduling : complete schedule-queue
-def add_uncomplete_task_to_queue(task):
+def add_uncomplete_task_to_queue(task, *, history_key=None):
     """Record an uncompletion intent or apply a near-term recurrence now."""
     next_due = task.due_date
+    history_args = {} if history_key is None else {"history_key": history_key}
 
     if due_in_home_task_window(next_due):
-        task.uncomplete()
+        task.uncomplete(**history_args)
         task.due_date = next_due
         return None
 
     if not CONFIG.production:
-        task.uncomplete()
+        task.uncomplete(**history_args)
         task.due_date = next_due
         return None
 

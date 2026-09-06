@@ -270,6 +270,7 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
     """Reject hash references whose resolved entity kind violates the action."""
     rules = {
         "create_page": (("category", {"category"}),),
+        "complete_task": (("task", {"task"}),),
         "create_task": (
             ("page", {"page"}),
             ("task", {"task"}),
@@ -417,6 +418,15 @@ def _validate_action_data_shape(
         )
     if action_type == "create_task":
         _validate_create_task_action_data(data, action_label, user=user)
+    if action_type == "complete_task":
+        if not _proposal_string(data.get("task")):
+            raise exceptions.AIException(
+                f"Action {action_label} requires an exact data.task reference."
+            )
+        if set(data) - {"task", "task_name"}:
+            raise exceptions.AIException(
+                f"Action {action_label} only accepts task and task_name; use separate submission patches before completion."
+            )
     entity_pair = ENTITY_PAIR_ACTION_REFERENCES.get(action_type)
     if entity_pair:
         source_root, target_roots = entity_pair

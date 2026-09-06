@@ -206,7 +206,11 @@ class EnvelopeClient(httpx.AsyncClient):
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/server.py::EnvelopeClient
     async def send(self, request, **kwargs):
-        validate_api_url(self.config.authority, str(request.url))
+        validate_api_url(
+            self.config.authority,
+            str(request.url),
+            allow_contract_query=request.method == "GET",
+        )
         self.workload_token = await self.identity.token()
         request.headers["Authorization"] = "Bearer " + self.workload_token
         request.headers[USER_TOKEN_HEADER] = self.config.api_key
@@ -274,7 +278,9 @@ class HostedAdapter(LagniappeAdapter):
             input_schema=schema,
             description="Upload files attached to this ChatGPT conversation into the existing Organize Plan, then finalize them. Reuse plan_id. Files are prepared for browser review and never applied automatically. If an attachment link expires, ask the user to reattach it.",
         )
-        self.tools.update({tool.name: tool for tool in terminal_files.tool_definitions(local)})
+        self.tools.update(
+            {tool.name: tool for tool in terminal_files.tool_definitions(local)}
+        )
         self._remote_initialized = True
 
     # @testable false
@@ -285,7 +291,11 @@ class HostedAdapter(LagniappeAdapter):
             return await super().execute(name, arguments)
         definition = self.tools[name]
         validate_value(definition.input_schema, arguments, phase="input")
-        operation = terminal_files.prepare_uploads if name == "prepare_file_uploads" else terminal_files.finalize_uploads
+        operation = (
+            terminal_files.prepare_uploads
+            if name == "prepare_file_uploads"
+            else terminal_files.finalize_uploads
+        )
         result = await operation(self, arguments)
         if name == "prepare_file_uploads":
             terminal_files.validate_manifest(result.value, bearer=self.config.api_key)

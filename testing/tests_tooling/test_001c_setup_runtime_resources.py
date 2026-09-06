@@ -1249,9 +1249,11 @@ def test_redis_tls_disablement_is_transactional(monkeypatch, tmp_path):
 
 
 # @matrix setup : deploy gcp-domain https managed-certificate provider-status retry success
+@pytest.mark.parametrize("announce_ready", [True, False])
 def test_managed_certificate_waits_for_provider_then_reports_active(
     monkeypatch,
     capsys,
+    announce_ready,
 ):
     from installer.domain import gcp as domain_gcp
 
@@ -1300,6 +1302,7 @@ def test_managed_certificate_waits_for_provider_then_reports_active(
 
     assert domain_gcp.wait_for_managed_certificate(
         "app.example.com",
+        announce_ready=announce_ready,
         poll_delays=(0, 2, 3),
         sleep=delays.append,
     )
@@ -1317,8 +1320,8 @@ def test_managed_certificate_waits_for_provider_then_reports_active(
         "Managed TLS certificate cert-pending for https://app.example.com "
         "in Google Cloud project project-1 using owner@example.com: PENDING"
     ) in output
-    assert "Managed TLS certificate active for https://app.example.com." in output
-    assert "It may take up to an hour before the domain opens over HTTPS." in output
+    assert ("Managed TLS certificate active for https://app.example.com." in output) is announce_ready
+    assert ("It may take up to an hour before the domain opens over HTTPS." in output) is announce_ready
     assert "Checking the App Engine managed TLS certificate" not in output
     assert "Google's HTTPS frontend" not in output
     assert "Retrying in 3 seconds" not in output
@@ -2402,6 +2405,19 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     assert "deploy" in events
     assert "scheduler-repair-warning" in events
 
+    settings.APP["VERSION"] = "2.0.0"
+    for answer in ("n", "N", ""):
+        events.clear()
+        capsys.readouterr()
+        monkeypatch.setattr("builtins.input", lambda prompt: answer)
+        assert upgrade.update() == 0
+        output = capsys.readouterr().out
+        assert output.rstrip().endswith("Deploy when ready: ./setup.sh update")
+        assert "./setup.sh jobs" not in output
+        assert "./setup.sh monitoring" not in output
+        assert "deploy" not in events
+        assert "scheduler-repair-warning" not in events
+
 
 # @matrix deferred-jobs setup : failure-isolation post-deploy recovery
 @pytest.mark.parametrize(
@@ -2511,6 +2527,7 @@ def test_image_restore_uses_loaded_metadata_and_timeouts(monkeypatch, tmp_path):
         b"image:nested/splash.png"
     )
     assert sp.oks == []
+    assert not any(message.startswith("Staged ") for message in sp.messages)
 
     class FailingBlob(FakeBlob):
         def download_to_filename(self, path, **kwargs):
@@ -4117,6 +4134,8 @@ def test_enable_gcloud_apis_guides_maps_terms_then_retries_activation(
 
 # @matrix setup : deploy failure gcloud-command progress
 def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
+    # Load the real summary dependency before replacing config with a small fake.
+    importlib.import_module("installer.mcp")
     import installer as setup_pkg
     from installer import utils
     from installer.domain import gcp as domain_gcp
@@ -4206,7 +4225,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     monkeypatch.setattr(
         domain_gcp,
         "wait_for_managed_certificate",
-        lambda domain: deploy_commands.append(("certificate", domain)),
+        lambda domain, **kwargs: deploy_commands.append(("certificate", domain, kwargs)),
     )
     deploy_module = types.ModuleType("runner.deploy")
     deploy_module.deploy = lambda **kwargs: deploy_commands.append(("deploy", kwargs))
@@ -4233,17 +4252,26 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
                 "announce_completion": False,
             },
         ),
-        ("certificate", "app.example.com"),
+        ("certificate", "app.example.com", {"announce_ready": False}),
         "summary",
     ]
+
+    deploy_commands.clear()
+    sys.modules["config"].SETTINGS.APP["REMOTE_MCP"] = {
+        "enabled": True, "resource": "https://mcp.example.test/mcp",
+    }
+    utils.deploy_to_app_engine(print_final_summary=False, first_install=True)
+    assert capsys.readouterr().out == "[OK] MCP server is ready\n"
+    assert deploy_commands[-1] == ("certificate", "app.example.com", {"announce_ready": True})
 
     deploy_module.deploy = lambda **kwargs: (_ for _ in ()).throw(
         RuntimeError("provider deployment failed")
     )
     with pytest.raises(RuntimeError, match="provider deployment failed"):
         utils.deploy_to_app_engine(print_final_summary=False)
-    assert deployment_spinner.oks == ["[OK]"]
+    assert deployment_spinner.oks == ["[OK]", "[OK]"]
     assert deployment_spinner.fails == ["[X]"]
+    assert "MCP server is ready" not in capsys.readouterr().out
 
 
 # @pairs migrations:deploy setup:legacy-upgrade setup:major-version
@@ -4253,6 +4281,7 @@ def test_legacy_upgrade_warning_can_cancel_before_provider_deploy(
 ):
     import installer as setup_pkg
     from installer import state, utils
+    importlib.import_module("installer.mcp")
 
     settings = _fake_settings(
         app={"VERSION": "1.0.0"},
@@ -5448,6 +5477,50 @@ def test_installer_bucket_permission_preflight_uses_bucket_resource(monkeypatch)
     assert "active installer account" in message
 
 
+# @matrix iam setup : idempotence operator-preservation
+def test_runtime_project_policy_preserves_unmanaged_bindings_and_is_idempotent(monkeypatch):
+    from google.cloud import resourcemanager_v3
+    from google.iam.v1 import policy_pb2
+    from installer import iam
+
+    runtime_email = "runtime@project-1.iam.gserviceaccount.com"
+    member = f"serviceAccount:{runtime_email}"
+    original = [
+        policy_pb2.Binding(role="roles/storage.admin", members=[member]),
+        policy_pb2.Binding(
+            role="roles/firebase.admin", members=[member],
+            condition={"title": "operator-owned", "expression": "true"},
+        ),
+        policy_pb2.Binding(role="roles/viewer", members=["user:operator@example.test"]),
+    ]
+    policy = policy_pb2.Policy(version=3, etag=b"unchanged-etag", bindings=original)
+    writes = []
+
+    class Client:
+        def get_iam_policy(self, request):
+            assert request == {
+                "resource": "projects/project-1", "options": {"requested_policy_version": 3},
+            }
+            return policy
+
+        def set_iam_policy(self, request):
+            assert request["resource"] == "projects/project-1"
+            assert request["policy"] is policy
+            writes.append(request)
+
+    monkeypatch.setattr(iam, "install_if_missing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(resourcemanager_v3, "ProjectsClient", Client)
+    assert iam.reconcile_runtime_project_policy("project-1", runtime_email)
+    assert len(writes) == 1
+    assert policy.version == 3
+    assert policy.etag == b"unchanged-etag"
+    assert all(binding in policy.bindings for binding in original)
+    granted = {binding.role for binding in policy.bindings if member in binding.members and not binding.HasField("condition")}
+    assert set(iam.constants.RUNTIME_PROJECT_ROLES).issubset(granted)
+    assert not iam.reconcile_runtime_project_policy("project-1", runtime_email)
+    assert len(writes) == 1
+
+
 def test_runtime_role_plan_limits_administration_to_owned_scheduler_lifecycle():
     constants = _load_config_constants()
 
@@ -5470,7 +5543,6 @@ def test_runtime_role_plan_limits_administration_to_owned_scheduler_lifecycle():
     )
     assert "iamcredentials.googleapis.com" in (constants.REQUIRED_GOOGLE_CLOUD_APIS)
     runtime_roles = set(constants.RUNTIME_PROJECT_ROLES)
-    assert runtime_roles.isdisjoint(constants.REMOVED_RUNTIME_PROJECT_ROLES)
     assert {
         "roles/cloudscheduler.admin",
         "roles/cloudtasks.enqueuer",
@@ -5481,6 +5553,7 @@ def test_runtime_role_plan_limits_administration_to_owned_scheduler_lifecycle():
         "roles/cloudtasks.admin",
         "roles/firebase.admin",
         "roles/firebaseauth.admin",
+        "roles/firebasecloudmessaging.admin",
         "roles/firebasemessagingcampaigns.admin",
         "roles/serviceusage.serviceUsageConsumer",
         "roles/serviceusage.serviceUsageAdmin",
@@ -5489,9 +5562,6 @@ def test_runtime_role_plan_limits_administration_to_owned_scheduler_lifecycle():
         "roles/cloudbuild.builds.editor",
         "roles/iam.serviceAccountUser",
     }.isdisjoint(runtime_roles)
-    assert "roles/firebasecloudmessaging.admin" in (
-        constants.REMOVED_RUNTIME_PROJECT_ROLES
-    )
     assert set(constants.RUNTIME_BUCKET_ROLES) == {
         "roles/storage.legacyBucketReader",
         "roles/storage.objectAdmin",
@@ -5729,7 +5799,7 @@ def test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject(
 
 
 # @matrix setup : provider-convergence service-account
-def test_service_account_waits_for_newly_enabled_iam(monkeypatch):
+def test_service_account_waits_for_newly_enabled_iam(monkeypatch, capsys):
     import installer as setup_pkg
 
     constants = _load_config_constants()
@@ -5809,11 +5879,12 @@ def test_service_account_waits_for_newly_enabled_iam(monkeypatch):
 
     assert gcloud.configure_service_account() == {"client_email": runtime_email}
     assert delays == [2, 4]
-    assert any(
-        "Google IAM is still becoming available" in message
-        for message in spinner.messages
-    )
-    assert not any("SERVICE_DISABLED" in message for message in spinner.messages)
+    output = capsys.readouterr().out
+    assert "Google IAM is still becoming available" in output
+    assert "SERVICE_DISABLED" not in output
+    assert "Configuring service account" not in output
+    assert "Using existing service account" not in output
+    assert spinner.oks == []
 
 
 # @matrix setup : app-engine cloud-tasks ocr service-account
@@ -5873,12 +5944,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
         (
             "project",
             ("project-1", runtime_email),
-            {
-                "removed_roles": (
-                    set(constants.REMOVED_RUNTIME_PROJECT_ROLES)
-                    - set(constants.REMOVED_RUNTIME_PROJECT_STORAGE_ROLES)
-                )
-            },
+            {},
         ),
         (
             "service-account",

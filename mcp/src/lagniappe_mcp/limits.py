@@ -50,7 +50,10 @@ MCP_RESULT_INSTRUCTIONS = (
 
 MCP_SUBMISSION_INSTRUCTIONS = (
     "Call submit_plan with this plan_id, contract_version, and a proposal "
-    "matching proposal_schema. Keep this plan_id for investigation, submission, "
+    "matching proposal_schema. If it is null (summary view), first fetch "
+    "get_plan_contract with the selected actions for their exact schemas. "
+    "Optional name/instructions revise the current brief with the proposal. "
+    "Keep this plan_id for investigation, submission, "
     "and revisions of the same request; starting again creates another report. "
     "The adapter fetches the current contract again "
     "before validating and submitting; do not add a separate final contract "
@@ -63,6 +66,4 @@ MCP_SUBMISSION_INSTRUCTIONS = (
 # Some hosts prepend this to every tool description. Keep tool-specific
 # instructions in the descriptions and working context so short discovery
 # excerpts still expose each tool's purpose.
-MCP_INSTRUCTIONS = (
-    "Lagniappe: Ask answers questions; Create/Organize prepare changes for browser review."
-)
+MCP_INSTRUCTIONS = "Answer with plan-free reads; save Ask on request. Create/Organize require browser review."

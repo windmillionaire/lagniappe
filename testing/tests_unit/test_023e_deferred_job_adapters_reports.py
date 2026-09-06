@@ -19,10 +19,51 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 pytestmark = pytest.mark.unit
 
 
+# @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::OrganizeReportAdapter
+# @matrix ai-report : remote-update transport-boundary plan-resume
+# @matrix deferred-jobs : checkpoint
+@pytest.mark.parametrize("origin", ["email", "api", "web"])
+def test_organize_fileless_remote_pipeline_and_resume(monkeypatch, origin):
+    from lagniappe.core import exceptions
+    from testing.utility.ai_report_fakes import _test_user
+    actor = _test_user("email-update-owner")
+    report = SimpleNamespace(
+        tool="organize", origin=origin, input_files=[], upload_manifest=[],
+        instructions="Complete the CLI task", proposal=None,
+    )
+    monkeypatch.setattr(report_adapters.ai, "finalize_report_upload_manifest", lambda *_a, **_k: None)
+    for name in ("summarize_report_input_files", "prepare_organize_retrieval_context", "complete_organize_submissions"):
+        monkeypatch.setattr(report_adapters.ai, name, lambda *_a, **_k: pytest.fail("Fileless updates must not run file stages"))
+    proposal = {"summary": "Complete CLI", "confidence": 1, "actions": [{"id": "done", "type": "complete_task", "data": {"task": "hash:updatetask01"}}]}
+    generated = []
+    def generate(prompt):
+        assert "complete_task" in prompt.allowed_actions
+        assert "create_page" not in prompt.allowed_actions
+        generated.append(prompt)
+        return proposal
+    monkeypatch.setattr(report_adapters.ai, "generate_organize_plan", generate)
+    context = DeferredJobContext(job=SimpleNamespace(attempt=1), actor=actor, notification=None,
+        inputs={"report": report}, parameters={}, checkpoint={})
+    adapter = report_adapters.OrganizeReportAdapter()
+    if origin == "web":
+        with pytest.raises(exceptions.ValidationError, match="uploaded file in the UI"):
+            adapter.prepare(context)
+        assert not generated
+        return
+    adapter.prepare(context)
+    assert context.checkpoint["stage"] == "ready_to_apply"
+    assert context.checkpoint["proposal"] == proposal
+    assert context.checkpoint["status"] == "ready"
+    context.checkpoint["stage"] = "plan_ready"
+    adapter.prepare(context)
+    assert len(generated) == 1
+    assert context.checkpoint["proposal"] == proposal
+
+
 # @matrix deferred-jobs : quota retry service-tier
 def test_organize_retry_uses_priority_for_every_generation_stage(monkeypatch):
     adapter = report_adapters.OrganizeReportAdapter()
-    report = SimpleNamespace(summary=None)
+    report = SimpleNamespace(summary=None, input_files=[SimpleNamespace()])
     actor = SimpleNamespace()
     summary_calls = []
     retrieval_calls = []
@@ -717,6 +758,7 @@ def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypat
 
     report = SimpleNamespace(
         urlsafe_key="organize-report",
+        input_files=[SimpleNamespace()],
         deferred_job={"key": "organize-job"},
         properties=SimpleNamespace(process=Process()),
     )

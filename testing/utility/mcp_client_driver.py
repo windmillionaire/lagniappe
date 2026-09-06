@@ -249,6 +249,10 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         actor_call = await _call(client, "get_actor", {})
         actor = _structured(actor_call)
         result["actor"] = actor_call
+        result["answer_context"] = await _call(client, "answer_question", {})
+        result["plan_free_search"] = await _call(client, "search_entities", {
+            "query": specification["search_name"], "kinds": ["page"], "limit": 10,
+        })
 
         ask_start = await _call(
             client,
@@ -309,7 +313,10 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             },
         )
         create = _structured(create_start)
-        create_contract_value = create["context"]["contract"]
+        create_contract_call = await _call(client, "get_plan_contract", {
+            "plan_id": create["id"], "actions": ["create_page", "create_task"],
+        })
+        create_contract_value = _structured(create_contract_call)
         create_schedule_checks = _schedule_contract_checks(create_contract_value)
         create_proposal = {
             "summary": "Create a field guide Page.",
@@ -360,16 +367,66 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                 "plan_id": create["id"],
                 "contract_version": create_contract_value["contract_version"],
                 "proposal": replacement,
+                "name": "MCP revised Create",
+                "instructions": "Prepare the revised field guide Page for browser review.",
             },
         )
         replacement_get = await _call(client, "get_plan", {"plan_id": create["id"]})
         result["create"] = {
             "start": create_start,
+            "selected_contract": create_contract_call,
             "schedule_checks": create_schedule_checks,
             "receipt": create_receipt,
             "get": create_get,
             "replacement_receipt": replacement_receipt,
             "replacement_get": replacement_get,
+        }
+
+        update_start = await _call(
+            client,
+            "start_organize",
+            {
+                "name": "MCP live existing-record update",
+                "instructions": "Propose renaming the existing test Page, without files.",
+            },
+        )
+        update = _structured(update_start)
+        update_contract = await _call(
+            client,
+            "get_plan_contract",
+            {
+                "plan_id": update["id"],
+                "actions": ["rename_entity", "complete_task"],
+            },
+        )
+        update_receipt = await _call(
+            client,
+            "submit_plan",
+            {
+                "plan_id": update["id"],
+                "contract_version": _structured(update_contract)["contract_version"],
+                "proposal": {
+                    "summary": "Propose renaming an existing Page.",
+                    "confidence": 1,
+                    "issues": [],
+                    "actions": [
+                        {
+                            "id": "rename",
+                            "type": "rename_entity",
+                            "data": {
+                                "entity": specification["page_ref"],
+                                "name": "Proposed MCP Page name",
+                            },
+                        }
+                    ],
+                },
+            },
+        )
+        result["update"] = {
+            "start": update_start,
+            "contract": update_contract,
+            "receipt": update_receipt,
+            "get": await _call(client, "get_plan", {"plan_id": update["id"]}),
         }
 
         organize_start = await _call(
@@ -381,6 +438,9 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             },
         )
         organize = _structured(organize_start)
+        organize_guidelines = await _call(
+            client, "get_guidelines", {"plan_id": organize["id"], "task": "organize"}
+        )
         organize_contract_before = await _call(
             client, "get_plan_contract", {"plan_id": organize["id"]}
         )
@@ -407,7 +467,17 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         )
         upload_value = _structured(upload)
         organize_contract_value = upload_value["context"]["contract"]
-        organize_schedule_checks = _schedule_contract_checks(organize_contract_value)
+        organize_selected_contract = await _call(
+            client,
+            "get_plan_contract",
+            {
+                "plan_id": organize["id"],
+                "actions": ["create_task", "attach_file_to_page", "summarize_file"],
+            },
+        )
+        organize_schedule_checks = _schedule_contract_checks(
+            _structured(organize_selected_contract)
+        )
         file_ref = organize_contract_value["required_file_refs"][0]
         file_metadata = await _call(
             client,
@@ -464,10 +534,12 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         organize_get = await _call(client, "get_plan", {"plan_id": organize["id"]})
         result["organize"] = {
             "start": organize_start,
+            "guidelines": organize_guidelines,
             "contract_before_upload": organize_contract_before,
             "invalid_type": invalid_type,
             "invalid_field": invalid_field,
             "upload": upload,
+            "selected_contract": organize_selected_contract,
             "schedule_checks": organize_schedule_checks,
             "file_metadata": file_metadata,
             "file_original": file_original,

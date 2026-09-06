@@ -768,9 +768,7 @@ def test_ai_search_json_generation_keeps_provider_response_unconstrained():
             self.calls = []
 
         def generate_content(self, *, model, contents, config):
-            self.calls.append(
-                {"model": model, "contents": contents, "config": config}
-            )
+            self.calls.append({"model": model, "contents": contents, "config": config})
             return response
 
     prompt = Prompt("System").enable_search().set_output_format("JSON")
@@ -1167,6 +1165,32 @@ def test_list_workspace_resources_caches_inventory(monkeypatch):
     assert "fields" not in first["categories"][0]["forms"][0]
     assert "schema" not in first["categories"][0]["forms"][0]
     assert "schema" not in first["projects"][0]["model_tasks"][0]["form"]
+    monkeypatch.setattr(
+        ai_list_resources.Entities,
+        "fetch_one",
+        lambda identifier, request: {
+            "hash:cat-contacts": category,
+            "hash:project-sales": project,
+        }.get(identifier),
+    )
+    scoped = ai_list_resources.execute_list_workspace_resources(
+        {"project_id": "hash:project-sales"}, user
+    )
+    assert scoped["projects"] == first["projects"]
+    assert scoped["categories"] == scoped["standalone_forms"] == []
+    assert len(fake_cache.redis.writes) == 1
+    category_scope = ai_list_resources.execute_list_workspace_resources(
+        {"category_id": "hash:cat-contacts"}, user
+    )
+    assert category_scope["categories"] == first["categories"]
+    assert not category_scope["projects"]
+    monkeypatch.setattr(project, "allowed", lambda *_args, **_kwargs: False)
+    assert "error" in ai_list_resources.execute_list_workspace_resources(
+        {"project_id": "hash:project-sales"}, user
+    )
+    assert "error" in ai_list_resources.execute_list_workspace_resources(
+        {"project_id": "hash:cat-contacts"}, user
+    )
 
 
 # @matrix ai form-schema : form-instances permissions status submission truncation
@@ -1486,17 +1510,22 @@ def test_ai_exact_name_search_is_parent_scoped_and_returns_permissions(monkeypat
     monkeypatch.setattr(
         ai_search.cache,
         "exact_name_search",
-        lambda name, restrictions, belongs_to, **kwargs: captured.update(
-            name=name,
-            restrictions=restrictions,
-            belongs_to=belongs_to,
-            **kwargs,
-        ) or [{
-            "kind": "page",
-            "id": "page-key",
-            "name": "Recovery",
-            "details": {"hash": "abcdef123456"},
-        }],
+        lambda name, restrictions, belongs_to, **kwargs: (
+            captured.update(
+                name=name,
+                restrictions=restrictions,
+                belongs_to=belongs_to,
+                **kwargs,
+            )
+            or [
+                {
+                    "kind": "page",
+                    "id": "page-key",
+                    "name": "Recovery",
+                    "details": {"hash": "abcdef123456"},
+                }
+            ]
+        ),
     )
 
     result = ai_search.execute_search(
@@ -1752,6 +1781,20 @@ def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
         }
     ]
 
+    names = ai_get_pages.execute_get_category_pages(
+        {"id": "category-ai", "names_only": True}, user
+    )
+    assert names["effective_limit"] == 100
+    assert names["pages"] == [
+        {
+            "kind": "page",
+            "hash": "hash:page-ai",
+            "name": "Wolf Range",
+            "url": "/pages/hash:page-ai",
+        }
+    ]
+    assert names["returned_count"] == 1 and not names["has_more"]
+
 
 # @matrix ai category-pages : pagination tool-context
 @pytest.mark.unit
@@ -1779,6 +1822,10 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
     page = SimpleNamespace(
         allowed=lambda action, user=None: True,
         to_ai=lambda user: {"name": "Avery Rowan"},
+        name="Avery Rowan",
+        hash="averyrowan12",
+        entity_kind="page",
+        _ai_url=lambda: "/pages/hash:averyrowan12",
     )
     restricted_page = SimpleNamespace(
         allowed=lambda action, user=None: False,
@@ -1857,7 +1904,7 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
 
     limit_schema = ai_get_pages.GET_CATEGORY_PAGES.parameters.properties["limit"]
     assert limit_schema.minimum == 1
-    assert limit_schema.maximum == ai_get_pages.SEARCH_LIMIT
+    assert limit_schema.maximum == ai_get_pages.NAMES_LIMIT
     assert calls == [
         (
             (category.key,),
@@ -1899,6 +1946,19 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
         "page_count": 1,
         "pages": [{"name": "Avery Rowan"}],
     }
+    names = ai_get_pages.execute_get_category_pages(
+        {"id": "people-category-ai", "names_only": True, "limit": 150,
+         "cursor": "current-page-token"}, user
+    )
+    assert names["effective_limit"] == 100
+    assert calls[-1][1]["limit"] == 100
+    assert calls[-1][1]["start_cursor"] == "current-page-token"
+    assert names["has_more"] is True
+    assert names["next_cursor"] == "next-page-token"
+    assert names["pages"] == [{
+        "name": "Avery Rowan", "hash": "hash:averyrowan12", "kind": "page",
+        "url": "/pages/hash:averyrowan12",
+    }]
 
 
 # @matrix ai categories : category-details permissions tool-context
@@ -2684,9 +2744,7 @@ def test_ai_page_details_includes_file_summaries_by_default(monkeypatch):
         lambda key, request: page if key == "page-key" else None,
     )
 
-    details = ai_get_page_details.execute_get_page_details(
-        {"id": "page-key"}, user
-    )
+    details = ai_get_page_details.execute_get_page_details({"id": "page-key"}, user)
     without_related = ai_get_page_details.execute_get_page_details(
         {"id": "page-key", "exclude_tasks": True, "exclude_files": True},
         user,
@@ -3103,6 +3161,7 @@ def test_ai_generation_validators_reject_bad_payloads_and_clean_citations():
         dates.validate_schedule(
             {"unit": None, "interval": None, "text": None}, "periodic"
         )
+
 
 # @matrix categories : ai-create ai-generated default-form
 @pytest.mark.unit
@@ -3821,9 +3880,19 @@ def test_ai_search_entity_filter_arguments(monkeypatch):
 @pytest.mark.unit
 def test_ai_feature_policy_is_boolean_and_disables_external_access_with_ai():
     from config.ai_settings import ConfigAISettingsError, normalize_ai_features
-    assert normalize_ai_features({}) == {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}
-    assert normalize_ai_features({"AI_ENABLED": False}) == {"AI_ENABLED": False, "EXTERNAL_AI_ENABLED": False}
-    assert normalize_ai_features({"EXTERNAL_AI_ENABLED": False}) == {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": False}
+
+    assert normalize_ai_features({}) == {
+        "AI_ENABLED": True,
+        "EXTERNAL_AI_ENABLED": True,
+    }
+    assert normalize_ai_features({"AI_ENABLED": False}) == {
+        "AI_ENABLED": False,
+        "EXTERNAL_AI_ENABLED": False,
+    }
+    assert normalize_ai_features({"EXTERNAL_AI_ENABLED": False}) == {
+        "AI_ENABLED": True,
+        "EXTERNAL_AI_ENABLED": False,
+    }
     for name in ("AI_ENABLED", "EXTERNAL_AI_ENABLED"):
         for value in (None, "false", "true", 0, 1):
             with pytest.raises(ConfigAISettingsError, match="booleans"):
@@ -3836,7 +3905,11 @@ def test_ai_feature_policy_is_boolean_and_disables_external_access_with_ai():
 @pytest.mark.unit
 def test_disabled_ai_never_resolves_models_or_calls_provider(monkeypatch):
     monkeypatch.setattr(ai_core.CONFIG, "AI_ENABLED", False)
-    monkeypatch.setattr(ai_core, "runtime_ai_settings", lambda: pytest.fail("disabled AI resolved models"))
+    monkeypatch.setattr(
+        ai_core,
+        "runtime_ai_settings",
+        lambda: pytest.fail("disabled AI resolved models"),
+    )
     generator = ai_core.GenAI()
     for operation in (generator.generate_content, generator.generate_image):
         with pytest.raises(ai_core.exceptions.AIException, match="disabled"):
