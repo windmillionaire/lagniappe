@@ -182,7 +182,7 @@ def validate_api_url(
             or any(
                 not (
                     key == "view"
-                    and item in {"full", "summary"}
+                    and item in {"full", "summary", "schema"}
                     or key == "actions"
                     and 1 <= len(item.split(",")) <= 100
                     and all(

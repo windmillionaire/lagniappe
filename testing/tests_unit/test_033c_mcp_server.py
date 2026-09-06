@@ -14,7 +14,7 @@ from lagniappe_mcp import server as hosted
 from lagniappe_mcp import attachments as hosted_files
 from lagniappe_mcp.adapter import LagniappeAdapter
 from lagniappe_mcp.configuration import ConnectionConfig
-from lagniappe_mcp.errors import AdapterError, ConfigurationError
+from lagniappe_mcp.errors import AdapterError, ConfigurationError, TransportError
 from lagniappe_mcp.url_security import normalize_site_url
 
 
@@ -804,6 +804,8 @@ def test_http_authentication_preflights_every_request_and_reconnects_on_revocati
 
 
 # @matrix mcp-remote : service-identity token-separation
+# @pair mcp-adapter:product-contract
+# @source mcp/src/lagniappe_mcp/url_security.py::validate_api_url
 def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin(
     monkeypatch,
 ):
@@ -859,15 +861,18 @@ def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
             await client.send(request, auth=None)
             assert seen[0].headers["Authorization"] == "Bearer " + proof
             assert seen[0].headers[hosted.USER_TOKEN_HEADER] == TOKEN_A
-            with pytest.raises(Exception):
+            with pytest.raises(TransportError):
                 await client.send(
                     httpx.Request("GET", "https://attacker.test/api/v1/me"), auth=None
                 )
             assert len(seen) == 1
             for query in (
+                "view=full",
                 "view=summary",
+                "view=schema",
                 "actions=create_page%2Ccreate_task",
                 "view=full&actions=create_task",
+                "view=schema&actions=update_submission_fields",
             ):
                 await client.send(
                     httpx.Request(
@@ -875,18 +880,32 @@ def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
                     ),
                     auth=None,
                 )
-            assert len(seen) == 4
+                assert str(seen[-1].url) == (
+                    CONFIG.audience + "/plans/plan/contract?" + query
+                )
+                assert seen[-1].headers["Authorization"] == "Bearer " + proof
+                assert seen[-1].headers[hosted.USER_TOKEN_HEADER] == TOKEN_A
+            assert len(seen) == 7
             for method, path in (
                 ("GET", "/plans/plan/contract?redirect=https://attacker.test"),
                 ("GET", "/plans/plan/contract?view=summary&view=full"),
+                ("GET", "/plans/plan/contract?view=schema&view=full"),
+                ("GET", "/plans/plan/contract?view=unknown"),
                 ("GET", "/plans/plan/contract?actions="),
+                ("GET", "/plans/plan/contract?view=schema&actions=../me"),
+                (
+                    "GET",
+                    "/plans/plan/contract?view=schema&redirect=https://attacker.test",
+                ),
                 ("GET", "/me?view=summary"),
+                ("GET", "/me?view=schema"),
                 ("POST", "/plans/plan/contract?view=summary"),
+                ("POST", "/plans/plan/contract?view=schema"),
             ):
-                with pytest.raises(Exception):
+                with pytest.raises(TransportError):
                     await client.send(
                         httpx.Request(method, CONFIG.audience + path), auth=None
                     )
-            assert len(seen) == 4
+            assert len(seen) == 7
 
     asyncio.run(scenario())

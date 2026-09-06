@@ -1,5 +1,6 @@
 """Focused AI-report characterization coverage."""
 
+from copy import deepcopy
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -933,6 +934,75 @@ def test_completed_task_retry_and_undo_restore_reused_task(monkeypatch):
     assert report.result["status"] == "undone"
 
 
+# @matrix ai-report : grouping result
+# @source lagniappe/core/properties/ai_report_result.py::Result
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "targets,status,expected",
+    [
+        (["task-one"] * 4, "complete", ["task-one"]),
+        (["page-one"], "complete", ["page-one"]),
+        (
+            ["task-one", "page-one", "task-one", "task-two"],
+            "complete",
+            ["task-one", "page-one", "task-two"],
+        ),
+        ([], "complete", []),
+        ([None], "complete", []),
+        (["task-one"], "failed", []),
+        (["task-one"], "skipped", []),
+    ],
+)
+def test_grouped_result_submission_updates_list_only_unique_applied_targets(
+    targets, status, expected
+):
+    applied = []
+    for index, target in enumerate(targets):
+        update = {"index": index, "schema_id": f"input-{index}"}
+        if target:
+            update["entity"] = {
+                "id": target,
+                "kind": target.split("-")[0],
+                "name": target,
+                "url": f"/{target.split('-')[0]}s/{target}",
+            }
+        applied.append(update)
+    original = {
+        "status": status,
+        "actions": [
+            {
+                "id": "details",
+                "type": "update_submission_fields",
+                "status": status,
+                "updates": {
+                    "applied": applied,
+                    "skipped": [
+                        {
+                            "entity": {
+                                "id": "page-skipped",
+                                "kind": "page",
+                                "name": "Skipped page",
+                            },
+                            "reason": "Missing schema field",
+                        }
+                    ],
+                },
+            }
+        ],
+    }
+    user = _test_user("submission-result-owner")
+    report = TestEntities.get(
+        "REPORT", {"parent": user, "user": user, "result": deepcopy(original)}
+    )
+
+    grouped = report.properties.result.grouped_actions
+
+    assert len(grouped) == 1
+    entities = grouped[0].get("updated_entities", [])
+    assert [entity["id"] for entity in entities] == expected
+    assert all(entity["url"].endswith("/" + entity["id"]) for entity in entities)
+    assert grouped[0]["updates"] == original["actions"][0]["updates"]
+    assert report.result == original
 
 
 # @matrix ai-report : completed-task-history grouping result

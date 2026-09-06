@@ -372,7 +372,7 @@
           {% endif %}
 
           {% if report.proposal and (not is_ask or has_actions) %}
-            <div data-role="report-result" class="flex flex-col gap-2">
+            <div data-role="report-proposal" class="flex flex-col gap-2">
               <h2 class="text-base font-semibold text-base-dark">{{ "Suggested Actions" if is_ask else "Proposal" }}</h2>
               {% if report.proposal.summary and not is_ask %}
                 <p class="text-base-dark">{{ report.proposal.summary }}</p>
@@ -424,7 +424,7 @@
           {% endif %}
 
           {% if report.result and not report.pending %}
-            <div class="flex flex-col gap-2">
+            <div data-role="report-result" class="flex flex-col gap-2">
               <h2 class="text-base font-semibold text-base-dark">Result</h2>
               {% if report.result.status == "complete" %}
                 <p class="text-base-dark">Work done.</p>
@@ -469,7 +469,13 @@
                           {{ controls.delete(label='Delete ' ~ action.entity.name) }}
                         </span>
                       {% elif action.status == "complete" and action.type == "update_submission_fields" %}
-                        Updated submissions
+                        {% for entity in action.updated_entities %}
+                          <span data-role="submission-update-target"{% if not loop.first %} class="block pl-5"{% endif %}>
+                            {{ entity.kind|title }} Updated: {{ format_name(entity, parent=False) }}
+                          </span>
+                        {% else %}
+                          {{ "Updated submissions" if action.updates.applied else "No submission changes applied" }}
+                        {% endfor %}
                       {% elif action.status == "complete" and action.entity and action.type == "update_form_schema" %}
                         Updated schema for {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.created is sameas false %}

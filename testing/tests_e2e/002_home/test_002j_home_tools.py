@@ -1612,6 +1612,13 @@ def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_us
     assert len(receipt["actions"][1]["updates"]["applied"]) == 4
     assert receipt["actions"][1]["updates"]["skipped"] == []
 
+    updated = report_page.result.locator("[data-role='submission-update-target']")
+    expect(updated).to_have_count(1)
+    expect(updated).to_contain_text("Task Updated:")
+    expect(updated.get_by_role("link", name=task.name, exact=True)).to_have_attribute(
+        "href", f"/tasks/{task.urlsafe_key}"
+    )
+
 
 # @matrix ai-report : batch-field-patch detail deterministic-run schema-update skip-action
 def test_report_detail_skips_schema_section_and_runs_submission_updates(get_user):
@@ -1641,7 +1648,12 @@ def test_report_detail_skips_schema_section_and_runs_submission_updates(get_user
     report_page.execute()
 
     expect(user.page.get_by_text("Work done.")).to_be_visible()
-    expect(user.page.get_by_text("Updated submissions")).to_be_visible()
+    updated = report_page.result.locator("[data-role='submission-update-target']")
+    expect(updated).to_have_count(1)
+    expect(updated).to_contain_text("Page Updated:")
+    expect(updated.get_by_role("link", name=page.name, exact=True)).to_have_attribute(
+        "href", f"/pages/{page.urlsafe_key}"
+    )
     expect(user.page.get_by_text("Updates: 1 applied")).to_be_visible()
 
     saved_report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())

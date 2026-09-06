@@ -2,6 +2,7 @@
 
 from .ai_report_process import ReportProcessValue
 
+
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @tests tests_unit/test_020h_ai_report_execution.py::test_grouped_result_actions_groups_completed_task_history_under_created_task
@@ -27,6 +28,12 @@ class Result(ReportProcessValue):
             target = item.get("target") or {}
             entity = item.get("entity") or {}
             action_type = item.get("type")
+
+            if (
+                action_type == "update_submission_fields"
+                and item.get("status") == "complete"
+            ):
+                item["updated_entities"] = self._submission_update_entities(item)
 
             if action_type == "attach_file_to_page":
                 page_group = self._result_page_group(target, grouped, page_groups)
@@ -100,6 +107,25 @@ class Result(ReportProcessValue):
                     task_groups[entity["id"]] = item
 
         return grouped
+
+    # @testable false
+    # @covered-by lagniappe/core/properties/ai_report_result.py::Result
+    def _submission_update_entities(self, action):
+        """List applied targets once, without changing the execution/undo ledger."""
+        updates = action.get("updates")
+        if not isinstance(updates, dict):
+            return []
+        entities = {}
+        for update in updates.get("applied") or []:
+            entity = update.get("entity") if isinstance(update, dict) else None
+            if (
+                isinstance(entity, dict)
+                and entity.get("kind") in {"page", "task"}
+                and isinstance(entity.get("id"), str)
+                and entity["id"]
+            ):
+                entities.setdefault(entity["id"], entity)
+        return list(entities.values())
 
     def _result_page_group(self, page, grouped, page_groups):
         if not isinstance(page, dict) or not page.get("id"):

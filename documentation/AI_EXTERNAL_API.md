@@ -202,6 +202,9 @@ updates without returning private recovery data. Counts describe action outcomes
 not a fresh field-value read; use `get_schema(..., include_values=true)` to inspect
 the saved result. Batch patches accumulate on one working entity per durable key
 and save the combined result. Undo restores the same batch in reverse row order.
+The browser report labels successful patches as `Task Updated` or `Page Updated`
+with a link to each distinct applied target. Skipped-only targets are not labeled
+as updated; this display projection leaves the execution/undo ledger unchanged.
 
 For clients that prefer direct HTTP, the API-key workflow and downloadable
 [client skill](#minimal-client-skill) remain independent of OAuth and MCP.
@@ -267,6 +270,8 @@ still be fetched after uploads and immediately before submission.
    tool, exact selected schemas, schema metadata and the submission wrapper;
    reuse previously obtained context or fetch full context if it is missing or
    state changed. All selections are checked against current permissions.
+   All three views work through both terminal and hosted MCP; the hosted URL
+   guard permits these queries only on the plan-contract GET route.
    Its `submission_format` gives the exact `POST` method,
    URL, and wrapper body shape. Organize also returns the authoritative
    finalized-upload inventory and per-file checklist.
