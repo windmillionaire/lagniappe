@@ -195,7 +195,9 @@ class EntityRegistry:
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache
+    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_masked_timezone_save_preserves_newer_user_state
     # @matrix mutations : cache-isolation direct-save exclusions intent-isolation lifecycle-isolation root-save
+    # @matrix cache session timezone : concurrent-permissions property-mask
     def save_root(self, entity, *, property_mask=None):
         """Persist one root, optionally updating only selected properties."""
         return execute_mutation(plan_root(entity, property_mask=property_mask))

@@ -29,6 +29,34 @@ pytestmark = pytest.mark.e2e
 FIELD_ID = "input-lifecycle-text"
 
 
+# @matrix cache session timezone : concurrent-permissions property-mask
+def test_masked_timezone_save_preserves_newer_user_state():
+    actor = Entities.USER.create({
+        "name": "Timezone Concurrency", "email": f"timezone-snapshot-{uuid4().hex}@example.test",
+        "test_user": True,
+    })
+    actor.save()
+    snapshot = Entities.USER.load(actor.email)
+    current = Entities.USER.load(actor.email)
+    current.is_admin = True
+    current.save()
+    revision = current.db["cache_invalidation_revision"]
+    try:
+        # This is a Datastore mutation contract, not a synthetic route call.
+        # The independent HTTP test covers the authenticated timezone endpoint.
+        snapshot.db["timezone"] = "UTC"
+        Entities.save_root(snapshot, property_mask=("timezone",))
+        persisted = Entities.USER.load(actor.email)
+        assert persisted.db["timezone"] == "UTC"
+        assert persisted.is_admin is True
+        assert persisted.invalidate_cache is True
+        assert persisted.db["cache_invalidation_revision"] == revision
+    finally:
+        persisted = Entities.USER.load(actor.email)
+        persisted.is_admin = False
+        persisted.save()
+
+
 # @matrix templates security : safe-html strict-filter
 def test_safe_html_filter_rejects_untyped_values():
     safe = sanitize_html("<strong>safe</strong>")

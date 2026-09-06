@@ -608,9 +608,9 @@ def identity_config():
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
 # @tests tests_e2e/001_site/test_001a_environment.py::test_update_session_rejects_invalid_timezone_and_location_atomically
-# @tests tests_e2e/001_site/test_001a_environment.py::test_timezone_update_preserves_newer_user_state
+# @tests tests_e2e/001_site/test_001a_environment.py::test_timezone_update_preserves_permissions_and_cache_revision
 # @matrix location session timezone : atomic-update coordinates validation
-# @matrix cache session timezone : concurrent-permissions property-mask
+# @matrix cache session timezone : permissions-preserved
 # @pair login:remember-cookie
 @internal.route("/update-session", methods=["POST"])
 @logged_in
