@@ -111,6 +111,7 @@ const _validateUser = async (cacheConfirmation = {}) => {
 				cacheCleared: cacheConfirmation.cacheCleared === true,
 				responseCacheCleared: cacheConfirmation.responseCacheCleared === true,
 				cacheGeneration: cacheConfirmation.cacheGeneration,
+				cacheRevision: cacheConfirmation.cacheRevision,
 			}),
 		});
 	} catch {
@@ -127,14 +128,16 @@ const _validateUser = async (cacheConfirmation = {}) => {
 		return failed("validation-body", validationResponse.status);
 	}
 	if (acknowledgement?.cacheCleared !== true) {
+		// A newer permission mutation can legitimately supersede this clear.
+		if (acknowledgement?.retry === true) return false;
 		return failed("validation-acknowledgement", validationResponse.status);
 	}
 	return true;
 };
 
 let _cacheGeneration = 0;
-let _cacheInvalidation = null;
-let _validateUserRequest = null;
+const _cacheInvalidations = new Map();
+const _validateUserRequests = new Map();
 
 /**
  * @testable false
@@ -151,11 +154,11 @@ function responseInvalidatesCache(response) {
  * @covered-by src/script/sw.template.mjs::checkForCacheInvalidation
  * @reason local cache clearing is exercised through the cache invalidation owner
  */
-async function clearClientCache() {
-	if (!_cacheInvalidation) {
+async function clearClientCache(cacheRevision = null) {
+	if (!_cacheInvalidations.has(cacheRevision)) {
 		const cacheGeneration = _cacheGeneration + 1;
 		_cacheGeneration = cacheGeneration;
-		_cacheInvalidation = (async () => {
+		const pending = (async () => {
 			await caches.delete(RESPONSE_CACHE);
 			const responseCacheCleared =
 				typeof caches.has === "function"
@@ -167,11 +170,12 @@ async function clearClientCache() {
 				cacheGeneration,
 			};
 		})().finally(() => {
-			_cacheInvalidation = null;
+			_cacheInvalidations.delete(cacheRevision);
 		});
+		_cacheInvalidations.set(cacheRevision, pending);
 	}
 
-	return _cacheInvalidation;
+	return _cacheInvalidations.get(cacheRevision);
 }
 
 /**
@@ -181,23 +185,32 @@ async function clearClientCache() {
  */
 function validateUserOnce(cacheConfirmation) {
 	if (!cacheConfirmation.cacheCleared) return null;
-	if (!_validateUserRequest) {
-		_validateUserRequest = _validateUser(cacheConfirmation).finally(() => {
-			_validateUserRequest = null;
-		});
+	const revision = cacheConfirmation.cacheRevision;
+	if (!_validateUserRequests.has(revision)) {
+		_validateUserRequests.set(
+			revision,
+			_validateUser(cacheConfirmation).finally(() => {
+				_validateUserRequests.delete(revision);
+			}),
+		);
 	}
-	return _validateUserRequest;
+	return _validateUserRequests.get(revision);
 }
 
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_confirmation_posts_after_local_clear
  * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_requires_explicit_server_acknowledgement
- * @matrix cache : acknowledgement failure invalidation retry service-worker
+ * @tests tests_js/test_008_service_worker.py::test_cache_acknowledgements_do_not_coalesce_different_revisions
+ * @matrix cache : acknowledgement concurrency failure invalidation retry service-worker
  */
 async function checkForCacheInvalidation(response, options = {}) {
 	if (!responseInvalidatesCache(response)) return { invalidated: false };
-	const confirmation = await clearClientCache();
+	const cacheRevision = response.headers.get("X-Lagniappe-Cache-Revision");
+	const confirmation = {
+		...(await clearClientCache(cacheRevision)),
+		cacheRevision,
+	};
 	const acknowledged =
 		options.validate !== false ? await validateUserOnce(confirmation) : null;
 	return {

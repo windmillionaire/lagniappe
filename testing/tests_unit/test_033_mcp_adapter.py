@@ -966,6 +966,30 @@ def test_api_request_uses_only_explicit_bearer_credentials() -> None:
     assert request.content == b'{"kind":"ask"}'
 
 
+# @matrix hosted-e2e mcp-adapter : authentication transport origin-isolation
+def test_hosted_driver_transport_scopes_only_run_cookie():
+    requests = []
+
+    async def exercise():
+        transport = mcp_client_driver.HostedRunTransport(
+            "https://hosted.example", "run-cookie",
+            httpx.MockTransport(lambda request: requests.append(request) or httpx.Response(200)),
+        )
+        async with httpx.AsyncClient(transport=transport) as client:
+            await client.get("https://hosted.example/api/v1", headers={
+                "Authorization": "Bearer api-key", "Cookie": "session=must-not-forward",
+            })
+            for target in ("https://storage.googleapis.com/object", "http://hosted.example/api/v1",
+                           "https://hosted.example:444/api/v1", "https://hosted.example.evil/api/v1"):
+                with pytest.raises(RuntimeError, match="different origin"):
+                    await client.get(target)
+
+    asyncio.run(exercise())
+    assert len(requests) == 1
+    assert requests[0].headers["Cookie"] == "__Host-lagniappe-e2e=run-cookie"
+    assert requests[0].headers["Authorization"] == "Bearer api-key"
+
+
 # @pair mcp-adapter:product-contract
 # @source mcp/src/lagniappe_mcp/errors.py::AdapterError
 def test_bounded_error_rendering_remains_valid_json() -> None:

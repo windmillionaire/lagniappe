@@ -24,6 +24,8 @@ from lagniappe_mcp.presentation import _error_result, _success_result
 from lagniappe_mcp.url_security import normalize_site_url
 from lagniappe_mcp.errors import SchemaError
 from lagniappe_mcp.schema import validate_value
+from lagniappe_mcp.rest import RESTClient
+from lagniappe_mcp.limits import CONNECT_TIMEOUT_SECONDS, RESPONSE_TIMEOUT_SECONDS
 
 
 _PRIVATE_TRANSPORT_MARKERS = (
@@ -64,17 +66,50 @@ def _write_json(path: Path, value: Any) -> None:
         raise
 
 
+# @testable true
+# @tests tests_unit/test_033_mcp_adapter.py::test_hosted_driver_transport_scopes_only_run_cookie
+# @matrix hosted-e2e mcp-adapter : authentication transport origin-isolation
+class HostedRunTransport(httpx.AsyncBaseTransport):
+    """Test-only deployment credential; never an application login session."""
+
+    def __init__(self, origin, cookie, transport=None):
+        self.origin = httpx.URL(origin)
+        self.cookie = cookie
+        self.transport = transport or httpx.AsyncHTTPTransport(trust_env=False)
+
+    async def handle_async_request(self, request):
+        if (request.url.scheme, request.url.host, request.url.port) != (
+            self.origin.scheme, self.origin.host, self.origin.port
+        ):
+            raise RuntimeError("Hosted test transport refused a different origin")
+        request.headers["Cookie"] = f"__Host-lagniappe-e2e={self.cookie}"
+        return await self.transport.handle_async_request(request)
+
+    async def aclose(self):
+        await self.transport.aclose()
+
+
 @asynccontextmanager
 async def _connection():
-    adapter = LagniappeAdapter(ConnectionConfig(
+    config = ConnectionConfig(
         normalize_site_url(os.environ["LAGNIAPPE_URL"]),
         os.environ["LAGNIAPPE_API_KEY"],
-    ))
+    )
+    cookie = os.environ.get("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE")
+    client = httpx.AsyncClient(
+        transport=HostedRunTransport(os.environ["LAGNIAPPE_URL"], cookie),
+        timeout=httpx.Timeout(RESPONSE_TIMEOUT_SECONDS, connect=CONNECT_TIMEOUT_SECONDS),
+        follow_redirects=False,
+        trust_env=False,
+    ) if cookie else None
+    adapter = LagniappeAdapter(config, rest=RESTClient(config, client=client))
     try:
         await adapter.initialize()
         yield adapter
     finally:
         await adapter.aclose()
+        if client is not None:
+            await client.aclose()
 
 
 async def _call(client: LagniappeAdapter, name: str, arguments: dict[str, Any]) -> dict:
@@ -473,6 +508,7 @@ def _sensitive_material(
             "credential",
             (
                 os.environ.get("LAGNIAPPE_API_KEY"),
+                os.environ.get("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE"),
                 revoke.get("csrf_token"),
                 *(revoke.get("cookies") or {}).values(),
             ),

@@ -11,6 +11,47 @@ from lagniappe.core.tools.database import filter as database_filter
 from lagniappe.core.tools.database.filter import Filter, Query, Results
 
 
+# @matrix cache user : invalidation acknowledgement concurrency property-mask
+@pytest.mark.parametrize("revision", ["new", "legacy"])
+def test_cache_acknowledgement_is_revision_checked_and_masked(monkeypatch, revision):
+    from contextlib import nullcontext
+    from copy import deepcopy
+    from google.cloud.datastore import Entity
+    from google.cloud.datastore.batch import Batch
+    from google.api_core.exceptions import Aborted
+
+    key = Key("users", "actor", project="unit-project")
+    row = Entity(key)
+    row.update(invalidate_cache=True, admin=True, permissions="new permissions")
+    if revision != "legacy":
+        row["cache_invalidation_revision"] = revision
+    transaction = Batch(SimpleNamespace(project="unit-project", namespace=None, database=None))
+    transaction.begin()
+    reads = []
+
+    def get_row(requested, **kwargs):
+        assert requested == key and kwargs["transaction"] is transaction
+        reads.append(requested)
+        if len(reads) == 1:
+            raise Aborted("concurrent permission mutation")
+        return deepcopy(row)
+
+    monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=SimpleNamespace(
+        transaction=lambda: nullcontext(transaction), get=get_row,
+    )))
+    assert utility.acknowledge_user_cache(key, "superseded") is False
+    assert transaction.mutations == []
+    assert utility.acknowledge_user_cache(key, revision) is True
+    mutation, = transaction.mutations
+    assert list(mutation.property_mask.paths) == ["invalidate_cache"]
+    assert mutation.update.properties["invalidate_cache"].boolean_value is False
+    assert mutation.update.properties["admin"].boolean_value is True
+    assert row["invalidate_cache"] is True  # the request snapshot was never saved
+    row["invalidate_cache"] = False
+    assert utility.acknowledge_user_cache(key, "superseded") is True
+    assert len(transaction.mutations) == 1
+
+
 # @matrix database : empty-page restricted-results
 @pytest.mark.unit
 def test_empty_results_has_no_items_or_cursor():

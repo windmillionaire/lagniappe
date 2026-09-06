@@ -76,6 +76,9 @@ reference. Title action menus use these options to anchor the panel's
 debounce, and a `QueryLifecycle`. Raw input invalidates the active epoch and
 hides mismatched rows immediately, before the debounced search begins. A panel
 cannot reopen while the latest input is waiting for its query branch to settle.
+The input publishes `aria-busy="true"` from raw input through the latest query,
+and `false` when it settles, including an empty result. A stale response cannot
+clear a newer query's busy state. Teardown removes the attribute.
 
 `QueryLifecycle.run(key, loader, publisher)` is the common asynchronous read
 boundary. Starting work increments an epoch, optionally aborts the previous

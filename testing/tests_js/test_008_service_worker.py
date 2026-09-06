@@ -584,7 +584,7 @@ checkForCacheInvalidation = realCheckForCacheInvalidation;
 
 const result = await context.checkForCacheInvalidation(
   new Response("", {
-    headers: { "X-Lagniappe-Invalidate-Cache": "true" },
+    headers: { "X-Lagniappe-Invalidate-Cache": "true", "X-Lagniappe-Cache-Revision": "user:actor:revision" },
   }),
 );
 
@@ -595,6 +595,9 @@ if (validateCalls.length !== 1) {
   throw new Error(`Expected one validate-user call, got ${validateCalls.length}`);
 }
 const body = JSON.parse(validateCalls[0].body);
+if (body.cacheRevision !== "user:actor:revision") {
+  throw new Error("Acknowledgement lost the observed server revision");
+}
 if (!body.cacheCleared || !body.responseCacheCleared || "etagStoreCleared" in body) {
   throw new Error(`validate-user payload did not confirm cache clearing: ${validateCalls[0].body}`);
 }
@@ -603,6 +606,43 @@ if (validateCalls[0].headers["X-CSRFToken"] !== "csrf-token") {
 }
 """,
     )
+
+
+# @matrix cache : acknowledgement concurrency invalidation retry service-worker
+def test_cache_acknowledgements_do_not_coalesce_different_revisions(run_node):
+    run_service_worker_check(run_node, """
+const started = [];
+const confirmations = [];
+const waiting = [];
+context.fetch = async (url, options = {}) => {
+  if (url === "/l/token") return new Response("csrf-token");
+  const body = JSON.parse(options.body);
+  confirmations.push(body);
+  return new Promise(resolve => {
+    waiting.push(resolve);
+    started[confirmations.length - 1]();
+  });
+};
+vm.runInContext(`checkForCacheInvalidation = realCheckForCacheInvalidation;`, context);
+const response = revision => new Response("", {headers: {
+  "X-Lagniappe-Invalidate-Cache": "true",
+  "X-Lagniappe-Cache-Revision": revision,
+}});
+const firstStarted = new Promise(resolve => started.push(resolve));
+const secondStarted = new Promise(resolve => started.push(resolve));
+const first = context.checkForCacheInvalidation(response("first"));
+await firstStarted;
+const second = context.checkForCacheInvalidation(response("second"));
+await secondStarted;
+waiting[0](new Response(JSON.stringify({cacheCleared: false, retry: true})));
+waiting[1](new Response(JSON.stringify({cacheCleared: true})));
+const [a, b] = await Promise.all([first, second]);
+if (a.acknowledged !== false || b.acknowledged !== true ||
+    confirmations[0].cacheRevision !== "first" || confirmations[1].cacheRevision !== "second" ||
+    b.cacheGeneration <= a.cacheGeneration) {
+  throw new Error("New invalidation reused the older clear or acknowledgement");
+}
+""")
 
 
 # @matrix cache : acknowledgement failure invalidation retry service-worker

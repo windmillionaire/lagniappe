@@ -10,6 +10,7 @@ from lagniappe import CONFIG
 from .core import DATA, KINDS
 from .defaults import DEFAULT_USER_FORM, DEFAULT_USER_PAGE
 from .filter import Filter, Query
+from .transactions import retry_aborted
 from lagniappe.core.definitions.default import DefaultEnum
 
 PREFIX = CONFIG.PREFIX
@@ -145,6 +146,26 @@ def _put_mutation(writer, entity, property_mask=None):
     mutation = writer.mutations[-1]
     mutation.update = mutation.upsert
     mutation.property_mask.paths.extend(property_mask)
+
+
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_cache_acknowledgement_is_revision_checked_and_masked
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_cache_acknowledgement_preserves_newer_permissions
+# @matrix cache user : invalidation acknowledgement concurrency property-mask
+@retry_aborted
+def acknowledge_user_cache(key, revision):
+    """Clear only the invalidation that the browser actually observed."""
+    with DATA.datastore.transaction() as transaction:
+        current = DATA.datastore.get(key, transaction=transaction)
+        if current is None:
+            return False
+        if not current.get("invalidate_cache"):
+            return True
+        if revision != current.get("cache_invalidation_revision", "legacy"):
+            return False
+        current["invalidate_cache"] = False
+        _put_mutation(transaction, current, ("invalidate_cache",))
+    return True
 
 
 # @testable true

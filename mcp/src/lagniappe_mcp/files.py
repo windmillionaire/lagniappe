@@ -155,6 +155,7 @@ async def _capture_descriptor_hashes(
 # @tests tests_unit/test_033b_mcp_files.py::test_replacing_path_after_open_still_uploads_the_open_descriptor
 # @tests tests_unit/test_033b_mcp_files.py::test_open_descriptor_rejects_same_size_rewrite_with_restored_mtime
 # @tests tests_unit/test_033b_mcp_files.py::test_unlinked_rewritten_descriptor_fails_content_identity_check
+# @tests tests_unit/test_033b_mcp_files.py::test_rewritten_descriptor_with_identical_metadata_fails_content_identity_check
 # @matrix mcp-upload : os-readable regular absolute parent-traversal symlink descriptor-lifetime mutation-snapshot byte-identity
 @dataclass(slots=True)
 class OpenedFile:

@@ -19,6 +19,7 @@ from flask import abort, current_app, g, redirect, request, session, url_for
 from flask_login import current_user
 
 from lagniappe import CONFIG
+from uuid import uuid4
 from lagniappe.core.definitions import AI, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
@@ -113,10 +114,14 @@ def clear_login_session():
 # @pair login:invalidation
 def request_client_cache_invalidation(user=None, persist_user=False):
     """Mark this session response as requiring a client response-cache clear."""
-    session[LOGIN_INVALIDATE_CACHE_KEY] = True
     if user is not None and persist_user:
         user.invalidate_cache = True
         user.save()
+    session[LOGIN_INVALIDATE_CACHE_KEY] = (
+        f"user:{user.urlsafe_key}:{user.db.get('cache_invalidation_revision', 'legacy')}"
+        if user is not None and user.invalidate_cache
+        else f"session:{uuid4().hex}"
+    )
 
 
 # @testable false
@@ -157,7 +162,7 @@ def seed_login_session(user, invalidate_cache=False):
     session[LOGIN_USER_KEY] = user.urlsafe_key
     session[LOGIN_USER_PAGE_KEY] = user.page.urlsafe_key
     if invalidate_cache or getattr(user, "invalidate_cache", False):
-        request_client_cache_invalidation()
+        request_client_cache_invalidation(user)
 
 
 
@@ -278,7 +283,7 @@ def _load_session_user_context(entity_identifier=None):
 
     g._login_user = user
     if user.invalidate_cache:
-        request_client_cache_invalidation()
+        request_client_cache_invalidation(user)
     return current_user, entity
 
 

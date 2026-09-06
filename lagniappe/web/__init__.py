@@ -195,8 +195,10 @@ def add_lagniappe_headers(response):
             separators=(",", ":"),
         )
 
+    cache_revision = session.get(CONFIG.LOGIN_INVALIDATE_CACHE_KEY)
     if _client_cache_invalidation_requested():
         headers["X-Lagniappe-Invalidate-Cache"] = True
+        headers["X-Lagniappe-Cache-Revision"] = str(cache_revision)
 
     if getattr(CONFIG, "DEBUG_TRACING", False):
         from lagniappe.core.exceptions.entity_load import print_entity_load_trace

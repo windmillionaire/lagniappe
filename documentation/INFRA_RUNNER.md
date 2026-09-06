@@ -104,6 +104,12 @@ merges the isolated outcomes into ordinary traceability evidence and combines
 the two pytest exit statuses without treating an empty companion selection as
 a failure.
 
+When both processes are selected with `--junitxml` (or `--junit-xml`), each
+writes a fresh partition report. The runner atomically publishes their combined
+test suites at the requested path; a missing or malformed partition is an
+error, never a silently incomplete report. Single-process runs retain normal
+pytest report behavior.
+
 The package environment is an internal test/container dependency. The local
 `mcp` and `mcp-artifact` commands, public wheel ledger and release checks have
 been removed. Cloud Run deployment remains separate from this runner.

@@ -86,6 +86,10 @@ def test_user_invalidate_cache(get_test_entities):
         user.invalidate_cache = True
         assert user.invalidate_cache is True
         assert user.db["invalidate_cache"] is True
+        revision = user.db["cache_invalidation_revision"]
+        assert isinstance(revision, str) and len(revision) == 32
+        user.invalidate_cache = True
+        assert user.db["cache_invalidation_revision"] != revision
 
         user.is_test_user = False
         assert user.invalidate_cache is True

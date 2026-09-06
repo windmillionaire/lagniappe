@@ -45,6 +45,13 @@ version, runtime identity, and shared-lease validation. Static compiled assets
 remain public like production assets. Internal `/process` routes retain their
 Cloud Tasks/Scheduler OIDC checks.
 
+Non-browser API clients need the same run cookie in addition to their ordinary
+API bearer credential. The managed MCP boundary test forwards only this cookie
+to its direct HTTP calls and isolated driver's test-only transport, bound to
+the exact application origin. It is never forwarded to storage URLs or added
+to the product adapter, whose requests remain bearer-only. Keep the cookie out
+of test artifacts and diagnostics just like the API key.
+
 Reserved E2E hostnames can soft-route after version deletion, so production
 Flask rejects the reserved host pattern with a marker-bearing 404. Setup,
 create, and teardown probe that guard before handling runnable versions.

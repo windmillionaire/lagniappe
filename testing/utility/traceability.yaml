@@ -69,6 +69,7 @@ annotated_source_roots:
   - runner/mcp_environment.py
   - runner/process.py
   - runner/pytest_routing.py
+  - runner/pytest_reports.py
   - runner/testing.py
   - runner/test_session.py
   - runner/upgrade.py
@@ -85,6 +86,7 @@ annotated_source_roots:
   - lagniappe/web/responses.py
   - testing/utility/browser_review.py
   - testing/utility/test_server_seed.py
+  - testing/utility/mcp_client_driver.py
 
 annotation_scan_roots:
   - installer

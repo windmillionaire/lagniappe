@@ -1235,6 +1235,64 @@ def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
     assert calls[:2] == ["prepare", "gcloud"]
 
 
+# @matrix testing mcp-package : junit result-aggregation environment-isolation
+@pytest.mark.parametrize("root_status,mcp_status", [(1, 0), (0, 1), (0, 0)])
+@pytest.mark.parametrize("option", ["--junitxml", "--junit-xml"])
+def test_run_py_merges_partition_junit(monkeypatch, tmp_path, root_status, mcp_status, option):
+    from xml.etree import ElementTree as ET
+    from runner import mcp_environment
+
+    destination = tmp_path / "report with spaces.xml"
+    written = []
+
+    def write_report(arguments, name, status):
+        report = Path(next(arg.split("=", 1)[1] for arg in arguments
+                           if arg.startswith("--junitxml=")))
+        written.append(report)
+        suite = ET.Element("testsuite", name=name)
+        case = ET.SubElement(suite, "testcase", classname=name, name="test_case")
+        if status:
+            ET.SubElement(case, "failure", message=f"{name} failed")
+        ET.ElementTree(suite).write(report)
+        return status
+
+    monkeypatch.setattr(mcp_environment, "prepare_environment", lambda: None)
+    monkeypatch.setattr(run, "activate_repository_gcloud", lambda **kwargs: None)
+    monkeypatch.setattr(run, "_run_pytest_subprocess",
+                        lambda args: write_report(args, "root", root_status))
+    monkeypatch.setattr(mcp_environment, "run_pytest",
+                        lambda args, **kwargs: write_report(args, "mcp", mcp_status))
+    monkeypatch.setattr(run, "_merge_mcp_test_evidence", lambda *args: None)
+    assert run.run_tests(["unit", option, str(destination)]) == max(root_status, mcp_status)
+    cases = ET.parse(destination).getroot().findall(".//testcase")
+    assert [case.attrib["classname"] for case in cases] == ["root", "mcp"]
+    assert sum(case.find("failure") is not None for case in cases) == root_status + mcp_status
+    assert len(set(written)) == 2
+    assert destination not in written
+
+
+# @matrix testing mcp-package : junit result-aggregation environment-isolation
+def test_partition_junit_reports_preserves_single_run_and_rejects_missing_results(tmp_path):
+    from runner.pytest_reports import partition_junit_reports
+
+    target = tmp_path / "junit.xml"
+    for partitions in (
+        pytest_routing.PytestPartitions((f"--junitxml={target}",), None),
+        pytest_routing.PytestPartitions(None, (f"--junit-xml={target}",)),
+        pytest_routing.PytestPartitions(("unit.py",), ("mcp.py",)),
+    ):
+        with partition_junit_reports(partitions) as actual:
+            assert actual is partitions
+    target.write_text("old report")
+    partitions = pytest_routing.PytestPartitions(
+        (f"--junitxml={target}",), (f"--junitxml={target}",)
+    )
+    with pytest.raises(RuntimeError, match="Missing or invalid partition JUnit"):
+        with partition_junit_reports(partitions):
+            pass
+    assert not target.exists()
+
+
 # @matrix mcp-package testing : fail-closed local-preflight repair-guidance
 def test_run_py_adapter_preflight_stops_before_root_test_work(monkeypatch, capsys):
     from runner import mcp_environment

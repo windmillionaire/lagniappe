@@ -142,13 +142,15 @@ def test_remote_combobox_invalidates_before_debounce_and_on_destroy(run_node):
             class Element {
               constructor() {
                 this.listeners = new Map();
+                this.attributes = new Map();
                 this.value = "A";
               }
               addEventListener(type, callback) { this.listeners.set(type, callback); }
               removeEventListener(type, callback) {
                 if (this.listeners.get(type) === callback) this.listeners.delete(type);
               }
-              removeAttribute() {}
+              setAttribute(name, value) { this.attributes.set(name, value); }
+              removeAttribute(name) { this.attributes.delete(name); }
             }
             class Combobox {
               constructor(element) {
@@ -195,6 +197,7 @@ def test_remote_combobox_invalidates_before_debounce_and_on_destroy(run_node):
             const element = new Element();
             const box = new TestBox(element);
             box.init();
+            assert.equal(element.attributes.get("aria-busy"), "false");
 
             let resolveRequest;
             let requestSignal;
@@ -209,6 +212,7 @@ def test_remote_combobox_invalidates_before_debounce_and_on_destroy(run_node):
             );
             assert.equal(await box.showPanel(), false);
             assert.equal(box.shows, 0);
+            assert.equal(element.attributes.get("aria-busy"), "true");
 
             element.value = "B";
             element.listeners.get("input")({ target: element });
@@ -216,8 +220,10 @@ def test_remote_combobox_invalidates_before_debounce_and_on_destroy(run_node):
             assert.equal(box.panelOpen, false);
             assert.equal(element.value, "B");
             assert.equal(inputs, 0);
+            assert.equal(element.attributes.get("aria-busy"), "true");
 
             box.destroy();
+            assert.equal(element.attributes.has("aria-busy"), false);
             box._debouncedInput.fire();
             assert.equal(inputs, 0);
             assert.equal(element.listeners.has("input"), false);

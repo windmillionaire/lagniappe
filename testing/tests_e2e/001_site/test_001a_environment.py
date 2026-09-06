@@ -35,6 +35,7 @@ import json
 import os
 from types import SimpleNamespace
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 import pytest
 import requests
@@ -48,6 +49,8 @@ from lagniappe.core.tools.database import core as database_core
 from lagniappe.core.tools.database import notifications as notification_database
 
 from testing.definitions import SitePages, Users
+from testing.definitions.user_definitions import UserDefinition
+from testing.resources import User
 from testing.utility.network import assert_same_etag
 
 pytestmark = pytest.mark.e2e
@@ -349,6 +352,38 @@ def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):
     second = auth._etag_fingerprint("resource", user)
 
     assert first != second
+
+
+# @matrix cache session timezone : concurrent-permissions property-mask
+def test_timezone_update_preserves_newer_user_state(get_user, monkeypatch):
+    from lagniappe.web import app
+    from lagniappe.web.routes.home import site
+
+    owner = get_user(Users.OWNER)
+    actor = User(user=owner, definition=UserDefinition(
+        name="Timezone Concurrency", email=f"timezone-{uuid4().hex}@example.test",
+    )).create()
+    snapshot = Entities.USER.load(actor.email)
+    current = Entities.USER.load(actor.email)
+    current.is_admin = True
+    current.save()
+    revision = current.db["cache_invalidation_revision"]
+    # Hold precisely the snapshot a startup request could have loaded before
+    # the permission mutation. Persist through the real Datastore write path.
+    monkeypatch.setattr(site, "current_user", snapshot)
+    try:
+        with app.test_request_context("/l/update-session", method="POST", json={"timezone": "UTC"}):
+            response = app.make_response(site.update_session.__wrapped__())
+        assert response.status_code == 200
+        persisted = Entities.USER.load(actor.email)
+        assert persisted.db["timezone"] == "UTC"
+        assert persisted.is_admin is True
+        assert persisted.invalidate_cache is True
+        assert persisted.db["cache_invalidation_revision"] == revision
+    finally:
+        persisted = Entities.USER.load(actor.email)
+        persisted.is_admin = False
+        persisted.save()
 
 
 # @matrix location session timezone : atomic-update coordinates validation

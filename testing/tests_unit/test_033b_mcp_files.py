@@ -914,6 +914,7 @@ def test_replacing_path_after_open_still_uploads_the_open_descriptor(
 # @pair mcp-adapter:product-contract
 def test_open_descriptor_rejects_same_size_rewrite_with_restored_mtime(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "approved"
     root.mkdir()
@@ -929,10 +930,45 @@ def test_open_descriptor_rejects_same_size_rewrite_with_restored_mtime(
             ns=(metadata.st_atime_ns, metadata.st_mtime_ns),
             follow_symlinks=False,
         )
-        assert os.fstat(opened.fd).st_ctime_ns != opened.changed_ns
+        # ctime resolution belongs to the host filesystem, not Python's _ns
+        # representation. Exercise the metadata branch deterministically.
+        current = os.fstat(opened.fd)
+        from types import SimpleNamespace
+
+        stat_values = {
+            name: getattr(current, name) for name in dir(current) if name.startswith("st_")
+        }
+        stat_values["st_ctime_ns"] = opened.changed_ns + 1
+        real_fstat = os.fstat
+        monkeypatch.setattr(
+            os, "fstat", lambda fd: SimpleNamespace(**stat_values)
+            if fd == opened.fd else real_fstat(fd)
+        )
         with pytest.raises(FileBoundaryError) as changed:
             opened.verify_unchanged(index=0)
         assert changed.value.code == "local_file_changed"
+
+
+# @matrix mcp-upload : descriptor-lifetime mutation-snapshot byte-identity
+# @pair mcp-adapter:product-contract
+def test_rewritten_descriptor_with_identical_metadata_fails_content_identity_check(tmp_path, monkeypatch):
+    selected = tmp_path / "payload.bin"
+    selected.write_bytes(b"original")
+    storage = _StorageClient([(200, {})])
+    with asyncio.run(OpenedFileBatch.open([{"path": str(selected)}])) as batch:
+        opened = batch.files[0]
+        original_stat = os.fstat(opened.fd)
+        selected.write_bytes(b"changed!")
+        real_fstat = os.fstat
+        monkeypatch.setattr(os, "fstat", lambda fd: original_stat
+                            if fd == opened.fd else real_fstat(fd))
+        opened.verify_unchanged(index=0)
+        with pytest.raises(FileBoundaryError) as changed:
+            asyncio.run(ResumableUploader(storage).upload(
+                opened, index=0, session_url=SESSION_URL, chunk_size=64,
+            ))
+        assert changed.value.code == "local_file_changed"
+        assert storage.requests == []
 
 
 # @matrix mcp-upload : descriptor-lifetime mutation-snapshot byte-identity

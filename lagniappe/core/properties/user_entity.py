@@ -1,4 +1,5 @@
 from ..definitions import AI, NotificationEmailMode, Ordering
+from uuid import uuid4
 from ..mixins import ColumnMixin, DateMixin
 from .base_db import DBProperty
 from .base_asset import AssetProperty
@@ -115,6 +116,10 @@ class InvalidateCache(DBProperty):
     @value.setter
     def value(self, value):
         DBProperty.value.fset(self, value)
+        if value:
+            # Each mutation owns a distinct acknowledgement, including a
+            # second invalidation while an earlier one is still outstanding.
+            self.entity.db["cache_invalidation_revision"] = uuid4().hex
 
 
 # @testable true

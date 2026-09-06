@@ -1,4 +1,3 @@
-from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import expect
 
 from config import SETTINGS
@@ -40,36 +39,19 @@ class SiteResource:
 
     def wait_for_interaction_readiness(self):
         """Wait for deferred view startup and its visual transition to settle."""
+        # Keep the complete boundary in one navigation-aware Playwright wait.
+        # Cache invalidation can replace the document more than once; separate
+        # evaluate calls (or a single manual retry) can race another replacement.
         self.user.page.wait_for_function(
-            "() => window.__NAVIGATION_TRANSITION_SETTLED__ === true",
-            timeout=VIEW_INITIALIZATION_TIMEOUT,
-        )
-        self.user.page.wait_for_function(
-            """() => performance
-                .getEntriesByName("lagniappe:services-ready", "mark").length > 0""",
-            timeout=VIEW_INITIALIZATION_TIMEOUT,
-        )
-        try:
-            self.user.page.evaluate(
-                "() => window.__WAIT_FOR_VIEW_TRANSITIONS__()"
-            )
-        except PlaywrightError as error:
-            if "Execution context was destroyed" not in str(error):
-                raise
-            self.user.page.wait_for_function(
-                "() => window.__NAVIGATION_TRANSITION_SETTLED__ === true",
-                timeout=VIEW_INITIALIZATION_TIMEOUT,
-            )
-            self.user.page.wait_for_function(
-                """() => performance
-                    .getEntriesByName(
+            """() => {
+                if (window.__NAVIGATION_TRANSITION_SETTLED__ !== true ||
+                    performance.getEntriesByName(
                         "lagniappe:services-ready", "mark"
-                    ).length > 0""",
-                timeout=VIEW_INITIALIZATION_TIMEOUT,
-            )
-            self.user.page.evaluate(
-                "() => window.__WAIT_FOR_VIEW_TRANSITIONS__()"
-            )
+                    ).length === 0) return false;
+                return window.__WAIT_FOR_VIEW_TRANSITIONS__().then(() => true);
+            }""",
+            timeout=VIEW_INITIALIZATION_TIMEOUT,
+        )
         return self
 
     def reload(self, wait_until="load"):

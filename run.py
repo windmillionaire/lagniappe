@@ -309,30 +309,33 @@ def run_tests(test_args: list[str]) -> int:
             server_process = run_test_server(authority)
             authority.update(phase="ready")
 
-        statuses = []
-        if partitions.root_args is not None:
-            statuses.append(
-                _run_pytest_subprocess(pytest_command(list(partitions.root_args)))
-            )
-        if partitions.mcp_args is not None:
-            from runner.mcp_environment import run_pytest as run_mcp_pytest
+        from runner.pytest_reports import partition_junit_reports
 
-            with tempfile.TemporaryDirectory(prefix="lagniappe-mcp-pytest-") as temp:
-                result_path = Path(temp) / "results.json"
-                adapter_status = run_mcp_pytest(
-                    list(partitions.mcp_args),
-                    prepared=True,
-                    result_path=result_path,
+        statuses = []
+        with partition_junit_reports(partitions) as reports:
+            if reports.root_args is not None:
+                statuses.append(
+                    _run_pytest_subprocess(pytest_command(list(reports.root_args)))
                 )
-                statuses.append(adapter_status)
-                combined_status = _combine_pytest_exit_statuses(*statuses)
-                if "--no-test-evidence" not in invocation.pytest_args:
-                    _merge_mcp_test_evidence(
-                        result_path,
-                        full_command,
-                        adapter_status,
-                        combined_status,
+            if reports.mcp_args is not None:
+                from runner.mcp_environment import run_pytest as run_mcp_pytest
+
+                with tempfile.TemporaryDirectory(prefix="lagniappe-mcp-pytest-") as temp:
+                    result_path = Path(temp) / "results.json"
+                    adapter_status = run_mcp_pytest(
+                        list(reports.mcp_args),
+                        prepared=True,
+                        result_path=result_path,
                     )
+                    statuses.append(adapter_status)
+                    combined_status = _combine_pytest_exit_statuses(*statuses)
+                    if "--no-test-evidence" not in invocation.pytest_args:
+                        _merge_mcp_test_evidence(
+                            result_path,
+                            full_command,
+                            adapter_status,
+                            combined_status,
+                        )
         return _combine_pytest_exit_statuses(*statuses)
     except RuntimeError as error:
         print(f"Test startup stopped: {error}")

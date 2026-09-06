@@ -37,6 +37,7 @@ class User(AssetMixin, UserMixin, Entity):
                 "allow_task_assignments",
                 "notification_email_mode",
                 "notification_email_opt_out_epoch",
+                "cache_invalidation_revision",
             }
         )
 

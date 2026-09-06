@@ -6,6 +6,7 @@ import base64
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 from urllib.parse import urljoin, urlsplit
@@ -143,12 +144,19 @@ def _request(
     headers: dict[str, str] | None = None,
     cookies: dict[str, str] | None = None,
 ) -> requests.Response:
+    url = urljoin(f"{CONFIG.BASE_URL.rstrip('/')}/", path.lstrip("/"))
+    if _origin(url) != _origin(CONFIG.BASE_URL):
+        raise ValueError("Direct test client refused a different origin")
     request_headers = {"Accept": "application/json", **(headers or {})}
     if token is not None:
         request_headers["Authorization"] = f"Bearer {token}"
+    run_cookie = os.environ.get("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE")
+    request_cookies = dict(cookies or {})
+    if run_cookie:
+        request_cookies["__Host-lagniappe-e2e"] = run_cookie
     options = {
         "headers": request_headers,
-        "cookies": cookies,
+        "cookies": request_cookies,
         "timeout": 60,
         "allow_redirects": False,
     }
@@ -156,7 +164,7 @@ def _request(
         options["json"] = body
     return requests.request(
         method,
-        urljoin(f"{CONFIG.BASE_URL.rstrip('/')}/", path.lstrip("/")),
+        url,
         **options,
     )
 
@@ -451,7 +459,18 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
     get_user,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    setup_test_server,
 ) -> None:
+    monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", raising=False)
+    for cookie in setup_test_server.browser_cookies:
+        if cookie["name"] == "__Host-lagniappe-e2e":
+            monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", cookie["value"])
+    with monkeypatch.context() as guarded:
+        guarded.setattr(requests, "request", lambda *args, **kwargs: pytest.fail(
+            "A foreign-origin request reached the network boundary"
+        ))
+        with pytest.raises(ValueError, match="different origin"):
+            _request("GET", "https://storage.googleapis.com/object", token="test-only")
     _prepare_package_environment()
     owner = get_user(Users.OWNER)
     owner.go(SitePages.HOME)
