@@ -13,7 +13,8 @@ def acknowledge_user_cache_invalidation(user, destination=None):
     if not pending:
         # A live worker may already have acknowledged before this helper starts.
         response = user.navigate(destination)
-        SitePages.HOME.get(user).wait_for_interaction_readiness()
+        if response.ok:
+            SitePages.HOME.get(user).wait_for_interaction_readiness()
         user.entity = Entities.USER.load(user.email)
         assert user.entity.invalidate_cache is False
         return response
@@ -31,7 +32,10 @@ def acknowledge_user_cache_invalidation(user, destination=None):
     validation = validation_info.value
     assert validation.status == 200
     assert validation.json()["cacheCleared"] is True
-    SitePages.HOME.get(user).wait_for_interaction_readiness()
+    # Intentional 403 destinations use the stripped error layout: the worker
+    # still acknowledges, but that document has no application-ready marker.
+    if response.ok:
+        SitePages.HOME.get(user).wait_for_interaction_readiness()
     user.entity = Entities.USER.load(user.email)
     assert user.entity.invalidate_cache is False
     return response

@@ -77,9 +77,14 @@ def _etag_fingerprint(base_fingerprint, user):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_invalidation_is_not_replayed_by_browser_http_cache
 # @matrix cache : etag missing-fingerprint standard-header
+# @matrix cache : invalidation conditional-response
 def _fingerprint_matches_etag():
     """Check if the client's If-None-Match header matches the current fingerprint."""
+    if session.get(LOGIN_INVALIDATE_CACHE_KEY):
+        # A 304 would merge a transient invalidation command into an older body.
+        return False
     if not getattr(g, "fingerprint", None):
         return False
     if request.headers.get("Range"):

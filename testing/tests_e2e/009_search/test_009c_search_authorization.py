@@ -12,10 +12,105 @@ from testing.definitions import Forms, Pages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements import HeaderSearch
 from testing.resources import Page, User
+from testing.utility.network import assert_same_etag, manual_mutation_headers
 from testing.utility.user_cache import acknowledge_user_cache_invalidation
 
 
 pytestmark = pytest.mark.e2e
+
+
+# @matrix cache : invalidation no-store etag conditional-response
+@pytest.mark.parametrize("path", ["/", "/l/get/tasks"])
+def test_invalidation_is_not_replayed_by_browser_http_cache(
+    get_user, browser, browser_failures, setup_test_server, path,
+):
+    owner = get_user(Users.OWNER)
+    actor = User(user=owner, definition=UserDefinition(
+        name="HTTP Cache Invalidation", email=f"http-cache-{uuid4().hex}@example.test",
+    )).create()
+    # Isolate the real browser HTTP cache from the worker's separate Cache API.
+    # Fetch documents as data from a script-free page so this test owns the ack.
+    with browser.new_context(service_workers="block") as context:
+        browser_failures.monitor_context(context, label="HTTP cache invalidation")
+        context.add_cookies(list(setup_test_server.browser_cookies))
+        login = context.request.get(
+            f"{CONFIG.BASE_URL}/users/login?{urlencode({'test_user': actor.email})}",
+            max_redirects=0,
+        )
+        assert login.status == 302
+        page = context.new_page()
+        assert page.goto(f"{CONFIG.BASE_URL}/offline").status == 200
+
+        def fetch(headers=None):
+            return page.evaluate(
+                """async ({path, headers}) => {
+                    const response = await fetch(path, {headers});
+                    await response.text();
+                    return {
+                        status: response.status,
+                        etag: response.headers.get('ETag'),
+                        cacheControl: response.headers.get('Cache-Control'),
+                        invalidation: response.headers.get('X-Lagniappe-Invalidate-Cache'),
+                        revision: response.headers.get('X-Lagniappe-Cache-Revision'),
+                    };
+                }""",
+                {"path": path, "headers": headers or {}},
+            )
+
+        baseline = fetch()
+        assert baseline["status"] == 200
+        assert baseline["invalidation"] is None
+        actor.entity = Entities.USER.load(actor.email)
+        # Keep authorization identical: this proves the user modification
+        # timestamp still independently invalidates the home/collection ETag.
+        actor.entity.invalidate_cache = True
+        actor.entity.save()
+        try:
+            pending = fetch({"If-None-Match": baseline["etag"]})
+            assert pending["status"] == 200
+            assert pending["etag"] != baseline["etag"]
+            assert pending["invalidation"] and pending["revision"]
+            assert pending["cacheControl"] == "no-store"
+            # Matching validators must deliver the live command as a full
+            # no-store response, never merge it into a cached body through 304.
+            repeated = fetch({"If-None-Match": pending["etag"]})
+            assert repeated["status"] == 200
+            assert repeated["cacheControl"] == "no-store"
+            assert repeated["revision"] == pending["revision"]
+            modified = Entities.USER.load(actor.email).modified
+            acknowledged = page.evaluate(
+                """async (revision) => {
+                    const token = await fetch('/l/token');
+                    if (!token.ok) throw new Error(`Token HTTP ${token.status}`);
+                    const response = await fetch('/l/validate-user', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json',
+                                  'X-CSRFToken': await token.text()},
+                        body: JSON.stringify({cacheCleared: true,
+                            responseCacheCleared: true, cacheRevision: revision}),
+                    });
+                    return {status: response.status, body: await response.json()};
+                }""",
+                pending["revision"],
+            )
+            assert acknowledged == {
+                "status": 200, "body": {"cacheCleared": True, "retry": False},
+            }
+            persisted = Entities.USER.load(actor.email)
+            assert persisted.invalidate_cache is False
+            assert persisted.modified == modified
+            for headers, status in [({}, 200), ({}, 200),
+                                    ({"If-None-Match": pending["etag"]}, 304)]:
+                clean = fetch(headers)
+                assert clean["status"] == status
+                assert clean["invalidation"] is None
+                assert clean["revision"] is None
+                assert clean["cacheControl"] == "private, no-cache"
+                assert_same_etag(clean["etag"], pending["etag"])
+        finally:
+            actor.entity = Entities.USER.load(actor.email)
+            actor.entity.invalidate_cache = False
+            actor.entity.save()
 
 
 # @matrix cache user : invalidation acknowledgement concurrency property-mask
@@ -59,7 +154,7 @@ def test_cache_acknowledgement_preserves_newer_permissions(get_user, setup_test_
     try:
         payload = {"cacheCleared": True, "responseCacheCleared": True, "cacheRevision": old_revision}
         stale = send("POST", "/l/validate-user", json=payload,
-                     headers={"X-CSRFToken": token.text})
+                     headers=manual_mutation_headers(CONFIG.BASE_URL, token.text))
         assert stale.status_code == 200
         assert stale.json()["cacheCleared"] is False
         current = Entities.USER.load(user.email)
@@ -69,7 +164,7 @@ def test_cache_acknowledgement_preserves_newer_permissions(get_user, setup_test_
         payload["cacheRevision"] = stale.headers["X-Lagniappe-Cache-Revision"]
         assert payload["cacheRevision"] != old_revision
         accepted = send("POST", "/l/validate-user", json=payload,
-                        headers={"X-CSRFToken": token.text})
+                        headers=manual_mutation_headers(CONFIG.BASE_URL, token.text))
         assert accepted.status_code == 200
         assert accepted.json()["cacheCleared"] is True
         current = Entities.USER.load(user.email)

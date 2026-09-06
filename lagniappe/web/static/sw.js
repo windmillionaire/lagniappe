@@ -1,137 +1,137 @@
 // biome-ignore lint/correctness/noUnusedVariables: build input replaced with the release build ID
-const SW_VERSION = "b5079572";
+const SW_VERSION = "b982881f";
 const CACHE = `static-cache`;
 const RESPONSE_CACHE = `response-cache`;
 const PRECACHE_URLS = [
-	"/chunks/activity.js?v=b5079572",
-	"/chunks/addImage.js?v=b5079572",
-	"/chunks/addLink.js?v=b5079572",
-	"/chunks/addYouTube.js?v=b5079572",
-	"/chunks/administrators.js?v=b5079572",
-	"/chunks/aiModels.js?v=b5079572",
-	"/chunks/analytics.js?v=b5079572",
-	"/chunks/base.js?v=b5079572",
-	"/chunks/base2.js?v=b5079572",
-	"/chunks/baseElement.js?v=b5079572",
-	"/chunks/baseForm.js?v=b5079572",
-	"/chunks/baseList.js?v=b5079572",
-	"/chunks/baseUpload.js?v=b5079572",
-	"/chunks/bookmark.js?v=b5079572",
-	"/chunks/builder.js?v=b5079572",
-	"/chunks/buttons.js?v=b5079572",
-	"/chunks/category.js?v=b5079572",
-	"/chunks/checkbox.js?v=b5079572",
-	"/chunks/collaborative.js?v=b5079572",
-	"/chunks/columns.js?v=b5079572",
-	"/chunks/combobox.js?v=b5079572",
-	"/chunks/connectivity.js?v=b5079572",
-	"/chunks/core-foundation.js?v=b5079572",
-	"/chunks/deferredOperations.js?v=b5079572",
-	"/chunks/deployment.js?v=b5079572",
-	"/chunks/documentHistory.js?v=b5079572",
-	"/chunks/documentSettings.js?v=b5079572",
-	"/chunks/dropdown.js?v=b5079572",
-	"/chunks/editWatcher.js?v=b5079572",
-	"/chunks/entity-foundation.js?v=b5079572",
-	"/chunks/entityMenu.js?v=b5079572",
-	"/chunks/facets.js?v=b5079572",
-	"/chunks/fileInfo.js?v=b5079572",
-	"/chunks/filePdfPreview.js?v=b5079572",
-	"/chunks/filters.js?v=b5079572",
-	"/chunks/form.js?v=b5079572",
-	"/chunks/form2.js?v=b5079572",
-	"/chunks/formatting.js?v=b5079572",
-	"/chunks/foundation.js?v=b5079572",
-	"/chunks/generateText.js?v=b5079572",
-	"/chunks/html.js?v=b5079572",
-	"/chunks/html2.js?v=b5079572",
-	"/chunks/icons.js?v=b5079572",
-	"/chunks/image.js?v=b5079572",
-	"/chunks/index-foundation.js?v=b5079572",
-	"/chunks/ingress.js?v=b5079572",
-	"/chunks/ingressUpload.js?v=b5079572",
-	"/chunks/input.js?v=b5079572",
-	"/chunks/installationAccess.js?v=b5079572",
-	"/chunks/link.js?v=b5079572",
-	"/chunks/lists.js?v=b5079572",
-	"/chunks/loader.js?v=b5079572",
-	"/chunks/location.js?v=b5079572",
-	"/chunks/logout.js?v=b5079572",
-	"/chunks/maintenance.js?v=b5079572",
-	"/chunks/menuItems.js?v=b5079572",
-	"/chunks/messageComposer.js?v=b5079572",
-	"/chunks/mobileTableControls.js?v=b5079572",
-	"/chunks/modal.js?v=b5079572",
-	"/chunks/modelTasks.js?v=b5079572",
-	"/chunks/note.js?v=b5079572",
-	"/chunks/notifications.js?v=b5079572",
-	"/chunks/offline.js?v=b5079572",
-	"/chunks/offlineQueue.js?v=b5079572",
-	"/chunks/offlineReplay.js?v=b5079572",
-	"/chunks/offlineWork.js?v=b5079572",
-	"/chunks/options.js?v=b5079572",
-	"/chunks/pageInfo.js?v=b5079572",
-	"/chunks/pagePermissions.js?v=b5079572",
-	"/chunks/pagePhoto.js?v=b5079572",
-	"/chunks/pageTaskList.js?v=b5079572",
-	"/chunks/pinVersion.js?v=b5079572",
-	"/chunks/polling.js?v=b5079572",
-	"/chunks/primitives.js?v=b5079572",
-	"/chunks/projectInfo.js?v=b5079572",
-	"/chunks/providers.js?v=b5079572",
-	"/chunks/queryLifecycle.js?v=b5079572",
-	"/chunks/radio.js?v=b5079572",
-	"/chunks/remote.js?v=b5079572",
-	"/chunks/results.js?v=b5079572",
-	"/chunks/search.js?v=b5079572",
-	"/chunks/sectionToggle.js?v=b5079572",
-	"/chunks/sections.js?v=b5079572",
-	"/chunks/select.js?v=b5079572",
-	"/chunks/select2.js?v=b5079572",
-	"/chunks/setColor.js?v=b5079572",
-	"/chunks/setFontFamily.js?v=b5079572",
-	"/chunks/setImage.js?v=b5079572",
-	"/chunks/signature.js?v=b5079572",
-	"/chunks/siteSettings.js?v=b5079572",
-	"/chunks/status.js?v=b5079572",
-	"/chunks/status2.js?v=b5079572",
-	"/chunks/storage.js?v=b5079572",
-	"/chunks/styles.js?v=b5079572",
-	"/chunks/submission.js?v=b5079572",
-	"/chunks/submitter.js?v=b5079572",
-	"/chunks/sync.js?v=b5079572",
-	"/chunks/table.js?v=b5079572",
-	"/chunks/tableEditor.js?v=b5079572",
-	"/chunks/tableSorting.js?v=b5079572",
-	"/chunks/tableVisibility.js?v=b5079572",
-	"/chunks/tables.js?v=b5079572",
-	"/chunks/taskForm.js?v=b5079572",
-	"/chunks/taskSettings.js?v=b5079572",
-	"/chunks/tasks.js?v=b5079572",
-	"/chunks/textarea.js?v=b5079572",
-	"/chunks/todo.js?v=b5079572",
-	"/chunks/toolbar.js?v=b5079572",
-	"/chunks/toolbarButtons.js?v=b5079572",
-	"/chunks/tools.js?v=b5079572",
-	"/chunks/uploadFile.js?v=b5079572",
-	"/chunks/upstreamUnavailable.js?v=b5079572",
-	"/chunks/user.js?v=b5079572",
-	"/chunks/user2.js?v=b5079572",
-	"/chunks/views/admin.js?v=b5079572",
-	"/chunks/views/analytics.js?v=b5079572",
-	"/chunks/views/builder.js?v=b5079572",
-	"/chunks/views/file.js?v=b5079572",
-	"/chunks/views/home.js?v=b5079572",
-	"/chunks/views/index.js?v=b5079572",
-	"/chunks/views/manual.js?v=b5079572",
-	"/chunks/views/messages.js?v=b5079572",
-	"/chunks/views/page.js?v=b5079572",
-	"/chunks/views/project.js?v=b5079572",
-	"/chunks/views/public.js?v=b5079572",
-	"/chunks/views/report.js?v=b5079572",
-	"/chunks/views/results.js?v=b5079572",
-	"/chunks/views/user.js?v=b5079572",
-	"/chunks/visibility.js?v=b5079572"
+	"/chunks/activity.js?v=b982881f",
+	"/chunks/addImage.js?v=b982881f",
+	"/chunks/addLink.js?v=b982881f",
+	"/chunks/addYouTube.js?v=b982881f",
+	"/chunks/administrators.js?v=b982881f",
+	"/chunks/aiModels.js?v=b982881f",
+	"/chunks/analytics.js?v=b982881f",
+	"/chunks/base.js?v=b982881f",
+	"/chunks/base2.js?v=b982881f",
+	"/chunks/baseElement.js?v=b982881f",
+	"/chunks/baseForm.js?v=b982881f",
+	"/chunks/baseList.js?v=b982881f",
+	"/chunks/baseUpload.js?v=b982881f",
+	"/chunks/bookmark.js?v=b982881f",
+	"/chunks/builder.js?v=b982881f",
+	"/chunks/buttons.js?v=b982881f",
+	"/chunks/category.js?v=b982881f",
+	"/chunks/checkbox.js?v=b982881f",
+	"/chunks/collaborative.js?v=b982881f",
+	"/chunks/columns.js?v=b982881f",
+	"/chunks/combobox.js?v=b982881f",
+	"/chunks/connectivity.js?v=b982881f",
+	"/chunks/core-foundation.js?v=b982881f",
+	"/chunks/deferredOperations.js?v=b982881f",
+	"/chunks/deployment.js?v=b982881f",
+	"/chunks/documentHistory.js?v=b982881f",
+	"/chunks/documentSettings.js?v=b982881f",
+	"/chunks/dropdown.js?v=b982881f",
+	"/chunks/editWatcher.js?v=b982881f",
+	"/chunks/entity-foundation.js?v=b982881f",
+	"/chunks/entityMenu.js?v=b982881f",
+	"/chunks/facets.js?v=b982881f",
+	"/chunks/fileInfo.js?v=b982881f",
+	"/chunks/filePdfPreview.js?v=b982881f",
+	"/chunks/filters.js?v=b982881f",
+	"/chunks/form.js?v=b982881f",
+	"/chunks/form2.js?v=b982881f",
+	"/chunks/formatting.js?v=b982881f",
+	"/chunks/foundation.js?v=b982881f",
+	"/chunks/generateText.js?v=b982881f",
+	"/chunks/html.js?v=b982881f",
+	"/chunks/html2.js?v=b982881f",
+	"/chunks/icons.js?v=b982881f",
+	"/chunks/image.js?v=b982881f",
+	"/chunks/index-foundation.js?v=b982881f",
+	"/chunks/ingress.js?v=b982881f",
+	"/chunks/ingressUpload.js?v=b982881f",
+	"/chunks/input.js?v=b982881f",
+	"/chunks/installationAccess.js?v=b982881f",
+	"/chunks/link.js?v=b982881f",
+	"/chunks/lists.js?v=b982881f",
+	"/chunks/loader.js?v=b982881f",
+	"/chunks/location.js?v=b982881f",
+	"/chunks/logout.js?v=b982881f",
+	"/chunks/maintenance.js?v=b982881f",
+	"/chunks/menuItems.js?v=b982881f",
+	"/chunks/messageComposer.js?v=b982881f",
+	"/chunks/mobileTableControls.js?v=b982881f",
+	"/chunks/modal.js?v=b982881f",
+	"/chunks/modelTasks.js?v=b982881f",
+	"/chunks/note.js?v=b982881f",
+	"/chunks/notifications.js?v=b982881f",
+	"/chunks/offline.js?v=b982881f",
+	"/chunks/offlineQueue.js?v=b982881f",
+	"/chunks/offlineReplay.js?v=b982881f",
+	"/chunks/offlineWork.js?v=b982881f",
+	"/chunks/options.js?v=b982881f",
+	"/chunks/pageInfo.js?v=b982881f",
+	"/chunks/pagePermissions.js?v=b982881f",
+	"/chunks/pagePhoto.js?v=b982881f",
+	"/chunks/pageTaskList.js?v=b982881f",
+	"/chunks/pinVersion.js?v=b982881f",
+	"/chunks/polling.js?v=b982881f",
+	"/chunks/primitives.js?v=b982881f",
+	"/chunks/projectInfo.js?v=b982881f",
+	"/chunks/providers.js?v=b982881f",
+	"/chunks/queryLifecycle.js?v=b982881f",
+	"/chunks/radio.js?v=b982881f",
+	"/chunks/remote.js?v=b982881f",
+	"/chunks/results.js?v=b982881f",
+	"/chunks/search.js?v=b982881f",
+	"/chunks/sectionToggle.js?v=b982881f",
+	"/chunks/sections.js?v=b982881f",
+	"/chunks/select.js?v=b982881f",
+	"/chunks/select2.js?v=b982881f",
+	"/chunks/setColor.js?v=b982881f",
+	"/chunks/setFontFamily.js?v=b982881f",
+	"/chunks/setImage.js?v=b982881f",
+	"/chunks/signature.js?v=b982881f",
+	"/chunks/siteSettings.js?v=b982881f",
+	"/chunks/status.js?v=b982881f",
+	"/chunks/status2.js?v=b982881f",
+	"/chunks/storage.js?v=b982881f",
+	"/chunks/styles.js?v=b982881f",
+	"/chunks/submission.js?v=b982881f",
+	"/chunks/submitter.js?v=b982881f",
+	"/chunks/sync.js?v=b982881f",
+	"/chunks/table.js?v=b982881f",
+	"/chunks/tableEditor.js?v=b982881f",
+	"/chunks/tableSorting.js?v=b982881f",
+	"/chunks/tableVisibility.js?v=b982881f",
+	"/chunks/tables.js?v=b982881f",
+	"/chunks/taskForm.js?v=b982881f",
+	"/chunks/taskSettings.js?v=b982881f",
+	"/chunks/tasks.js?v=b982881f",
+	"/chunks/textarea.js?v=b982881f",
+	"/chunks/todo.js?v=b982881f",
+	"/chunks/toolbar.js?v=b982881f",
+	"/chunks/toolbarButtons.js?v=b982881f",
+	"/chunks/tools.js?v=b982881f",
+	"/chunks/uploadFile.js?v=b982881f",
+	"/chunks/upstreamUnavailable.js?v=b982881f",
+	"/chunks/user.js?v=b982881f",
+	"/chunks/user2.js?v=b982881f",
+	"/chunks/views/admin.js?v=b982881f",
+	"/chunks/views/analytics.js?v=b982881f",
+	"/chunks/views/builder.js?v=b982881f",
+	"/chunks/views/file.js?v=b982881f",
+	"/chunks/views/home.js?v=b982881f",
+	"/chunks/views/index.js?v=b982881f",
+	"/chunks/views/manual.js?v=b982881f",
+	"/chunks/views/messages.js?v=b982881f",
+	"/chunks/views/page.js?v=b982881f",
+	"/chunks/views/project.js?v=b982881f",
+	"/chunks/views/public.js?v=b982881f",
+	"/chunks/views/report.js?v=b982881f",
+	"/chunks/views/results.js?v=b982881f",
+	"/chunks/views/user.js?v=b982881f",
+	"/chunks/visibility.js?v=b982881f"
 ];
 const UPDATED_HEADER = "X-Lagniappe-Updated";
 const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
@@ -410,6 +410,7 @@ async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
  * @reason response storage filtering is exercised through no-store, static, redirect, and precache owners
  */
 function responsePreventsStorage(response) {
+	if (responseInvalidatesCache(response)) return true;
 	if (response.redirected || response.type === "opaqueredirect") return true;
 
 	return (
@@ -434,7 +435,8 @@ async function discardCachedResponse(cache, request) {
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.py::test_no_store_304_discards_cached_response
- * @matrix cache : no-store service-worker
+ * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @matrix cache : acknowledgement invalidation no-store service-worker
  */
 async function handleUncacheableResponse(
 	event,
@@ -450,7 +452,9 @@ async function handleUncacheableResponse(
 	} else {
 		event.waitUntil(discard);
 	}
-	event.waitUntil(checkForCacheInvalidation(response));
+	// Preserve the acknowledgement boundary for invalidating dynamic responses,
+	// including those now explicitly marked no-store by the server.
+	await checkForCacheInvalidation(response);
 	return true;
 }
 
@@ -926,7 +930,9 @@ async function handleNetworkOnlyGet(event) {
  * @tests tests_js/test_008_service_worker.py::test_redirect_response_with_invalidation_header_clears_cache
  * @tests tests_js/test_008_service_worker.py::test_redirected_responses_are_discarded_and_not_cached
  * @tests tests_js/test_008_service_worker.py::test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response
- * @matrix cache : cached-response invalidation network-validation no-store redirected-response service-worker
+ * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @tests tests_js/test_008_service_worker.py::test_previously_stored_invalidation_is_discarded_before_reuse
+ * @matrix cache : browser-validators cached-response invalidation network-validation no-store redirected-response service-worker
  */
 async function handleCacheable(event, pathname) {
 	const { request } = event;
@@ -935,6 +941,8 @@ async function handleCacheable(event, pathname) {
 	const cache = await caches.open(RESPONSE_CACHE);
 
 	let cachedResponse = await cache.match(request, { ignoreVary: true });
+	const storedInvalidation =
+		cachedResponse && responseInvalidatesCache(cachedResponse);
 	if (cachedResponse && responsePreventsStorage(cachedResponse)) {
 		await discardCachedResponse(cache, request);
 		cachedResponse = null;
@@ -946,7 +954,10 @@ async function handleCacheable(event, pathname) {
 
 	const storedETag = cachedResponse?.headers.get("ETag");
 
-	const fetchRequest = networkRequest(request, { etag: storedETag });
+	const fetchRequest = networkRequest(request, {
+		etag: storedETag,
+		...(storedInvalidation ? { cache: "reload" } : {}),
+	});
 
 	const networkPromise = (async () => {
 		try {

@@ -140,8 +140,10 @@ that the persisted flag is false. A page-scoped wait can be lost across the new
 document that performs this acknowledgement.
 
 Use `acknowledge_user_cache_invalidation()` for permission setup. It accepts an
-already-completed worker acknowledgement and waits for destination interaction
-readiness before returning. Do not require the transient invalidation flag to
+already-completed worker acknowledgement and waits for successful application
+destinations to become interaction-ready before returning. Intentional error
+destinations still require acknowledgement but have no application readiness
+markers. Do not require the transient invalidation flag to
 still be true after a mutation: the active worker may already have consumed it.
 The server matches the acknowledged invalidation revision and clears only that
 field transactionally, preserving newer permission changes.
@@ -206,7 +208,9 @@ response expectation and assert its exact status.
 
 Use direct HTTP requests only when the protocol itself is under test, such as
 forgery protection or malformed payload handling. Carry the browser's cookies
-and CSRF token, set a finite timeout, and keep a final user-visible assertion
+and CSRF token, use `manual_mutation_headers()` for same-origin `Origin` and
+`Referer` headers required by HTTPS CSRF checks, set a finite timeout, and keep a
+final user-visible assertion
 when the test claims a browser story.
 
 The E2E browser failure guard fails tests on unaccounted console errors,

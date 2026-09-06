@@ -51,7 +51,7 @@ from lagniappe.core.tools.database import notifications as notification_database
 from testing.definitions import SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import User
-from testing.utility.network import assert_same_etag
+from testing.utility.network import assert_same_etag, manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 
@@ -384,7 +384,7 @@ def test_timezone_update_preserves_permissions_and_cache_revision(get_user, setu
     revision = current.db["cache_invalidation_revision"]
     try:
         response = send("POST", "/l/update-session", json={"timezone": "UTC"},
-                        headers={"X-CSRFToken": token.text})
+                        headers=manual_mutation_headers(CONFIG.BASE_URL, token.text))
         assert response.status_code == 200
         assert response.json()["userHash"]
         persisted = Entities.USER.load(actor.email)

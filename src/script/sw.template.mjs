@@ -253,6 +253,7 @@ async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
  * @reason response storage filtering is exercised through no-store, static, redirect, and precache owners
  */
 function responsePreventsStorage(response) {
+	if (responseInvalidatesCache(response)) return true;
 	if (response.redirected || response.type === "opaqueredirect") return true;
 
 	return (
@@ -277,7 +278,8 @@ async function discardCachedResponse(cache, request) {
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.py::test_no_store_304_discards_cached_response
- * @matrix cache : no-store service-worker
+ * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @matrix cache : acknowledgement invalidation no-store service-worker
  */
 async function handleUncacheableResponse(
 	event,
@@ -293,7 +295,9 @@ async function handleUncacheableResponse(
 	} else {
 		event.waitUntil(discard);
 	}
-	event.waitUntil(checkForCacheInvalidation(response));
+	// Preserve the acknowledgement boundary for invalidating dynamic responses,
+	// including those now explicitly marked no-store by the server.
+	await checkForCacheInvalidation(response);
 	return true;
 }
 
@@ -769,7 +773,9 @@ async function handleNetworkOnlyGet(event) {
  * @tests tests_js/test_008_service_worker.py::test_redirect_response_with_invalidation_header_clears_cache
  * @tests tests_js/test_008_service_worker.py::test_redirected_responses_are_discarded_and_not_cached
  * @tests tests_js/test_008_service_worker.py::test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response
- * @matrix cache : cached-response invalidation network-validation no-store redirected-response service-worker
+ * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @tests tests_js/test_008_service_worker.py::test_previously_stored_invalidation_is_discarded_before_reuse
+ * @matrix cache : browser-validators cached-response invalidation network-validation no-store redirected-response service-worker
  */
 async function handleCacheable(event, pathname) {
 	const { request } = event;
@@ -778,6 +784,8 @@ async function handleCacheable(event, pathname) {
 	const cache = await caches.open(RESPONSE_CACHE);
 
 	let cachedResponse = await cache.match(request, { ignoreVary: true });
+	const storedInvalidation =
+		cachedResponse && responseInvalidatesCache(cachedResponse);
 	if (cachedResponse && responsePreventsStorage(cachedResponse)) {
 		await discardCachedResponse(cache, request);
 		cachedResponse = null;
@@ -789,7 +797,10 @@ async function handleCacheable(event, pathname) {
 
 	const storedETag = cachedResponse?.headers.get("ETag");
 
-	const fetchRequest = networkRequest(request, { etag: storedETag });
+	const fetchRequest = networkRequest(request, {
+		etag: storedETag,
+		...(storedInvalidation ? { cache: "reload" } : {}),
+	});
 
 	const networkPromise = (async () => {
 		try {
