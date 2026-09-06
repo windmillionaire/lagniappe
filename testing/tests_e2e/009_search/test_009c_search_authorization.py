@@ -65,52 +65,47 @@ def test_invalidation_is_not_replayed_by_browser_http_cache(
         # timestamp still independently invalidates the home/collection ETag.
         actor.entity.invalidate_cache = True
         actor.entity.save()
-        try:
-            pending = fetch({"If-None-Match": baseline["etag"]})
-            assert pending["status"] == 200
-            assert pending["etag"] != baseline["etag"]
-            assert pending["invalidation"] and pending["revision"]
-            assert pending["cacheControl"] == "no-store"
-            # Matching validators must deliver the live command as a full
-            # no-store response, never merge it into a cached body through 304.
-            repeated = fetch({"If-None-Match": pending["etag"]})
-            assert repeated["status"] == 200
-            assert repeated["cacheControl"] == "no-store"
-            assert repeated["revision"] == pending["revision"]
-            modified = Entities.USER.load(actor.email).modified
-            acknowledged = page.evaluate(
-                """async (revision) => {
-                    const token = await fetch('/l/token');
-                    if (!token.ok) throw new Error(`Token HTTP ${token.status}`);
-                    const response = await fetch('/l/validate-user', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json',
-                                  'X-CSRFToken': await token.text()},
-                        body: JSON.stringify({cacheCleared: true,
-                            responseCacheCleared: true, cacheRevision: revision}),
-                    });
-                    return {status: response.status, body: await response.json()};
-                }""",
-                pending["revision"],
-            )
-            assert acknowledged == {
-                "status": 200, "body": {"cacheCleared": True, "retry": False},
-            }
-            persisted = Entities.USER.load(actor.email)
-            assert persisted.invalidate_cache is False
-            assert persisted.modified == modified
-            for headers, status in [({}, 200), ({}, 200),
-                                    ({"If-None-Match": pending["etag"]}, 304)]:
-                clean = fetch(headers)
-                assert clean["status"] == status
-                assert clean["invalidation"] is None
-                assert clean["revision"] is None
-                assert clean["cacheControl"] == "private, no-cache"
-                assert_same_etag(clean["etag"], pending["etag"])
-        finally:
-            actor.entity = Entities.USER.load(actor.email)
-            actor.entity.invalidate_cache = False
-            actor.entity.save()
+        pending = fetch({"If-None-Match": baseline["etag"]})
+        assert pending["status"] == 200
+        assert pending["etag"] != baseline["etag"]
+        assert pending["invalidation"] and pending["revision"]
+        assert pending["cacheControl"] == "no-store"
+        # Matching validators must deliver the live command as a full
+        # no-store response, never merge it into a cached body through 304.
+        repeated = fetch({"If-None-Match": pending["etag"]})
+        assert repeated["status"] == 200
+        assert repeated["cacheControl"] == "no-store"
+        assert repeated["revision"] == pending["revision"]
+        modified = Entities.USER.load(actor.email).modified
+        acknowledged = page.evaluate(
+            """async (revision) => {
+                const token = await fetch('/l/token');
+                if (!token.ok) throw new Error(`Token HTTP ${token.status}`);
+                const response = await fetch('/l/validate-user', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json',
+                              'X-CSRFToken': await token.text()},
+                    body: JSON.stringify({cacheCleared: true,
+                        responseCacheCleared: true, cacheRevision: revision}),
+                });
+                return {status: response.status, body: await response.json()};
+            }""",
+            pending["revision"],
+        )
+        assert acknowledged == {
+            "status": 200, "body": {"cacheCleared": True, "retry": False},
+        }
+        persisted = Entities.USER.load(actor.email)
+        assert persisted.invalidate_cache is False
+        assert persisted.modified == modified
+        for headers, status in [({}, 200), ({}, 200),
+                                ({"If-None-Match": pending["etag"]}, 304)]:
+            clean = fetch(headers)
+            assert clean["status"] == status
+            assert clean["invalidation"] is None
+            assert clean["revision"] is None
+            assert clean["cacheControl"] == "private, no-cache"
+            assert_same_etag(clean["etag"], pending["etag"])
 
 
 # @matrix cache user : invalidation acknowledgement concurrency property-mask
