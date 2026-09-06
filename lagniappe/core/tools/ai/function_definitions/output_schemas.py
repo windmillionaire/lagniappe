@@ -140,6 +140,7 @@ OUTPUT_SCHEMAS = {
             "form_type": {"type": "string"},
             "schema": {"type": "array", "items": {"type": "object"}},
             "field_count": {"type": "integer"},
+            "values": {"type": ["object", "null"]},
         },
     ),
     "get_form_instances": _object(

@@ -249,6 +249,20 @@ EXTERNAL_FORM_AUTOFILL_BUNDLE = {
 }
 
 
+SUBMISSION_PATCH_BUNDLE = {
+    "description": "Grounded changes to selected existing form fields.",
+    "instructions": "Return final updates in the current workflow's action schema.",
+    "sections": (
+        "Use exact Page/Task references and schema field ids. Reuse known schema "
+        "and values, or get_schema(include_values=true) when needed. Include only "
+        "requested, evidence-supported changes; omitted fields remain unchanged. "
+        "Do not invent missing facts or silently resolve conflicting evidence. "
+        "For newly added fields, depend on the preceding update_form_schema action.",
+        SCHEMA_TYPE_GUIDELINES,
+    ),
+}
+
+
 GET_GUIDELINES = types.FunctionDeclaration(
     name="get_guidelines",
     description=(
@@ -283,7 +297,8 @@ GET_GUIDELINES = types.FunctionDeclaration(
                 },
                 "description": (
                     "For task=report_actions, return only rules for the selected "
-                    "proposal action types."
+                    "proposal action types. For task=form_autofill, select "
+                    "[update_submission_fields] for patch guidance instead of full autofill."
                 ),
             },
         },
@@ -295,6 +310,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_guidelines_returns_named_bundle
 # @tests tests_unit/test_015_ai_tools.py::test_get_guidelines_filters_actions_and_schema_field_types
+# @tests tests_unit/test_032d_external_guidance.py::test_submission_patch_guidance_is_shared_and_omits_autofill_workflow
 # @matrix ai : guidelines tool-dispatch
 # @matrix ai guidelines : action-selection field-type-selection payload-size
 def execute_get_guidelines(args, _user):
@@ -304,7 +320,9 @@ def execute_get_guidelines(args, _user):
 
 # @testable true
 # @tests tests_unit/test_032d_external_guidance.py::test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow
+# @tests tests_unit/test_032d_external_guidance.py::test_submission_patch_guidance_is_shared_and_omits_autofill_workflow
 # @matrix ai agent-api : guidelines tool-dispatch
+# @matrix ai guidelines : action-selection field-type-selection payload-size
 def execute_external_get_guidelines(args, _user):
     """Compose external authoring guidance from trusted API dispatch context."""
     return _guidelines_result(args, external=True)
@@ -344,8 +362,12 @@ def _guidelines_result(args, *, external):
     )
     if error:
         return error
-    if actions is not None and task != "report_actions":
-        return {"error": "actions is supported only for task=report_actions."}
+    if actions is not None and task == "form_autofill":
+        if actions != ["update_submission_fields"]:
+            return {"error": "form_autofill actions must be [update_submission_fields]."}
+        bundle = SUBMISSION_PATCH_BUNDLE
+    elif actions is not None and task != "report_actions":
+        return {"error": "actions is supported only for task=report_actions or form_autofill."}
 
     sections = []
     for section in bundle["sections"]:

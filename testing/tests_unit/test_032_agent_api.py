@@ -1276,12 +1276,21 @@ def test_contract_selection_preserves_permissions_and_full_validation(monkeypatc
     assert set(selected["proposal_schema"]["$defs"]) == {"create_task"}
     assert summary["proposal_schema"] is None
     assert summary["schema_scope"] == "summary"
+    compact = external_api.plan_contract(report, actor, actions=["create_task"], view="schema", **kwargs)
+    assert compact["proposal_schema"] == selected["proposal_schema"]
+    assert compact["submission_format"] == full["submission_format"]
+    assert compact["schema_actions"] == ["create_task"]
+    assert "workflow_rules" not in compact
+    assert "personal_page" not in compact
+    assert len(json.dumps(compact)) < len(json.dumps(selected)) * .7
     assert (
         selected["payload_sizes"]["contract_without_payload_sizes_bytes"]
         < full["payload_sizes"]["contract_without_payload_sizes_bytes"]
     )
     with pytest.raises(exceptions.ValidationError, match="allowed action"):
         external_api.plan_contract(report, actor, actions=["delete_page"], **kwargs)
+    with pytest.raises(exceptions.ValidationError, match="allowed action"):
+        external_api.plan_contract(report, actor, actions=["delete_page"], view="schema", **kwargs)
 
 
 # @pair agent-api:execution-receipt
@@ -1325,6 +1334,7 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
                     "entity": {"id": "visible-key", "name": "Stale title"},
                     "prepared": True,
                     "error": "private diagnostic",
+                    "updates": {"applied": [{"schema_id": "input-private", "value": "secret"}], "skipped": [{"reason": "private diagnostic"}]},
                 },
                 {
                     "id": "second",
@@ -1357,6 +1367,7 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
         "url": "/tasks/hash:visible12345",
     }
     assert result["actions"][1]["entity"] is None
+    assert result["actions"][0]["updates"] == {"applied": 1, "skipped": 1}
     assert result["actions"][2]["entity"] is None
     assert result["actions"][2]["undo_status"] == "complete"
     assert result["actions"][3]["entity"] == {

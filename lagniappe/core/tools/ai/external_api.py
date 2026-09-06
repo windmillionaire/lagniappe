@@ -331,6 +331,10 @@ def _guidance_requirements(tool, *, update_only=False):
             },
         },
     ]
+    if update_only:
+        for item in conditional:
+            if item["request"].get("task") == "form_autofill":
+                item["request"]["actions"] = ["update_submission_fields"]
     return {
         "tool": "get_guidelines",
         "required_before_analysis": (
@@ -738,8 +742,8 @@ def plan_contract(report, user, *, submit_url, actions=None, view="full"):
     tool = normalize_plan_tool(getattr(report, "tool", None))
     allowed = _external_allowed_report_actions(user, tool, report)
     update_only = is_remote_organize_update(report)
-    if view not in {"full", "summary"}:
-        raise exceptions.ValidationError("Contract view must be full or summary.")
+    if view not in {"full", "summary", "schema"}:
+        raise exceptions.ValidationError("Contract view must be full, summary, or schema.")
     if actions is not None and (
         not isinstance(actions, list)
         or not actions
@@ -989,6 +993,23 @@ def plan_contract(report, user, *, submit_url, actions=None, view="full"):
             "max_total_file_bytes": MAX_TOTAL_FILE_BYTES,
         },
     }
+    if view == "schema":
+        # Follow-up projection: exact allowed shapes, without repeating the
+        # lifecycle context already returned when this plan was started.
+        contract["schema_instructions"] = (
+            "Exact currently allowed proposal shapes only. Reuse the plan's "
+            "previous workflow context; fetch view=full if it is missing or "
+            "state/permissions changed. Selection does not change authorization. "
+            "Submission validates against full current permissions and still "
+            "requires authenticated browser review before changes are executed."
+        )
+        return {
+            key: value for key, value in contract.items()
+            if key in {
+                "contract_version", "tool", "submission_format", "proposal_schema",
+                "schema_scope", "schema_actions", "schema_instructions",
+            }
+        }
     contract["payload_sizes"] = {
         "proposal_schema_bytes": _json_bytes(proposal_schema),
         "workflow_rules_bytes": _json_bytes(workflow_rules),
@@ -1282,6 +1303,15 @@ def public_execution_receipt(report, user):
         undo = record.get("undo")
         if isinstance(undo, dict) and isinstance(undo.get("status"), str):
             action["undo_status"] = undo["status"][:40]
+        for key in ("updates", "schema_updates"):
+            changes = record.get(key)
+            if isinstance(changes, dict):
+                # Counts expose partial success without leaking field values,
+                # private diagnostics, or stale target identities from the ledger.
+                action[key] = {
+                    status: len(rows) if isinstance(rows := changes.get(status), list) else 0
+                    for status in ("applied", "skipped")
+                }
         actions.append(action)
     return {
         "status": str(result.get("status") or report.status)[:40],

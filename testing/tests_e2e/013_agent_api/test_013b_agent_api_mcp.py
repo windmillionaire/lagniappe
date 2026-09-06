@@ -66,8 +66,8 @@ LIFECYCLE_SCHEMA_SHA256 = {
         "eb650c1830bbe181518f23cde1dc0b724e70357784ff79443395ee5efa5df521",
     ),
     "get_plan_contract": (
-        "c183e46d7c63a1c8404b9771f52157c163ae7cdf016e8ab22119da62985be01b",
-        "45ad484593d9579fdd91106dc22efc577ddafd9f5d4ddcfcadc63a4f4feb5fd3",
+        "8054a33de0dcc82cb083398f7f8fb6bb0c2e72aa439f4bf21471e75ee7b44989",
+        "92713e7083f091ca3da230fa5b45e0f2e4a0597969e968bc8466fcb8501ac047",
     ),
     "upload_local_files": (
         "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
@@ -655,6 +655,13 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         }
         assert actor["credential"]["active"] is True
         assert _structured(workflow["answer_context"])["report_created"] is False
+        schema_values = _structured(workflow["schema_values"])
+        assert schema_values["entity"]["hash"] == f"hash:{readable_page.entity.hash}"
+        if schema_values["form"]:
+            assert isinstance(schema_values["values"], dict)
+            assert set(schema_values["values"]) <= {field["id"] for field in schema_values["schema"]}
+        else:
+            assert schema_values["values"] is None
         assert any(item.get("hash") == f"hash:{readable_page.entity.hash}" for item in _structured(workflow["plan_free_search"]))
 
         ask_start = _assert_safe_plan(
@@ -697,6 +704,9 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert create_contract["proposal_schema"] is None and create_contract["schema_scope"] == "summary"
         selected_contract = _structured(workflow["create"]["selected_contract"])
         assert selected_contract["schema_scope"] == "selected"
+        assert "workflow_rules" not in selected_contract
+        assert "submission_format" not in selected_contract
+        assert selected_contract["mcp_submission"]["contract_version"] == 6
         assert set(selected_contract["proposal_schema"]["$defs"]) == {"create_page", "create_task"}
         create_receipt = _assert_safe_receipt(
             workflow["create"]["receipt"], status="ready"
@@ -795,6 +805,8 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert organize_contract["schema_scope"] == "summary"
         organize_selected = _structured(workflow["organize"]["selected_contract"])
         assert organize_selected["schema_scope"] == "selected"
+        assert "workflow_rules" not in organize_selected
+        assert "upload_inventory" not in organize_selected
         assert set(organize_selected["proposal_schema"]["$defs"]) == {
             "create_task", "attach_file_to_page", "summarize_file"
         }

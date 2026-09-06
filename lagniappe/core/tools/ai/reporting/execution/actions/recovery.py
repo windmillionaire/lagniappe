@@ -59,6 +59,11 @@ def _expected_action_state(action, record):
             for index, update in enumerate((_data(action).get("updates") or []), 1)
             if index in applied
         ]
+        # Only the last applied value of a repeated field survives the batch.
+        expected["updates"] = list({
+            (update["entity"], update["schema_id"]): update
+            for update in expected["updates"]
+        }.values())
     if action_type == "rename_entity":
         expected["name"] = str(_data(action).get("name") or "").strip()
     if action_type == "update_form_schema":
@@ -119,6 +124,7 @@ def _urlsafe_key_value(value):
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix[move]
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix[update]
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_persists_all_fields_with_fresh_entity_reads
 # @matrix ai-report : batch-field-patch completed-prefix completed-task moves permissions post-commit-checkpoint recovery
 def _inspect_action_applied(action, report, user, record):
     action_type = action.get("type")

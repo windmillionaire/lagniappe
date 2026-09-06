@@ -303,8 +303,8 @@ SCHEMA_TYPE_GUIDELINES = """
 #### `textarea` Submission Value Guidelines
 
 - Text area element values are strings
-- Fill with concise descriptive text from provided sources when the evidence
-  supports the field
+- Use evidence-supported text suited to the field's purpose. Prefer a concise
+  summary when sufficient; keep longer detail when the field or user needs it.
 - In autofill, a grounded summary sentence or paragraph is a valid textarea
   value; do not omit textarea fields merely because they are narrative
 

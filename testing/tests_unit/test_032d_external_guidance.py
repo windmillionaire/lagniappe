@@ -81,6 +81,32 @@ def test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow():
     assert "exact schema field ids" in external_form["guidelines"]
 
 
+# @matrix ai guidelines : action-selection field-type-selection payload-size
+@pytest.mark.unit
+def test_submission_patch_guidance_is_shared_and_omits_autofill_workflow():
+    args = {
+        "task": "form_autofill",
+        "actions": ["update_submission_fields"],
+        "field_types": ["input", "textarea"],
+    }
+    actor = SimpleNamespace()
+    internal = get_guidelines.execute_get_guidelines(args, actor)
+    external = get_guidelines.execute_external_get_guidelines(args, actor)
+    full = get_guidelines.execute_external_get_guidelines(
+        {"task": "form_autofill"}, actor
+    )
+    assert internal == external
+    assert external["content_bytes"] < full["content_bytes"] / 2
+    text = external["guidelines"]
+    assert "omitted fields remain unchanged" in text
+    assert "get_schema(include_values=true)" in text
+    assert "keep longer detail" in text
+    assert "Data Source Priority" not in text
+    assert "Attached Files" not in text
+    assert "`table` Submission Value Guidelines" not in text
+    assert external["filters"] == {key: args[key] for key in ("actions", "field_types")}
+
+
 # @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
 # @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 # @matrix ai agent-api : guidelines tool-dispatch

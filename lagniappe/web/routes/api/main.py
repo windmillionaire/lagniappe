@@ -1275,8 +1275,8 @@ def openapi_document():
             {
                 "name": "view",
                 "in": "query",
-                "schema": {"enum": ["full", "summary"], "default": "full"},
-                "description": "summary omits the proposal schema; all allowed action names remain visible.",
+                "schema": {"enum": ["full", "summary", "schema"], "default": "full"},
+                "description": "summary omits the proposal schema; schema returns only exact schemas and submission metadata for follow-ups using previously obtained plan context.",
             },
             {
                 "name": "actions",
@@ -1298,7 +1298,7 @@ def openapi_document():
             },
         }
     )
-    return {
+    document = {
         "openapi": "3.1.0",
         "info": {
             "title": f"{CONFIG.APP_NAME} External Agent API",
@@ -1690,6 +1690,26 @@ def openapi_document():
         },
         "paths": paths,
     }
+    schemas = document["components"]["schemas"]
+    schema_keys = (
+        "contract_version", "tool", "submission_format", "proposal_schema",
+        "schema_scope", "schema_actions", "schema_instructions",
+    )
+    schemas["PlanSchemaContract"] = {
+        "type": "object", "additionalProperties": False,
+        "required": list(schema_keys),
+        "properties": {
+            key: ({"type": "object"} if key == "proposal_schema" else schemas["PlanContract"]["properties"][key])
+            for key in schema_keys
+        },
+    }
+    paths["/api/v1/plans/{plan_id}/contract"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] = {
+        "oneOf": [
+            {"$ref": "#/components/schemas/PlanContract"},
+            {"$ref": "#/components/schemas/PlanSchemaContract"},
+        ],
+    }
+    return document
 
 
 # @testable true

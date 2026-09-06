@@ -2130,6 +2130,72 @@ def test_get_schema_returns_schema_for_form_bearing_entities(monkeypatch):
     assert loads == [form.key, form.key]
 
 
+# @matrix ai form-schema : form page permissions schema task tool-context
+@pytest.mark.unit
+@pytest.mark.parametrize("kind", ["PAGE", "TASK"])
+def test_get_schema_includes_values_by_id_without_label_collisions(monkeypatch, kind):
+    form = TestEntities.get("FORM", {"name": "Details", "hash": "details-form"})
+    form.form_type = kind.lower()
+    form.schema = [
+        {"id": "input-first", "type": "input", "input": "text", "title": "Notes"},
+        {"id": "textarea-second", "type": "textarea", "title": "Notes"},
+        {"id": "checkbox-confirmed", "type": "checkbox", "title": "Confirmed"},
+        {"id": "input-empty", "type": "input", "input": "text", "title": "Empty"},
+    ]
+    entity = TestEntities.get(kind, {"name": "Work", "hash": "details-target"})
+    entity.form = form
+    expected = {
+        "input-first": "First",
+        "textarea-second": "Second",
+        "checkbox-confirmed": False,
+    }
+    entity.properties.submission.value = expected.copy()
+    user = SimpleNamespace(
+        is_authenticated=True, is_owner=True, has_permission=lambda *a, **k: True
+    )
+    targets = {entity.urlsafe_key: entity, form.urlsafe_key: form}
+    monkeypatch.setattr(
+        ai_get_schema.Entities,
+        "fetch_one",
+        lambda identifier, request: targets[identifier],
+    )
+
+    result = ai_get_schema.execute_get_schema(
+        {"id": entity.urlsafe_key, "include_values": True}, user
+    )
+
+    # Values use the existing AI representation, not raw stored keys. Explicit
+    # negative answers must remain present (checkbox AI text is "False").
+    assert result["values"] == {**expected, "checkbox-confirmed": "False"}
+    assert result["schema"] == form.schema
+    assert set(result) == {
+        "entity",
+        "form",
+        "form_type",
+        "schema",
+        "field_count",
+        "values",
+    }
+    assert "values" not in ai_get_schema.execute_get_schema(
+        {"id": entity.urlsafe_key}, user
+    )
+    assert (
+        ai_get_schema.execute_get_schema(
+            {"id": form.urlsafe_key, "include_values": True}, user
+        )["values"]
+        is None
+    )
+    monkeypatch.setattr(entity, "allowed", lambda *a, **k: False)
+    assert ai_get_schema.execute_get_schema(
+        {"id": entity.urlsafe_key, "include_values": True}, user
+    ) == {"error": "Access denied"}
+    monkeypatch.setattr(entity, "allowed", lambda *a, **k: True)
+    monkeypatch.setattr(form, "allowed", lambda *a, **k: False)
+    assert ai_get_schema.execute_get_schema(
+        {"id": entity.urlsafe_key, "include_values": True}, user
+    ) == {"error": "Access denied"}
+
+
 # @matrix ai form-schema : autofill category-forms schema
 @pytest.mark.unit
 def test_get_category_forms_returns_full_form_schema(monkeypatch):

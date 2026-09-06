@@ -621,7 +621,16 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     contract_response_schema = openapi.json["paths"][
         "/api/v1/plans/{plan_id}/contract"
     ]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    assert contract_response_schema == {"$ref": "#/components/schemas/PlanContract"}
+    assert contract_response_schema == {"oneOf": [
+        {"$ref": "#/components/schemas/PlanContract"},
+        {"$ref": "#/components/schemas/PlanSchemaContract"},
+    ]}
+    compact_schema = openapi.json["components"]["schemas"]["PlanSchemaContract"]
+    assert set(compact_schema["required"]) == {
+        "contract_version", "tool", "submission_format", "proposal_schema",
+        "schema_scope", "schema_actions", "schema_instructions",
+    }
+    assert compact_schema["properties"]["proposal_schema"] == {"type": "object"}
     plan_contract_schema = openapi.json["components"]["schemas"]["PlanContract"]
     expected_contract_fields = {
         "schema_scope",

@@ -176,10 +176,16 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
                 if target.endswith("view=summary"):
                     contract.update(proposal_schema=None, schema_scope="summary")
                 else:
-                    assert target.endswith("actions=create_task")
+                    assert "actions=create_task" in target
                     contract.update(
-                        schema_scope="selected", schema_actions=["create_task"]
+                        schema_scope="selected", schema_actions=["create_task"],
+                        schema_instructions="Reuse plan context. Submit against current permissions.",
                     )
+                    if target.endswith("view=schema"):
+                        contract = {key: value for key, value in contract.items() if key in {
+                            "contract_version", "tool", "proposal_schema", "schema_scope",
+                            "schema_actions", "schema_instructions", "submission_format",
+                        }}
                 return contract, "contract"
             return await super().request_json(method, target, body=body, **kwargs)
 
@@ -210,6 +216,13 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
             "create_task",
             "create_page",
         ]
+        compact = await adapter.execute("get_plan_contract", {
+            "plan_id": "abcdefghijkl", "actions": ["create_task"], "view": "schema",
+        })
+        assert compact.value["proposal_schema"] == selected.value["proposal_schema"]
+        assert compact.value["mcp_submission"] == selected.value["mcp_submission"]
+        assert "workflow_rules" not in compact.value
+        assert "submission_format" not in compact.value
         with pytest.raises(SchemaError):
             await adapter.execute(
                 "submit_plan",

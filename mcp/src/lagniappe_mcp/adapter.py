@@ -15,7 +15,9 @@ from .catalog import (
     GET_FILE_PRIVATE_FIELDS,
     GET_FILE_SAFE_PROPERTIES,
     REST_CONTRACT_SCHEMA,
+    REST_SCHEMA_CONTRACT_SCHEMA,
     SAFE_CONTRACT_SCHEMA,
+    SAFE_SCHEMA_CONTRACT_SCHEMA,
     SAFE_PLAN_SCHEMA,
     SAFE_RECEIPT_SCHEMA,
     UPLOAD_RESULT_SCHEMA,
@@ -404,7 +406,10 @@ class LagniappeAdapter:
             raise TransportError(
                 "invalid_response", "Plan contract must be a JSON object."
             )
-        validate_value(REST_CONTRACT_SCHEMA, value, phase="contract")
+        validate_value(
+            REST_SCHEMA_CONTRACT_SCHEMA if view == "schema" else REST_CONTRACT_SCHEMA,
+            value, phase="contract",
+        )
         proposal_schema = (
             validate_schema_document(value["proposal_schema"], input_root=True)
             if value["proposal_schema"] is not None
@@ -447,7 +452,7 @@ class LagniappeAdapter:
         # These contract-v6 clauses describe REST client orchestration. Keep
         # their domain/review semantics, but present the MCP-owned equivalent
         # rather than instructing the model to repeat the adapter's reads.
-        contract["workflow_rules"] = [
+        workflow_rules = [
             rule.replace(
                 "When an answer is ready, fetch the latest contract and submit it "
                 "without waiting for separate save confirmation.",
@@ -462,15 +467,20 @@ class LagniappeAdapter:
                 "is unavailable or relevant state changes, use get_plan_contract. "
                 "submit_plan performs the final fresh-contract check.",
             )
-            for rule in contract["workflow_rules"]
+            for rule in contract.get("workflow_rules", [])
         ]
+        if "workflow_rules" in contract:
+            contract["workflow_rules"] = workflow_rules
         contract["mcp_submission"] = {
             "contract_version": submission["contract_version"],
             "proposal": {},
             "proposal_schema": "$.proposal_schema",
             "instructions": MCP_SUBMISSION_INSTRUCTIONS,
         }
-        validate_value(SAFE_CONTRACT_SCHEMA, contract, phase="output")
+        validate_value(
+            SAFE_SCHEMA_CONTRACT_SCHEMA if view == "schema" else SAFE_CONTRACT_SCHEMA,
+            contract, phase="output",
+        )
         return AdapterResult(contract)
 
     # @testable false

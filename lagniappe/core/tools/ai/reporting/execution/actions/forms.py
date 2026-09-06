@@ -25,7 +25,10 @@ from .references import (
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_skips_empty_submission_update_and_continues
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_persists_all_fields_with_fresh_entity_reads
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_runs_submission_updates
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_adds_schema_fields_persists_all_task_values_and_completes
+# @matrix ai-report submission : batch-field-patch persistence
 # @matrix ai-report : batch-field-patch deterministic-run empty-update
 # @matrix submission : continue deterministic-run empty-update recoverable
 def _update_submission_fields(action, _report, user, created):
@@ -40,6 +43,7 @@ def _update_submission_fields(action, _report, user, created):
     skipped = []
     previous = []
     to_save = []
+    working_entities = {}
     for index, update in enumerate(updates, 1):
         if not isinstance(update, dict):
             skipped.append({"index": index, "reason": "Update row must be an object."})
@@ -50,6 +54,9 @@ def _update_submission_fields(action, _report, user, created):
             entity.allowed(Action.EDIT, user=user),
             "You do not have permission to update this submission.",
         )
+        # Reads need not share identity. Accumulate every patch on the same
+        # working root, including when different references resolve to its key.
+        entity = working_entities.setdefault(entity.key, entity)
         schema_id = update.get("schema_id") or update.get("field_id")
         if not isinstance(schema_id, str) or not schema_id.strip():
             skipped.append({"index": index, "reason": "Missing schema_id."})
@@ -114,6 +121,9 @@ def _update_submission_fields(action, _report, user, created):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_rejects_schema_update_without_form_edit_permission
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_persists_all_fields_with_fresh_entity_reads
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_adds_schema_fields_persists_all_task_values_and_completes
+# @matrix ai-report submission : schema-update
 # @matrix ai-report form-schema : deterministic-run permission-failure schema-update
 def _update_form_schema(action, _report, user, created):
     data = _data(action)
@@ -343,12 +353,17 @@ def _update_summary_note(prefix, applied, skipped):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_persists_all_fields_with_fresh_entity_reads
 # @matrix ai-report : batch-field-patch undo
+# @matrix submission : undo
 def _undo_submission_updates(action, user):
     restored = []
     skipped = []
     to_save = []
-    for previous in action.get("previous") or []:
+    working_entities = {}
+    # Reverse row order also restores the original value when the same field
+    # was changed more than once in this action.
+    for previous in reversed(action.get("previous") or []):
         entity = _load_result_entity(previous.get("entity"))
         if entity is None:
             skipped.append({**previous, "reason": "Entity is missing."})
@@ -357,6 +372,7 @@ def _undo_submission_updates(action, user):
             entity.allowed(Action.EDIT, user=user),
             "You do not have permission to restore this submission.",
         )
+        entity = working_entities.setdefault(entity.key, entity)
         schema_id = previous.get("schema_id")
         if not schema_id:
             skipped.append({**previous, "reason": "Missing schema_id."})

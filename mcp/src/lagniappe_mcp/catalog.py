@@ -296,6 +296,21 @@ SAFE_CONTRACT_SCHEMA = {
     "additionalProperties": False,
 }
 
+SCHEMA_CONTRACT_KEYS = (
+    "contract_version", "tool", "proposal_schema", "schema_scope",
+    "schema_actions", "schema_instructions", "mcp_submission",
+)
+SAFE_SCHEMA_CONTRACT_SCHEMA = {
+    "type": "object",
+    "required": list(SCHEMA_CONTRACT_KEYS),
+    "properties": {
+        key: ({"type": "object"} if key == "proposal_schema" else SAFE_CONTRACT_SCHEMA["properties"][key])
+        for key in SCHEMA_CONTRACT_KEYS
+    },
+    "additionalProperties": False,
+}
+
+
 REST_CONTRACT_SCHEMA = {
     "type": "object",
     "required": [
@@ -343,6 +358,21 @@ REST_CONTRACT_SCHEMA = {
     },
     "additionalProperties": False,
 }
+
+REST_SCHEMA_CONTRACT_KEYS = (
+    *[key for key in SCHEMA_CONTRACT_KEYS if key != "mcp_submission"],
+    "submission_format",
+)
+REST_SCHEMA_CONTRACT_SCHEMA = {
+    "type": "object",
+    "required": list(REST_SCHEMA_CONTRACT_KEYS),
+    "properties": {
+        key: ({"type": "object"} if key == "proposal_schema" else REST_CONTRACT_SCHEMA["properties"][key])
+        for key in REST_SCHEMA_CONTRACT_KEYS
+    },
+    "additionalProperties": False,
+}
+
 
 UPLOAD_RESULT_SCHEMA = {
     "type": "object",
@@ -684,7 +714,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan_contract",
-            "Load exact schemas for selected allowed actions; full view without actions returns all schemas. summary view omits proposal_schema while retaining all allowed names. Reuse complete selected schemas; refresh for changed actions/state/permissions. submit_plan independently validates against the full current contract.",
+            "Load exact schemas for selected allowed actions. Use view=schema for a follow-up after receiving the plan context: it omits repeated workflow/inventory guidance. full includes context and, without actions, all schemas. summary includes context without schemas. Reuse selected schemas; refresh context for changed state/permissions. submit_plan independently validates against the full current contract.",
             {
                 **_plan_id_input(),
                 "properties": {
@@ -695,10 +725,10 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
                         "maxItems": 100,
                         "items": {"type": "string"},
                     },
-                    "view": {"enum": ["full", "summary"]},
+                    "view": {"enum": ["full", "summary", "schema"]},
                 },
             },
-            SAFE_CONTRACT_SCHEMA,
+            {"type": "object", "anyOf": [SAFE_CONTRACT_SCHEMA, SAFE_SCHEMA_CONTRACT_SCHEMA]},
             "get_plan_contract",
             READ_ANNOTATIONS,
         ),

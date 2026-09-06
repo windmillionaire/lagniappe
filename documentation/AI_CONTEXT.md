@@ -115,6 +115,16 @@ arguments. The guideline tool can restrict Form value rules to actual schema
 field types and action rules to selected action types; filtered and full calls
 remain different arguments in the normal exact-call cache.
 
+For an existing-submission patch, the same tool accepts `task="form_autofill"`
+with `actions=["update_submission_fields"]` and actual `field_types`; this returns
+patch-specific guidance in both native and external flows, without the blank-only
+Autofill/file-reading workflow. `get_schema(include_values=true)` joins current
+AI-readable values to exact schema ids in one read. Neither option adds a tool
+name or a required model round. Prefer projections and reuse over splitting one
+natural read into several dependent calls: each extra Gemini round sends another
+provider request and replays prior tool output. Tool count alone is not the useful
+measure; observe rounds, cumulative tokens, latency and provider errors.
+
 The API route selects external dispatch through server-owned context, never a
 model-supplied argument. In particular, `get_guidelines(task="organize")`
 has separate compositions. Built-in Gemini receives structural-planning rules:

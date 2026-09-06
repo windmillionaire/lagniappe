@@ -1516,6 +1516,103 @@ def test_report_detail_skips_action_dependencies(get_user):
     ]
 
 
+# @matrix ai-report submission : batch-field-patch persistence schema-update
+def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_user):
+    user = get_user(Users.OWNER)
+    report, _page_form, page = _schema_section_report(user)
+    form = Entities.FORM.create(
+        {
+            "name": f"test-task-details-{_suffix()}",
+            "form-type": "task",
+            "schema": [
+                {
+                    "id": "textarea-notes",
+                    "type": "textarea",
+                    "title": "Implementation Notes",
+                }
+            ],
+        }
+    )
+    task = Entities.TASK.create(
+        {
+            "name": f"test-optional-ask-{_suffix()}",
+            "page": page,
+            "form": form,
+            "submission": {"textarea-notes": "Previous notes"},
+        }
+    )
+    expected = {
+        "textarea-notes": "Problem: saving was required. Solution: answer first.",
+        "textarea-acceptance": "Save only on request.",
+        "textarea-verification": "Checked live retrieval.",
+        "input-commit": "abc123",
+    }
+    report.proposal = {
+        "summary": "Record details and complete the task",
+        "confidence": 1,
+        "actions": [
+            {
+                "id": "schema",
+                "type": "update_form_schema",
+                "data": {
+                    "form": form.urlsafe_key,
+                    "operations": [
+                        {
+                            "op": "add_field",
+                            "field": {
+                                "id": field_id,
+                                "type": field_id.split("-", 1)[0],
+                                "title": field_id,
+                                **(
+                                    {"input": "text"}
+                                    if field_id.startswith("input-")
+                                    else {}
+                                ),
+                            },
+                        }
+                        for field_id in list(expected)[1:]
+                    ],
+                },
+            },
+            {
+                "id": "details",
+                "type": "update_submission_fields",
+                "depends_on": ["schema"],
+                "data": {
+                    "updates": [
+                        {
+                            "task": task.urlsafe_key,
+                            "schema_id": field_id,
+                            "new_value": value,
+                        }
+                        for field_id, value in expected.items()
+                    ],
+                },
+            },
+            {
+                "id": "done",
+                "type": "complete_task",
+                "depends_on": ["details"],
+                "data": {"task": task.urlsafe_key},
+            },
+        ],
+    }
+    Entities.save(form, task, report)
+
+    report_page = user.go(Report.for_entity(user, report))
+    report_page.execute()
+    expect(user.page.get_by_text("Work done.")).to_be_visible()
+
+    saved = Entities.fetch_one(task.urlsafe_key, request=Fetch.direct())
+    receipt = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct()).result
+    assert saved.completed is True
+    assert saved.submission == expected
+    assert len(saved.form.schema) == 4
+    assert [action["status"] for action in receipt["actions"]] == ["complete"] * 3
+    assert len(receipt["actions"][1]["updates"]["applied"]) == 4
+    assert receipt["actions"][1]["updates"]["skipped"] == []
+
+
 # @matrix ai-report : batch-field-patch detail deterministic-run schema-update skip-action
 def test_report_detail_skips_schema_section_and_runs_submission_updates(get_user):
     user = get_user(Users.OWNER)

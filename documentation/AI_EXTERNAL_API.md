@@ -180,11 +180,28 @@ still applies; this is not a promise that the external model retains nothing.
 Starters bundle current workflow context; Create, Organize and completed uploads use a
 compact contract summary. It retains all allowed action names and permissions,
 but `proposal_schema` is null and `schema_scope` is `summary`. Fetch
-`get_plan_contract(actions=[...])` for the selected schemas, or `view=full`
+`get_plan_contract(actions=[...], view="schema")` for the selected schemas without
+repeating that context, or `view=full`
 without actions for all schemas. `submit_plan` privately checks the full current contract
 before saving. Consume one complete result representation when the client
 provides both text and structured content. Legacy protocol clients receive an
 object wrapper for non-object results, with matching schemas and result paths.
+
+`get_schema(id=<Page or Task>, include_values=true)` returns the schema and
+current AI-readable values keyed by exact field id. This avoids matching
+human-readable labels (which can repeat) and loading unrelated entity details.
+Values use the existing AI field representations, not a raw storage export;
+follow the field type's submission format when writing. Unset fields are omitted;
+a Form itself has no submission and returns `values: null`.
+For patches, `get_guidelines(task="form_autofill",
+actions=["update_submission_fields"], field_types=[...])` omits the full Autofill
+and file-discovery workflow. Reuse guidance already received when sufficient.
+
+Execution receipts expose applied/skipped counts for submission and schema
+updates without returning private recovery data. Counts describe action outcomes,
+not a fresh field-value read; use `get_schema(..., include_values=true)` to inspect
+the saved result. Batch patches accumulate on one working entity per durable key
+and save the combined result. Undo restores the same batch in reverse row order.
 
 For clients that prefer direct HTTP, the API-key workflow and downloadable
 [client skill](#minimal-client-skill) remain independent of OAuth and MCP.
@@ -246,7 +263,11 @@ still be fetched after uploads and immediately before submission.
    `contract_version`. Optional `view=summary` omits the schema; optional
    comma-separated `actions` selects exact action schemas without changing
    permissions. Default `view=full` without `actions` preserves the complete
-   contract. Its `submission_format` gives the exact `POST` method,
+   contract. `view=schema` is a follow-up projection containing only version,
+   tool, exact selected schemas, schema metadata and the submission wrapper;
+   reuse previously obtained context or fetch full context if it is missing or
+   state changed. All selections are checked against current permissions.
+   Its `submission_format` gives the exact `POST` method,
    URL, and wrapper body shape. Organize also returns the authoritative
    finalized-upload inventory and per-file checklist.
 8. `POST /plans/{id}/submit` validates and publishes the final result. It returns

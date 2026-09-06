@@ -250,6 +250,9 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         actor = _structured(actor_call)
         result["actor"] = actor_call
         result["answer_context"] = await _call(client, "answer_question", {})
+        result["schema_values"] = await _call(client, "get_schema", {
+            "id": specification["page_ref"], "include_values": True,
+        })
         result["plan_free_search"] = await _call(client, "search_entities", {
             "query": specification["search_name"], "kinds": ["page"], "limit": 10,
         })
@@ -315,6 +318,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         create = _structured(create_start)
         create_contract_call = await _call(client, "get_plan_contract", {
             "plan_id": create["id"], "actions": ["create_page", "create_task"],
+            "view": "schema",
         })
         create_contract_value = _structured(create_contract_call)
         create_schedule_checks = _schedule_contract_checks(create_contract_value)
@@ -473,6 +477,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             {
                 "plan_id": organize["id"],
                 "actions": ["create_task", "attach_file_to_page", "summarize_file"],
+                "view": "schema",
             },
         )
         organize_schedule_checks = _schedule_contract_checks(

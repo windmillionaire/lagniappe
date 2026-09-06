@@ -1,5 +1,7 @@
 """Focused AI-report characterization coverage."""
 
+import copy
+
 import pytest
 
 from lagniappe.core import exceptions
@@ -664,6 +666,128 @@ def test_run_report_moves_entities_updates_schema_and_patches_submissions_with_u
     assert saved
 
 
+
+
+# @matrix ai-report submission : batch-field-patch persistence schema-update undo
+@pytest.mark.unit
+@pytest.mark.parametrize("kind", ["PAGE", "TASK"])
+def test_submission_batch_persists_all_fields_with_fresh_entity_reads(
+    monkeypatch, kind
+):
+    user = _test_user("batch-owner")
+    original = {"input-notes": "Before", "input-untouched": "Keep"}
+    schema = [
+        {"id": field_id, "type": "input", "input": "text", "title": field_id}
+        for field_id in original
+    ]
+    stored = {"schema": copy.deepcopy(schema), "submission": copy.deepcopy(original)}
+    saved_targets = []
+
+    def fetch_one(identifier, *, request):
+        if hasattr(identifier, "db"):
+            return identifier
+        form = TestEntities.get("FORM", {"name": "Details", "hash": "batch-form"})
+        form.form_type = kind.lower()
+        form.schema = copy.deepcopy(stored["schema"])
+        if identifier == "batch-form":
+            return form
+        if identifier in {"batch-target", "target-alias"}:
+            target = TestEntities.get(kind, {"name": "Work", "hash": "batch-target"})
+            target.form = form
+            target.properties.submission.value = copy.deepcopy(stored["submission"])
+            return target
+        return None
+
+    def save(*entities):
+        for entity in entities:
+            if entity.urlsafe_key == "batch-form":
+                stored["schema"] = copy.deepcopy(entity.schema)
+            elif entity.urlsafe_key == "batch-target":
+                stored["submission"] = copy.deepcopy(entity.submission)
+                saved_targets.append(copy.deepcopy(entity.submission))
+
+    new_fields = ["input-acceptance", "input-verification", "input-commit"]
+    changes = [
+        ("input-notes", "Problem solved"),
+        *zip(new_fields, ["Expected", "Tested", "abc123"]),
+    ]
+    # Repeated references (including aliases) and a repeated field must share
+    # one working entity; each fetch below deliberately reconstructs stored state.
+    changes.append(("input-notes", "Final notes"))
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Batch fields",
+            "hash": "batch-report",
+            "parent": user,
+            "user": user,
+            "status": "ready",
+            "pending": False,
+            "proposal": {
+                "summary": "Add and fill task details",
+                "confidence": 1,
+                "actions": [
+                    {
+                        "id": "schema",
+                        "type": "update_form_schema",
+                        "data": {
+                            "form": "batch-form",
+                            "operations": [
+                                {
+                                    "op": "add_field",
+                                    "field": {
+                                        "id": field_id,
+                                        "type": "input",
+                                        "input": "text",
+                                        "title": field_id,
+                                    },
+                                }
+                                for field_id in new_fields
+                            ],
+                        },
+                    },
+                    {
+                        "id": "fields",
+                        "type": "update_submission_fields",
+                        "depends_on": ["schema"],
+                        "data": {
+                            "updates": [
+                                {
+                                    kind.lower(): "target-alias"
+                                    if index % 2
+                                    else "batch-target",
+                                    "schema_id": field_id,
+                                    "new_value": value,
+                                }
+                                for index, (field_id, value) in enumerate(changes)
+                            ],
+                        },
+                    },
+                ],
+            },
+        },
+    )
+    monkeypatch.setattr(report_runner.Entities, "fetch_one", fetch_one)
+    monkeypatch.setattr(report_runner.Entities, "save", save)
+
+    result = report_runner.run_report(report, user)
+
+    assert result["status"] == "complete"
+    assert len(result["actions"][1]["updates"]["applied"]) == 5
+    assert result["actions"][1]["updates"]["skipped"] == []
+    expected = {**original, **dict(changes)}
+    assert fetch_one("batch-target", request=None).submission == expected
+    assert saved_targets == [expected]
+    # Retrying a completed report must not reapply the mutations.
+    assert report_runner.run_report(report, user)["status"] == "complete"
+    assert saved_targets == [expected]
+
+    undo = report_undo.undo_report(report, user)
+
+    assert undo["status"] == "complete"
+    assert fetch_one("batch-target", request=None).submission == original
+    assert stored["schema"] == schema
+    assert saved_targets == [expected, original]
 
 
 # @matrix ai-report : deterministic-run rename undo
