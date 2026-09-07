@@ -27,11 +27,11 @@ def verify_installation():
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_installation_is_read_only_and_activation_is_explicit
 # @matrix setup : activation gcloud-config
-def activate_installation():
+def activate_installation(*, announce=True):
     """Explicitly activate the installation's saved local gcloud context."""
     from runner.gcloud import config_gcloud
 
-    config_gcloud()
+    config_gcloud(announce=announce)
     return True
 
 

@@ -302,7 +302,7 @@ def test_receiving_dns_guidance_prefers_cloudflare_and_keeps_manual_fallback(
 
     manual_output = capsys.readouterr().out
     assert "inbound-smtp.resend.com" in manual_output
-    assert "priority=10" in manual_output
+    assert "Priority:  10" in manual_output
 
 
 # @matrix ai-email setup : custom-domain prerequisites setup supporting-services
@@ -368,7 +368,7 @@ def test_main_install_ai_email_offer_requires_custom_domain_and_resend(
     assert ai_email.setup_ai_email() is None
     output = capsys.readouterr().out
     assert "custom application domain" in output
-    assert "Resend authentication email" in output
+    assert "Resend authentication email" in " ".join(output.split())
     assert "./setup.sh ai-email" in output
 
     settings.APP = {
@@ -500,14 +500,17 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
     output = capsys.readouterr().out
     assert "Next step: deploy and activate AI email submissions." in output
     assert "no synthetic email or health probe is run" in output
-    assert "\n".join(
-        (
-            "  Ai       ai@inbound.app.example.com",
-            "  Ask      ask@inbound.app.example.com",
-            "  Create   create@inbound.app.example.com",
-            "  Organize organize@inbound.app.example.com",
+    assert (
+        "\n".join(
+            (
+                "  Ai:       ai@inbound.app.example.com",
+                "  Ask:      ask@inbound.app.example.com",
+                "  Create:   create@inbound.app.example.com",
+                "  Organize:  organize@inbound.app.example.com",
+            )
         )
-    ) in output
+        in output
+    )
     assert "Send a normal email from a registered user's exact email address" in output
 
 

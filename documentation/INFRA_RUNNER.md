@@ -30,6 +30,9 @@ missing, byte-mismatched, or wrong-version managed copy stops with the exact
 `runner/gcloud.py` activates the complete gcloud configuration saved in
 `lagniappe_dev.yaml`. It verifies configuration name, account, and project as a
 unit and exports the selected project for child pytest/Flask processes.
+Successful activation prints one grouped target summary and lists the credential
+checks completed. Internal callers may suppress repeated success announcements;
+configuration, token, and ADC verification still run normally.
 
 An unconfigured checkout may run offline tooling. A partial saved target fails
 before collection or app startup instead of using ambient gcloud state.

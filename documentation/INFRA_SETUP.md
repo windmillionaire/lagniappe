@@ -162,7 +162,27 @@ for Windows. See [INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md).
 
 ## Operator output
 
-Pass prose through `installer.wrap_text()` so prompts remain readable at the
-current terminal width. Keep resource identifiers, URLs, commands, and other
-copy-sensitive values verbatim. Successful summaries use a safe-field allowlist
-and never dump the application settings mapping.
+Use the standard-library helpers in `runner/console.py` for operator output;
+`installer.wrap_text()` remains available for existing callers.
+
+- `wrap_text()` wraps prose at the current terminal width (up to 100 cells),
+  preserving paragraphs and hanging list indentation. Long tokens stay intact.
+- `format_prompt()` adds a consistent `?` marker, keeps the final answer hint
+  together, and leaves a space before input. Call it immediately before `input()`;
+  it only formats the question and does not choose defaults or parse answers.
+- `format_value(..., verbatim=True)` preserves resource identifiers, URLs, DNS
+  values, and command arguments exactly. Add `standalone=True` for commands so
+  they occupy their own line, even when longer than the terminal. Do not pass
+  padded tables or raw provider diagnostics through the prose wrapper.
+
+Use short, neutral spinner labels and print longer explanations separately.
+Write messages through the active spinner to avoid colliding with animation.
+Windows, redirected output, basic terminals, unsupported Unicode encodings, and
+terminals narrower than 20 columns use static progress. Animated labels adapt
+to shrinking terminal widths. Color remains optional and respects `NO_COLOR`.
+
+Successful summaries align short rows when space permits and stack values on
+narrow terminals. They retain the safe-field allowlist and never dump the
+application settings mapping. The setup test alias includes offline layout
+checks at widths 12, 40, 60, 80, and 100, including plain and colored output,
+Unicode cell widths, copyable values, and resizing.

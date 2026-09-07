@@ -3,6 +3,7 @@ import shlex
 from urllib.parse import unquote, urlsplit
 import webbrowser
 
+from runner.console import format_prompt
 from runner.context import setup_command
 from installer import FORMATTER, wrap_text
 from installer.errors import ProviderError
@@ -44,19 +45,23 @@ def test_redis_connection(settings=None, *, exit_on_failure=True):
             sp.ok(f.ok_glyph)
             return True
         except Exception as e:
-            sp.write(f.error(f"Failed to connect to Redis.\n{e}"))
+            sp.write(f.error(wrap_text("Failed to connect to Redis.") + "\n" + str(e)))
             if redis_tls_enabled(settings):
                 sp.write(
                     f.warning(
-                        "Confirm TLS is enabled in Redis Cloud, Mutual TLS is "
-                        "unchecked, and config/files/redis_ca.pem is current."
+                        wrap_text(
+                            "Confirm TLS is enabled in Redis Cloud, Mutual TLS is "
+                            "unchecked, and config/files/redis_ca.pem is current."
+                        )
                     )
                 )
             else:
                 sp.write(
                     f.warning(
-                        "Confirm TLS is disabled in Redis Cloud for this "
-                        "plaintext connection."
+                        wrap_text(
+                            "Confirm TLS is disabled in Redis Cloud for this "
+                            "plaintext connection."
+                        )
                     )
                 )
             sp.fail(f.fail_glyph)
@@ -78,7 +83,7 @@ def eviction_policy_instructions():
     from installer import FORMATTER
 
     f = FORMATTER.initialize()
-    print(f"\n{f.warning('IMPORTANT REDIS CONFIGURATION:')}")
+    print(wrap_text(f"\n{f.warning('Redis configuration requirements:')}"))
     print(
         f.info(
             wrap_text(
@@ -87,7 +92,7 @@ def eviction_policy_instructions():
             )
         )
     )
-    print(f"  • Data eviction policy: {f.success('volatile-ttl')}")
+    print(wrap_text(f"  • Data eviction policy: {f.success('volatile-ttl')}"))
     print(
         f.info(
             wrap_text(
@@ -123,7 +128,9 @@ def eviction_policy_instructions():
         )
     )
     input(
-        f"\n{f.warning('Press Enter only after Redis Cloud confirms the eviction policy...')}"
+        format_prompt(
+            f"\n{f.warning('Press Enter only after Redis Cloud confirms the eviction policy...')}"
+        )
     )
 
 
@@ -139,14 +146,14 @@ def redis_cloud_instructions():
         SETTINGS.APP.get("RESOURCE_REGION") or constants.DEFAULT_RESOURCE_REGION
     ).strip()
 
-    print(f"\n{f.info('Configure Redis Cloud')}")
+    print(wrap_text(f"\n{f.info('Configure Redis Cloud')}"))
     print(
         wrap_text(
             "Lagniappe uses a Redis Cloud database for search, cache, and "
             "synchronization state."
         )
     )
-    print(f"Opening Redis Cloud:\n  {REDIS_CLOUD_CONSOLE_URL}")
+    print(wrap_text(f"Opening Redis Cloud:\n  {REDIS_CLOUD_CONSOLE_URL}"))
     try:
         webbrowser.open_new_tab(REDIS_CLOUD_CONSOLE_URL)
     except webbrowser.Error:
@@ -328,7 +335,7 @@ def _enable_redis_tls():
 
     f = FORMATTER.initialize()
 
-    print(f"\n{f.info('Redis Cloud TLS')}")
+    print(wrap_text(f"\n{f.info('Redis Cloud TLS')}"))
     print(
         wrap_text(
             "Redis database TLS is available on paid Redis Cloud "
@@ -349,10 +356,10 @@ def _enable_redis_tls():
             "verifies the Redis Cloud server."
         )
     )
-    print(f"Documentation: {REDIS_TLS_DOCUMENTATION_URL}")
+    print(wrap_text(f"Documentation: {REDIS_TLS_DOCUMENTATION_URL}"))
 
     paid_plan = input(
-        f.info("Is this database on a paid Redis Cloud plan? [y/N]: ")
+        format_prompt(f.info("Is this database on a paid Redis Cloud plan? [y/N]: "))
     )
     if paid_plan.lower() != "y":
         print(
@@ -363,42 +370,54 @@ def _enable_redis_tls():
         )
         return None
 
-    print("\n1. Open Redis Cloud → Databases and select this database")
-    print("2. Open Configuration, select Edit, and find the Security section")
-    print("3. Enable Transport layer security (TLS)")
-    print("4. Download the server certificate ZIP archive")
-    print("5. Unzip the downloaded archive")
+    print(wrap_text("\n1. Open Redis Cloud → Databases and select this database"))
     print(
-        "6. Place the extracted redis_ca.pem file in "
-        f"{constants.REDIS_CA_CERT_RELATIVE_PATH}"
+        wrap_text("2. Open Configuration, select Edit, and find the Security section")
     )
-    print("7. Leave Mutual TLS (require client authentication) unchecked")
-    print("8. Save the database configuration")
+    print(wrap_text("3. Enable Transport layer security (TLS)"))
+    print(wrap_text("4. Download the server certificate ZIP archive"))
+    print(wrap_text("5. Unzip the downloaded archive"))
+    print(
+        wrap_text(
+            "6. Place the extracted redis_ca.pem file in "
+            f"{constants.REDIS_CA_CERT_RELATIVE_PATH}"
+        )
+    )
+    print(wrap_text("7. Leave Mutual TLS (require client authentication) unchecked"))
+    print(wrap_text("8. Save the database configuration"))
     print(
         f.warning(
-            "After TLS is saved, Redis Cloud rejects new unencrypted connections."
+            wrap_text(
+                "After TLS is saved, Redis Cloud rejects new unencrypted connections."
+            )
         )
     )
 
     configured = input(
-        f.info(
-            "Has TLS been enabled and the extracted redis_ca.pem placed in "
-            f"{constants.REDIS_CA_CERT_RELATIVE_PATH}? [y/N]: "
+        format_prompt(
+            f.info(
+                "Has TLS been enabled and the extracted redis_ca.pem placed in "
+                f"{constants.REDIS_CA_CERT_RELATIVE_PATH}? [y/N]: "
+            )
         )
     )
     if configured.lower() != "y":
-        print(f.warning("Redis TLS configuration was not changed."))
+        print(f.warning(wrap_text("Redis TLS configuration was not changed.")))
         return None
 
     try:
         managed_ca_path = validate_redis_ca_cert(_managed_redis_ca_path())
     except RedisTLSConfigurationError as error:
-        print(f.error(f"Redis TLS settings were not saved.\n{error}"))
+        print(
+            f.error(wrap_text("Redis TLS settings were not saved.") + "\n" + str(error))
+        )
         print(
             f.warning(
-                "Unzip the Redis Cloud certificate download and place the "
-                "extracted redis_ca.pem file at "
-                f"{constants.REDIS_CA_CERT_RELATIVE_PATH}, then retry."
+                wrap_text(
+                    "Unzip the Redis Cloud certificate download and place the "
+                    "extracted redis_ca.pem file at "
+                    f"{constants.REDIS_CA_CERT_RELATIVE_PATH}, then retry."
+                )
             )
         )
         return False
@@ -410,14 +429,18 @@ def _enable_redis_tls():
     if not test_redis_connection(candidate, exit_on_failure=False):
         print(
             f.error(
-                "Redis TLS settings were not saved; the previous settings "
-                "remain unchanged."
+                wrap_text(
+                    "Redis TLS settings were not saved; the previous settings "
+                    "remain unchanged."
+                )
             )
         )
         print(
             f.warning(
-                "Fix the certificate/connection and retry promptly, or disable "
-                "TLS again in Redis Cloud to restore the previous transport mode."
+                wrap_text(
+                    "Fix the certificate/connection and retry promptly, or disable "
+                    "TLS again in Redis Cloud to restore the previous transport mode."
+                )
             )
         )
         return False
@@ -425,7 +448,9 @@ def _enable_redis_tls():
     SETTINGS.APP["REDIS_TLS"] = True
     SETTINGS.APP["REDIS_CA_CERT"] = constants.REDIS_CA_CERT_RELATIVE_PATH
     SETTINGS.save()
-    print(f.success("Redis TLS enabled with server certificate verification."))
+    print(
+        f.success(wrap_text("Redis TLS enabled with server certificate verification."))
+    )
     return True
 
 
@@ -440,13 +465,13 @@ def _disable_redis_tls():
     f = FORMATTER.initialize()
 
     if not redis_tls_enabled(SETTINGS.APP):
-        print(f.info("Redis TLS is already disabled."))
+        print(f.info(wrap_text("Redis TLS is already disabled.")))
         return None
 
-    print(f"\n{f.warning('Disable Redis Cloud TLS')}")
-    print("1. Open the database Configuration screen in Redis Cloud")
-    print("2. Edit the Security section and disable TLS")
-    print("3. Save the database configuration")
+    print(wrap_text(f"\n{f.warning('Disable Redis Cloud TLS')}"))
+    print(wrap_text("1. Open the database Configuration screen in Redis Cloud"))
+    print(wrap_text("2. Edit the Security section and disable TLS"))
+    print(wrap_text("3. Save the database configuration"))
     print(
         f.warning(
             wrap_text(
@@ -455,9 +480,11 @@ def _disable_redis_tls():
             )
         )
     )
-    configured = input(f.info("Has TLS been disabled in Redis Cloud? [y/N]: "))
+    configured = input(
+        format_prompt(f.info("Has TLS been disabled in Redis Cloud? [y/N]: "))
+    )
     if configured.lower() != "y":
-        print(f.warning("Redis TLS configuration was not changed."))
+        print(f.warning(wrap_text("Redis TLS configuration was not changed.")))
         return None
 
     candidate = dict(SETTINGS.APP)
@@ -466,8 +493,10 @@ def _disable_redis_tls():
     if not test_redis_connection(candidate, exit_on_failure=False):
         print(
             f.error(
-                "Redis TLS settings were not changed; the previous verified "
-                "configuration remains saved."
+                wrap_text(
+                    "Redis TLS settings were not changed; the previous verified "
+                    "configuration remains saved."
+                )
             )
         )
         print(
@@ -499,7 +528,7 @@ def _offer_redis_tls_for_fresh_install():
     """Offer Redis TLS while the initial Redis connection is being configured."""
     f = FORMATTER.initialize()
 
-    print(f"\n{f.info('Optional Redis Transport Security')}")
+    print(wrap_text(f"\n{f.info('Optional Redis transport security')}"))
     print(
         wrap_text(
             "Paid Redis Cloud plans can encrypt application-to-database traffic "
@@ -507,7 +536,7 @@ def _offer_redis_tls_for_fresh_install():
             "database setting."
         )
     )
-    consent = input(f.info("Configure Redis TLS now? [y/N]: "))
+    consent = input(format_prompt(f.info("Configure Redis TLS now? [y/N]: ")))
     if consent.lower() == "y":
         return _enable_redis_tls()
 
@@ -580,7 +609,9 @@ def setup_redis():
                 )
             )
             retry = input(
-                f.info("Enter the Redis connection details again? [Y/n]: ")
+                format_prompt(
+                    f.info("Enter the Redis connection details again? [Y/n]: ")
+                )
             )
             if retry.strip().lower() == "n":
                 raise error

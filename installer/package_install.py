@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 
+from runner.console import format_prompt, format_value, wrap_text
 from runner.context import REPOSITORY_ROOT
 from installer.errors import PIP_TIMEOUT, SetupCancelled, SetupError
 
@@ -125,7 +126,7 @@ def ensure_pip_is_available():
         # pip is not found or python executable itself is not found
         pass  # Proceed to try and install it
 
-    print("Pip not found. Attempting to install it...")
+    print(wrap_text("Pip not found. Attempting to install it..."))
     try:
         # Try to install pip using ensurepip
         subprocess.check_call(
@@ -141,7 +142,7 @@ def ensure_pip_is_available():
             stderr=subprocess.DEVNULL,
             timeout=30,
         )
-        print("Pip installed successfully.")
+        print(wrap_text("Pip installed successfully."))
         return  # pip is now available
     except (
         subprocess.CalledProcessError,
@@ -149,23 +150,50 @@ def ensure_pip_is_available():
         FileNotFoundError,
     ) as e:
         print(
-            f"Error: Automatic installation of 'pip' failed. ({e})\n"
-            f"Please install pip manually for your Python environment ({sys.executable}).\n\n"
-            "Instructions:\n"
-            "-------------\n"
-            "1. Download get-pip.py from https://bootstrap.pypa.io/get-pip.py\n"
-            f"2. Run: '{sys.executable}' get-pip.py\n\n"
-            "For Windows (if the above fails or python is not in PATH):\n"
-            "  - Search for 'Manage app execution aliases' in Windows settings.\n"
-            "  - Ensure 'python.exe' and 'python3.exe' (if present) provided by 'Python Software Foundation' are enabled.\n"
-            "  - Or, use the full path to your python.exe when running get-pip.py, e.g.:\n"
-            f"    '{sys.executable}' get-pip.py\n\n"
-            "For macOS/Linux (if python is not in PATH or you have multiple Pythons):\n"
-            "  - Use 'python3' or the specific Python executable path:\n"
-            f"    '{sys.executable}' get-pip.py\n"
-            "  - You might need to use 'sudo' if installing system-wide (not recommended if using virtual environments):\n"
-            f"    sudo '{sys.executable}' get-pip.py\n\n"
-            "After installing pip, please re-run this setup script.",
+            wrap_text("Error: Automatic installation of pip failed."), file=sys.stderr
+        )
+        print(str(e), file=sys.stderr)
+        print(
+            wrap_text(
+                f"Please install pip manually for your Python environment ({sys.executable})."
+            ),
+            file=sys.stderr,
+        )
+        print(
+            format_value(
+                "1. Download get-pip.py",
+                "https://bootstrap.pypa.io/get-pip.py",
+                verbatim=True,
+                standalone=True,
+            ),
+            file=sys.stderr,
+        )
+        print(
+            format_value(
+                "2. Run",
+                f"'{sys.executable}' get-pip.py",
+                verbatim=True,
+                standalone=True,
+            ),
+            file=sys.stderr,
+        )
+        print(
+            wrap_text(
+                "\nFor Windows (if the above fails or python is not in PATH):\n"
+                "  - Search for 'Manage app execution aliases' in Windows settings.\n"
+                "  - Ensure 'python.exe' and 'python3.exe' (if present) provided by "
+                "'Python Software Foundation' are enabled.\n"
+                "  - Or, use the full path to your python.exe in the command above.\n\n"
+                "For macOS/Linux (if python is not in PATH or you have multiple Pythons):\n"
+                "  - Use 'python3' or the specific Python executable path.\n"
+                "  - You might need to use 'sudo' if installing system-wide "
+                "(not recommended if using virtual environments):"
+            ),
+            file=sys.stderr,
+        )
+        print(f"    sudo '{sys.executable}' get-pip.py", file=sys.stderr)
+        print(
+            wrap_text("\nAfter installing pip, please re-run this setup script."),
             file=sys.stderr,
         )
         raise SetupError("Automatic pip installation failed.") from e
@@ -291,16 +319,27 @@ def ensure_setup_dependencies():
             "LAGNIAPPE_NONINTERACTIVE", ""
         ).lower() not in ("1", "true", "yes")
         if interactive:
-            print("Setup needs to install or correct these Python dependencies:")
+            print(
+                wrap_text(
+                    "Setup needs to install or correct these Python dependencies:"
+                )
+            )
             for _import_name, package_name, explanation, requirement, detail in pending:
                 print(f"  {requirement} — {explanation} ({detail})")
             if compatibility_error:
                 print(
-                    "  transitive dependencies — compatibility repair "
-                    f"({compatibility_error})"
+                    wrap_text(
+                        "  transitive dependencies — compatibility repair "
+                        f"({compatibility_error})"
+                    )
                 )
-            if input("Continue with this dependency transaction? [Y/n]: ").lower() == "n":
-                print("Aborting installer.")
+            if (
+                input(
+                    format_prompt("Continue with this dependency transaction? [Y/n]: ")
+                ).lower()
+                == "n"
+            ):
+                print(wrap_text("Aborting installer."))
                 raise SetupCancelled(
                     "Setup dependency transaction cancelled by the operator."
                 )
@@ -403,20 +442,25 @@ def install_if_missing(import_name, explanation=None, package_name=None):
 
             if interactive:
                 prompt = f"Install {package_name}? ({explanation if explanation else ''}) [Y/n]: "
-                sys.stderr.write(prompt)
+                sys.stderr.write(format_prompt(prompt))
                 sys.stderr.flush()
                 response = input()
                 if response.lower() == "n":
-                    print("Aborting installer.")
+                    print(wrap_text("Aborting installer."))
                     raise SetupCancelled(
                         f"Installation of {package_name} was cancelled."
                     )
 
-            print(f"Installing {package_name}...", file=sys.stderr)
+            print(wrap_text(f"Installing {package_name}..."), file=sys.stderr)
             try:
                 _install(package_name, import_name)
             except Exception as e:
-                print(f"Failed to install {package_name}. Error: {e}", file=sys.stderr)
+                print(
+                    wrap_text(f"Failed to install {package_name}. Error:")
+                    + "\n"
+                    + str(e),
+                    file=sys.stderr,
+                )
                 raise SetupError(
                     f"Failed to install setup dependency {package_name}."
                 ) from e

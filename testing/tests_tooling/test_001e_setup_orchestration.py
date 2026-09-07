@@ -315,7 +315,7 @@ def test_default_install_only_prints_manual_deployment_steps_when_declined(
     assert "Review the generated YAML files" in output
     assert "index.yaml --project project-1" in output
     assert "lagniappe.yaml --project project-1" in output
-    assert "Then reconcile memory monitoring: ./setup.sh monitoring" in output
+    assert "Then reconcile memory monitoring:\n  ./setup.sh monitoring" in output
     assert "Wrapping up installation..." not in output
     assert "deploy_to_app_engine" not in events
 
@@ -1315,7 +1315,7 @@ def test_cli_subprocess_routes_upgrade_branch():
 
     assert result.returncode == 0
     assert "CALL upgrade" in result.stdout
-    assert "kwargs={'branch': 'release/candidate'}" in result.stdout
+    assert "kwargs={'branch': 'release/candidate', 'announce': False}" in result.stdout
 
 
 def test_cli_subprocess_rejects_branch_without_upgrade():

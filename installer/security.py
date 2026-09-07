@@ -1,5 +1,6 @@
 """Interactive security configuration entry points."""
 
+from runner.console import format_prompt, wrap_text
 from .verify import prepare_existing_installation
 
 
@@ -18,15 +19,19 @@ def configure_security():
     f = FORMATTER.initialize()
     enabled = redis_tls_enabled(SETTINGS.APP)
 
-    print(f"\n{f.info('Lagniappe Security Configuration')}")
-    print(f"Redis TLS is currently {'enabled' if enabled else 'disabled'}.")
+    print(wrap_text(f"\n{f.info('Security configuration')}"))
+    print(wrap_text(f"Redis TLS is currently {'enabled' if enabled else 'disabled'}."))
 
     while True:
-        choice = input(
-            f.info(
-                "Enable/refresh Redis TLS, disable it, or exit? [E/d/x]: "
+        choice = (
+            input(
+                format_prompt(
+                    f.info("Enable/refresh Redis TLS, disable it, or exit? [E/d/x]: ")
+                )
             )
-        ).strip().lower()
+            .strip()
+            .lower()
+        )
         if choice in {"", "e", "enable", "refresh"}:
             result = redis_setup._enable_redis_tls()
             break
@@ -34,9 +39,13 @@ def configure_security():
             result = redis_setup._disable_redis_tls()
             break
         if choice in {"x", "exit"}:
-            print(f.success("Security configuration unchanged."))
+            print(f.success(wrap_text("Security configuration unchanged.")))
             return 1
-        print(f.error("Choose E to enable/refresh, D to disable, or X to exit."))
+        print(
+            f.error(
+                wrap_text("Choose E to enable/refresh, D to disable, or X to exit.")
+            )
+        )
 
     if result is False:
         return 1
@@ -45,19 +54,23 @@ def configure_security():
 
     print(
         f.warning(
-            "The app must be redeployed promptly so new Redis connections use "
-            "the same transport mode as Redis Cloud."
+            wrap_text(
+                "The app must be redeployed promptly so new Redis connections use "
+                "the same transport mode as Redis Cloud."
+            )
         )
     )
-    consent = input(f.info("Deploy the updated app now? [Y/n]: "))
+    consent = input(format_prompt(f.info("Deploy the updated app now? [Y/n]: ")))
     if consent.lower() != "n":
         utils.deploy_to_app_engine()
-        print(f.success("Redis security configuration deployed."))
+        print(f.success(wrap_text("Redis security configuration deployed.")))
     else:
         print(
             f.warning(
-                "Deployment deferred. Newly opened app connections may fail "
-                "until the updated settings are deployed."
+                wrap_text(
+                    "Deployment deferred. Newly opened app connections may fail "
+                    "until the updated settings are deployed."
+                )
             )
         )
     return 0

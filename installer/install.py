@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from runner.console import format_prompt, format_value
 from runner.context import (
     GCLOUD_CLI,
     REPOSITORY_ROOT,
@@ -30,7 +31,7 @@ def _recovery_file_present(app_dir=None):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
 # @matrix setup : explicit-project main-install manual-deploy prerequisites virtualenv
 def install():
-    print("Welcome to Lagniappe Setup!")
+    print(wrap_text("Welcome to Lagniappe Setup!"))
     if _recovery_file_present():
         print(
             wrap_text(
@@ -47,15 +48,10 @@ def install():
     record_step("validate gcloud CLI")
     check_gcloud_cli()
 
-    value = input(
-        wrap_text(
-            "This script will need to install certain Python packages if they "
-            "are not already installed. The script will ask for confirmation "
-            "before installing. Continue? [Y/n]: "
-        )
-    )
+    print(wrap_text("Setup will ask before installing any missing Python packages."))
+    value = input(format_prompt("Continue? [Y/n]: "))
     if value.lower() == "n":
-        print("Exiting installer.")
+        print(wrap_text("Exiting installer."))
         raise SetupCancelled("Setup cancelled before dependency installation.")
 
     record_step("install setup dependencies")
@@ -106,8 +102,10 @@ def install():
 
     print(
         f.warning(
-            "Deployment memory note: every Gunicorn worker adds application "
-            "memory use; Lagniappe limits F2 and B2 to three workers."
+            wrap_text(
+                "Deployment memory note: every Gunicorn worker adds application "
+                "memory use; Lagniappe limits F2 and B2 to three workers."
+            )
         )
     )
 
@@ -115,9 +113,11 @@ def install():
     if getattr(SETTINGS, "RECOVERY_MODE", False):
         print(
             f.info(
-                "Recovery preserved monitoring, Sentry, AI, Redis, domain, and "
-                "other saved choices. Use the focused setup modes to reconfigure "
-                "them explicitly."
+                wrap_text(
+                    "Recovery preserved monitoring, Sentry, AI, Redis, domain, and "
+                    "other saved choices. Use the focused setup modes to reconfigure "
+                    "them explicitly."
+                )
             )
         )
     else:
@@ -130,7 +130,9 @@ def install():
     SETTINGS.save()
 
     deployed = False
-    consent = input(f.info("Would you like to deploy the app now? [y/N]: "))
+    consent = input(
+        format_prompt(f.info("Would you like to deploy the app now? [y/N]: "))
+    )
     if consent.lower() == "y":
         record_step("deploy application")
         utils.deploy_to_app_engine(
@@ -139,22 +141,28 @@ def install():
         )
         from installer.upgrade import _configure_deferred_job_recovery
 
-        print(f"\n{f.info('Wrapping up installation...')}")
+        print(wrap_text(f"\n{f.info('Wrapping up installation...')}"))
         if not _configure_deferred_job_recovery(f, gcloud):
             return 1
         if ai_email_config:
             record_step("activate AI email submissions")
             ai_email.activate_ai_email(ai_email_config)
-        print(f"\n{f.success('Deployment complete!')}")
+        print(wrap_text(f"\n{f.success('Deployment complete!')}"))
         deployed = True
     else:
         project = SETTINGS.GCLOUD_CONFIG["PROJECT"]
-        print(f.success("You can deploy the application manually when ready."))
-        print("Manual deployment steps:")
-        print("1. Review the generated YAML files")
         print(
-            "2. Run: "
-            f"{format_command([GCLOUD_CLI, 'config', 'set', 'project', project])}"
+            f.success(wrap_text("You can deploy the application manually when ready."))
+        )
+        print(wrap_text("Manual deployment steps:"))
+        print(wrap_text("1. Review the generated YAML files"))
+        print(
+            format_value(
+                "2. Select the project",
+                format_command([GCLOUD_CLI, "config", "set", "project", project]),
+                verbatim=True,
+                standalone=True,
+            )
         )
         index_command = [
             GCLOUD_CLI,
@@ -172,20 +180,59 @@ def install():
             "--project",
             project,
         ]
-        print(f"3. Run: {format_command(index_command)}")
-        print(f"4. Run: {format_command(app_command)}")
-        print(f"After deployment, run: {setup_command('jobs')}")
-        print(f"Then reconcile memory monitoring: {setup_command('monitoring')}")
+        print(
+            format_value(
+                "3. Deploy indexes",
+                format_command(index_command),
+                verbatim=True,
+                standalone=True,
+            )
+        )
+        print(
+            format_value(
+                "4. Deploy the application",
+                format_command(app_command),
+                verbatim=True,
+                standalone=True,
+            )
+        )
+        print(
+            format_value(
+                "After deployment, run",
+                setup_command("jobs"),
+                verbatim=True,
+                standalone=True,
+            )
+        )
+        print(
+            format_value(
+                "Then reconcile memory monitoring",
+                setup_command("monitoring"),
+                verbatim=True,
+                standalone=True,
+            )
+        )
         from installer.mcp import requested
         if requested(SETTINGS.APP):
-            print(f"Then publish MCP and its app configuration: {setup_command('mcp')}")
+            print(
+                format_value(
+                    "Then publish MCP and its app configuration",
+                    setup_command("mcp"),
+                    verbatim=True,
+                    standalone=True,
+                )
+            )
         if ai_email_config:
             print(
-                "Then activate the saved AI email configuration with: "
-                f"{setup_command('ai-email')}"
+                format_value(
+                    "Then activate the saved AI email configuration",
+                    setup_command("ai-email"),
+                    verbatim=True,
+                    standalone=True,
+                )
             )
 
-    print(f"\n{f.success('Setup complete!')}")
+    print(wrap_text(f"\n{f.success('Setup complete!')}"))
 
     from installer.summary import print_install_summary
 

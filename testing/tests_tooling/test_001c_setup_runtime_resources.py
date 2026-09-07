@@ -624,13 +624,16 @@ def test_disabled_error_monitoring_offers_to_enable(monkeypatch, capsys):
 
     optional.setup_error_monitoring()
 
-    assert prompts[0] == "Would you like to enable error monitoring? [y/N]: "
+    assert (
+        " ".join(prompts[0].split())
+        == "? Would you like to enable error monitoring? [y/N]:"
+    )
     assert settings.APP == {
         "CAPTURE_ERRORS": "True",
         "SENTRY_DSN": constants.SENTRY_DSN,
         "SENTRY_JS_DSN": constants.SENTRY_JS_DSN,
     }
-    assert "Error Monitoring & Crash Reporting" in capsys.readouterr().out
+    assert "Error monitoring and crash reporting" in capsys.readouterr().out
 
 
 # @matrix ai-observability setup : privacy-consent rerun settings-save
@@ -674,9 +677,11 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     output_lines = visible_output.splitlines()
     assert all(len(line) <= 53 for line in output_lines)
     assert any("token totals," in line for line in output_lines)
-    assert "<info>Optional AI Generation Observability</info>" in first_output
+    assert "<info>Optional AI generation observability</info>" in first_output
     assert "<success>AI generation observability enabled.</success>" in first_output
-    assert prompts == ["\n<info>Enable AI generation observability? [y/N]: </info>"]
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? <info>Enable AI generation observability? [y/N]: </info>"
+    ]
 
     prompts.clear()
     monkeypatch.setattr(
@@ -686,14 +691,15 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     assert optional.configure_ai_observability()
     assert settings.APP["AI_OBSERVABILITY"] is True
     preserved_output = capsys.readouterr().out
-    assert (
-        "<info>AI generation observability is currently enabled.</info>"
-        in preserved_output
+    assert "<info>AI generation observability is currently enabled.</info>" in " ".join(
+        preserved_output.split()
     )
     assert "<success>Existing AI observability choice preserved.</success>" in (
         preserved_output
     )
-    assert prompts == ["<info>Keep this AI observability choice? [Y/n]: </info>"]
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? <info>Keep this AI observability choice? [Y/n]: </info>"
+    ]
 
 
 # @matrix setup : google-oauth optional rerun settings-save
@@ -711,7 +717,9 @@ def test_google_signin_is_an_explicit_preserved_setup_choice(monkeypatch, capsys
 
     assert admin.configure_google_signin_choice() is False
     assert settings.APP["GOOGLE_SIGNIN_ENABLED"] is False
-    assert prompts == ["Enable Google sign-in? [Y/n]: "]
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? Enable Google sign-in? [Y/n]:"
+    ]
 
     monkeypatch.setattr(
         "builtins.input",
@@ -826,7 +834,7 @@ def test_redis_cli_command_uses_visible_standard_input(monkeypatch, capsys):
         "port": 12345,
         "password": "redis-secret",
     }
-    assert prompts == ["Paste copied Redis CLI command (x to exit): "] * 2
+    assert prompts == ["? Paste copied Redis CLI command (x to exit): "] * 2
     output = capsys.readouterr().out
     assert "find Access, click Connect, expand Redis CLI, click Copy" in output
     assert "begin with 'redis-cli' or 'redis:'" in output
@@ -895,8 +903,8 @@ def test_redis_eviction_policy_instructions_require_confirmation(
     assert "'Confirm' or 'Confirm & pay'" in output
     assert "Wait for the pending-change indicator to clear" in output
     assert "displayed Data eviction policy is still volatile-ttl" in output
-    assert prompts == [
-        "\nPress Enter only after Redis Cloud confirms the eviction policy..."
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? Press Enter only after Redis Cloud confirms the eviction policy..."
     ]
 
 
@@ -1321,7 +1329,10 @@ def test_managed_certificate_waits_for_provider_then_reports_active(
         "in Google Cloud project project-1 using owner@example.com: PENDING"
     ) in output
     assert ("Managed TLS certificate active for https://app.example.com." in output) is announce_ready
-    assert ("It may take up to an hour before the domain opens over HTTPS." in output) is announce_ready
+    assert (
+        "It may take up to an hour before the domain opens over HTTPS."
+        in " ".join(output.split())
+    ) is announce_ready
     assert "Checking the App Engine managed TLS certificate" not in output
     assert "Google's HTTPS frontend" not in output
     assert "Retrying in 3 seconds" not in output
@@ -1722,10 +1733,10 @@ def test_domain_ownership_instructions_name_selected_gcloud_account(
 
     output = capsys.readouterr().out
     assert "installer@example.com" in output
-    assert "signed in to that exact account" in output
-    assert "confirm that account is an Owner" in output
-    assert prompts == [
-        "Has Google confirmed that installer@example.com owns app.example.com? [y/N]: "
+    assert "signed in to that exact account" in " ".join(output.split())
+    assert "confirm that account is an Owner" in " ".join(output.split())
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? Has Google confirmed that installer@example.com owns app.example.com? [y/N]:"
     ]
 
 
@@ -1759,7 +1770,9 @@ def test_cloudflare_token_prompt_explains_dashboard_steps_and_scope(
     assert "both DNS:Edit and Zone:Read" in output
     assert "does not save it" in output
     assert "delete it from Cloudflare after setup" in output
-    assert prompts == ["Cloudflare API token (x to cancel): "]
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? Cloudflare API token (x to cancel):"
+    ]
 
     monkeypatch.setattr("builtins.input", lambda prompt: "x")
     with pytest.raises(
@@ -2148,7 +2161,7 @@ def test_upgrade_replaces_source_then_applies_update(monkeypatch):
     monkeypatch.setattr(
         upgrade,
         "activate_installation",
-        lambda: events.append("activate"),
+        lambda **kwargs: events.append("activate"),
     )
     monkeypatch.setitem(
         sys.modules,
@@ -2334,7 +2347,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     monkeypatch.setattr(
         upgrade,
         "activate_installation",
-        lambda: events.append("activate_installation"),
+        lambda **kwargs: events.append("activate_installation"),
     )
     monkeypatch.setattr(
         upgrade, "_update_custom_images", lambda f: events.append("images")
@@ -2365,8 +2378,8 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     assert upgrade.update() == 0
     output = capsys.readouterr().out
     assert "Required post-upgrade maintenance" in output
-    assert "Apply Updates" in output
-    assert "Refresh Cache" in output
+    assert "Apply Updates" in " ".join(output.split())
+    assert "Refresh Cache" in " ".join(output.split())
     assert "Required next steps" in output
 
     assert events == [
@@ -2412,7 +2425,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
         monkeypatch.setattr("builtins.input", lambda prompt: answer)
         assert upgrade.update() == 0
         output = capsys.readouterr().out
-        assert output.rstrip().endswith("Deploy when ready: ./setup.sh update")
+        assert output.rstrip().endswith("Deploy when ready:\n  ./setup.sh update")
         assert "./setup.sh jobs" not in output
         assert "./setup.sh monitoring" not in output
         assert "deploy" not in events
@@ -2439,7 +2452,7 @@ def test_post_deploy_deferred_job_recovery_failure_is_nonfatal(capsys, failure):
     assert "Deployment succeeded" in output
     assert "does not invalidate the completed update" in output
     assert "active deferred jobs may fail" in output
-    assert "Retry with: ./setup.sh jobs" in output
+    assert "Retry with:\n  ./setup.sh jobs" in output
 
 
 # @pair setup:image-restore
@@ -3763,6 +3776,8 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
         output,
     )
 
+    # Exercise factory tracking separately from terminal capability selection.
+    monkeypatch.setattr(setup_pkg, "_use_plain_progress", lambda stream=None: False)
     formatter = setup_pkg.Formatter().initialize()
 
     with formatter.yaspin(text="Configuring service account") as active_spinner:
@@ -4234,10 +4249,11 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     capsys.readouterr()
     utils.deploy_to_app_engine()
 
-    assert capsys.readouterr().out == "Deployment complete!\n"
-    assert deployment_progress == [
-        "Deploy App Engine indexes and application (may take up to 10 minutes)"
-    ]
+    assert capsys.readouterr().out == (
+        "Deploying App Engine indexes and the application may take up to 10 minutes.\n"
+        "Deployment complete!\n"
+    )
+    assert deployment_progress == ["Deploying application"]
     assert deployment_spinner.oks == ["[OK]"]
     assert deployment_spinner.fails == []
     assert deploy_commands == [
@@ -4261,7 +4277,10 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
         "enabled": True, "resource": "https://mcp.example.test/mcp",
     }
     utils.deploy_to_app_engine(print_final_summary=False, first_install=True)
-    assert capsys.readouterr().out == "[OK] MCP server is ready\n"
+    assert capsys.readouterr().out == (
+        "Deploying App Engine indexes and the application may take up to 10 minutes.\n"
+        "[OK] MCP server is ready\n"
+    )
     assert deploy_commands[-1] == ("certificate", "app.example.com", {"announce_ready": True})
 
     deploy_module.deploy = lambda **kwargs: (_ for _ in ()).throw(
@@ -4314,8 +4333,8 @@ def test_legacy_upgrade_warning_can_cancel_before_provider_deploy(
     assert deploy_calls == []
     output = capsys.readouterr().out
     assert "Required post-upgrade maintenance" in output
-    assert "Apply Updates" in output
-    assert "Refresh Cache" in output
+    assert "Apply Updates" in " ".join(output.split())
+    assert "Refresh Cache" in " ".join(output.split())
 
     monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
     utils.deploy_to_app_engine(print_final_summary=False)
@@ -5027,7 +5046,7 @@ def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
     output = capsys.readouterr().out
     assert str(credential_path) in output
     assert "Complete the Google Auth Platform browser steps" in prompts[0]
-    assert "signed in as 'operator@example.com'" in prompts[0]
+    assert "signed in as 'operator@example.com'" in " ".join(prompts[0].split())
     assert "press Enter to verify it" in prompts[0]
     assert "already matches" in output
     assert "Google may still be applying" in output
@@ -6043,8 +6062,8 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
     assert created_app.default_hostname == "project-1.appspot.com"
     assert app_requests[0]["application"].id == "project-1"
     assert app_requests[0]["application"].location_id == "us-central"
-    assert location_prompts == [
-        "Create the App Engine application in 'us-central'? [y/N]: "
+    assert [" ".join(prompt.split()) for prompt in location_prompts] == [
+        "? Create the App Engine application in 'us-central'? [y/N]:"
     ]
     discovery_exit = app_engine_events.index(
         ("spinner-exit", "Discover App Engine application")
@@ -6052,7 +6071,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
     prompt_event = app_engine_events.index(
         (
             "input",
-            "Create the App Engine application in 'us-central'? [y/N]: ",
+            "? Create the App Engine application in 'us-central'? [y/N]: ",
         )
     )
     creation_enter = app_engine_events.index(

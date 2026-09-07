@@ -282,10 +282,8 @@ def setup_identity_platform(app_url=None):
             )
         except Exception as error:
             sp.fail(f.fail_glyph)
-            print(
-                f.error(
-                    wrap_text(f"Could not configure Identity Platform: {error}")
-                )
+            sp.write(
+                f.error(wrap_text("Could not configure Identity Platform:"), error)
             )
             raise ProviderError("Could not configure Identity Platform.") from error
 

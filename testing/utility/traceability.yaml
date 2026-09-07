@@ -29,6 +29,7 @@ test_roots:
   - testing/tests_tooling/test_001h_setup_ai_email.py
   - testing/tests_tooling/test_001i_setup_monitoring.py
   - testing/tests_tooling/test_001j_setup_ai_mcp.py
+  - testing/tests_tooling/test_001k_setup_console.py
   - testing/tests_tooling/test_003_config.py
   - testing/tests_tooling/test_004_reports.py
   - testing/tests_tooling/test_005_test_server_command.py
@@ -60,6 +61,7 @@ annotated_source_roots:
   - testing/utility/hosted_deferred_jobs.py
   - run.py
   - runner/context.py
+  - runner/console.py
   - runner/adc.py
   - runner/deploy.py
   - runner/development.py

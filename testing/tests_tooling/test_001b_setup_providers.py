@@ -317,7 +317,7 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
 
     def answer(prompt):
         prompts.append(prompt)
-        if prompt.startswith("Press Enter when you are ready"):
+        if prompt.startswith("? Press Enter when you are ready"):
             assert opened_urls == []
         return next(answers)
 
@@ -341,7 +341,7 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
     ]
     assert opened_urls == [auth_email.GMAIL_APP_PASSWORDS_URL]
     assert any(
-        prompt.startswith("Press Enter when you are ready") for prompt in prompts
+        prompt.startswith("? Press Enter when you are ready") for prompt in prompts
     )
     assert "accounts.google.com/AccountChooser" in opened_urls[0]
     assert "myaccount.google.com%2Fapppasswords" in opened_urls[0]
@@ -528,7 +528,7 @@ def test_auth_email_dmarc_setup_supports_cloudflare_and_manual_dns(
     output = capsys.readouterr().out
     assert "Type:  TXT" in output
     assert "Name:  _dmarc.example.test" in output
-    assert f"Value: {domain_setup.DMARC_DEFAULT_POLICY}" in output
+    assert f"Value:  {domain_setup.DMARC_DEFAULT_POLICY}" in output
 
     settings.APP = {"CLOUDFLARE_ZONE_ID": "zone-1"}
     monkeypatch.setattr(
@@ -1152,7 +1152,9 @@ def test_identity_platform_setup_finishes_spinner_before_reporting_error(
             yaspin=spinner_factory(spinner),
             fail_glyph="X",
             ok_glyph="OK",
-            error=lambda message: events.append(("error", message)) or message,
+            error=lambda message, detail="": (
+                events.append(("error", message + "\n" + str(detail))) or message
+            ),
             success=lambda message: message,
         )
     )

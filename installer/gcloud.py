@@ -4,6 +4,7 @@ import webbrowser
 from types import SimpleNamespace
 
 from config import constants
+from runner.console import format_prompt
 from installer import FORMATTER, wrap_text
 from installer import iam as iam_access
 from .package_install import install_if_missing
@@ -85,15 +86,17 @@ def _guide_google_service_terms_acceptance(
                 f"the browser profile is '{selected_account}'."
             )
         )
-        print(f"Terms page: {terms_error.terms_url}")
+        print(wrap_text(f"Terms page: {terms_error.terms_url}"))
         try:
             webbrowser.open_new_tab(terms_error.terms_url)
         except webbrowser.Error:
             pass
         answer = input(
-            f.info(
-                "Press Enter after completing the agreement to retry API "
-                "activation, or X to cancel: "
+            format_prompt(
+                f.info(
+                    "Press Enter after completing the agreement to retry API "
+                    "activation, or X to cancel: "
+                )
             )
         )
         if answer.strip().casefold() == "x":
@@ -155,7 +158,7 @@ def enable_gcloud_apis():
         if missing_apis:
             sp.write(
                 f.info(
-                    "Enabling Google Cloud APIs may take up to 5 minutes..."
+                    wrap_text("Enabling Google Cloud APIs may take up to 5 minutes...")
                 )
             )
             # @testable false
@@ -213,7 +216,8 @@ def enable_gcloud_apis():
                     resource="provider-api",
                     identifier=service_name,
                 )
-                sp.write(f.success(f"Enabled {display_name}"))
+                sp.write(f.success(wrap_text(f"Enabled {display_name}")))
+
             def verify_enabled_services():
                 discovered = _enabled_google_cloud_apis(project_id)
                 pending = sorted(set(required_apis) - discovered)
@@ -374,7 +378,7 @@ def configure_service_account():
                 )
                 print(f.error(message))
                 raise ProviderTransientError(message) from e
-            print(f.error("Failed to create service account."))
+            print(f.error(wrap_text("Failed to create service account.")))
             raise classify_provider_error(
                 e,
                 message="Failed to create service account.",
@@ -408,7 +412,7 @@ def configure_service_account():
             )
             print(f.error(message))
             raise ProviderTransientError(message) from e
-        print(f.error("Failed to reconcile the service account."))
+        print(f.error(wrap_text("Failed to reconcile the service account.")))
         raise classify_provider_error(
             e,
             message="Failed to reconcile the keyless runtime service account.",
@@ -507,7 +511,7 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
                         location=BUCKET_CREATE_LOCATION,
                     )
                     created = True
-                    sp.write(f.success(f"Created bucket {bucket_name}"))
+                    sp.write(f.success(wrap_text(f"Created bucket {bucket_name}")))
                 except api_exceptions.Conflict:
                     bucket = client.get_bucket(bucket_name)
 
@@ -648,24 +652,28 @@ def create_app_engine_app():
             sp.ok(f.ok_glyph)
             return application
         except ProviderNotFound:
-            sp.write(f.info("No App Engine application exists yet."))
+            sp.write(f.info(wrap_text("No App Engine application exists yet.")))
 
     print(
         f.warning(
-            "App Engine location is permanent and cannot be changed after "
-            f"creation. Selected location: {location}"
+            wrap_text(
+                "App Engine location is permanent and cannot be changed after "
+                f"creation. Selected location: {location}"
+            )
         )
     )
     print(
         f.info(
-            "Creating the App Engine application may take up to 5 minutes. "
-            "The next prompt is waiting for your response."
+            wrap_text(
+                "Creating the App Engine application may take up to 5 minutes. "
+                "The next prompt is waiting for your response."
+            )
         )
     )
     try:
         confirmation = input(
-            f.warning(
-                f"Create the App Engine application in '{location}'? [y/N]: "
+            format_prompt(
+                f.warning(f"Create the App Engine application in '{location}'? [y/N]: ")
             )
         )
     except EOFError as error:
@@ -676,7 +684,7 @@ def create_app_engine_app():
         print(f.error(message))
         raise SetupCancelled(message) from error
     if confirmation.strip().lower() not in ("y", "yes"):
-        print(f.error("App Engine application creation cancelled."))
+        print(f.error(wrap_text("App Engine application creation cancelled.")))
         raise SetupCancelled("App Engine application creation was cancelled.")
 
     with f.yaspin(
@@ -695,7 +703,7 @@ def create_app_engine_app():
             )
             sp.write(
                 f.info(
-                    "Waiting for Google to finish App Engine provisioning..."
+                    wrap_text("Waiting for Google to finish App Engine provisioning...")
                 )
             )
             created_app = operation.result(timeout=APP_ENGINE_CREATE_TIMEOUT)
@@ -708,8 +716,10 @@ def create_app_engine_app():
 
             sp.write(
                 f.success(
-                    "Successfully created App Engine app in "
-                    f"{created_app.location_id}."
+                    wrap_text(
+                        "Successfully created App Engine app in "
+                        f"{created_app.location_id}."
+                    )
                 )
             )
             sp.ok(f.ok_glyph)
@@ -799,7 +809,7 @@ def create_task_queue():
             sp.ok(f.ok_glyph)
             return True
         except ProviderNotFound:
-            sp.write(f.info("Creating new Cloud Tasks queue..."))
+            sp.write(f.info(wrap_text("Creating new Cloud Tasks queue...")))
             queue = tasks_v2.types.Queue(name=queue_path)
             try:
                 retry_provider_call(
@@ -817,18 +827,24 @@ def create_task_queue():
                     identifier=queue_path,
                 )
                 SETTINGS.save()
-                sp.write(f.success("Successfully created Cloud Tasks queue."))
+                sp.write(
+                    f.success(wrap_text("Successfully created Cloud Tasks queue."))
+                )
                 sp.ok(f.ok_glyph)
                 return True
             except Exception as e:
-                sp.write(f.error(f"Failed to create Cloud Tasks queue.\n{str(e)}"))
+                sp.write(
+                    f.error(wrap_text(f"Failed to create Cloud Tasks queue.\n{str(e)}"))
+                )
                 sp.fail(f.fail_glyph)
                 raise classify_provider_error(
                     e,
                     message="Failed to create the Cloud Tasks queue.",
                 ) from e
         except Exception as e:
-            sp.write(f.error(f"Error checking for Cloud Tasks queue.\n{str(e)}"))
+            sp.write(
+                f.error(wrap_text(f"Error checking for Cloud Tasks queue.\n{str(e)}"))
+            )
             sp.fail(f.fail_glyph)
             raise classify_provider_error(
                 e,
@@ -1148,11 +1164,13 @@ def create_ocr_processor():
                 resource="document-ai-processor",
                 identifier=processor.name,
             )
-            sp.write(f.info(f"Document AI processor '{display_name}' created."))
+            sp.write(
+                f.info(wrap_text(f"Document AI processor '{display_name}' created."))
+            )
             SETTINGS.save()
             sp.ok(f.ok_glyph)
         except Exception as e:
-            sp.write(f.error(f"Failed to create OCR processor.\n{str(e)}"))
+            sp.write(f.error(wrap_text(f"Failed to create OCR processor.\n{str(e)}")))
             sp.fail(f.fail_glyph)
             raise classify_provider_error(
                 e,

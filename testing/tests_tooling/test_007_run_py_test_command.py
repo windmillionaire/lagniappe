@@ -1975,7 +1975,7 @@ def test_run_py_test_forwards_signals_to_pytest_process_group(monkeypatch):
 
 
 # @pair setup:gcloud-token
-def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
+def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch, capsys):
     from runner import adc as runner_adc
     from runner import gcloud as runner_gcloud
 
@@ -2001,7 +2001,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     monkeypatch.setattr(
         runner_gcloud,
         "config_gcloud",
-        lambda: calls.append("activate"),
+        lambda **kwargs: calls.append(("activate", kwargs)),
     )
     monkeypatch.setattr(
         runner_adc,
@@ -2028,8 +2028,8 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
         is True
     )
     assert calls == [
-        "activate",
-        "activate",
+        ("activate", {"announce": False}),
+        ("activate", {"announce": False}),
         (
             "adc",
             "owner@example.test",
@@ -2037,9 +2037,10 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
             {
                 "allowed_principals": (),
                 "select_gcloud_target": False,
+                "announce": False,
             },
         ),
-        "activate",
+        ("activate", {"announce": False}),
         ("cli-token", "owner@example.test", {"allow_login": False}),
         (
             "adc",
@@ -2051,9 +2052,15 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
                     "runtime@lagniappe-local-project.iam.gserviceaccount.com",
                 ),
                 "select_gcloud_target": False,
+                "announce": False,
             },
         ),
     ]
+
+    output = capsys.readouterr().out
+    assert output.count("Google Cloud configuration verified") == 3
+    assert output.count("owner@example.test") == 3
+    assert "gcloud account access and Application Default Credentials" in output
 
 
 # @matrix auth : gcloud-token interactive refresh
@@ -2621,21 +2628,25 @@ def _release_check_repository(tmp_path: Path) -> Path:
     files = {
         ".gitignore": "config/files/\nlagniappe.yaml\nindex.yaml\n",
         "runner/__init__.py": "",
+        "runner/console.py": (
+            (Path(run.__file__).parent / "runner" / "console.py").read_text(
+                encoding="utf-8"
+            )
+        ),
         "runner/context.py": (
             (Path(run.__file__).parent / "runner" / "context.py").read_text(
                 encoding="utf-8"
             )
         ),
         "runner/uv_bootstrap.py": (
-            (
-                Path(run.__file__).parent / "runner" / "uv_bootstrap.py"
-            ).read_text(encoding="utf-8")
+            (Path(run.__file__).parent / "runner" / "uv_bootstrap.py").read_text(
+                encoding="utf-8"
+            )
         ),
         "mcp/uv-bootstrap.json": (
-            (
-                Path(run.__file__).parent
-                / "mcp/uv-bootstrap.json"
-            ).read_text(encoding="utf-8")
+            (Path(run.__file__).parent / "mcp/uv-bootstrap.json").read_text(
+                encoding="utf-8"
+            )
         ),
         "runner/process.py": (
             (Path(run.__file__).parent / "runner" / "process.py").read_text(
@@ -2653,9 +2664,9 @@ def _release_check_repository(tmp_path: Path) -> Path:
             )
         ),
         "runner/pytest_routing.py": (
-            (
-                Path(run.__file__).parent / "runner" / "pytest_routing.py"
-            ).read_text(encoding="utf-8")
+            (Path(run.__file__).parent / "runner" / "pytest_routing.py").read_text(
+                encoding="utf-8"
+            )
         ),
         "run.py": Path(run.__file__).read_text(encoding="utf-8"),
         "package.json": '{"name": "lagniappe", "version": "0.1.0"}\n',

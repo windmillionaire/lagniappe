@@ -1,5 +1,6 @@
 """Optional Cloudflare DNS-only reconciliation for custom domains."""
 
+from runner.console import format_prompt
 from installer.errors import (
     ProviderError,
     ProviderNotFound,
@@ -106,7 +107,7 @@ def get_cloudflare_api_token():
             "Lagniappe uses it only during this run and does not save it."
         )
     )
-    print("1. Open Cloudflare's API Tokens page:")
+    print(wrap_text("1. Open Cloudflare's API Tokens page:"))
     print(f"   {CLOUDFLARE_API_TOKEN_URL}")
     print(
         wrap_text(
@@ -140,12 +141,12 @@ def get_cloudflare_api_token():
         )
     )
     while True:
-        token = input("Cloudflare API token (x to cancel): ").strip()
+        token = input(format_prompt("Cloudflare API token (x to cancel): ")).strip()
         if token.casefold() == "x":
             raise SetupCancelled("Cloudflare DNS setup cancelled.")
         if validate_cloudflare_api_token(token):
             return token
-        print("Enter a non-empty scoped Cloudflare API token.")
+        print(wrap_text("Enter a non-empty scoped Cloudflare API token."))
 
 
 # @testable true

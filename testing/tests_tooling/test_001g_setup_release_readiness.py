@@ -132,22 +132,20 @@ def test_redacted_install_summary_is_allowlisted():
         deployed=True,
     )
     text = "\n".join(lines)
+    prose = " ".join(text.split())
 
-    assert "Application:               Demo" in text
-    assert "Temporary Administrator:   installer@example.test" in text
-    assert "Lagniappe version:         0.2" in text
-    assert "Google sign-in:            enabled" in text
-    assert "Redis:                     configured; TLS disabled" in text
-    assert "Error monitoring:          disabled" in text
-    assert "AI observability:          disabled" in text
-    assert "AI model:                  gemini-2.5-pro" in text
-    assert "Deployment completed:      yes" in text
-    assert "Health check:              ./setup.sh doctor" in text
-    assert "Repair if needed:          ./setup.sh repair" in text
-    assert (
-        "Installer handoff:         ./setup.sh handoff after Owner review"
-        in text
-    )
+    assert "Application: Demo" in prose
+    assert "Temporary Administrator: installer@example.test" in prose
+    assert "Lagniappe version: 0.2" in prose
+    assert "Google sign-in: enabled" in prose
+    assert "Redis: configured; TLS disabled" in prose
+    assert "Error monitoring: disabled" in prose
+    assert "AI observability: disabled" in prose
+    assert "AI model: gemini-2.5-pro" in prose
+    assert "Deployment completed: yes" in prose
+    assert "Health check:\n  ./setup.sh doctor" in text
+    assert "Repair if needed:\n  ./setup.sh repair" in text
+    assert "Installer handoff:\n  After Owner review:\n  ./setup.sh handoff" in text
     for omitted_detail in (
         "runtime@demo-project.iam.gserviceaccount.com",
         "lagniappe-tasks",
@@ -158,9 +156,7 @@ def test_redacted_install_summary_is_allowlisted():
         "Identity Platform project",
     ):
         assert omitted_detail not in text
-    assert lines[-1] == (
-        "Open this installation:    https://demo.example.test"
-    )
+    assert lines[-2:] == ["Open this installation:", "  https://demo.example.test"]
     for secret in (
         "bucket-source-secret",
         "redis-secret",
@@ -170,7 +166,7 @@ def test_redacted_install_summary_is_allowlisted():
         assert secret not in text
 
     manual_lines = summary.install_summary_lines(settings)
-    assert manual_lines[-1] == "After manual deployment: ./setup.sh jobs"
+    assert manual_lines[-2:] == ["After manual deployment:", "  ./setup.sh jobs"]
 
 
 # @matrix doctor setup : operator-summary provider-resources secret-redaction

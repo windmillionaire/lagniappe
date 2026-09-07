@@ -1,6 +1,7 @@
 from functools import wraps
 import subprocess
 
+from runner.console import format_prompt, wrap_text
 from . import GCLOUD_CLI
 from .errors import (
     GCLOUD_TIMEOUT,
@@ -79,22 +80,23 @@ def validate_input(
             has_default = default not in (None, "")
             default_value = str(default).strip() if has_default else ""
             if has_default:
-                prompt_suffix = (
-                    f" [{default_value}] "
-                    "(press Enter to use the bracketed value; x to exit): "
-                )
+                prompt_suffix = f" [{default_value}]: "
             else:
                 prompt_suffix = " (x to exit): "
 
+            if has_default:
+                print(wrap_text("Press Enter to use the bracketed value; x to exit."))
             while True:
-                value = input(f.info(f"{prompt}{prompt_suffix}"))
+                value = input(format_prompt(f.info(f"{prompt}{prompt_suffix}")))
                 if value.lower() == "x":
-                    print(f.error("Setup cancelled."))
+                    print(f.error(wrap_text("Setup cancelled.")))
                     raise SetupCancelled("Setup cancelled by the operator.")
                 if not value and has_default:
                     value = default_value
                 if not value and not allow_empty:
-                    print(f.error("Input cannot be empty. Please try again."))
+                    print(
+                        f.error(wrap_text("Input cannot be empty. Please try again."))
+                    )
                     continue
                 if validation_fn and not validation_fn(value):
                     print(f.error(error_msg or "Invalid input. Please try again."))
@@ -112,7 +114,9 @@ def validate_input(
 def check_gcloud_cli():
     if not GCLOUD_CLI:
         print(
-            "ERROR: gcloud CLI not found. Please install and configure the Google Cloud SDK."
+            wrap_text(
+                "ERROR: gcloud CLI not found. Please install and configure the Google Cloud SDK."
+            )
         )
         raise SetupError(
             "gcloud CLI not found. Install the Google Cloud CLI and retry."
@@ -181,10 +185,12 @@ def deploy_to_app_engine(
         ).strip()
         confirm_legacy_upgrade_deployment(f, target_version)
 
-    progress = f.success(
-        "Deploy App Engine indexes and application (may take up to 10 minutes)"
+    print(
+        wrap_text(
+            "Deploying App Engine indexes and the application may take up to 10 minutes."
+        )
     )
-    with f.yaspin(text=progress) as spinner:
+    with f.yaspin(text="Deploying application") as spinner:
         try:
             deploy(
                 build_assets=False,
@@ -202,9 +208,9 @@ def deploy_to_app_engine(
     from installer.mcp import requested
 
     if requested(SETTINGS.APP):
-        print(f"{f.ok_glyph} {f.success('MCP server is ready')}")
+        print(wrap_text(f"{f.ok_glyph} {f.success('MCP server is ready')}"))
     elif (SETTINGS.APP.get("REMOTE_MCP") or {}).get("resource"):
-        print("External AI access is disabled.")
+        print(wrap_text("External AI access is disabled."))
 
     from installer.monitoring import reconcile_memory_alert_after_deploy
 
@@ -219,7 +225,7 @@ def deploy_to_app_engine(
         wait_for_managed_certificate(custom_domain, announce_ready=first_install)
 
     if print_final_summary:
-        print("Deployment complete!")
+        print(wrap_text("Deployment complete!"))
         print_summary()
     if legacy_upgrade_notice:
         print_post_upgrade_maintenance_steps(f)

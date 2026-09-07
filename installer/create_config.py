@@ -9,6 +9,7 @@ import subprocess
 import time
 import webbrowser
 
+from runner.console import format_prompt
 from runner.context import GCLOUD_CLI, format_command, setup_command
 from config.constants import UNSUPPORTED_SETTING_KEYS
 from config.recovery import (
@@ -96,8 +97,10 @@ def _configure_delegated_bootstrap(
     SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = True
     SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] = account
     print(
-        "[OK] Delegated installer application access is ready "
-        f"({account}; Google sign-in and temporary Administrator enabled)."
+        wrap_text(
+            "[OK] Delegated installer application access is ready "
+            f"({account}; Google sign-in and temporary Administrator enabled)."
+        )
     )
     return True
 
@@ -436,9 +439,11 @@ def _get_gcloud_account(account):
         )
 
     account = active_accounts[0]
-    print(f"\nThe active gcloud CLI account is: {account}")
+    print(wrap_text(f"\nThe active gcloud CLI account is: {account}"))
     while True:
-        answer = input("Use this account for the installation? [y/N]: ").strip()
+        answer = input(
+            format_prompt("Use this account for the installation? [y/N]: ")
+        ).strip()
         if answer.casefold() in {"y", "yes"}:
             break
         if answer.casefold() in {"", "n", "no", "x", "exit"}:
@@ -449,7 +454,7 @@ def _get_gcloud_account(account):
                 "rerun setup."
             )
             raise SetupCancelled("Setup cancelled during account confirmation.")
-        print("Enter Y to confirm this account, or N to cancel.")
+        print(wrap_text("Enter Y to confirm this account, or N to cancel."))
 
     check_account_authentication(account)
     token_check = run_gcloud_command(
@@ -463,7 +468,7 @@ def _get_gcloud_account(account):
             f"The gcloud CLI login for '{account}' could not be verified. Run "
             f"{login_command}, then rerun setup."
         )
-    print(f"[OK] Verified gcloud CLI installation account: {account}")
+    print(wrap_text(f"[OK] Verified gcloud CLI installation account: {account}"))
 
     return account
 
@@ -536,7 +541,7 @@ def _confirm_project_candidate(project_id, state, formatter):
     if state["state"] == "unavailable":
         print(
             formatter.error(
-                f"Could not validate project {project_id}: {state['error']}"
+                wrap_text(f"Could not validate project {project_id}: {state['error']}")
             )
         )
         return False
@@ -546,7 +551,7 @@ def _confirm_project_candidate(project_id, state, formatter):
     else:
         action = "Create a new"
     answer = input(
-        formatter.info(f"{action} project '{project_id}'? [y/N]: ")
+        format_prompt(formatter.info(f"{action} project '{project_id}'? [y/N]: "))
     ).strip()
     if answer.lower() in ("y", "yes"):
         return True
@@ -566,15 +571,17 @@ def _get_gcloud_project(project_id, sanitized_app_name):
 
     if project_id:
         if not validate_project_id(project_id):
-            print(f.error(f"Saved project ID is invalid: {project_id}"))
+            print(f.error(wrap_text(f"Saved project ID is invalid: {project_id}")))
             _fail()
         return project_id
 
     if configured_project["state"] == GCLOUD_VALUE_ERROR:
         print(
             f.error(
-                "Could not determine the active gcloud project: "
-                f"{configured_project['error']}"
+                wrap_text(
+                    "Could not determine the active gcloud project: "
+                    f"{configured_project['error']}"
+                )
             )
         )
         _fail()
@@ -607,9 +614,11 @@ def _get_gcloud_project(project_id, sanitized_app_name):
         suggestion = _randomized_project_id(sanitized_app_name)
     while True:
         entered = input(
-            f.info(
-                "Press Enter to use the suggested Google Cloud project ID "
-                f"[{suggestion}], or type a different project ID: "
+            format_prompt(
+                f.info(
+                    "Press Enter to use the suggested Google Cloud project ID "
+                    f"[{suggestion}], or type a different project ID: "
+                )
             )
         ).strip()
         candidate = entered or suggestion
@@ -781,8 +790,10 @@ def _select_existing_gcloud_project(account, *, direct_owner_required=True):
     while True:
         default = " [1]" if len(projects) == 1 else ""
         entered = input(
-            "Select the project for this installation by number"
-            f"{default}, or X to cancel: "
+            format_prompt(
+                "Select the project for this installation by number"
+                f"{default}, or X to cancel: "
+            )
         ).strip()
         if not entered and len(projects) == 1:
             entered = "1"
@@ -797,11 +808,15 @@ def _select_existing_gcloud_project(account, *, direct_owner_required=True):
                     "reverified as accessible to the active gcloud account."
                 )
             print(
-                f"Selected existing project '{selected['display_name']}' "
-                f"({selected['project_id']})."
+                wrap_text(
+                    f"Selected existing project '{selected['display_name']}' "
+                    f"({selected['project_id']})."
+                )
             )
             return selected["display_name"], selected["project_id"]
-        print("Enter one of the project numbers shown above, or X to cancel.")
+        print(
+            wrap_text("Enter one of the project numbers shown above, or X to cancel.")
+        )
 
 
 # @testable true
@@ -810,23 +825,39 @@ def _select_existing_gcloud_project(account, *, direct_owner_required=True):
 def _select_initial_target(account):
     """Choose the delegated picker or ordinary installation naming flow."""
     while True:
-        answer = input(
-            "Are you installing Lagniappe for a different permanent Owner? "
-            "[y/N]: "
-        ).strip().casefold()
+        answer = (
+            input(
+                format_prompt(
+                    "Are you installing Lagniappe for a different permanent Owner? "
+                    "[y/N]: "
+                )
+            )
+            .strip()
+            .casefold()
+        )
         if answer in {"y", "yes"}:
             return _select_existing_gcloud_project(
                 account, direct_owner_required=True
             )
         if answer in {"", "n", "no"}:
             break
-        print("Enter Y for a delegated installation, or N for your own installation.")
+        print(
+            wrap_text(
+                "Enter Y for a delegated installation, or N for your own installation."
+            )
+        )
 
     while True:
-        answer = input(
-            "Has the Google Cloud project for this installation already been "
-            "created? [y/N]: "
-        ).strip().casefold()
+        answer = (
+            input(
+                format_prompt(
+                    "Has the Google Cloud project for this installation already been "
+                    "created? [y/N]: "
+                )
+            )
+            .strip()
+            .casefold()
+        )
         if answer in {"y", "yes"}:
             return _select_existing_gcloud_project(
                 account, direct_owner_required=False
@@ -836,7 +867,7 @@ def _select_initial_target(account):
             sanitized_app_name = _gcloud_configuration_name(app_name)
             project_id = _get_gcloud_project("", sanitized_app_name)
             return app_name, project_id
-        print("Enter Y to select an existing project, or N to create one.")
+        print(wrap_text("Enter Y to select an existing project, or N to create one."))
 
 
 # @testable false
@@ -891,7 +922,11 @@ def _set_adc_quota_project(project_id, sp):
         nonlocal adc_refreshed
         sp.write(f.warning(reason))
         sp.write(f.warning(GOOGLE_AUTH_PERMISSION_GUIDANCE))
-        sp.write("Opening browser to authenticate ADC with the selected CLI account:")
+        sp.write(
+            wrap_text(
+                "Opening browser to authenticate ADC with the selected CLI account:"
+            )
+        )
         sp.write(
             f"  {_adc_login_command(account, project_id, force=force)}"
         )
@@ -914,9 +949,11 @@ def _set_adc_quota_project(project_id, sp):
                 start_spinner()
 
         if adc_login_result.returncode != 0:
-            sp.write(f.error("ADC login did not complete."))
+            sp.write(f.error(wrap_text("ADC login did not complete.")))
             sp.write(
-                "Setup could not refresh Application Default Credentials automatically."
+                wrap_text(
+                    "Setup could not refresh Application Default Credentials automatically."
+                )
             )
             sp.fail(f.fail_glyph)
             _fail(
@@ -945,7 +982,7 @@ def _set_adc_quota_project(project_id, sp):
         project_id,
         "--quiet",
     ]
-    sp.write(f.info(f"Setting ADC quota project to '{project_id}'..."))
+    sp.write(f.info(wrap_text(f"Setting ADC quota project to '{project_id}'...")))
     quota_project_result = run_gcloud_command(
         quota_project_command,
         check=False,
@@ -975,8 +1012,10 @@ def _set_adc_quota_project(project_id, sp):
         if adc_refreshed:
             sp.write(
                 f.error(
-                    "The selected project did not become available to ADC in "
-                    "time. Run setup again to resume."
+                    wrap_text(
+                        "The selected project did not become available to ADC in "
+                        "time. Run setup again to resume."
+                    )
                 )
             )
             if detail:
@@ -989,7 +1028,9 @@ def _set_adc_quota_project(project_id, sp):
             "use the selected quota project."
         )
 
-        sp.write(f.info("Retrying the ADC quota project after authentication..."))
+        sp.write(
+            f.info(wrap_text("Retrying the ADC quota project after authentication..."))
+        )
         quota_project_result = run_gcloud_command(
             quota_project_command,
             check=False,
@@ -1003,18 +1044,26 @@ def _set_adc_quota_project(project_id, sp):
             ).strip()
             sp.write(
                 f.error(
-                    "ADC login completed, but setup still could not set the ADC quota project."
+                    wrap_text(
+                        "ADC login completed, but setup still could not set the ADC quota project."
+                    )
                 )
             )
             if detail:
-                sp.write(f.warning(f"Google Cloud returned: {detail.splitlines()[0]}"))
+                sp.write(
+                    f.warning(
+                        wrap_text(f"Google Cloud returned: {detail.splitlines()[0]}")
+                    )
+                )
             sp.write(
-                "Verify the selected account can access the project, then run setup again."
+                wrap_text(
+                    "Verify the selected account can access the project, then run setup again."
+                )
             )
             sp.fail(f.fail_glyph)
             _fail()
 
-    sp.write(f.info("Reading the local ADC identity..."))
+    sp.write(f.info(wrap_text("Reading the local ADC identity...")))
     identity = _adc_identity()
     mismatches = []
     if identity["state"] != "success":
@@ -1038,7 +1087,7 @@ def _set_adc_quota_project(project_id, sp):
             "ADC identity does not match the selected CLI account and target: "
             + ", ".join(mismatches)
         )
-        sp.write(f.info("Rechecking the ADC quota project and identity..."))
+        sp.write(f.info(wrap_text("Rechecking the ADC quota project and identity...")))
         quota_project_result = run_gcloud_command(
             quota_project_command,
             check=False,
@@ -1055,7 +1104,9 @@ def _set_adc_quota_project(project_id, sp):
     ):
         sp.write(
             f.error(
-                "ADC still does not match the selected CLI account and target project."
+                wrap_text(
+                    "ADC still does not match the selected CLI account and target project."
+                )
             )
         )
         sp.fail(f.fail_glyph)
@@ -1086,8 +1137,10 @@ def _ensure_adc_principal(account, project_id=None):
     )
     print(
         f.warning(
-            "Application Default Credentials use a different principal. "
-            f"CLI={account}; ADC={actual or '(unknown)'}."
+            wrap_text(
+                "Application Default Credentials use a different principal. "
+                f"CLI={account}; ADC={actual or '(unknown)'}."
+            )
         )
     )
     print(
@@ -1099,7 +1152,7 @@ def _ensure_adc_principal(account, project_id=None):
     print(f.warning(GOOGLE_AUTH_PERMISSION_GUIDANCE))
     result = _run_adc_login(account, project_id)
     if result.returncode != 0:
-        print(f.error("ADC authentication did not complete."))
+        print(f.error(wrap_text("ADC authentication did not complete.")))
         _fail(
             "ADC authentication did not complete.",
             repair_action=_google_cloud_terms_repair_action(account),
@@ -1112,7 +1165,9 @@ def _ensure_adc_principal(account, project_id=None):
     ):
         print(
             f.error(
-                "ADC principal still does not match the selected gcloud CLI account."
+                wrap_text(
+                    "ADC principal still does not match the selected gcloud CLI account."
+                )
             )
         )
         _fail()
@@ -1162,22 +1217,30 @@ def _select_billing_account(accounts):
         selected, account = next(iter(choices.items()))
         print(
             f.info(
-                f"Using existing billing account {selected}: "
-                f"{account.get('displayName') or '(unnamed)'}"
+                wrap_text(
+                    f"Using existing billing account {selected}: "
+                    f"{account.get('displayName') or '(unnamed)'}"
+                )
             )
         )
         return selected
 
-    print(f.info("Accessible open billing accounts:"))
+    print(f.info(wrap_text("Accessible open billing accounts:")))
     for name, account in choices.items():
-        print(f"  {name}: {account.get('displayName') or '(unnamed)'}")
+        print(wrap_text(f"  {name}: {account.get('displayName') or '(unnamed)'}"))
     while True:
         selected = input(
-            f.info("Billing account for this installation: ")
+            format_prompt(f.info("Billing account for this installation: "))
         ).strip()
         if selected in choices:
             return selected
-        print(f.error("Enter one of the accessible billing account IDs shown above."))
+        print(
+            f.error(
+                wrap_text(
+                    "Enter one of the accessible billing account IDs shown above."
+                )
+            )
+        )
 
 
 # @testable true
@@ -1194,8 +1257,10 @@ def _authorize_project_billing(project_id):
     )
     print(
         f.info(
-            "In Google Cloud, select 'Link a billing account' and choose your "
-            f"existing billing account for project '{project_id}':\n  {url}"
+            wrap_text(
+                "In Google Cloud, select 'Link a billing account' and choose your "
+                f"existing billing account for project '{project_id}':\n  {url}"
+            )
         )
     )
     try:
@@ -1205,9 +1270,11 @@ def _authorize_project_billing(project_id):
 
     while True:
         response = input(
-            f.info(
-                "After the existing billing account is linked, press Enter to "
-                "continue (x to exit): "
+            format_prompt(
+                f.info(
+                    "After the existing billing account is linked, press Enter to "
+                    "continue (x to exit): "
+                )
             )
         ).strip()
         if response.lower() == "x":
@@ -1226,8 +1293,10 @@ def _authorize_project_billing(project_id):
             return billing_account
         print(
             f.warning(
-                f"Billing is not enabled for project '{project_id}' yet. "
-                "Complete the Google Cloud page, then check again."
+                wrap_text(
+                    f"Billing is not enabled for project '{project_id}' yet. "
+                    "Complete the Google Cloud page, then check again."
+                )
             )
         )
 
@@ -1331,8 +1400,10 @@ def _apply_target_preflight(project_id, preflight, project_ready=None):
     if bootstrap_missing:
         print(
             f.info(
-                "Preparing Google Cloud project APIs. This may take up to "
-                "5 minutes..."
+                wrap_text(
+                    "Preparing Google Cloud project APIs. This may take up to "
+                    "5 minutes..."
+                )
             )
         )
         result = run_gcloud_command(
@@ -1505,7 +1576,9 @@ def _preflight_operator_authority(account, project_id, *, client=None):
             f"not changed. {error}"
         ) from error
     print(
-        f"[OK] gcloud CLI installer access is ready ({account}, {project_id})"
+        wrap_text(
+            f"[OK] gcloud CLI installer access is ready ({account}, {project_id})"
+        )
     )
     return client
 
@@ -1538,39 +1611,57 @@ def _confirm_operator_permissions(
 def _display_install_identity_summary(preflight, adc_identity):
     from config import SETTINGS
 
-    print("\n=== Configuration ===")
-    print(f"Active gcloud configuration: {SETTINGS.GCLOUD_CONFIG['NAME']}")
-    print(f"Active gcloud CLI account: {SETTINGS.GCLOUD_CONFIG['ACCOUNT']}")
+    print(wrap_text("\n=== Configuration ==="))
+    print(wrap_text(f"Active gcloud configuration: {SETTINGS.GCLOUD_CONFIG['NAME']}"))
+    print(wrap_text(f"Active gcloud CLI account: {SETTINGS.GCLOUD_CONFIG['ACCOUNT']}"))
     if adc_identity.get("state") != "pending":
-        print(f"ADC principal: {adc_identity.get('principal') or '(unknown)'}")
-        print(f"ADC project: {adc_identity.get('project') or '(unset)'}")
-        print(f"ADC quota project: {adc_identity.get('quota_project') or '(unset)'}")
-    print(f"Target project: {SETTINGS.GCLOUD_CONFIG['PROJECT']}")
+        print(
+            wrap_text(f"ADC principal: {adc_identity.get('principal') or '(unknown)'}")
+        )
+        print(wrap_text(f"ADC project: {adc_identity.get('project') or '(unset)'}"))
+        print(
+            wrap_text(
+                f"ADC quota project: {adc_identity.get('quota_project') or '(unset)'}"
+            )
+        )
+    print(wrap_text(f"Target project: {SETTINGS.GCLOUD_CONFIG['PROJECT']}"))
     print(
-        f"Installer/provisioner: "
-        f"{SETTINGS.APP.get('INSTALLER_EMAIL') or SETTINGS.GCLOUD_CONFIG['ACCOUNT']}"
+        wrap_text(
+            f"Installer/provisioner: "
+            f"{SETTINGS.APP.get('INSTALLER_EMAIL') or SETTINGS.GCLOUD_CONFIG['ACCOUNT']}"
+        )
     )
     print(
-        f"Deployer: "
-        f"{SETTINGS.APP.get('DEPLOYER_EMAIL') or SETTINGS.GCLOUD_CONFIG['ACCOUNT']}"
+        wrap_text(
+            f"Deployer: "
+            f"{SETTINGS.APP.get('DEPLOYER_EMAIL') or SETTINGS.GCLOUD_CONFIG['ACCOUNT']}"
+        )
     )
-    print(f"Application owner: {SETTINGS.APP.get('ADMIN_EMAIL') or '(not set)'}")
     print(
-        "Temporary application Administrator: "
-        f"{SETTINGS.APP.get('BOOTSTRAP_ADMIN_EMAIL') or '(none)'}"
+        wrap_text(
+            f"Application owner: {SETTINGS.APP.get('ADMIN_EMAIL') or '(not set)'}"
+        )
+    )
+    print(
+        wrap_text(
+            "Temporary application Administrator: "
+            f"{SETTINGS.APP.get('BOOTSTRAP_ADMIN_EMAIL') or '(none)'}"
+        )
     )
     runtime_email = SETTINGS.APP.get("RUNTIME_SERVICE_ACCOUNT_EMAIL")
     if runtime_email:
-        print(f"Runtime service account: {runtime_email}")
+        print(wrap_text(f"Runtime service account: {runtime_email}"))
     else:
         planned_email = (
             f"{SETTINGS.GCLOUD_CONFIG['NAME']}@"
             f"{SETTINGS.GCLOUD_CONFIG['PROJECT']}.iam.gserviceaccount.com"
         )
-        print(f"Runtime service account (planned): {planned_email}")
+        print(wrap_text(f"Runtime service account (planned): {planned_email}"))
     print(
-        "Required APIs already enabled: "
-        f"{len(preflight['enabled_apis'])}; pending: {len(preflight['missing_apis'])}"
+        wrap_text(
+            "Required APIs already enabled: "
+            f"{len(preflight['enabled_apis'])}; pending: {len(preflight['missing_apis'])}"
+        )
     )
 
 
@@ -1877,10 +1968,12 @@ def _set_application_defaults():
     if recovery_mode:
         print(
             f.warning(
-                "Recovery mode: found config/files/lagniappe_settings.yaml "
-                "without config/files/lagniappe_dev.yaml. No provider or local "
-                "configuration mutation will occur until the recovered target "
-                "has been authenticated and verified."
+                wrap_text(
+                    "Recovery mode: found config/files/lagniappe_settings.yaml "
+                    "without config/files/lagniappe_dev.yaml. No provider or local "
+                    "configuration mutation will occur until the recovered target "
+                    "has been authenticated and verified."
+                )
             )
         )
         recovered = validate_recovery_document(SETTINGS.APP)
@@ -1915,7 +2008,7 @@ def _set_application_defaults():
         selected_project = _get_gcloud_project(project_id, sanitized_app_name)
 
     if not _validate_app_name(app_name):
-        print(f.error("A name is required for your Lagniappe installation."))
+        print(f.error(wrap_text("A name is required for your Lagniappe installation.")))
         _fail()
     SETTINGS.APP["APP_NAME"] = app_name
 
@@ -2039,16 +2132,22 @@ def _set_application_defaults():
             project_id,
             project_details=preflight["project"].get("details"),
         )
-        print("\n=== Recovery provider discovery ===")
+        print(wrap_text("\n=== Recovery provider discovery ==="))
         for resource, observation in recovery_report.items():
-            print(f"{resource}: {observation['state']}")
+            print(wrap_text(f"{resource}: {observation['state']}"))
 
     _set_default_config()
 
     _display_install_identity_summary(preflight, adc_identity)
-    confirmation = input(f.warning("Continue with installation? [y/N]: "))
+    confirmation = input(
+        format_prompt(f.warning("Continue with installation? [y/N]: "))
+    )
     if confirmation.strip().lower() not in ("y", "yes"):
-        print(f.info("Installation cancelled. Configuration files were preserved."))
+        print(
+            f.info(
+                wrap_text("Installation cancelled. Configuration files were preserved.")
+            )
+        )
         raise SetupCancelled("Installation cancelled.")
 
     _apply_target_preflight(
@@ -2165,5 +2264,5 @@ def verify_application_config(upgrade=False):
         )
         _fail()
 
-    print(f.success("Application configuration verified."))
+    print(f.success(wrap_text("Application configuration verified.")))
     return True

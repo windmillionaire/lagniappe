@@ -276,11 +276,11 @@ def _dispatch(args):
     if command == "update":
         from installer.upgrade import update
 
-        return update()
+        return update(announce=False)
     if command == "upgrade":
         from installer.upgrade import upgrade
 
-        return upgrade(branch=args.branch)
+        return upgrade(branch=args.branch, announce=False)
     if command == "development":
         from installer.development import setup_development
 

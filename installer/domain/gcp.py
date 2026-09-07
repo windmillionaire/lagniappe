@@ -4,6 +4,7 @@ import json
 import subprocess
 import time
 
+from runner.console import wrap_text
 from installer import FORMATTER, GCLOUD_CLI
 from installer.errors import (
     GCLOUD_TIMEOUT,
@@ -306,8 +307,10 @@ def wait_for_managed_certificate(
             if announce_ready:
                 print(
                     f.success(
-                        f"Managed TLS certificate active for https://{domain}. "
-                        "It may take up to an hour before the domain opens over HTTPS."
+                        wrap_text(
+                            f"Managed TLS certificate active for https://{domain}. "
+                            "It may take up to an hour before the domain opens over HTTPS."
+                        )
                     )
                 )
             return True

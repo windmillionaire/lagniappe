@@ -1,9 +1,14 @@
 import os
-import re
-import shutil
 import sys
-import textwrap
 from types import SimpleNamespace
+
+from runner.console import (
+    ProgressLabel,
+    format_prompt,
+    terminal_width,
+    unstyle,
+    wrap_text,
+)
 
 from runner.context import (
     GCLOUD_CLI,
@@ -16,40 +21,6 @@ from runner.context import (
     setup_command,
     virtualenv_instructions,
 )
-
-
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @matrix setup : portability terminal-wrapping
-def wrap_text(message, width=None):
-    """Word-wrap operator-facing prose while preserving intentional line breaks."""
-    if width is None:
-        columns = shutil.get_terminal_size(fallback=(80, 24)).columns
-        width = min(100, columns - 1)
-    width = max(20, int(width))
-
-    wrapped_lines = []
-    for line in str(message).split("\n"):
-        if not line:
-            wrapped_lines.append("")
-            continue
-        indentation = line[: len(line) - len(line.lstrip())]
-        content = line.lstrip()
-        marker = re.match(r"(?:[•*-]|\d+[.)])\s+", content)
-        continuation_indent = indentation
-        if marker:
-            continuation_indent += " " * len(marker.group(0))
-        wrapped_lines.append(
-            textwrap.fill(
-                content,
-                width=width,
-                initial_indent=indentation,
-                subsequent_indent=continuation_indent,
-                break_long_words=False,
-                break_on_hyphens=False,
-            )
-        )
-    return "\n".join(wrapped_lines)
 
 
 # @testable true
@@ -86,11 +57,18 @@ def _supports_unicode(stream, text):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
+# @tests tests_tooling/test_001k_setup_console.py::test_progress_modes
 # @matrix setup : portability spinner
 def _use_plain_progress(stream=None):
-    """Use static progress on Windows and whenever stdout is not interactive."""
+    """Animate only where the terminal can display and redraw a spinner safely."""
     stream = stream or sys.stdout
-    return os.name == "nt" or not stream.isatty()
+    return (
+        os.name == "nt"
+        or not stream.isatty()
+        or os.environ.get("TERM", "").lower() == "dumb"
+        or not _supports_unicode(stream, "⠋✔✗")
+        or terminal_width() < 20
+    )
 
 
 # @testable false
@@ -98,11 +76,11 @@ def _use_plain_progress(stream=None):
 # @reason non-TTY spinner adapter is exercised through formatter behavior
 class _PlainSpinner:
     def __init__(self, text=""):
-        self.text = str(text or "")
+        self.text = unstyle(text or "")
 
     def __enter__(self):
         if self.text:
-            print(self.text)
+            print(wrap_text(self.text))
         return self
 
     def __exit__(self, exc_type, exc, tb):
@@ -112,10 +90,10 @@ class _PlainSpinner:
         print(message)
 
     def ok(self, glyph="[OK]"):
-        print(glyph)
+        print(wrap_text(f"{glyph} {self.text}"))
 
     def fail(self, glyph="[X]"):
-        print(glyph)
+        print(wrap_text(f"{glyph} {self.text}"))
 
     def start(self):
         return self
@@ -138,6 +116,7 @@ def config_file_status():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
+# @tests tests_tooling/test_001k_setup_console.py::test_formatter_preserves_plain_and_colored_output
 # @matrix setup : package-install spinner
 class Formatter:
     _initialized = False
@@ -172,6 +151,8 @@ class Formatter:
             if _use_plain_progress():
                 text = kwargs.get("text", args[0] if args else "")
                 return _PlainSpinner(text)
+            if "text" in kwargs:
+                kwargs["text"] = ProgressLabel(kwargs["text"])
             return yaspin(*args, **kwargs)
 
         self.yaspin = track_spinner_factory(portable_yaspin)
@@ -185,9 +166,8 @@ class Formatter:
         return self
 
     def error(self, message, error=None):
-        return (
-            f"{self.Fore.RED}{message}{self.Style.RESET_ALL}\n{error if error else ''}"
-        )
+        heading = f"{self.Fore.RED}{message}{self.Style.RESET_ALL}"
+        return f"{heading}\n{error}" if error else heading
 
     def warning(self, message):
         return f"{self.Fore.YELLOW}{message}{self.Style.RESET_ALL}"

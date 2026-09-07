@@ -180,9 +180,8 @@ def test_validate_input_retries_allows_empty_and_exits(monkeypatch):
         return value
 
     assert get_default_value() == "chosen-value"
-    assert prompts == [
-        "Suggested [chosen-value] "
-        "(press Enter to use the bracketed value; x to exit): "
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? Suggested [chosen-value]:"
     ]
 
     monkeypatch.setattr("builtins.input", lambda prompt: "x")
@@ -381,12 +380,9 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     assert create_config._get_gcloud_project("", "demo-app") == "demo-app"
     assert inspected == ["demo-app"]
     assert create_config.validate_project_id("demo-app")
-    assert prompts == [
-        (
-            "Press Enter to use the suggested Google Cloud project ID "
-            "[demo-app], or type a different project ID: "
-        ),
-        "Create a new project 'demo-app'? [y/N]: ",
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? Press Enter to use the suggested Google Cloud project ID [demo-app], or type a different project ID:",
+        "? Create a new project 'demo-app'? [y/N]:",
     ]
 
     def matching_active_config(command):
@@ -430,7 +426,9 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
         create_config._get_gcloud_project("", "demo-app")
         == "active-project-1"
     )
-    assert prompts == ["Use the existing project 'active-project-1'? [y/N]: "]
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? Use the existing project 'active-project-1'? [y/N]:"
+    ]
 
     monkeypatch.setattr(
         create_config,
@@ -452,18 +450,12 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     prompts.clear()
     answers = iter(["n", "", "n", "", "y"])
     assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
-    assert prompts == [
-        "Use the existing project 'active-project-1'? [y/N]: ",
-        (
-            "Press Enter to use the suggested Google Cloud project ID "
-            "[demo-app], or type a different project ID: "
-        ),
-        "Use the existing project 'demo-app'? [y/N]: ",
-        (
-            "Press Enter to use the suggested Google Cloud project ID "
-            "[demo-app-abc123], or type a different project ID: "
-        ),
-        "Create a new project 'demo-app-abc123'? [y/N]: ",
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? Use the existing project 'active-project-1'? [y/N]:",
+        "? Press Enter to use the suggested Google Cloud project ID [demo-app], or type a different project ID:",
+        "? Use the existing project 'demo-app'? [y/N]:",
+        "? Press Enter to use the suggested Google Cloud project ID [demo-app-abc123], or type a different project ID:",
+        "? Create a new project 'demo-app-abc123'? [y/N]:",
     ]
 
     def matching_exact_active_config(command):
@@ -480,13 +472,10 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     prompts.clear()
     answers = iter(["n", "", "y"])
     assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
-    assert prompts == [
-        "Use the existing project 'demo-app'? [y/N]: ",
-        (
-            "Press Enter to use the suggested Google Cloud project ID "
-            "[demo-app-abc123], or type a different project ID: "
-        ),
-        "Create a new project 'demo-app-abc123'? [y/N]: ",
+    assert [" ".join(prompt.split()) for prompt in prompts] == [
+        "? Use the existing project 'demo-app'? [y/N]:",
+        "? Press Enter to use the suggested Google Cloud project ID [demo-app-abc123], or type a different project ID:",
+        "? Create a new project 'demo-app-abc123'? [y/N]:",
     ]
 
     def mismatched_active_config(command):
@@ -515,8 +504,9 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
         match="Installation cancelled during project selection",
     ):
         create_config._get_gcloud_project("", "new-lagniappe")
-    assert prompts[-1] == (
-        "Create a new project 'new-lagniappe'? [y/N]: "
+    assert (
+        " ".join(prompts[-1].split())
+        == "? Create a new project 'new-lagniappe'? [y/N]:"
     )
 
 
@@ -877,13 +867,13 @@ def test_project_billing_authorization_uses_existing_account_and_project_console
         "?project=target-project-1"
     ]
     assert len(checks) == 2
-    assert prompts[0] == (
-        "After the existing billing account is linked, press Enter to "
-        "continue (x to exit): "
+    assert (
+        " ".join(prompts[0].split())
+        == "? After the existing billing account is linked, press Enter to continue (x to exit):"
     )
     output = capsys.readouterr().out
     assert "select 'Link a billing account'" in output
-    assert "existing billing account" in output
+    assert "existing billing account" in " ".join(output.split())
     assert "create a billing account" not in output
 
 
@@ -1619,7 +1609,7 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     assert "Creating the confirmed local configuration draft" not in output
     assert "ADC authentication: after project creation" not in output
     assert "Project state:" not in output
-    assert prompts[-1] == "Continue with installation? [y/N]: "
+    assert " ".join(prompts[-1].split()) == "? Continue with installation? [y/N]:"
     assert config.SETTINGS._SETUP_ENABLED_GOOGLE_CLOUD_APIS == set()
     assert cloud_boundary == [
         {
@@ -2230,7 +2220,7 @@ def test_verify_installation_is_read_only_and_activation_is_explicit(monkeypatch
 
     monkeypatch.setattr(setup_utils, "check_gcloud_cli", lambda: None)
     switcher = types.ModuleType("runner.gcloud")
-    switcher.config_gcloud = lambda: calls.append("activate")
+    switcher.config_gcloud = lambda **kwargs: calls.append("activate")
     monkeypatch.setitem(sys.modules, "runner.gcloud", switcher)
     monkeypatch.setitem(
         sys.modules,

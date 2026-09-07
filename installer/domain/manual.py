@@ -1,5 +1,6 @@
 """Provider-neutral domain verification and DNS instructions."""
 
+from runner.console import format_prompt, format_value, wrap_text
 from installer import FORMATTER
 
 
@@ -12,23 +13,27 @@ def confirm_domain_ownership(domain):
 
     f = FORMATTER.initialize()
     account = SETTINGS.GCLOUD_CONFIG["ACCOUNT"]
-    print(f"\n{f.info('Verify domain ownership with Google')}")
-    print("1. Use the Google account selected by this installation:")
+    print(wrap_text(f"\n{f.info('Verify domain ownership with Google')}"))
+    print(wrap_text("1. Use the Google account selected by this installation:"))
     print(f"   {account}")
     print(
-        "2. Open https://search.google.com/search-console while signed in "
-        "to that exact account"
+        wrap_text(
+            "2. Open https://search.google.com/search-console while signed in "
+            "to that exact account"
+        )
     )
-    print("3. Add the registrable domain as a Domain property")
-    print("4. Add the verification TXT record at your DNS provider")
-    print("5. Wait for Google Search Console to confirm ownership")
+    print(wrap_text("3. Add the registrable domain as a Domain property"))
+    print(wrap_text("4. Add the verification TXT record at your DNS provider"))
+    print(wrap_text("5. Wait for Google Search Console to confirm ownership"))
     print(
-        "6. In Search Console Settings > Users and permissions, confirm "
-        "that account is an Owner"
+        wrap_text(
+            "6. In Search Console Settings > Users and permissions, confirm "
+            "that account is an Owner"
+        )
     )
     verified = input(
-        f.info(
-            f"Has Google confirmed that {account} owns {domain}? [y/N]: "
+        format_prompt(
+            f.info(f"Has Google confirmed that {account} owns {domain}? [y/N]: ")
         )
     )
     return verified.casefold() == "y"
@@ -36,15 +41,21 @@ def confirm_domain_ownership(domain):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_custom_domain_supports_manual_dns
-# @matrix setup : custom-domain manual-dns provider-records
+# @tests tests_tooling/test_001k_setup_console.py::test_dns_values_remain_verbatim
+# @matrix setup : custom-domain manual-dns provider-records terminal-wrapping
 def print_manual_dns_instructions(domain, resource_records):
     """Print the exact records returned by App Engine."""
     f = FORMATTER.initialize()
-    print(f"\n{f.info(f'DNS records for {domain}')}")
-    print("Add every record below at your DNS provider with proxying disabled:")
+    print(wrap_text(f"\n{f.info(f'DNS records for {domain}')}"))
+    print(
+        wrap_text("Add every record below at your DNS provider with proxying disabled:")
+    )
     for record in resource_records:
         record_type = str(record.get("type") or "")
         name = str(record.get("name") or "").strip() or domain
         value = str(record.get("rrdata") or "").strip()
-        print(f"  {record_type:<5} {name:<30} {value}")
-    print("Use your provider's automatic/default TTL.")
+        print(format_value("  Type", record_type, verbatim=True))
+        print(format_value("  Name", name, verbatim=True))
+        print(format_value("  Value", value, verbatim=True))
+        print()
+    print(wrap_text("Use your provider's automatic/default TTL."))
