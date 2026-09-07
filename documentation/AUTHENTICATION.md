@@ -223,9 +223,13 @@ The main app serves authorization-server metadata at
 `/.well-known/oauth-authorization-server` and the `/oauth/authorize`,
 `/oauth/token`, and `/oauth/revoke` endpoints. Only authorization code with PKCE
 S256 and rotating refresh tokens are supported. Client ID, redirect URI,
-issuer, resource, and the single `mcp:use` scope are checked exactly. There is
-no dynamic client registration or client secret. Login continuation stores the
-validated request in a short-lived server-side record, then uses the clean
+issuer, and resource are checked exactly. OAuth does not advertise or request
+scopes: each request uses the connected user's current workspace permissions.
+New OAuth records and token responses omit scope. Previously issued credentials
+and clients still sending the former `mcp:use` scope remain compatible; other
+explicit scopes are rejected. There is no dynamic client registration or client
+secret. Login continuation stores the validated request in a short-lived
+server-side record, then uses the clean
 `/oauth/authorize` URL through login and consent. Only its opaque reference is
 held in a dedicated Secure, HttpOnly, SameSite=Lax cookie scoped to `/oauth`.
 Keeping this separate from the main session lets the pending authorization
@@ -234,6 +238,9 @@ binds its submitted pending reference and actor to the current request, so a
 stale form cannot authorize a different attempt or account. Consent and connection
 revocation use ordinary session authentication and CSRF protection; only token
 exchange and token-possession revocation are exempt views.
+CSRF failures on the consent endpoint show the AI connections error page with
+sign-in-session mismatch and client-restart guidance. They still return HTTP 400
+with `X-Lagniappe-CSRF: invalid`, without issuing a code or redirecting to a client.
 
 Opaque codes and tokens have digest-addressed records in the `mcp_oauth`
 Datastore kind. Pending requests last ten minutes, codes five minutes, access

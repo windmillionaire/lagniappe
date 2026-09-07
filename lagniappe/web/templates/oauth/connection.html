@@ -28,7 +28,11 @@
         <h1 class="{{ styles.login.heading }}">AI connections</h1>
         {% if error %}
           <div role="alert" class="{{ styles.login.error|replace(' hidden', '') }} text-center">
-            This connection could not be authorized.
+            {% if session_mismatch %}
+              This connection request no longer matches your sign-in session.
+            {% else %}
+              This connection could not be authorized.
+            {% endif %}
           </div>
           <p class="{{ styles.login.guidance }}">Start again from your AI client, and sign in with your invited Lagniappe account.</p>
         {% elif consent %}

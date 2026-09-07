@@ -474,10 +474,12 @@ def test_hosted_configuration_and_public_discovery_are_exact():
                 response = await client.get("/.well-known/oauth-protected-resource")
                 assert response.json()["resource"] == CONFIG.resource
                 assert response.json()["authorization_servers"] == [CONFIG.issuer]
+                assert "scopes_supported" not in response.json()
                 assert (await client.get("/health")).json() == {"status": "ok"}
                 response = await _rpc(client, "initialize", token=None)
                 assert response.status_code == 401
                 assert response.headers["www-authenticate"] == CONFIG.challenge
+                assert "scope=" not in response.headers["www-authenticate"]
                 assert (
                     await _rpc(client, "ping", token="lgn_existing-key")
                 ).status_code == 401
@@ -526,7 +528,7 @@ def test_remote_catalog_and_calls_reuse_adapter_behavior_and_isolate_users(versi
                     assert (
                         item["securitySchemes"]
                         == item["_meta"]["securitySchemes"]
-                        == [{"type": "oauth2", "scopes": ["mcp:use"]}]
+                        == [{"type": "oauth2", "scopes": []}]
                     )
                 a, b = await asyncio.gather(
                     _rpc(

@@ -1775,8 +1775,9 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     )
     created_tools = []
 
-    def create(current, *, instructions, tool, name=None):
+    def create(current, *, instructions, tool, name=None, remote_mcp=False):
         assert current is actor
+        assert remote_mcp is False
         created_tools.append(tool)
         report.tool = tool
         report.instructions = instructions
@@ -1824,21 +1825,21 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         headers=headers,
         json={"tool": "create", "instructions": "Make a project."},
     )
-    assert create_draft.status_code == 201
+    assert create_draft.status_code == 201, create_draft.get_json()
 
     organize_draft = client.post(
         "/api/v1/plans",
         headers=headers,
         json={"tool": "organize", "instructions": "Organize these files."},
     )
-    assert organize_draft.status_code == 201
+    assert organize_draft.status_code == 201, organize_draft.get_json()
 
     created = client.post(
         "/api/v1/plans",
         headers=headers,
         json={"tool": "ask", "instructions": report.instructions},
     )
-    assert created.status_code == 201
+    assert created.status_code == 201, created.get_json()
     assert created.json["tool"] == "ask"
     assert "execute_url" not in created.json
     assert "execution" not in created.json

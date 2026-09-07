@@ -115,10 +115,12 @@
           agent, then sign in to Lagniappe and allow the connection. The server exposes
           workspace tools directly. No local Lagniappe package is required.</p>
         <p><strong>Skill:</strong> for an agent that can make HTTP requests, create an API
-          key under My Page → External agent API. Ask the agent to fetch the skill below
+          key under <strong>My Page / User Settings / External agent API</strong>.
+          Ask the agent to fetch the skill below
           using that key and install it for itself. Keep the key in the agent's secret
           settings; do not paste it into shared prompts or files.</p>
-        {% if current_user.is_authenticated and not current_user.is_public and CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED %}
+        {% set show_connection_details = current_user.is_authenticated and not current_user.is_public and CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED %}
+        {% if show_connection_details %}
           <div data-role="external-ai-account-details" class="space-y-2">
             {% if CONFIG.REMOTE_MCP.enabled %}
               <p>MCP server: <code>{{ CONFIG.REMOTE_MCP.resource }}</code></p>
@@ -133,6 +135,31 @@
             external access is enabled and for its MCP server address. The skill URL is
             <code>https://YOUR-LAGNIAPPE-SITE/api/v1/client-skill.md</code>; replace the
             example host with the installation's website address.</p>
+        {% endif %}
+        {% if not show_connection_details or (CONFIG.REMOTE_MCP.enabled and CONFIG.REMOTE_MCP.codex_enabled) %}
+          {% set codex_mcp_url = CONFIG.REMOTE_MCP.resource if show_connection_details else 'https://MCP-ENDPOINT/mcp' %}
+          <div data-role="external-ai-codex-setup" class="space-y-3">
+            <h3 class="font-semibold text-page-default">Connect Codex</h3>
+            <p>With Codex CLI installed, run this command in a terminal.
+              No Lagniappe API key or local Lagniappe package is needed.</p>
+            {% if not show_connection_details %}
+              <p>Ask the installation Owner to confirm Codex access is enabled and
+                replace <code>https://MCP-ENDPOINT/mcp</code> with its MCP
+                server URL. You need an invited, non-public Lagniappe account.</p>
+            {% endif %}
+            {{ code('codex mcp add lagniappe-remote --url ' ~ codex_mcp_url ~ ' --oauth-client-id lagniappe-codex') }}
+            <p>Follow the sign-in link printed by Codex. Sign in to Lagniappe,
+              check the account shown on the consent page, then choose <strong>Allow</strong>.</p>
+            <p>If sign-in does not start, or you need to reconnect later, run:</p>
+            {{ code('codex mcp login lagniappe-remote') }}
+            <p>When the terminal confirms login, you can close the localhost
+              completion tab. Restart any existing Codex sessions to load the
+              connection, then ask Codex to check which Lagniappe account it is using.</p>
+            <p>To switch accounts, sign in to the intended account in Lagniappe
+              first, then run the login command again and restart Codex.
+              To revoke a connection, open <strong>Settings / Manage AI connections</strong>
+              in Lagniappe.</p>
+          </div>
         {% endif %}
         <p>Both use the user's normal workspace permissions and the external agent's
           model provider. Both can answer questions and prepare plans; workspace changes
@@ -207,7 +234,7 @@
       search grounding, file processing, image generation, or run large Create
       or Organize requests, it is worth glancing at usage a little more often.
     </p>
-    <p class="text-base-medium">Change models in Admin → Site Settings → AI Models.
+    <p class="text-base-medium">Change models in <strong>Admin / Site Settings / AI Models</strong>.
       The installer can change AI and external-agent access with:</p>
     {{ code("./setup.sh ai") }}
   {% endcall %}

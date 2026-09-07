@@ -205,9 +205,16 @@ MCP package or upload helper is installed.
 For Codex, configure the server URL and fixed public client:
 
 ```bash
-codex mcp add lagniappe-remote --url https://YOUR-CLOUD-RUN-ORIGIN/mcp --oauth-client-id lagniappe-codex
+codex mcp add lagniappe-remote --url https://MCP-ENDPOINT/mcp --oauth-client-id lagniappe-codex
 codex mcp login lagniappe-remote
 ```
+
+The AI Integration manual gives signed-in non-public users the setup command
+using `REMOTE_MCP.resource` when Codex is enabled. Public readers see a placeholder
+and must obtain the installation's MCP URL and an eligible account. The add
+command can start sign-in automatically; use login if needed or to reconnect,
+then restart existing Codex sessions. OAuth uses current workspace permissions
+without scope negotiation; no `--scopes` option is needed.
 
 A `tool_timeout_sec` of 300 and `startup_timeout_sec` of 60 accommodate uploads
 and startup. `required = true` makes missing initialization visible; it does not

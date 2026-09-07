@@ -105,7 +105,6 @@ def pilot(monkeypatch):
         "client_id": config["client_id"],
         "redirect_uri": config["redirect_uri"],
         "resource": config["resource"],
-        "scope": "mcp:use",
         "response_type": "code",
         "state": "state-not-in-login-url",
         "code_challenge_method": "S256",
@@ -176,6 +175,7 @@ def test_oauth_metadata_login_consent_and_csrf(pilot):
     assert metadata.json["issuer"] == ISSUER
     assert metadata.json["token_endpoint_auth_methods_supported"] == ["none"]
     assert metadata.json["authorization_response_iss_parameter_supported"] is True
+    assert "scopes_supported" not in metadata.json
     assert "registration_endpoint" not in metadata.json
     started = _open(pilot, "GET", "/oauth/authorize", query_string=pilot.parameters)
     assert started.status_code == 303
@@ -210,6 +210,45 @@ def test_oauth_metadata_login_consent_and_csrf(pilot):
         _open(pilot, "GET", "/oauth/authorize", query_string=duplicate).status_code
         == 400
     )
+
+
+# @matrix error-handling : csrf
+# @source lagniappe/web/start/errors.py::handle_http_error
+@pytest.mark.parametrize("csrf_failure", ["changed-session", "missing-token"])
+def test_oauth_csrf_failure_shows_connection_restart_guidance(pilot, csrf_failure):
+    _login(pilot)
+    form = _consent_page(pilot)
+    before = deepcopy(pilot.rows)
+    if csrf_failure == "changed-session":
+        with pilot.client.session_transaction(base_url=ISSUER) as session:
+            session["csrf_token"] = "another-signin-session"
+    else:
+        form.pop("csrf_token")
+
+    rejected = _open(
+        pilot, "POST", "/oauth/authorize", data={"decision": "allow", **form}
+    )
+    assert rejected.status_code == 400
+    assert rejected.mimetype == "text/html"
+    assert rejected.headers["X-Lagniappe-CSRF"] == "invalid"
+    assert "no-store" in rejected.headers["Cache-Control"]
+    assert "Location" not in rejected.headers
+    assert 'role="alert"' in rejected.text
+    assert "This connection request no longer matches your sign-in session." in rejected.text
+    assert "Start again from your AI client" in rejected.text
+    assert "Return to Lagniappe" in rejected.text
+    assert 'name="decision"' not in rejected.text
+    assert all(value not in rejected.text for value in form.values())
+    assert pilot.parameters["state"] not in rejected.text
+    assert pilot.rows == before
+
+    # Starting over reaches a fresh consent form and a normal denial callback.
+    fresh_form = _consent_page(pilot)
+    denied = _open(
+        pilot, "POST", "/oauth/authorize", data={"decision": "deny", **fresh_form}
+    )
+    assert denied.status_code == 303
+    assert parse_qs(urlsplit(denied.location).query)["error"] == ["access_denied"]
 
 
 # @matrix mcp-oauth : consent consent-binding
@@ -611,8 +650,9 @@ def codex_loopback():
 
 # @matrix mcp-oauth : consent loopback browser-callback submit-progress
 # @matrix web-headers : security
+@pytest.mark.parametrize("decision", ["allow", "deny"])
 def test_codex_native_consent_reaches_loopback_and_shows_submit_progress(
-    pilot, browser, codex_loopback
+    pilot, browser, codex_loopback, decision
 ):
     from playwright.sync_api import expect
     from config.remote_mcp import CODEX_CLIENT_ID
@@ -623,6 +663,7 @@ def test_codex_native_consent_reaches_loopback_and_shows_submit_progress(
     _login(pilot)
     _consent_page(pilot)
     decisions, progress, browser_errors = [], [], []
+    before = deepcopy(pilot.rows)
     with browser.new_context(service_workers="block") as context:
         page = context.new_page()
         page.on(
@@ -667,23 +708,30 @@ def test_codex_native_consent_reaches_loopback_and_shows_submit_progress(
         # The extra observer runs after the product's submit handler and
         # records visible DOM state before the native navigation replaces it.
         page.evaluate("""() => document.addEventListener('submit', () => {
-            const button = document.querySelector('button[value="allow"]');
+            const button = document.querySelector('button[aria-busy="true"]');
             const icon = button.querySelector('[data-role="icon"]');
             window.recordConsentProgress({busy: button.getAttribute('aria-busy'),
                 visible: icon.getBoundingClientRect().width > 0,
                 icon: icon.textContent});
         })""")
-        page.get_by_role("button", name="Allow", exact=True).click()
+        page.get_by_role(
+            "button", name="Allow" if decision == "allow" else "Cancel", exact=True
+        ).click()
         expect(page, str(browser_errors)).to_have_url(
             re.compile("^" + re.escape(callback_url) + r"\?")
         )
         expect(page.locator("body")).to_have_text("Codex callback received")
-        assert decisions == [["allow"]]
+        assert decisions == [[decision]]
         assert len(progress) == 1 and progress[0]["busy"] == "true"
         assert progress[0]["visible"] and progress[0]["icon"]
         assert len(callbacks) == 1 and callbacks[0]["iss"] == [ISSUER]
         assert callbacks[0]["state"] == [pilot.parameters["state"]]
-        assert len(callbacks[0]["code"]) == 1
+        if decision == "allow":
+            assert len(callbacks[0]["code"]) == 1
+        else:
+            assert callbacks[0]["error"] == ["access_denied"]
+            assert "code" not in callbacks[0]
+            assert pilot.rows.keys() == before.keys()
 
 
 # @matrix mcp-oauth : site-policy discovery
@@ -705,6 +753,7 @@ def test_site_policy_closes_oauth_discovery_and_external_routes(pilot, monkeypat
 # @source lagniappe/web/responses.py::manual_content
 def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pilot, monkeypatch):
     pilot.actor.access = lambda _: False
+    pilot.config["codex_enabled"] = True
     monkeypatch.setattr(CONFIG, "CUSTOM_DOMAIN", "workspace.example.test")
     monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", True)
     _login(pilot)
@@ -714,8 +763,23 @@ def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pi
     assert 'data-role="external-ai-account-details"' in text
     assert "https://pilot.run.app/mcp" in text
     assert "https://workspace.example.test/api/v1/client-skill.md" in text
+    assert (
+        "codex mcp add lagniappe-remote --url https://pilot.run.app/mcp "
+        "--oauth-client-id lagniappe-codex"
+    ) in text
+    assert "codex mcp login lagniappe-remote" in text
+    assert "Restart any existing Codex sessions" in text
+    assert "MCP-ENDPOINT" not in text
     assert re.search(r'<details\s+data-role="external-ai-help">', text)
     assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
+    # Another installation must render its own configured URL in the command.
+    pilot.config["resource"] = "https://another-installation.run.app/mcp"
+    another = _open(pilot, "GET", "/manual/section/ai").text
+    assert "--url https://another-installation.run.app/mcp " in another
+    assert "https://pilot.run.app/mcp" not in another
+    pilot.config["codex_enabled"] = False
+    disabled = _open(pilot, "GET", "/manual/section/ai").text
+    assert 'data-role="external-ai-codex-setup"' not in disabled
     for anonymous in (False, True):
         pilot.actor.is_public = True
         if anonymous:
@@ -726,14 +790,47 @@ def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pi
         assert 'data-role="external-ai-account-details"' not in response.text
         assert 'data-role="external-ai-generic-details"' in response.text
         assert "https://pilot.run.app/mcp" not in response.text
+        assert "https://another-installation.run.app/mcp" not in response.text
         assert "https://workspace.example.test" not in response.text
         assert "/api/v1/client-skill.md" in response.text
+        assert (
+            "codex mcp add lagniappe-remote --url https://MCP-ENDPOINT/mcp "
+            "--oauth-client-id lagniappe-codex"
+        ) in response.text
     pilot.actor.is_public = False
     _login(pilot)
     monkeypatch.setattr(CONFIG, "EXTERNAL_AI_ENABLED", False)
     response = _open(pilot, "GET", "/manual/section/ai")
     assert response.status_code == 200
     assert 'data-role="external-ai-account-details"' not in response.text
+
+
+# @matrix mcp-oauth : consent user-binding
+# @source lagniappe/web/routes/oauth/main.py::authorize
+# @source lagniappe/core/tools/auth/remote_mcp.py::eligible_user
+@pytest.mark.parametrize("client", ["chatgpt", "codex"])
+def test_public_user_cannot_authorize_with_valid_client_setup(pilot, client):
+    from config.remote_mcp import CODEX_CLIENT_ID
+
+    # Full client configuration and an unrestricted actor list do not make a
+    # public user eligible. Keep a valid pre-existing form to test POST as well.
+    pilot.config["actors"] = None
+    if client == "codex":
+        pilot.config["codex_enabled"] = True
+        pilot.parameters.update(
+            client_id=CODEX_CLIENT_ID, redirect_uri="http://127.0.0.1:38417/callback"
+        )
+    _login(pilot)
+    form = _consent_page(pilot)
+    pilot.actor.is_public = True
+    rejected = _open(pilot, "GET", "/oauth/authorize")
+    assert rejected.status_code == 403
+    assert 'name="decision"' not in rejected.text
+    rejected = _open(
+        pilot, "POST", "/oauth/authorize", data={"decision": "allow", **form}
+    )
+    assert rejected.status_code == 403
+    assert not any(name.startswith(("c-", "a-", "r-", "grant-")) for name in pilot.rows)
 
 
 # @matrix ai-access : site-policy

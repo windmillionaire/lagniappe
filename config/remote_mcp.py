@@ -4,7 +4,8 @@ import re
 from urllib.parse import urlsplit
 
 
-SCOPE = "mcp:use"
+# Accepted only for credentials and clients issued before scope negotiation ended.
+LEGACY_SCOPE = "mcp:use"
 USER_TOKEN_HEADER = "X-Lagniappe-MCP-Token"
 CLIENT_ID = "https://chatgpt.com/oauth/client.json"
 REDIRECT_URI = "https://chatgpt.com/connector_platform_oauth_redirect"

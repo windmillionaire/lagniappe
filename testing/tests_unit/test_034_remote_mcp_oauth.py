@@ -98,7 +98,6 @@ def oauth(monkeypatch):
         "client_id": config["client_id"],
         "redirect_uri": config["redirect_uri"],
         "resource": config["resource"],
-        "scope": "mcp:use",
         "response_type": "code",
         "state": "opaque-state",
         "code_challenge_method": "S256",
@@ -208,6 +207,85 @@ def test_authorization_requires_exact_bindings_state_and_s256(oauth):
         with pytest.raises(auth.OAuthError):
             auth.begin_authorization({**oauth.request, field: value})
     assert not oauth.rows
+
+
+# @matrix mcp-oauth : authorization consent token refresh validation
+# @source lagniappe/core/tools/auth/remote_mcp.py::begin_authorization
+# @source lagniappe/core/tools/auth/remote_mcp.py::consent
+# @source lagniappe/core/tools/auth/remote_mcp.py::exchange_token
+@pytest.mark.parametrize("client", ["chatgpt", "codex"])
+@pytest.mark.parametrize("scope", [None, "", "mcp:use"])
+def test_authorization_without_scopes_preserves_consent_and_token_lifecycle(
+    oauth, client, scope
+):
+    from config.remote_mcp import CODEX_CLIENT_ID
+
+    existing = auth.exchange_token(_code(oauth))
+    request = dict(oauth.request)
+    if client == "codex":
+        oauth.config["codex_enabled"] = True
+        request.update(
+            client_id=CODEX_CLIENT_ID, redirect_uri="http://127.0.0.1:38417/callback"
+        )
+    if scope is not None:
+        request["scope"] = scope
+    pending = auth.begin_authorization(request)
+    target, denied = auth.consent(pending, oauth.actor, allow=False)
+    assert target == request["redirect_uri"]
+    assert denied == {
+        "error": "access_denied",
+        "state": request["state"],
+        "iss": oauth.config["issuer"],
+    }
+    assert auth.authenticate_access(existing["access_token"])[0] is oauth.actor
+
+    pending = auth.begin_authorization(request)
+    target, allowed = auth.consent(pending, oauth.actor, allow=True)
+    token = auth.exchange_token({
+        "grant_type": "authorization_code",
+        "client_id": request["client_id"],
+        "redirect_uri": target,
+        "resource": request["resource"],
+        "code": allowed["code"],
+        "code_verifier": VERIFIER,
+    })
+    assert "scope" not in token
+    assert all("scope" not in row for row in oauth.rows.values())
+    assert auth.authenticate_access(token["access_token"])[0] is oauth.actor
+    refreshed = auth.exchange_token({
+        "grant_type": "refresh_token",
+        "client_id": request["client_id"],
+        "resource": request["resource"],
+        "refresh_token": token["refresh_token"],
+    })
+    assert "scope" not in refreshed
+    assert refreshed["refresh_token"] != token["refresh_token"]
+    assert auth.authenticate_access(refreshed["access_token"])[0] is oauth.actor
+
+
+# @matrix mcp-oauth : authentication existing-grants refresh
+# @source lagniappe/core/tools/auth/remote_mcp.py::exchange_token
+# @source lagniappe/core/tools/auth/remote_mcp.py::authenticate_access
+def test_existing_scoped_credentials_survive_scope_removal(oauth):
+    parameters = _code(oauth)
+    # Reproduce records issued before scope negotiation was removed, including
+    # an outstanding authorization code and already-issued token family.
+    for row in oauth.rows.values():
+        row["scope"] = "mcp:use"
+    token = auth.exchange_token(parameters)
+    for row in oauth.rows.values():
+        row["scope"] = "mcp:use"
+    assert auth.authenticate_access(token["access_token"])[0] is oauth.actor
+    refreshed = auth.exchange_token({
+        **_refresh(oauth, token["refresh_token"]), "scope": "mcp:use"
+    })
+    assert "scope" not in refreshed
+    assert auth.authenticate_access(refreshed["access_token"])[0] is oauth.actor
+    assert auth.authenticate_access(token["access_token"])[0] is oauth.actor
+    auth.connection_status(oauth.actor, revoke=True)
+    for result in (token, refreshed):
+        with pytest.raises(auth.OAuthError):
+            auth.authenticate_access(result["access_token"])
 
 
 # @matrix mcp-oauth : consent transaction
@@ -655,6 +733,14 @@ def test_site_policy_blocks_existing_oauth_grants_and_optional_actor_lists(oauth
     assert auth.eligible_user(oauth.actor)
     oauth.actor.is_public = True
     assert not auth.eligible_user(oauth.actor)
+    with pytest.raises(auth.OAuthError):
+        auth.authenticate_access(tokens["access_token"])
+    with pytest.raises(auth.OAuthError):
+        auth.exchange_token(_refresh(oauth, tokens["refresh_token"]))
+    pending = auth.begin_authorization(oauth.request)
+    with pytest.raises(auth.OAuthError):
+        auth.consent(pending, oauth.actor, allow=True)
     oauth.actor.is_public = False
+    assert auth.authenticate_access(tokens["access_token"])[0] is oauth.actor
     monkeypatch.setitem(oauth.config, "actors", [])
     assert not auth.eligible_user(oauth.actor)

@@ -57,10 +57,9 @@ from lagniappe_mcp.url_security import normalize_site_url, validate_api_url
 
 
 LOGGER = logging.getLogger("lagniappe_mcp.hosted")
-SCOPE = "mcp:use"
 USER_TOKEN_HEADER = "X-Lagniappe-MCP-Token"
 _ACCESS_TOKEN = re.compile(r"lgmo_a_[A-Za-z0-9_-]{43}")
-_SCHEMES = [{"type": "oauth2", "scopes": [SCOPE]}]
+_SCHEMES = [{"type": "oauth2", "scopes": []}]
 _METADATA_PATH = "/.well-known/oauth-protected-resource"
 _LOG_METHODS = {
     "initialize",
@@ -128,7 +127,7 @@ class HostedConfig:
     @property
     def challenge(self):
         return (
-            f'Bearer resource_metadata="{self.origin}{_METADATA_PATH}", scope="{SCOPE}"'
+            f'Bearer resource_metadata="{self.origin}{_METADATA_PATH}"'
         )
 
 
@@ -514,7 +513,6 @@ def create_app(config, *, adapter_factory=None):
                 "resource": config.resource,
                 "authorization_servers": [config.issuer],
                 "bearer_methods_supported": ["header"],
-                "scopes_supported": [SCOPE],
                 "resource_name": "Lagniappe MCP",
             }
         )

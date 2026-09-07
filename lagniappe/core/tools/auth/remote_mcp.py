@@ -22,7 +22,7 @@ from config.remote_mcp import (
     redirect_allowed,
     PENDING_SECONDS,
     REFRESH_SECONDS,
-    SCOPE,
+    LEGACY_SCOPE,
 )
 from lagniappe import CONFIG
 from lagniappe.core.definitions import Fetch
@@ -141,7 +141,7 @@ def _bound(row, config):
     return (
         all(row.get(key) == config[key] for key in ("issuer", "resource"))
         and client_allowed(config, row.get("client_id"))
-        and row.get("scope") == SCOPE
+        and row.get("scope") in (None, LEGACY_SCOPE)
     )
 
 
@@ -289,7 +289,6 @@ def begin_authorization(parameters, *, now=None):
         "client_id",
         "redirect_uri",
         "resource",
-        "scope",
         "state",
         "code_challenge",
         "code_challenge_method",
@@ -300,7 +299,9 @@ def begin_authorization(parameters, *, now=None):
         raise OAuthError("unsupported_response_type")
     if parameters["resource"] != config["resource"]:
         raise OAuthError("invalid_target")
-    if parameters["scope"] != SCOPE:
+    # Access follows the user's current permissions, with no scope negotiation.
+    # Older clients may still send the previously advertised scope.
+    if parameters.get("scope") not in (None, "", LEGACY_SCOPE):
         raise OAuthError("invalid_scope")
     if parameters["code_challenge_method"] != "S256" or not _CHALLENGE.fullmatch(
         parameters["code_challenge"]
@@ -364,7 +365,6 @@ def consent(pending, user, *, allow, now=None):
                     "client_id",
                     "redirect_uri",
                     "resource",
-                    "scope",
                     "code_challenge",
                     "issuer",
                 )
@@ -400,7 +400,7 @@ def exchange_token(parameters, *, now=None):
         raise OAuthError("invalid_client")
     if parameters.get("resource") != config["resource"]:
         raise OAuthError("invalid_target")
-    if parameters.get("scope", SCOPE) != SCOPE:
+    if parameters.get("scope") not in (None, "", LEGACY_SCOPE):
         raise OAuthError("invalid_scope")
     grant_type = parameters.get("grant_type")
     if grant_type not in {"authorization_code", "refresh_token"}:
@@ -464,7 +464,6 @@ def exchange_token(parameters, *, now=None):
                 "issuer": config["issuer"],
                 "client_id": candidate["client_id"],
                 "resource": config["resource"],
-                "scope": SCOPE,
             }
         elif (
             not _live(grant, now)
@@ -481,7 +480,7 @@ def exchange_token(parameters, *, now=None):
         records.put(grant_name, grant)
         common = {
             key: grant[key]
-            for key in ("user", "family", "issuer", "client_id", "resource", "scope")
+            for key in ("user", "family", "issuer", "client_id", "resource")
         }
         common["grant"] = grant_name
         common.update(issued_at=now, generation=grant["generation"])
@@ -491,7 +490,6 @@ def exchange_token(parameters, *, now=None):
         return {
             "access_token": access,
             "token_type": "Bearer",
-            "scope": SCOPE,
             "expires_in": int((expires_at - now).total_seconds()),
             "refresh_token": refresh,
         }

@@ -269,12 +269,12 @@ def test_entity_save_persists_relations_process_payloads_and_cache():
     assert _blob_exists(assets["document"])
     assert _blob_exists(assets["snapshot"])
 
-    history = database_get.document_history(page)
-    assert len(history) == 1
-    assert history[0]["type"] == "document_history"
-    assert database_get.entity(history[0].key) is not None
+    # Ordinary saves persist the current document without creating a version.
+    assert database_get.document_history(page) == []
 
     reloaded = Entities.fetch_one(page.key, request=Fetch.direct())
+    assert reloaded.assets["document"] == assets["document"]
+    assert reloaded.assets["snapshot"] == assets["snapshot"]
     assert reloaded.name == page.name
     assert reloaded.form.key == form.key
     assert {c.key for c in reloaded.categories} == {category.key}
