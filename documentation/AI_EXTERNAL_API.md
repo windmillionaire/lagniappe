@@ -355,8 +355,9 @@ cannot be revised. A Plan GET includes the round-trippable proposal and, for
 Create/Organize, a bounded `execution` receipt with action IDs/types/statuses and
 currently viewable resulting entity names, hash references, and URLs. Missing or
 no-longer-viewable entities are null; stored ledger names, recovery snapshots,
-private diagnostics and internal entity keys are not exposed. An unavailable
-entity does not mean its action never ran. Ask has no execution receipt.
+private diagnostics and standalone internal entity keys are not exposed. An
+unavailable entity does not mean its action never ran. Ask has no execution
+receipt.
 
 ### Ask
 
@@ -369,13 +370,14 @@ editor-compatible Markdown pipeline and stores the resulting `answer_html` for
 the report view. Submission moves the report directly to `complete`; it returns
 preview and review URLs. Ask rejects uploads and has no execution lifecycle.
 Internal hash tokens remain tool-call references and may not appear as visible
-answer text. When a read tool returns a URL containing such a token, clients may
-use that exact URL as a Markdown link destination with the entity's human name
-as its link label. The shared AI Markdown conversion resolves known hash
-destinations to canonical browser URLs after validation, so tool-only notation
-is not stored in the human-facing link. The external submission accepts the
-advertised Ask fields only; clients cannot submit pre-rendered `answer_html` or
-bypass the shared Markdown sanitizer.
+answer text. Read tools and execution receipts return canonical browser URLs
+separately from hash references. Clients should use those URLs as Markdown link
+destinations with human names as link labels, without constructing URLs from
+hash tokens. Search builds links from existing cached IDs before projecting
+references; this does not require extra entity reads. The shared AI Markdown
+conversion still resolves known hash destinations in older saved proposals.
+The external submission accepts the advertised Ask fields only; clients cannot
+submit pre-rendered `answer_html` or bypass the shared Markdown sanitizer.
 
 Answer directly using plan-free reads, then offer to save the answer. Do not
 start a Plan merely to retrieve a task or answer a question. If the user requests

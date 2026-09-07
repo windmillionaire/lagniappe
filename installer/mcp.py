@@ -39,7 +39,13 @@ PROJECT_PERMISSIONS = (
     "datastore.indexes.get", "datastore.indexes.list", "datastore.indexes.update",
     "iam.serviceAccounts.get", "resourcemanager.projects.get", "serviceusage.services.enable",
 )
-AUTH_LOG_FILTER = 'resource.type="gae_app" AND (protoPayload.resource=~"^/oauth/" OR httpRequest.requestUrl=~"/oauth/")'
+# Navigation away from OAuth can put its query in another request's referrer.
+# App Engine RequestLog and the shared HTTP envelope use different spellings.
+AUTH_LOG_FILTER = (
+    'resource.type="gae_app" AND ('
+    'protoPayload.resource=~"^/oauth/" OR httpRequest.requestUrl=~"/oauth/" OR '
+    'protoPayload.referrer=~"/oauth/" OR httpRequest.referer=~"/oauth/")'
+)
 AUTH_LOG_EXCLUSION = "remote-mcp-oauth-query"
 
 
@@ -231,7 +237,8 @@ def _ensure_account(target, email):
 
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_resources_use_separate_build_identity_and_scoped_roles
-# @matrix mcp-install : iam resources keyless
+# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_resource_upgrade_covers_oauth_referrers_and_preserves_other_exclusions
+# @matrix mcp-install : iam resources keyless privacy idempotence
 def reconcile_resources(target, deployer):
     require_permissions(target)
     _run(target, ["services", "enable", *SERVICES])

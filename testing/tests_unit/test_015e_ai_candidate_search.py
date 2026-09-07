@@ -179,6 +179,7 @@ def _actor():
 
 
 # @matrix ai search : candidate-routing cached-details
+# @pair ai:search-url
 def test_external_candidates_use_cached_context_without_entity_loading(monkeypatch):
     calls = []
 
@@ -219,6 +220,8 @@ def test_external_candidates_use_cached_context_without_entity_loading(monkeypat
     assert results[1]["completed"] is False
     assert results[0]["parent"] == {"hash": "hash:123456abcdef", "name": "Filtering"}
     assert results[0]["hash"] == "hash:abcdef123456"
+    assert results[0]["url"] == "/tasks/task-key"
+    assert results[1]["url"] == "/tasks/open-task"
     assert "permissions" not in results[0]
     assert "details" not in results[0]
 

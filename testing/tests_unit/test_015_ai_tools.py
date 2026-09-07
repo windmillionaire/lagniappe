@@ -1643,7 +1643,7 @@ def test_get_entity_returns_model_task_form_schema_for_ai_autofill(monkeypatch):
             "can_edit": True,
             "can_create": True,
         },
-        "url": "/test/form/hash:invoice-form-ai",
+        "url": "/test/form/invoice-form-ai",
     }
 
 
@@ -1709,7 +1709,7 @@ def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
         form=form,
         categories=[category],
         allowed=lambda *args, **kwargs: True,
-        _ai_url=lambda: "/pages/hash:page-ai",
+        _ai_url=lambda: "/pages/page-key",
         to_ai=lambda user: (_ for _ in ()).throw(
             AssertionError("compact mode should not call page.to_ai")
         ),
@@ -1772,7 +1772,7 @@ def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
                     "name": "Appliances",
                 }
             ],
-            "url": "/pages/hash:page-ai",
+            "url": "/pages/page-key",
             "permissions": {
                 "can_view": True,
                 "can_edit": True,
@@ -1790,7 +1790,7 @@ def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
             "kind": "page",
             "hash": "hash:page-ai",
             "name": "Wolf Range",
-            "url": "/pages/hash:page-ai",
+            "url": "/pages/page-key",
         }
     ]
     assert names["returned_count"] == 1 and not names["has_more"]
@@ -1825,7 +1825,7 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
         name="Avery Rowan",
         hash="averyrowan12",
         entity_kind="page",
-        _ai_url=lambda: "/pages/hash:averyrowan12",
+        _ai_url=lambda: "/pages/avery-page-key",
     )
     restricted_page = SimpleNamespace(
         allowed=lambda action, user=None: False,
@@ -1957,7 +1957,7 @@ def test_get_category_pages_reports_effective_limit_and_pagination(monkeypatch):
     assert names["next_cursor"] == "next-page-token"
     assert names["pages"] == [{
         "name": "Avery Rowan", "hash": "hash:averyrowan12", "kind": "page",
-        "url": "/pages/hash:averyrowan12",
+        "url": "/pages/avery-page-key",
     }]
 
 
@@ -3117,7 +3117,7 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
                 "can_edit": True,
                 "can_create": True,
             },
-            "url": "/test/file/hash:history-oil-file",
+            "url": "/test/file/history-oil-file",
         }
     ]
 
@@ -3865,6 +3865,39 @@ def test_ai_search_entity_urls_and_result_scrubbing():
         "url": "/projects/project/tasks/model?completed=false",
     }
 
+    for kind, expected_url in (
+        ("category", "/categories/record-key"),
+        ("page", "/pages/record-key"),
+        ("task", "/tasks/record-key"),
+        ("file", "/files/record-key"),
+        ("form", "/forms/record-key"),
+        ("project", "/projects/record-key"),
+        ("model", "/projects/parent-key/tasks/record-key?completed=false"),
+    ):
+        raw = {
+            "kind": kind,
+            "id": "record-key",
+            "name": "Linked record",
+            "details": {
+                "hash": "abc123def456",
+                "parent": {"id": "parent-key", "hash": "def456abc123"},
+            },
+        }
+
+        formatted = ai_search.format_search_result(raw)
+
+        assert formatted["url"] == expected_url
+        assert formatted["hash"] == "hash:abc123def456"
+        assert formatted["parent"] == {"hash": "hash:def456abc123"}
+        assert "id" not in formatted
+        assert "details" not in formatted
+        assert raw["details"]["parent"]["id"] == "parent-key"
+
+    assert ai_search.entity_url({
+        "kind": "model", "id": "record-key", "hash": "hash:abc123def456",
+        "parent": {"id": "parent-key", "hash": "hash:def456abc123"},
+    }) == "/projects/parent-key/tasks/record-key?completed=false"
+
 
 # @matrix ai : search-filter search-limit
 @pytest.mark.unit
@@ -3922,7 +3955,7 @@ def test_ai_search_entity_filter_arguments(monkeypatch):
             "kind": "page",
             "hash": "hash:abc123def456",
             "name": "Utilities",
-            "url": "/pages/hash:abc123def456",
+            "url": "/pages/page-id",
         }
     ]
 

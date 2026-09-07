@@ -787,10 +787,8 @@ def plan_contract(report, user, *, submit_url, actions=None, view="full"):
             "Hash tokens are tool-call references only; never display them in "
             "summary or answer_markdown.",
             "Use a human name and URL from a tool result when linking an internal "
-            "entity in answer_markdown. The tool-provided URL may contain a hash "
-            "token in its link destination; use a human name as the link label. "
-            "Trusted server rendering resolves known hash destinations to ordinary "
-            "browser URLs.",
+            "entity in answer_markdown. Use the returned browser URL unchanged "
+            "as the link destination; never construct URLs from hash tokens.",
         ]
     else:
         proposal_schema = external_report_proposal_response_schema(

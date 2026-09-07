@@ -38,14 +38,17 @@ CANDIDATE_SEARCH_DESCRIPTION = (
 # @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_urls_and_result_scrubbing
 # @pair ai:search-url
 def entity_url(result):
-    entity_ref = result.get("hash") or result["id"]
+    entity_ref = result["id"]
+    details = result.get("details")
+    parent = result.get("parent")
+    if parent is None and isinstance(details, dict):
+        parent = details.get("parent")
     if result["kind"] == "category":
         return f"/categories/{entity_ref}"
     elif result["kind"] == "task" and "parent" in result:
         return f"/tasks/{entity_ref}"
-    elif result["kind"] == "model" and "parent" in result:
-        parent = result["parent"]
-        parent_ref = parent.get("hash") or parent["id"]
+    elif result["kind"] == "model" and parent:
+        parent_ref = parent["id"]
         return (
             f"/projects/{parent_ref}/tasks/{entity_ref}?completed=false"
         )
@@ -55,9 +58,13 @@ def entity_url(result):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_urls_and_result_scrubbing
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_external_candidates_use_cached_context_without_entity_loading
 # @matrix ai : parent-hydration result-scrubbing
+# @pair ai:search-url
 def format_search_result(result):
     formatted = dict(result)
+    # Build browser links before projecting canonical IDs into tool references.
+    formatted["url"] = entity_url(result)
     details = formatted.get("details")
     if isinstance(details, dict) and details.get("hash"):
         formatted["hash"] = f"hash:{details['hash']}"
@@ -67,7 +74,6 @@ def format_search_result(result):
         and details.get("parent")
     ):
         formatted["parent"] = _format_detail_hashes(details["parent"])
-    formatted["url"] = entity_url(formatted)
     if formatted.get("hash"):
         formatted.pop("id", None)
     formatted.pop("details", None)

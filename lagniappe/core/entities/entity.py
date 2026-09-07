@@ -310,9 +310,11 @@ class Entity:
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_ai_merges_submission_fields_without_nested_duplicate
     # @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
+    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_ai_keeps_browser_urls_separate_from_hash_references
     # @matrix ai entity submission : single-merge submission-fields
     # @matrix ai file : metadata permissions
     # @pair permissions:authenticated-user
+    # @pair ai:browser-url
     def to_ai(self, user=None):
         user = current_context_user(user)
         if not user or not getattr(user, "is_authenticated", False):
@@ -339,18 +341,12 @@ class Entity:
 
         return {k: v for k, v in values.items() if v is not None}
 
+    # @testable false
+    # @covered-by lagniappe/core/entities/entity.py::Entity.to_ai
+    # @reason canonical URL passthrough is exercised through the AI entity projection
     def _ai_url(self):
-        url = self.url
-        entity_hash = getattr(self, "hash", None)
-        if not url or not entity_hash:
-            return url
-
-        try:
-            urlsafe_key = self.urlsafe_key
-        except RuntimeError:
-            return url
-
-        return url.replace(urlsafe_key, f"hash:{entity_hash}", 1)
+        """Return the browser URL; hash references are separate tool arguments."""
+        return self.url
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality

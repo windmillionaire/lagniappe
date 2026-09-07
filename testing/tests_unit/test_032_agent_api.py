@@ -1306,7 +1306,7 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
         entity_kind="task",
         name="Current task title",
         url="/tasks/visible-key",
-        _ai_url=lambda: "/tasks/hash:visible12345",
+        _ai_url=lambda: "/tasks/visible-key",
         allowed=lambda *_args, **_kwargs: True,
     )
     hidden = SimpleNamespace(
@@ -1368,7 +1368,7 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
         "hash": "hash:visible12345",
         "kind": "task",
         "name": "Current task title",
-        "url": "/tasks/hash:visible12345",
+        "url": "/tasks/visible-key",
     }
     assert result["actions"][1]["entity"] is None
     assert result["actions"][0]["updates"] == {"applied": 1, "skipped": 1}
@@ -1378,7 +1378,8 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
         "hash": "hash:history12345", "kind": "task_history", "name": None, "url": None
     }
     assert result["returned_count"] == 4
-    assert "visible-key" not in json.dumps(result)
+    # Keys may occur within browser URLs, but never as standalone references.
+    assert '"visible-key"' not in json.dumps(result)
     assert not result["has_more"]
     assert "Secret" not in json.dumps(result) and "private" not in json.dumps(result)
     report.tool = "ask"

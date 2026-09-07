@@ -213,6 +213,17 @@ def test_entity_to_ai_merges_submission_fields_without_nested_duplicate():
     assert "submission" not in ai_values
 
 
+# @pair ai:browser-url
+@pytest.mark.parametrize("kind", ["PAGE", "TASK", "FORM", "FILE", "CATEGORY", "PROJECT"])
+def test_entity_to_ai_keeps_browser_urls_separate_from_hash_references(kind):
+    entity = TestEntities.get(kind, {"name": "Linked record", "hash": "abc123def456"})
+
+    values = entity.to_ai()
+
+    assert values["hash"] == "hash:abc123def456"
+    assert values["url"] == f"/test/{entity.entity_kind}/abc123def456"
+
+
 # @pair entity:key-validation
 def test_entity_key_access_without_key_raises_runtime_error():
     entity = _KeylessEntity(testing=True)

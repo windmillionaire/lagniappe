@@ -157,7 +157,21 @@ region. Standard resource names are:
 | Build account | `lagniappe-mcp-build@PROJECT.iam.gserviceaccount.com` |
 | Private build-source bucket | `PROJECT-mcp-builds` |
 | Firestore TTL | `mcp_oauth.expires_at` |
-| `_Default` log-sink exclusion | `remote-mcp-oauth-query`; excludes App Engine OAuth request URLs |
+| `_Default` log-sink exclusion | `remote-mcp-oauth-query`; excludes App Engine OAuth request URLs and referrers |
+
+The OAuth exclusion checks both request-URL fields (`protoPayload.resource`,
+`httpRequest.requestUrl`) and referrer fields (`protoPayload.referrer`,
+`httpRequest.referer`). Navigation to an ordinary page can carry authorization
+parameters in its referrer even though that page's own URL contains none.
+Reconciliation upgrades the named exclusion in place, re-enables it if needed,
+and preserves unrelated exclusions. Keep the consent endpoint's same-origin
+referrer policy for CSRF validation; the logging exclusion provides protection
+before entries are stored by the default sink. Updating this filter affects new
+log entries, not entries already retained. Verify with synthetic OAuth referrers and ordinary control
+requests without copying real authorization parameters into diagnostic output.
+[Sink changes can take a few minutes to apply](https://docs.cloud.google.com/logging/docs/export/configure_export_v2).
+Confirm the saved filter, then send fresh probes after propagation; retained
+ordinary controls distinguish exclusion from missing or delayed request logs.
 
 The installer uses the existing project Owner/delegated-installer convention.
 It checks the additional Cloud Run, Cloud Build, Artifact Registry, service

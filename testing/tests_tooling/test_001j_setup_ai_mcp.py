@@ -111,7 +111,16 @@ class Cloud:
                 self.fields = [{"name": "projects/demo-project/databases/(default)/collectionGroups/mcp_oauth/fields/expires_at", "ttlConfig": {"state": "CREATING"}}]
         elif args[:2] == ["logging", "sinks"]:
             if args[2] == "update":
-                self.sink["exclusions"].append({"name": mcp.AUTH_LOG_EXCLUSION, "filter": mcp.AUTH_LOG_FILTER})
+                flag = next(arg for arg in arguments if arg.startswith(("--add-exclusion=", "--update-exclusion=")))
+                operation, values = flag.split("=", 1)
+                values = dict(item.split("=", 1) for item in values.split(","))
+                values["disabled"] = bool(values["disabled"])
+                if operation == "--add-exclusion":
+                    assert not any(row["name"] == values["name"] for row in self.sink["exclusions"])
+                    self.sink["exclusions"].append(values)
+                else:
+                    exclusion = next(row for row in self.sink["exclusions"] if row["name"] == values["name"])
+                    exclusion.update(values)
             output = self.sink
         elif args[:3] == ["artifacts", "docker", "images"]:
             output = self.image
@@ -278,6 +287,36 @@ def test_mcp_resources_use_separate_build_identity_and_scoped_roles(cloud):
         with pytest.raises(SetupError, match=message):
             mcp.reconcile_resources(cloud.target, "owner@example.test")
         assert not any("set-iam-policy" in call for call in cloud.calls)
+
+
+# @matrix mcp-install : resources privacy idempotence
+@pytest.mark.parametrize("current_filter,disabled", [(False, False), (False, True), (True, True)])
+def test_mcp_resource_upgrade_covers_oauth_referrers_and_preserves_other_exclusions(cloud, current_filter, disabled):
+    legacy_filter = 'resource.type="gae_app" AND (protoPayload.resource=~"^/oauth/" OR httpRequest.requestUrl=~"/oauth/")'
+    unrelated = deepcopy(cloud.sink["exclusions"])
+    cloud.sink["exclusions"].append({
+        "name": mcp.AUTH_LOG_EXCLUSION,
+        "filter": mcp.AUTH_LOG_FILTER if current_filter else legacy_filter,
+        "disabled": disabled,
+        "description": "Preserve operator description",
+    })
+
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+
+    assert len(cloud.sink["exclusions"]) == len(unrelated) + 1
+    assert cloud.sink["exclusions"][:-1] == unrelated
+    exclusion = cloud.sink["exclusions"][-1]
+    assert not exclusion["disabled"]
+    assert exclusion["description"] == "Preserve operator description"
+    for field in ("protoPayload.resource", "httpRequest.requestUrl", "protoPayload.referrer", "httpRequest.referer"):
+        assert f'{field}=~"' in exclusion["filter"]
+    updates = [call for call in cloud.calls if call[:3] == ["logging", "sinks", "update"]]
+    assert len(updates) == 1
+    assert any(arg.startswith("--update-exclusion=") for arg in updates[0])
+
+    cloud.calls.clear()
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+    assert not any(call[:3] == ["logging", "sinks", "update"] for call in cloud.calls)
 
 
 # @matrix mcp-install : bootstrap configuration source-version update-order
