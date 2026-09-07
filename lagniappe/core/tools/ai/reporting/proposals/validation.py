@@ -22,7 +22,7 @@ from .references import (
 
 ENTITY_PAIR_ACTION_REFERENCES = {
     "add_form_to_page": ("page", ("form",)),
-    "add_category": ("page", ("category", "model")),
+    "add_page_category": ("page", ("category", "model")),
     "move_page": ("page", ("category", "model")),
     "move_task": ("task", ("to_page", "page")),
 }
@@ -39,7 +39,7 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
     if not isinstance(actions, list):
         return proposal
     for action in actions:
-        if not isinstance(action, dict) or action.get("type") != "create_page":
+        if not isinstance(action, dict) or action.get("type") not in {"create_page", "append_page_document"}:
             continue
         data = action.get("data")
         if not isinstance(data, dict) or "document_markdown" not in data:
@@ -47,7 +47,7 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
         source = data.get("document_markdown")
         if not isinstance(source, str):
             raise exceptions.AIException(
-                "Create page document_markdown must be a string."
+                "Page document_markdown must be a string."
             )
         data["document"] = render_ai_markdown(source)
         if not preserve_markdown:
@@ -190,15 +190,11 @@ def validate_proposal(
             action.get("data", {}).get("file")
             for action in actions
             if isinstance(action, dict)
-            and action.get("type") in {"attach_file_to_page", "attach_file_to_task"}
+            and action.get("type") == "attach_file"
             and action.get("skip") is not True
             and isinstance(action.get("data"), dict)
             and _proposal_string(action["data"].get("file"))
-            and (
-                _first_data_reference(action["data"], "page")
-                if action.get("type") == "attach_file_to_page"
-                else _first_data_reference(action["data"], "task")
-            )
+            and _first_data_reference(action["data"], "entity")
         }
         missing_file_refs = [
             submitted_file_ref
@@ -283,7 +279,7 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
             ("category", {"category"}),
             ("form", {"form"}),
         ),
-        "add_category": (
+        "add_page_category": (
             ("page", {"page"}),
             ("category", {"category"}),
         ),
@@ -297,14 +293,14 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
             ("project", {"project"}),
             ("model", {"model"}),
         ),
-        "attach_file_to_page": (("page", {"page"}),),
-        "attach_file_to_task": (("task", {"task", "task_history"}),),
+        "attach_file": (("entity", {"page", "task", "task_history"}),),
+        "append_page_document": (("page", {"page"}),),
         "summarize_file": (("file", {"file"}),),
-        "update_submission_fields": (
+        "update_form_values": (
             ("page", {"page"}),
             ("task", {"task"}),
         ),
-        "delete_page": (("page", {"page"}),),
+        "suggest_page_deletion": (("page", {"page"}),),
     }
     data = action.get("data") if isinstance(action, dict) else None
     if not isinstance(data, dict):
@@ -406,8 +402,14 @@ def _validate_action_data_shape(
 
     if action_type == "create_form":
         _validate_create_form_action_data(data, action_label)
-    if action_type == "update_form_schema":
-        _validate_update_form_schema_action_data(data, action_label)
+    if action_type == "append_page_document":
+        if not _first_data_reference(data, "page") or not _proposal_string(data.get("document")):
+            raise exceptions.AIException(f"Action {action_label} requires a Page reference and non-empty document_markdown.")
+    if action_type == "attach_file":
+        if set(data) - {"entity", "entity_action", "entity_name", "file", "display_name"}:
+            raise exceptions.AIException(f"Action {action_label} uses entity/entity_action for its attachment target.")
+    if action_type == "extend_form_schema":
+        _validate_extend_form_schema_action_data(data, action_label)
     if action_type == "create_page" and not _proposal_string(data.get("name")):
         raise exceptions.AIException(f"Action {action_label} requires data.name.")
     if action_type in {"create_page", "create_task"}:
@@ -446,7 +448,7 @@ def _validate_action_data_shape(
             action_label,
             require_retrieval_terms=require_file_summary_terms,
         )
-    if action_type == "update_submission_fields":
+    if action_type == "update_form_values":
         _validate_submission_update_action_data(
             data,
             action_label,
@@ -537,7 +539,7 @@ def _validate_create_form_action_data(data, action_label):
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unsafe_schema_update_operations
 # @matrix form-schema : proposal schema-update validation
-def _validate_update_form_schema_action_data(data, action_label):
+def _validate_extend_form_schema_action_data(data, action_label):
     if not _first_data_reference(data, "form"):
         raise exceptions.AIException(f"Action {action_label} requires data.form.")
 
@@ -638,7 +640,7 @@ def _validate_create_task_action_data(data, action_label, user=None):
     if _proposal_file_refs(data):
         raise exceptions.AIException(
             f"Action {action_label} should attach task files with "
-            "attach_file_to_task, not data.file or data.files."
+            "attach_file, not data.file or data.files."
         )
 
     task_references = [

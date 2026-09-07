@@ -52,14 +52,15 @@ def test_remote_organize_update_contract_and_submission(monkeypatch):
     kwargs = {"submit_url": "https://example.test/submit"}
     summary = external_api.plan_contract(report, actor, view="summary", **kwargs)
     selected = external_api.plan_contract(
-        report, actor, actions=["complete_task", "update_submission_fields"], **kwargs
+        report, actor, actions=["complete_task", "update_form_values"], **kwargs
     )
     assert summary["proposal_schema"] is None
     assert "complete_task" in summary["permissions"]["allowed_actions"]
     assert "create_task" not in summary["permissions"]["allowed_actions"]
     assert "summarize_file" not in summary["permissions"]["allowed_actions"]
     assert not summary["guidance_requirements"]["required_before_analysis"]
-    assert "page_document" not in {
+    assert "append_page_document" in summary["permissions"]["allowed_actions"]
+    assert "page_document" in {
         item["request"]["task"]
         for item in summary["guidance_requirements"]["conditional"]
     }
@@ -67,7 +68,7 @@ def test_remote_organize_update_contract_and_submission(monkeypatch):
     assert summary["uploads_supported"]
     assert set(selected["proposal_schema"]["$defs"]) == {
         "complete_task",
-        "update_submission_fields",
+        "update_form_values",
     }
     assert "### Task Scheduling" not in "\n".join(selected["workflow_rules"])
     proposal = {
@@ -146,7 +147,8 @@ def test_client_skill_markdown_is_minimal_and_discovery_first():
 # @pair agent-api:entitlement-independent
 # @pair agent-api:origin
 @pytest.mark.unit
-def test_api_report_draft_preserves_agent_manifest(monkeypatch):
+@pytest.mark.parametrize("remote_mcp", [False, True])
+def test_api_report_draft_preserves_agent_manifest(monkeypatch, remote_mcp):
     _patch_fake_keys(monkeypatch)
     user = _test_user("agent-api-owner")
     user.ai_access = "NONE"
@@ -162,6 +164,7 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch):
         user,
         instructions="  Put these records into project pages.  ",
         name="Records import",
+        remote_mcp=remote_mcp,
     )
 
     assert saved == [report]
@@ -172,6 +175,7 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch):
     assert report.instructions == "Put these records into project pages."
     assert report.agent_manifest["version"] == 1
     assert report.agent_manifest["contract_version"] == external_api.CONTRACT_VERSION
+    assert report.agent_manifest["source"] == ("remote_mcp" if remote_mcp else "api")
     assert report.note == "Waiting for external plan"
 
 
@@ -905,7 +909,7 @@ def test_external_proposal_schema_has_named_discriminated_actions():
     schema = external_api.external_report_proposal_response_schema(
         allowed_actions=(
             "create_task",
-            "attach_file_to_task",
+            "attach_file",
             "summarize_file",
         ),
         require_file_summary_terms=True,
@@ -915,14 +919,14 @@ def test_external_proposal_schema_has_named_discriminated_actions():
     assert schema["properties"]["actions"]["items"] == {
         "oneOf": [
             {"$ref": "#/$defs/create_task"},
-            {"$ref": "#/$defs/attach_file_to_task"},
+            {"$ref": "#/$defs/attach_file"},
             {"$ref": "#/$defs/summarize_file"},
         ],
         "discriminator": {
             "propertyName": "type",
             "mapping": {
                 "create_task": "#/$defs/create_task",
-                "attach_file_to_task": "#/$defs/attach_file_to_task",
+                "attach_file": "#/$defs/attach_file",
                 "summarize_file": "#/$defs/summarize_file",
             },
         },
@@ -1288,9 +1292,9 @@ def test_contract_selection_preserves_permissions_and_full_validation(monkeypatc
         < full["payload_sizes"]["contract_without_payload_sizes_bytes"]
     )
     with pytest.raises(exceptions.ValidationError, match="allowed action"):
-        external_api.plan_contract(report, actor, actions=["delete_page"], **kwargs)
+        external_api.plan_contract(report, actor, actions=["suggest_page_deletion"], **kwargs)
     with pytest.raises(exceptions.ValidationError, match="allowed action"):
-        external_api.plan_contract(report, actor, actions=["delete_page"], view="schema", **kwargs)
+        external_api.plan_contract(report, actor, actions=["suggest_page_deletion"], view="schema", **kwargs)
 
 
 # @pair agent-api:execution-receipt
@@ -2004,7 +2008,7 @@ def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatc
     monkeypatch.setattr(
         external_api,
         "allowed_report_actions",
-        lambda user: ("attach_file_to_page",),
+        lambda user: ("attach_file",),
     )
     monkeypatch.setattr(
         external_api,

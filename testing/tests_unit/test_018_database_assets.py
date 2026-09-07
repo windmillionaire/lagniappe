@@ -25,6 +25,44 @@ from lagniappe.core.definitions import (
 _DATA_SERVICES_INITIALIZE = core.DataServices.initialize
 
 
+# @source lagniappe/core/tools/database/assets.py::get_text
+# @source lagniappe/core/tools/database/assets.py::copy_file
+# @source lagniappe/core/definitions/asset.py::Asset.get
+# @matrix storage : generation-pinned read copy
+@pytest.mark.unit
+def test_text_reads_and_version_copies_use_recorded_generation(monkeypatch):
+    from lagniappe.core.definitions.asset import HTMLAsset
+
+    calls = []
+    class Blob:
+        def download_as_text(self, **kwargs):
+            calls.append(("download", kwargs))
+            return "<p>Recorded version</p>"
+
+        def exists(self):
+            return True
+
+    class Bucket:
+        def blob(self, path, **kwargs):
+            calls.append(("blob", path, kwargs))
+            return Blob()
+
+        def copy_blob(self, source, destination, path, **kwargs):
+            calls.append(("copy", path, kwargs))
+            return "copied"
+
+    monkeypatch.setattr(assets, "DATA", SimpleNamespace(bucket=lambda visibility: Bucket()))
+    asset = HTMLAsset({"path": "old.html", "generation": "123"})
+    assert asset.get() == "<p>Recorded version</p>"
+    assert calls == [("blob", "old.html", {"generation": 123}), ("download", {"encoding": "utf-8-sig"})]
+    calls.clear()
+    assert assets.copy_file("old.html", "private", "named.html", "private", source_generation="123") == "copied"
+    assert calls == [("blob", "old.html", {"generation": 123}), ("copy", "named.html", {"source_generation": 123})]
+    calls.clear()
+    assert assets.get_text("legacy.html", "private") == "<p>Recorded version</p>"
+    assert calls[0] == ("blob", "legacy.html", {})
+
+
 # @matrix file storage : byte-range
 @pytest.mark.unit
 def test_download_file_passes_optional_byte_range(monkeypatch):

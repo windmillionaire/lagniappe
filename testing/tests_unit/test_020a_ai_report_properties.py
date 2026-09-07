@@ -315,8 +315,8 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
                     },
                     {
                         "id": "attachment",
-                        "type": "attach_file_to_page",
-                        "data": {"page_action": "page", "file": "rhythm.pdf"},
+                        "type": "attach_file",
+                        "data": {'entity_action': "page", "file": "rhythm.pdf"},
                     },
                     {
                         "id": "summary",
@@ -441,7 +441,7 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
                     },
                     {
                         "id": "cleanup",
-                        "type": "delete_page",
+                        "type": "suggest_page_deletion",
                         "data": {
                             "page": "ahBSYWduaWFwcGUtNDU5MTAwchILEgRwYWdlGICAgM",
                             "page_name": "Raw source page",
@@ -796,7 +796,7 @@ def test_ai_report_proposal_display_actions_groups_added_categories_under_page(
                     },
                     {
                         "id": "add_family_records",
-                        "type": "add_category",
+                        "type": "add_page_category",
                         "data": {
                             "page_action": "page",
                             "category": "family-records-category",
@@ -858,9 +858,9 @@ def test_ai_report_proposal_display_actions_show_existing_page_category_for_atta
                 "actions": [
                     {
                         "id": "attach_lucy_ss",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "data": {
-                            "page": page.urlsafe_key,
+                            'entity': page.urlsafe_key,
                             "file": file.urlsafe_key,
                         },
                     },
@@ -1014,9 +1014,9 @@ def test_ai_report_proposal_display_actions_group_completed_task_events(monkeypa
                     },
                     {
                         "id": "attach_registration_scan",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "registration_event",
+                            'entity_action': "registration_event",
                             "file": "2023-06-24 jeep registration.pdf",
                         },
                     },
@@ -1035,9 +1035,9 @@ def test_ai_report_proposal_display_actions_group_completed_task_events(monkeypa
                     },
                     {
                         "id": "attach_oil_change_scan",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "existing_history",
+                            'entity_action': "existing_history",
                             "file": "2023-06-24 jeep registration.pdf",
                         },
                     },
@@ -1094,7 +1094,7 @@ def test_ai_report_proposal_display_actions_group_schema_updates_separately(
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "update_form_schema",
+                        "type": "extend_form_schema",
                         "data": {
                             "form": "invoice-form",
                             "form_name": "Invoice",
@@ -1121,7 +1121,7 @@ def test_ai_report_proposal_display_actions_group_schema_updates_separately(
                     },
                     {
                         "id": "updates",
-                        "type": "update_submission_fields",
+                        "type": "update_form_values",
                         "depends_on": ["schema"],
                         "data": {
                             "updates": [
@@ -1143,7 +1143,7 @@ def test_ai_report_proposal_display_actions_group_schema_updates_separately(
 
     assert [action["type"] for action in actions] == [
         "schema_update_group",
-        "update_submission_fields",
+        "update_form_values",
     ]
     schema_group = actions[0]
     assert schema_group["display_label"] == "Schema Updates"
@@ -1165,7 +1165,7 @@ def test_ai_report_proposal_display_actions_group_schema_updates_separately(
             "group_action_indexes": [1],
         }
     ]
-    assert actions[1]["display_label"] == "Submission Update: updates"
+    assert actions[1]["display_label"] == "Update Form Values: updates"
     assert actions[1]["details"] == [
         {"label": "Updates", "value": "1 field update", "kind": "default"}
     ]

@@ -67,8 +67,9 @@ Choose `ask` for questions, explanations, comparisons, searches, or summaries,
 including questions about attached files. Choose `create` for attachment-free
 requests to create pages, tasks, reminders, recurring tasks, forms, categories,
 projects, or model tasks. Choose `organize` for requests to change existing
-records: complete a task, correct submission fields, rename or move a record,
-or make another supported update. These requests do not require attachments.
+records: complete a task, correct Form values, append notes to a Page document,
+extend a Form schema, rename or move a record, or make another supported update.
+These requests do not require attachments.
 Also choose `organize` when attached files should be saved,
 classified, attached to records, used to create or autofill a task/page
 submission, or used to update an existing submission (for example an invoice,

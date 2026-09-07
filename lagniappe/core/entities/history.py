@@ -211,7 +211,7 @@ class FormHistory(Entity):
 
 
 # @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
+# @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_saves_do_not_create_automatic_history
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_create_copies_document_asset
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_named_versions_order_and_delete_in_bounded_batches
@@ -267,13 +267,13 @@ class DocumentHistory(AssetMixin, Entity):
         return EntityProperties(self, properties)
 
     @classmethod
-    def create(cls, entity, *, name=None, html=None):
+    def create(cls, entity, *, name=None, html=None, key=None):
         named = name is not None or html is not None
         if named:
             name = cls.validate_name(name)
             cls.validate_html(html)
 
-        new_history = cls(parent=entity)
+        new_history = cls(key, parent=entity)
         new_history.kind = cls.entity_kind
         key_identity = new_history.urlsafe_key or str(new_history.key)
         new_history.hash = key_identity

@@ -241,7 +241,10 @@ def _report_action_data_properties():
                 "to create an intentionally empty submission."
             ),
         },
-        "document_markdown": {"type": "string"},
+        "document_markdown": {
+            "type": "string",
+            "description": "Markdown for the new document or requested addition only. append_page_document preserves existing content; the server prefixes trusted source/time attribution.",
+        },
         "due_date": {"type": "string"},
         "schedule": task_schedule_response_schema(),
         "completed": {"type": "boolean"},

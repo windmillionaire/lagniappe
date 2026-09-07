@@ -86,7 +86,7 @@ def test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow():
 def test_submission_patch_guidance_is_shared_and_omits_autofill_workflow():
     args = {
         "task": "form_autofill",
-        "actions": ["update_submission_fields"],
+        "actions": ["update_form_values"],
         "field_types": ["input", "textarea"],
     }
     actor = SimpleNamespace()

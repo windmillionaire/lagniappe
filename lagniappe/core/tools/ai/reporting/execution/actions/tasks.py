@@ -33,7 +33,7 @@ from .references import (
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_warns_but_continues_when_task_form_submission_missing
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_task_that_references_page_form_and_continues
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_to_task_targets_created_task
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
 # @matrix ai-report : completed-task continue deterministic-run mismatched-form missing-submission persistence submission-completion task-form
 # @matrix forms : continue deterministic-run mismatched-form recoverable
 # @matrix task-completion : completed-task continue missing-submission task-form

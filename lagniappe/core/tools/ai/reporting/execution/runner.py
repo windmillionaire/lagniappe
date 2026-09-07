@@ -43,7 +43,7 @@ from .ledger import (
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_to_task_targets_created_task
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
 # @matrix ai-report : attachments cancellation compensation completed-prefix continue create create-order deterministic-run execute idempotency partial-result permissions persistence post-commit-checkpoint recoverable recovery reuse skip-action stale-proposal validation
 def run_report(report, user, ensure_active=None):
     """Execute or resume a stored AI report proposal from durable checkpoints."""
@@ -217,7 +217,7 @@ def run_report(report, user, ensure_active=None):
         (index, record)
         for index, record in enumerate(result["actions"])
         if record.get("status") == "failed"
-        and record.get("type") in {"attach_file_to_page", "attach_file_to_task"}
+        and record.get("type") in {"attach_file"}
     ]
     if failed_placements:
         result["status"] = "failed"

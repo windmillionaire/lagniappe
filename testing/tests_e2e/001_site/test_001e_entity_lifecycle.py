@@ -212,8 +212,8 @@ def test_report_undo_preserves_category_editor_access_and_uploaded_file():
                 {"id": "page", "type": "create_page", "data": {
                     "name": _name("undo-contact-page"), "category": category.urlsafe_key,
                 }},
-                {"id": "attachment", "type": "attach_file_to_page", "data": {
-                    "page_action": "page", "file": file.urlsafe_key,
+                {"id": "attachment", "type": "attach_file", "data": {
+                    'entity_action': "page", "file": file.urlsafe_key,
                 }},
                 {"id": "task", "type": "create_task", "data": {
                     "name": _name("undo-follow-up"), "page_action": "page",

@@ -137,8 +137,8 @@ def test_generate_organize_report_repairs_invalid_action_type_once(monkeypatch):
         "actions": [
             {
                 "id": "attach_file",
-                "type": "attach_file_to_page",
-                "data": {"page": "page-id", "file": "file-id"},
+                "type": "attach_file",
+                "data": {'entity': "page-id", "file": "file-id"},
             }
         ],
     }
@@ -155,7 +155,7 @@ def test_generate_organize_report_repairs_invalid_action_type_once(monkeypatch):
     )
 
     prompt = SimpleNamespace(
-        allowed_actions=("attach_file_to_page", "needs_review"),
+        allowed_actions=("attach_file", "needs_review"),
         output_format={"type": "JSON", "description": "Return report JSON."},
         prompt_type="organize report",
         user=None,
@@ -163,7 +163,7 @@ def test_generate_organize_report_repairs_invalid_action_type_once(monkeypatch):
 
     result = organize.generate_organize_plan(prompt)
 
-    assert result["actions"][0]["type"] == "attach_file_to_page"
+    assert result["actions"][0]["type"] == "attach_file"
     assert len(calls) == 2
     _assert_repair_prompt_contract(
         calls[1],
@@ -202,14 +202,14 @@ def test_generate_organize_report_repairs_missing_file_attachments(monkeypatch):
             *invalid["actions"],
             {
                 "id": "attach_log",
-                "type": "attach_file_to_page",
-                "data": {"page_action": "school_logs", "file": "file-log-id"},
+                "type": "attach_file",
+                "data": {'entity_action': "school_logs", "file": "file-log-id"},
             },
             {
                 "id": "attach_resource",
-                "type": "attach_file_to_page",
+                "type": "attach_file",
                 "data": {
-                    "page_action": "school_resources",
+                    'entity_action': "school_resources",
                     "file": "file-resource-id",
                 },
             },
@@ -227,7 +227,7 @@ def test_generate_organize_report_repairs_missing_file_attachments(monkeypatch):
         _with_validator(fake_generate),
     )
     prompt = SimpleNamespace(
-        allowed_actions=("create_page", "attach_file_to_page", "needs_review"),
+        allowed_actions=("create_page", "attach_file", "needs_review"),
         output_format={"type": "JSON", "description": "Return report JSON."},
         prompt_type="organize report",
         user=None,
@@ -294,7 +294,7 @@ def test_generate_organize_report_reviews_files_missing_after_repair(monkeypatch
         lambda error, context=None, level="error": captured.append(context),
     )
     prompt = SimpleNamespace(
-        allowed_actions=("create_page", "attach_file_to_page", "needs_review"),
+        allowed_actions=("create_page", "attach_file", "needs_review"),
         output_format={"type": "JSON", "description": "Return report JSON."},
         prompt_type="organize report",
         user=None,
@@ -473,10 +473,10 @@ def test_generate_organize_report_repairs_category_used_as_page_reference(monkey
         "actions": [
             {
                 "id": "attach_attendance",
-                "type": "attach_file_to_page",
+                "type": "attach_file",
                 "data": {
-                    "page": "hash:abc123def456",
-                    "page_name": "Homeschool",
+                    'entity': "hash:abc123def456",
+                    'entity_name': "Homeschool",
                     "file": "hash:def456abc789",
                 },
             }
@@ -497,9 +497,9 @@ def test_generate_organize_report_repairs_category_used_as_page_reference(monkey
             },
             {
                 "id": "attach_attendance",
-                "type": "attach_file_to_page",
+                "type": "attach_file",
                 "data": {
-                    "page_action": "create_administration_page",
+                    'entity_action': "create_administration_page",
                     "file": "hash:def456abc789",
                 },
             },
@@ -533,7 +533,7 @@ def test_generate_organize_report_repairs_category_used_as_page_reference(monkey
         },
     )
     prompt = SimpleNamespace(
-        allowed_actions=("create_page", "attach_file_to_page", "needs_review"),
+        allowed_actions=("create_page", "attach_file", "needs_review"),
         output_format={"type": "JSON", "description": "Return report JSON."},
         prompt_type="organize report",
         user=None,
@@ -543,11 +543,11 @@ def test_generate_organize_report_repairs_category_used_as_page_reference(monkey
 
     assert len(calls) == 2
     assert result["actions"][0]["data"]["category"] == "category-id"
-    assert result["actions"][1]["data"]["page_action"] == (
+    assert result["actions"][1]["data"]["entity_action"] == (
         "create_administration_page"
     )
     assert result["actions"][1]["data"]["file"] == "file-id"
-    assert "uses category 'Homeschool' as its page reference" in _prompt_context(
+    assert "uses category 'Homeschool' as its entity reference" in _prompt_context(
         calls[1], "Validation Error"
     )
 
@@ -643,7 +643,7 @@ def test_generate_organize_report_repairs_invalid_action_data_shape(monkeypatch)
 
 # @matrix ai-report : add-category repair required-data
 @pytest.mark.unit
-def test_generate_organize_report_repairs_missing_add_category_target(monkeypatch):
+def test_generate_organize_report_repairs_missing_add_page_category_target(monkeypatch):
     invalid = {
         "summary": "Add Sheik Orthodontics to Lucy.",
         "confidence": 0.7,
@@ -651,7 +651,7 @@ def test_generate_organize_report_repairs_missing_add_category_target(monkeypatc
         "actions": [
             {
                 "id": "add_sheik_ortho_to_lucy",
-                "type": "add_category",
+                "type": "add_page_category",
                 "data": {
                     "page": "lucy-page-id",
                     "page_name": "Lucy",
@@ -698,7 +698,7 @@ def test_generate_organize_report_repairs_missing_add_category_target(monkeypatc
     )
 
     prompt = SimpleNamespace(
-        allowed_actions=("add_category", "needs_review"),
+        allowed_actions=("add_page_category", "needs_review"),
         output_format={"type": "JSON", "description": "Return report JSON."},
         prompt_type="organize report",
         user=None,
@@ -931,7 +931,7 @@ def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
         "actions": [
             {
                 "id": "add_payment_reference",
-                "type": "update_form_schema",
+                "type": "extend_form_schema",
                 "data": {
                     "form": "invoice-form",
                     "operations": [
@@ -959,7 +959,7 @@ def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
         _with_validator(fake_generate),
     )
     prompt = SimpleNamespace(
-        allowed_actions=("update_form_schema", "needs_review"),
+        allowed_actions=("extend_form_schema", "needs_review"),
         output_format={"type": "JSON", "description": "Return report JSON."},
         prompt_type="organize report",
         user=None,
@@ -1374,7 +1374,7 @@ def test_generate_organize_report_downgrades_missing_category_without_sentry_cap
             },
             {
                 "id": "add_comics_category_to_drawers",
-                "type": "add_category",
+                "type": "add_page_category",
                 "display_label": "Add Comics category to Comic Book Drawers",
                 "data": {
                     "completed": False,
@@ -1410,7 +1410,7 @@ def test_generate_organize_report_downgrades_missing_category_without_sentry_cap
         ),
     )
     prompt = SimpleNamespace(
-        allowed_actions=("create_page", "add_category", "needs_review"),
+        allowed_actions=("create_page", "add_page_category", "needs_review"),
         output_format={"type": "JSON", "description": "Return report JSON."},
         prompt_type="organize report",
         user=None,
@@ -1442,7 +1442,7 @@ def test_validate_proposal_rejects_unsafe_schema_update_operations():
         "actions": [
             {
                 "id": "delete_payment_reference",
-                "type": "update_form_schema",
+                "type": "extend_form_schema",
                 "data": {
                     "form": "invoice-form",
                     "operations": [
@@ -1965,7 +1965,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
 
     with pytest.raises(
         exceptions.AIException,
-        match=r"add_category\) requires data.page",
+        match=r"add_page_category\) requires data.page",
     ):
         organize.validate_proposal(
             {
@@ -1974,7 +1974,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                 "actions": [
                     {
                         "id": "add_records_category",
-                        "type": "add_category",
+                        "type": "add_page_category",
                         "data": {"category": "records-category-id"},
                     },
                 ],
@@ -1982,7 +1982,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         )
     with pytest.raises(
         exceptions.AIException,
-        match=r"update_submission_fields\) requires at least one data.updates row",
+        match=r"update_form_values\) requires at least one data.updates row",
     ):
         organize.validate_proposal(
             {
@@ -1991,7 +1991,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                 "actions": [
                     {
                         "id": "empty_submission_update",
-                        "type": "update_submission_fields",
+                        "type": "update_form_values",
                         "data": {"updates": []},
                     },
                 ],
@@ -2009,7 +2009,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                 "actions": [
                     {
                         "id": "bad_submission_update",
-                        "type": "update_submission_fields",
+                        "type": "update_form_values",
                         "data": {
                             "updates": [
                                 {
@@ -2038,10 +2038,11 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                 },
                 {
                     "id": "attachment",
-                    "type": "attach_file_to_page",
+                    "type": "attach_file",
                     "data": {
-                        "page": "existing-page",
-                        "file_name": "Pettis Proposal",
+                        'entity': "existing-page",
+                        "display_name": "Pettis Proposal",
+                        "file": "unavailable-report-file",
                     },
                 },
                 {
@@ -2074,7 +2075,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         "Some file references were readable labels instead of executable refs."
     ]
 
-    with pytest.raises(exceptions.AIException, match="attach_file_to_task"):
+    with pytest.raises(exceptions.AIException, match="attach_file"):
         organize.validate_proposal(
             {
                 "summary": "Invalid task attachment shape",
@@ -2134,9 +2135,9 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                 },
                 {
                     "id": "completed_task_attachment",
-                    "type": "attach_file_to_task",
+                    "type": "attach_file",
                     "data": {
-                        "task_action": "completed_task",
+                        'entity_action': "completed_task",
                         "file": "registration.pdf",
                     },
                 },
@@ -2164,9 +2165,9 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                 },
                 {
                     "id": "attach_task_file",
-                    "type": "attach_file_to_task",
+                    "type": "attach_file",
                     "data": {
-                        "task_action": "task",
+                        'entity_action': "task",
                         "file": "hash:def456abc789",
                     },
                 },
@@ -2250,15 +2251,15 @@ def test_validate_proposal_requires_every_report_file_attachment(monkeypatch):
         "actions": [
             {
                 "id": "attach_first",
-                "type": "attach_file_to_page",
+                "type": "attach_file",
                 "data": {
-                    "page": "existing-page",
+                    'entity': "existing-page",
                     "file": "hash:aaaaaaaaaaaa",
                 },
             },
             {
                 "id": "unresolved_second",
-                "type": "attach_file_to_page",
+                "type": "attach_file",
                 "data": {"file": "hash:bbbbbbbbbbbb"},
             },
         ],
@@ -2273,8 +2274,8 @@ def test_validate_proposal_requires_every_report_file_attachment(monkeypatch):
             required_file_refs=("hash:aaaaaaaaaaaa", "hash:bbbbbbbbbbbb"),
         )
 
-    proposal["actions"][1]["data"]["task"] = "existing-task"
-    proposal["actions"][1]["type"] = "attach_file_to_task"
+    proposal["actions"][1]["data"]["entity"] = "existing-task"
+    proposal["actions"][1]["type"] = "attach_file"
 
     validated = organize.validate_proposal(
         proposal,
@@ -2302,13 +2303,13 @@ def test_validate_proposal_requires_external_file_summaries(monkeypatch):
         "actions": [
             {
                 "id": "attach_first",
-                "type": "attach_file_to_page",
-                "data": {"page": "existing-page", "file": "hash:aaaaaaaaaaaa"},
+                "type": "attach_file",
+                "data": {'entity': "existing-page", "file": "hash:aaaaaaaaaaaa"},
             },
             {
                 "id": "attach_second",
-                "type": "attach_file_to_task",
-                "data": {"task": "existing-task", "file": "hash:bbbbbbbbbbbb"},
+                "type": "attach_file",
+                "data": {'entity': "existing-task", "file": "hash:bbbbbbbbbbbb"},
             },
         ],
     }
@@ -2420,8 +2421,8 @@ def test_skip_proposal_actions_marks_dependencies():
             },
             {
                 "id": "attachment",
-                "type": "attach_file_to_page",
-                "data": {"page_action": "page", "file": "scan.pdf"},
+                "type": "attach_file",
+                "data": {'entity_action': "page", "file": "scan.pdf"},
             },
             {"id": "other", "type": "needs_review", "data": {}},
         ],
@@ -2455,8 +2456,8 @@ def test_toggle_proposal_action_skip_restores_dependencies():
             },
             {
                 "id": "attachment",
-                "type": "attach_file_to_page",
-                "data": {"page_action": "page", "file": "scan.pdf"},
+                "type": "attach_file",
+                "data": {'entity_action': "page", "file": "scan.pdf"},
             },
             {"id": "other", "type": "needs_review", "data": {}},
         ],

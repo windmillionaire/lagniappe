@@ -476,7 +476,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             "get_plan_contract",
             {
                 "plan_id": organize["id"],
-                "actions": ["create_task", "attach_file_to_page", "summarize_file"],
+                "actions": ["create_task", "attach_file", "summarize_file"],
                 "view": "schema",
             },
         )
@@ -509,8 +509,8 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             "actions": [
                 {
                     "id": "attach-image",
-                    "type": "attach_file_to_page",
-                    "data": {"page": personal_page_ref, "file": file_ref},
+                    "type": "attach_file",
+                    "data": {'entity': personal_page_ref, "file": file_ref},
                 },
                 {
                     "id": "summarize-image",

@@ -449,6 +449,7 @@ class Entity:
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_add_mutation_intents_requires_typed_intents_and_dedupes
     # @matrix entity : dedupe key-validation typed-intent validation
+    # @matrix editor mutations : document durable-first cleanup named-versions
     def add_mutation_intents(self, *intents):
         if self._mutation_intents is None:
             self._mutation_intents = []
@@ -461,6 +462,8 @@ class Entity:
                 intent.property_updates,
                 intent.cache_key,
                 intent.cache_kind,
+                intent.path,
+                intent.visibility,
                 intent.reason,
             )
             for intent in self._mutation_intents
@@ -480,6 +483,8 @@ class Entity:
                 intent.property_updates,
                 intent.cache_key,
                 intent.cache_kind,
+                intent.path,
+                intent.visibility,
                 intent.reason,
             )
             if signature not in existing:

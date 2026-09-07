@@ -872,7 +872,7 @@ def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
                 "view=schema",
                 "actions=create_page%2Ccreate_task",
                 "view=full&actions=create_task",
-                "view=schema&actions=update_submission_fields",
+                "view=schema&actions=update_form_values",
             ):
                 await client.send(
                     httpx.Request(

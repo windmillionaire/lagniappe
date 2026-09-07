@@ -218,14 +218,15 @@ class EntityRegistry:
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_document_checkpoint_masks_parent_state_and_optionally_advances_lists
     # @matrix mutations sync : checkpoint document history parent-fingerprint property-mask
-    def save_document_checkpoint(self, entity, *, advance_parent=False):
+    def save_document_checkpoint(self, entity, *, advance_parent=False, expected_state=None):
         """Persist a document checkpoint without rewriting sibling state."""
         return execute_mutation(
             plan_document_checkpoint(
                 entity,
                 advance_parent=advance_parent,
                 registry=self,
-            )
+            ),
+            **({"guards": [(entity.key, expected_state)]} if expected_state is not None else {}),
         )
 
     # @testable true

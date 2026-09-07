@@ -194,7 +194,7 @@ Values use the existing AI field representations, not a raw storage export;
 follow the field type's submission format when writing. Unset fields are omitted;
 a Form itself has no submission and returns `values: null`.
 For patches, `get_guidelines(task="form_autofill",
-actions=["update_submission_fields"], field_types=[...])` omits the full Autofill
+actions=["update_form_values"], field_types=[...])` omits the full Autofill
 and file-discovery workflow. Reuse guidance already received when sufficient.
 
 Execution receipts expose applied/skipped counts for submission and schema
@@ -282,10 +282,11 @@ still be fetched after uploads and immediately before submission.
    replaces the prior result while the report remains reusable; `status_url`
    retrieves the detailed Plan resource.
 
-Contract version 6 is an intentional breaking cutover: the contract uses only
+Contract version 7 is an intentional breaking cutover: the contract uses only
 top-level `contract_version`, and primary read-tool subjects use only `id`.
 There are no legacy aliases. Clients must refresh discovery, OpenAPI, the tool
-catalog, and the current Plan contract rather than replaying a version 5 shape.
+catalog, and the current Plan contract rather than replaying an older shape or
+retired action name.
 Absolute API and review links use the installation's validated configured
 origin; an incoming HTTP `Host` header never selects their destination.
 
@@ -546,21 +547,44 @@ unchanged.
 ### Publication and browser approval
 
 Fileless API/MCP Organize drafts expose an existing-record update subset:
-completion, submission patches, additive schema changes, rename/move and
-category/form attachment. `needs_review` handles ambiguous or unsupported work.
+completion, Form-value patches, document appends, additive schema changes,
+rename/move and category/form attachment. `needs_review` handles ambiguous work.
 Trusted API/email origin and the absence of uploads select this shared profile;
 there is no new UI tool or client-controlled authorization flag. UI Organize
 continues to require files (instruction-only UI requests still become Ask).
 
 Start Organize and use the compact action list, then request
-`get_plan_contract(actions=["update_submission_fields", "complete_task"])`
+`get_plan_contract(actions=["update_form_values", "complete_task"])`
 for exact shapes. Use read tools to identify the intended record and inspect its
 current schema. Put final field patches before `complete_task`, with the patch's
 id in completion's `depends_on`. Failed/skipped required updates prevent completion.
 The completion action uses only `data.task` and optional `task_name`; it never
 uses name-based matching or historical replacement semantics. Normal required
-fields, recurrence, permissions, retry and undo still apply. Existing document
-editing and file-tool consolidation remain separate follow-up work.
+fields, recurrence, permissions, retry and undo still apply.
+
+The current action vocabulary is deliberately not backward-compatible. Contract
+version 7 uses `update_form_values`, `extend_form_schema`, `add_page_category`,
+`suggest_page_deletion`, and one `attach_file` action. Recreate old saved proposals
+that use retired action names; there are no execution aliases. Schema extension
+remains additive, and a deletion suggestion still requires manual cleanup.
+
+`attach_file` takes `file` (the exact report upload reference) and either `entity`
+(an existing Page, Task, or TaskHistory) or `entity_action` (an earlier Page/Task
+creation action). `entity_name` is display context only. This creates a file
+link, not document text. Completed-occurrence evidence stays on that occurrence.
+
+`append_page_document` takes `page` or `page_action` and `document_markdown`.
+Supply only the requested addition; it starts a missing document but never
+replaces existing text. New AI-created Page documents and each addition begin
+with a server-generated UTC timestamp/source quote. Sources distinguish
+Application, Email, Remote MCP, and External API / skill using trusted intake,
+not proposal fields. Manual editor typing receives no header.
+
+Document append execution requires a checkpointed collaborative baseline. Unsaved
+edits stop execution for a retry; HTML-only older documents must be opened and
+saved once first. Retry receipts prevent duplicate additions. Undo removes only
+the unchanged addition and stops if subsequent document changes would be lost.
+See [document sync](SYNC_DOCUMENTS.md#reviewed-document-appends) for persistence.
 
 Uploading files switches back to the file-backed contract, including mandatory
 summaries and placements for every file; pending uploads always block submission.
@@ -749,7 +773,7 @@ access.
 
 ```json
 {
-  "contract_version": 6,
+  "contract_version": 7,
   "proposal": {
     "summary": "Organize the records into a new page.",
     "confidence": 0.94,

@@ -342,7 +342,8 @@ class MutationPlanBuilder:
         self._standard_planning.remove(key)
         self._standard_planned.add(key)
 
-    # @testable infrastructure
+    # @testable true
+    # @matrix editor mutations : document durable-first cleanup named-versions
     def consume_intents(self, owner):
         intents = tuple(getattr(owner, "mutation_intents", ()))
         if not intents:
@@ -379,6 +380,8 @@ class MutationPlanBuilder:
                 )
             elif intent.intent is MutationIntentType.PUBLIC_DISCOVERY_INVALIDATE:
                 self.invalidate_public_discovery(reason=intent.reason)
+            elif intent.intent is MutationIntentType.BLOB_DELETE:
+                self.delete_blob(intent.path, intent.visibility, reason=intent.reason)
             else:
                 raise ValueError(f"Unsupported mutation intent: {intent.intent}")
 

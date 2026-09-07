@@ -215,8 +215,13 @@ class Asset:
     def cache_value(self):
         return None
 
+    # @testable true
+    # @matrix storage : generation-pinned read copy
     def get(self):
-        return database_assets.get_text(self.path, self.visibility.value)
+        return database_assets.get_text(
+            self.path, self.visibility.value,
+            **({"generation": self.generation} if self.generation else {}),
+        )
 
     def delete(self):
         database_assets.delete_file(self.path, self.visibility.value)

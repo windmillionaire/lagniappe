@@ -1454,16 +1454,16 @@ def test_get_guidelines_filters_actions_and_schema_field_types():
     selected_actions = ai_get_guidelines.execute_get_guidelines(
         {
             "task": "report_actions",
-            "actions": ["create_page", "attach_file_to_page"],
+            "actions": ["create_page", "attach_file"],
         },
         SimpleNamespace(),
     )
     assert selected_actions["filters"]["actions"] == [
         "create_page",
-        "attach_file_to_page",
+        "attach_file",
     ]
     assert "`create_page`" in selected_actions["guidelines"]
-    assert "`attach_file_to_page`" in selected_actions["guidelines"]
+    assert "`attach_file`" in selected_actions["guidelines"]
     assert "`create_task`" not in selected_actions["guidelines"]
     assert selected_actions["content_bytes"] < len(
         ai_get_guidelines.ORGANIZE_ACTION_GUIDELINES.encode("utf-8")

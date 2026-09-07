@@ -44,9 +44,9 @@ def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatc
                 "actions": [
                     {
                         "id": "attachment",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "data": {
-                            "page": "pettis-page",
+                            'entity': "pettis-page",
                             "file": f"/files/{file.urlsafe_key}",
                         },
                     },
@@ -127,7 +127,7 @@ def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeyp
                     },
                     {
                         "id": "delete_old_page",
-                        "type": "delete_page",
+                        "type": "suggest_page_deletion",
                         "depends_on": ["move_file"],
                         "data": {"page": source_page.urlsafe_key},
                     },
@@ -157,7 +157,7 @@ def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeyp
     assert result["status"] == "complete"
     assert [action["type"] for action in result["actions"]] == [
         "move_file",
-        "delete_page",
+        "suggest_page_deletion",
     ]
     assert file.db["pages"] == [target_page.key]
     assert result["actions"][0]["moved"]["from"]["id"] == source_page.urlsafe_key
@@ -165,16 +165,16 @@ def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeyp
     cleanup = result["actions"][1]
     assert cleanup["entity"]["id"] == source_page.urlsafe_key
     assert cleanup["entity"]["fingerprint"] == source_page.fingerprint
-    assert cleanup["manual"]["type"] == "delete_page"
+    assert cleanup["manual"]["type"] == "suggest_page_deletion"
     assert cleanup["manual"]["action"] == "delete"
     assert cleanup["note"] == "Manual cleanup suggested."
-    assert report.properties.result.grouped_actions[-1]["type"] == "delete_page"
+    assert report.properties.result.grouped_actions[-1]["type"] == "suggest_page_deletion"
 
     undo = report_undo.undo_report(report, user)
 
     assert undo["status"] == "complete"
     assert file.db["pages"] == [source_page.key]
-    assert undo["actions"][0]["type"] == "delete_page"
+    assert undo["actions"][0]["type"] == "suggest_page_deletion"
     assert undo["actions"][0]["note"] == (
         "Manual cleanup suggestion; nothing was executed."
     )
@@ -257,7 +257,7 @@ def test_run_report_moves_file_by_exact_source_attachment_name(monkeypatch):
 
 # @matrix ai-report files : attachment exact-page-name page-reference repair
 @pytest.mark.unit
-def test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_missing(
+def test_run_report_rejects_attachment_target_guessing_from_page_name(
     monkeypatch,
 ):
     _patch_fake_keys(monkeypatch)
@@ -283,11 +283,11 @@ def test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_m
                 "actions": [
                     {
                         "id": "attach_grading_drainage_plan",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "display_label": "Attach Grading & Drainage Plan",
                         "data": {
-                            "page": "almost-the-right-page-key",
-                            "page_name": "Fixtures & Materials",
+                            'entity': "almost-the-right-page-key",
+                            'entity_name': "Fixtures & Materials",
                             "file": file.urlsafe_key,
                         },
                     },
@@ -324,11 +324,10 @@ def test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_m
 
     result = report_runner.run_report(report, user)
 
-    assert result["status"] == "complete"
-    assert result["actions"][0]["status"] == "complete"
-    assert result["actions"][0]["target"]["id"] == page.urlsafe_key
-    assert result["actions"][0]["entity"]["id"] == file.urlsafe_key
-    assert file.db["pages"] == [page.key]
+    assert result["status"] == "failed"
+    assert result["actions"][0]["status"] == "failed"
+    assert "almost-the-right-page-key" in result["actions"][0]["error"]
+    assert file.db.get("pages") in (None, [])
 
 
 
@@ -360,28 +359,28 @@ def test_run_report_marks_missing_file_placements_failed_and_continues(monkeypat
                     },
                     {
                         "id": "attach_card",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "display_label": "Attach Landscape Nirvana Business Card",
                         "data": {
-                            "page_action": "page",
+                            'entity_action': "page",
                             "file": "landscape-card.pdf",
                         },
                     },
                     {
                         "id": "attach_missing",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "display_label": "Attach Pettis Landscape Plan Set",
                         "data": {
-                            "page_action": "page",
+                            'entity_action': "page",
                             "file": "almost-the-right-file-key",
                         },
                     },
                     {
                         "id": "attach_missing_target",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "display_label": "Attach Grading & Drainage Plan",
                         "data": {
-                            "page": "almost-the-right-page-key",
+                            'entity': "almost-the-right-page-key",
                             "file": "landscape-card.pdf",
                         },
                     },
@@ -516,11 +515,11 @@ def test_run_report_rejects_category_used_as_attachment_page(monkeypatch):
                 "actions": [
                     {
                         "id": "attach_attendance",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "display_label": "Attach attendanceform",
                         "data": {
-                            "page": category.urlsafe_key,
-                            "page_name": category.name,
+                            'entity': category.urlsafe_key,
+                            'entity_name': category.name,
                             "file": file.urlsafe_key,
                         },
                     }
@@ -553,7 +552,7 @@ def test_run_report_rejects_category_used_as_attachment_page(monkeypatch):
     assert report.status == "failed"
     assert result["actions"][0]["status"] == "failed"
     assert result["actions"][0]["error"] == (
-        "Homeschool is a category, not a page."
+        "Attachment target must be a Page, Task or task history."
     )
-    assert captured == ["Homeschool is a category, not a page."]
+    assert captured == ["Attachment target must be a Page, Task or task history."]
     assert file.db.get("pages") in (None, [])

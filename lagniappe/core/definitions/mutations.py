@@ -48,6 +48,7 @@ class MutationIntentType(Enum):
     CACHE_SEARCH_DELETE = "cache-search-delete"
     SCHEDULED_UNCOMPLETE_DISPATCH = "scheduled-uncomplete-dispatch"
     PUBLIC_DISCOVERY_INVALIDATE = "public-discovery-invalidate"
+    BLOB_DELETE = "blob-delete"
 
 
 class RelationAuthority(Enum):
@@ -233,6 +234,21 @@ class MutationIntent:
     reason: str = ""
     cache_key: str | None = None
     cache_kind: str | None = None
+    path: str | None = None
+    visibility: str | None = None
+
+    @classmethod
+    # @testable false
+    # @covered-by lagniappe/core/properties/common_assets.py::Document.save
+    # @reason superseded document assets use the existing post-commit blob cleanup
+    def delete_blob(cls, path, visibility, *, reason):
+        return cls(
+            MutationIntentType.BLOB_DELETE,
+            path=path,
+            visibility=visibility,
+            refresh_cache=False,
+            reason=reason,
+        )
 
     @classmethod
     # @testable false

@@ -45,7 +45,7 @@ def _expected_action_state(action, record):
     if action_type == "complete_task":
         expected["completion_state"] = record.get("completion_state")
         expected["task_state_fingerprint"] = record.get("task_state_fingerprint")
-    if action_type == "update_submission_fields":
+    if action_type == "update_form_values":
         applied = {
             item.get("index"): item
             for item in (record.get("updates") or {}).get("applied") or []
@@ -66,7 +66,7 @@ def _expected_action_state(action, record):
         }.values())
     if action_type == "rename_entity":
         expected["name"] = str(_data(action).get("name") or "").strip()
-    if action_type == "update_form_schema":
+    if action_type == "extend_form_schema":
         expected["schema_fingerprint"] = record.get("schema_fingerprint")
     if action_type == "summarize_file":
         data = _data(action)
@@ -126,14 +126,20 @@ def _urlsafe_key_value(value):
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_persists_all_fields_with_fresh_entity_reads
 # @matrix ai-report : batch-field-patch completed-prefix completed-task moves permissions post-commit-checkpoint recovery
+# @pair ai-report:skipped-prefix
 def _inspect_action_applied(action, report, user, record):
     action_type = action.get("type")
     if record.get("status") == "skipped" or action_type in {
         "skip",
         "needs_review",
-        "delete_page",
+        "suggest_page_deletion",
     }:
         return ACTION_APPLIED
+
+    if action_type == "append_page_document":
+        from .documents import inspect_document_append
+
+        return inspect_document_append(record, user)
 
     expected = record.get("expected") or {}
     entity_id = expected.get("entity") or (record.get("entity") or {}).get("id")
@@ -178,7 +184,7 @@ def _inspect_action_applied(action, report, user, record):
             if _stored_reference_key(entity, "form") == target_id
             else ACTION_DRIFTED
         )
-    if action_type == "add_category":
+    if action_type == "add_page_category":
         keys = [
             _urlsafe_key_value(key)
             for key in [entity.db.get("model"), *(entity.db.get("categories") or [])]
@@ -214,7 +220,7 @@ def _inspect_action_applied(action, report, user, record):
         if expected.get("task_state_fingerprint") and _task_state_fingerprint(entity) != expected["task_state_fingerprint"]:
             return ACTION_DRIFTED
         return ACTION_APPLIED if _completion_state(entity) == expected.get("completion_state") else ACTION_DRIFTED
-    if action_type == "update_submission_fields":
+    if action_type == "update_form_values":
         for update in expected.get("updates") or []:
             target_entity = _fetch_report_entity(update.get("entity"))
             if target_entity is None:
@@ -223,14 +229,14 @@ def _inspect_action_applied(action, report, user, record):
             if current["value"] != update.get("value"):
                 return ACTION_DRIFTED
         return ACTION_APPLIED
-    if action_type == "update_form_schema":
+    if action_type == "extend_form_schema":
         return (
             ACTION_APPLIED
             if _value_fingerprint(entity.schema or [])
             == expected.get("schema_fingerprint")
             else ACTION_DRIFTED
         )
-    if action_type in {"attach_file_to_page", "attach_file_to_task"}:
+    if action_type == "attach_file":
         if target is None:
             return ACTION_DRIFTED
         return (
@@ -257,7 +263,7 @@ def _inspect_action_applied(action, report, user, record):
 def _inspect_action_compensated(record, report, user):
     action_type = record.get("type")
     before = record.get("before") or {}
-    if action_type in {"skip", "needs_review", "delete_page"}:
+    if action_type in {"skip", "needs_review", "suggest_page_deletion"}:
         return ACTION_APPLIED
     if action_type.startswith("create_"):
         if record.get("created") is False:
@@ -281,6 +287,13 @@ def _inspect_action_compensated(record, report, user):
     entity = _load_result_entity(record.get("entity"))
     if entity is None:
         return ACTION_DRIFTED
+    if action_type == "append_page_document":
+        from lagniappe.core.tools.document_crdt import load_document
+
+        if not _recovery_entity_allowed(entity, user):
+            return ACTION_DRIFTED
+        receipt = load_document(entity.properties.document.ydoc)["lagniappeReports"].get(record["idempotency_key"])
+        return ACTION_APPLIED if receipt and receipt["state"] == "undone" else ACTION_NOT_APPLIED
     if action_type == "complete_task":
         if not _recovery_entity_allowed(entity, user):
             return ACTION_DRIFTED
@@ -304,7 +317,7 @@ def _inspect_action_compensated(record, report, user):
             if _stored_reference_key(entity, "form") == previous_id
             else ACTION_NOT_APPLIED
         )
-    if action_type == "add_category":
+    if action_type == "add_page_category":
         target_id = (record.get("target") or {}).get("id")
         keys = {
             _urlsafe_key_value(key)
@@ -346,7 +359,7 @@ def _inspect_action_compensated(record, report, user):
         return (
             ACTION_APPLIED if entity.name == before.get("name") else ACTION_NOT_APPLIED
         )
-    if action_type == "update_submission_fields":
+    if action_type == "update_form_values":
         for previous in before.get("updates") or []:
             target = _load_result_entity(previous.get("entity"))
             if target is None:
@@ -357,14 +370,14 @@ def _inspect_action_compensated(record, report, user):
             ] != previous.get("previous_value"):
                 return ACTION_NOT_APPLIED
         return ACTION_APPLIED
-    if action_type == "update_form_schema":
+    if action_type == "extend_form_schema":
         return (
             ACTION_APPLIED
             if _value_fingerprint(entity.schema or [])
             == _value_fingerprint(before.get("schema") or [])
             else ACTION_NOT_APPLIED
         )
-    if action_type in {"attach_file_to_page", "attach_file_to_task"}:
+    if action_type == "attach_file":
         target = _load_result_entity(record.get("target"))
         if target is None:
             return ACTION_DRIFTED
@@ -393,6 +406,8 @@ def _inspect_action_compensated(record, report, user):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason recoverable action errors are asserted through full report execution
 def _is_recoverable_action_error(_action, error):
+    if _action.get("type") == "append_page_document":
+        return False  # A document conflict must remain retryable, not be skipped.
     return isinstance(error, exceptions.ValidationError) and not str(error).startswith(
         "You do not have permission"
     )
@@ -423,10 +438,7 @@ def _record_required_file_placement_error(action_record, error):
 def _recoverable_action_error_note(action_record, message):
     if message == "Referenced report file was not found.":
         return "Skipped because a referenced report file was not found."
-    if action_record.get("type") in {
-        "attach_file_to_page",
-        "attach_file_to_task",
-    } and message.startswith("Referenced entity not found:"):
+    if action_record.get("type") == "attach_file" and message.startswith("Referenced entity not found:"):
         return "Skipped because a referenced attachment target was not found."
     if action_record.get("type") == "create_task" and message == TASK_FORM_TYPE_ERROR:
         return (
@@ -440,7 +452,7 @@ def _recoverable_action_error_note(action_record, message):
             "Skipped because the action referenced a task form instead of a page form."
         )
     if (
-        action_record.get("type") == "update_submission_fields"
+        action_record.get("type") == "update_form_values"
         and message == SUBMISSION_UPDATE_ROWS_ERROR
     ):
         return "Skipped because no executable submission field updates were provided."

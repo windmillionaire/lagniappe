@@ -10,14 +10,14 @@ from .compensation import (
     _without_report,
 )
 from .entities import (
-    _add_category,
+    _add_page_category,
     _add_form_to_page,
     _create_category,
     _create_form,
     _create_model_task,
     _create_page,
     _create_project,
-    _manual_delete_page_action,
+    _suggest_page_deletion,
     _move_page,
     _move_task,
     _needs_review_action,
@@ -25,19 +25,18 @@ from .entities import (
     _skip_action,
 )
 from .files import (
-    _attach_file_to_page,
-    _attach_file_to_task,
+    _attach_file,
     _move_file,
     _summarize_file,
 )
 from .forms import (
     _undo_form_schema_update,
     _undo_submission_updates,
-    _update_form_schema,
-    _update_submission_fields,
+    _extend_form_schema,
+    _update_form_values,
 )
 from .compensation import (
-    _undo_add_category_action,
+    _undo_add_page_category_action,
     _undo_add_form_to_page_action,
     _undo_attachment_action,
     _undo_move_action,
@@ -45,6 +44,7 @@ from .compensation import (
     _undo_summarize_file,
 )
 from .tasks import _create_task
+from .documents import _append_page_document, _undo_page_document
 from .task_completion import _complete_task, _undo_complete_task
 
 REPORT_ACTION_ADAPTERS = {
@@ -58,7 +58,8 @@ REPORT_ACTION_ADAPTERS = {
             _create_model_task,
             _compensate_created,
         ),
-        ReportActionAdapter("create_page", _create_page, _compensate_created),
+        ReportActionAdapter("create_page", _create_page, _compensate_created, uses_context=True),
+        ReportActionAdapter("append_page_document", _append_page_document, _undo_page_document, uses_context=True),
         ReportActionAdapter("complete_task", _complete_task, _undo_complete_task, uses_context=True),
         ReportActionAdapter(
             "create_task",
@@ -72,9 +73,9 @@ REPORT_ACTION_ADAPTERS = {
             _without_report(_undo_add_form_to_page_action),
         ),
         ReportActionAdapter(
-            "add_category",
-            _add_category,
-            _without_report(_undo_add_category_action),
+            "add_page_category",
+            _add_page_category,
+            _without_report(_undo_add_page_category_action),
         ),
         ReportActionAdapter(
             "move_page", _move_page, _without_report(_undo_move_action)
@@ -91,29 +92,23 @@ REPORT_ACTION_ADAPTERS = {
             _without_report(_undo_rename_entity),
         ),
         ReportActionAdapter(
-            "update_submission_fields",
-            _update_submission_fields,
+            "update_form_values",
+            _update_form_values,
             _without_report(_undo_submission_updates),
         ),
         ReportActionAdapter(
-            "update_form_schema",
-            _update_form_schema,
+            "extend_form_schema",
+            _extend_form_schema,
             _without_report(_undo_form_schema_update),
         ),
         ReportActionAdapter(
-            "attach_file_to_page",
-            _attach_file_to_page,
+            "attach_file",
+            _attach_file,
             _without_report(_undo_attachment_action),
             required=True,
         ),
         ReportActionAdapter(
-            "attach_file_to_task",
-            _attach_file_to_task,
-            _without_report(_undo_attachment_action),
-            required=True,
-        ),
-        ReportActionAdapter(
-            "delete_page", _manual_delete_page_action, _manual_compensation
+            "suggest_page_deletion", _suggest_page_deletion, _manual_compensation
         ),
         ReportActionAdapter(
             "summarize_file",

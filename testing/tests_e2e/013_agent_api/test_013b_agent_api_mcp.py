@@ -40,6 +40,7 @@ LIFECYCLE_TOOLS = (
 )
 # Reviewed conversational contracts: plan-free context, optional brief revisions,
 # execution receipts, and compact/selected schemas in starter/upload context.
+# Version 7 changes only the supported contract-version bounds in these schemas.
 LIFECYCLE_SCHEMA_SHA256 = {
     "answer_question": (
         "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
@@ -51,31 +52,31 @@ LIFECYCLE_SCHEMA_SHA256 = {
     ),
     "start_ask": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "8477e535a1018480128e7ffe4d28dc5734b452a6665880842fb695e7bd5bba12",
+        "544d4448ac2af7f8d3685766fc86c5dadac524e062ba4ffa291a03808d54366d",
     ),
     "start_create": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "8477e535a1018480128e7ffe4d28dc5734b452a6665880842fb695e7bd5bba12",
+        "544d4448ac2af7f8d3685766fc86c5dadac524e062ba4ffa291a03808d54366d",
     ),
     "start_organize": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "8477e535a1018480128e7ffe4d28dc5734b452a6665880842fb695e7bd5bba12",
+        "544d4448ac2af7f8d3685766fc86c5dadac524e062ba4ffa291a03808d54366d",
     ),
     "get_plan": (
         "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
-        "eb650c1830bbe181518f23cde1dc0b724e70357784ff79443395ee5efa5df521",
+        "93ac7fd41d6414596b6c4a9ad555af53fe97f37c410f44a8bd736f67a562c287",
     ),
     "get_plan_contract": (
         "8054a33de0dcc82cb083398f7f8fb6bb0c2e72aa439f4bf21471e75ee7b44989",
-        "92713e7083f091ca3da230fa5b45e0f2e4a0597969e968bc8466fcb8501ac047",
+        "ca7162560fcd6af6d04feb38860f43c10e55111951428d2dccf22baa029205c8",
     ),
     "upload_local_files": (
         "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
-        "43a9ad79ba7b1003ca4cfe28d919e27c4e42adf7cbf7976aa7c5444b75ad77c9",
+        "95d57b63452cce0766c9ff0c636f61fc85fea02226d688435763b060bf556297",
     ),
     "submit_plan": (
         "18e44236fd78c5fa56314d6df698b339be168781d967947a7ac9efcfee57a9ef",
-        "a5511c1c4827ad0c8a1aee2f3be5f66636b59fe630ec659036ee802c60c9965e",
+        "0062860fc35ce6a61f7a49c702558356f99553f6b8834e37816e63966e7fe062",
     ),
 }
 PLAN_KEYS = {
@@ -313,7 +314,7 @@ def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
         "proposal_schema",
         "instructions",
     }
-    assert submission["contract_version"] == contract["contract_version"] == 6
+    assert submission["contract_version"] == contract["contract_version"] == 7
     assert submission["proposal"] == {}
     assert submission["proposal_schema"] == "$.proposal_schema"
     assert submission["instructions"].startswith("Call submit_plan")
@@ -619,8 +620,8 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert submission["url"] == (
             f"{expected_api_origin}/api/v1/plans/{invalid_plan['id']}/submit"
         )
-        assert submission["contract_version"] == forwarded["contract_version"] == 6
-        assert submission["body"] == {"contract_version": 6, "proposal": {}}
+        assert submission["contract_version"] == forwarded["contract_version"] == 7
+        assert submission["body"] == {"contract_version": 7, "proposal": {}}
         assert set(submission) == {"method", "url", "contract_version", "body", "rule"}
         assert "credential-thief.invalid" not in json.dumps(forwarded)
 
@@ -706,7 +707,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert selected_contract["schema_scope"] == "selected"
         assert "workflow_rules" not in selected_contract
         assert "submission_format" not in selected_contract
-        assert selected_contract["mcp_submission"]["contract_version"] == 6
+        assert selected_contract["mcp_submission"]["contract_version"] == 7
         assert set(selected_contract["proposal_schema"]["$defs"]) == {"create_page", "create_task"}
         create_receipt = _assert_safe_receipt(
             workflow["create"]["receipt"], status="ready"
@@ -808,7 +809,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert "workflow_rules" not in organize_selected
         assert "upload_inventory" not in organize_selected
         assert set(organize_selected["proposal_schema"]["$defs"]) == {
-            "create_task", "attach_file_to_page", "summarize_file"
+            "create_task", "attach_file", "summarize_file"
         }
         assert organize_contract["required_file_refs"] == [
             organize_contract["upload_inventory"]["files"][0]["ref"]

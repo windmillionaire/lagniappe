@@ -1,6 +1,7 @@
 """Focused AI-report characterization coverage."""
 
 import copy
+from types import SimpleNamespace
 
 import pytest
 
@@ -73,8 +74,8 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
             },
             {
                 "id": "attachment",
-                "type": "attach_file_to_page",
-                "data": {"page_action": "page", "file": "july-receipt.pdf"},
+                "type": "attach_file",
+                "data": {'entity_action': "page", "file": "july-receipt.pdf"},
             },
             {
                 "id": "summary",
@@ -160,7 +161,7 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
 
     def create_page_with_in_memory_assets(data):
         page = create_page(data)
-        page.save_asset = lambda content, *_args, **_kwargs: content
+        page.save_asset = lambda content, *_args, **_kwargs: SimpleNamespace(updated=False)
         return page
 
     monkeypatch.setattr(
@@ -221,7 +222,9 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
         if getattr(entity, "entity_kind", None) == "page"
         and entity.name == "July Receipt"
     )
-    assert july_page.properties.document.html == (
+    assert "UTC · Application</p></blockquote>" in july_page.properties.document.html
+    assert july_page.properties.document.ydoc
+    assert july_page.properties.document.html.endswith(
         "<h1>Receipt notes</h1><ul><li>Review the total</li></ul>"
     )
     assert "document_markdown" not in report.proposal["actions"][2]["data"]
@@ -451,7 +454,7 @@ def test_run_report_moves_entities_updates_schema_and_patches_submissions_with_u
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "update_form_schema",
+                        "type": "extend_form_schema",
                         "data": {
                             "form": "invoice-form",
                             "operations": [
@@ -484,7 +487,7 @@ def test_run_report_moves_entities_updates_schema_and_patches_submissions_with_u
                     },
                     {
                         "id": "field_updates",
-                        "type": "update_submission_fields",
+                        "type": "update_form_values",
                         "depends_on": ["schema"],
                         "data": {
                             "updates": [
@@ -729,7 +732,7 @@ def test_submission_batch_persists_all_fields_with_fresh_entity_reads(
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "update_form_schema",
+                        "type": "extend_form_schema",
                         "data": {
                             "form": "batch-form",
                             "operations": [
@@ -748,7 +751,7 @@ def test_submission_batch_persists_all_fields_with_fresh_entity_reads(
                     },
                     {
                         "id": "fields",
-                        "type": "update_submission_fields",
+                        "type": "update_form_values",
                         "depends_on": ["schema"],
                         "data": {
                             "updates": [
@@ -873,7 +876,7 @@ def test_run_report_skips_empty_submission_update_and_continues(monkeypatch):
                 "actions": [
                     {
                         "id": "empty_submission_update",
-                        "type": "update_submission_fields",
+                        "type": "update_form_values",
                         "display_label": "Submission Update: Rank",
                         "data": {"updates": []},
                     },
@@ -1043,7 +1046,7 @@ def test_run_report_rejects_schema_update_without_form_edit_permission(monkeypat
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "update_form_schema",
+                        "type": "extend_form_schema",
                         "data": {
                             "form": "restricted-invoice-form",
                             "operations": [

@@ -136,7 +136,7 @@ def _create_model_task(action, _report, user, created):
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
 # @matrix ai-report : create-order default-category persistence submission-completion
-def _create_page(action, _report, user, created):
+def _create_page(action, _report, user, created, context=None):
     data = _data(action)
     category = _resolve_entity(
         data.get("category")
@@ -178,7 +178,15 @@ def _create_page(action, _report, user, created):
     if page_form is not None and "submission" in data:
         page.ai_submission(data.get("submission") or {})
     if data.get("document"):
-        page.properties.document.html = data["document"]
+        from datetime import datetime, timezone
+        from lagniappe.core.tools.document_crdt import append_fragment
+        from .documents import document_source_quote
+
+        record = (context or {}).get("action_record") or {}
+        timestamp = record.get("document_at") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        html = document_source_quote(_report, timestamp) + data["document"]
+        snapshot, _receipt = append_fragment(None, html, record.get("idempotency_key") or "creation")
+        page.properties.document.save(html=html, ydoc=snapshot)
     metadata = {}
     if page_form is not None:
         metadata["form"] = _entity_result(page_form)
@@ -254,7 +262,7 @@ def _add_form_to_page(action, _report, user, created):
 # @tests tests_unit/test_020g_ai_report_actions_entities.py::test_run_report_adds_page_category_without_changing_primary_with_undo
 # @matrix ai-report : add-category deterministic-run idempotent
 # @matrix categories : add-category deterministic-run idempotent undo
-def _add_category(action, _report, user, created):
+def _add_page_category(action, _report, user, created):
     data = _data(action)
     page = _resolve_entity(
         data.get("page")
@@ -475,7 +483,7 @@ def _rename_entity(action, _report, user, created):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup_with_undo
 # @pair ai-report:manual-cleanup
-def _manual_delete_page_action(action, _report, user, created):
+def _suggest_page_deletion(action, _report, user, created):
     data = _data(action)
     page = _resolve_entity(
         data.get("page")
@@ -494,7 +502,7 @@ def _manual_delete_page_action(action, _report, user, created):
         [],
         {
             "manual": {
-                "type": "delete_page",
+                "type": "suggest_page_deletion",
                 "action": "delete",
                 "reason": (
                     "Use the page delete button to confirm cleanup after "

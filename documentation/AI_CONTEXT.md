@@ -116,7 +116,7 @@ field types and action rules to selected action types; filtered and full calls
 remain different arguments in the normal exact-call cache.
 
 For an existing-submission patch, the same tool accepts `task="form_autofill"`
-with `actions=["update_submission_fields"]` and actual `field_types`; this returns
+with `actions=["update_form_values"]` and actual `field_types`; this returns
 patch-specific guidance in both native and external flows, without the blank-only
 Autofill/file-reading workflow. `get_schema(include_values=true)` joins current
 AI-readable values to exact schema ids in one read. Neither option adds a tool

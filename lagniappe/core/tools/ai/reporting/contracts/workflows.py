@@ -3,13 +3,14 @@
 REMOTE_UPDATE_ACTIONS = frozenset(
     {
         "complete_task",
-        "update_submission_fields",
-        "update_form_schema",
+        "append_page_document",
+        "update_form_values",
+        "extend_form_schema",
         "rename_entity",
         "move_page",
         "move_task",
         "move_file",
-        "add_category",
+        "add_page_category",
         "add_form_to_page",
         "needs_review",
     }
@@ -32,14 +33,16 @@ schema_evolution bundle before additive Form changes. Fetch only relevant field
 types for form_autofill guidance. Do not load file-organization or task-creation
 guidance for a simple existing-record update.
 
-Use update_submission_fields for named field patches, preserving other values;
+Use update_form_values for named field patches, preserving other values;
 read existing values before replacing them and clear a value only when requested.
 Apply submission updates before complete_task and make completion depend on them.
 complete_task checks off one exact existing Task using normal completion rules,
 including required fields and recurrence; it is not create_task's historical
 occurrence import. Preserve unrelated descriptions, assignments and attachments.
-No existing-document editing action is available yet; do not use create_page to
-replace an existing document.
+Use append_page_document to add the requested text to an existing Page's document
+(or start its missing document). Supply only the addition in document_markdown,
+not a rewritten copy of the document. The server prefixes source/time attribution.
+Replacement/deletion of existing document text is not supported.
 
 Return a complete proposal, not a conversational answer or an intermediate plan.
 Every mutation still requires the user's browser approval and live permissions.

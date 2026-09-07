@@ -346,6 +346,7 @@ class Restrictions(Property):
             "can_create_categories": can_create_models,
             "can_create_projects": can_create_models,
             "can_create_pages": can_create_pages,
+            "can_append_page_documents": can_edit_pages,
             "can_create_model_tasks": can_create_models or can_edit_projects,
             "can_attach_files_to_pages": can_edit_pages or can_create_pages,
             "can_attach_files_to_tasks": can_edit_tasks or can_edit_pages,
@@ -362,7 +363,7 @@ class Restrictions(Property):
                     can_edit_tasks,
                 )
             ),
-            "can_update_form_schemas": can_edit_forms,
+            "can_extend_form_schemas": can_edit_forms,
             "can_update_submissions": can_edit_pages or can_edit_tasks,
             "can_delete_pages": (
                 can_delete_categories

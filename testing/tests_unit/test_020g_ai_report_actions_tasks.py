@@ -28,7 +28,7 @@ from testing.utility.test_entities import TestEntities
 # @matrix ai-report : created-task deterministic-run persistence submission-completion task-attachment
 # @matrix files tasks : task-attachment
 @pytest.mark.unit
-def test_run_report_attach_file_to_task_targets_created_task(monkeypatch, get_schema):
+def test_run_report_attach_file_targets_created_task(monkeypatch, get_schema):
     _patch_fake_keys(monkeypatch)
     user = _test_user("runner-task-file-owner")
     page = TestEntities.get("PAGE", {"name": "Medical", "hash": "medical-page"})
@@ -69,9 +69,9 @@ def test_run_report_attach_file_to_task_targets_created_task(monkeypatch, get_sc
                     },
                     {
                         "id": "attach_physical",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "review_physical",
+                            'entity_action': "review_physical",
                             "file": file.urlsafe_key,
                         },
                     },
@@ -102,7 +102,7 @@ def test_run_report_attach_file_to_task_targets_created_task(monkeypatch, get_sc
     assert result["actions"][0]["type"] == "create_task"
     assert "attachments" not in result["actions"][0]
     attach_action = result["actions"][1]
-    assert attach_action["type"] == "attach_file_to_task"
+    assert attach_action["type"] == "attach_file"
     assert attach_action["entity"]["id"] == file.urlsafe_key
     assert attach_action["target"]["kind"] == "task"
     tasks = [
@@ -296,17 +296,17 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
                     },
                     {
                         "id": "attach_registration_scan",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "registration_history",
+                            'entity_action': "registration_history",
                             "file": "2023-06-24 jeep registration.pdf",
                         },
                     },
                     {
                         "id": "attach_dmv_receipt",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "registration_history",
+                            'entity_action': "registration_history",
                             "file": "dmv receipt.pdf",
                         },
                     },
@@ -378,8 +378,8 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
     assert action["submission"] == {"created": True, "field_count": 1}
     attachment_actions = result["actions"][1:3]
     assert [a["type"] for a in attachment_actions] == [
-        "attach_file_to_task",
-        "attach_file_to_task",
+        "attach_file",
+        "attach_file",
     ]
     assert [a["target"]["kind"] for a in attachment_actions] == [
         "task_history",
@@ -445,9 +445,9 @@ def test_run_report_records_dateless_historical_task_completion(monkeypatch):
                     },
                     {
                         "id": "attach_certificate",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "volunteer_service",
+                            'entity_action': "volunteer_service",
                             "file": "volunteer certificate.pdf",
                         },
                     },
@@ -549,9 +549,9 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
                     },
                     {
                         "id": "attach_registration_scan",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "registration_history",
+                            'entity_action': "registration_history",
                             "file": "2023-06-24 jeep registration.pdf",
                         },
                     },
@@ -609,7 +609,7 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
     assert action["submission"] == {"created": True, "field_count": 1}
     assert action["note"] == "Moved the previous completion to history."
     attach_action = result["actions"][1]
-    assert attach_action["type"] == "attach_file_to_task"
+    assert attach_action["type"] == "attach_file"
     assert attach_action["entity"]["id"] == new_file.urlsafe_key
     assert attach_action["target"]["id"] == task.urlsafe_key
     assert attach_action["file_summary"]["present"] is False
@@ -684,9 +684,9 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
                     },
                     {
                         "id": "attach_registration_2023",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "registration_2023",
+                            'entity_action': "registration_2023",
                             "file": "2023-06-24 jeep registration.pdf",
                         },
                     },
@@ -706,9 +706,9 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
                     },
                     {
                         "id": "attach_registration_2018",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "registration_2018",
+                            'entity_action': "registration_2018",
                             "file": "2018_06_07 jeep registration.pdf",
                         },
                     },
@@ -773,7 +773,7 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
     assert first_task_action["type"] == "create_task"
     assert first_task_action["created"] is True
     assert first_task_action["entity"]["name"] == "Registration"
-    assert first_attach_action["type"] == "attach_file_to_task"
+    assert first_attach_action["type"] == "attach_file"
     assert first_attach_action["target"]["id"] == first_task_action["entity"]["id"]
     assert second_task_action["type"] == "create_task"
     assert second_task_action["created"] is True
@@ -782,7 +782,7 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
     assert second_task_action["entity"]["kind"] == "task_history"
     assert second_task_action["entity"]["id"].startswith("task_history-")
     assert second_task_action["submission"] == {"created": True, "field_count": 1}
-    assert second_attach_action["type"] == "attach_file_to_task"
+    assert second_attach_action["type"] == "attach_file"
     assert second_attach_action["target"]["id"] == second_task_action["entity"]["id"]
 
 
@@ -943,9 +943,9 @@ def test_run_report_loads_model_task_form_from_stored_key_for_history(
                     },
                     {
                         "id": "attach_invoice_2024",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "invoice_2024",
+                            'entity_action': "invoice_2024",
                             "file": file_new.urlsafe_key,
                         },
                     },
@@ -964,9 +964,9 @@ def test_run_report_loads_model_task_form_from_stored_key_for_history(
                     },
                     {
                         "id": "attach_invoice_2023",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "invoice_2023",
+                            'entity_action': "invoice_2023",
                             "file": file_old.urlsafe_key,
                         },
                     },
@@ -1016,14 +1016,14 @@ def test_run_report_loads_model_task_form_from_stored_key_for_history(
     assert result["actions"][0]["model"]["parent"]["name"] == "Maintenance"
     assert result["actions"][0]["form"]["name"] == "Invoice Form"
     assert result["actions"][0]["page"]["name"] == "Pool"
-    assert result["actions"][1]["type"] == "attach_file_to_task"
+    assert result["actions"][1]["type"] == "attach_file"
     assert result["actions"][2]["project"]["name"] == "Maintenance"
     assert result["actions"][2]["model"]["name"] == "Invoices"
     assert result["actions"][2]["model"]["parent"]["name"] == "Maintenance"
     assert result["actions"][2]["form"]["name"] == "Invoice Form"
     assert result["actions"][2]["page"]["name"] == "Pool"
     assert result["actions"][2]["submission"] == {"created": True, "field_count": 1}
-    assert result["actions"][3]["type"] == "attach_file_to_task"
+    assert result["actions"][3]["type"] == "attach_file"
 
 
 
@@ -1072,9 +1072,9 @@ def test_run_report_reuses_existing_task_for_completed_event(
                     },
                     {
                         "id": "attach_registration_2023",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "registration_2023",
+                            'entity_action': "registration_2023",
                             "file": "2023-06-24 jeep registration.pdf",
                         },
                     },
@@ -1108,7 +1108,7 @@ def test_run_report_reuses_existing_task_for_completed_event(
     assert result["actions"][0]["created"] is False
     assert result["actions"][0]["entity"]["id"] == "registration-task"
     assert result["actions"][0]["target"]["id"] == "registration-task"
-    assert result["actions"][1]["type"] == "attach_file_to_task"
+    assert result["actions"][1]["type"] == "attach_file"
     assert result["actions"][1]["target"]["id"] == "registration-task"
     assert len(histories) == 0
     assert task.completed is True
@@ -1624,9 +1624,9 @@ def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wron
                     },
                     {
                         "id": "attach_registration_2023",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "registration_2023",
+                            'entity_action': "registration_2023",
                             "file": "2023-06-24 jeep registration.pdf",
                         },
                     },
@@ -1687,7 +1687,7 @@ def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wron
     assert len(histories) == 0
     assert result["actions"][0]["entity"]["name"] == "Registration"
     assert result["actions"][0]["target"]["id"] == result["actions"][0]["entity"]["id"]
-    assert result["actions"][1]["type"] == "attach_file_to_task"
+    assert result["actions"][1]["type"] == "attach_file"
     assert result["actions"][1]["target"]["id"] == result["actions"][0]["entity"]["id"]
 
 
@@ -1695,7 +1695,7 @@ def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wron
 
 # @matrix ai-report files : attachment page-reference prior-task-page repair
 @pytest.mark.unit
-def test_run_report_resolves_attachment_page_from_single_prior_task_when_reference_is_file(
+def test_run_report_rejects_file_as_attachment_target_without_guessing_prior_page(
     monkeypatch,
 ):
     _patch_fake_keys(monkeypatch)
@@ -1736,9 +1736,9 @@ def test_run_report_resolves_attachment_page_from_single_prior_task_when_referen
                     },
                     {
                         "id": "attach_2022_renewal",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "task_2022_renewal",
+                            'entity_action': "task_2022_renewal",
                             "file": file_2022.urlsafe_key,
                         },
                     },
@@ -1754,18 +1754,18 @@ def test_run_report_resolves_attachment_page_from_single_prior_task_when_referen
                     },
                     {
                         "id": "attach_2023_renewal",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "data": {
-                            "task_action": "task_2023_renewal",
+                            'entity_action': "task_2023_renewal",
                             "file": file_2023.urlsafe_key,
                         },
                     },
                     {
                         "id": "attach_2025_file",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "display_label": "Attach 2025 Homeowners Insurance Document",
                         "data": {
-                            "page": file_2025.urlsafe_key,
+                            'entity': file_2025.urlsafe_key,
                             "file": file_2025.urlsafe_key,
                         },
                     },
@@ -1796,18 +1796,17 @@ def test_run_report_resolves_attachment_page_from_single_prior_task_when_referen
 
     result = report_runner.run_report(report, user)
 
-    assert result["status"] == "complete"
+    assert result["status"] == "failed"
     assert [action["status"] for action in result["actions"]] == [
         "complete",
         "complete",
         "complete",
         "complete",
-        "complete",
+        "failed",
     ]
-    assert result["actions"][4]["type"] == "attach_file_to_page"
-    assert result["actions"][4]["target"]["id"] == page.urlsafe_key
-    assert result["actions"][4]["entity"]["id"] == file_2025.urlsafe_key
-    assert file_2025.db["pages"] == [page.key]
+    assert result["actions"][4]["type"] == "attach_file"
+    assert result["actions"][4]["error"] == "Attachment target must be a Page, Task or task history."
+    assert file_2025.db.get("pages") in (None, [])
     created_tasks = [
         entity
         for batch in saved

@@ -45,7 +45,8 @@ SCHEMA_FIELD_TYPES = (
     "todo",
 )
 ACTION_GUIDELINES = {
-    "complete_task": "Check off one exact existing Task via data.task. No name-based matching, replacement submission, or historical completed_on override. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_submission_fields first and list its action id in depends_on when completing with details. An already-completed Task is a no-op. Undo reverses only this completion, not a reopen/reset of its form.",
+    "append_page_document": "Add only the requested text in document_markdown to one editable Page (page or page_action). Starts a missing document; never replaces existing text. The server adds trusted source/time attribution. Read existing content first. Unsaved collaborative edits or an uninitialized older document stop execution for a safe retry; undo stops if content has since changed.",
+    "complete_task": "Check off one exact existing Task via data.task. No name-based matching, replacement submission, or historical completed_on override. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_form_values first and list its action id in depends_on when completing with details. An already-completed Task is a no-op. Undo reverses only this completion, not a reopen/reset of its form.",
     "create_form": "Create forms before actions that reference them; use the matching page_form or task_form bundle.",
     "create_category": "Create a category only for a durable collection; reference an earlier default page-form action only when the collection is homogeneous.",
     "create_project": "Create a project before its model tasks and use it for a durable area of goal-directed work.",
@@ -53,16 +54,15 @@ ACTION_GUIDELINES = {
     "create_page": "Choose the stable subject, compare plausible existing Pages, use an executable Category/Form reference, and include grounded final submission values when the workflow requires them.",
     "create_task": "Use an editable Page or earlier page action, a stable work name, task Forms only, and a source-backed completed_on date only for completed evidence. To check off an existing Task while preserving its details use complete_task, not historical-occurrence import.",
     "add_form_to_page": "Reference one editable existing Page and one page Form; this does not require a Category.",
-    "add_category": "Reference both the editable existing Page and additional existing Category; readable names are not executable references.",
-    "update_form_schema": "Use additive fields or select/radio options only and place the schema update before actions that use it.",
-    "update_submission_fields": "Reference exactly one editable existing Page or Task and provide only grounded final field updates.",
-    "attach_file_to_page": "Use the exact report file ref and an editable existing Page or earlier page action.",
-    "attach_file_to_task": "Use the exact report file ref and an editable existing Task or earlier task action; completed-task evidence belongs here.",
+    "add_page_category": "Reference both the editable existing Page and additional existing Category; readable names are not executable references.",
+    "extend_form_schema": "Use additive fields or select/radio options only and place the schema update before actions that use it.",
+    "update_form_values": "Reference exactly one editable existing Page or Task and provide only grounded final field updates.",
+    "attach_file": "Attach the exact report file ref to data.entity (an editable existing Page, Task or task history) or data.entity_action (an earlier create_page/create_task action). This links the file; it does not convert it into document text. Use the completed occurrence as the target for its evidence.",
     "move_page": "Use exact editable source and destination references; Organize should normally prefer needs_review for cleanup moves.",
     "move_task": "Use exact editable source and destination references; Organize should normally prefer needs_review for cleanup moves.",
     "move_file": "Use an exact file and editable source/destination; preserve evidence attachments required by the plan.",
     "rename_entity": "Use one exact editable target and a concise stable name supported by the request.",
-    "delete_page": "Return only as a final manual-cleanup suggestion after useful content is preserved; the runner does not automatically delete it.",
+    "suggest_page_deletion": "Return only as a final manual-cleanup suggestion after useful content is preserved; the runner does not automatically delete it.",
     "summarize_file": "Use each exact report file ref once with a grounded full-file summary, two distinct broad retrieval terms, and normally search=true.",
     "skip": "Use only when an artifact truly should not be saved or the user explicitly excluded it.",
     "needs_review": "Use when a real human judgment remains; do not use it to avoid documented schema or reference work.",
@@ -226,7 +226,7 @@ EXTERNAL_FORM_AUTOFILL_BUNDLE = {
     "description": "Final form submissions and grounded field updates for external proposals.",
     "instructions": (
         "Author final values in the current external action schema. For "
-        "update_submission_fields, return only the selected grounded updates; "
+        "update_form_values, return only the selected grounded updates; "
         "do not copy unrelated existing values into data.updates."
     ),
     "sections": (
@@ -241,7 +241,7 @@ EXTERNAL_FORM_AUTOFILL_BUNDLE = {
         SUBMISSION_OUTPUT_REQUIREMENTS.replace(
             "- Submission objects should contain all properties from the partial submission (if provided) unaltered.",
             "- New submission objects retain supplied partial values unless a "
-            "grounded correction is required. For update_submission_fields, "
+            "grounded correction is required. For update_form_values, "
             "include only grounded changes using exact schema field ids.",
         ),
         SCHEMA_TYPE_GUIDELINES,
@@ -257,7 +257,7 @@ SUBMISSION_PATCH_BUNDLE = {
         "and values, or get_schema(include_values=true) when needed. Include only "
         "requested, evidence-supported changes; omitted fields remain unchanged. "
         "Do not invent missing facts or silently resolve conflicting evidence. "
-        "For newly added fields, depend on the preceding update_form_schema action.",
+        "For newly added fields, depend on the preceding extend_form_schema action.",
         SCHEMA_TYPE_GUIDELINES,
     ),
 }
@@ -298,7 +298,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
                 "description": (
                     "For task=report_actions, return only rules for the selected "
                     "proposal action types. For task=form_autofill, select "
-                    "[update_submission_fields] for patch guidance instead of full autofill."
+                    "[update_form_values] for patch guidance instead of full autofill."
                 ),
             },
         },
@@ -363,8 +363,8 @@ def _guidelines_result(args, *, external):
     if error:
         return error
     if actions is not None and task == "form_autofill":
-        if actions != ["update_submission_fields"]:
-            return {"error": "form_autofill actions must be [update_submission_fields]."}
+        if actions != ["update_form_values"]:
+            return {"error": "form_autofill actions must be [update_form_values]."}
         bundle = SUBMISSION_PATCH_BUNDLE
     elif actions is not None and task != "report_actions":
         return {"error": "actions is supported only for task=report_actions or form_autofill."}

@@ -37,6 +37,7 @@ from lagniappe_mcp.errors import (
     TransportError,
 )
 from lagniappe_mcp.limits import (
+    CONTRACT_VERSION_MAX,
     MAX_ERROR_BYTES,
     MAX_MEDIA_RAW_BYTES,
     MAX_STRUCTURED_RESULT_BYTES,
@@ -109,7 +110,7 @@ def _plan() -> dict[str, Any]:
         "files": [],
         "uploads_pending": False,
         "upload_batch_id": None,
-        "contract_version": 6,
+        "contract_version": CONTRACT_VERSION_MAX,
         "contract_url": "https://example.com/api/v1/plans/abcdefghijkl/contract",
         "submit_url": "https://example.com/api/v1/plans/abcdefghijkl/submit",
         "status_url": "https://example.com/api/v1/plans/abcdefghijkl",
@@ -121,7 +122,7 @@ def _plan() -> dict[str, Any]:
 
 def _contract() -> dict[str, Any]:
     return {
-        "contract_version": 6,
+        "contract_version": CONTRACT_VERSION_MAX,
         "tool": "create",
         "current_date": "2026-09-04",
         "timezone": "UTC",
@@ -145,8 +146,8 @@ def _contract() -> dict[str, Any]:
         "submission_format": {
             "method": "POST",
             "url": "https://example.com/api/v1/plans/abcdefghijkl/submit",
-            "contract_version": 6,
-            "body": {"contract_version": 6, "proposal": {}},
+            "contract_version": CONTRACT_VERSION_MAX,
+            "body": {"contract_version": CONTRACT_VERSION_MAX, "proposal": {}},
             "rule": "Replace the empty proposal template.",
         },
     }
@@ -228,7 +229,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
                 "submit_plan",
                 {
                     "plan_id": "abcdefghijkl",
-                    "contract_version": 6,
+                    "contract_version": CONTRACT_VERSION_MAX,
                     "proposal": {"wrong": "shape"},
                 },
             )
@@ -236,7 +237,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
             "submit_plan",
             {
                 "plan_id": "abcdefghijkl",
-                "contract_version": 6,
+                "contract_version": CONTRACT_VERSION_MAX,
                 "proposal": {"title": "Task"},
                 "name": "Expanded request",
                 "instructions": "Now includes another task",
@@ -245,7 +246,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
         assert receipt.value["status"] == "ready"
         assert rest.requests[-2][1] == "plans/abcdefghijkl/contract"
         assert rest.requests[-1][2] == {
-            "contract_version": 6,
+            "contract_version": CONTRACT_VERSION_MAX,
             "proposal": {"title": "Task"},
             "name": "Expanded request",
             "instructions": "Now includes another task",
@@ -326,7 +327,7 @@ class _WorkflowREST:
                 "preview_url": "https://example.com/tools/api-plan/abcdefghijkl",
                 "review_url": "https://example.com/tools/reports/abcdefghijkl",
                 "status_url": "https://example.com/api/v1/plans/abcdefghijkl",
-                "contract_version": 6,
+                "contract_version": CONTRACT_VERSION_MAX,
                 "proposal_fingerprint": "f" * 64,
             }, "request-submit"
         raise AssertionError(f"Unexpected request: {method} {target}")
@@ -1844,7 +1845,7 @@ def test_lifecycle_transport_and_human_links_fail_closed() -> None:
                 "submit_plan",
                 {
                     "plan_id": "abcdefghijkl",
-                    "contract_version": 6,
+                    "contract_version": CONTRACT_VERSION_MAX,
                     "proposal": {"title": "Safe"},
                 },
             )
@@ -1874,7 +1875,7 @@ def test_lifecycle_responses_reject_values_outside_the_frozen_contract() -> None
         for field, value in (
             ("status", "queued"),
             ("name", None),
-            ("contract_version", 7),
+            ("contract_version", CONTRACT_VERSION_MAX + 1),
         ):
             plan = _plan()
             plan[field] = value
@@ -1902,12 +1903,12 @@ def test_lifecycle_responses_reject_values_outside_the_frozen_contract() -> None
             "preview_url": "https://example.com/tools/api-plan/abcdefghijkl",
             "review_url": "https://example.com/tools/reports/abcdefghijkl",
             "status_url": "https://example.com/api/v1/plans/abcdefghijkl",
-            "contract_version": 6,
+            "contract_version": CONTRACT_VERSION_MAX,
             "proposal_fingerprint": "f" * 64,
         }
         for field, value in (
             ("status", "draft"),
-            ("contract_version", 7),
+            ("contract_version", CONTRACT_VERSION_MAX + 1),
             ("proposal_fingerprint", ""),
         ):
             invalid_receipt = {**receipt, field: value}
@@ -1938,7 +1939,7 @@ def test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper() -> Non
                 "submit_plan",
                 {
                     "plan_id": "abcdefghijkl",
-                    "contract_version": 6,
+                    "contract_version": CONTRACT_VERSION_MAX,
                     "proposal": {"title": 7},
                 },
             )
@@ -1948,7 +1949,7 @@ def test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper() -> Non
             "submit_plan",
             {
                 "plan_id": "abcdefghijkl",
-                "contract_version": 6,
+                "contract_version": CONTRACT_VERSION_MAX,
                 "proposal": {"title": "Approved in the browser"},
             },
         )
@@ -1963,7 +1964,7 @@ def test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper() -> Non
         "POST",
         "https://example.com/api/v1/plans/abcdefghijkl/submit",
         {
-            "contract_version": 6,
+            "contract_version": CONTRACT_VERSION_MAX,
             "proposal": {"title": "Approved in the browser"},
         },
     )

@@ -110,7 +110,7 @@ def _undo_add_form_to_page_action(action, user):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_entities.py::test_run_report_adds_page_category_without_changing_primary_with_undo
 # @matrix ai-report : add-category undo
-def _undo_add_category_action(action, user):
+def _undo_add_page_category_action(action, user):
     previous = action.get("previous") or {}
     if previous.get("had_category"):
         return {"note": "Category was already present; nothing removed."}
@@ -334,7 +334,7 @@ def _undo_attachment_action(action, user):
             "target": _entity_result(target),
             "note": "Attachment already existed; nothing removed.",
         }
-    if action.get("type") == "attach_file_to_page":
+    if isinstance(target, Entities.PAGE):
         changed = _remove_file_page_reference(file, target)
     else:
         changed = _remove_task_file_reference(target, file)

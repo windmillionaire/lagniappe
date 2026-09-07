@@ -95,7 +95,7 @@ def _ready_report(user):
                     },
                     {
                         "id": "cleanup",
-                        "type": "delete_page",
+                        "type": "suggest_page_deletion",
                         "depends_on": ["page"],
                         "data": {"page_action": "page"},
                     },
@@ -319,7 +319,7 @@ def _schema_section_report(user):
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "update_form_schema",
+                        "type": "extend_form_schema",
                         "display_label": "Add paid invoice option",
                         "data": {
                             "form": form.urlsafe_key,
@@ -337,7 +337,7 @@ def _schema_section_report(user):
                     },
                     {
                         "id": "update_note",
-                        "type": "update_submission_fields",
+                        "type": "update_form_values",
                         "display_label": "Mark invoice note paid",
                         "depends_on": ["schema"],
                         "data": {
@@ -1553,7 +1553,7 @@ def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_us
         "actions": [
             {
                 "id": "schema",
-                "type": "update_form_schema",
+                "type": "extend_form_schema",
                 "data": {
                     "form": form.urlsafe_key,
                     "operations": [
@@ -1576,7 +1576,7 @@ def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_us
             },
             {
                 "id": "details",
-                "type": "update_submission_fields",
+                "type": "update_form_values",
                 "depends_on": ["schema"],
                 "data": {
                     "updates": [

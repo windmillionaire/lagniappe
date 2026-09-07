@@ -138,7 +138,7 @@ def _resolve_file_endpoint(data, created, endpoint):
 def _file_attached_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         return endpoint.key in list(file.db.get("pages") or [])
-    if isinstance(endpoint, Entities.TASK):
+    if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
         return endpoint.key in list(file.db.get("tasks") or []) or file.key in list(
             endpoint.db.get("files") or []
         )
@@ -152,7 +152,7 @@ def _file_attached_to_endpoint(file, endpoint):
 def _remove_file_from_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         return file.properties.pages.remove(endpoint)
-    if isinstance(endpoint, Entities.TASK):
+    if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
         return endpoint.properties.files.remove(file)
     return False
 
@@ -164,19 +164,14 @@ def _remove_file_from_endpoint(file, endpoint):
 def _add_file_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         return file.properties.pages.add(endpoint)
-    if isinstance(endpoint, Entities.TASK):
+    if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
         return endpoint.properties.files.add(file)
     return False
 
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wrong_kind
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_resolves_attachment_page_from_single_prior_task_when_reference_is_file
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_missing
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_category_used_as_attachment_page
-# @matrix ai-report : attachment exact-page-name page-reference prior-task-page repair task-history validation
-# @matrix files : exact-page-name page-reference prior-task-page repair
-# @matrix task-completion tasks : page-reference repair task-history
+# @matrix ai-report task-completion tasks : page-reference repair task-history
 def _resolve_action_page(data, created, user):
     reference = (
         data.get("page")

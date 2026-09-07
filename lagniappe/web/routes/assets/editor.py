@@ -181,7 +181,7 @@ def generate_text(key, **kwargs):
 
 
 # @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
+# @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_saves_do_not_create_automatic_history
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
 # @matrix editor : history-list history-pin history-restore

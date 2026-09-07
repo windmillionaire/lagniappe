@@ -254,7 +254,7 @@ def test_complete_task_depends_on_successful_submission_patch(monkeypatch, failu
     actions = report.proposal["actions"]
     patch = {
         "id": "details",
-        "type": "update_submission_fields",
+        "type": "update_form_values",
         "data": {
             "updates": [
                 {
@@ -635,7 +635,7 @@ def test_run_report_retry_validates_completed_move_and_update_prefix(
         if first_action == "move"
         else {
             "id": "update_page",
-            "type": "update_submission_fields",
+            "type": "update_form_values",
             "data": {
                 "updates": [
                     {
@@ -972,7 +972,7 @@ def test_grouped_result_submission_updates_list_only_unique_applied_targets(
         "actions": [
             {
                 "id": "details",
-                "type": "update_submission_fields",
+                "type": "update_form_values",
                 "status": status,
                 "updates": {
                     "applied": applied,
@@ -1033,7 +1033,7 @@ def test_grouped_result_actions_groups_page_files_tasks_and_summaries():
                 "actions": [
                     {
                         "id": "attach_plan",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "status": "complete",
                         "entity": {
                             "id": "file-plan",
@@ -1079,7 +1079,7 @@ def test_grouped_result_actions_groups_page_files_tasks_and_summaries():
                     },
                     {
                         "id": "attach_invoice",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "status": "complete",
                         "entity": {
                             "id": "file-invoice",
@@ -1248,7 +1248,7 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
                     },
                     {
                         "id": "attachment",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "status": "complete",
                         "entity": {
                             "id": file.urlsafe_key,

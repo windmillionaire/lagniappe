@@ -1852,6 +1852,7 @@ def create_plan():
         instructions=instructions,
         tool=tool,
         name=name,
+        remote_mcp=bool(getattr(g, "remote_mcp_authenticated", False)),
     )
     return _plan_payload(report), 201
 

@@ -30,19 +30,19 @@ class Result(ReportProcessValue):
             action_type = item.get("type")
 
             if (
-                action_type == "update_submission_fields"
+                action_type == "update_form_values"
                 and item.get("status") == "complete"
             ):
                 item["updated_entities"] = self._submission_update_entities(item)
 
-            if action_type == "attach_file_to_page":
+            if action_type == "attach_file" and target.get("kind") in {"page", "user"}:
                 page_group = self._result_page_group(target, grouped, page_groups)
                 if page_group:
                     page_group.setdefault("attachments", []).append(item)
                     self._remember_result_file_target(file_targets, item)
                     continue
 
-            if action_type == "attach_file_to_task":
+            if action_type == "attach_file" and target.get("kind") in {"task", "task_history"}:
                 task_group = task_groups.get(target.get("id")) or by_entity_id.get(
                     target.get("id")
                 )

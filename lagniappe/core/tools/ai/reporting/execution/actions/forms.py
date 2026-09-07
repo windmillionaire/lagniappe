@@ -31,7 +31,7 @@ from .references import (
 # @matrix ai-report submission : batch-field-patch persistence
 # @matrix ai-report : batch-field-patch deterministic-run empty-update
 # @matrix submission : continue deterministic-run empty-update recoverable
-def _update_submission_fields(action, _report, user, created):
+def _update_form_values(action, _report, user, created):
     data = _data(action)
     updates = data.get("updates") or []
     if not isinstance(updates, list):
@@ -125,7 +125,7 @@ def _update_submission_fields(action, _report, user, created):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_adds_schema_fields_persists_all_task_values_and_completes
 # @matrix ai-report submission : schema-update
 # @matrix ai-report form-schema : deterministic-run permission-failure schema-update
-def _update_form_schema(action, _report, user, created):
+def _extend_form_schema(action, _report, user, created):
     data = _data(action)
     form = _resolve_entity(
         data.get("form")
@@ -184,7 +184,7 @@ def _update_form_schema(action, _report, user, created):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_submission_fields
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_values
 # @reason row entity resolution is covered through batch submission report-run tests
 def _resolve_submission_update_entity(update, created):
     page_reference = (
@@ -209,7 +209,7 @@ def _resolve_submission_update_entity(update, created):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_submission_fields
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_values
 # @reason previous value capture is covered through undo tests
 def _submission_previous_value(entity, schema_id):
     submission = getattr(entity, "submission", None)
@@ -222,7 +222,7 @@ def _submission_previous_value(entity, schema_id):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_submission_fields
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_values
 # @reason validation behavior is covered through batch submission report-run tests
 def _apply_submission_field_update(entity, schema_id, value):
     if not getattr(entity, "form", None):
@@ -247,7 +247,7 @@ def _apply_submission_field_update(entity, schema_id, value):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_extend_form_schema
 # @reason schema operation parsing is covered through schema update report-run tests
 def _schema_add_field(schema, raw_field):
     field = _safe_schema_field(raw_field)
@@ -265,7 +265,7 @@ def _schema_add_field(schema, raw_field):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_extend_form_schema
 # @reason schema operation parsing is covered through schema update report-run tests
 def _schema_add_select_option(schema, operation):
     schema_id = operation.get("schema_id") or operation.get("field_id")
@@ -314,7 +314,7 @@ def _schema_add_select_option(schema, operation):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_extend_form_schema
 # @reason field sanitization is covered through schema update report-run tests
 def _safe_schema_field(raw_field):
     if not isinstance(raw_field, dict):
@@ -336,8 +336,8 @@ def _safe_schema_field(raw_field):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_submission_fields
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_values
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_extend_form_schema
 # @reason user-facing notes are asserted through report-run result tests
 def _update_summary_note(prefix, applied, skipped):
     count = len(applied or [])

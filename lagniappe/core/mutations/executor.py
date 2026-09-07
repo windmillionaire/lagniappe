@@ -222,7 +222,7 @@ def execute_post_commit(plan):
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
 # @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save typed-intent-preservation
-def execute_mutation(plan):
+def execute_mutation(plan, *, guards=None):
     """Execute durable effects before rebuildable cache and blob effects."""
     if not isinstance(plan, MutationPlan):
         raise TypeError("execute_mutation requires a MutationPlan")
@@ -237,8 +237,9 @@ def execute_mutation(plan):
     ]
 
     if writes:
+        options = {"guards": guards} if guards else {}
         database_utility.save_mutations(
-            (effect.entity, effect.property_mask) for effect in writes
+            ((effect.entity, effect.property_mask) for effect in writes), **options
         )
         for effect in writes:
             _completed(outcome, effect.effect)

@@ -3,6 +3,7 @@
 import hashlib
 import json
 import uuid
+from contextlib import contextmanager
 
 from redis import WatchError
 
@@ -14,6 +15,52 @@ DOCUMENT_TTL_SECONDS = 300
 PRESENCE_TTL_SECONDS = 60
 CHECKPOINT_DELTA_COUNT = 64
 MAX_TRANSACTION_ATTEMPTS = 8
+
+
+# @testable true
+# @tests tests_unit/test_010b_document_append.py::test_document_write_lock_is_scoped_and_bounded
+# @matrix editor sync : document append write-lock
+@contextmanager
+def document_write_lock(sync_id):
+    """Serialize checkpoint preparation; durable CAS still fences expired locks."""
+    with cache.redis.lock(f"{Sync.DOCUMENTS.key(sync_id)}:write", timeout=60, blocking_timeout=5):
+        yield
+
+
+# @testable true
+# @tests tests_unit/test_010b_document_append.py::test_publish_checkpoint_preserves_live_updates
+# @matrix editor sync : document append cache-recovery offline-replay
+def publish_document_checkpoint(sync_id, *, seed):
+    """Reconcile a committed checkpoint, retaining any uncheckpointed CRDT work."""
+    from lagniappe.core.tools.document_crdt import merge_documents
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/cache/documents.py::publish_document_checkpoint
+    # @reason isolated transaction callback
+    def transform(state):
+        state["ydoc"] = merge_documents(seed.get("ydoc"), state.get("ydoc"), *(item["update"] for item in state.get("updates", [])))
+        state["generation"] = str(uuid.uuid4())
+        state["revision"] = int(state["revision"]) + 1
+        state["base_revision"] = state["revision"]
+        state["fingerprint"] = seed.get("fingerprint")
+        state["markup"] = seed.get("markup")
+        state["updates"] = []
+        state["authors"] = {}
+        state["checkpoint_author_hash"] = None
+
+    state, _result = _mutate(sync_id, seed, transform)
+    return state
+
+
+# @testable true
+# @tests tests_unit/test_010b_document_append.py::test_publish_checkpoint_preserves_live_updates
+# @matrix editor sync : document append cache-recovery offline-replay
+def current_document_state(sync_id, *, seed):
+    """Called under the write lock with a fresh durable seed, not a cached Page."""
+    state = _read_document_state(sync_id, seed)
+    if state.get("fingerprint") != seed.get("fingerprint") and seed.get("ydoc"):
+        state = publish_document_checkpoint(sync_id, seed=seed)
+    return state
 
 
 # @testable false

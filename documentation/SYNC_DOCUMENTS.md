@@ -60,8 +60,61 @@ This prevents both lost concurrent edits and Redis-only state.
 
 After 64 retained deltas, the server requests a checkpoint from an editable
 client. Editor blur can also send one. Accepted checkpoints persist document
-asset/history through a property-masked entity mutation and refresh Redis
+assets through a property-masked entity mutation and refresh Redis
 metadata without touching the parent's ordinary form fingerprint.
+
+Checkpoint writers now share a bounded per-document Redis write lock, reload
+the editable entity inside that lock, and guard the durable asset metadata with
+a Datastore compare-and-set. The lock serializes the common path; the durable
+guard still rejects an expired-lock/stale writer. HTML/YDoc checkpoint blobs use
+attempt-isolated paths, so a losing writer cannot overwrite the winner's blob
+before its metadata commit. After a successful commit, the existing mutation
+cleanup retires only superseded HTML/YDoc objects, never embedded images. Paths
+are not reused, even for equal content, so delayed cleanup cannot delete a newer
+save. Readers and version copies use recorded Storage generations so an
+in-flight reader can finish after its old live object is retired. Empty
+documents retain Yjs tombstones to prevent offline resurrection.
+
+## Versions and recovery
+
+- Current editing state is one HTML/YDoc pair; normal checkpoints do not create
+  DocumentHistory records or retained live checkpoint archives.
+- Named/pinned versions remain explicit HTML snapshots in DocumentHistory.
+  Existing automatic entries remain readable, restorable, and removable with
+  Clear Unpinned Versions; no upgrade migration deletes them.
+- A reviewed append to an existing document saves one named "Before report
+  append" version in that same history, atomically with the append's metadata.
+  The Report preallocates its version key, so retries do not duplicate versions.
+  Undo uses that version and CRDT deletions, not retained checkpoint paths.
+- Disaster recovery continues to use the existing Storage object generations
+  and backup configuration. Retiring a live object allows the existing
+  noncurrent-version lifecycle to reclaim it; no new retention policy is added.
+
+Cleanup is post-commit best-effort and failures use the existing mutation outcome
+reporting. A provider failure or interrupted write can leave an unreferenced
+blob; failed/ambiguous writes never trigger deletion of the accepted pair.
+
+## Reviewed document appends
+
+`append_page_document` uses `pycrdt` to append editor-compatible nodes to the
+existing Yjs `default` fragment without reconstructing old nodes. Only new,
+sanitized Markdown fragments are converted; existing rich content and IDs remain
+untouched. New AI-created documents are initialized with Yjs state immediately.
+
+The action requires a saved baseline: pending Redis edits or an older HTML-only
+document stop execution rather than guessing or replacing a draft. The latter
+needs one ordinary editor save. A durable `lagniappeReports` Yjs map records the
+operation receipt, including the expected post-append content signature, so a
+retry after a Report checkpoint failure does not append twice. Undo emits
+deletions (not an old snapshot reset) and checks that later edits are preserved.
+If a required named version is missing, Undo stops without modifying the document.
+
+After an append commits, the server publishes a new revision/generation with the
+merged snapshot. Connected/offline clients merge it using the existing sync
+protocol. A fresh durable fingerprint also repairs a missed cache publication
+at the next write; any retained CRDT changes are merged, not discarded. Ordinary
+browser checkpoints keep their current generation when their metadata refresh
+succeeds. Source/time quotes belong to reviewed AI additions, not normal typing.
 
 ## Offline document records
 

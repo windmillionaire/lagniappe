@@ -1,6 +1,7 @@
 """Before-state and post-commit checkpoints for report actions."""
 
 import copy
+from datetime import datetime, timezone
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
@@ -20,7 +21,6 @@ from .references import (
     _file_attached_to_endpoint,
     _load_result_entity,
     _reference_key,
-    _resolve_action_page,
     _resolve_entity,
     _resolve_file_endpoint,
     _resolve_file_entity,
@@ -28,6 +28,7 @@ from .references import (
 )
 from .forms import _resolve_submission_update_entity, _submission_previous_value
 from .task_completion import _completion_state
+from .documents import prepare_document_append
 from .completed_tasks import (
     _capture_completed_task_before,
     _completed_event_belongs_in_history,
@@ -113,7 +114,7 @@ def _capture_action_before(action, report, user, created, context=None):
             "entity": _snapshot_entity(page),
             "form": _snapshot_entity(page.form),
         }
-    if action_type == "add_category":
+    if action_type == "add_page_category":
         page = _resolve_entity(
             _first_data_reference(data, "page"), created, expected=Entities.PAGE
         )
@@ -153,7 +154,7 @@ def _capture_action_before(action, report, user, created, context=None):
             "entity": _snapshot_entity(entity),
             "name": entity.name,
         }
-    if action_type == "update_submission_fields":
+    if action_type == "update_form_values":
         previous = []
         for index, update in enumerate(data.get("updates") or [], 1):
             if not isinstance(update, dict):
@@ -171,7 +172,7 @@ def _capture_action_before(action, report, user, created, context=None):
                 }
             )
         return {"updates": previous}
-    if action_type == "update_form_schema":
+    if action_type == "extend_form_schema":
         form = _resolve_entity(
             _first_data_reference(data, "form"), created, expected=Entities.FORM
         )
@@ -179,12 +180,8 @@ def _capture_action_before(action, report, user, created, context=None):
             "entity": _entity_result(form),
             "schema": copy.deepcopy(form.schema or []),
         }
-    if action_type in {"attach_file_to_page", "attach_file_to_task"}:
-        target = (
-            _resolve_action_page(data, created, user)
-            if action_type == "attach_file_to_page"
-            else _resolve_entity(_first_data_reference(data, "task"), created)
-        )
+    if action_type == "attach_file":
+        target = _resolve_entity(_first_data_reference(data, "entity"), created)
         file = _resolve_report_file(
             data.get("file") or data.get("file_id") or data.get("file_ref"),
             report,
@@ -220,6 +217,11 @@ def _capture_action_before(action, report, user, created, context=None):
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
 # @matrix ai-report : completed-task idempotency recovery
 def _prepare_action_checkpoint(action, report, user, created, context, record):
+    if action.get("type") == "append_page_document":
+        prepare_document_append(action, report, user, created, record)
+        return
+    if action.get("type") == "create_page" and _data(action).get("document"):
+        record["document_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     record["before"] = _capture_action_before(
         action,
         report,
@@ -302,7 +304,7 @@ def _record_action_result(record, action, entity, to_save, metadata, created, co
     if entity:
         _remember_created(created, action, entity)
         record["entity"] = _entity_result(entity)
-        if action.get("type") == "delete_page":
+        if action.get("type") == "suggest_page_deletion":
             record["entity"]["fingerprint"] = entity.fingerprint
     if "created" in metadata:
         record["created"] = metadata["created"]
@@ -337,10 +339,11 @@ def _record_action_result(record, action, entity, to_save, metadata, created, co
         "manual",
         "task_state_fingerprint",
         "completion_state",
+        "document_after",
     ):
         if key in metadata:
             record[key] = metadata[key]
-    if action.get("type") == "update_form_schema" and entity is not None:
+    if action.get("type") == "extend_form_schema" and entity is not None:
         record["schema_fingerprint"] = _value_fingerprint(entity.schema or [])
     if metadata.get("note"):
         record["note"] = metadata["note"]

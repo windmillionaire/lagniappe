@@ -1,8 +1,8 @@
-"""Frozen safety limits for the first MCP trial release."""
+"""Safety limits and the supported shared AI contract version."""
 
 API_VERSION = "v1"
-CONTRACT_VERSION_MIN = 6
-CONTRACT_VERSION_MAX = 6
+CONTRACT_VERSION_MIN = 7
+CONTRACT_VERSION_MAX = 7
 
 MAX_CATALOG_BYTES = 1 * 1024 * 1024
 MAX_TOOL_COUNT = 64

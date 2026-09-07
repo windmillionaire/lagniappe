@@ -474,12 +474,12 @@ def file_size(path, visibility):
     return blob.size
 
 
-# @testable false
-# @reason cloud storage behavior is owned by E2E coverage against configured services
-def get_text(path, visibility, encoding="utf-8"):
-    """Download a blob as decoded text from the specified bucket."""
+# @testable true
+# @matrix storage : generation-pinned read copy
+def get_text(path, visibility, encoding="utf-8", *, generation=None):
+    """Read text, optionally pinning a descriptor's recorded object generation."""
     bucket = DATA.bucket(visibility)
-    blob = bucket.blob(path)
+    blob = bucket.blob(path, **({"generation": int(generation)} if generation else {}))
 
     encoding = "utf-8-sig" if encoding == "utf-8" else encoding
     text = blob.download_as_text(encoding=encoding)
@@ -505,17 +505,22 @@ def save_text(text, path, content_type, visibility):
     return blob
 
 
-# @testable false
-# @reason cloud storage copy behavior is provider-owned; export tests mock this helper
-def copy_file(source_path, source_visibility, destination_path, destination_visibility):
-    """Copy a blob between storage buckets without downloading it into memory."""
+# @testable true
+# @matrix storage : generation-pinned read copy
+def copy_file(source_path, source_visibility, destination_path, destination_visibility, *, source_generation=None):
+    """Copy a live or generation-pinned blob without downloading it into memory."""
     source_bucket = DATA.bucket(source_visibility)
     destination_bucket = DATA.bucket(destination_visibility)
-    source_blob = source_bucket.blob(source_path)
+    source_blob = source_bucket.blob(
+        source_path, **({"generation": int(source_generation)} if source_generation else {})
+    )
     if not source_blob.exists():
         return None
 
-    return source_bucket.copy_blob(source_blob, destination_bucket, destination_path)
+    return source_bucket.copy_blob(
+        source_blob, destination_bucket, destination_path,
+        **({"source_generation": int(source_generation)} if source_generation else {}),
+    )
 
 
 # @testable false

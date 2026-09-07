@@ -345,6 +345,7 @@ class ProposalReferenceResolver:
     def entity_reference_values(self, data):
         references = []
         for root in (
+            "entity",
             "category",
             "file",
             "form",

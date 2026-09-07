@@ -114,12 +114,12 @@ ORGANIZE_ACTION_TYPES = frozenset(
         "create_page",
         "create_task",
         "add_form_to_page",
-        "add_category",
-        "update_form_schema",
-        "update_submission_fields",
-        "attach_file_to_page",
-        "attach_file_to_task",
-        "delete_page",
+        "add_page_category",
+        "extend_form_schema",
+        "update_form_values",
+        "attach_file",
+        "append_page_document",
+        "suggest_page_deletion",
         "skip",
         "needs_review",
     }
@@ -156,7 +156,7 @@ def _organize_action_permission_context(user, allowed_actions):
             "can_rename_entities",
         }
     }
-    if "add_category" in set(allowed_actions or ()):
+    if "add_page_category" in set(allowed_actions or ()):
         context["capabilities"]["can_add_page_categories"] = True
     return context
 

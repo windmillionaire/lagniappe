@@ -123,7 +123,7 @@ def _complete_form_schema_fields(proposal):
         fields = []
         if action.get("type") == "create_form" and isinstance(data.get("schema"), list):
             fields = data["schema"]
-        elif action.get("type") == "update_form_schema" and isinstance(
+        elif action.get("type") == "extend_form_schema" and isinstance(
             data.get("operations"), list
         ):
             fields = [
@@ -484,7 +484,7 @@ def _report_needs_review_proposal(
     is_ask = report_label == "Ask"
     is_form_error = not is_ask and any(
         marker in validation_error
-        for marker in ("create_form", "update_form_schema", "data.schema")
+        for marker in ("create_form", "extend_form_schema", "data.schema")
     )
     if is_ask:
         display_label = "Suggested changes"
@@ -767,7 +767,7 @@ def _organize_prompt_report_file_refs(prompt):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_invalid_action_references_once
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_category_used_as_page_reference
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_invalid_action_data_shape
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_missing_add_category_target
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_missing_add_page_category_target
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_empty_form_schema_without_capture
 # @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_repairs_unusable_answers
 # @matrix ai-report : add-category capture empty-form file-placement references repair required-data
@@ -886,7 +886,7 @@ table-payments; do not return schema fields without ids.
 When get_guidelines is available, call get_guidelines("page_form") or
 get_guidelines("task_form") before repairing a create_form action, matching its
 data.form_type. Call get_guidelines("schema_evolution") before repairing an
-update_form_schema action. An add_field operation has the same id, type, and
+extend_form_schema action. An add_field operation has the same id, type, and
 title requirements as a create_form schema field, and input fields must also
 include an input subtype. Do not merely claim a schema was corrected in the
 summary; put every correction in the returned action data.
@@ -905,7 +905,7 @@ to force an earlier report task. Omit both for ordinary repeated work; use a
 distinct stable name when the work is distinct.
 For Organize repairs, compare the complete Report Input Files list with the
 replacement actions. Every exact report_file_ref must appear in a valid
-attach_file_to_page or attach_file_to_task action whose page/task target is an
+attach_file action whose entity/entity_action target is an
 existing entity or an earlier proposal action. Creating a page or task,
 summarizing a file, or mentioning a filename does not place the file. Add any
 missing attachment actions and preserve all valid existing placements.
@@ -915,12 +915,12 @@ form reference in data.form/data.form_action. If exactly one earlier page
 create_form action is compatible, use its id in data.form_action. If the page
 form cannot be identified safely, replace the add_form_to_page action with
 needs_review.
-add_category actions must include both an existing or earlier-created page
+add_page_category actions must include both an existing or earlier-created page
 reference in data.page/data.page_action and an existing or earlier-created
 category reference through data.category, data.category_action, data.model, or
 data.model_action. A readable category_name/model_name is not enough to execute.
 If the category cannot be identified from the invalid proposal or available
-context, replace the add_category action with needs_review.
+context, replace the add_page_category action with needs_review.
 move_page actions must include both the existing page in data.page and the
 destination category in data.category or data.model. move_task actions must
 include both the existing task in data.task and the destination page in
@@ -932,7 +932,7 @@ source reference using from_page/from_task or their aliases, and exactly one
 target reference using to_page/to_task or their aliases. For existing page files,
 use get_page_file_list to get the file hash and source page; include display_name
 or file_name only as a readable label, not as the executable file reference.
-For Organize planning, update_submission_fields must identify exactly one
+For Organize planning, update_form_values must identify exactly one
 existing target in data.page or data.task and omit data.updates so the focused
 submission completion stage can derive evidence-backed values. In other report
 types, data.updates must contain at least one object with exactly one page or

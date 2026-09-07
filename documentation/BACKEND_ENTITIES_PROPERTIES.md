@@ -129,6 +129,12 @@ discarding them. See [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md).
 `tools/database/assets.py`. Asset deletion is post-commit cleanup; a provider
 failure cannot make the Datastore outcome ambiguous.
 
+Document checkpoints keep current HTML and Yjs assets, not an automatic history
+entry per save. Replaced document blobs are retired after commit through ordinary
+mutation cleanup; named versions and legacy history are separate preserved
+records. Text reads/copies honor recorded Storage generations. See
+[SYNC_DOCUMENTS.md](SYNC_DOCUMENTS.md#versions-and-recovery).
+
 `ProcessProperty` stores named sections such as extraction, summary, and task
 scheduling in a shared JSON document. A process property declares its DB key,
 section ID, and allowed dynamic attributes. Cross-record orchestration remains

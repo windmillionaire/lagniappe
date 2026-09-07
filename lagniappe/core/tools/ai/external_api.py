@@ -45,7 +45,7 @@ from .reporting.contracts.workflows import (
 )
 
 
-CONTRACT_VERSION = 6
+CONTRACT_VERSION = 7
 SUPPORTED_PLAN_TOOLS = ("ask", "create", "organize")
 MAX_INSTRUCTIONS_BYTES = 65536
 MAX_PROPOSAL_BYTES = 1024 * 1024
@@ -197,7 +197,7 @@ def normalize_plan_tool(tool):
 # @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
 # @matrix agent-api ai-report : draft report-session
 # @pair agent-api:entitlement-independent
-def create_plan(user, *, instructions, tool="organize", name=None):
+def create_plan(user, *, instructions, tool="organize", name=None, remote_mcp=False):
     """Create a durable draft report without dispatching a provider job."""
     instructions = str(instructions or "").strip()
     if not instructions:
@@ -218,6 +218,7 @@ def create_plan(user, *, instructions, tool="organize", name=None):
             "pending": False,
             "agent_manifest": {
                 "version": 1,
+                "source": "remote_mcp" if remote_mcp else "api",
                 "contract_version": CONTRACT_VERSION,
                 "created_at": _utcnow().isoformat(),
                 "original_brief": {
@@ -290,7 +291,7 @@ def _guidance_requirements(tool, *, update_only=False):
             "request": {"task": "task_form"},
         },
         {
-            "when": {"actions_any": ["update_form_schema"]},
+            "when": {"actions_any": ["extend_form_schema"]},
             "request": {"task": "schema_evolution"},
         },
         {
@@ -298,7 +299,7 @@ def _guidance_requirements(tool, *, update_only=False):
                 "actions_any": [
                     "create_page",
                     "create_task",
-                    "update_submission_fields",
+                    "update_form_values",
                 ],
                 "form_values_present": True,
             },
@@ -334,7 +335,7 @@ def _guidance_requirements(tool, *, update_only=False):
     if update_only:
         for item in conditional:
             if item["request"].get("task") == "form_autofill":
-                item["request"]["actions"] = ["update_submission_fields"]
+                item["request"]["actions"] = ["update_form_values"]
     return {
         "tool": "get_guidelines",
         "required_before_analysis": (
@@ -920,8 +921,7 @@ def plan_contract(report, user, *, submit_url, actions=None, view="full"):
         guidance["conditional"] = [
             item
             for item in guidance["conditional"]
-            if item["when"].get("actions_have") != "document_markdown"
-            and (
+            if (
                 not item["when"].get("actions_any")
                 or set(item["when"]["actions_any"]) & set(allowed)
             )
@@ -1367,7 +1367,7 @@ def public_plan_proposal(report):
         data = action.get("data") if isinstance(action, dict) else None
         if not isinstance(data, dict):
             continue
-        if action.get("type") == "create_page":
+        if action.get("type") in {"create_page", "append_page_document"}:
             data.pop("document", None)
 
     if normalize_plan_tool(getattr(report, "tool", None)) == "ask":

@@ -173,7 +173,7 @@ def acknowledge_user_cache(key, revision):
 # @tests tests_unit/test_018_database_utility.py::test_notification_save_and_delete_skip_site_fingerprints
 # @matrix database mutations : document-checkpoint full-upsert property-mask site-fingerprint update
 # @matrix notifications : mutation site-fingerprint-isolation
-def save_mutations(writes):
+def save_mutations(writes, *, guards=None):
     """Persist full and property-masked entity writes in one Datastore batch.
 
     ``writes`` contains ``(typed_entity, property_mask)`` pairs. A ``None`` mask
@@ -201,12 +201,32 @@ def save_mutations(writes):
     fingerprints = (
         update_site_fingerprints(*fingerprint_entities) if fingerprint_entities else []
     )
+    if guards:
+        return _save_guarded_mutations(writes, fingerprints, guards)
     with DATA.datastore.batch() as batch:
         for entity, mask in writes:
             _put_mutation(batch, entity.db, mask)
 
         for fingerprint in fingerprints:
             batch.put(fingerprint)
+
+
+# @testable true
+# @tests tests_unit/test_010b_document_append.py::test_guarded_checkpoint_rejects_a_concurrent_asset_change
+# @matrix mutations sync : document checkpoint cas conflict
+@retry_aborted
+def _save_guarded_mutations(writes, fingerprints, guards):
+    with DATA.datastore.transaction() as transaction:
+        for key, expected in guards:
+            current = DATA.datastore.get(key, transaction=transaction)
+            if current is None or any(current.get(name) != value for name, value in expected.items()):
+                from lagniappe.core.exceptions import ValidationError
+
+                raise ValidationError("Document changed while saving; sync and retry.")
+        for entity, mask in writes:
+            _put_mutation(transaction, entity.db, mask)
+        for fingerprint in fingerprints:
+            transaction.put(fingerprint)
 
 
 # @testable true
