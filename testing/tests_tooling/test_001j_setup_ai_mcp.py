@@ -1,6 +1,7 @@
 """AI policy and MCP lifecycle contracts at the installer/provider boundary."""
 
 from copy import deepcopy
+from dataclasses import replace
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -333,6 +334,77 @@ def test_mcp_resources_use_separate_build_identity_and_scoped_roles(cloud):
         assert not any("set-iam-policy" in call for call in cloud.calls)
 
 
+# @matrix mcp-install : configuration iam resources recovery
+@pytest.mark.parametrize(
+    "app_name,internal_name,saved_name,runtime_name,build_name",
+    [
+        ("ordinary-app", "ordinary-app", None, "lagniappe-mcp", "lagniappe-mcp-build"),
+        ("lagniappe-mcp", "lagniappe-mcp", None, "lagniappe-mcp-2", "lagniappe-mcp-build"),
+        ("lagniappe-mcp", "lagniappe-mcp", "lagniappe-mcp", "lagniappe-mcp-2", "lagniappe-mcp-build"),
+        ("lagniappe-mcp-build", "lagniappe-mcp-build", None, "lagniappe-mcp", "lagniappe-mcp-build-2"),
+        ("ordinary-app", "ordinary-app", "lagniappe-mcp-build", "lagniappe-mcp-build", "lagniappe-mcp-build-2"),
+        ("lagniappe-mcp", "lagniappe-mcp-2", None, "lagniappe-mcp-3", "lagniappe-mcp-build"),
+        ("ordinary-app", "ordinary-app", "custom-mcp", "custom-mcp", "lagniappe-mcp-build"),
+    ],
+)
+def test_mcp_install_keeps_app_runtime_and_build_accounts_separate(
+    cloud, app_name, internal_name, saved_name, runtime_name, build_name,
+):
+    config = settings()
+    account_suffix = "@demo-project.iam.gserviceaccount.com"
+    app_account = app_name + account_suffix
+    internal_account = internal_name + account_suffix
+    config.update({
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": app_account,
+        "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": internal_account,
+    })
+    app_accounts = {app_account, internal_account}
+    cloud.accounts.update({email: {"email": email} for email in app_accounts})
+    app_binding = {
+        "role": "roles/datastore.user",
+        "members": [f"serviceAccount:{app_account}"],
+    }
+    project_key = ("projects", "demo-project")
+    cloud.policies[project_key] = {"bindings": [deepcopy(app_binding)]}
+    resource = "https://lagniappe-demo.run.app/mcp"
+    if saved_name:
+        saved_account = saved_name + account_suffix
+        config.update(MCP_SERVICE_ACCOUNT=saved_account, MCP_RESOURCE=resource)
+        cloud.accounts[saved_account] = {"email": saved_account}
+        cloud.service = service(replace(cloud.target, runtime=saved_account))
+
+    target = mcp.prepare_deployment(config, announce_progress=False)
+    mcp.finish_deployment(target, config, announce_progress=False)
+
+    assert target.runtime == runtime_name + account_suffix
+    assert target.build_account == build_name + account_suffix
+    assert len({target.runtime, target.build_account}) == 2
+    assert not app_accounts.intersection({target.runtime, target.build_account})
+    assert config["MCP_SERVICE_ACCOUNT"] == target.runtime
+    assert config["MCP_RESOURCE"] == resource
+    assert config["RUNTIME_SERVICE_ACCOUNT_EMAIL"] == app_account
+    assert config["INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL"] == internal_account
+    assert cloud.service["spec"]["template"]["spec"]["serviceAccountName"] == target.runtime
+    deploy_calls = [call for call in cloud.calls if call[:2] == ["run", "deploy"]]
+    if not saved_name or saved_name != runtime_name:
+        assert deploy_calls
+    assert all(f"--service-account={target.runtime}" in call for call in deploy_calls)
+    build_calls = [call for call in cloud.calls if call[:2] == ["builds", "submit"]]
+    assert all(f"--service-account=projects/demo-project/serviceAccounts/{target.build_account}" in call for call in build_calls)
+    assert set(cloud.accounts) >= {target.runtime, target.build_account}
+    project_bindings = cloud.policies[project_key]["bindings"]
+    assert app_binding in project_bindings
+    assert not any(f"serviceAccount:{target.runtime}" in row["members"] for row in project_bindings)
+    assert [row["role"] for row in project_bindings if f"serviceAccount:{target.build_account}" in row["members"]] == ["roles/logging.logWriter"]
+
+    cloud.calls.clear()
+    repeated = mcp.prepare_deployment(config, announce_progress=False)
+    mcp.finish_deployment(repeated, config, announce_progress=False)
+    assert repeated == target
+    assert not any("create" in call or "set-iam-policy" in call for call in cloud.calls)
+    assert not any(call[:2] in (["builds", "submit"], ["run", "deploy"]) for call in cloud.calls)
+
+
 # @matrix mcp-install : iam resources provider-convergence idempotence
 def test_mcp_account_creation_waits_for_visibility(cloud, monkeypatch, capsys):
     pending_reads = {cloud.target.runtime: 2, cloud.target.build_account: 2}
@@ -534,17 +606,22 @@ def test_mcp_inspection_is_read_only_and_detects_version_drift(cloud):
 
 
 # @matrix mcp-install : handoff iam
-def test_mcp_handoff_covers_both_accounts_bucket_repository_and_service(cloud):
+@pytest.mark.parametrize("app_name", ["ordinary-app", "lagniappe-mcp", "lagniappe-mcp-build"])
+def test_mcp_handoff_uses_selected_accounts_and_scoped_resources(cloud, app_name):
     config = settings()
     config["DEPLOYER_EMAIL"] = "installer@example.test"
-    mcp.prepare_deployment(config)
+    config["RUNTIME_SERVICE_ACCOUNT_EMAIL"] = f"{app_name}@demo-project.iam.gserviceaccount.com"
+    target = mcp.prepare_deployment(config)
     mcp.handoff_access(config, owner="owner@example.test")
     mcp.handoff_access(config, remove_installer="installer@example.test")
     scoped = [policy for key, policy in cloud.policies.items() if key[0] != "projects"]
     assert len(scoped) == 5
     assert all("user:owner@example.test" in json.dumps(policy) for policy in scoped)
     assert all("user:installer@example.test" not in json.dumps(policy) for policy in scoped)
-    assert "serviceAccount:lagniappe-mcp-build@demo-project.iam.gserviceaccount.com" in json.dumps(list(cloud.policies.values()))
+    assert "serviceAccount:" + target.build_account in json.dumps(list(cloud.policies.values()))
+    assert ("iam", "service-accounts", target.runtime) in cloud.policies
+    assert ("iam", "service-accounts", target.build_account) in cloud.policies
+    assert ("iam", "service-accounts", config["RUNTIME_SERVICE_ACCOUNT_EMAIL"]) not in cloud.policies
 
 
 # @matrix mcp-install : cli-routing retry

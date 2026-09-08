@@ -165,6 +165,14 @@ Standard resource names are:
 | Firestore TTL | `mcp_oauth.expires_at` |
 | `_Default` log-sink exclusion | `remote-mcp-oauth-query`; excludes App Engine OAuth request URLs and referrers |
 
+Account names above are defaults. The app runtime/internal-caller account, MCP
+runtime account and MCP build account must remain distinct. If a default name
+collides, setup selects a numbered suffix (`-2`, then `-3`, as needed). A saved
+MCP runtime account is retained unless it is also an application account; normal
+MCP deployment repairs that collision by saving and deploying a separate MCP
+identity. It preserves the app's account and permissions and the canonical MCP
+URL. The same account selection is used for provisioning, inspection and handoff.
+
 The OAuth exclusion checks both request-URL fields (`protoPayload.resource`,
 `httpRequest.requestUrl`) and referrer fields (`protoPayload.referrer`,
 `httpRequest.referer`). Navigation to an ordinary page can carry authorization

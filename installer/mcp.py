@@ -105,8 +105,21 @@ def requested(settings):
 
 
 # @testable false
-# @covered-by installer/mcp.py::prepare_deployment
-# @reason target derivation is exercised through deployment and recovery boundaries
+# @covered-by installer/mcp.py::_deployment
+# @reason deterministic account naming is exercised through resource provisioning
+def _available_account(project, name, occupied):
+    """Keep managed MCP identities separate from the application's accounts."""
+    email = f"{name}@{project}.iam.gserviceaccount.com"
+    suffix = 2
+    while email in occupied:
+        email = f"{name}-{suffix}@{project}.iam.gserviceaccount.com"
+        suffix += 1
+    return email
+
+
+# @testable true
+# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_install_keeps_app_runtime_and_build_accounts_separate
+# @matrix mcp-install : configuration iam resources recovery
 def _deployment(settings, *, version=None):
     project = settings.get("GOOGLE_CLOUD_PROJECT") or SETTINGS.GCLOUD_CONFIG.get("PROJECT")
     if not isinstance(project, str) or not re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project):
@@ -116,9 +129,18 @@ def _deployment(settings, *, version=None):
     runtime = settings.get("MCP_SERVICE_ACCOUNT") or f"{SERVICE}@{project}.iam.gserviceaccount.com"
     if not runtime.endswith(f"@{project}.iam.gserviceaccount.com"):
         raise SetupError("MCP runtime identity must belong to this installation's project.")
+    app_accounts = {
+        settings.get("RUNTIME_SERVICE_ACCOUNT_EMAIL"),
+        settings.get("INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL"),
+    }
+    # The app's account is named from the installation name, which may itself
+    # be "lagniappe-mcp" or "lagniappe-mcp-build". Never reuse its privileges.
+    if runtime in app_accounts:
+        runtime = _available_account(project, SERVICE, app_accounts)
+    build_account = _available_account(project, BUILD_ACCOUNT, app_accounts | {runtime})
     version = version or source_version()
     return Deployment(
-        project, region, runtime, f"{BUILD_ACCOUNT}@{project}.iam.gserviceaccount.com",
+        project, region, runtime, build_account,
         f"{project}-mcp-builds", issuer, version,
         f"{region}-docker.pkg.dev/{project}/{SERVICE}/server:{version}",
     )
@@ -573,7 +595,7 @@ def inspect_deployment(settings):
 
 
 # @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_handoff_covers_both_accounts_bucket_repository_and_service
+# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_handoff_uses_selected_accounts_and_scoped_resources
 # @matrix mcp-install : handoff iam
 def handoff_access(settings, *, owner=None, remove_installer=None):
     """Transfer exact MCP resource access before removing the installer's project role."""
