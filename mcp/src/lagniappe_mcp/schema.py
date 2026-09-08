@@ -38,6 +38,7 @@ _ALLOWED_SCHEMA_KEYWORDS = frozenset(
         "uniqueItems",
         "minLength",
         "maxLength",
+        "format",
         "minimum",
         "maximum",
         "minProperties",
@@ -61,10 +62,6 @@ _REGEX_OR_UNBOUNDED_SCHEMA_KEYWORDS = frozenset(
         "pattern",
         "patternProperties",
         "propertyNames",
-        # FormatChecker dispatches to keyword-selected Python callables.  The
-        # live remote schemas do not need formats; adapter-owned schemas may
-        # still use their fixed date/URI checks directly in ``validate_value``.
-        "format",
         # These are either unbounded collection scans, schema-valued dynamic
         # evaluation, or draft features absent from the frozen API contract.
         "contains",
@@ -212,6 +209,15 @@ def _reject_unsafe_schema_subset(schema: dict[str, Any]) -> None:
             raise SchemaError(
                 "unsupported_schema",
                 "Upstream schema uses a keyword outside the adapter subset.",
+            )
+        # Only the fixed calendar-date checker is reviewed for remote schemas.
+        # Due-date actions use it even in full contracts for unrelated updates.
+        # Do not let upstream select arbitrary FormatChecker callables; owned
+        # schemas can still use their fixed date-time/URI checks directly.
+        if "format" in node and node["format"] != "date":
+            raise SchemaError(
+                "unsupported_schema",
+                "Upstream schema format must be the supported 'date' format.",
             )
 
         for keyword in ("properties", "$defs"):

@@ -199,6 +199,12 @@ before saving. Consume one complete result representation when the client
 provides both text and structured content. Legacy protocol clients receive an
 object wrapper for non-object results, with matching schemas and result paths.
 
+The MCP adapter accepts a bounded JSON Schema subset. Remote schemas may use
+`format: date` for calendar dates; other formats remain unsupported. Check new
+contract keywords through the adapter's full submission path, including a
+proposal that does not use the new action: an unsupported keyword in any allowed
+action can block submission even when a selected-schema read succeeds.
+
 For task discovery or duplicate-work checks on a known Page, use
 `get_page_tasks(id=..., compact=true)`. It returns active `tasks` and
 `completed_tasks` with names, hashes, canonical browser URLs, completion state,

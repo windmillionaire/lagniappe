@@ -25,6 +25,12 @@ demand. `complete_task` and `set_task_due_date` are reviewed Organize plan actio
 For due-date edits, supply an exact Task and a calendar date, or null to clear it.
 When files are uploaded, every file still needs inspection, summary and placement.
 
+The adapter validates the full current proposal contract before submitting,
+including actions the proposal does not use. Its bounded remote-schema subset
+supports `format: date` for calendar dates; other format names remain rejected.
+When an application contract introduces a keyword or format, check it through
+the adapter's submission path as well as the application's validator.
+
 Tests live in `testing/tests_unit/test_033*.py`; live API and OAuth workflows
 live in `testing/tests_e2e/013_agent_api/`. The normal repository runner selects
 the isolated service environment automatically for the MCP unit tests:
