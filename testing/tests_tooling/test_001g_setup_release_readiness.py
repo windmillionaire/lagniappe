@@ -106,6 +106,10 @@ def test_redacted_install_summary_is_allowlisted():
         "AI_UTILITY_MODEL": "gemini-2.5-flash",
         "AI_IMAGE_MODEL": "gemini-3.1-flash-image",
         "AI_OBSERVABILITY": False,
+        "AI_ENABLED": True,
+        "EXTERNAL_AI_ENABLED": True,
+        "MCP_RESOURCE": "https://agent.example.test/mcp",
+        "MCP_VERSION": "diagnostic-revision-only",
         "CAPTURE_ERRORS": "False",
         "REDIS_TLS": False,
         "TASK_QUEUE_NAME": "lagniappe-tasks",
@@ -142,6 +146,9 @@ def test_redacted_install_summary_is_allowlisted():
     assert "Error monitoring: disabled" in prose
     assert "AI observability: disabled" in prose
     assert "AI model: gemini-2.5-pro" in prose
+    assert "MCP server: https://agent.example.test/mcp" in prose
+    assert "diagnostic-revision-only" not in text
+    assert text.count("https://demo.example.test") == 1
     assert "Deployment completed: yes" in prose
     assert "Health check:\n  ./setup.sh doctor" in text
     assert "Repair if needed:\n  ./setup.sh repair" in text

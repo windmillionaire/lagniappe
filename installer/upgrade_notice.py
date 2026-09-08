@@ -68,14 +68,17 @@ def print_post_upgrade_maintenance_notice(formatter, installed_version, target_v
     print(
         wrap_text(
             f"This deployment upgrades Lagniappe {transition} and requires "
-            "Owner-run application maintenance. setup.sh does not run data migrations."
+            "Owner-run application maintenance. Setup does not run data migrations."
         )
     )
     print(
         wrap_text(
-            "After deployment, open Admin \u2192 Site Settings \u2192 Maintenance, "
-            "select Apply Updates, resolve any reported failures, and then select "
-            "Refresh Cache."
+            (
+                "After deployment, open "
+                f"{ui.literal('Admin → Site Settings → Maintenance')}, select "
+                f"{ui.literal('Apply Updates')}, resolve any reported failures, and then "
+                f"select {ui.literal('Refresh Cache')}."
+            )
         )
     )
 
@@ -87,10 +90,26 @@ def print_post_upgrade_maintenance_notice(formatter, installed_version, target_v
 def print_post_upgrade_maintenance_steps(formatter):
     """Repeat the required in-app work after a major deployment succeeds."""
     print(wrap_text(f"\n{ui.heading('Required next steps')}"))
-    print(wrap_text("  1. Sign in as the Owner or an Administrator."))
-    print(wrap_text("  2. Open Admin \u2192 Site Settings \u2192 Maintenance."))
-    print(wrap_text("  3. Select Apply Updates and resolve any reported failures."))
-    print(wrap_text("  4. Select Refresh Cache."))
+    print(
+        wrap_text((f"  {ui.literal('1.')} Sign in as the Owner or an Administrator."))
+    )
+    print(
+        wrap_text(
+            (
+                f"  {ui.literal('2.')} Open "
+                f"{ui.literal('Admin → Site Settings → Maintenance')}."
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"  {ui.literal('3.')} Select {ui.literal('Apply Updates')} and resolve "
+                "any reported failures."
+            )
+        )
+    )
+    print(wrap_text((f"  {ui.literal('4.')} Select {ui.literal('Refresh Cache')}.")))
 
 
 # @testable false

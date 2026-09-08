@@ -2,7 +2,7 @@ from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 from pathlib import Path
 
-from runner.console import format_prompt, format_value
+from runner.console import format_prompt
 from runner.context import (
     GCLOUD_CLI,
     REPOSITORY_ROOT,
@@ -143,13 +143,11 @@ def install():
         )
         from installer.upgrade import _configure_deferred_job_recovery
 
-        print(wrap_text(f"\n{f.info('Wrapping up installation...')}"))
         if not _configure_deferred_job_recovery(f, gcloud):
             return 1
         if ai_email_config:
             record_step("activate AI email submissions")
             ai_email.activate_ai_email(ai_email_config)
-        print(wrap_text(f"\n{f.success('Deployment complete')}"))
         deployed = True
     else:
         project = SETTINGS.GCLOUD_CONFIG["PROJECT"]
@@ -157,13 +155,14 @@ def install():
             ui.info(wrap_text("You can deploy the application manually when ready."))
         )
         print(wrap_text(ui.heading("Manual deployment steps:")))
-        print(wrap_text("1. Review the generated YAML files"))
+        print(wrap_text((f"{ui.literal('1.')} Review the generated YAML files")))
         print(
-            format_value(
-                "2. Select the project",
+            ui.value(
+                (f"{ui.literal('2.')} Select the project"),
                 format_command([GCLOUD_CLI, "config", "set", "project", project]),
                 verbatim=True,
                 standalone=True,
+                action=True,
             )
         )
         index_command = [
@@ -183,54 +182,60 @@ def install():
             project,
         ]
         print(
-            format_value(
-                "3. Deploy indexes",
+            ui.value(
+                (f"{ui.literal('3.')} Deploy indexes"),
                 format_command(index_command),
                 verbatim=True,
                 standalone=True,
+                action=True,
             )
         )
         print(
-            format_value(
-                "4. Deploy the application",
+            ui.value(
+                (f"{ui.literal('4.')} Deploy the application"),
                 format_command(app_command),
                 verbatim=True,
                 standalone=True,
+                action=True,
             )
         )
         print(
-            format_value(
+            ui.value(
                 "After deployment, run",
                 setup_command("jobs"),
                 verbatim=True,
                 standalone=True,
+                action=True,
             )
         )
         print(
-            format_value(
+            ui.value(
                 "Then reconcile memory monitoring",
                 setup_command("monitoring"),
                 verbatim=True,
                 standalone=True,
+                action=True,
             )
         )
         from installer.mcp import requested
         if requested(SETTINGS.APP):
             print(
-                format_value(
+                ui.value(
                     "Then publish MCP and its app configuration",
                     setup_command("mcp"),
                     verbatim=True,
                     standalone=True,
+                    action=True,
                 )
             )
         if ai_email_config:
             print(
-                format_value(
+                ui.value(
                     "Then activate the saved AI email configuration",
                     setup_command("ai-email"),
                     verbatim=True,
                     standalone=True,
+                    action=True,
                 )
             )
 

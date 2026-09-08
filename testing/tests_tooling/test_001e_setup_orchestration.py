@@ -289,12 +289,13 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
         "create_deferred_job_reconciler",
     ]
     output = capsys.readouterr().out
-    assert "Wrapping up installation..." in output
-    assert "Deployment complete" in output
+    assert "Wrapping up installation..." not in output
+    assert "\n✓ Deployment complete\n" not in output
+    assert output.count("✓ Setup complete") == 1
     assert "every Gunicorn worker adds application memory use" in output
     assert "limits F2 and B2 to three workers" in output
-    assert output.index("Deployment complete") < output.index("Setup complete")
-    assert "Manual deployment steps:" not in output
+    assert output.index("Setup complete") < output.index("Installation summary")
+    assert "Manual deployment steps" not in output
 
 
 # @matrix setup : explicit-project manual-deploy
@@ -309,7 +310,7 @@ def test_default_install_only_prints_manual_deployment_steps_when_declined(
 
     assert install_module.install() == 0
     output = capsys.readouterr().out
-    assert "Manual deployment steps:" in output
+    assert "Manual deployment steps" in output
     assert "Review the generated YAML files" in output
     assert "index.yaml --project project-1" in output
     assert "lagniappe.yaml --project project-1" in output
@@ -1521,6 +1522,6 @@ def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
     ]
     assert "secret" not in json.dumps(journal).casefold()
     output = capsys.readouterr().out
-    assert "Completed remote mutations:" in output
+    assert "Completed remote mutations" in output
     assert "tasks.googleapis.com" in output
-    assert "Run ./setup.sh jobs again to resume." in output
+    assert "Resume with:\n  ./setup.sh jobs" in output

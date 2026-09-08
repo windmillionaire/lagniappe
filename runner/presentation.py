@@ -5,7 +5,13 @@ from contextlib import contextmanager
 import os
 import sys
 
-from runner.console import ProgressLabel, terminal_width, unstyle, wrap_text
+from runner.console import (
+    ProgressLabel,
+    format_value,
+    terminal_width,
+    unstyle,
+    wrap_text,
+)
 
 
 ACTIVE_PROGRESS = []
@@ -79,6 +85,33 @@ def styled(message, style, *, stream=None):
 # @reason format-only section heading follows the shared semantic style contract
 def heading(message):
     return styled(str(message).rstrip().rstrip(":.!"), "bold")
+
+
+# @testable false
+# @covered-by runner/presentation.py::styled
+# @reason literal inline emphasis shares the renderer's terminal and plain fallbacks
+def emphasis(message, *, stream=None):
+    return styled(message, "bold", stream=stream)
+
+
+# @testable false
+# @covered-by runner/presentation.py::styled
+# @reason exact action targets share the renderer's literal span contract
+def literal(message, *, stream=None):
+    return styled(message, "cyan", stream=stream)
+
+
+# @testable true
+# @tests tests_tooling/test_001k_setup_console.py::test_instruction_values_preserve_styles_and_copyable_content
+# @matrix setup : operator-summary terminal-wrapping
+def value(label, content, *, action=False, stream=None, **layout):
+    """Render a bold label and an optional cyan copy/type/open target."""
+    label = str(label).rstrip(":")
+    content = literal(content, stream=stream) if action else str(content)
+    if unstyle(label) == label:
+        text = label.lstrip()
+        label = label[: len(label) - len(text)] + emphasis(text, stream=stream)
+    return format_value(label, content, **layout)
 
 
 # @testable false

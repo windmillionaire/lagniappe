@@ -1257,8 +1257,11 @@ def _authorize_project_billing(project_id):
     print(
         f.info(
             wrap_text(
-                "In Google Cloud, select 'Link a billing account' and choose your "
-                f"existing billing account for project '{project_id}':\n  {url}"
+                (
+                    f"In Google Cloud, select '{ui.literal('Link a billing account')}' and "
+                    "choose your existing billing account for project '"
+                    f"{ui.literal(project_id)}':\n  {ui.literal(url)}"
+                )
             )
         )
     )
@@ -1605,58 +1608,51 @@ def _confirm_operator_permissions(
 def _display_install_identity_summary(preflight, adc_identity):
     from config import SETTINGS
 
-    print(ui.heading(wrap_text("\nConfiguration")))
-    print(wrap_text(f"Active gcloud configuration: {SETTINGS.GCLOUD_CONFIG['NAME']}"))
-    print(wrap_text(f"Active gcloud CLI account: {SETTINGS.GCLOUD_CONFIG['ACCOUNT']}"))
+    rows = [
+        ("Active gcloud configuration", SETTINGS.GCLOUD_CONFIG["NAME"]),
+        ("Active gcloud CLI account", SETTINGS.GCLOUD_CONFIG["ACCOUNT"]),
+    ]
     if adc_identity.get("state") != "pending":
-        print(
-            wrap_text(f"ADC principal: {adc_identity.get('principal') or '(unknown)'}")
+        rows.extend(
+            [
+                ("ADC principal", adc_identity.get("principal") or "(unknown)"),
+                ("ADC project", adc_identity.get("project") or "(unset)"),
+                ("ADC quota project", adc_identity.get("quota_project") or "(unset)"),
+            ]
         )
-        print(wrap_text(f"ADC project: {adc_identity.get('project') or '(unset)'}"))
-        print(
-            wrap_text(
-                f"ADC quota project: {adc_identity.get('quota_project') or '(unset)'}"
-            )
-        )
-    print(wrap_text(f"Target project: {SETTINGS.GCLOUD_CONFIG['PROJECT']}"))
-    print(
-        wrap_text(
-            f"Installer/provisioner: "
-            f"{SETTINGS.APP.get('INSTALLER_EMAIL') or SETTINGS.GCLOUD_CONFIG['ACCOUNT']}"
-        )
-    )
-    print(
-        wrap_text(
-            f"Deployer: "
-            f"{SETTINGS.APP.get('DEPLOYER_EMAIL') or SETTINGS.GCLOUD_CONFIG['ACCOUNT']}"
-        )
-    )
-    print(
-        wrap_text(
-            f"Application owner: {SETTINGS.APP.get('ADMIN_EMAIL') or '(not set)'}"
-        )
-    )
-    print(
-        wrap_text(
-            "Temporary application Administrator: "
-            f"{SETTINGS.APP.get('BOOTSTRAP_ADMIN_EMAIL') or '(none)'}"
-        )
+    rows.extend(
+        [
+            ("Target project", SETTINGS.GCLOUD_CONFIG["PROJECT"]),
+            (
+                "Installer/provisioner",
+                SETTINGS.APP.get("INSTALLER_EMAIL")
+                or SETTINGS.GCLOUD_CONFIG["ACCOUNT"],
+            ),
+            (
+                "Deployer",
+                SETTINGS.APP.get("DEPLOYER_EMAIL") or SETTINGS.GCLOUD_CONFIG["ACCOUNT"],
+            ),
+            ("Application owner", SETTINGS.APP.get("ADMIN_EMAIL") or "(not set)"),
+            (
+                "Temporary application Administrator",
+                SETTINGS.APP.get("BOOTSTRAP_ADMIN_EMAIL") or "(none)",
+            ),
+        ]
     )
     runtime_email = SETTINGS.APP.get("RUNTIME_SERVICE_ACCOUNT_EMAIL")
     if runtime_email:
-        print(wrap_text(f"Runtime service account: {runtime_email}"))
+        rows.append(("Runtime service account", runtime_email))
     else:
         planned_email = (
             f"{SETTINGS.GCLOUD_CONFIG['NAME']}@"
             f"{SETTINGS.GCLOUD_CONFIG['PROJECT']}.iam.gserviceaccount.com"
         )
-        print(wrap_text(f"Runtime service account (planned): {planned_email}"))
-    print(
-        wrap_text(
-            "Required APIs already enabled: "
-            f"{len(preflight['enabled_apis'])}; pending: {len(preflight['missing_apis'])}"
-        )
-    )
+        rows.append(("Runtime service account (planned)", planned_email))
+    print("\n" + ui.heading("Configuration"))
+    for label, value in rows:
+        print(ui.value(label, value, column=38, verbatim=True))
+    print(ui.value("Required APIs already enabled", len(preflight["enabled_apis"])))
+    print(ui.value("Required APIs pending", len(preflight["missing_apis"])))
 
 
 # @testable true

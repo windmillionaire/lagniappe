@@ -308,7 +308,7 @@ def test_automatic_reconciliation_failure_is_nonfatal_and_prints_retry_command(
 
     assert monitoring.reconcile_memory_alert_after_deploy() is False
     output = capsys.readouterr().out
-    assert "deployment succeeded" in output
+    assert "Deployment succeeded" in output
     assert "monitoring could not be reconciled" in " ".join(output.split())
     assert "Retry with:\n  ./setup.sh monitoring" in output
 

@@ -5,7 +5,7 @@ import json
 import os
 
 from runner.context import GCLOUD_CLI, format_command
-from runner.console import format_value, wrap_text
+from runner.console import wrap_text
 from runner.process import run_command
 
 
@@ -82,11 +82,11 @@ def activate_repository_gcloud(
         ("Account", target["ACCOUNT"]),
         ("Project", target["PROJECT"]),
     ):
-        print(format_value(label, value, column=17, verbatim=True))
+        print(ui.value(label, value, column=17, verbatim=True))
     if ensure_adc:
         principal = (adc_identity or {}).get("principal")
         if principal and principal.casefold() != target["ACCOUNT"].casefold():
-            print(format_value("ADC account", principal, column=17, verbatim=True))
+            print(ui.value("ADC account", principal, column=17, verbatim=True))
     checks = []
     if ensure_cli_token:
         checks.append("gcloud account access")
@@ -153,9 +153,9 @@ def check_account_authentication(account):
     """Check if account is authenticated, exit with instructions if not."""
     if not is_account_authenticated(account):
         print(ui.error("The saved account is not authenticated with gcloud"))
-        print(format_value("Account", account, verbatim=True))
+        print(ui.value("Account", account, verbatim=True))
         print(wrap_text("\nTo authenticate this account, run:"))
-        print(f"\n  {format_command([GCLOUD_CLI, 'auth', 'login', account])}")
+        print(f"\n  {ui.literal(format_command([GCLOUD_CLI, 'auth', 'login', account]))}")
         print(wrap_text("\nThis will open a browser window where you can sign in."))
         print(wrap_text("\nAuthenticated accounts:"))
         authenticated = get_authenticated_accounts()
@@ -252,7 +252,7 @@ def verify_active_configuration(name, account, project, *, announce=True):
         ):
             print(ui.heading(heading))
             for label, value in zip(("Configuration", "Account", "Project"), values):
-                print(format_value(label, value, column=17, verbatim=True))
+                print(ui.value(label, value, column=17, verbatim=True))
         raise RuntimeError(
             "Active gcloud configuration does not match expected settings."
         )
@@ -269,7 +269,7 @@ def verify_active_configuration(name, account, project, *, announce=True):
             ("Account", account),
             ("Project", project),
         ):
-            print(format_value(label, value, column=17, verbatim=True))
+            print(ui.value(label, value, column=17, verbatim=True))
 
 
 # @testable false
@@ -284,12 +284,20 @@ def display_configurations():
 
     for config in configs:
         is_active = " (ACTIVE)" if config["name"] == active else ""
-        print(f"\nName: {config['name']}{is_active}")
+        print(ui.value("\nName", f"{config['name']}{is_active}", verbatim=True))
         print(
-            f"  Account: {config.get('properties', {}).get('core', {}).get('account', 'Not set')}"
+            ui.value(
+                "  Account",
+                f"{config.get('properties', {}).get('core', {}).get('account', 'Not set')}",
+                verbatim=True,
+            )
         )
         print(
-            f"  Project: {config.get('properties', {}).get('core', {}).get('project', 'Not set')}"
+            ui.value(
+                "  Project",
+                f"{config.get('properties', {}).get('core', {}).get('project', 'Not set')}",
+                verbatim=True,
+            )
         )
 
 

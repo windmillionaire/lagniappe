@@ -97,30 +97,41 @@ def eviction_policy_instructions():
             )
         )
     )
-    print(wrap_text(f"  - Data eviction policy: {ui.info('volatile-ttl')}"))
+    print(
+        ui.value("  Data eviction policy", "volatile-ttl", action=True, verbatim=True)
+    )
     print(
         f.info(
             wrap_text(
-                "On the same Redis Cloud database details page, find "
-                "Performance & Availability → Data eviction policy and "
-                "select volatile-ttl."
+                (
+                    "On the same Redis Cloud database details page, find "
+                    f"{ui.literal('Performance & Availability')} → "
+                    f"{ui.literal('Data eviction policy')} and select "
+                    f"{ui.literal('volatile-ttl')}."
+                )
             )
         )
     )
     print(
         f.info(
             wrap_text(
-                "The selection is only pending until you click 'Review "
-                "changes', review the confirmation modal, and click 'Confirm' "
-                "or 'Confirm & pay' to save it."
+                (
+                    "The selection is only pending until you click '"
+                    f"{ui.literal('Review changes')}', review the confirmation modal, "
+                    f"and click '{ui.literal('Confirm')}' or '"
+                    f"{ui.literal('Confirm & pay')}' to save it."
+                )
             )
         )
     )
     print(
         f.info(
             wrap_text(
-                "Wait for the pending-change indicator to clear, then verify "
-                "the displayed Data eviction policy is still volatile-ttl."
+                (
+                    "Wait for the pending-change indicator to clear, then verify the "
+                    f"displayed {ui.literal('Data eviction policy')} is still "
+                    f"{ui.literal('volatile-ttl')}."
+                )
             )
         )
     )
@@ -144,7 +155,7 @@ def redis_cloud_instructions():
     """Open Redis Cloud and guide database placement and credential copying."""
     from config import SETTINGS, constants
 
-    f = FORMATTER.initialize()
+    FORMATTER.initialize()
     resource_region = str(
         SETTINGS.APP.get("RESOURCE_REGION") or constants.DEFAULT_RESOURCE_REGION
     ).strip()
@@ -156,58 +167,82 @@ def redis_cloud_instructions():
             "synchronization state."
         )
     )
-    print(wrap_text(f"Opening Redis Cloud:\n  {REDIS_CLOUD_CONSOLE_URL}"))
+    print(wrap_text(f"Opening Redis Cloud:\n  {ui.literal(REDIS_CLOUD_CONSOLE_URL)}"))
     try:
         webbrowser.open_new_tab(REDIS_CLOUD_CONSOLE_URL)
     except webbrowser.Error:
         pass
 
-    print(wrap_text("\n1. Sign in to Redis Cloud or create an account."))
     print(
         wrap_text(
-            "2. Open Databases and create a database. For a disposable "
-            "trial/test installation, select 'Try 30 MB for free'; it is "
-            "sufficient for the rehearsal, but Lagniappe's configurable "
-            "database TLS option is unavailable on the free plan."
+            (f"\n{ui.literal('1.')} Sign in to Redis Cloud or create an account.")
         )
     )
     print(
         wrap_text(
-            "3. For production, or to configure Redis TLS during setup, "
-            "select a paid Essentials or Pro plan instead."
+            (
+                f"{ui.literal('2.')} Open {ui.literal('Databases')} and create a "
+                "database. For a disposable trial/test installation, select '"
+                f"{ui.literal('Try 30 MB for free')}'; it is sufficient for the "
+                "rehearsal, but Lagniappe's configurable database TLS option is "
+                "unavailable on the free plan."
+            )
         )
     )
     print(
         wrap_text(
-            "4. Under 'Select cloud provider & region', choose Cloud vendor "
-            f"'Google Cloud' and Region '{resource_region}' to match "
-            "Lagniappe's regional Google Cloud resources. An existing "
-            "database is suitable only when it has that same placement."
+            (
+                f"{ui.literal('3.')} For production, or to configure Redis TLS during "
+                f"setup, select a paid {ui.literal('Essentials')} or {ui.literal('Pro')} "
+                "plan instead."
+            )
         )
     )
     print(
         wrap_text(
-            "5. Create the database, then find Access on that same database "
-            "details page and click the blue Connect button."
+            (
+                f"{ui.literal('4.')} Under '{ui.literal('Select cloud provider & region')}', "
+                f"choose {ui.literal('Cloud vendor')} '{ui.literal('Google Cloud')}' and "
+                f"{ui.literal('Region')} '{ui.literal(resource_region)}' to match "
+                "Lagniappe's regional Google Cloud resources. An existing database is "
+                "suitable only when it has that same placement."
+            )
         )
     )
     print(
         wrap_text(
-            "6. In the connection panel, expand Redis CLI and keep Internet "
-            "(public endpoint) as the connection method."
+            (
+                f"{ui.literal('5.')} Create the database, then find "
+                f"{ui.literal('Access')} on that same database details page and click "
+                f"the blue {ui.literal('Connect')} button."
+            )
         )
     )
     print(
         wrap_text(
-            "7. Click the blue Copy button beneath the redis-cli command."
+            (
+                f"{ui.literal('6.')} In the connection panel, expand "
+                f"{ui.literal('Redis CLI')} and keep "
+                f"{ui.literal('Internet (public endpoint)')} as the connection method."
+            )
         )
     )
     print(
         wrap_text(
-            "8. Return to setup and paste the complete copied command when "
-            "prompted; you do not need to run it. Keep the database details "
-            "page open because setup will next guide the required eviction "
-            "policy there."
+            (
+                f"{ui.literal('7.')} Click the blue {ui.literal('Copy')} button beneath "
+                "the redis-cli command."
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('8.')} Return to setup and paste the complete copied "
+                "command when prompted; you do not need to run it. Keep the database "
+                "details page open because setup will next guide the required eviction "
+                "policy there."
+            )
         )
     )
 
@@ -341,9 +376,8 @@ def _enable_redis_tls():
     print(wrap_text(f"\n{ui.heading('Redis Cloud TLS')}"))
     print(
         wrap_text(
-            "Redis database TLS is available on paid Redis Cloud "
-            "Essentials/Flex and Pro plans. It is not available on the free "
-            "30 MB Essentials plan."
+            "Redis database TLS is available on paid Redis Cloud Essentials/Flex "
+            "and Pro plans. It is not available on the free 30 MB Essentials plan."
         )
     )
     print(
@@ -359,7 +393,7 @@ def _enable_redis_tls():
             "verifies the Redis Cloud server."
         )
     )
-    print(wrap_text(f"Documentation: {REDIS_TLS_DOCUMENTATION_URL}"))
+    print(wrap_text(f"Documentation: {ui.literal(REDIS_TLS_DOCUMENTATION_URL)}"))
 
     paid_plan = input(
         format_prompt("Is this database on a paid Redis Cloud plan? [y/N]: ")
@@ -373,21 +407,51 @@ def _enable_redis_tls():
         )
         return None
 
-    print(wrap_text("\n1. Open Redis Cloud → Databases and select this database"))
-    print(
-        wrap_text("2. Open Configuration, select Edit, and find the Security section")
-    )
-    print(wrap_text("3. Enable Transport layer security (TLS)"))
-    print(wrap_text("4. Download the server certificate ZIP archive"))
-    print(wrap_text("5. Unzip the downloaded archive"))
     print(
         wrap_text(
-            "6. Place the extracted redis_ca.pem file in "
-            f"{constants.REDIS_CA_CERT_RELATIVE_PATH}"
+            (
+                f"\n{ui.literal('1.')} Open Redis Cloud → {ui.literal('Databases')} and "
+                "select this database"
+            )
         )
     )
-    print(wrap_text("7. Leave Mutual TLS (require client authentication) unchecked"))
-    print(wrap_text("8. Save the database configuration"))
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('2.')} Open {ui.literal('Configuration')}, select "
+                f"{ui.literal('Edit')}, and find the {ui.literal('Security')} section"
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('3.')} Enable "
+                f"{ui.literal('Transport layer security (TLS)')}"
+            )
+        )
+    )
+    print(
+        wrap_text((f"{ui.literal('4.')} Download the server certificate ZIP archive"))
+    )
+    print(wrap_text((f"{ui.literal('5.')} Unzip the downloaded archive")))
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('6.')} Place the extracted {ui.literal('redis_ca.pem')} file "
+                f"in {ui.literal(constants.REDIS_CA_CERT_RELATIVE_PATH)}"
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('7.')} Leave "
+                f"{ui.literal('Mutual TLS (require client authentication)')} unchecked"
+            )
+        )
+    )
+    print(wrap_text((f"{ui.literal('8.')} Save the database configuration")))
     print(
         f.warning(
             wrap_text(
@@ -416,9 +480,11 @@ def _enable_redis_tls():
         print(
             f.warning(
                 wrap_text(
-                    "Unzip the Redis Cloud certificate download and place the "
-                    "extracted redis_ca.pem file at "
-                    f"{constants.REDIS_CA_CERT_RELATIVE_PATH}, then retry."
+                    (
+                        "Unzip the Redis Cloud certificate download and place the extracted "
+                        "redis_ca.pem file at "
+                        f"{ui.literal(constants.REDIS_CA_CERT_RELATIVE_PATH)}, then retry."
+                    )
                 )
             )
         )
@@ -471,9 +537,23 @@ def _disable_redis_tls():
         return None
 
     print(wrap_text(f"\n{ui.heading('Disable Redis Cloud TLS')}"))
-    print(wrap_text("1. Open the database Configuration screen in Redis Cloud"))
-    print(wrap_text("2. Edit the Security section and disable TLS"))
-    print(wrap_text("3. Save the database configuration"))
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('1.')} Open the database {ui.literal('Configuration')} "
+                "screen in Redis Cloud"
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('2.')} {ui.literal('Edit')} the {ui.literal('Security')} "
+                "section and disable TLS"
+            )
+        )
+    )
+    print(wrap_text((f"{ui.literal('3.')} Save the database configuration")))
     print(
         f.warning(
             wrap_text(
@@ -534,8 +614,7 @@ def _offer_redis_tls_for_fresh_install():
     print(
         wrap_text(
             "Paid Redis Cloud plans can encrypt application-to-database traffic "
-            "with TLS; the free 30 MB Essentials plan cannot enable this "
-            "database setting."
+            "with TLS; the free 30 MB Essentials plan cannot enable this database setting."
         )
     )
     consent = input(format_prompt("Configure Redis TLS now? [y/N]: "))
@@ -544,8 +623,10 @@ def _offer_redis_tls_for_fresh_install():
 
     print(
         f.info(
-            f"Redis TLS left disabled. Run {setup_command('security')} "
-            "after upgrading to a paid Redis Cloud plan."
+            (
+                f"Redis TLS left disabled. Run {ui.literal(setup_command('security'))} after "
+                "upgrading to a paid Redis Cloud plan."
+            )
         )
     )
     return None

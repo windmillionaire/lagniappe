@@ -630,9 +630,13 @@ def test_focused_mcp_command_uses_normal_deployment_path(monkeypatch):
     events = []
     monkeypatch.setattr(mcp.SETTINGS, "APP", settings())
     monkeypatch.setattr(verify, "prepare_existing_installation", lambda: events.append("prepare"))
-    monkeypatch.setattr(utils, "deploy_to_app_engine", lambda: events.append("deploy"))
+    monkeypatch.setattr(
+        utils,
+        "deploy_to_app_engine",
+        lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
+    )
     assert mcp.configure_mcp() == 0
-    assert events == ["prepare", "deploy"]
+    assert events == ["prepare", ("deploy", False)]
 
 
 # @matrix deploy : app-failure update-order

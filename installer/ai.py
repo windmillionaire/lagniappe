@@ -84,14 +84,14 @@ def _api_request(session, method, url, headers, json_data=None, allow_codes=None
 # @reason manual fallback instructions for the AI cache setup flow
 def print_ai_cache_instructions(project_id):
     """Print a portable Python retry command for AI caching."""
-    f = FORMATTER.initialize()
+    FORMATTER.initialize()
     print(
         wrap_text(
             f"\n{ui.info('Fix Application Default Credentials for project ')}"
             f"{project_id}, then retry the Python setup mode:"
         )
     )
-    print(setup_command("ai"))
+    print(ui.literal(setup_command("ai")))
 
 
 # @testable true
@@ -147,8 +147,7 @@ def _configure_ai_cache(sp):
     sp.ok("AI data caching disabled")
     print(
         wrap_text(
-            "Vertex AI prompt caching is now disabled for this project. Review "
-            "Google Cloud's zero data retention guidance for the remaining "
+            "Review Google Cloud's zero data retention guidance for the remaining "
             "provider settings."
         )
     )
@@ -181,9 +180,15 @@ def configure_ai():
             ).casefold()
             != "n"
         ):
-            deploy_to_app_engine()
+            deploy_to_app_engine(print_final_summary=False)
+            print(ui.success("AI access policy deployed"))
         else:
-            print(f"Saved locally. Apply the policy with {setup_command('update')}.")
+            print(
+                (
+                    "Saved locally. Apply the policy with "
+                    f"{ui.literal(setup_command('update'))}."
+                )
+            )
         return 0
     print(wrap_text("\nThis will configure Vertex AI data retention settings."))
     print(
@@ -219,7 +224,10 @@ def configure_ai():
         ).casefold()
         != "n"
     ):
-        deploy_to_app_engine()
+        deploy_to_app_engine(print_final_summary=False)
+        print(ui.success("AI access policy deployed"))
     else:
-        print(f"Saved locally. Apply the policy with {setup_command('update')}.")
+        print(
+            f"Saved locally. Apply the policy with {ui.literal(setup_command('update'))}."
+        )
     return 0

@@ -702,7 +702,7 @@ def test_resend_auth_email_rerun_reuses_saved_sending_key_without_prompt(
     assert deliveries == [(saved, "owner@example.test")]
     assert all("Resend API key" not in prompt for prompt in prompts)
     assert opened_urls == [auth_email.RESEND_DOMAINS_URL]
-    assert "reuse it without prompting" in (
+    assert "Reusing the saved Resend Sending key" in (
         " ".join(capsys.readouterr().out.split())
     )
     assert saves == [True]
@@ -1139,7 +1139,7 @@ def test_identity_platform_setup_finishes_spinner_before_reporting_error(
 
     events = []
     spinner = SpinnerRecorder()
-    spinner.fail = lambda mark: events.append(("fail", mark))
+    spinner.fail = lambda mark=None: events.append(("fail", mark))
     formatter = types.SimpleNamespace(
         initialize=lambda: types.SimpleNamespace(
             progress=spinner_factory(spinner),
@@ -1174,7 +1174,7 @@ def test_identity_platform_setup_finishes_spinner_before_reporting_error(
     with pytest.raises(ProviderError, match="Could not configure Identity Platform"):
         identity.setup_identity_platform()
 
-    assert events[0] == ("fail", "X")
+    assert events[0] == ("fail", None)
     assert events[1][0] == "error"
     assert "provider response timed out" in events[1][1]
 

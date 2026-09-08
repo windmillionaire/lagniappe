@@ -339,13 +339,13 @@ def wait_for_managed_certificate(
 
         if attempt < len(delays) - 1:
             next_delay = delays[attempt + 1]
-            certificate_id = pending_id or "not assigned yet"
-            detail = (
-                f"Managed TLS certificate {certificate_id} for "
-                f"https://{domain} in {target}: {last_status}"
+            print(
+                ui.status(
+                    f"Managed TLS certificate for {domain}: {last_status}; "
+                    f"retrying in {next_delay} seconds",
+                    "pending",
+                )
             )
-            print(ui.status(detail, "pending"))
-            print(ui.activity(f"Retrying in {next_delay} seconds"))
 
     raise ProviderTimeout(
         "Deployment succeeded, but the App Engine managed TLS certificate for "
@@ -388,7 +388,7 @@ def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
     """Discover or create a mapping and return Google's exact DNS records."""
     from config import SETTINGS
 
-    f = FORMATTER.initialize()
+    FORMATTER.initialize()
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
     account = str(SETTINGS.GCLOUD_CONFIG.get("ACCOUNT") or "").strip()
     target_flags = [f"--project={project_id}"]
@@ -468,29 +468,11 @@ def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
         validated = _validated_mapping(mapping, project_id, domain)
         if validated is not None and _uses_automatic_ssl(validated):
             action = "created" if created else "updated" if updated else "existing"
-            ssl_settings = _ssl_settings(validated) or {}
-            management_type = str(
-                ssl_settings.get("sslManagementType")
-                or ssl_settings.get("ssl_management_type")
-                or "SSL_MANAGEMENT_TYPE_UNSPECIFIED"
-            ).strip().upper()
-            certificate_id = str(
-                ssl_settings.get("certificateId")
-                or ssl_settings.get("pendingManagedCertificateId")
-                or "not assigned yet"
-            ).strip()
             record_mutation(
                 "custom-domain-mapping",
                 action=action,
                 resource="App Engine domain mapping",
                 identifier=validated.get("name") or domain,
-            )
-            sp.write(
-                f.success(
-                    f"App Engine domain mapping {action}: {validated['name']} "
-                    f"using {account or '<configured-account>'}; managed TLS "
-                    f"{management_type}, certificate {certificate_id}"
-                )
             )
             return validated
 

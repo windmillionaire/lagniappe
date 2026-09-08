@@ -9,6 +9,7 @@ import pytest
 
 from runner.console import (
     ProgressLabel,
+    cell_width,
     format_prompt,
     format_value,
     unstyle,
@@ -179,13 +180,56 @@ def test_install_summary_is_responsive(width):
     assert "\n  ./setup.sh doctor\n" in text
     assert "\n  ./setup.sh repair\n" in text
     assert text.endswith("\n  " + url)
+    assert text.count(url) == 1
+    assert all(
+        cell_width(line) <= width
+        for line in text.partition("\n\n")[0].splitlines()
+    )
+    assert "\nAccess\n" in text
+    assert "\nServices\n" in text
+    assert "\nAI\n" in text
+    assert "\nNext steps\n" in text
     if width == 40:
         assert "Application:\n  Example workspace" in text
     if width == 100:
         rows = text.splitlines()
         application = next(line for line in rows if line.startswith("Application:"))
-        feature = next(line for line in rows if line.startswith("AI features:"))
-        assert application.index("Example workspace") == feature.index("enabled")
+        version = next(line for line in rows if line.startswith("Lagniappe version:"))
+        assert application.index("Example workspace") == version.index(
+            "(not configured)"
+        )
+
+
+# @matrix setup : operator-summary terminal-wrapping
+@pytest.mark.parametrize("width", [12, 40, 80, 100])
+def test_instruction_values_preserve_styles_and_copyable_content(width, monkeypatch):
+    from rich.text import Text
+    from runner import presentation as ui
+
+    class Terminal(io.StringIO):
+        def isatty(self):
+            return True
+
+    stream = Terminal()
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    literal = '"v=DMARC1;  p=none;" [literal brackets]'
+    colored = ui.value(
+        "  Value", literal, action=True, stream=stream, width=width, verbatim=True
+    )
+    assert literal in unstyle(colored)
+    parsed = Text.from_ansi(colored)
+    assert any(span.style.bold for span in parsed.spans)
+    assert any(
+        span.style.color and span.style.color.number == 6 for span in parsed.spans
+    )
+    assert ui.emphasis("Required:", stream=stream).endswith("\x1b[0m")
+    monkeypatch.setenv("NO_COLOR", "1")
+    plain = ui.value(
+        "  Value", literal, action=True, stream=stream, width=width, verbatim=True
+    )
+    assert plain == unstyle(colored)
+    assert "\x1b" not in plain
 
 
 # @matrix setup : spinner terminal-wrapping

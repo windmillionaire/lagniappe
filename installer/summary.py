@@ -6,7 +6,7 @@ from runner.presentation import output as print
 import hashlib
 import json
 from runner.context import setup_command
-from runner.console import cell_width, format_value, terminal_width, wrap_text
+from runner.console import cell_width, terminal_width, wrap_text
 
 
 # @testable false
@@ -180,7 +180,6 @@ def install_summary_lines(
     lines = [
         "Installation summary",
         _install_line("Application", settings.get("APP_NAME")),
-        _install_line("Application URL", app_url, verbatim=True),
         _install_line(
             "Lagniappe version",
             settings.get("VERSION") or node.get("version"),
@@ -188,6 +187,8 @@ def install_summary_lines(
         _install_line("Target project", project, verbatim=True),
         _install_line("gcloud configuration", gcloud_config.get("NAME"), verbatim=True),
     ]
+    if not deployed:
+        lines.append(_install_line("Application URL", app_url, verbatim=True))
     from config.ai_settings import normalize_ai_features
     from installer.mcp import requested
     features = normalize_ai_features(settings)
@@ -208,7 +209,6 @@ def install_summary_lines(
                     standalone=True,
                 )
             )
-        lines.append(_install_line("MCP desired version", settings.get("MCP_VERSION") or "pending"))
     if (
         installer
         and deployer
@@ -267,7 +267,7 @@ def install_summary_lines(
             lines.append(
                 _install_line(
                     "Installer handoff",
-                    f"After Owner review:\n{setup_command('handoff')}",
+                    f"After Owner review:\n{ui.literal(setup_command('handoff'))}",
                     verbatim=True,
                     standalone=True,
                 )
@@ -287,22 +287,78 @@ def install_summary_lines(
             )
         )
     width = terminal_width(width)
-    column = max(cell_width(row[0]) + 3 for row in lines if isinstance(row, tuple))
-    rendered = []
-    for row in lines:
-        if isinstance(row, str):
-            text = wrap_text(row, width)
-        else:
+    rows = {row[0]: row for row in lines if isinstance(row, tuple)}
+    groups = (
+        (
+            "Application",
+            (
+                "Application",
+                "Application URL",
+                "Lagniappe version",
+                "Target project",
+                "gcloud configuration",
+                "App Engine location",
+                "Regional resources",
+                "OCR location",
+                "Deployment completed",
+            ),
+        ),
+        (
+            "Access",
+            (
+                "Installer / deployer",
+                "Installer",
+                "Deployer",
+                "Application Owner",
+                "Temporary Administrator",
+                "Google sign-in",
+            ),
+        ),
+        ("Services", ("Redis", "Error monitoring")),
+        (
+            "AI",
+            (
+                "AI features",
+                "External AI (MCP and API/skill)",
+                "MCP server",
+                "AI observability",
+                "AI model",
+                "AI utility model",
+                "AI image model",
+            ),
+        ),
+        (
+            "Next steps",
+            (
+                "Health check",
+                "Repair if needed",
+                "Finish MCP setup",
+                "Installer handoff",
+                "After manual deployment",
+                "Open this installation",
+            ),
+        ),
+    )
+    rendered = [wrap_text(ui.heading("Installation summary"), width)]
+    for title, labels in groups:
+        selected = [rows[label] for label in labels if label in rows]
+        if not selected:
+            continue
+        rendered.extend(("", wrap_text(ui.heading(title), width)))
+        column = max(cell_width(row[0]) + 3 for row in selected)
+        for row in selected:
             label, value, verbatim, standalone = row
-            text = format_value(
+            text = ui.value(
                 label,
                 value,
+                action=(title == "Next steps" and label != "Installer handoff")
+                or label == "MCP server",
                 width=width,
                 column=column,
                 verbatim=verbatim,
                 standalone=standalone or width - column < 20,
             )
-        rendered.extend(text.split("\n"))
+            rendered.extend(text.split("\n"))
     return rendered
 
 
@@ -328,4 +384,4 @@ def print_install_summary(
         deployed=deployed,
         width=width,
     ):
-        print(ui.heading(line) if line == "Installation summary" else line)
+        print(line)

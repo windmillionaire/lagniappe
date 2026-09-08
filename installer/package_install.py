@@ -7,8 +7,8 @@ import re
 import subprocess
 import sys
 
-from runner.console import format_prompt, format_value, wrap_text
-from runner.context import REPOSITORY_ROOT
+from runner.console import format_prompt, wrap_text
+from runner.context import REPOSITORY_ROOT, format_command
 from installer.errors import PIP_TIMEOUT, SetupCancelled, SetupError
 
 from runner.presentation import ACTIVE_PROGRESS as _ACTIVE_SPINNERS
@@ -105,34 +105,39 @@ def ensure_pip_is_available():
             file=sys.stderr,
         )
         print(
-            format_value(
-                "1. Download get-pip.py",
+            ui.value(
+                (f"{ui.literal('1.')} Download get-pip.py"),
                 "https://bootstrap.pypa.io/get-pip.py",
                 verbatim=True,
                 standalone=True,
+                action=True,
             ),
             file=sys.stderr,
         )
         print(
-            format_value(
-                "2. Run",
-                f"'{sys.executable}' get-pip.py",
+            ui.value(
+                (f"{ui.literal('2.')} Run"),
+                format_command([sys.executable, "get-pip.py"]),
                 verbatim=True,
                 standalone=True,
+                action=True,
             ),
             file=sys.stderr,
         )
         print(
             wrap_text(
-                "\nFor Windows (if the above fails or python is not in PATH):\n"
-                "  - Search for 'Manage app execution aliases' in Windows settings.\n"
-                "  - Ensure 'python.exe' and 'python3.exe' (if present) provided by "
-                "'Python Software Foundation' are enabled.\n"
-                "  - Or, use the full path to your python.exe in the command above.\n\n"
-                "For macOS/Linux (if python is not in PATH or you have multiple Pythons):\n"
-                "  - Use 'python3' or the specific Python executable path.\n"
-                "  - You might need to use 'sudo' if installing system-wide "
-                "(not recommended if using virtual environments):"
+                (
+                    "\nFor Windows (if the above fails or python is not in PATH):\n  - "
+                    f"Search for '{ui.literal('Manage app execution aliases')}' in "
+                    f"Windows settings.\n  - Ensure '{ui.literal('python.exe')}' and '"
+                    f"{ui.literal('python3.exe')}' (if present) provided by 'Python "
+                    "Software Foundation' are enabled.\n  - Or, use the full path to "
+                    f"your {ui.literal('python.exe')} in the command above.\n\nFor "
+                    "macOS/Linux (if python is not in PATH or you have multiple "
+                    "Pythons):\n  - Use 'python3' or the specific Python executable "
+                    "path.\n  - You might need to use 'sudo' if installing system-wide "
+                    "(not recommended if using virtual environments):"
+                )
             ),
             file=sys.stderr,
         )

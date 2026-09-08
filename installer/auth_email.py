@@ -12,7 +12,7 @@ from email.utils import formataddr
 
 import certifi
 
-from runner.console import format_prompt, format_value
+from runner.console import format_prompt
 from installer import FORMATTER, wrap_text
 from installer.errors import (
     ProviderError,
@@ -266,33 +266,51 @@ def _print_gmail_instructions():
     print(wrap_text(ui.heading("\nConfigure authentication email:")))
     print(
         wrap_text(
-            "Lagniappe can send verification and password-reset "
-            "links through any Gmail or Google Workspace mailbox with 2-Step "
-            "Verification and App Passwords enabled. After adding a custom "
-            f"domain, {setup_command('email')} can replace Gmail with any "
-            "SMTP email service."
+            (
+                "Lagniappe can send verification and password-reset links through any Gmail "
+                f"or Google Workspace mailbox with {ui.literal('2-Step Verification')} and "
+                f"{ui.literal('App Passwords')} enabled. After adding a custom domain, "
+                f"{ui.literal(setup_command('email'))} can replace Gmail with any SMTP email "
+                "service."
+            )
         )
     )
     print(
         wrap_text(
-            "Google warns about app passwords because they let an app sign in "
-            "without the usual interactive Google prompt. Lagniappe uses this "
-            "one only to send email from the chosen mailbox on its owner's "
-            "behalf, so people the owner invites can verify their email "
-            "addresses and request password resets."
-        )
-    )
-    print(wrap_text("\n1. Choose the mailbox Lagniappe should send from."))
-    print(wrap_text("2. Enable 2-Step Verification if it is not already enabled."))
-    print(
-        wrap_text(
-            "3. In the App name box, enter 'Lagniappe', then click Create."
+            (
+                "Google warns about app passwords because they let an app sign in without the usual interactive Google prompt. "
+                "Lagniappe uses this one only to send email from the chosen mailbox on its owner's behalf, so people the owner invites can verify their email addresses and request password resets."
+            )
         )
     )
     print(
         wrap_text(
-            "4. Copy the 16-character password Google displays. Setup will "
-            "test it and store it in the private application settings file."
+            (f"\n{ui.literal('1.')} Choose the mailbox Lagniappe should send from.")
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('2.')} Enable {ui.literal('2-Step Verification')} if it is "
+                "not already enabled."
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('3.')} In the {ui.literal('App name')} box, enter '"
+                f"{ui.literal('Lagniappe')}', then click {ui.literal('Create')}."
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('4.')} Copy the 16-character password Google displays. "
+                "Setup will test it and store it in the private application settings "
+                "file."
+            )
         )
     )
     ready = input(
@@ -302,8 +320,10 @@ def _print_gmail_instructions():
         raise SetupCancelled("Installation cancelled before Google App Passwords.")
     print(
         wrap_text(
-            "Opening a Google account picker for App Passwords:\n"
-            f"  {GMAIL_APP_PASSWORDS_URL}"
+            (
+                f"Opening a Google account picker for {ui.literal('App Passwords')}:\n  "
+                f"{ui.literal(GMAIL_APP_PASSWORDS_URL)}"
+            )
         )
     )
     try:
@@ -417,7 +437,7 @@ def setup_auth_email(*, replace=False):
             "senderName": sender_name,
         }
         print(
-            wrap_text(
+            ui.activity(
                 "Testing authentication email delivery "
                 "(an interrupted connection is retried once)..."
             )
@@ -433,8 +453,7 @@ def setup_auth_email(*, replace=False):
                         "the connection failed, was interrupted, timed out, or "
                         "could not verify the TLS certificate, retry with the same "
                         "mailbox and app password after resolving that issue. "
-                        "Create a new password only if Gmail explicitly rejects "
-                        "sign-in."
+                        "Create a new password only if Gmail explicitly rejects sign-in."
                     )
                 )
             )
@@ -505,11 +524,13 @@ def _configure_dmarc_for_sender(sender_email):
     print(
         "\n"
         + wrap_text(
-            "DMARC ties the visible From domain to SPF or DKIM and tells "
-            "receiving mail systems how to handle messages that fail. Setup "
-            "starts with the non-disruptive p=none policy; it enables DMARC "
-            "authentication without asking receivers to quarantine or reject "
-            "mail. This step is recommended but optional."
+            (
+                "DMARC ties the visible From domain to SPF or DKIM and tells receiving "
+                "mail systems how to handle messages that fail. Setup starts with the "
+                f"non-disruptive {ui.literal('p=none')} policy; it enables DMARC "
+                "authentication without asking receivers to quarantine or reject mail. "
+                "This step is recommended but optional."
+            )
         )
     )
 
@@ -547,9 +568,9 @@ def _configure_dmarc_for_sender(sender_email):
             return True
 
     print(wrap_text("\nAdd this DNS record at the provider for the sender domain:"))
-    print(format_value("  Type", "TXT", verbatim=True))
-    print(format_value("  Name", record_name, verbatim=True))
-    print(format_value("  Value", DMARC_DEFAULT_POLICY, verbatim=True))
+    print(ui.value("  Type", "TXT", verbatim=True, action=True))
+    print(ui.value("  Name", record_name, verbatim=True, action=True))
+    print(ui.value("  Value", DMARC_DEFAULT_POLICY, verbatim=True, action=True))
     confirmed = (
         input(
             format_prompt(
@@ -589,11 +610,13 @@ def _setup_resend_auth_email(current, custom_domain):
     if cloudflare_configured:
         print(
             wrap_text(
-                "This installation already uses Cloudflare DNS. Resend can "
-                "publish its SPF, DKIM, and return-path records through the "
-                "'Sign in to Cloudflare' button. After the SMTP test, setup "
-                "will separately publish or verify the sender domain's DMARC "
-                "record."
+                (
+                    "This installation already uses Cloudflare DNS. Resend can publish "
+                    "its SPF, DKIM, and return-path records through the '"
+                    f"{ui.literal('Sign in to Cloudflare')}' button. After the SMTP "
+                    "test, setup will separately publish or verify the sender domain's "
+                    "DMARC record."
+                )
             )
         )
     else:
@@ -603,7 +626,7 @@ def _setup_resend_auth_email(current, custom_domain):
                 "verification before continuing."
             )
         )
-    print(wrap_text(f"Opening Resend domains:\n  {RESEND_DOMAINS_URL}"))
+    print(wrap_text(f"Opening Resend domains:\n  {ui.literal(RESEND_DOMAINS_URL)}"))
     try:
         webbrowser.open_new_tab(RESEND_DOMAINS_URL)
     except webbrowser.Error:
@@ -661,19 +684,25 @@ def _setup_resend_auth_email(current, custom_domain):
             api_key = current_sending_key
             print(
                 wrap_text(
-                    "A Resend Sending key is already saved for this verified "
-                    "domain. Setup will reuse it without prompting."
+                    "Reusing the saved Resend Sending key for this verified domain."
                 )
             )
         else:
             print(
                 wrap_text(
-                    "\nCreate an API key named 'Lagniappe' with Sending access. "
-                    "Restrict it to the verified sending domain when Resend offers "
-                    "that choice. The key is shown only once."
+                    (
+                        f"\nCreate an API key named '{ui.literal('Lagniappe')}' with "
+                        f"{ui.literal('Sending access')}. Restrict it to the verified "
+                        "sending domain when Resend offers that choice. The key is shown "
+                        "only once."
+                    )
                 )
             )
-            print(wrap_text(f"Opening Resend API keys:\n  {RESEND_API_KEYS_URL}"))
+            print(
+                wrap_text(
+                    f"Opening Resend API keys:\n  {ui.literal(RESEND_API_KEYS_URL)}"
+                )
+            )
             try:
                 webbrowser.open_new_tab(RESEND_API_KEYS_URL)
             except webbrowser.Error:
@@ -740,7 +769,7 @@ def _setup_resend_auth_email(current, custom_domain):
             )
             continue
 
-        print(wrap_text("Testing Resend SMTP delivery..."))
+        print(ui.activity("Testing Resend SMTP delivery"))
         try:
             test_smtp_delivery(candidate, test_recipient)
         except ProviderError as error:
@@ -748,9 +777,11 @@ def _setup_resend_auth_email(current, custom_domain):
             print(
                 f.warning(
                     wrap_text(
-                        "The previous authentication-email settings remain active. "
-                        "Confirm that Resend verified the domain and that the API "
-                        "key has Sending access before retrying."
+                        (
+                            "The previous authentication-email settings remain active. "
+                            "Confirm that Resend verified the domain and that the API "
+                            f"key has {ui.literal('Sending access')} before retrying."
+                        )
                     )
                 )
             )
@@ -791,9 +822,8 @@ def _setup_provider_auth_email():
     print(wrap_text(f"\n{ui.heading('Authentication email configuration')}"))
     print(
         wrap_text(
-            "Setup can configure Resend directly, or accept SMTP details from "
-            "Postmark, Mailgun, Mailjet, SMTP2GO, Amazon SES, or another "
-            "provider. The sender address must belong to a domain the provider "
+            "Use Resend or another SMTP provider. The sender address must "
+            "belong to a domain the provider "
             "has approved."
         )
     )
@@ -816,9 +846,9 @@ def _setup_provider_auth_email():
 
     print(
         wrap_text(
-            f"Lagniappe's application domain is {custom_domain}. Gather the "
-            "SMTP host, port, encryption mode, username, and password or API "
-            "key from the email provider before continuing."
+            f"Lagniappe's application domain is {custom_domain}. Gather the SMTP "
+            "host, port, encryption mode, username, and password or API key "
+            "from the email provider before continuing."
         )
     )
 
@@ -867,7 +897,7 @@ def _setup_provider_auth_email():
             )
             continue
 
-        print(f"Testing {service} SMTP delivery...")
+        print(ui.activity(f"Testing {service} SMTP delivery"))
         try:
             test_smtp_delivery(candidate, test_recipient)
         except ProviderError as error:
@@ -924,7 +954,7 @@ def configure_auth_email():
         format_prompt("Deploy the updated email settings now? [Y/n]: ")
     )
     if consent.strip().casefold() != "n":
-        utils.deploy_to_app_engine()
+        utils.deploy_to_app_engine(print_final_summary=False)
         print(f.success(wrap_text("Authentication email settings deployed.")))
     else:
         print(

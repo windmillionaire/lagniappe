@@ -8,7 +8,7 @@ import subprocess
 from datetime import datetime
 from importlib import reload
 
-from runner.console import format_prompt, format_value, wrap_text
+from runner.console import format_prompt, wrap_text
 from runner.context import GIT_CLI, REPOSITORY_ROOT, setup_command
 from installer.image import get_images, save_images
 from installer.utils import ensure_datastore_dependency, ensure_storage_dependency
@@ -193,25 +193,26 @@ def _apply_update(
             print_final_summary=False,
             upgrade_notice_handled=True,
         )
-        print(wrap_text(f"\n{f.info('Wrapping up installation...')}"))
         recovery_ready = _configure_deferred_job_recovery(f, gcloud)
         print(wrap_text(f"\n{f.success('Deployment complete')}"))
         if SETTINGS.APP.get("CUSTOM_DOMAIN"):
             print(
-                format_value(
+                ui.value(
                     "Your app is available at",
                     f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}",
                     verbatim=True,
                     standalone=True,
+                    action=True,
                 )
             )
         else:
             print(
-                format_value(
+                ui.value(
                     "Your app is available at",
                     SETTINGS.APP.get("APP_URL", "your App Engine URL"),
                     verbatim=True,
                     standalone=True,
+                    action=True,
                 )
             )
         if maintenance_required:
@@ -219,8 +220,12 @@ def _apply_update(
         return 0 if recovery_ready else 1
 
     print(
-        format_value(
-            "Deploy when ready", setup_command("update"), verbatim=True, standalone=True
+        ui.value(
+            "Deploy when ready",
+            setup_command("update"),
+            verbatim=True,
+            standalone=True,
+            action=True,
         )
     )
     if maintenance_required:
@@ -246,8 +251,12 @@ def _configure_deferred_job_recovery(f, gcloud):
         if not isinstance(error, SystemExit) and str(error).strip():
             print(str(error), raw=True)
         print(
-            format_value(
-                "Retry with", setup_command("jobs"), verbatim=True, standalone=True
+            ui.value(
+                "Retry with",
+                setup_command("jobs"),
+                verbatim=True,
+                standalone=True,
+                action=True,
             )
         )
         return False
@@ -280,7 +289,6 @@ def _update_custom_images(f):
     ) as spinner:
         try:
             site_image_entity = get_images()
-            spinner.ok()
         except Exception as error:
             spinner.write(
                 f.warning(
@@ -292,8 +300,10 @@ def _update_custom_images(f):
             return
 
     if not site_image_entity:
+        print(ui.status("Custom images unchanged"))
         return
     if not any(key != "version" for key in site_image_entity):
+        print(ui.status("Custom images unchanged"))
         return
 
     try:
@@ -367,7 +377,6 @@ def _update_deployment_settings(f):
     ) as spinner:
         try:
             deployment_entity = deployment_module.get_deployment_settings()
-            spinner.ok()
         except Exception as error:
             spinner.write(
                 f.warning(wrap_text("Could not update deployment settings:"))
@@ -377,6 +386,7 @@ def _update_deployment_settings(f):
             return
 
     if not deployment_entity:
+        print(ui.status("Deployment settings unchanged"))
         return
 
     with f.progress(
@@ -423,7 +433,6 @@ def _update_ai_settings(f):
     ) as spinner:
         try:
             ai_entity = ai_settings_module.get_ai_settings()
-            spinner.ok()
         except Exception as error:
             spinner.write(
                 f.warning(wrap_text("Could not update AI settings:")) + f"\n{error}"
@@ -432,6 +441,7 @@ def _update_ai_settings(f):
             return
 
     if not ai_entity:
+        print(ui.status("AI settings unchanged"))
         return
 
     with f.progress(
@@ -475,7 +485,6 @@ def _update_public_page_settings(f):
     ) as spinner:
         try:
             entity = public_pages_module.get_public_page_settings()
-            spinner.ok()
         except Exception as error:
             spinner.write(
                 f.warning(wrap_text("Could not update public-page settings:"))
@@ -485,6 +494,7 @@ def _update_public_page_settings(f):
             return
 
     if not entity:
+        print(ui.status("Public-page settings unchanged"))
         return
 
     with f.progress(

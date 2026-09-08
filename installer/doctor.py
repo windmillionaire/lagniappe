@@ -386,19 +386,66 @@ def run_doctor(
                 )
         issues.extend(identity_issues)
         print(
-            "Active gcloud configuration: "
-            f"{active.get('configuration') or '(unavailable)'}"
+            ui.value(
+                "Active gcloud configuration",
+                f"{active.get('configuration') or '(unavailable)'}",
+                verbatim=True,
+            )
         )
-        print(f"Active gcloud account: {active.get('account') or '(unavailable)'}")
-        print(f"Active gcloud project: {active.get('project') or '(unavailable)'}")
-        print(f"ADC principal: {adc.get('principal') or '(unavailable)'}")
-        print(f"ADC project: {adc.get('project') or '(unavailable)'}")
-        print(f"ADC quota project: {adc.get('quota_project') or '(unavailable)'}")
         print(
-            f"Saved installer: {settings.get('INSTALLER_EMAIL') or '(not configured)'}"
+            ui.value(
+                "Active gcloud account",
+                f"{active.get('account') or '(unavailable)'}",
+                verbatim=True,
+            )
         )
-        print(f"Saved deployer: {settings.get('DEPLOYER_EMAIL') or '(not configured)'}")
-        print(f"Saved owner: {settings.get('ADMIN_EMAIL') or '(not configured)'}")
+        print(
+            ui.value(
+                "Active gcloud project",
+                f"{active.get('project') or '(unavailable)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "ADC principal",
+                f"{adc.get('principal') or '(unavailable)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "ADC project", f"{adc.get('project') or '(unavailable)'}", verbatim=True
+            )
+        )
+        print(
+            ui.value(
+                "ADC quota project",
+                f"{adc.get('quota_project') or '(unavailable)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "Saved installer",
+                f"{settings.get('INSTALLER_EMAIL') or '(not configured)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "Saved deployer",
+                f"{settings.get('DEPLOYER_EMAIL') or '(not configured)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "Saved owner",
+                f"{settings.get('ADMIN_EMAIL') or '(not configured)'}",
+                verbatim=True,
+            )
+        )
         if identity_issues:
             print(ui.warning("Identity state: drift detected"))
             for issue in identity_issues:
@@ -416,7 +463,8 @@ def run_doctor(
         deploy=deploy,
         gcloud_config=saved_gcloud,
     ):
-        print(ui.info(f"  - {line}"))
+        label, _, value = line.partition(": ")
+        print(ui.value(label, value, verbatim=True))
 
     project = settings.get("GOOGLE_CLOUD_PROJECT") or saved_gcloud.get("PROJECT")
     provider_report = {}
@@ -462,7 +510,15 @@ def run_doctor(
         print(ui.warning("Provider state: unavailable"))
 
     if issues:
-        print("Repair command:\n  " + setup_command("repair"))
+        print(
+            ui.value(
+                "Repair command",
+                setup_command("repair"),
+                action=True,
+                verbatim=True,
+                standalone=True,
+            )
+        )
         return 1
     print(ui.success("Doctor result: verified"))
     return 0

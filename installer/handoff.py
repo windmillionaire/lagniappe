@@ -300,34 +300,58 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
     )
 
     print(ui.heading("\nDelegated installation handoff"))
-    print(f"Installer/source: {installer_email}")
-    print(f"Permanent Owner/deployer: {owner_email}")
-    print(f"Target project: {project_id}")
-    print(f"Runtime service account: {runtime_email}")
+    print(ui.value("Installer/source", f"{installer_email}", verbatim=True))
+    print(ui.value("Permanent Owner/deployer", f"{owner_email}", verbatim=True))
+    print(ui.value("Target project", f"{project_id}", verbatim=True))
+    print(ui.value("Runtime service account", f"{runtime_email}", verbatim=True))
     print(ui.heading("Planned binding changes:"))
     for name in managed_bucket_names:
         print(f"  Bucket {name}:")
-        print(f"    add Owner: {_role_list(iam.constants.OPERATOR_BUCKET_ROLES)}")
         print(
-            "    remove installer: "
-            f"{_role_list(bucket_installer_roles.get(name, set()))}"
+            ui.value(
+                "    add Owner",
+                f"{_role_list(iam.constants.OPERATOR_BUCKET_ROLES)}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "    remove installer",
+                f"{_role_list(bucket_installer_roles.get(name, set()))}",
+                verbatim=True,
+            )
         )
     print(f"  Runtime service account {runtime_email}:")
     print(
-        "    add Owner: "
-        f"{_role_list(iam.constants.RUNTIME_SERVICE_ACCOUNT_ROLES)}"
+        ui.value(
+            "    add Owner",
+            f"{_role_list(iam.constants.RUNTIME_SERVICE_ACCOUNT_ROLES)}",
+            verbatim=True,
+        )
     )
-    print(f"    remove installer: {_role_list(runtime_installer_roles)}")
+    print(
+        ui.value(
+            "    remove installer",
+            f"{_role_list(runtime_installer_roles)}",
+            verbatim=True,
+        )
+    )
     if settings.get("MCP_RESOURCE"):
         print("  MCP runtime/build accounts, build bucket, image repository and service:")
         print("    grant Owner scoped access; remove installer access after deployment")
     print("  Application configuration:")
-    print(f"    set DEPLOYER_EMAIL: {owner_email}")
-    print(f"    set saved gcloud account: {owner_email}")
+    print(ui.value("    set DEPLOYER_EMAIL", f"{owner_email}", verbatim=True))
+    print(ui.value("    set saved gcloud account", f"{owner_email}", verbatim=True))
     print("    clear BOOTSTRAP_ADMIN_EMAIL and deploy")
     print(f"  Project {project_id} (final cloud mutation):")
-    print(f"    retain Owner: {OWNER_ROLE}")
-    print(f"    remove installer: {_role_list(project_installer_roles)}")
+    print(ui.value("    retain Owner", f"{OWNER_ROLE}", verbatim=True))
+    print(
+        ui.value(
+            "    remove installer",
+            f"{_role_list(project_installer_roles)}",
+            verbatim=True,
+        )
+    )
     answer = (confirm or input)(format_prompt("Continue with handoff? [y/N]: "))
     if str(answer or "").strip().casefold() not in {"y", "yes"}:
         print(ui.status("Handoff cancelled. No changes were made."))

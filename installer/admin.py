@@ -52,10 +52,18 @@ def print_oauth_instructions():
             "OAuth client creation are the remaining one-time browser steps."
         )
     )
-    print(wrap_text(f"\nOpening Google Auth Platform for project '{project_id}':"))
-    print(f"  {clients_url}")
+    print(
+        wrap_text(
+            f"\nOpening Google Auth Platform for project '{ui.literal(project_id)}':"
+        )
+    )
+    print(f"  {ui.literal(clients_url)}")
     if account:
-        print(wrap_text(f"  Required browser account: {account}"))
+        print(
+            ui.value(
+                "  Required browser account", f"{ui.literal(account)}", verbatim=True
+            )
+        )
     try:
         webbrowser.open_new_tab(clients_url)
     except webbrowser.Error:
@@ -64,65 +72,93 @@ def print_oauth_instructions():
     if account:
         print(
             wrap_text(
-                "\nBefore continuing, confirm the Google Cloud Console "
-                f"profile is '{account}'. If Google says you need additional "
-                "access, switch the browser to this account and reload the "
-                "page; setup already verified this account's project "
-                "permissions."
+                (
+                    "\nBefore continuing, confirm the Google Cloud Console profile is '"
+                    f"{ui.literal(account)}'. If Google says you need additional access, "
+                    "switch the browser to this account and reload the page; setup already "
+                    "verified this account's project permissions."
+                )
             )
         )
 
     print(
         wrap_text(
-            "\n1. If Google says the Auth Platform is not configured, "
-            "click 'Get started':"
+            (
+                f"\n{ui.literal('1.')} If Google says the Auth Platform is not "
+                f"configured, click '{ui.literal('Get started')}':"
+            )
         )
     )
     print(
         wrap_text(
-            f"   - App information: use '{app_name}' and select a support email"
+            (
+                f"   - {ui.literal('App information')}: use '{ui.literal(app_name)}' and "
+                "select a support email"
+            )
         )
     )
-    print(wrap_text("   - Audience: choose 'External'"))
+    print(wrap_text((f"   - Audience: choose '{ui.literal('External')}'")))
     print(
         wrap_text(
-            "   - Contact information: enter your email and finish registration"
+            (
+                f"   - {ui.literal('Contact information')}: enter your email and finish "
+                "registration"
+            )
         )
-    )
-    print(
-        wrap_text(
-            "2. For a new or replacement client, click 'Create client'. For "
-            "secret rotation, open the existing Web application client and "
-            "create a new Client secret instead."
-        )
-    )
-    print(
-        wrap_text(
-            "3. For a new client, choose 'Web application' and enter the "
-            "values below. The "
-            "client type must say 'Web application'; a 'Desktop app' client "
-            "will not work."
-        )
-    )
-    print(wrap_text(f"   - Name: {app_name}"))
-    print(wrap_text(f"   - Authorized JavaScript origin: {app_origin}"))
-    print(
-        wrap_text(f"   - Authorized redirect URI: {SETTINGS.APP['GOOGLE_LOGIN_URI']}")
     )
     print(
         wrap_text(
-            "4. Click 'Create'. Under Client secrets, click 'Download JSON'. "
-            "Move the downloaded file to the exact path below, renaming it "
-            "'google_oauth_credentials.json':"
+            (
+                f"{ui.literal('2.')} For a new or replacement client, click '"
+                f"{ui.literal('Create client')}'. For secret rotation, open the existing "
+                f"{ui.literal('Web application')} client and create a new "
+                f"{ui.literal('Client secret')} instead."
+            )
         )
     )
-    print(f"   {OAUTH_CLIENT_FILE}")
     print(
         wrap_text(
-            "5. Return to setup and press Enter. Setup will verify the Web "
-            "client type, project, JavaScript origin, and redirect URI from "
-            "that file before sending its client ID and secret to Identity "
-            "Platform. The secret will not be saved in Lagniappe settings.\n"
+            (
+                f"{ui.literal('3.')} For a new client, choose '"
+                f"{ui.literal('Web application')}' and enter the values below. The "
+                f"client type must say '{ui.literal('Web application')}'; a 'Desktop "
+                "app' client will not work."
+            )
+        )
+    )
+    print(ui.value("   Name", app_name, action=True, verbatim=True))
+    print(
+        ui.value(
+            "   Authorized JavaScript origin", app_origin, action=True, verbatim=True
+        )
+    )
+    print(
+        ui.value(
+            "   Authorized redirect URI",
+            SETTINGS.APP["GOOGLE_LOGIN_URI"],
+            action=True,
+            verbatim=True,
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('4.')} Click '{ui.literal('Create')}'. Under "
+                f"{ui.literal('Client secrets')}, click '{ui.literal('Download JSON')}'. "
+                "Move the downloaded file to the exact path below, renaming it '"
+                f"{ui.literal('google_oauth_credentials.json')}':"
+            )
+        )
+    )
+    print(f"   {ui.literal(OAUTH_CLIENT_FILE)}")
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('5.')} Return to setup and press Enter. Setup will verify "
+                "the Web client type, project, JavaScript origin, and redirect URI from "
+                "that file before sending its client ID and secret to Identity Platform. "
+                "The secret will not be saved in Lagniappe settings.\n"
+            )
         )
     )
 
@@ -345,7 +381,7 @@ def _get_verified_oauth_credentials(settings, credential_path=OAUTH_CLIENT_FILE)
     redirect_uri = settings.APP["GOOGLE_LOGIN_URI"]
     credentials = None
     print(wrap_text("\nPlace the downloaded Google OAuth JSON at:"))
-    print(f"  {credential_path}")
+    print(f"  {ui.literal(credential_path)}")
     account = str(settings.GCLOUD_CONFIG.get("ACCOUNT") or "").strip()
     account_guidance = f" while signed in as '{account}'" if account else ""
     choice = (
@@ -465,13 +501,14 @@ def _print_oauth_file_retention_message(credential_path=OAUTH_CLIENT_FILE):
     """Explain the local credential file's post-setup retention choices."""
     print(
         wrap_text(
-            "Identity Platform now stores the OAuth client secret. Lagniappe "
-            f"runtime does not need {credential_path}. You may delete the "
-            "local JSON or move it to secure storage. The config/files path "
-            "is excluded from Git and App Engine uploads, but the JSON still "
-            "contains a secret. To replace or rotate Google OAuth later, "
-            "place the new downloaded JSON at that path and run "
-            f"{setup_command('oauth')}."
+            (
+                "Identity Platform now stores the OAuth client secret. Lagniappe runtime "
+                f"does not need {ui.literal(credential_path)}. You may delete the local JSON "
+                "or move it to secure storage. The config/files path is excluded from Git "
+                "and App Engine uploads, but the JSON still contains a secret. To replace or "
+                "rotate Google OAuth later, place the new downloaded JSON at that path and "
+                f"run {ui.literal(setup_command('oauth'))}."
+            )
         )
     )
 
@@ -647,7 +684,9 @@ def configure_oauth():
     current_client_id = str(SETTINGS.APP.get("GOOGLE_CLIENT_ID") or "").strip()
     print(wrap_text(f"\n{ui.heading('Google OAuth configuration')}"))
     if current_client_id:
-        print(wrap_text(f"Current OAuth client ID: {current_client_id}"))
+        print(
+            ui.value("Current OAuth client ID", f"{current_client_id}", verbatim=True)
+        )
     print_oauth_instructions()
 
     client_id, client_secret = _get_verified_oauth_credentials(SETTINGS)
@@ -662,7 +701,7 @@ def configure_oauth():
         format_prompt("Deploy the updated OAuth settings now? [Y/n]: ")
     )
     if consent.strip().casefold() != "n":
-        utils.deploy_to_app_engine()
+        utils.deploy_to_app_engine(print_final_summary=False)
         print(f.success(wrap_text("Google OAuth settings deployed.")))
     else:
         print(

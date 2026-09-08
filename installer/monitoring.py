@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from runner import presentation as ui
+
 from runner.presentation import output as print
 
 from copy import deepcopy
 from urllib.parse import quote
 
-from runner.console import format_value, wrap_text
+from runner.console import wrap_text
 from runner.context import setup_command
 
 
@@ -461,11 +463,12 @@ def reconcile_memory_alert_after_deploy():
             )
         )
         print(
-            format_value(
+            ui.value(
                 "Retry with",
                 setup_command("monitoring"),
                 verbatim=True,
                 standalone=True,
+                action=True,
             )
         )
         return False

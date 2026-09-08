@@ -124,7 +124,7 @@ def setup_development():
             wrap_text(
                 "Native Windows development is not supported. Use WSL2 for "
                 "development, browser tests, and local server process "
-                "management. The Windows Google Cloud CLI Shell/Command Prompt "
+                "management. The Windows PowerShell "
                 "support surface is installation, recovery, update, and "
                 "deployment only."
             )
@@ -221,8 +221,8 @@ def setup_development():
             return 1
 
     print(ui.success("\nDevelopment setup complete. Safe to rerun after dependency changes."))
-    print(f"Start the local app: {python_command('run.py', 'dev')}")
-    print(f"Run backend tests: {python_command('run.py', 'test', 'unit')}")
-    print(f"Run frontend tests: {python_command('run.py', 'test', 'js')}")
-    print(f"Run browser tests: {python_command('run.py', 'test', 'e2e')}")
+    print(f"Start the local app: {ui.literal(python_command('run.py', 'dev'))}")
+    print(f"Run backend tests: {ui.literal(python_command('run.py', 'test', 'unit'))}")
+    print(f"Run frontend tests: {ui.literal(python_command('run.py', 'test', 'js'))}")
+    print(f"Run browser tests: {ui.literal(python_command('run.py', 'test', 'e2e'))}")
     return 0

@@ -628,5 +628,5 @@ def configure_mcp():
     prepare_existing_installation()
     if not requested(SETTINGS.APP) and not SETTINGS.APP.get("MCP_RESOURCE"):
         raise SetupError(f"External AI is disabled. Choose it with {setup_command('ai')} first.")
-    deploy_to_app_engine()
+    deploy_to_app_engine(print_final_summary=False)
     return 0

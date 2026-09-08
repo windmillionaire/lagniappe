@@ -289,7 +289,7 @@ def _print_recovery(journal, prefix):
     print(f"{prefix} after: {journal.payload['last_step'] or 'start'}")
     mutations = journal.payload["mutations"]
     if mutations:
-        print("Completed remote mutations:")
+        print(ui.heading("Completed remote mutations"))
         for mutation in mutations:
             print(
                 "  - "
@@ -298,7 +298,15 @@ def _print_recovery(journal, prefix):
             )
     else:
         print("Completed remote mutations: none")
-    print(f"Run {journal.payload['resume_command']} again to resume.")
+    print(
+        ui.value(
+            "Resume with",
+            journal.payload["resume_command"],
+            action=True,
+            verbatim=True,
+            standalone=True,
+        )
+    )
 
 
 # @testable true

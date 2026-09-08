@@ -240,32 +240,28 @@ def _print_plan(plan):
     formatter = FORMATTER.initialize()
     merge = plan["merge"]
     print(f"\n{ui.heading('Restore plan')}")
-    print(f"  {ui.info('Restore ID:')} {plan['restore_id']}")
+    print(ui.value("  Restore ID", plan["restore_id"], verbatim=True))
     print(
-        f"  {ui.info('Manual backup:')} "
-        f"{plan['backup_id']} ({plan['consistency']})"
+        f"  {ui.emphasis('Manual backup:')} {plan['backup_id']} ({plan['consistency']})"
     )
+    print(f"  {ui.emphasis('Database:')} {ui.info('merge directly into (default)')}")
     print(
-        f"  {ui.info('Database:')} "
-        f"{ui.info('merge directly into (default)')}"
-    )
-    print(
-        f"  {ui.info('Snapshot keys:')} "
+        f"  {ui.emphasis('Snapshot keys:')} "
         f"{merge['snapshot_entities']} ({merge['overwritten']} overwritten, "
         f"{merge['restored_missing']} restored); live-only keys are preserved"
     )
     print(
-        f"  {ui.info('Safety clone:')} {plan['safety_database']} "
+        f"  {ui.emphasis('Safety clone:')} {plan['safety_database']} "
         "(removed after validation)"
     )
     print(
-        f"  {ui.info('Queue:')} {plan['queue']} "
+        f"  {ui.emphasis('Queue:')} {plan['queue']} "
         f"{ui.info('(paused, audited, purged, then reconciled)')}"
     )
     print(formatter.warning(wrap_text(CONSISTENCY_NOTICE)))
     print(f"\n{ui.heading('Proposed recovery sequence')}")
     for number, step in enumerate(plan["sequence"], 1):
-        print(wrap_text(f"  {formatter.info(f'{number}.')} {step}"))
+        print(wrap_text(f"  {ui.literal(f'{number}.')} {step}"))
 
 
 # @testable false
@@ -699,8 +695,11 @@ def restore_backup(
         f"{plan['merge']['restored_missing']} missing keys restored.")
     )
     print(
-        "Cache data was cleared. Sign in as the Owner, then open "
-        "Admin → Site Settings → Maintenance and select Refresh Cache."
+        (
+            "Cache data was cleared. Sign in as the Owner, then open "
+            f"{ui.literal('Admin → Site Settings → Maintenance')} and select "
+            f"{ui.literal('Refresh Cache')}."
+        )
     )
     return plan
 

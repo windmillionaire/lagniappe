@@ -43,7 +43,7 @@ def _guide_google_service_terms_acceptance(
     spinner,
 ):
     """Pause API activation for account-scoped Google terms acceptance."""
-    f = FORMATTER.initialize()
+    FORMATTER.initialize()
     selected_account = str(account or "").strip()
     permanent_owner = str(owner_email or "").strip()
     delegated_maps = (
@@ -65,30 +65,43 @@ def _guide_google_service_terms_acceptance(
         print()
         print(
             wrap_text(
-                f"Google requires the active setup account "
-                f"'{selected_account}' to complete "
-                f"the {agreement_name}."
+                (
+                    "Google requires the active setup account '"
+                    f"{ui.literal(selected_account)}' to complete the "
+                    f"{ui.literal(agreement_name)}."
+                )
             )
         )
         if delegated_maps:
             print(
                 wrap_text(
-                    f"Permanent Owner '{permanent_owner}' must first review "
-                    "the Google Maps Platform agreement and authorize the "
-                    "temporary installer to acknowledge it with the "
-                    "business-controlled installer account. The Owner does "
-                    "not need to enable Places API manually; setup will retry "
-                    "and enable it."
+                    (
+                        f"Permanent Owner '{ui.literal(permanent_owner)}' must first review "
+                        "the Google Maps Platform agreement and authorize the temporary "
+                        "installer to acknowledge it with the business-controlled installer "
+                        "account. The Owner does not need to enable Places API manually; "
+                        "setup will retry and enable it."
+                    )
                 )
             )
         print(
             wrap_text(
-                "The terms page may first show Google Cloud's welcome "
-                "agreement. Complete every agreement it presents, and confirm "
-                f"the browser profile is '{selected_account}'."
+                (
+                    "The terms page may first show Google Cloud's welcome agreement. "
+                    "Complete every agreement it presents, and confirm the browser profile "
+                    f"is '{ui.literal(selected_account)}'."
+                )
             )
         )
-        print(wrap_text(f"Terms page: {terms_error.terms_url}"))
+        print(
+            ui.value(
+                "Terms page",
+                terms_error.terms_url,
+                action=True,
+                verbatim=True,
+                standalone=True,
+            )
+        )
         try:
             webbrowser.open_new_tab(terms_error.terms_url)
         except webbrowser.Error:
@@ -143,7 +156,9 @@ def enable_gcloud_apis():
         "_SETUP_ENABLED_GOOGLE_CLOUD_APIS",
         None,
     )
-    with f.progress(text=feedback_text) as sp:
+    with f.progress(
+        text=feedback_text, success_text="Required Google Cloud APIs verified"
+    ) as sp:
         if enabled_apis is None:
             result = retry_provider_call(
                 lambda: _enabled_google_cloud_apis(project_id),
@@ -206,14 +221,12 @@ def enable_gcloud_apis():
                 description="Enable required Google Cloud APIs",
             )
             for service_name in missing_apis:
-                display_name = required_apis[service_name]
                 record_mutation(
                     "enable Google Cloud APIs",
                     action="enabled",
                     resource="provider-api",
                     identifier=service_name,
                 )
-                sp.write(f.success(wrap_text(f"Enabled {display_name}")))
 
             def verify_enabled_services():
                 discovered = _enabled_google_cloud_apis(project_id)
@@ -511,7 +524,6 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
                         location=BUCKET_CREATE_LOCATION,
                     )
                     created = True
-                    sp.write(f.success(wrap_text(f"Created bucket {bucket_name}")))
                 except api_exceptions.Conflict:
                     bucket = client.get_bucket(bucket_name)
 
@@ -655,7 +667,7 @@ def create_app_engine_app():
             sp.ok()
             return application
         except ProviderNotFound:
-            sp.write(f.info(wrap_text("No App Engine application exists yet.")))
+            pass
 
     print(
         f.warning(
@@ -667,10 +679,7 @@ def create_app_engine_app():
     )
     print(
         f.info(
-            wrap_text(
-                "Creating the App Engine application may take up to 5 minutes. "
-                "The next prompt is waiting for your response."
-            )
+            wrap_text("Creating the App Engine application may take up to 5 minutes.")
         )
     )
     try:
@@ -703,11 +712,6 @@ def create_app_engine_app():
                 request={"application": application_to_create},
                 timeout=APP_ENGINE_RPC_TIMEOUT,
             )
-            sp.write(
-                f.info(
-                    wrap_text("Waiting for Google to finish App Engine provisioning...")
-                )
-            )
             created_app = operation.result(timeout=APP_ENGINE_CREATE_TIMEOUT)
             record_mutation(
                 "reconcile App Engine",
@@ -716,15 +720,7 @@ def create_app_engine_app():
                 identifier=project_id,
             )
 
-            sp.write(
-                f.success(
-                    wrap_text(
-                        "Successfully created App Engine app in "
-                        f"{created_app.location_id}."
-                    )
-                )
-            )
-            sp.ok()
+            sp.ok(f"App Engine application created in {created_app.location_id}")
             return created_app
         except Exception as e:
             classified = classify_provider_error(
@@ -814,7 +810,6 @@ def create_task_queue():
             sp.ok()
             return True
         except ProviderNotFound:
-            sp.write(f.info(wrap_text("Creating new Cloud Tasks queue...")))
             queue = tasks_v2.types.Queue(name=queue_path)
             try:
                 retry_provider_call(
@@ -832,9 +827,6 @@ def create_task_queue():
                     identifier=queue_path,
                 )
                 SETTINGS.save()
-                sp.write(
-                    f.success(wrap_text("Successfully created Cloud Tasks queue."))
-                )
                 sp.ok()
                 return True
             except Exception as e:
@@ -1176,9 +1168,6 @@ def create_ocr_processor():
                 action="created",
                 resource="document-ai-processor",
                 identifier=processor.name,
-            )
-            sp.write(
-                f.info(wrap_text(f"Document AI processor '{display_name}' created."))
             )
             SETTINGS.save()
             sp.ok()

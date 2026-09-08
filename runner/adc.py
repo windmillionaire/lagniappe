@@ -6,7 +6,7 @@ import sys
 from runner import presentation as ui
 from runner.presentation import output as print
 from runner.context import GCLOUD_CLI, format_command, python_command, setup_command
-from runner.console import format_value, wrap_text
+from runner.console import wrap_text
 from runner.process import run_command
 
 
@@ -127,7 +127,7 @@ def ensure_gcloud_source_login(account, *, allow_login=False):
             "opening account authentication:"
         )
     )
-    print(f"  {format_command(login_command)}")
+    print(f"  {ui.literal(format_command(login_command))}")
     result = run_command(
         login_command,
         check=False,
@@ -209,10 +209,8 @@ def ensure_adc_target(
     if not mismatches:
         if announce:
             print(ui.success("Application Default Credentials verified"))
-            print(
-                format_value("Account", identity["principal"], column=10, verbatim=True)
-            )
-            print(format_value("Project", project, column=10, verbatim=True))
+            print(ui.value("Account", identity["principal"], column=10, verbatim=True))
+            print(ui.value("Project", project, column=10, verbatim=True))
         return identity
 
     if allowed_principals and allow_login is False:
@@ -257,7 +255,7 @@ def ensure_adc_target(
                 "opening the saved account login:"
             )
         )
-        print(f"  {format_command(login_command)}")
+        print(f"  {ui.literal(format_command(login_command))}")
         result = run_command(
             login_command,
             check=False,
@@ -302,6 +300,6 @@ def ensure_adc_target(
 
     if announce:
         print(ui.success("Application Default Credentials verified"))
-        print(format_value("Account", identity["principal"], column=10, verbatim=True))
-        print(format_value("Project", project, column=10, verbatim=True))
+        print(ui.value("Account", identity["principal"], column=10, verbatim=True))
+        print(ui.value("Project", project, column=10, verbatim=True))
     return identity

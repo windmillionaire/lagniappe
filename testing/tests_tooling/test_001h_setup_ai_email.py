@@ -223,7 +223,7 @@ def test_resend_setup_guides_full_receiving_key_creation(monkeypatch, capsys):
 
     ai_email.guide_resend_receiving_key()
 
-    output = capsys.readouterr().out
+    output = " ".join(capsys.readouterr().out.split())
     assert "Lagniappe AI Email Receiving" in output
     assert "Permission: Full access" in output
     assert "Do not use this Full access key for sending" in output
@@ -472,7 +472,7 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
     )
     monkeypatch.setattr(
         "installer.utils.deploy_to_app_engine",
-        lambda: events.append("deploy"),
+        lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
     monkeypatch.setattr(ai_email.webbrowser, "open_new_tab", lambda _url: True)
     responses = iter(
@@ -490,7 +490,7 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
     assert events == [
         "prepare",
         "save",
-        "deploy",
+        ("deploy", False),
         "enable-webhook",
     ]
     saved = settings.APP["AI_EMAIL_CONFIG"]
@@ -598,7 +598,7 @@ def test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt(
     assert candidate["resend"]["inboundApiKey"] == "re_full"
     assert all("API key" not in prompt for prompt in prompts)
     output = " ".join(capsys.readouterr().out.split())
-    assert "reuse it for provider reconciliation without prompting" in output
+    assert "Reusing the saved Full access receiving key." in output
 
 
 # @matrix ai-email setup : deploy disable disabled-first provider-state secrets setup
@@ -638,14 +638,14 @@ def test_ai_email_disable_turns_off_provider_before_saving_and_deploying(
     monkeypatch.setattr(ai_email, "ResendSetupClient", Client)
     monkeypatch.setattr(
         "installer.utils.deploy_to_app_engine",
-        lambda: events.append("deploy"),
+        lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
     monkeypatch.setattr(builtins, "input", lambda _prompt="": "")
 
     existing = settings.APP["AI_EMAIL_CONFIG"]
     assert ai_email._disable(existing) == 0
 
-    assert events == ["provider-disable", "provider-check", "save", "deploy"]
+    assert events == ["provider-disable", "provider-check", "save", ("deploy", False)]
     disabled = settings.APP["AI_EMAIL_CONFIG"]
     assert disabled["enabled"] is False
     assert disabled["resend"]["webhookSecret"] == existing["resend"]["webhookSecret"]

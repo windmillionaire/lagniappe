@@ -64,9 +64,11 @@ def _print_backup_summary(formatter, manifest):
         manifest.snapshot_time.replace("Z", "+00:00")
     ).astimezone(timezone.utc)
     print(formatter.success(f"Backup {manifest.backup_id} is complete."))
-    print(f"  Snapshot: {snapshot:%d %b %Y at %H:%M UTC}")
-    print(f"  Database records: {manifest.entity_count}")
-    print(f"  Referenced file versions: {manifest.asset_count}")
+    print(ui.value("  Snapshot", f"{snapshot:%d %b %Y at %H:%M UTC}", verbatim=True))
+    print(ui.value("  Database records", f"{manifest.entity_count}", verbatim=True))
+    print(
+        ui.value("  Referenced file versions", f"{manifest.asset_count}", verbatim=True)
+    )
     print("  This manual backup is self-contained and remains available until deleted.")
 
 
@@ -508,12 +510,17 @@ def list_backups(
         manifests.append(manifest)
     manifests.sort(key=lambda item: (item.export_completed_at, item.backup_id), reverse=True)
     if announce:
+        if not manifests:
+            print("No completed manual backups")
         for manifest in manifests:
-            print(
-                f"{manifest.backup_id}  {manifest.export_completed_at}  "
-                f"database={manifest.source_database_id}  {manifest.consistency}  "
-                f"app={manifest.application_version}"
-            )
+            print(ui.heading(f"\nBackup {manifest.backup_id}"))
+            for label, value in (
+                ("Completed", manifest.export_completed_at),
+                ("Database", manifest.source_database_id),
+                ("Consistency", manifest.consistency),
+                ("Application version", manifest.application_version),
+            ):
+                print(ui.value(label, value, column=23, verbatim=True))
     return manifests
 
 
@@ -564,7 +571,7 @@ def delete_backup(
             continue
         blob.delete()
     _try_refresh_runtime_catalog(context)
-    print(ui.success(f"Deleted backup {backup_id} from its exact v3 prefix."))
+    print(ui.success(f"Backup {backup_id} deleted"))
     return True
 
 

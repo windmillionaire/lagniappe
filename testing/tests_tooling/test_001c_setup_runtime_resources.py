@@ -292,11 +292,15 @@ def test_email_cli_replaces_gmail_without_custom_domain(monkeypatch):
         "setup_auth_email",
         lambda *, replace=False: events.append(("gmail", replace)) or True,
     )
-    monkeypatch.setattr(utils, "deploy_to_app_engine", lambda: events.append("deploy"))
+    monkeypatch.setattr(
+        utils,
+        "deploy_to_app_engine",
+        lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
+    )
     monkeypatch.setattr("builtins.input", lambda prompt: "")
 
     assert auth_email.configure_auth_email() == 0
-    assert events == ["verify", ("gmail", True), "deploy"]
+    assert events == ["verify", ("gmail", True), ("deploy", False)]
 
 
 # @matrix setup : authentication-email cli custom-domain deploy smtp
@@ -326,12 +330,12 @@ def test_email_cli_configures_and_optionally_deploys(monkeypatch):
     monkeypatch.setattr(
         utils,
         "deploy_to_app_engine",
-        lambda: events.append("deploy"),
+        lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
     monkeypatch.setattr("builtins.input", lambda prompt: "")
 
     assert auth_email.configure_auth_email() == 0
-    assert events == ["verify", "configure", "deploy"]
+    assert events == ["verify", "configure", ("deploy", False)]
 
 
 # @matrix setup : cli deploy redis-tls
@@ -363,13 +367,15 @@ def test_security_cli_configures_and_optionally_deploys_redis_tls(monkeypatch):
     monkeypatch.setattr(
         redis_setup, "_enable_redis_tls", lambda: events.append("enable") or True
     )
-    monkeypatch.setattr(utils, "deploy_to_app_engine", lambda: events.append("deploy"))
+    monkeypatch.setattr(
+        utils,
+        "deploy_to_app_engine",
+        lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
+    )
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
     assert security.configure_security() == 0
-    assert events == ["verify", "enable", "deploy"]
-
-
+    assert events == ["verify", "enable", ("deploy", False)]
 
 
 def _install_cloud_module(monkeypatch, name, module):
@@ -1314,8 +1320,7 @@ def test_managed_certificate_waits_for_provider_then_reports_active(
     assert "--account=owner@example.com" in gcloud_calls[2][0]
     output = capsys.readouterr().out
     assert (
-        "Managed TLS certificate cert-pending for https://app.example.com "
-        "in Google Cloud project project-1 using owner@example.com: PENDING"
+        "Managed TLS certificate for app.example.com: PENDING; retrying in 2 seconds"
     ) in output
     assert ("Managed TLS certificate active for https://app.example.com." in output) is announce_ready
     assert (
@@ -1514,8 +1519,7 @@ def test_empty_mapping_list_creates_managed_mapping(monkeypatch):
         "app.example.com",
     ]
     assert "--certificate-management=automatic" in mutations[0]
-    assert any("domain mapping created" in message for message in sp.messages)
-    assert not any("domain mapping existing" in message for message in sp.messages)
+    assert not sp.messages
 
 
 # @matrix setup : gcp-domain idempotence managed-certificate reconciliation
@@ -1577,13 +1581,7 @@ def test_existing_domain_mapping_enables_managed_tls(monkeypatch):
     assert "--certificate-management=automatic" in calls[2]
     assert "--project=project-1" in calls[2]
     assert "--account=owner@example.com" in calls[2]
-    assert any("domain mapping updated" in message for message in sp.messages)
-    assert any(
-        "apps/project-1/domainMappings/app.example.com" in message
-        for message in sp.messages
-    )
-    assert any("managed TLS AUTOMATIC" in message for message in sp.messages)
-    assert any("certificate cert-pending" in message for message in sp.messages)
+    assert not sp.messages
 
 
 # @matrix setup : ai-cache gcp-domain idempotence provider-records
@@ -2678,7 +2676,7 @@ def test_upgrade_restore_images_continues_when_no_remote_image_is_available(
 
     assert settings.APP["SITE_IMAGE_VERSION"] == 7
     assert spinner.fails == []
-    assert len(spinner.oks) == 1
+    assert not spinner.oks
     assert "Custom images unchanged" in spinner.messages
 
 
@@ -4721,7 +4719,7 @@ def test_oauth_instructions_open_current_project_clients_page(
     assert opened == [
         "https://console.cloud.google.com/auth/clients?project=demo-project"
     ]
-    output = capsys.readouterr().out
+    output = " ".join(capsys.readouterr().out.split())
     assert "Identity Platform is ready" in output
     assert "Required browser account: operator@example.com" in output
     assert "switch the" in output
@@ -5099,7 +5097,7 @@ def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
     monkeypatch.setattr(
         utils,
         "deploy_to_app_engine",
-        lambda: events.append("deploy"),
+        lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: "")
 
@@ -5114,7 +5112,7 @@ def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
             "1234-web.apps.googleusercontent.com",
             "new-secret",
         ),
-        "deploy",
+        ("deploy", False),
     ]
 
 
@@ -6438,7 +6436,7 @@ def test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_i
     assert settings.APP["BOOTSTRAP_ADMIN_EMAIL"] == ""
     assert settings.GCLOUD_CONFIG["ACCOUNT"] == owner
     assert settings._saves == [True]
-    preview = capsys.readouterr().out
+    preview = " ".join(capsys.readouterr().out.split())
     assert "Installer/source: installer@example.test" in preview
     assert "Permanent Owner/deployer: owner@example.test" in preview
     assert "roles/storage.objectAdmin" in preview

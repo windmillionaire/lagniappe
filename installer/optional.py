@@ -80,8 +80,8 @@ def setup_error_monitoring():
     )
     print(
         wrap_text(
-            "Privacy notice: https://lagniappe.site/reporting_privacy "
-            "(repository copy: ERROR_REPORTING_PRIVACY.md)"
+            f"Privacy notice: {ui.literal('https://lagniappe.site/reporting_privacy')} "
+            f"(repository copy: {ui.literal('ERROR_REPORTING_PRIVACY.md')})"
         )
     )
 
@@ -172,29 +172,13 @@ def setup_error_monitoring():
         )
     )
 
-    print(wrap_text(f"\n{ui.heading('How this helps:')}"))
-    print(wrap_text("- Developers can fix bugs you encounter automatically"))
-    print(wrap_text("- Performance issues get identified and resolved faster"))
-    print(wrap_text("- Your Lagniappe instance becomes more stable over time"))
-
-    print(wrap_text(ui.heading("\nExamples of what gets reported:")))
-    print(
-        wrap_text('- "Image upload failed: file too large" (no image content)')
-    )
     print(
         wrap_text(
-            '- "Form validation error on date field" (no submitted field values)'
+            (
+                f"\nYou can disable this at any time by changing {ui.literal('CAPTURE_ERRORS')} "
+                f"to {ui.literal('False')} in your settings file."
+            )
         )
-    )
-    print(
-        wrap_text(
-            '- "Database connection timeout after 30s" (no query details)'
-        )
-    )
-
-    print(
-        f"\n{f.info(wrap_text('You can disable this at any time by changing '
-                             'CAPTURE_ERRORS to False in your settings file.'))}"
     )
 
     consent = input(
@@ -393,12 +377,21 @@ def configure_ai_features():
         SETTINGS.APP["AI_OBSERVABILITY"] = False
         print(ui.info("AI features and external AI access are disabled."))
     else:
-        print(wrap_text(
-            f"AI models: {SETTINGS.APP.get('AI_MODEL', constants.DEFAULT_AI_MODEL)} "
-            f"(primary), {SETTINGS.APP.get('AI_UTILITY_MODEL', constants.DEFAULT_UTILITY_AI_MODEL)} "
-            f"(utility), {SETTINGS.APP.get('AI_IMAGE_MODEL', constants.DEFAULT_AI_IMAGE_MODEL)} "
-            "(images). You can change these in Admin → Site Settings → AI Models."
-        ))
+        print(ui.heading("\nAI models"))
+        for label, key, default in (
+            ("Primary", "AI_MODEL", constants.DEFAULT_AI_MODEL),
+            ("Utility", "AI_UTILITY_MODEL", constants.DEFAULT_UTILITY_AI_MODEL),
+            ("Images", "AI_IMAGE_MODEL", constants.DEFAULT_AI_IMAGE_MODEL),
+        ):
+            print(ui.value(label, SETTINGS.APP.get(key, default), column=11))
+        print(
+            wrap_text(
+                (
+                    "You can change these in "
+                    f"{ui.literal('Admin → Site Settings → AI Models')}."
+                )
+            )
+        )
         print(wrap_text(
             "External AI access lets users connect their own agents through MCP "
             "or the API/skill. Those agents use their own model providers. "

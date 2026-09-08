@@ -34,6 +34,10 @@ italics, or a different color for each section.
 | Section heading | Bold normal foreground |
 | Secondary text | Gray supplementary annotation; never essential instructions |
 | Progress | Gray spinner and short activity label: `Configuring Redis...` |
+| Instruction target | Cyan exact button, field, setting, URL, path, or command to use |
+| Numbered step | Cyan number, normal instruction text |
+| Configuration row | Bold label, normal descriptive value |
+| DNS/input row | Bold label, cyan exact value to enter or copy |
 
 Color only the marker in ordinary messages. Compact diagnostic tables may color
 an explicit outcome word, such as `Verified`, `Pending`, or `Failed`. Feature
@@ -49,6 +53,14 @@ diagnostics and their spacing separately from authored explanations.
 Input validation failures use the error marker and explain how to correct the
 answer. Keep normal state descriptions, such as a feature being disabled,
 neutral; use success only when reporting a completed change or verification.
+
+Use inline emphasis sparingly. Bold short lead phrases that help scan a long
+explanation; color exact action targets cyan, such as `Download JSON`,
+`Zone > DNS > Edit`, or `volatile-ttl`. Do not color whole instructional
+paragraphs. Supplementary annotations may be gray, but consent disclosures,
+required permissions, destructive details, and recovery instructions retain
+normal contrast. Preserve distinctions between application, sending, and
+receiving domains and between sending and receiving credentials.
 
 ## Prompts and copy
 
@@ -95,13 +107,30 @@ tokens and accounts for ANSI styles and Unicode cell widths. Prompts retain
 their final input space. Short summary rows align; narrow terminals stack
 labels and values. Use borderless summaries and explicit empty-state messages.
 
-Use `format_value(..., verbatim=True)` for identifiers, URLs, DNS records, and
+Use `ui.value(..., verbatim=True)` for identifiers, URLs, DNS records, and
 paths. Add `standalone=True` for commands. Copyable content retains its exact
 bytes and receives no added punctuation, hard wrapping, or ellipsis. Use the
 platform-aware command helpers, including PowerShell's `.\setup.cmd` form.
 Help examples use `<placeholder-values>` and `[optional-arguments]`, following
 the Primer's [command syntax](https://github.com/cli/cli/blob/trunk/docs/command-line-syntax.md).
 Retain the summary's existing safe-field allowlist.
+
+Group the full installation summary into Application, Access, Services, AI,
+and Next steps, with one blank line between groups and alignment within each
+group. Keep the existing configuration details; show the application URL once
+as the final open action after deployment. The MCP revision belongs in `doctor`.
+Focused commands finish with their own result and relevant next steps; nested
+deployment uses `print_final_summary=False` to avoid an installation inventory
+and a second completion banner.
+
+Use one final result for each operation. Remove duplicate creating/created/
+configured announcements, internal bucket names, and individual API activation
+successes from normal installation progress. Retain these identifiers in
+diagnostics and recovery inventories. Keep duration estimates and concise retry
+updates, including in static output. Report saved locally, deployed, DNS
+submitted, certificate pending/active, and provider activation as distinct
+states supported by the existing checks. Remove promotional copy and redundant
+examples; retain substantive instructions, caveats, confirmations, and next steps.
 
 ## Shared implementation
 
@@ -113,6 +142,12 @@ in installer modules) to emit
 already-laid-out text. It preserves literal brackets and copyable values;
 automatic Rich markup, highlighting, emoji substitution, and wrapping are off.
 Pass `raw=True` for unmodified third-party diagnostics.
+
+Use `emphasis` for inline bold text, `literal` for cyan action targets, and
+`value(label, content, action=False, **layout)` for labeled rows. `value` uses
+the shared `format_value` layout contract; pass `action=True` for DNS values,
+commands, and other exact inputs. Mark spans explicitly at authored message
+sites; never infer highlighting from arbitrary output or parse it as markup.
 
 Use `read_input` (imported as `input`) with `format_prompt` for interactive
 questions. Input parsing stays with the existing caller. Pass a structured
@@ -153,6 +188,13 @@ provider failure, and manual next steps. Visually review Linux, macOS, and
 PowerShell running `.\setup.cmd`, including PowerShell in Windows Terminal and
 the older console host. Check for flashing labels, duplicate completion lines,
 prompt collisions, narrow-window behavior, and readable plain fallbacks.
+
+Include alternate paths: manual and Cloudflare DNS; Gmail, Resend, and generic
+SMTP; optional DMARC; OAuth replacement and retry; Redis TLS enable/disable;
+AI email receiving, saved-key reuse, and deferred activation; recovery, doctor,
+handoff, update/upgrade, and backup/archive/restore. Preserve exact DNS records
+(including TXT quoting and MX priority), typed confirmations, and resume
+commands when shortening their surrounding copy.
 
 The offline preview makes no installation or provider changes:
 

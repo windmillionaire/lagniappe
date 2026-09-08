@@ -37,10 +37,15 @@ def add_custom_domain():
         format_prompt("Would you like to deploy the app now? [y/N]: ")
     )
     if consent.casefold() == "y":
-        utils.deploy_to_app_engine()
+        utils.deploy_to_app_engine(print_final_summary=False)
+        print(ui.success("Custom domain settings deployed"))
         print(
-            wrap_text(
-                f"Your app is available at: https://{SETTINGS.APP['CUSTOM_DOMAIN']}"
+            ui.value(
+                "Open this installation",
+                f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}",
+                action=True,
+                verbatim=True,
+                standalone=True,
             )
         )
     else:

@@ -14,7 +14,7 @@ from config.ai_email import (
     normalize_email_address,
     normalize_email_domain,
 )
-from runner.console import format_prompt, format_value
+from runner.console import format_prompt
 from installer import FORMATTER, wrap_text
 from installer.errors import (
     ProviderError,
@@ -207,7 +207,7 @@ def _prompt_secret(label, existing=None):
 # @covered-by installer/ai_email.py::guide_resend_sending_identity
 # @reason browser launch behavior is exercised through the public instruction helpers
 def _open_resend_page(label, url):
-    print(wrap_text(f"Opening {label}:\n  {url}"))
+    print(wrap_text(f"Opening {label}:\n  {ui.literal(url)}"))
     try:
         webbrowser.open_new_tab(url)
     except webbrowser.Error:
@@ -223,26 +223,35 @@ def guide_resend_receiving_key(*, existing=False):
     print(wrap_text(ui.heading("\nConfigure the Resend receiving administration key:")))
     if existing:
         print(
-            wrap_text(
-                "A Full access receiving key is already saved. Setup will reuse "
-                "it for provider reconciliation without prompting for it again."
-            )
+            wrap_text((f"Reusing the saved {ui.literal('Full access')} receiving key."))
         )
         return
-    print(wrap_text("1. Sign in to Resend and open API Keys."))
-    print(wrap_text("2. Click 'Create API Key'."))
-    print(wrap_text("   - Name: Lagniappe AI Email Receiving"))
-    print(wrap_text("   - Permission: Full access"))
     print(
         wrap_text(
-            "3. Click 'Create', then copy the key immediately. Resend displays "
-            "the key value only once. Do not use this Full access key for sending."
+            (f"{ui.literal('1.')} Sign in to Resend and open {ui.literal('API Keys')}.")
+        )
+    )
+    print(wrap_text((f"{ui.literal('2.')} Click '{ui.literal('Create API Key')}'.")))
+    print(
+        ui.value("   Name", "Lagniappe AI Email Receiving", action=True, verbatim=True)
+    )
+    print(ui.value("   Permission", "Full access", action=True, verbatim=True))
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('3.')} Click '{ui.literal('Create')}', then copy the key "
+                "immediately. Resend displays the key value only once. Do not use this "
+                f"{ui.literal('Full access')} key for sending."
+            )
         )
     )
     print(
         wrap_text(
-            "4. Return to setup and paste the key. Setup will verify Full access "
-            "by listing and reconciling Resend domains before it saves anything."
+            (
+                f"{ui.literal('4.')} Return to setup and paste the key. Setup will "
+                f"verify {ui.literal('Full access')} by listing and reconciling Resend "
+                "domains before it saves anything."
+            )
         )
     )
     if not existing:
@@ -257,16 +266,18 @@ def guide_resend_sending_identity(sending_domain, *, reusable_sender=None):
     print(wrap_text(ui.heading("\nConfigure the Resend feedback-sending identity:")))
     if not reusable_sender:
         raise ProviderInvalidInput(
-            "AI email requires Resend-backed authentication email. "
-            "Rerun ./setup.sh email and choose Resend first."
+            f"AI email requires Resend-backed authentication email. Rerun {setup_command('email')} and choose Resend first."
         )
     print(
         wrap_text(
-            f"Authentication email already established the verified Resend sender "
-            f"{reusable_sender} on {sending_domain} and its Sending-access key. "
-            "AI email will reuse that sender and key; it will not repeat the "
-            "sending-domain DNS setup or create another Sending key. The new Full "
-            "access receiving key must remain different."
+            (
+                "Authentication email already established the verified Resend sender "
+                f"{ui.literal(reusable_sender)} on {ui.literal(sending_domain)} and its "
+                f"{ui.literal('Sending-access')} key. AI email will reuse that sender and "
+                "key; it will not repeat the sending-domain DNS setup or create another "
+                f"Sending key. The new {ui.literal('Full access')} receiving key must remain "
+                "different."
+            )
         )
     )
 
@@ -339,11 +350,11 @@ def _print_domain_records(domain):
         name = str(record.get("name") or "").strip()
         value = str(record.get("value") or "").strip()
         priority = record.get("priority")
-        print(format_value("  Type", record_type, verbatim=True))
-        print(format_value("  Name", name, verbatim=True))
-        print(format_value("  Value", value, verbatim=True))
+        print(ui.value("  Type", record_type, verbatim=True, action=True))
+        print(ui.value("  Name", name, verbatim=True, action=True))
+        print(ui.value("  Value", value, verbatim=True, action=True))
         if priority is not None:
-            print(format_value("  Priority", priority, verbatim=True))
+            print(ui.value("  Priority", priority, verbatim=True, action=True))
         print()
 
 
@@ -373,22 +384,30 @@ def guide_resend_receiving_dns(domain, *, cloudflare_default=False):
         )
         print(
             wrap_text(
-                f"1. Open Resend Domains and select {domain_name}. Setup has "
-                "already created it with receiving enabled."
+                (
+                    f"{ui.literal('1.')} Open {ui.literal('Resend Domains')} and select "
+                    f"{ui.literal(domain_name)}. Setup has already created it with receiving "
+                    "enabled."
+                )
             )
         )
         print(
             wrap_text(
-                "2. Use Resend's 'Sign in to Cloudflare' or automatic DNS setup "
-                "when it is offered, select the correct Cloudflare zone, and "
-                "authorize the receiving record."
+                (
+                    f"{ui.literal('2.')} Use Resend's '"
+                    f"{ui.literal('Sign in to Cloudflare')}' or automatic DNS setup when "
+                    "it is offered, select the correct Cloudflare zone, and authorize "
+                    "the receiving record."
+                )
             )
         )
         print(
             wrap_text(
-                "3. Return here after Resend/Cloudflare reports that the DNS "
-                "change was submitted. If the automatic option is unavailable, "
-                "type M to switch to the exact manual records."
+                (
+                    f"{ui.literal('3.')} Return here after Resend/Cloudflare reports "
+                    "that the DNS change was submitted. If the automatic option is "
+                    "unavailable, type M to switch to the exact manual records."
+                )
             )
         )
         _open_resend_page("Resend Domains", RESEND_DOMAINS_URL)
@@ -433,8 +452,7 @@ def _wait_for_domain(client, domain_id, *, attempts=12, sleep=time.sleep):
         if attempt < attempts - 1:
             sleep(5)
     raise ProviderError(
-        "Resend domain verification is still pending. Wait for DNS propagation and "
-        "rerun ./setup.sh ai-email; the existing domain will be reused."
+        f"Resend domain verification is still pending. Wait for DNS propagation and rerun {setup_command('ai-email')}; the existing domain will be reused."
     )
 
 
@@ -538,7 +556,7 @@ def _prerequisites(settings):
         and auth_email.get("senderName")
     ):
         missing.append(
-            "Resend-backed authentication email (run ./setup.sh email and choose Resend)"
+            f"Resend-backed authentication email (run {setup_command('email')} and choose Resend)"
         )
     if not settings.get("AI_MODEL"):
         missing.append("AI configuration")
@@ -583,7 +601,7 @@ def _disable(existing):
         .casefold()
         != "n"
     ):
-        utils.deploy_to_app_engine()
+        utils.deploy_to_app_engine(print_final_summary=False)
         print(ui.success(wrap_text("The disabled AI email configuration has been deployed.")))
     else:
         print(
@@ -622,9 +640,24 @@ def setup_ai_email():
             )
         )
         print(wrap_text("To add it later:"))
-        print(f"  1. Configure the custom URL: {setup_command('url')}")
-        print(f"  2. Choose Resend for email: {setup_command('email')}")
-        print(f"  3. Configure AI email: {setup_command('ai-email')}")
+        print(
+            (
+                f"  {ui.literal('1.')} Configure the custom URL: "
+                f"{ui.literal(setup_command('url'))}"
+            )
+        )
+        print(
+            (
+                f"  {ui.literal('2.')} Choose Resend for email: "
+                f"{ui.literal(setup_command('email'))}"
+            )
+        )
+        print(
+            (
+                f"  {ui.literal('3.')} Configure AI email: "
+                f"{ui.literal(setup_command('ai-email'))}"
+            )
+        )
         return None
 
     _prerequisites(settings)
@@ -641,7 +674,12 @@ def setup_ai_email():
     if choice == "x":
         raise SetupCancelled("Installation cancelled before AI email setup.")
     if choice != "y":
-        print(f"AI email can be configured later with {setup_command('ai-email')}.")
+        print(
+            (
+                "AI email can be configured later with "
+                f"{ui.literal(setup_command('ai-email'))}."
+            )
+        )
         return None
     return configure_ai_email(prepare_installation=False, deploy=False)
 
@@ -674,7 +712,7 @@ def activate_ai_email(candidate=None):
     print(f.success(wrap_text("AI email provider configuration is ready.")))
     for tool in ("ai", "ask", "create", "organize"):
         print(
-            format_value(
+            ui.value(
                 f"  {tool.title()}",
                 f"{candidate['aliases'][tool]}@{candidate['domain']}",
                 column=12,
@@ -684,19 +722,25 @@ def activate_ai_email(candidate=None):
     print(wrap_text(ui.heading("\nNext steps:")))
     print(
         wrap_text(
-            "  1. Send a normal email from a registered user's exact email address."
+            (
+                f"  {ui.literal('1.')} Send a normal email from a registered user's "
+                "exact email address."
+            )
         )
     )
     print(
         wrap_text(
-            "  2. Confirm the acceptance email links to a pending report, then confirm"
+            (
+                f"  {ui.literal('2.')} Confirm the acceptance email links to a pending "
+                "report, then confirm"
+            )
         )
     )
     print(wrap_text("     the result email links to the completed answer/proposal."))
     print(
         wrap_text(
-            "Create and Organize emails only prepare reports. Applying a proposal still "
-            "requires the user to sign in, review it, and run it in Lagniappe."
+            "Create and Organize emails only prepare reports. Applying a proposal "
+            "still requires the user to sign in, review it, and run it in Lagniappe."
         )
     )
     return True
@@ -803,16 +847,14 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
         )
     except ValueError as error:
         raise ProviderInvalidInput(
-            "Authentication email must have a valid configured sender before "
-            "AI email setup can run. Rerun ./setup.sh email first."
+            f"Authentication email must have a valid configured sender before AI email setup can run. Rerun {setup_command('email')} first."
         ) from error
     sender_name = str(
         auth_email.get("senderName") or SETTINGS.APP.get("APP_NAME") or "Lagniappe"
     ).strip()
     if not sender_name:
         raise ProviderInvalidInput(
-            "Authentication email must have a configured sender name. "
-            "Rerun ./setup.sh email first."
+            f"Authentication email must have a configured sender name. Rerun {setup_command('email')} first."
         )
     sending_domain = sender_email.rsplit("@", 1)[-1]
     sending_key = str(auth_email.get("password") or "")
@@ -822,12 +864,14 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
     )
     if not sending_key or sending_key == inbound_key:
         raise ProviderInvalidInput(
-            "The authentication-email Resend Sending key must differ from the "
-            "Full access receiving key. Rerun ./setup.sh email to rotate the "
-            "Sending key, then rerun this command."
+            f"The authentication-email Resend Sending key must differ from the Full access receiving key. Rerun {setup_command('email')} to rotate the Sending key, then rerun this command."
         )
     print(
-        f"Feedback sender: {sender_name} <{sender_email}> (from authentication email)"
+        ui.value(
+            "Feedback sender",
+            f"{sender_name} <{sender_email}> (from authentication email)",
+            verbatim=True,
+        )
     )
 
     endpoint = f"https://{custom_domain}{WEBHOOK_PATH}"
@@ -874,14 +918,13 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
         print(
             f.warning(
                 wrap_text(
-                    "Configuration was saved locally and the Resend webhook remains "
-                    "disabled. Rerun ./setup.sh ai-email when ready to deploy."
+                    f"Configuration was saved locally and the Resend webhook remains disabled. Rerun {setup_command('ai-email')} when ready to deploy."
                 )
             )
         )
         return 0
 
-    utils.deploy_to_app_engine()
+    utils.deploy_to_app_engine(print_final_summary=False)
     activate_ai_email(candidate)
     return 0
 

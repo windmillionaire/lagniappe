@@ -65,7 +65,7 @@ def configure_security():
     )
     consent = input(format_prompt("Deploy the updated app now? [Y/n]: "))
     if consent.lower() != "n":
-        utils.deploy_to_app_engine()
+        utils.deploy_to_app_engine(print_final_summary=False)
         print(f.success(wrap_text("Redis security configuration deployed.")))
     else:
         print(
