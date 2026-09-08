@@ -203,10 +203,13 @@ live model selections in Admin → Site Settings → AI Models.
 
 Normal installation asks for AI first, then offers external AI/MCP (default
 no), and prints one informational line with the three default models. Existing
-choices are preserved by update/recovery. `./setup.sh ai` changes these choices
-and offers to deploy them. Legacy configurations lacking the flags retain their
-existing built-in and REST API behavior; missing external policy does **not**
-implicitly install a Cloud Run service. A previously enabled remote service
+choices are preserved by update/recovery. Source upgrade asks for AI choices
+when `EXTERNAL_AI_ENABLED` has not yet been recorded; selecting external AI
+provisions MCP during that upgrade's deployment. Later upgrades preserve the
+saved choice. `./setup.sh ai` changes these choices and offers to deploy them.
+Legacy configurations lacking the flags retain their existing built-in and REST
+API behavior on ordinary update; missing external policy does **not** implicitly
+install a Cloud Run service. A previously enabled remote service
 continues to be selected through its saved `MCP_RESOURCE`. New installations
 always save explicit choices. Normal config generation also writes the
 `AI_ENABLED` default explicitly when it was absent.

@@ -31,7 +31,7 @@ environment exists is `venv/bin/python -m installer ...`.
 | `jobs` | Reconcile deferred-job Cloud Scheduler infrastructure. |
 | `handoff` | Transfer a delegated installation to the permanent Owner/deployer. |
 | `update` | Regenerate configuration and restore app-saved settings without replacing source. |
-| `upgrade [--branch BRANCH]` | Replace tracked source from the selected remote branch, then run update. |
+| `upgrade [--branch BRANCH]` | Replace tracked source from the selected remote branch, collect missing AI choices, then update and offer deployment. |
 
 Only one mode may be selected. Cancellation, validation failure, provider
 failure, and incomplete required work return nonzero. Helpers raise typed

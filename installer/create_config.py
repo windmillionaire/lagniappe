@@ -2180,8 +2180,11 @@ def _set_application_defaults():
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_requires_google_client_only_when_enabled
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_rejects_keyless_identity_mismatch
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_reports_invalid_redis_tls
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_upgrade_collects_missing_ai_choices
 # @matrix setup : config-files google-oauth keyless-config optional project-identity redis-tls validation
+# @matrix setup : ai-policy git-upgrade interactive-input
 def verify_application_config(upgrade=False):
+    """Validate settings and collect the new AI policy during source upgrades."""
     from installer import FORMATTER
 
     f = FORMATTER.initialize()
@@ -2265,6 +2268,13 @@ def verify_application_config(upgrade=False):
             )
         )
         _fail()
+
+    if upgrade and "EXTERNAL_AI_ENABLED" not in SETTINGS.APP:
+        # The source-upgrade path reloads this module after replacing the checkout,
+        # so older upgrade orchestrators also reach the newly introduced choices.
+        from installer.optional import configure_ai_features
+
+        configure_ai_features()
 
     print(f.success(wrap_text("Application configuration verified.")))
     return True

@@ -98,7 +98,8 @@ registration.
 
 MCP is an optional component of the installation, managed by `installer/mcp.py`
 through the ordinary `runner.deploy.deploy` path. Select it in the AI section
-of setup, or later with `./setup.sh ai`. Selecting external AI enables both
+of setup, during source upgrade when no external-AI choice has been saved, or
+later with `./setup.sh ai`. Selecting external AI enables both
 MCP and the direct API/skill; disabling external AI closes both. Disabling AI
 closes built-in generation and external access together.
 
@@ -318,6 +319,12 @@ The command resolves one exact fetched commit and reads its committed
 rehearsal. It names that exact replacement target and requires confirmation.
 Ignored installation configuration and untracked files remain. Maintained
 forks should merge the desired release themselves and run `update`.
+
+When the installation has no saved `EXTERNAL_AI_ENABLED` choice, source upgrade
+runs the AI feature questions before offering deployment. Choosing external AI
+provisions MCP as part of that deployment; no separate AI command is needed.
+Saved choices are preserved on subsequent upgrades. Ordinary `update` does not
+introduce these questions or implicitly opt a legacy installation into MCP.
 
 When the target crosses a major-version boundary, the deployment prompt states
 that setup does not run application migrations and lists the required

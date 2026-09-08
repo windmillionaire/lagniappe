@@ -2281,6 +2281,67 @@ def test_verify_application_config_reports_missing_areas(monkeypatch, capsys):
     assert "SECRET_KEY" not in output
 
 
+# @matrix setup : ai-policy config-files git-upgrade interactive-input settings-save
+# @matrix mcp-install : configuration opt-in legacy-settings
+# @source installer/optional.py::configure_ai_features
+# @source installer/mcp.py::requested
+@pytest.mark.parametrize(
+    "upgrade,policy,answers,expected_policy,expect_mcp",
+    [
+        (True, {}, ["y", "y", "n"], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, True),
+        (True, {}, ["y", "n", "n"], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": False}, False),
+        (True, {}, ["n"], {"AI_ENABLED": False, "EXTERNAL_AI_ENABLED": False}, False),
+        (True, {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": False}, [], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": False}, False),
+        (True, {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, [], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, True),
+        (False, {}, [], {}, False),
+    ],
+    ids=["enable-mcp", "decline-mcp", "disable-ai", "saved-disabled", "saved-enabled", "ordinary-update"],
+)
+def test_upgrade_collects_missing_ai_choices(
+    monkeypatch, upgrade, policy, answers, expected_policy, expect_mcp,
+):
+    import config
+    import installer as setup_pkg
+    from installer import create_config, mcp, optional
+
+    saved = []
+    settings = types.SimpleNamespace(APP={**policy, "AI_MODEL": "saved-model"})
+    settings.save = lambda: saved.append(dict(settings.APP))
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setattr(config.constants, "REQUIRED_APPLICATION_SETTINGS", {})
+    monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
+    monkeypatch.setattr(optional, "FORMATTER", _fake_formatter())
+    prompts = []
+    responses = iter(answers)
+
+    def answer(prompt):
+        prompts.append(" ".join(prompt.split()))
+        return next(responses)
+
+    monkeypatch.setattr("builtins.input", answer)
+
+    assert create_config.verify_application_config(upgrade=upgrade)
+    assert {
+        key: settings.APP[key]
+        for key in ("AI_ENABLED", "EXTERNAL_AI_ENABLED")
+        if key in settings.APP
+    } == expected_policy
+    assert mcp.requested(settings.APP) is expect_mcp
+    assert settings.APP["AI_MODEL"] == "saved-model"
+    assert bool(saved) is bool(answers)
+    assert len(prompts) == len(answers)
+    if answers:
+        assert prompts[0] == "? Enable AI features [Y/n]"
+        if expected_policy["AI_ENABLED"]:
+            assert prompts[1] == "? Enable external AI access and the MCP server [y/N]"
+        assert saved[-1] == settings.APP
+        prompts.clear()
+        saved.clear()
+        assert create_config.verify_application_config(upgrade=True)
+        assert prompts == []
+        assert saved == []
+
+
 # @matrix setup : config-files google-oauth optional validation
 def test_verify_application_config_requires_google_client_only_when_enabled(
     monkeypatch,
