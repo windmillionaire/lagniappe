@@ -1,29 +1,27 @@
 {% macro specific_access(form, type) %}
-  <li class="px-3 py-2 border-t border-user-light">
-    <label class="{{ styles.checkbox.label }}">
-      <div class="{{ styles.checkbox.container }}">
-        <input type="checkbox"
-               data-role="specific-access"
-               data-kind="user"
-               name="{{ type }}"
-               {{ 'checked' if form.properties.restricted_to.stored == ['owner'] else '' }}
-               class="{{ styles.checkbox.default }}">
-        {{ render_icon("check", (styles.checkbox.icon)) }}
-      </div>
-      <span>Restrict to site {{ type }}</span>
-    </label>
-  </li>
+  <label class="{{ styles.checkbox.label }}">
+    <div class="{{ styles.checkbox.container }}">
+      <input type="checkbox"
+             data-role="specific-access"
+             data-kind="user"
+             name="{{ type }}"
+             {{ 'checked' if form.properties.restricted_to.stored == ['owner'] else '' }}
+             class="{{ styles.checkbox.default }}">
+      {{ render_icon("check", (styles.checkbox.icon)) }}
+    </div>
+    <span>Restrict to site {{ type }}</span>
+  </label>
 {% endmacro %}
 
 {% macro group_access(group) %}
-  <li class="{{ styles.form.restriction }}">
+  <li class="flex items-center justify-between gap-2">
     <input type="hidden" name="group-key" value="{{ group.urlsafe_key }}">
-    <span class="text-base font-semibold text-user-default truncate">{{ group.name }}</span>
+    <span class="{{ styles.label.default }} truncate">{{ group.name }}</span>
     <button class="{{ styles.toggle.container }}"
             data-role="remove-restriction"
             data-key="{{ group.urlsafe_key }}"
             data-kind="delete"
-            method="post">
+            type="button">
       {{ render_icon("x") }}
     </button>
   </li>
@@ -31,41 +29,47 @@
 
 {% macro restrict_access(form) %}
   <form data-role="restrict-access"
-       class="outline-2 outline-user-default rounded-md shadow-sm"
+       class="{{ styles.form.tools }} rounded-md bg-kind-bg p-4 outline-2 outline-kind-default"
        data-kind="user"
        data-route="{{ url_for('forms.restrictions', key=form.urlsafe_key) }}"
        method="post">
-    <div class="{{ styles.iconLabel.wrapper }} rounded-t-md px-3 py-1.5 bg-user-bg text-base font-semibold">
-      {{ render_icon("group", (styles.iconLabel.icon) ~ " text-user-default") }}
-      <span>Access Restrictions</span>
-    </div>
-    <p class="text-sm text-base-dark px-3 py-2 italic"
-       data-role="restricted-description">
-      If a form is restricted to a specific group, only application Administrators and users in that
-      group can view it and any tasks or forms that are defined by it.
-    </p>
-    <ul>
-      <li class="border-t border-user-light">
-        <input data-index="group"
-               data-role="restrict-group-input"
-               data-kind="user"
-               data-placeholder="add group restriction..."
-               name="group"
-               class="{{ styles.input }} rounded-none">
-      </li>
+    <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-2">
+        <h3 class="{{ styles.form.header.title }}">
+          {{ render_icon("group") }}
+          <span>Access Restrictions</span>
+        </h3>
+        <p class="text-sm text-base-dark italic"
+           data-role="restricted-description">
+          If a form is restricted to a specific group, only application Administrators and users in that
+          group can view it and any tasks or forms that are defined by it.
+        </p>
+      </div>
       {{ specific_access(form, 'owner') }}
-      {% for group in form.groups %}{{ group_access(group) }}{% endfor %}
-    </ul>
+      <div class="flex flex-col gap-3">
+        <div class="{{ styles.select.container }}" lp-select>
+          <label for="restriction-group" class="{{ styles.label.sectionHeading }}">Group Restrictions</label>
+          <input data-index="group"
+                 data-role="restrict-group-input"
+                 data-kind="user"
+                 data-placeholder="add group restriction..."
+                 id="restriction-group"
+                 name="group"
+                 class="{{ styles.input }}">
+        </div>
+        <ul class="flex flex-col gap-3 empty:hidden">{% for group in form.groups %}{{ group_access(group) }}{% endfor %}</ul>
+      </div>
+    </div>
     <template data-role="restriction-template">
-      <li class="{{ styles.form.restriction }}">
+      <li class="flex items-center justify-between gap-2">
         <input type="hidden" name="group-key">
-        <span class="text-base font-semibold text-user-default truncate"></span>
-        <button class="{{ styles.toggle.container }}" data-role="remove-restriction" type="button">
+        <span class="{{ styles.label.default }} truncate"></span>
+        <button class="{{ styles.toggle.container }}" data-role="remove-restriction" data-kind="delete" type="button">
           {{ render_icon("x") }}
         </button>
       </li>
     </template>
-    <div class="{{ styles.button.group }} p-3" data-role="submit-group">
+    <div class="{{ styles.button.group }}" data-role="submit-group">
       <button type="submit" class="{{ styles.button.submit }}">Save Restrictions</button>
     </div>
   </form>
