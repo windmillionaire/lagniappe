@@ -6423,10 +6423,11 @@ def test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_i
         assert kwargs == {"print_final_summary": False}
         events.append("deploy")
 
+    prompts = []
     result = handoff_module.handoff(
         context=context,
         deploy=deploy,
-        confirm=lambda prompt: "y",
+        confirm=lambda prompt: prompts.append(prompt) or "y",
         permission_check=lambda project: events.append(f"preflight:{project}"),
     )
 
@@ -6436,12 +6437,20 @@ def test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_i
     assert settings.APP["BOOTSTRAP_ADMIN_EMAIL"] == ""
     assert settings.GCLOUD_CONFIG["ACCOUNT"] == owner
     assert settings._saves == [True]
-    preview = " ".join(capsys.readouterr().out.split())
-    assert "Installer/source: installer@example.test" in preview
-    assert "Permanent Owner/deployer: owner@example.test" in preview
-    assert "roles/storage.objectAdmin" in preview
-    assert "roles/iam.serviceAccountTokenCreator" in preview
-    assert "Project handoff-project (final cloud mutation)" in preview
+    output = capsys.readouterr().out
+    preview = " ".join(output.split())
+    assert "Installer: installer@example.test" in preview
+    assert "Permanent Owner: owner@example.test" in preview
+    assert "Project: handoff-project" in preview
+    assert "Deploy app and complete handoff" in prompts[0]
+    assert "[y/N]" in prompts[0]
+    assert "roles/" not in preview
+    assert "Planned binding changes" not in preview
+    assert "Installation roles removed from installer." in preview
+    assert "  - Delete the installer's Workspace account" in output
+    assert "authentication email" not in output
+    assert "Revoke provider" not in output
+    assert "Remove local credentials" not in output
     assert events.index("deploy") < events.index(
         "step:remove installer managed-resource access"
     )
@@ -6474,6 +6483,10 @@ def test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_i
     }
 
     events.clear()
+    settings.APP["AUTH_EMAIL_CONFIG"] = {
+        "senderEmail": owner,
+        "username": installer.upper(),
+    }
     assert (
         handoff_module.handoff(
             context=context,
@@ -6486,6 +6499,10 @@ def test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_i
     assert "project" not in events
     assert "service-account" not in events
     assert not any(event.startswith("bucket:") for event in events)
+    cleanup = " ".join(capsys.readouterr().out.split())
+    assert "- Run ./setup.sh email" in cleanup
+    assert f"authentication email for {installer}" in cleanup
+    assert "deploy the change before deleting the mailbox" in cleanup
 
 
 # @matrix handoff : confirmation default-no no-mutation owner-lockout preconditions

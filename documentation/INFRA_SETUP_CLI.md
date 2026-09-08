@@ -73,6 +73,8 @@ receiving domains and between sending and receiving credentials.
   default. Show action hints in brackets, such as `[Enter to retry; x to exit]`.
   Advertise only actions the existing input loop accepts.
 - Use `Deploy app now [y/N]` for the standard app-deployment confirmation.
+  Handoff uses `Deploy app and complete handoff [y/N]` to cover the deployment
+  and subsequent transfer/removal of installation access in one confirmation.
 - Show a text default in parentheses. Enter retains the existing default
   behavior. Text defaults are not completion suggestions and do not require
   a new input library.
@@ -123,6 +125,16 @@ as the final open action after deployment. The MCP revision belongs in `doctor`.
 Focused commands finish with their own result and relevant next steps; nested
 deployment uses `print_final_summary=False` to avoid an installation inventory
 and a second completion banner.
+
+After gcloud validation, show the verified status and configuration/account/
+project rows once. Omit an additional `Verified: gcloud account access ...`
+line. Retain a distinct ADC account row when the verified principal differs
+from the selected account.
+
+Handoff previews name the installer, Owner and project and explain the transfer
+in plain language; individual IAM roles and managed-resource inventories belong
+in diagnostics. Completion instructions use dashed lists and name only actual
+installation dependencies, with concrete commands where action is required.
 
 Use one final result for each operation. Remove duplicate creating/created/
 configured announcements, internal bucket names, and individual API activation

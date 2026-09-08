@@ -103,7 +103,10 @@ recovered working copy. A clean clone alone is insufficient because handoff
 also needs the exact saved settings and generated deployment files. Neither
 path requires the other person's password or credentials.
 
-After default-no review, the command:
+The review names the installer, permanent Owner and project, then describes
+the access transfer without listing IAM role identifiers. Its default-no
+`Deploy app and complete handoff [y/N]` prompt explicitly authorizes deployment.
+After confirmation, the command:
 
 1. grants the Owner bucket operator and exact runtime-account act-as/signing
    bindings;
@@ -112,6 +115,13 @@ After default-no review, the command:
 4. removes the installer from managed bucket and runtime-account IAM; and
 5. removes the installer's direct project IAM bindings and verifies the Owner
    remains.
+
+The completion output reports removal of installation roles and uses dashed
+instructions for this installation's remaining cleanup. It identifies the
+installer's Workspace account for deletion if no longer needed. When the saved
+authentication-email sender or SMTP login is that installer, it first directs
+the Owner to `./setup.sh email` and deployment to replace that mailbox dependency.
+It does not print generic provider-token or local-credential cleanup advice.
 
 The operation preserves unrelated IAM members/conditions and runtime
 self-bindings. It does not manage Workspace accounts, billing-account IAM, or

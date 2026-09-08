@@ -87,13 +87,6 @@ def activate_repository_gcloud(
         principal = (adc_identity or {}).get("principal")
         if principal and principal.casefold() != target["ACCOUNT"].casefold():
             print(ui.value("ADC account", principal, column=17, verbatim=True))
-    checks = []
-    if ensure_cli_token:
-        checks.append("gcloud account access")
-    if ensure_adc:
-        checks.append("Application Default Credentials")
-    if checks:
-        print(wrap_text("Verified: " + " and ".join(checks) + "."))
     return True
 
 

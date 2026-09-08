@@ -2060,7 +2060,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch, capsys
     output = capsys.readouterr().out
     assert output.count("Google Cloud configuration verified") == 3
     assert output.count("owner@example.test") == 3
-    assert "gcloud account access and Application Default Credentials" in output
+    assert "Verified:" not in output
 
 
 # @matrix auth : gcloud-token interactive refresh
