@@ -209,7 +209,7 @@ def deploy_to_app_engine(
 
     if requested(SETTINGS.APP):
         print(wrap_text(f"{f.ok_glyph} {f.success('MCP server is ready')}"))
-    elif (SETTINGS.APP.get("REMOTE_MCP") or {}).get("resource"):
+    elif SETTINGS.APP.get("MCP_RESOURCE"):
         print(wrap_text("External AI access is disabled."))
 
     from installer.monitoring import reconcile_memory_alert_after_deploy

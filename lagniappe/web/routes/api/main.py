@@ -12,6 +12,7 @@ import uuid
 from flask import g, jsonify, make_response, request, url_for
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
+from config.remote_mcp import mcp_issuer
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, MutationOperation
@@ -54,7 +55,7 @@ UPLOAD_BATCH_ID_PATTERN = re.compile(external_api.UPLOAD_BATCH_ID_PATTERN)
 def _api_origin():
     """Use the configured site origin, or the authenticated remote OAuth issuer."""
     if getattr(g, "remote_mcp_authenticated", False):
-        return CONFIG.REMOTE_MCP["issuer"]
+        return mcp_issuer(vars(CONFIG))
     if CONFIG.hosted_e2e:
         return CONFIG.BASE_URL.rstrip("/")
     return absolute_url("/").rstrip("/")

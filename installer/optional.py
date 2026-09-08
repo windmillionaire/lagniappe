@@ -374,7 +374,7 @@ def configure_ai_features():
             "or the API/skill. Those agents use their own model providers. "
             "Leave this disabled to keep AI access within the site's configured provider."
         ))
-        previous = SETTINGS.APP.get("EXTERNAL_AI_ENABLED", (SETTINGS.APP.get("REMOTE_MCP") or {}).get("enabled", False))
+        previous = SETTINGS.APP.get("EXTERNAL_AI_ENABLED", bool(SETTINGS.APP.get("MCP_RESOURCE")))
         answer = (
             input(
                 format_prompt(

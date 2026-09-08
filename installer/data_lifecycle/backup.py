@@ -11,6 +11,7 @@ import re
 from typing import Any
 
 from installer.state import record_mutation, record_step
+from runner.console import format_prompt
 
 from .provider import (
     BACKUP_FORMAT,
@@ -541,7 +542,7 @@ def delete_backup(
             expected_bucket=context.recovery_bucket,
         )
     print(f"This will permanently delete only gs://{context.recovery_bucket}/{prefix}")
-    if str(confirm("Type DELETE to continue: ")).strip() != "DELETE":
+    if str(confirm(format_prompt("Type DELETE to continue: "))).strip() != "DELETE":
         raise DataLifecycleError("Backup deletion cancelled; confirmation did not match.")
     if manifest_blob is not None:
         generation = int(manifest_blob.generation or 0)

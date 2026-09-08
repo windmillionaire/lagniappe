@@ -16,7 +16,8 @@ from config.remote_mcp import (
     ACCESS_SECONDS,
     CODE_SECONDS,
     REFRESH_SECONDS,
-    normalize_remote_mcp_config,
+    CLIENT_ID,
+    REDIRECT_URI,
 )
 from lagniappe.core.tools.auth import remote_mcp as auth
 from lagniappe.core.tools.database import remote_mcp as store
@@ -38,16 +39,16 @@ class Actor:
 
 @pytest.fixture
 def oauth(monkeypatch):
-    config = normalize_remote_mcp_config(
-        {
-            "enabled": True,
-            "issuer": "https://lagniappe.test",
-            "resource": "https://pilot.run.app/mcp",
-            "actors": [Actor.email],
-            "service_account": "lagniappe-mcp@pilot-project.iam.gserviceaccount.com",
-        }
+    monkeypatch.setattr(auth.CONFIG, "AI_ENABLED", True)
+    monkeypatch.setattr(auth.CONFIG, "EXTERNAL_AI_ENABLED", True)
+    monkeypatch.setattr(auth.CONFIG, "APP_URL", "https://lagniappe.test")
+    monkeypatch.setattr(auth.CONFIG, "CUSTOM_DOMAIN", "")
+    monkeypatch.setattr(auth.CONFIG, "MCP_RESOURCE", "https://pilot.run.app/mcp")
+    monkeypatch.setattr(
+        auth.CONFIG, "MCP_SERVICE_ACCOUNT",
+        "lagniappe-mcp@pilot-project.iam.gserviceaccount.com",
     )
-    monkeypatch.setattr(auth.CONFIG, "REMOTE_MCP", config)
+    config = {**auth.settings(), "client_id": CLIENT_ID, "redirect_uri": REDIRECT_URI}
     monkeypatch.setattr(auth, "_client_cache", None)
     monkeypatch.setattr(auth, "_certificate_cache", None)
     monkeypatch.setattr(auth, "_now", lambda now=None: now or NOW)
@@ -223,7 +224,6 @@ def test_authorization_without_scopes_preserves_consent_and_token_lifecycle(
     existing = auth.exchange_token(_code(oauth))
     request = dict(oauth.request)
     if client == "codex":
-        oauth.config["codex_enabled"] = True
         request.update(
             client_id=CODEX_CLIENT_ID, redirect_uri="http://127.0.0.1:38417/callback"
         )
@@ -342,7 +342,7 @@ def test_code_is_single_use_and_refresh_replay_revokes_the_family(oauth):
 
 
 # @matrix mcp-oauth : token pkce refresh replay transaction authentication expiry revocation user-binding
-def test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion(oauth):
+def test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion(oauth, monkeypatch):
     parameters = _code(oauth)
     for field, value in (
         ("code_verifier", "x" * 43),
@@ -375,12 +375,12 @@ def test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion(oauth):
     with pytest.raises(auth.OAuthError):
         auth.authenticate_access(tokens["access_token"])
     oauth.actor.is_active = True
-    oauth.config["resource"] += "/changed"
+    monkeypatch.setattr(auth.CONFIG, "MCP_RESOURCE", "https://changed.run.app/mcp")
     with pytest.raises(auth.OAuthError):
         auth.authenticate_access(tokens["access_token"])
 
 
-# @matrix mcp-oauth : allowlist user-binding oidc audience service-identity token-separation authentication expiry revocation
+# @matrix mcp-oauth : user-binding oidc audience service-identity token-separation authentication expiry revocation
 def test_oauth_user_and_workload_identity_are_both_required(oauth, monkeypatch):
     tokens = auth.exchange_token(_code(oauth))
     claims = {
@@ -414,11 +414,12 @@ def test_oauth_user_and_workload_identity_are_both_required(oauth, monkeypatch):
         with pytest.raises(auth.OAuthError):
             auth.authenticate_envelope("workload-proof", tokens["access_token"])
         claims[field] = original
-    oauth.config["actors"] = ("other@example.com",)
+    oauth.actor.is_public = True
     assert auth.eligible_user(oauth.actor) is False
     with pytest.raises(auth.OAuthError):
         auth.authenticate_envelope("workload-proof", tokens["access_token"])
-    oauth.config["enabled"] = False
+    oauth.actor.is_public = False
+    monkeypatch.setattr(auth.CONFIG, "EXTERNAL_AI_ENABLED", False)
     with pytest.raises(auth.OAuthError):
         auth.authenticate_access(tokens["access_token"])
 
@@ -555,7 +556,6 @@ def test_oauth_outcomes_log_only_closed_categories_after_workload_verification(o
         "email": oauth.config["service_account"], "email_verified": True, "sub": "123456789",
     }
     monkeypatch.setattr(auth.id_token, "verify_oauth2_token", lambda *args, **kwargs: claims)
-    oauth.config["actors"] = ()
     opaque_user_token = "lgmo_a_" + "x" * 43
     with pytest.raises(auth.OAuthError):
         auth.authenticate_envelope("private-workload-proof", opaque_user_token)
@@ -670,9 +670,6 @@ def test_codex_loopback_grants_coexist_and_cannot_cross_clients(oauth):
         "client_id": CODEX_CLIENT_ID,
         "redirect_uri": "http://127.0.0.1:54321/callback",
     }
-    with pytest.raises(auth.OAuthError):
-        auth.begin_authorization(request)
-    oauth.config["codex_enabled"] = True
     chatgpt = auth.exchange_token(_code(oauth))
     downloads_before = len(oauth.downloads)
     pending = auth.begin_authorization(request)
@@ -709,16 +706,15 @@ def test_codex_loopback_grants_coexist_and_cannot_cross_clients(oauth):
     with pytest.raises(auth.OAuthError):
         auth.authenticate_access(rotated["access_token"])
     assert auth.authenticate_access(chatgpt["access_token"])[0] is oauth.actor
-    oauth.config["codex_enabled"] = False
     with pytest.raises(auth.OAuthError):
-        auth.begin_authorization(request)
+        auth.begin_authorization({**request, "client_id": "unregistered"})
 
 
-# @matrix mcp-oauth : site-policy existing-grants optional-actors
+# @matrix mcp-oauth : site-policy existing-grants user-binding
 # @source lagniappe/core/tools/auth/remote_mcp.py::authenticate_access
 # @source lagniappe/core/tools/auth/remote_mcp.py::eligible_user
 @pytest.mark.unit
-def test_site_policy_blocks_existing_oauth_grants_and_optional_actor_lists(oauth, monkeypatch):
+def test_site_policy_blocks_existing_oauth_grants_and_public_users(oauth, monkeypatch):
     tokens = auth.exchange_token(_code(oauth))
     for flag in ("AI_ENABLED", "EXTERNAL_AI_ENABLED"):
         with monkeypatch.context() as policy:
@@ -728,7 +724,6 @@ def test_site_policy_blocks_existing_oauth_grants_and_optional_actor_lists(oauth
             with pytest.raises(auth.OAuthError):
                 auth.begin_authorization(oauth.request)
     assert auth.authenticate_access(tokens["access_token"])[0] is oauth.actor
-    monkeypatch.setitem(oauth.config, "actors", None)
     oauth.actor.email = "new-user@example.test"
     assert auth.eligible_user(oauth.actor)
     oauth.actor.is_public = True
@@ -742,5 +737,3 @@ def test_site_policy_blocks_existing_oauth_grants_and_optional_actor_lists(oauth
         auth.consent(pending, oauth.actor, allow=True)
     oauth.actor.is_public = False
     assert auth.authenticate_access(tokens["access_token"])[0] is oauth.actor
-    monkeypatch.setitem(oauth.config, "actors", [])
-    assert not auth.eligible_user(oauth.actor)

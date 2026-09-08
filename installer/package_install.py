@@ -441,7 +441,7 @@ def install_if_missing(import_name, explanation=None, package_name=None):
             ).lower() not in ("1", "true", "yes")
 
             if interactive:
-                prompt = f"Install {package_name}? ({explanation if explanation else ''}) [Y/n]: "
+                prompt = f"Install {package_name} ({explanation if explanation else ''}) [Y/n] "
                 sys.stderr.write(format_prompt(prompt))
                 sys.stderr.flush()
                 response = input()

@@ -111,8 +111,9 @@ closes built-in generation and external access together.
 2. Compute the MCP source fingerprint. Reuse a matching image or build it with
    Cloud Build. On first installation, create a **disabled** Cloud Run service
    and read its canonical `status.url`; this does not require a running app.
-3. Save that URL plus `/mcp`, the app's canonical issuer, runtime service account,
-   and desired `MCP_VERSION` in application settings. Publish App Engine normally.
+3. Save that URL plus `/mcp` as `MCP_RESOURCE`, the runtime identity as
+   `MCP_SERVICE_ACCOUNT`, and desired `MCP_VERSION` in application settings.
+   The issuer derives from `CUSTOM_DOMAIN` or `APP_URL`. Publish App Engine normally.
 4. Only after App Engine succeeds, enable/update the Cloud Run revision and
    verify its readiness, traffic, runtime identity, image version and environment.
    An unchanged service skips both the build and revision deployment.
@@ -212,8 +213,8 @@ workspace editing remain available within normal permissions.
 
 Users add the MCP URL shown in the signed-in AI manual, then authorize with an
 eligible Lagniappe account. The account's workspace permissions still apply;
-its email need not match the agent account. New installations permit eligible
-non-public users; an explicit older `actors` restriction is preserved. No local
+its email need not match the agent account. Eligible active non-public users
+may connect without an installation-specific actor list. No local
 MCP package or upload helper is installed.
 
 For Codex, configure the server URL and fixed public client:
@@ -224,7 +225,7 @@ codex mcp login lagniappe-remote
 ```
 
 The AI Integration manual gives signed-in non-public users the setup command
-using `REMOTE_MCP.resource` when Codex is enabled. Public readers see a placeholder
+using `MCP_RESOURCE` when external AI and MCP are configured. Public readers see a placeholder
 and must obtain the installation's MCP URL and an eligible account. The add
 command can start sign-in automatically; use login if needed or to reconnect,
 then restart existing Codex sessions. OAuth uses current workspace permissions

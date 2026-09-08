@@ -186,11 +186,10 @@ Optional agent access uses `AGENT_ACCESS_ENABLED`, `AGENT_ACCESS_EMAIL`,
 `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. Successful login resolves to a
 normal User and normal group permissions.
 
-The bearer-authenticated external planning API has no deployment-wide feature
-setting. Setup removes the retired `EXTERNAL_AGENT_API_ENABLED` key from older
-generated settings. Access is controlled by user AI eligibility, per-user
-credential revocation, and ordinary workspace permissions; it does not enable
-or invoke an AI provider.
+The bearer-authenticated external planning API follows the AI policy below.
+Setup removes the retired `EXTERNAL_AGENT_API_ENABLED` key from generated
+settings. User AI eligibility, credential revocation, and ordinary workspace
+permissions also apply; external access does not invoke the site’s AI provider.
 
 ## AI policy and remote MCP
 
@@ -208,29 +207,36 @@ choices are preserved by update/recovery. `./setup.sh ai` changes these choices
 and offers to deploy them. Legacy configurations lacking the flags retain their
 existing built-in and REST API behavior; missing external policy does **not**
 implicitly install a Cloud Run service. A previously enabled remote service
-continues to be selected. New installations always save explicit choices.
+continues to be selected through its saved `MCP_RESOURCE`. New installations
+always save explicit choices. Normal config generation also writes the
+`AI_ENABLED` default explicitly when it was absent.
 
-`REMOTE_MCP` is the component configuration, validated by `config/remote_mcp.py`.
-Missing configuration means `{enabled: false}`. Normal setup fills these values
-from the selected project and verified Cloud Run service:
+MCP deployment details are flat application settings, validated by
+`config/remote_mcp.py`. Normal setup fills them from the selected project and
+verified Cloud Run service:
 
 | Field | Contract |
 | --- | --- |
-| `enabled` | Boolean component switch, also gated by both site AI flags. |
-| `codex_enabled` | Boolean; normal setup enables the fixed `lagniappe-codex` public client and loopback callback. |
-| `issuer` | Exact canonical main-app HTTPS origin, without trailing slash or path. |
-| `resource` | Exact canonical Cloud Run `status.url` plus `/mcp`, on a different origin. |
-| `client_id` | Exact ChatGPT CIMD URL; default `https://chatgpt.com/oauth/client.json`. |
-| `redirect_uri` | Exact ChatGPT callback; default `https://chatgpt.com/connector_platform_oauth_redirect`. |
-| `actors` | Optional list of eligible Lagniappe login emails. Missing/null permits eligible active non-public users; `[]` permits none. Explicit existing restrictions are preserved. |
-| `service_account` | Exact MCP runtime identity in this project. |
+| `MCP_RESOURCE` | Exact canonical Cloud Run `status.url` plus `/mcp`, on a different origin from the application. |
+| `MCP_SERVICE_ACCOUNT` | Exact MCP runtime identity in this project. |
+| `MCP_VERSION` | Desired 32-character hexadecimal source fingerprint. |
 
-URLs reject credentials, query strings, fragments, ports and noncanonical host
-spelling. Changing issuer, resource or client binding requires reconnection.
-The upstream API and Google ID-token audience derive from `issuer + "/api/v1"`.
-Workspace permissions always control data and proposed actions.
+The endpoint and service account must be present together. Without them, MCP
+OAuth is unavailable. Disabling external AI retains both values for re-enabling.
+There is no separate MCP or per-client switch, and no actor list in CONFIG.
+Eligible active non-public users may connect within their workspace permissions.
 
-`MCP_VERSION` stores the desired 32-character hexadecimal source fingerprint.
+The issuer is derived from `CUSTOM_DOMAIN` when configured, otherwise `APP_URL`.
+It is a canonical HTTPS origin without a path or trailing slash. The upstream
+API and Google ID-token audience use that origin plus `/api/v1`. URLs reject
+credentials, query strings, fragments, ports and noncanonical host spelling.
+Changing the canonical app origin or MCP resource requires reconnection.
+
+Supported client identities and callback rules live in application code:
+ChatGPT uses its fixed metadata URL and callback; Codex uses `lagniappe-codex`
+and an exact loopback callback with an optional valid port. Incoming OAuth
+requests must match those rules; they do not choose the server’s trust policy.
+
 The installer compares the actual ready Cloud Run revision and its matching
 label, image and environment before deciding whether a redeploy is necessary.
 It does not equate a locally saved version with deployment success. Recovery

@@ -4,6 +4,7 @@ from config.storage import recovery_bucket_name, storage_bucket_names
 from installer import iam
 from installer.package_install import install_if_missing
 from installer.state import record_step
+from runner.console import format_prompt
 
 
 OWNER_ROLE = "roles/owner"
@@ -314,7 +315,7 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
         f"{_role_list(iam.constants.RUNTIME_SERVICE_ACCOUNT_ROLES)}"
     )
     print(f"    remove installer: {_role_list(runtime_installer_roles)}")
-    if (settings.get("REMOTE_MCP") or {}).get("resource"):
+    if settings.get("MCP_RESOURCE"):
         print("  MCP runtime/build accounts, build bucket, image repository and service:")
         print("    grant Owner scoped access; remove installer access after deployment")
     print("  Application configuration:")
@@ -324,7 +325,7 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
     print(f"  Project {project_id} (final cloud mutation):")
     print(f"    retain Owner: {OWNER_ROLE}")
     print(f"    remove installer: {_role_list(project_installer_roles)}")
-    answer = (confirm or input)("Continue with handoff? [y/N]: ")
+    answer = (confirm or input)(format_prompt("Continue with handoff? [y/N]: "))
     if str(answer or "").strip().casefold() not in {"y", "yes"}:
         print("Handoff cancelled. No changes were made.")
         return 1

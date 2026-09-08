@@ -1,4 +1,4 @@
-"""Opt-in configuration for the ChatGPT and Codex remote MCP service."""
+"""MCP deployment settings and the supported public OAuth clients."""
 
 import re
 from urllib.parse import urlsplit
@@ -17,7 +17,7 @@ REFRESH_SECONDS = 30 * 24 * 60 * 60
 
 
 # @testable false
-# @covered-by config/remote_mcp.py::normalize_remote_mcp_config
+# @covered-by config/remote_mcp.py::normalize_mcp_config
 def https_url(value, *, origin=False):
     """Require an exact, canonical HTTPS URL rather than normalizing identity."""
     if not isinstance(value, str) or not value or len(value) > 2048:
@@ -47,86 +47,49 @@ def https_url(value, *, origin=False):
 # @testable true
 # @tests tests_tooling/test_012c_remote_mcp_config.py::test_remote_mcp_configuration_is_opt_in_and_exact
 # @matrix mcp-oauth : configuration validation
-def normalize_remote_mcp_config(value):
-    if value is None:
-        return {"enabled": False}
-    allowed = {
-        "enabled",
-        "issuer",
-        "resource",
-        "client_id",
-        "redirect_uri",
-        "actors",
-        "service_account",
-        "codex_enabled",
-    }
-    if not isinstance(value, dict) or set(value) - allowed:
-        raise ValueError("Unknown remote MCP configuration field")
-    if type(value.get("enabled", False)) is not bool:
-        raise ValueError("Remote MCP enabled must be a boolean")
-    if type(value.get("codex_enabled", False)) is not bool:
-        raise ValueError("Remote MCP codex_enabled must be a boolean")
-    if not value.get("enabled", False):
-        return {**value, "enabled": False}
-    issuer = https_url(value.get("issuer"), origin=True)
-    resource = https_url(value.get("resource"))
+def normalize_mcp_config(settings):
+    """Validate the installed endpoint and identity, including while AI is off."""
+    resource = settings.get("MCP_RESOURCE")
+    service_account = settings.get("MCP_SERVICE_ACCOUNT")
+    if resource is None and service_account is None:
+        return {"MCP_RESOURCE": None, "MCP_SERVICE_ACCOUNT": None}
+    issuer = mcp_issuer(settings)
+    resource = https_url(resource)
     if urlsplit(resource).path != "/mcp" or resource == issuer + "/mcp":
         raise ValueError("Remote MCP requires one separate-origin /mcp resource")
-    client_id = https_url(value.get("client_id", CLIENT_ID))
-    if urlsplit(client_id).hostname != "chatgpt.com" or not re.fullmatch(
-        r"/oauth/(?:[A-Za-z0-9_-]+/)?client\.json", urlsplit(client_id).path
-    ):
-        raise ValueError("Remote MCP accepts one ChatGPT CIMD URL")
-    redirect_uri = https_url(value.get("redirect_uri", REDIRECT_URI))
-    if urlsplit(redirect_uri).hostname != "chatgpt.com":
-        raise ValueError("Remote MCP redirect must belong to ChatGPT")
-    actors = value.get("actors")
-    if actors is not None and not isinstance(actors, (list, tuple)):
-        raise ValueError("Remote MCP actors must be a list when specified")
-    if any(
-        not isinstance(actor, str)
-        or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", actor)
-        for actor in (actors or ())
-    ):
-        raise ValueError("Invalid remote MCP service actor")
-    actors = tuple(actor.casefold() for actor in actors) if actors is not None else None
-    if actors is not None and len(set(actors)) != len(actors):
-        raise ValueError("Duplicate remote MCP service actor")
-    service_account = value.get("service_account")
     if not isinstance(service_account, str) or not re.fullmatch(
         r"[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z][a-z0-9-]+\.iam\.gserviceaccount\.com",
         service_account,
     ):
         raise ValueError("Remote MCP requires its exact runtime service account")
-    return {
-        "enabled": True,
-        "issuer": issuer,
-        "resource": resource,
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "actors": actors,
-        "service_account": service_account,
-        "codex_enabled": value.get("codex_enabled", False),
-    }
+    return {"MCP_RESOURCE": resource, "MCP_SERVICE_ACCOUNT": service_account}
 
 
 # @testable true
-# @tests tests_tooling/test_012c_remote_mcp_config.py::test_codex_client_requires_opt_in_and_exact_loopback_callback
-# @matrix mcp-oauth : configuration validation loopback
-def client_allowed(config, client_id):
-    return client_id == config["client_id"] or (
-        config.get("codex_enabled") is True and client_id == CODEX_CLIENT_ID
-    )
+# @tests tests_tooling/test_012c_remote_mcp_config.py::test_remote_mcp_configuration_is_opt_in_and_exact
+# @matrix mcp-oauth : configuration validation
+def mcp_issuer(settings):
+    """Use the application's canonical origin for OAuth and workload identity."""
+    domain = settings.get("CUSTOM_DOMAIN")
+    issuer = f"https://{domain}" if domain else settings.get("APP_URL")
+    return https_url(issuer.rstrip("/") if isinstance(issuer, str) else issuer, origin=True)
 
 
 # @testable true
-# @tests tests_tooling/test_012c_remote_mcp_config.py::test_codex_client_requires_opt_in_and_exact_loopback_callback
+# @tests tests_tooling/test_012c_remote_mcp_config.py::test_supported_clients_require_exact_callbacks
 # @matrix mcp-oauth : configuration validation loopback
-def redirect_allowed(config, client_id, redirect_uri):
-    if not client_allowed(config, client_id):
+def client_allowed(client_id):
+    return client_id in (CLIENT_ID, CODEX_CLIENT_ID)
+
+
+# @testable true
+# @tests tests_tooling/test_012c_remote_mcp_config.py::test_supported_clients_require_exact_callbacks
+# @matrix mcp-oauth : configuration validation loopback
+def redirect_allowed(client_id, redirect_uri):
+    if not client_allowed(client_id):
         return False
-    if client_id == config["client_id"]:
-        return redirect_uri == config["redirect_uri"]
+    if client_id == CLIENT_ID:
+        return redirect_uri == REDIRECT_URI
     # RFC 8252 native clients bind an ephemeral port. Every other byte of the
     # pre-registered loopback callback stays exact; localhost/DNS is not used.
     if not isinstance(redirect_uri, str) or not re.fullmatch(

@@ -181,7 +181,7 @@ def test_validate_input_retries_allows_empty_and_exits(monkeypatch):
 
     assert get_default_value() == "chosen-value"
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Suggested [chosen-value]:"
+        "? Suggested [chosen-value]"
     ]
 
     monkeypatch.setattr("builtins.input", lambda prompt: "x")
@@ -381,8 +381,8 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     assert inspected == ["demo-app"]
     assert create_config.validate_project_id("demo-app")
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Press Enter to use the suggested Google Cloud project ID [demo-app], or type a different project ID:",
-        "? Create a new project 'demo-app'? [y/N]:",
+        "? Press Enter to use the suggested Google Cloud project ID [demo-app], or type a different project ID",
+        "? Create a new project 'demo-app' [y/N]",
     ]
 
     def matching_active_config(command):
@@ -427,7 +427,7 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
         == "active-project-1"
     )
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Use the existing project 'active-project-1'? [y/N]:"
+        "? Use the existing project 'active-project-1' [y/N]"
     ]
 
     monkeypatch.setattr(
@@ -451,11 +451,11 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     answers = iter(["n", "", "n", "", "y"])
     assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Use the existing project 'active-project-1'? [y/N]:",
-        "? Press Enter to use the suggested Google Cloud project ID [demo-app], or type a different project ID:",
-        "? Use the existing project 'demo-app'? [y/N]:",
-        "? Press Enter to use the suggested Google Cloud project ID [demo-app-abc123], or type a different project ID:",
-        "? Create a new project 'demo-app-abc123'? [y/N]:",
+        "? Use the existing project 'active-project-1' [y/N]",
+        "? Press Enter to use the suggested Google Cloud project ID [demo-app], or type a different project ID",
+        "? Use the existing project 'demo-app' [y/N]",
+        "? Press Enter to use the suggested Google Cloud project ID [demo-app-abc123], or type a different project ID",
+        "? Create a new project 'demo-app-abc123' [y/N]",
     ]
 
     def matching_exact_active_config(command):
@@ -473,9 +473,9 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     answers = iter(["n", "", "y"])
     assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Use the existing project 'demo-app'? [y/N]:",
-        "? Press Enter to use the suggested Google Cloud project ID [demo-app-abc123], or type a different project ID:",
-        "? Create a new project 'demo-app-abc123'? [y/N]:",
+        "? Use the existing project 'demo-app' [y/N]",
+        "? Press Enter to use the suggested Google Cloud project ID [demo-app-abc123], or type a different project ID",
+        "? Create a new project 'demo-app-abc123' [y/N]",
     ]
 
     def mismatched_active_config(command):
@@ -506,7 +506,7 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
         create_config._get_gcloud_project("", "new-lagniappe")
     assert (
         " ".join(prompts[-1].split())
-        == "? Create a new project 'new-lagniappe'? [y/N]:"
+        == "? Create a new project 'new-lagniappe' [y/N]"
     )
 
 
@@ -869,7 +869,7 @@ def test_project_billing_authorization_uses_existing_account_and_project_console
     assert len(checks) == 2
     assert (
         " ".join(prompts[0].split())
-        == "? After the existing billing account is linked, press Enter to continue (x to exit):"
+        == "? After the existing billing account is linked, press Enter to continue (x to exit)"
     )
     output = capsys.readouterr().out
     assert "select 'Link a billing account'" in output
@@ -1609,7 +1609,7 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     assert "Creating the confirmed local configuration draft" not in output
     assert "ADC authentication: after project creation" not in output
     assert "Project state:" not in output
-    assert " ".join(prompts[-1].split()) == "? Continue with installation? [y/N]:"
+    assert " ".join(prompts[-1].split()) == "? Continue with installation [y/N]"
     assert config.SETTINGS._SETUP_ENABLED_GOOGLE_CLOUD_APIS == set()
     assert cloud_boundary == [
         {
@@ -2027,6 +2027,7 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
             # Legacy settings are removed during update rather than retained as
             # an inert deployment-wide feature gate.
             "EXTERNAL_AGENT_API_ENABLED": True,
+            "REMOTE_MCP": {"enabled": True},
         },
         GCLOUD_CONFIG={
             "NAME": "project-1",
@@ -2055,6 +2056,8 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     assert settings.APP["AGENT_ACCESS_NAME"] == "Review Agent"
     assert settings.APP["AGENT_ACCESS_CODE"] == "generated-agent-code"
     assert "EXTERNAL_AGENT_API_ENABLED" not in settings.APP
+    assert "REMOTE_MCP" not in settings.APP
+    assert settings.APP["AI_ENABLED"] is True
     assert settings.APP["AI_MODEL"] == constants.DEFAULT_AI_MODEL
     assert settings.APP["AI_UTILITY_MODEL"] == constants.DEFAULT_UTILITY_AI_MODEL
     assert settings.APP["AI_IMAGE_MODEL"] == constants.DEFAULT_AI_IMAGE_MODEL
@@ -2087,6 +2090,7 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
             # A stale value introduced by an older settings file is removed on
             # every rebuild, regardless of its former value.
             "EXTERNAL_AGENT_API_ENABLED": False,
+            "AI_ENABLED": False,
             "AI_UTILITY_MODEL": "custom-utility-model",
             "AI_IMAGE_MODEL": "custom-image-model",
             "AI_OBSERVABILITY": True,
@@ -2102,6 +2106,7 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     create_config._build_app_settings()
 
     assert settings.APP["AGENT_ACCESS_EMAIL"] == "changed@example.com"
+    assert settings.APP["AI_ENABLED"] is False
     assert settings.APP["AGENT_ACCESS_NAME"] == "Changed Agent"
     assert settings.APP["AGENT_ACCESS_CODE"] == "changed-code"
     assert "EXTERNAL_AGENT_API_ENABLED" not in settings.APP
@@ -2239,6 +2244,10 @@ def test_verify_installation_is_read_only_and_activation_is_explicit(monkeypatch
 
     verify.activate_installation()
     assert calls == ["generation", "deploy-surface", "activate"]
+
+    calls.clear()
+    assert verify.prepare_existing_installation() is True
+    assert calls == ["generation", "deploy-surface"]
 
 
 # @matrix setup : config-files validation

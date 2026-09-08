@@ -123,11 +123,10 @@ def expected_resource_lines(
     lines.append(f"AI features: {'enabled' if features['AI_ENABLED'] else 'disabled'}")
     lines.append(f"External AI (MCP and API/skill): {'enabled' if features['EXTERNAL_AI_ENABLED'] else 'disabled'}")
     if requested(settings):
-        remote = settings.get("REMOTE_MCP") or {}
         lines.extend([
-            f"MCP URL: {_value(remote.get('resource'))}",
+            f"MCP URL: {_value(settings.get('MCP_RESOURCE'))}",
             f"MCP desired version: {_value(settings.get('MCP_VERSION'))}",
-            f"MCP runtime account: {_value(remote.get('service_account'))}",
+            f"MCP runtime account: {_value(settings.get('MCP_SERVICE_ACCOUNT'))}",
             f"MCP build account: lagniappe-mcp-build@{project}.iam.gserviceaccount.com",
             f"MCP build bucket: {project}-mcp-builds",
         ])
@@ -192,13 +191,12 @@ def install_summary_lines(
     lines.append(_install_line("AI features", "enabled" if features["AI_ENABLED"] else "disabled"))
     lines.append(_install_line("External AI (MCP and API/skill)", "enabled" if features["EXTERNAL_AI_ENABLED"] else "disabled"))
     if requested(settings):
-        remote = settings.get("REMOTE_MCP") or {}
         lines.append(
             _install_line(
-                "MCP server", remote.get("resource") or "selected", verbatim=True
+                "MCP server", settings.get("MCP_RESOURCE") or "selected", verbatim=True
             )
         )
-        if not remote.get("resource"):
+        if not settings.get("MCP_RESOURCE"):
             lines.append(
                 _install_line(
                     "Finish MCP setup",

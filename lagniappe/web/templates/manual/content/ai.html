@@ -122,8 +122,8 @@
         {% set show_connection_details = current_user.is_authenticated and not current_user.is_public and CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED %}
         {% if show_connection_details %}
           <div data-role="external-ai-account-details" class="space-y-2">
-            {% if CONFIG.REMOTE_MCP.enabled %}
-              <p>MCP server: <code>{{ CONFIG.REMOTE_MCP.resource }}</code></p>
+            {% if CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE %}
+              <p>MCP server: <code>{{ CONFIG.MCP_RESOURCE }}</code></p>
             {% else %}
               <p>Ask the installation Owner for the MCP server address once setup is complete.</p>
             {% endif %}
@@ -136,8 +136,8 @@
             <code>https://YOUR-LAGNIAPPE-SITE/api/v1/client-skill.md</code>; replace the
             example host with the installation's website address.</p>
         {% endif %}
-        {% if not show_connection_details or (CONFIG.REMOTE_MCP.enabled and CONFIG.REMOTE_MCP.codex_enabled) %}
-          {% set codex_mcp_url = CONFIG.REMOTE_MCP.resource if show_connection_details else 'https://MCP-ENDPOINT/mcp' %}
+        {% if not show_connection_details or (CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE) %}
+          {% set codex_mcp_url = CONFIG.MCP_RESOURCE if show_connection_details else 'https://MCP-ENDPOINT/mcp' %}
           <div data-role="external-ai-codex-setup" class="space-y-3">
             <h3 class="font-semibold text-page-default">Connect Codex</h3>
             <p>With Codex CLI installed, run this command in a terminal.

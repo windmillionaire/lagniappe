@@ -1672,9 +1672,11 @@ def _build_app_settings():
     from config import SETTINGS, constants
 
     SETTINGS.APP.pop("FIREBASE_CONFIG", None)
-    # This legacy deployment-wide gate is intentionally retired. External API
-    # access is controlled by each user's AI eligibility and API credential.
+    # Current AI policy uses AI_ENABLED and EXTERNAL_AI_ENABLED. MCP deployment
+    # details are flat settings; client registration belongs to application code.
     SETTINGS.APP.pop("EXTERNAL_AGENT_API_ENABLED", None)
+    SETTINGS.APP.pop("REMOTE_MCP", None)
+    SETTINGS.APP.setdefault("AI_ENABLED", True)
     unsupported = sorted(UNSUPPORTED_SETTING_KEYS.intersection(SETTINGS.APP))
     if unsupported:
         raise RuntimeError(

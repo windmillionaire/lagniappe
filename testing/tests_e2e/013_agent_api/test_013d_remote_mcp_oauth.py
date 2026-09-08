@@ -16,7 +16,8 @@ import pytest
 from config.remote_mcp import (
     PENDING_SECONDS,
     USER_TOKEN_HEADER,
-    normalize_remote_mcp_config,
+    CLIENT_ID,
+    REDIRECT_URI,
 )
 from lagniappe import CONFIG
 from lagniappe.core.tools.ai import external_api
@@ -55,16 +56,16 @@ class Actor:
 
 @pytest.fixture
 def pilot(monkeypatch):
-    config = normalize_remote_mcp_config(
-        {
-            "enabled": True,
-            "issuer": ISSUER,
-            "resource": "https://pilot.run.app/mcp",
-            "actors": [Actor.email],
-            "service_account": "lagniappe-mcp@pilot-project.iam.gserviceaccount.com",
-        }
+    monkeypatch.setattr(CONFIG, "AI_ENABLED", True)
+    monkeypatch.setattr(CONFIG, "EXTERNAL_AI_ENABLED", True)
+    monkeypatch.setattr(CONFIG, "APP_URL", ISSUER)
+    monkeypatch.setattr(CONFIG, "CUSTOM_DOMAIN", "")
+    monkeypatch.setattr(CONFIG, "MCP_RESOURCE", "https://pilot.run.app/mcp")
+    monkeypatch.setattr(
+        CONFIG, "MCP_SERVICE_ACCOUNT",
+        "lagniappe-mcp@pilot-project.iam.gserviceaccount.com",
     )
-    monkeypatch.setattr(CONFIG, "REMOTE_MCP", config)
+    config = {**auth.settings(), "client_id": CLIENT_ID, "redirect_uri": REDIRECT_URI}
     monkeypatch.setattr(auth.Entities, "USER", Actor)
     actor, rows = Actor(), {}
     monkeypatch.setattr(
@@ -281,7 +282,6 @@ def test_oauth_consent_rejects_replaced_request_and_changed_account(pilot, monke
         "second-user",
         "second-user",
     )
-    pilot.config["actors"] = (pilot.actor.email, second.email)
     monkeypatch.setattr(app.login_manager, "_user_callback", lambda _: second)
     with pilot.client.session_transaction(base_url=ISSUER) as session:
         session["_user_id"] = second.get_id()
@@ -545,7 +545,6 @@ def test_remote_mcp_rate_limit_precedes_workload_verification(pilot, monkeypatch
 def test_codex_browser_consent_names_client_and_revokes_only_its_connection(pilot):
     from config.remote_mcp import CODEX_CLIENT_ID
 
-    pilot.config["codex_enabled"] = True
     _login(pilot)
     # Establish ChatGPT first, then prove Codex does not replace it.
     form = _consent_page(pilot)
@@ -658,7 +657,6 @@ def test_codex_native_consent_reaches_loopback_and_shows_submit_progress(
     from config.remote_mcp import CODEX_CLIENT_ID
 
     callback_url, callbacks = codex_loopback
-    pilot.config["codex_enabled"] = True
     pilot.parameters.update(client_id=CODEX_CLIENT_ID, redirect_uri=callback_url)
     _login(pilot)
     _consent_page(pilot)
@@ -753,7 +751,6 @@ def test_site_policy_closes_oauth_discovery_and_external_routes(pilot, monkeypat
 # @source lagniappe/web/responses.py::manual_content
 def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pilot, monkeypatch):
     pilot.actor.access = lambda _: False
-    pilot.config["codex_enabled"] = True
     monkeypatch.setattr(CONFIG, "CUSTOM_DOMAIN", "workspace.example.test")
     monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", True)
     _login(pilot)
@@ -773,11 +770,11 @@ def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pi
     assert re.search(r'<details\s+data-role="external-ai-help">', text)
     assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
     # Another installation must render its own configured URL in the command.
-    pilot.config["resource"] = "https://another-installation.run.app/mcp"
+    monkeypatch.setattr(CONFIG, "MCP_RESOURCE", "https://another-installation.run.app/mcp")
     another = _open(pilot, "GET", "/manual/section/ai").text
     assert "--url https://another-installation.run.app/mcp " in another
     assert "https://pilot.run.app/mcp" not in another
-    pilot.config["codex_enabled"] = False
+    monkeypatch.setattr(CONFIG, "MCP_RESOURCE", None)
     disabled = _open(pilot, "GET", "/manual/section/ai").text
     assert 'data-role="external-ai-codex-setup"' not in disabled
     for anonymous in (False, True):
@@ -812,11 +809,9 @@ def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pi
 def test_public_user_cannot_authorize_with_valid_client_setup(pilot, client):
     from config.remote_mcp import CODEX_CLIENT_ID
 
-    # Full client configuration and an unrestricted actor list do not make a
-    # public user eligible. Keep a valid pre-existing form to test POST as well.
-    pilot.config["actors"] = None
+    # A supported client does not make a public user eligible. Keep a valid
+    # pre-existing form to test POST as well.
     if client == "codex":
-        pilot.config["codex_enabled"] = True
         pilot.parameters.update(
             client_id=CODEX_CLIENT_ID, redirect_uri="http://127.0.0.1:38417/callback"
         )

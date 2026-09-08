@@ -50,7 +50,7 @@ def _sample_rate(value, name):
 # @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
 # @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
 # @tests tests_unit/test_016_config.py::test_config_normalizes_and_validates_sentry_sample_rates
-# @matrix config : ai-email build-id constants error-reporting google-signin observability-setting optional-providers public-projection secrets source-link stale-settings
+# @matrix config : ai-email build-id configuration constants error-reporting google-signin observability-setting optional-providers public-projection secrets site-policy source-link stale-settings validation
 # @pairs ai:observability error-reporting:sampling
 class Config:
     """Application configuration."""
@@ -182,14 +182,13 @@ class Config:
             getattr(self, "CUSTOM_DOMAIN", "") or ""
         ).strip()
         from config.ai_settings import normalize_ai_features
-        from config.remote_mcp import normalize_remote_mcp_config
+        from config.remote_mcp import normalize_mcp_config
 
         for name, enabled in normalize_ai_features(vars(self)).items():
             setattr(self, name, enabled)
 
-        self.REMOTE_MCP = normalize_remote_mcp_config(
-            getattr(self, "REMOTE_MCP", None)
-        )
+        for name, value in normalize_mcp_config(vars(self)).items():
+            setattr(self, name, value)
         self.CLOUDFLARE_ACCOUNT_ID = str(
             getattr(self, "CLOUDFLARE_ACCOUNT_ID", "") or ""
         ).strip()

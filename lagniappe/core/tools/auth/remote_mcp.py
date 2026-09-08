@@ -18,6 +18,9 @@ from config.remote_mcp import (
     ACCESS_SECONDS,
     CODE_SECONDS,
     CODEX_CLIENT_ID,
+    CLIENT_ID,
+    REDIRECT_URI,
+    mcp_issuer,
     client_allowed,
     redirect_allowed,
     PENDING_SECONDS,
@@ -98,10 +101,16 @@ class OAuthError(ValueError):
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def settings():
-    value = CONFIG.REMOTE_MCP
-    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED or not value.get("enabled"):
+    if (
+        not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED
+        or not CONFIG.MCP_RESOURCE or not CONFIG.MCP_SERVICE_ACCOUNT
+    ):
         raise OAuthError("temporarily_unavailable", 503)
-    return value
+    return {
+        "issuer": mcp_issuer(vars(CONFIG)),
+        "resource": CONFIG.MCP_RESOURCE,
+        "service_account": CONFIG.MCP_SERVICE_ACCOUNT,
+    }
 
 
 # @testable false
@@ -140,23 +149,21 @@ def _live(row, now):
 def _bound(row, config):
     return (
         all(row.get(key) == config[key] for key in ("issuer", "resource"))
-        and client_allowed(config, row.get("client_id"))
+        and client_allowed(row.get("client_id"))
         and row.get("scope") in (None, LEGACY_SCOPE)
     )
 
 
 # @testable true
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_user_and_workload_identity_are_both_required
-# @matrix mcp-oauth : allowlist user-binding site-policy optional-actors
+# @matrix mcp-oauth : user-binding site-policy
 def eligible_user(user):
-    config = settings()
+    settings()
     return bool(
         isinstance(user, Entities.USER)
         and user.is_authenticated
         and user.is_active
         and not user.is_public
-        and (config.get("actors") is None
-             or (user.email or "").casefold() in config["actors"])
     )
 
 
@@ -224,12 +231,12 @@ def _certificate_request(url, method="GET"):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_cimd_is_exact_bounded_cached_and_accepts_public_method_intersection
 # @matrix mcp-oauth : cimd validation
 def client_metadata(client_id):
-    """Fetch only the configured ChatGPT document, with no DCR or client secret."""
+    """Fetch only the supported ChatGPT document, with no DCR or client secret."""
     global _client_cache
-    config = settings()
-    if client_id != config["client_id"]:
+    settings()
+    if client_id != CLIENT_ID:
         raise OAuthError("invalid_client")
-    cache_key = (client_id, config["redirect_uri"])
+    cache_key = (client_id, REDIRECT_URI)
     with _client_lock:
         if (
             _client_cache
@@ -256,7 +263,7 @@ def client_metadata(client_id):
                 or "none" not in methods
                 or not all(isinstance(item, str) for item in methods)
                 or not isinstance(redirects, list)
-                or config["redirect_uri"] not in redirects
+                or REDIRECT_URI not in redirects
                 or not all(isinstance(item, str) for item in redirects)
                 or not isinstance(grants, list)
                 or "authorization_code" not in grants
@@ -267,7 +274,7 @@ def client_metadata(client_id):
         except (ValueError, TypeError, UnicodeError, RecursionError):
             raise OAuthError("invalid_client") from None
         # Cache only the already validated, minimal public projection.
-        metadata = {"client_id": client_id, "redirect_uri": config["redirect_uri"]}
+        metadata = {"client_id": client_id, "redirect_uri": REDIRECT_URI}
         _client_cache = (cache_key, time.monotonic() + 300, metadata)
         return metadata
 
@@ -280,7 +287,7 @@ def begin_authorization(parameters, *, now=None):
     config = settings()
     if (
         not redirect_allowed(
-            config, parameters.get("client_id"), parameters.get("redirect_uri")
+            parameters.get("client_id"), parameters.get("redirect_uri")
         )
     ):
         raise OAuthError("invalid_client")
@@ -314,7 +321,7 @@ def begin_authorization(parameters, *, now=None):
         or any(ord(char) < 32 or ord(char) == 127 for char in state)
     ):
         raise OAuthError("invalid_request")
-    if parameters["client_id"] == config["client_id"]:
+    if parameters["client_id"] == CLIENT_ID:
         client_metadata(parameters["client_id"])
     now = _now(now)
     pending = _secret("p")
@@ -396,7 +403,7 @@ def _grant_name(user, client_id=None):
 def exchange_token(parameters, *, now=None):
     config = settings()
     now = _now(now)
-    if not client_allowed(config, parameters.get("client_id")):
+    if not client_allowed(parameters.get("client_id")):
         raise OAuthError("invalid_client")
     if parameters.get("resource") != config["resource"]:
         raise OAuthError("invalid_target")
@@ -566,7 +573,7 @@ def authenticate_envelope(workload_token, user_token):
 # @matrix mcp-oauth : revocation reconnect privacy
 def revoke_token(token, client_id):
     config = settings()
-    if not client_allowed(config, client_id):
+    if not client_allowed(client_id):
         raise OAuthError("invalid_client")
     try:
         match = _TOKEN.fullmatch(token) if isinstance(token, str) else None
@@ -596,8 +603,8 @@ def revoke_token(token, client_id):
 # @matrix mcp-oauth : revocation user-binding
 def connection_status(user, *, client_id=None, revoke=False, now=None):
     config = settings()
-    client_id = client_id or config["client_id"]
-    if not client_allowed(config, client_id):
+    client_id = client_id or CLIENT_ID
+    if not client_allowed(client_id):
         raise OAuthError("invalid_client")
     name, now = _grant_name(user, client_id), _now(now)
 

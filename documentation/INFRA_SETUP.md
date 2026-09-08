@@ -45,8 +45,9 @@ The installer separates inspection from mutation:
   state;
 - `activate_installation()` selects the checkout's saved gcloud target;
 - `initialize_installation()` owns first-time project/settings work;
-- `prepare_existing_installation()` composes activation and validation for
-  focused mutating commands; and
+- `prepare_existing_installation()` validates local setup for focused mutating
+  commands after the CLI has activated the target and verified CLI access and
+  ADC; it does not repeat that activation; and
 - `repair_installation()` is the explicitly authorized reconciliation path.
 
 `doctor` activates the saved target at the CLI boundary and remains read-only.
@@ -167,9 +168,11 @@ Use the standard-library helpers in `runner/console.py` for operator output;
 
 - `wrap_text()` wraps prose at the current terminal width (up to 100 cells),
   preserving paragraphs and hanging list indentation. Long tokens stay intact.
-- `format_prompt()` adds a consistent `?` marker, keeps the final answer hint
-  together, and leaves a space before input. Call it immediately before `input()`;
-  it only formats the question and does not choose defaults or parse answers.
+- `format_prompt()` uses one leading `?` marker, removes trailing question marks
+  and colons, keeps the final answer hint together, and leaves a space before
+  input: `? Enable AI features [Y/n]`. Use this for every setup question,
+  including confirmations and text entry. It preserves defaults and answer
+  parsing. This follows the [GitHub CLI Primer prompt example](https://github.com/cli/cli/blob/trunk/docs/primer/components/README.md#yesno).
 - `format_value(..., verbatim=True)` preserves resource identifiers, URLs, DNS
   values, and command arguments exactly. Add `standalone=True` for commands so
   they occupy their own line, even when longer than the terminal. Do not pass

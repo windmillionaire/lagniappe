@@ -36,12 +36,10 @@ def activate_installation(*, announce=True):
 
 
 # @testable false
-# @covered-by installer/verify.py::activate_installation
 # @covered-by installer/verify.py::validate_installation
-# @reason named composition of the explicit activation and validation contracts
+# @reason focused commands use the target already verified at the CLI boundary
 def prepare_existing_installation():
-    """Activate local gcloud state, then validate an existing installation."""
-    activate_installation()
+    """Validate local setup after the CLI has activated and verified credentials."""
     return validate_installation()
 
 

@@ -2504,7 +2504,7 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
         confirmation=lambda prompt: confirmation_prompts.append(prompt) or "RESTORE",
     )
     assert restored == plan
-    assert confirmation_prompts == ["Type RESTORE to continue: "]
+    assert confirmation_prompts == ["? Type RESTORE to continue "]
     assert "Deploying the restore maintenance version" in capsys.readouterr().out
     assert checkpoint.load()["status"] == "complete"
     assert ("import", plan["export_output_prefix"], "(default)") in context.calls

@@ -95,7 +95,7 @@
                       class="rounded-md border border-user-default p-3">
               <legend class="{{ styles.label.default }} px-1">External agent API</legend>
               <div class="space-y-3">
-                {% if CONFIG.REMOTE_MCP.enabled %}
+                {% if CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE %}
                   <p>
                     <a href="{{ url_for('oauth.connection') }}"
                        class="font-semibold text-page-default underline hover:text-page-dark">Manage AI connections</a>

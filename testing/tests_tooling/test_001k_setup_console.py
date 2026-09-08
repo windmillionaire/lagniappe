@@ -51,16 +51,30 @@ def test_prompt_layout(width):
     message = "Would you like to deploy the app now? [y/N]: "
     result = format_prompt(message, width)
     assert result.startswith("? ")
-    assert result.endswith("[y/N]: ")
+    assert result.endswith("[y/N] ")
     assert not result.endswith("  ")
     assert all(len(line) <= width for line in result.splitlines())
-    assert result.split()[1:] == message.split()
-    assert "[My workspace]: " in format_prompt(
+    assert " ".join(result.split()) == "? Would you like to deploy the app now [y/N]"
+    assert "[My workspace] " in format_prompt(
         "Installation name [My workspace]: ", width
     )
-    assert format_prompt("Continue? [Y/n]: ", width).endswith("[Y/n]: ")
-    assert format_prompt("Value (x to exit): ", width).endswith("(x to exit): ")
-    assert format_prompt("Press Enter to continue: ", width).endswith(": ")
+    assert format_prompt("Continue? [Y/n]: ", width).endswith("[Y/n] ")
+    assert format_prompt("Value (x to exit): ", width).endswith("(x to exit) ")
+    assert format_prompt("Press Enter to continue: ", width).endswith("continue ")
+    assert (
+        " ".join(format_prompt("Continue? [Y/n] (x to exit): ", width).split())
+        == "? Continue [Y/n] (x to exit)"
+    )
+    assert (
+        " ".join(
+            format_prompt("Continue? [Y/n] (s to skip; x to exit): ", width).split()
+        )
+        == "? Continue [Y/n] (s to skip; x to exit)"
+    )
+    assert "[Why?]" in format_prompt("Label [Why?]: ", width)
+    assert "https://example.test/?q=value" in format_prompt(
+        "URL [https://example.test/?q=value]: ", width
+    )
     colored = format_prompt("\n\x1b[36m" + message + "\x1b[0m", width)
     assert unstyle(colored) == "\n" + result
     assert "\x1b[36m?\x1b[0m" in colored

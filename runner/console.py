@@ -7,7 +7,10 @@ import unicodedata
 
 _SGR = re.compile(r"\x1b\[[0-9;]*m")
 _MARKER = re.compile(r"(?:[•*?✔✗!-]|\d+[.)]|\[(?:OK|X|!)\])\s+")
-_PROMPT_HINT = re.compile(r"\s+(\[[^\]\n]+\]|\([YyNn]/[YyNn]\)|\(x to exit\))\s*:?$")
+_PROMPT_HINT = re.compile(
+    r"\s+((?:\[[^\]\n]+\]|\([YyNn]/[YyNn]\))"
+    r"(?:\s+\([^()\n]+\))?|\(x to (?:exit|cancel)\))\s*:?$"
+)
 
 
 # @testable false
@@ -84,7 +87,7 @@ def wrap_text(message, width=None):
 # @tests tests_tooling/test_001k_setup_console.py::test_prompt_layout
 # @matrix setup : interactive-input terminal-wrapping
 def format_prompt(message, width=None):
-    """Lay out an existing input label without changing its answer/default rules."""
+    """Use one leading question marker while preserving answer/default hints."""
     width = terminal_width(width)
     original = str(message)
     text = unstyle(original).rstrip()
@@ -93,8 +96,9 @@ def format_prompt(message, width=None):
     if text.startswith("? "):
         text = text[2:]
     hint_match = _PROMPT_HINT.search(text)
-    hint = text[hint_match.start() :].strip() if hint_match else ""
+    hint = hint_match.group(1) if hint_match else ""
     body = text[: hint_match.start()] if hint_match else text
+    body = body.rstrip().rstrip("?:").rstrip()
     rendered = wrap_text("? " + body, width=max(1, width - 1))
     if hint:
         separator = (

@@ -182,10 +182,10 @@ def test_mcp_policy_preserves_legacy_api_without_implicitly_installing_service()
     from config.ai_settings import normalize_ai_features
     assert normalize_ai_features({})["EXTERNAL_AI_ENABLED"]
     assert not mcp.requested({})
-    assert mcp.requested({"REMOTE_MCP": {"enabled": True}})
+    assert mcp.requested({"MCP_RESOURCE": "https://mcp.example.test/mcp"})
     assert mcp.requested({"EXTERNAL_AI_ENABLED": True})
     assert not mcp.requested({"AI_ENABLED": False, "EXTERNAL_AI_ENABLED": True})
-    assert not mcp.requested({"EXTERNAL_AI_ENABLED": False, "REMOTE_MCP": {"enabled": True}})
+    assert not mcp.requested({"EXTERNAL_AI_ENABLED": False, "MCP_RESOURCE": "https://mcp.example.test/mcp"})
 
 
 # @matrix mcp-install : fail-closed provider-discovery
@@ -324,14 +324,14 @@ def test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app(clo
     config = settings()
     prepared = mcp.prepare_deployment(config, announce_progress=False)
     assert prepared.version == config["MCP_VERSION"]
-    assert config["REMOTE_MCP"]["resource"] == "https://lagniappe-demo.run.app/mcp"
-    assert config["REMOTE_MCP"]["actors"] is None
-    assert config["REMOTE_MCP"]["codex_enabled"] is True
-    assert not mcp._matches(cloud.service, prepared, config["REMOTE_MCP"]["resource"])
+    assert config["MCP_RESOURCE"] == "https://lagniappe-demo.run.app/mcp"
+    assert config["MCP_SERVICE_ACCOUNT"] == prepared.runtime
+    assert "REMOTE_MCP" not in config
+    assert not mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
     assert any("--gcs-source-staging-dir=gs://demo-project-mcp-builds/source" in call for call in cloud.calls)
     assert all("LAGNIAPPE_MCP_ENABLED=true" not in " ".join(call) for call in cloud.calls)
     mcp.finish_deployment(prepared, config, announce_progress=False)
-    assert mcp._matches(cloud.service, prepared, config["REMOTE_MCP"]["resource"])
+    assert mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
     assert capsys.readouterr().out == ""
     mcp.finish_deployment(prepared, config, announce_progress=False)
     config["AI_ENABLED"] = False
@@ -352,13 +352,13 @@ def test_mcp_unchanged_update_skips_build_and_revision(cloud, capsys, monkeypatc
     mcp.finish_deployment(prepared, config)
     output = capsys.readouterr().out
     assert output.endswith("✔ <green>MCP server is ready</green>\n")
-    assert config["REMOTE_MCP"]["resource"] not in output
+    assert config["MCP_RESOURCE"] not in output
     cloud.calls.clear()
     prepared = mcp.prepare_deployment(config)
     mcp.finish_deployment(prepared, config)
     assert not any(call[:2] in (["builds", "submit"], ["run", "deploy"]) for call in cloud.calls)
     cloud.service["status"]["traffic"][0]["percent"] = 50
-    assert not mcp._matches(cloud.service, prepared, config["REMOTE_MCP"]["resource"])
+    assert not mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
 
 
 # @matrix mcp-install : source-version update-order verification
@@ -381,7 +381,7 @@ def test_mcp_changed_source_update_builds_then_activates_new_image(cloud, monkey
     mcp.finish_deployment(prepared, config, announce_progress=False)
     assert sum(call[:2] == ["run", "deploy"] for call in cloud.calls) == 1
     assert cloud.service["spec"]["template"]["spec"]["containers"][0]["image"] == prepared.image
-    assert mcp._matches(cloud.service, prepared, config["REMOTE_MCP"]["resource"])
+    assert mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
 
 
 # @matrix mcp-install : disable failure-recovery update-order verification
@@ -396,10 +396,14 @@ def test_mcp_disable_and_failed_activation_do_not_claim_success(cloud, capsys):
     mcp.finish_deployment(mcp.prepare_deployment(config), config)
     config["EXTERNAL_AI_ENABLED"] = False
     assert mcp.prepare_deployment(config) is None
-    assert config["REMOTE_MCP"]["enabled"] is False
+    assert config["MCP_RESOURCE"] == "https://lagniappe-demo.run.app/mcp"
+    assert config["MCP_SERVICE_ACCOUNT"] == prepared.runtime
     mcp.finish_deployment(None, config)
-    assert not mcp._matches(cloud.service, prepared, config["REMOTE_MCP"]["resource"])
+    assert not mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
     assert not any("delete" in call for call in cloud.calls)
+    config["EXTERNAL_AI_ENABLED"] = True
+    mcp.finish_deployment(mcp.prepare_deployment(config), config)
+    assert mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
 
 
 # @matrix mcp-install : doctor recovery source-version

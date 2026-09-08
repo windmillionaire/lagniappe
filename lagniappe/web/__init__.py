@@ -167,12 +167,10 @@ def add_lagniappe_headers(response):
         # Flask-WTF verifies the HTTPS same-origin Referer on consent POSTs.
         # Cross-origin redirects to ChatGPT must not receive one.
         headers["Referrer-Policy"] = "same-origin"
-        if CONFIG.REMOTE_MCP.get("enabled"):
-            destinations = "https://chatgpt.com"
-            if CONFIG.REMOTE_MCP.get("codex_enabled"):
-                # Browsers enforce form-action on the POST's redirect chain,
-                # including the native client's ephemeral loopback listener.
-                destinations += " http://127.0.0.1:*/callback"
+        if CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE:
+            # Browsers enforce form-action on the POST's redirect chain,
+            # including the native client's ephemeral loopback listener.
+            destinations = "https://chatgpt.com http://127.0.0.1:*/callback"
             headers["Content-Security-Policy"] = CSP.replace(
                 "form-action 'self'", "form-action 'self' " + destinations
             )

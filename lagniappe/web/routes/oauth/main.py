@@ -13,7 +13,7 @@ from flask import (
 )
 from flask_login import current_user
 
-from config.remote_mcp import CODEX_CLIENT_ID, PENDING_SECONDS
+from config.remote_mcp import CLIENT_ID, CODEX_CLIENT_ID, PENDING_SECONDS, mcp_issuer
 from lagniappe import CONFIG
 from lagniappe.core.tools.auth import remote_mcp as auth
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
@@ -30,11 +30,10 @@ _PENDING_COOKIE = "__Secure-lagniappe-mcp-pending"
 def guard():
     g.NO_CACHE = True
     request.max_content_length = 16 * 1024
-    config = CONFIG.REMOTE_MCP
     if (
         not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED
-        or not config.get("enabled")
-        or request.host_url.rstrip("/") != config["issuer"]
+        or not CONFIG.MCP_RESOURCE or not CONFIG.MCP_SERVICE_ACCOUNT
+        or request.host_url.rstrip("/") != mcp_issuer(vars(CONFIG))
     ):
         abort(404)
     if request.content_length and request.content_length > 16 * 1024:
@@ -74,11 +73,13 @@ def _parameters(values):
 # @matrix mcp-oauth : discovery site-policy
 @oauth_metadata.route("/oauth-authorization-server")
 def metadata():
-    config = CONFIG.REMOTE_MCP
     g.NO_CACHE = True
-    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED or not config.get("enabled"):
+    if (
+        not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED
+        or not CONFIG.MCP_RESOURCE or not CONFIG.MCP_SERVICE_ACCOUNT
+    ):
         abort(404)
-    issuer = config["issuer"]
+    issuer = mcp_issuer(vars(CONFIG))
     return jsonify(
         issuer=issuer,
         authorization_endpoint=issuer + "/oauth/authorize",
@@ -150,7 +151,7 @@ def authorize():
         "oauth/connection.html",
         consent=True,
         pending=pending,
-        resource=CONFIG.REMOTE_MCP["resource"],
+        resource=CONFIG.MCP_RESOURCE,
         client_name="Codex" if pending_request["client_id"] == CODEX_CLIENT_ID else "ChatGPT",
     )
 
@@ -200,15 +201,12 @@ def connection():
     if not current_user.is_authenticated:
         return redirect(url_for("users.login", next=url_for("oauth.connection")))
     user = current_user._get_current_object()
-    config = CONFIG.REMOTE_MCP
     if request.method == "POST":
         parameters = _parameters(request.form)
         auth.connection_status(
-            user, client_id=parameters.get("client_id", config["client_id"]), revoke=True
+            user, client_id=parameters.get("client_id", CLIENT_ID), revoke=True
         )
-    clients = [(config["client_id"], "ChatGPT")]
-    if config.get("codex_enabled"):
-        clients.append((CODEX_CLIENT_ID, "Codex"))
+    clients = [(CLIENT_ID, "ChatGPT"), (CODEX_CLIENT_ID, "Codex")]
     connections = [
         {"client_id": client_id, "name": name, **auth.connection_status(user, client_id=client_id)}
         for client_id, name in clients

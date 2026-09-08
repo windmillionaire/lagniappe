@@ -35,8 +35,8 @@ remain available within normal permissions even when generation is disabled.
 Legacy settings without these flags preserve existing built-in and REST access.
 That compatibility default does not automatically provision MCP: normal
 deployment selects it only with an explicit external-AI choice or an already
-enabled `REMOTE_MCP` configuration. An existing explicit OAuth `actors` list
-remains restrictive; without a list, eligible non-public users may connect.
+saved `MCP_RESOURCE`. Eligible active non-public users may connect; there is
+no separate actor list or client switch in installation configuration.
 
 Direct REST clients use a user API key; MCP clients use the installation's
 Cloud Run `/mcp` URL and authorize on the Lagniappe website. The skill is a thin

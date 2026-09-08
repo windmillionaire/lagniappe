@@ -393,11 +393,10 @@ def validate_recovery_document(settings):
     recovered["AUTH_EMAIL_CONFIG"] = normalized_auth_email
 
     from config.ai_settings import normalize_ai_features
-    from config.remote_mcp import normalize_remote_mcp_config
+    from config.remote_mcp import normalize_mcp_config
     try:
         normalize_ai_features(recovered)
-        if recovered.get("REMOTE_MCP") is not None:
-            recovered["REMOTE_MCP"] = normalize_remote_mcp_config(recovered["REMOTE_MCP"])
+        normalize_mcp_config(recovered)
         if recovered.get("MCP_VERSION") is not None and not re.fullmatch(r"[a-f0-9]{32}", str(recovered["MCP_VERSION"])):
             raise ValueError("MCP_VERSION must be a source fingerprint")
     except ValueError as error:

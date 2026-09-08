@@ -626,7 +626,7 @@ def test_disabled_error_monitoring_offers_to_enable(monkeypatch, capsys):
 
     assert (
         " ".join(prompts[0].split())
-        == "? Would you like to enable error monitoring? [y/N]:"
+        == "? Would you like to enable error monitoring [y/N]"
     )
     assert settings.APP == {
         "CAPTURE_ERRORS": "True",
@@ -644,13 +644,14 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     import config
     import installer as setup_pkg
     from installer import optional
+    from runner.console import unstyle
 
     settings = _fake_settings()
     monkeypatch.setattr(config, "SETTINGS", settings)
     formatter = types.SimpleNamespace(
         initialize=lambda: types.SimpleNamespace(
-            info=lambda message: f"<info>{message}</info>",
-            success=lambda message: f"<success>{message}</success>",
+            info=lambda message: f"\x1b[36m{message}\x1b[0m",
+            success=lambda message: f"\x1b[32m{message}\x1b[0m",
         )
     )
     monkeypatch.setattr(optional, "FORMATTER", formatter)
@@ -668,19 +669,14 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     assert optional.configure_ai_observability()
     assert settings.APP["AI_OBSERVABILITY"] is True
     first_output = capsys.readouterr().out
-    visible_output = (
-        first_output.replace("<info>", "")
-        .replace("</info>", "")
-        .replace("<success>", "")
-        .replace("</success>", "")
-    )
+    visible_output = unstyle(first_output)
     output_lines = visible_output.splitlines()
     assert all(len(line) <= 53 for line in output_lines)
     assert any("token totals," in line for line in output_lines)
-    assert "<info>Optional AI generation observability</info>" in first_output
-    assert "<success>AI generation observability enabled.</success>" in first_output
-    assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? <info>Enable AI generation observability? [y/N]: </info>"
+    assert "Optional AI generation observability" in visible_output
+    assert "AI generation observability enabled." in visible_output
+    assert [" ".join(unstyle(prompt).split()) for prompt in prompts] == [
+        "? Enable AI generation observability [y/N]"
     ]
 
     prompts.clear()
@@ -690,15 +686,15 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     )
     assert optional.configure_ai_observability()
     assert settings.APP["AI_OBSERVABILITY"] is True
-    preserved_output = capsys.readouterr().out
-    assert "<info>AI generation observability is currently enabled.</info>" in " ".join(
+    preserved_output = unstyle(capsys.readouterr().out)
+    assert "AI generation observability is currently enabled." in " ".join(
         preserved_output.split()
     )
-    assert "<success>Existing AI observability choice preserved.</success>" in (
+    assert "Existing AI observability choice preserved." in (
         preserved_output
     )
-    assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? <info>Keep this AI observability choice? [Y/n]: </info>"
+    assert [" ".join(unstyle(prompt).split()) for prompt in prompts] == [
+        "? Keep this AI observability choice [Y/n]"
     ]
 
 
@@ -718,7 +714,7 @@ def test_google_signin_is_an_explicit_preserved_setup_choice(monkeypatch, capsys
     assert admin.configure_google_signin_choice() is False
     assert settings.APP["GOOGLE_SIGNIN_ENABLED"] is False
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Enable Google sign-in? [Y/n]:"
+        "? Enable Google sign-in [Y/n]"
     ]
 
     monkeypatch.setattr(
@@ -834,7 +830,7 @@ def test_redis_cli_command_uses_visible_standard_input(monkeypatch, capsys):
         "port": 12345,
         "password": "redis-secret",
     }
-    assert prompts == ["? Paste copied Redis CLI command (x to exit): "] * 2
+    assert prompts == ["? Paste copied Redis CLI command (x to exit) "] * 2
     output = capsys.readouterr().out
     assert "find Access, click Connect, expand Redis CLI, click Copy" in output
     assert "begin with 'redis-cli' or 'redis:'" in output
@@ -1736,7 +1732,7 @@ def test_domain_ownership_instructions_name_selected_gcloud_account(
     assert "signed in to that exact account" in " ".join(output.split())
     assert "confirm that account is an Owner" in " ".join(output.split())
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Has Google confirmed that installer@example.com owns app.example.com? [y/N]:"
+        "? Has Google confirmed that installer@example.com owns app.example.com [y/N]"
     ]
 
 
@@ -1771,7 +1767,7 @@ def test_cloudflare_token_prompt_explains_dashboard_steps_and_scope(
     assert "does not save it" in output
     assert "delete it from Cloudflare after setup" in output
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Cloudflare API token (x to cancel):"
+        "? Cloudflare API token (x to cancel)"
     ]
 
     monkeypatch.setattr("builtins.input", lambda prompt: "x")
@@ -4273,9 +4269,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     ]
 
     deploy_commands.clear()
-    sys.modules["config"].SETTINGS.APP["REMOTE_MCP"] = {
-        "enabled": True, "resource": "https://mcp.example.test/mcp",
-    }
+    sys.modules["config"].SETTINGS.APP["MCP_RESOURCE"] = "https://mcp.example.test/mcp"
     utils.deploy_to_app_engine(print_final_summary=False, first_install=True)
     assert capsys.readouterr().out == (
         "Deploying App Engine indexes and the application may take up to 10 minutes.\n"
@@ -6063,7 +6057,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
     assert app_requests[0]["application"].id == "project-1"
     assert app_requests[0]["application"].location_id == "us-central"
     assert [" ".join(prompt.split()) for prompt in location_prompts] == [
-        "? Create the App Engine application in 'us-central'? [y/N]:"
+        "? Create the App Engine application in 'us-central' [y/N]"
     ]
     discovery_exit = app_engine_events.index(
         ("spinner-exit", "Discover App Engine application")
@@ -6071,7 +6065,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
     prompt_event = app_engine_events.index(
         (
             "input",
-            "? Create the App Engine application in 'us-central'? [y/N]: ",
+            "? Create the App Engine application in 'us-central' [y/N] ",
         )
     )
     creation_enter = app_engine_events.index(

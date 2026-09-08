@@ -478,6 +478,41 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
     assert setup_package.verify_setup_runtime() is None
 
 
+# @matrix setup : focused-mode gcloud-token prerequisites deploy-surface gcloud-config transactional-state
+# @source installer/__main__.py::_prepare_setup_dependencies
+# @source installer/verify.py::validate_installation
+def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch):
+    import config
+    from installer import __main__ as setup_cli
+    from installer import optional, package_install, utils
+    from runner import deploy, gcloud
+
+    events = []
+    monkeypatch.setattr(package_install, "ensure_pip_is_available", lambda: None)
+    monkeypatch.setattr(package_install, "ensure_setup_dependencies", lambda: None)
+    monkeypatch.setattr(
+        gcloud, "activate_repository_gcloud",
+        lambda **kwargs: events.append(("credentials", kwargs)) or True,
+    )
+    monkeypatch.setattr(
+        gcloud, "config_gcloud",
+        lambda **kwargs: pytest.fail("the handler repeated gcloud activation"),
+    )
+    monkeypatch.setattr(utils, "check_gcloud_cli", lambda: None)
+    monkeypatch.setattr(config, "verify_generation_manifest", lambda: events.append("generation"))
+    monkeypatch.setattr(deploy, "verify_runtime_deploy_surface", lambda: events.append("deploy-surface"))
+    monkeypatch.setattr(optional, "configure_ai_features", lambda: events.append("AI prompt") or False)
+    monkeypatch.setattr("builtins.input", lambda prompt: "n")
+
+    args = setup_cli._parser().parse_args(["ai"])
+    setup_cli._prepare_setup_dependencies(args)
+    assert setup_cli._dispatch(args) == 0
+    assert events == [
+        ("credentials", {"ensure_adc": True, "ensure_cli_token": True}),
+        "generation", "deploy-surface", "AI prompt",
+    ]
+
+
 # @matrix auth setup : adc explicit-command gcloud-token interactive
 def test_setup_auth_uses_explicit_browser_flow(monkeypatch, capsys):
     from installer import auth

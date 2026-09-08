@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from config import SETTINGS
 from config.ai_settings import normalize_ai_features
 from config.locations import normalize_resource_region
-from config.remote_mcp import https_url, normalize_remote_mcp_config
+from config.remote_mcp import https_url, mcp_issuer, normalize_mcp_config
 from installer import iam
 from installer.errors import SetupError
 from installer.state import record_mutation, record_step
@@ -95,9 +95,8 @@ def source_version(root=REPOSITORY_ROOT):
 def requested(settings):
     """Legacy REST access alone does not opt an installation into Cloud Run."""
     policy = normalize_ai_features(settings)
-    remote = settings.get("REMOTE_MCP") or {}
     return policy["EXTERNAL_AI_ENABLED"] and settings.get(
-        "EXTERNAL_AI_ENABLED", remote.get("enabled", False)
+        "EXTERNAL_AI_ENABLED", bool(settings.get("MCP_RESOURCE"))
     ) is True
 
 
@@ -109,11 +108,8 @@ def _deployment(settings, *, version=None):
     if not isinstance(project, str) or not re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project):
         raise SetupError("MCP requires the installation's exact Google Cloud project.")
     region = normalize_resource_region(settings.get("RESOURCE_REGION"))
-    issuer = (f"https://{settings['CUSTOM_DOMAIN']}" if settings.get("CUSTOM_DOMAIN")
-              else settings.get("APP_URL", "")).rstrip("/")
-    https_url(issuer, origin=True)
-    remote = settings.get("REMOTE_MCP") or {}
-    runtime = remote.get("service_account") or f"{SERVICE}@{project}.iam.gserviceaccount.com"
+    issuer = mcp_issuer(settings)
+    runtime = settings.get("MCP_SERVICE_ACCOUNT") or f"{SERVICE}@{project}.iam.gserviceaccount.com"
     if not runtime.endswith(f"@{project}.iam.gserviceaccount.com"):
         raise SetupError("MCP runtime identity must belong to this installation's project.")
     version = version or source_version()
@@ -422,8 +418,6 @@ def prepare_deployment(settings=None, *, announce_progress=True):
     """Prepare the optional service and configuration before publishing App Engine."""
     settings = SETTINGS.APP if settings is None else settings
     if not requested(settings):
-        if settings.get("REMOTE_MCP"):
-            settings["REMOTE_MCP"] = {**settings["REMOTE_MCP"], "enabled": False}
         return None
     target = _deployment(settings)
     record_step("prepare MCP service")
@@ -432,12 +426,12 @@ def prepare_deployment(settings=None, *, announce_progress=True):
         raise SetupError("MCP requires the saved installer/deployer identity.")
     reconcile_resources(target, deployer)
     service = _service(target)
-    saved = settings.get("REMOTE_MCP") or {}
+    saved_resource = settings.get("MCP_RESOURCE")
     if service is not None:
         resource = _resource(service)
-        if saved.get("resource") and saved["resource"] != resource:
+        if saved_resource and saved_resource != resource:
             raise SetupError("The saved MCP resource differs from this Cloud Run service.")
-        if not saved.get("resource") and service.get("metadata", {}).get("labels", {}).get("managed-by") != "lagniappe":
+        if not saved_resource and service.get("metadata", {}).get("labels", {}).get("managed-by") != "lagniappe":
             raise SetupError("An unmanaged Cloud Run service already uses the MCP service name.")
         if not _matches(service, target, resource):
             _build(target, announce_progress=announce_progress)
@@ -449,13 +443,9 @@ def prepare_deployment(settings=None, *, announce_progress=True):
         if service is None:
             raise SetupError("The prepared MCP service could not be read back.")
         resource = _resource(service)
-    remote = {
-        **saved, "enabled": True, "issuer": target.issuer, "resource": resource,
-        "service_account": target.runtime, "codex_enabled": True,
-    }
-    # Preserve an explicit older restriction; new installations allow all eligible users.
-    normalized = normalize_remote_mcp_config(remote)
-    settings["REMOTE_MCP"] = {**normalized, "actors": list(normalized["actors"]) if normalized["actors"] is not None else None}
+    settings.update(normalize_mcp_config({
+        **settings, "MCP_RESOURCE": resource, "MCP_SERVICE_ACCOUNT": target.runtime,
+    }))
     settings["MCP_VERSION"] = target.version
     reconcile_access(target, ["run", "services"], SERVICE,
                      [(iam.principal_member(deployer), ["roles/run.admin"])],
@@ -471,13 +461,12 @@ def finish_deployment(target=None, settings=None, *, announce_progress=True):
     """Activate only after the main app accepts the matching OAuth configuration."""
     settings = SETTINGS.APP if settings is None else settings
     if not requested(settings):
-        remote = settings.get("REMOTE_MCP") or {}
-        if not remote.get("resource"):
+        if not settings.get("MCP_RESOURCE"):
             return
         target = _deployment(settings, version=settings.get("MCP_VERSION") or "disabled")
         service = _service(target)
         if service is not None:
-            if _resource(service) != remote["resource"]:
+            if _resource(service) != settings["MCP_RESOURCE"]:
                 raise SetupError("The saved MCP resource differs from this Cloud Run service.")
             if _enabled(service):
                 _run(target, ["run", "services", "update", SERVICE, f"--region={target.region}",
@@ -493,7 +482,7 @@ def finish_deployment(target=None, settings=None, *, announce_progress=True):
         return
     if target is None:
         raise SetupError(f"MCP deployment was not prepared. Run {setup_command('mcp')}.")
-    resource = settings["REMOTE_MCP"]["resource"]
+    resource = settings["MCP_RESOURCE"]
     if _matches(_service(target), target, resource):
         if announce_progress:
             print(f"MCP service {target.version} is unchanged; no new revision needed.")
@@ -526,16 +515,15 @@ def _enabled(service):
 # @matrix mcp-install : doctor recovery source-version
 def inspect_deployment(settings):
     if not requested(settings):
-        remote = settings.get("REMOTE_MCP") or {}
-        if remote.get("resource"):
+        if settings.get("MCP_RESOURCE"):
             target = _deployment(settings, version=settings.get("MCP_VERSION") or "disabled")
             service = _service(target)
-            if service is not None and (_resource(service) != remote["resource"] or _enabled(service)):
+            if service is not None and (_resource(service) != settings["MCP_RESOURCE"] or _enabled(service)):
                 return {"state": "UNAVAILABLE", "details": {"message": f"Reconcile disabled MCP with {setup_command('mcp')}."}}
         return {"state": "AVAILABLE", "details": {"message": "MCP is not selected."}}
     target = _deployment(settings)
     service = _service(target)
-    resource = (settings.get("REMOTE_MCP") or {}).get("resource")
+    resource = settings.get("MCP_RESOURCE")
     if service is None or not resource or _resource(service) != resource or not _matches(service, target, resource):
         return {"state": "UNAVAILABLE", "details": {"message": f"MCP is missing or out of date; run {setup_command('mcp')}."}}
     return {"state": "AVAILABLE", "details": {"version": target.version}}
@@ -546,7 +534,7 @@ def inspect_deployment(settings):
 # @matrix mcp-install : handoff iam
 def handoff_access(settings, *, owner=None, remove_installer=None):
     """Transfer exact MCP resource access before removing the installer's project role."""
-    if not (settings.get("REMOTE_MCP") or {}).get("resource"):
+    if not settings.get("MCP_RESOURCE"):
         return
     target = _deployment(settings)
     member = iam.principal_member(owner) if owner else None
@@ -573,7 +561,7 @@ def configure_mcp():
     from installer.verify import prepare_existing_installation
     from installer.utils import deploy_to_app_engine
     prepare_existing_installation()
-    if not requested(SETTINGS.APP) and not (SETTINGS.APP.get("REMOTE_MCP") or {}).get("resource"):
+    if not requested(SETTINGS.APP) and not SETTINGS.APP.get("MCP_RESOURCE"):
         raise SetupError(f"External AI is disabled. Choose it with {setup_command('ai')} first.")
     deploy_to_app_engine()
     return 0

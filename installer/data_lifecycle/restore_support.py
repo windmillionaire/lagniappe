@@ -14,6 +14,7 @@ from config.datastore import (
     decode_urlsafe_key,
     encode_urlsafe_key,
 )
+from runner.console import format_prompt
 
 from .provider import (
     RESTORE_ROOT_PREFIX,
@@ -918,7 +919,7 @@ def _confirm_mutation(expected, *, confirmation=None):
 
     formatter = FORMATTER.initialize()
     prompt = formatter.warning(f"Type {expected} to continue: ")
-    actual = (confirmation or input)(prompt)
+    actual = (confirmation or input)(format_prompt(prompt))
     if str(actual).strip() != expected:
         raise DataLifecycleError("Restore confirmation did not match; nothing changed.")
 
