@@ -1,3 +1,5 @@
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
 from pathlib import Path
 
 from runner.console import format_prompt, format_value
@@ -31,7 +33,7 @@ def _recovery_file_present(app_dir=None):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
 # @matrix setup : explicit-project main-install manual-deploy prerequisites virtualenv
 def install():
-    print(wrap_text("Welcome to Lagniappe Setup!"))
+    print(ui.heading(wrap_text("Welcome to Lagniappe setup")))
     if _recovery_file_present():
         print(
             wrap_text(
@@ -51,7 +53,7 @@ def install():
     print(wrap_text("Setup will ask before installing any missing Python packages."))
     value = input(format_prompt("Continue? [Y/n]: "))
     if value.lower() == "n":
-        print(wrap_text("Exiting installer."))
+        print(ui.status(wrap_text("Exiting installer.")))
         raise SetupCancelled("Setup cancelled before dependency installation.")
 
     record_step("install setup dependencies")
@@ -131,7 +133,7 @@ def install():
 
     deployed = False
     consent = input(
-        format_prompt(f.info("Would you like to deploy the app now? [y/N]: "))
+        format_prompt("Would you like to deploy the app now? [y/N]: ")
     )
     if consent.lower() == "y":
         record_step("deploy application")
@@ -147,14 +149,14 @@ def install():
         if ai_email_config:
             record_step("activate AI email submissions")
             ai_email.activate_ai_email(ai_email_config)
-        print(wrap_text(f"\n{f.success('Deployment complete!')}"))
+        print(wrap_text(f"\n{f.success('Deployment complete')}"))
         deployed = True
     else:
         project = SETTINGS.GCLOUD_CONFIG["PROJECT"]
         print(
-            f.success(wrap_text("You can deploy the application manually when ready."))
+            ui.info(wrap_text("You can deploy the application manually when ready."))
         )
-        print(wrap_text("Manual deployment steps:"))
+        print(wrap_text(ui.heading("Manual deployment steps:")))
         print(wrap_text("1. Review the generated YAML files"))
         print(
             format_value(
@@ -232,7 +234,7 @@ def install():
                 )
             )
 
-    print(wrap_text(f"\n{f.success('Setup complete!')}"))
+    print(wrap_text(f"\n{f.success('Setup complete')}"))
 
     from installer.summary import print_install_summary
 

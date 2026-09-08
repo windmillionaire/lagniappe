@@ -1,5 +1,8 @@
 """Add development tooling to an existing Lagniappe installation."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 import os
 import re
 import subprocess
@@ -86,7 +89,7 @@ def node_version_supported(version):
 # @covered-by installer/development.py::setup_development
 # @reason subprocess sequencing and failures are exercised through the development setup entrypoint
 def _run_command(label, command, timeout=None):
-    print(f"\n{label}")
+    print("\n" + ui.heading(label))
     if timeout is None:
         if "playwright" in command:
             timeout = PLAYWRIGHT_TIMEOUT
@@ -95,14 +98,15 @@ def _run_command(label, command, timeout=None):
         else:
             timeout = NPM_TIMEOUT
     try:
-        result = subprocess.run(command, cwd=APP_ROOT, timeout=timeout)
+        with ui.pause_progress():
+            result = subprocess.run(command, cwd=APP_ROOT, timeout=timeout)
     except subprocess.TimeoutExpired:
-        print(f"{label} timed out after {timeout} seconds.")
+        print(ui.error(f"{label} timed out after {timeout} seconds."))
         return False
     if result.returncode == 0:
         return True
 
-    print(f"{label} failed with exit code {result.returncode}.")
+    print(ui.error(f"{label} failed with exit code {result.returncode}."))
     return False
 
 
@@ -113,7 +117,7 @@ def _run_command(label, command, timeout=None):
 # @matrix setup : development frontend-build idempotence package-install portability prerequisites windows
 def setup_development():
     """Install local development dependencies after ordinary installer."""
-    print("Lagniappe Development Setup")
+    print(ui.heading("Lagniappe development setup"))
 
     if _native_windows():
         print(
@@ -127,17 +131,17 @@ def setup_development():
         )
         return 1
     if not _in_virtualenv():
-        print("Development setup must run inside the project virtualenv.")
+        print(ui.error("Development setup must run inside the project virtualenv."))
         print(virtualenv_instructions())
         return 1
 
     missing = _missing_installation_files()
     if missing:
         print(
-            "Development setup requires a completed Lagniappe installation. "
-            f"Run {setup_command()} first."
+            ui.error("Development setup requires a completed Lagniappe installation. "
+            f"Run {setup_command()} first.")
         )
-        print(f"Missing installation files: {', '.join(missing)}")
+        print(ui.error(f"Missing installation files: {', '.join(missing)}"))
         return 1
 
     missing_executables = [
@@ -147,8 +151,8 @@ def setup_development():
     ]
     if missing_executables:
         print(
-            "Development setup requires Node.js and npm. "
-            f"Missing: {', '.join(missing_executables)}."
+            ui.error("Development setup requires Node.js and npm. "
+            f"Missing: {', '.join(missing_executables)}.")
         )
         print(f"Supported Node versions: {NODE_ENGINE_RANGE}")
         return 1
@@ -156,8 +160,8 @@ def setup_development():
     node_version = _installed_node_version()
     if not node_version or not node_version_supported(node_version):
         print(
-            f"Unsupported Node version: {node_version or 'unknown'}. "
-            f"Supported versions: {NODE_ENGINE_RANGE}."
+            ui.error(f"Unsupported Node version: {node_version or 'unknown'}. "
+            f"Supported versions: {NODE_ENGINE_RANGE}.")
         )
         return 1
 
@@ -216,7 +220,7 @@ def setup_development():
         if not _run_command(label, command):
             return 1
 
-    print("\nDevelopment setup complete. Safe to rerun after dependency changes.")
+    print(ui.success("\nDevelopment setup complete. Safe to rerun after dependency changes."))
     print(f"Start the local app: {python_command('run.py', 'dev')}")
     print(f"Run backend tests: {python_command('run.py', 'test', 'unit')}")
     print(f"Run frontend tests: {python_command('run.py', 'test', 'js')}")

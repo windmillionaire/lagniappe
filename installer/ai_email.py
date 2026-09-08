@@ -1,5 +1,8 @@
 """Provision the Resend transport used by production AI email submissions."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 import time
 import webbrowser
 
@@ -179,11 +182,10 @@ class ResendSetupClient:
 # @covered-by installer/ai_email.py::configure_ai_email
 # @reason interactive prompt behavior is owned by the focused setup workflow
 def _prompt(label, default=None):
-    if default not in (None, ""):
-        suffix = f" [{default}] (Enter to keep; x to exit): "
-    else:
-        suffix = " (x to exit): "
-    value = input(format_prompt(f"{label}{suffix}")).strip()
+    value = input(format_prompt(
+        label, default=default if default not in (None, "") else None,
+        hint="Enter to keep; x to exit" if default not in (None, "") else "x to exit",
+    )).strip()
     if value.casefold() == "x":
         raise SetupCancelled("AI email setup cancelled.")
     return value or str(default or "").strip()
@@ -193,12 +195,8 @@ def _prompt(label, default=None):
 # @covered-by installer/ai_email.py::configure_ai_email
 # @reason secret-preserving prompt behavior is owned by the setup workflow
 def _prompt_secret(label, existing=None):
-    suffix = (
-        " (Enter to keep the saved value; x to exit): "
-        if existing
-        else " (x to exit): "
-    )
-    value = input(format_prompt(f"{label}{suffix}")).strip()
+    hint = "Enter to keep the saved value; x to exit" if existing else "x to exit"
+    value = input(format_prompt(label, hint=hint)).strip()
     if value.casefold() == "x":
         raise SetupCancelled("AI email setup cancelled.")
     return value or str(existing or "")
@@ -222,7 +220,7 @@ def _open_resend_page(label, url):
 # @matrix ai-email resend setup : authorization browser instructions resend secrets setup
 def guide_resend_receiving_key(*, existing=False):
     """Explain the exact dashboard steps for the receiving administration key."""
-    print(wrap_text("\nConfigure the Resend receiving administration key:"))
+    print(wrap_text(ui.heading("\nConfigure the Resend receiving administration key:")))
     if existing:
         print(
             wrap_text(
@@ -256,7 +254,7 @@ def guide_resend_receiving_key(*, existing=False):
 # @matrix ai-email resend setup : authentication-email authorization instructions resend reuse secrets sending-domain setup
 def guide_resend_sending_identity(sending_domain, *, reusable_sender=None):
     """Confirm reuse of the Resend identity established by authentication email."""
-    print(wrap_text("\nConfigure the Resend feedback-sending identity:"))
+    print(wrap_text(ui.heading("\nConfigure the Resend feedback-sending identity:")))
     if not reusable_sender:
         raise ProviderInvalidInput(
             "AI email requires Resend-backed authentication email. "
@@ -370,7 +368,7 @@ def guide_resend_receiving_dns(domain, *, cloudflare_default=False):
     if use_cloudflare:
         print(
             wrap_text(
-                "\nConfigure the new receiving subdomain through Resend and Cloudflare:"
+                ui.heading("\nConfigure the new receiving subdomain through Resend and Cloudflare:")
             )
         )
         print(
@@ -396,9 +394,7 @@ def guide_resend_receiving_dns(domain, *, cloudflare_default=False):
         _open_resend_page("Resend Domains", RESEND_DOMAINS_URL)
         completion = (
             input(
-                format_prompt(
-                    "Press Enter after Cloudflare setup, M for manual records, or X to exit: "
-                )
+                format_prompt("Complete Cloudflare setup", hint="Enter to continue; m for manual records; x to exit")
             )
             .strip()
             .casefold()
@@ -412,9 +408,7 @@ def guide_resend_receiving_dns(domain, *, cloudflare_default=False):
 
     _print_domain_records(domain)
     confirmed = input(
-        format_prompt(
-            "After adding all exact records at your DNS provider, press Enter (x to exit): "
-        )
+        format_prompt("Add all exact records at your DNS provider", hint="Enter to continue; x to exit")
     ).strip()
     if confirmed.casefold() == "x":
         raise SetupCancelled(
@@ -579,9 +573,9 @@ def _disable(existing):
     SETTINGS.APP["AI_EMAIL_CONFIG"] = normalize_ai_email_config(disabled)
     SETTINGS.save()
     print(
-        wrap_text(
+        ui.success(wrap_text(
             "AI email receiving is disabled; provider resources and secrets were retained."
-        )
+        ))
     )
     if (
         input(format_prompt("Deploy the disabled AI email configuration now? [Y/n]: "))
@@ -590,7 +584,7 @@ def _disable(existing):
         != "n"
     ):
         utils.deploy_to_app_engine()
-        print(wrap_text("The disabled AI email configuration has been deployed."))
+        print(ui.success(wrap_text("The disabled AI email configuration has been deployed.")))
     else:
         print(
             wrap_text(
@@ -687,7 +681,7 @@ def activate_ai_email(candidate=None):
                 verbatim=True,
             )
         )
-    print(wrap_text("\nNext steps:"))
+    print(wrap_text(ui.heading("\nNext steps:")))
     print(
         wrap_text(
             "  1. Send a normal email from a registered user's exact email address."
@@ -747,7 +741,7 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
         if action == "d":
             return _disable(existing)
 
-    print(wrap_text(f"\n{f.info('AI email submissions')}"))
+    print(wrap_text(f"\n{ui.heading('AI email submissions')}"))
     print(
         wrap_text(
             "This configures Resend receiving and the Lagniappe AI, Ask, Create, "

@@ -1,5 +1,8 @@
 """Interactive security configuration entry points."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 from runner.console import format_prompt, wrap_text
 from .verify import prepare_existing_installation
 
@@ -19,14 +22,14 @@ def configure_security():
     f = FORMATTER.initialize()
     enabled = redis_tls_enabled(SETTINGS.APP)
 
-    print(wrap_text(f"\n{f.info('Security configuration')}"))
+    print(wrap_text(f"\n{ui.heading('Security configuration')}"))
     print(wrap_text(f"Redis TLS is currently {'enabled' if enabled else 'disabled'}."))
 
     while True:
         choice = (
             input(
                 format_prompt(
-                    f.info("Enable/refresh Redis TLS, disable it, or exit? [E/d/x]: ")
+                    "Enable/refresh Redis TLS, disable it, or exit? [E/d/x]: "
                 )
             )
             .strip()
@@ -39,7 +42,7 @@ def configure_security():
             result = redis_setup._disable_redis_tls()
             break
         if choice in {"x", "exit"}:
-            print(f.success(wrap_text("Security configuration unchanged.")))
+            print(ui.status(wrap_text("Security configuration unchanged.")))
             return 1
         print(
             f.error(
@@ -60,7 +63,7 @@ def configure_security():
             )
         )
     )
-    consent = input(format_prompt(f.info("Deploy the updated app now? [Y/n]: ")))
+    consent = input(format_prompt("Deploy the updated app now? [Y/n]: "))
     if consent.lower() != "n":
         utils.deploy_to_app_engine()
         print(f.success(wrap_text("Redis security configuration deployed.")))

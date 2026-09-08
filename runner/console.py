@@ -6,10 +6,14 @@ import unicodedata
 
 
 _SGR = re.compile(r"\x1b\[[0-9;]*m")
-_MARKER = re.compile(r"(?:[•*?✔✗!-]|\d+[.)]|\[(?:OK|X|!)\])\s+")
+_MARKER = re.compile(
+    r"(?:\x1b\[[0-9;]*m)*(?:[•*?✓✔✗!-]|\d+[.)]|\[(?:OK|X|!)\])"
+    r"(?:\x1b\[[0-9;]*m)*\s+"
+)
 _PROMPT_HINT = re.compile(
-    r"\s+((?:\[[^\]\n]+\]|\([YyNn]/[YyNn]\))"
-    r"(?:\s+\([^()\n]+\))?|\(x to (?:exit|cancel)\))\s*:?$"
+    r"\s+((?:\[[^\]\n]+\]|\([A-Za-z](?:/[A-Za-z])+\))"
+    r"(?:\s+\([^()\n]+\))?|\((?:[xrs] to |press Enter)[^()\n]+\))\s*:?$",
+    re.IGNORECASE,
 )
 
 
@@ -86,32 +90,58 @@ def wrap_text(message, width=None):
 # @testable true
 # @tests tests_tooling/test_001k_setup_console.py::test_prompt_layout
 # @matrix setup : interactive-input terminal-wrapping
-def format_prompt(message, width=None):
-    """Use one leading question marker while preserving answer/default hints."""
+def format_prompt(message, width=None, *, default=None, hint=None, stream=None):
+    """Render a Primer question without changing the caller's input semantics."""
+    from runner.presentation import styled
+
     width = terminal_width(width)
-    original = str(message)
-    text = unstyle(original).rstrip()
+    text = unstyle(message).rstrip()
     leading = "\n" * (len(text) - len(text.lstrip("\n")))
     text = text.lstrip("\n")
-    if text.startswith("? "):
+    already_formatted = text.startswith("? ")
+    if already_formatted:
         text = text[2:]
-    hint_match = _PROMPT_HINT.search(text)
-    hint = hint_match.group(1) if hint_match else ""
-    body = text[: hint_match.start()] if hint_match else text
-    body = body.rstrip().rstrip("?:").rstrip()
+    # Accept existing suffixes during source upgrades as well as structured
+    # defaults/hints. Values remain literal and are never parsed as Rich markup.
+    suffix = _PROMPT_HINT.search(text)
+    if already_formatted:
+        suffix = re.search(r"\s+((?:\([^\n]+\)|\[[^\n]+\])(?:\s+\[[^\n]+\])*)$", text) or suffix
+    parts = []
+    if suffix:
+        raw_suffix = suffix.group(1)
+        body = text[:suffix.start()]
+        # Separate a default or yes/no hint from a following action hint.
+        parts = re.split(r"(?<=[\])])\s+(?=[\[(])", raw_suffix)
+    else:
+        body = text
+    hints = [hint] if hint else []
+    for part in parts:
+        value = part[1:-1]
+        if re.fullmatch(r"[A-Za-z](?:/[A-Za-z])+", value) or re.search(
+            r"(?:\b(?:enter|[xrs])\b.*\b(?:to|exit|cancel|skip|retry|continue)\b)",
+            value, re.IGNORECASE,
+        ):
+            hints.append(value)
+        elif default is None:
+            default = value
+    body = body.rstrip().rstrip("?:.! ")
     rendered = wrap_text("? " + body, width=max(1, width - 1))
-    if hint:
+    styled_body = styled("?", "green", stream=stream) + styled(
+        rendered[1:], "bold", stream=stream
+    )
+    for part, style in [(f"({default})" if default is not None else "", None)] + [
+        (f"[{item}]", "cyan") for item in hints
+    ]:
+        if not part:
+            continue
         separator = (
             " "
-            if cell_width(rendered.split("\n")[-1] + " " + hint + " ") <= width
+            if cell_width(rendered.split("\n")[-1] + " " + part + " ") <= width
             else "\n  "
         )
-        rendered += separator + hint
-    # Preserve the caller's color policy, applying its emphasis only to the marker.
-    color = _SGR.search(original)
-    if color:
-        rendered = color.group() + "?" + "\x1b[0m" + rendered[1:]
-    return leading + rendered + " "
+        rendered += separator + part
+        styled_body += separator + (styled(part, style, stream=stream) if style else part)
+    return leading + styled_body + " "
 
 
 # @testable true
@@ -141,15 +171,14 @@ def format_value(
 # @tests tests_tooling/test_001k_setup_console.py::test_progress_label_tracks_terminal_width
 # @matrix setup : spinner terminal-wrapping
 class ProgressLabel:
-    """Yaspin string adapter; fit a neutral label on each animation frame."""
+    """Fit a neutral label on each progress animation frame."""
 
     def __init__(self, message):
         self.message = " ".join(unstyle(message).split())
         self.initial_width = terminal_width()
 
     def __str__(self):
-        # Reserve space for the widest completion glyph ([OK]), separator,
-        # and Yaspin's own ellipsis budget. Do not depend on its cached width.
+        # Reserve room for the marker, spacing, and a truncation indication.
         width = max(1, min(self.initial_width, terminal_width()) - 8)
         if cell_width(self.message) <= width:
             return self.message

@@ -1,3 +1,5 @@
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
 from config import constants
 from runner.console import format_prompt
 from installer import FORMATTER, wrap_text
@@ -19,11 +21,11 @@ def _operator_sentry_dsn(prompt):
         if parsed.scheme == "https" and parsed.username and parsed.netloc and parsed.path:
             return dsn
         print(
-            wrap_text(
+            ui.error(wrap_text(
                 "Enter an HTTPS Sentry DSN such as "
                 "'https://public-key@sentry.example.com/project-id', "
                 "or leave blank to disable monitoring."
-            )
+            ))
         )
 
 
@@ -58,7 +60,7 @@ def setup_error_monitoring():
                         else destination
                     )
                     SETTINGS.save()
-                print(wrap_text("Existing error-monitoring settings preserved."))
+                print(ui.status(wrap_text("Existing error-monitoring settings preserved.")))
                 return True
         else:
             print(wrap_text("\nError monitoring is currently disabled."))
@@ -66,10 +68,10 @@ def setup_error_monitoring():
                 format_prompt("Would you like to enable error monitoring? [y/N]: ")
             )
             if enable.casefold() != "y":
-                print(wrap_text("Error monitoring remains disabled."))
+                print(ui.status(wrap_text("Error monitoring remains disabled.")))
                 return True
 
-    print(wrap_text(f"\n{f.info('Error monitoring and crash reporting')}"))
+    print(wrap_text(f"\n{ui.heading('Error monitoring and crash reporting')}"))
     print(
         wrap_text(
             "Lagniappe can optionally report errors and crashes to help improve "
@@ -84,109 +86,109 @@ def setup_error_monitoring():
     )
 
     print(
-        wrap_text(f"\n{f.success('What can be reported when monitoring is enabled:')}")
+        wrap_text(f"\n{ui.heading('What can be reported when monitoring is enabled:')}")
     )
-    print(wrap_text("• Error messages and stack traces when something breaks"))
+    print(wrap_text("- Error messages and stack traces when something breaks"))
     print(
         wrap_text(
-            "• Route template, endpoint, method, and bounded request-size metadata"
+            "- Route template, endpoint, method, and bounded request-size metadata"
         )
     )
     print(
         wrap_text(
-            "• Query field names/counts and a short allowlist of diagnostic headers"
+            "- Query field names/counts and a short allowlist of diagnostic headers"
         )
     )
-    print(wrap_text("• Browser context and performance data when available"))
+    print(wrap_text("- Browser context and performance data when available"))
 
-    print(wrap_text(f"\n{f.warning('What Lagniappe removes before sending:')}"))
+    print(wrap_text(f"\n{ui.heading('What Lagniappe removes before sending:')}"))
     print(
         wrap_text(
-            "• Form and JSON values, request/response bodies, and query values"
+            "- Form and JSON values, request/response bodies, and query values"
         )
     )
     print(
         wrap_text(
-            "• Uploaded filenames, file contents, full URLs, and referrers"
+            "- Uploaded filenames, file contents, full URLs, and referrers"
         )
     )
     print(
         wrap_text(
-            "• Authorization, cookies, arbitrary X-* headers, and user identity "
+            "- Authorization, cookies, arbitrary X-* headers, and user identity "
             "context"
         )
     )
     print(
         wrap_text(
-            "• Recognized password, token, API-key, and private-key values at "
+            "- Recognized password, token, API-key, and private-key values at "
             "any depth"
         )
     )
     print(
         wrap_text(
-            "• Oversized strings, collections, and deeply nested diagnostic "
+            "- Oversized strings, collections, and deeply nested diagnostic "
             "context"
         )
     )
 
-    print(wrap_text(f"\n{f.warning('Important limits:')}"))
-    print(wrap_text("• Sentry default PII collection is disabled"))
+    print(wrap_text(f"\n{ui.heading('Important limits:')}"))
+    print(wrap_text("- Sentry default PII collection is disabled"))
     print(
         wrap_text(
-            "• Unstructured error messages and stack traces are still "
+            "- Unstructured error messages and stack traces are still "
             "diagnostic text"
         )
     )
     print(
         wrap_text(
-            "• Third-party integrations can add metadata before the final "
+            "- Third-party integrations can add metadata before the final "
             "scrubber runs"
         )
     )
     print(
         wrap_text(
-            "• Reports are privacy-reduced, not guaranteed to be anonymous"
+            "- Reports are privacy-reduced, not guaranteed to be anonymous"
         )
     )
-    print(wrap_text("• Error reports are sent over HTTPS"))
+    print(wrap_text("- Error reports are sent over HTTPS"))
 
-    print(wrap_text(f"\n{f.info('Where reports go:')}"))
+    print(wrap_text(f"\n{ui.heading('Where reports go:')}"))
     print(
         wrap_text(
-            "• The default DSN sends opted-in reports to the Lagniappe maintainer"
+            "- The default DSN sends opted-in reports to the Lagniappe maintainer"
         )
     )
-    print(wrap_text("• You may instead enter your own Sentry DSN"))
+    print(wrap_text("- You may instead enter your own Sentry DSN"))
     print(
         wrap_text(
-            "• With your own DSN, reports go to your Sentry project, not the "
+            "- With your own DSN, reports go to your Sentry project, not the "
             "maintainer"
         )
     )
     print(
         wrap_text(
-            "• Development installations must use their own DSN or disable "
+            "- Development installations must use their own DSN or disable "
             "monitoring"
         )
     )
 
-    print(wrap_text(f"\n{f.info('How this helps:')}"))
-    print(wrap_text("• Developers can fix bugs you encounter automatically"))
-    print(wrap_text("• Performance issues get identified and resolved faster"))
-    print(wrap_text("• Your Lagniappe instance becomes more stable over time"))
+    print(wrap_text(f"\n{ui.heading('How this helps:')}"))
+    print(wrap_text("- Developers can fix bugs you encounter automatically"))
+    print(wrap_text("- Performance issues get identified and resolved faster"))
+    print(wrap_text("- Your Lagniappe instance becomes more stable over time"))
 
-    print(wrap_text("\nExamples of what gets reported:"))
+    print(wrap_text(ui.heading("\nExamples of what gets reported:")))
     print(
-        wrap_text('• "Image upload failed: file too large" (no image content)')
+        wrap_text('- "Image upload failed: file too large" (no image content)')
     )
     print(
         wrap_text(
-            '• "Form validation error on date field" (no submitted field values)'
+            '- "Form validation error on date field" (no submitted field values)'
         )
     )
     print(
         wrap_text(
-            '• "Database connection timeout after 30s" (no query details)'
+            '- "Database connection timeout after 30s" (no query details)'
         )
     )
 
@@ -197,7 +199,7 @@ def setup_error_monitoring():
 
     consent = input(
         format_prompt(
-            f"\n{f.warning('Send privacy-reduced error reports to the Lagniappe maintainer? [y/N]: ')}"
+            f"\n{'Send privacy-reduced error reports to the Lagniappe maintainer? [y/N]: '}"
         )
     )
     if consent.casefold() == "y":
@@ -229,14 +231,15 @@ def setup_error_monitoring():
             if dsn == constants.SENTRY_DSN
             else "your Sentry project"
         )
-        print(f.success(wrap_text(f"Error monitoring enabled with {destination}.")))
+        print(ui.info(f"Error monitoring enabled with {destination}."))
     else:
         SETTINGS.APP["CAPTURE_ERRORS"] = "False"
         SETTINGS.APP.pop("SENTRY_DSN", None)
         SETTINGS.APP.pop("SENTRY_JS_DSN", None)
-        print(f.success(wrap_text("Error monitoring disabled.")))
+        print(ui.info("Error monitoring disabled."))
 
     SETTINGS.save()
+    print(f.success("Error monitoring settings saved"))
     return True
 
 
@@ -269,10 +272,10 @@ def configure_development_error_monitoring():
         if dsn not in maintainer_dsns:
             break
         print(
-            wrap_text(
+            ui.error(wrap_text(
                 "That is the maintainer DSN. Development installations must "
                 "use a different Sentry project or disable monitoring."
-            )
+            ))
         )
     if dsn:
         SETTINGS.APP["SENTRY_DSN"] = dsn
@@ -310,13 +313,13 @@ def configure_ai_observability():
             )
         )
         preserve = input(
-            format_prompt(f.info("Keep this AI observability choice? [Y/n]: "))
+            format_prompt("Keep this AI observability choice? [Y/n]: ")
         )
         if preserve.casefold() != "n":
-            print(f.success(wrap_text("Existing AI observability choice preserved.")))
+            print(ui.status(wrap_text("Existing AI observability choice preserved.")))
             return existing_enabled
 
-    print(wrap_text(f"\n{f.info('Optional AI generation observability')}"))
+    print(wrap_text(f"\n{ui.heading('Optional AI generation observability')}"))
     for paragraph in (
         "When enabled, Lagniappe stores owner-only operational summaries for "
         "text generations, including model, token totals, duration, retry and "
@@ -327,13 +330,13 @@ def configure_ai_observability():
         print(wrap_text(paragraph))
     enabled = (
         input(
-            format_prompt(f"\n{f.info('Enable AI generation observability? [y/N]: ')}")
+            format_prompt(f"\n{'Enable AI generation observability? [y/N]: '}")
         ).casefold()
         == "y"
     )
     SETTINGS.APP["AI_OBSERVABILITY"] = enabled
     state = "enabled" if enabled else "disabled"
-    print(f.success(wrap_text(f"AI generation observability {state}.")))
+    print(ui.info(f"AI generation observability {state}."))
     return enabled
 
 
@@ -354,11 +357,11 @@ def configure_mcp_name():
         default = "lagniappe-mcp"
     print(wrap_text("The manual uses this name in connection instructions and copyable commands."))
     while True:
-        answer = input(format_prompt(f"MCP connection name [{default}]")).strip()
+        answer = input(format_prompt("MCP connection name", default=default)).strip()
         try:
             name = mcp_connection_name(answer or default)
         except ValueError as error:
-            print(wrap_text(str(error)))
+            print(ui.error(str(error)))
             continue
         SETTINGS.APP["MCP_NAME"] = name
         return name
@@ -372,12 +375,12 @@ def configure_ai_features():
     from config import SETTINGS
 
     f = FORMATTER.initialize()
-    print(wrap_text(f"\n{f.info('AI features')}"))
+    print(wrap_text(f"\n{ui.heading('AI features')}"))
     previous = SETTINGS.APP.get("AI_ENABLED", True)
     answer = (
         input(
             format_prompt(
-                f.info(f"Enable AI features? {'[Y/n]' if previous else '[y/N]'}: ")
+                f"Enable AI features? {'[Y/n]' if previous else '[y/N]'}: "
             )
         )
         .strip()
@@ -388,7 +391,7 @@ def configure_ai_features():
     if not enabled:
         SETTINGS.APP["EXTERNAL_AI_ENABLED"] = False
         SETTINGS.APP["AI_OBSERVABILITY"] = False
-        print(f.success(wrap_text("AI features and external AI access are disabled.")))
+        print(ui.info("AI features and external AI access are disabled."))
     else:
         print(wrap_text(
             f"AI models: {SETTINGS.APP.get('AI_MODEL', constants.DEFAULT_AI_MODEL)} "
@@ -405,9 +408,7 @@ def configure_ai_features():
         answer = (
             input(
                 format_prompt(
-                    f.info(
-                        f"Enable external AI access and the MCP server? {'[Y/n]' if previous else '[y/N]'}: "
-                    )
+                    f"Enable external AI access and the MCP server? {'[Y/n]' if previous else '[y/N]'}: "
                 )
             )
             .strip()
@@ -418,4 +419,5 @@ def configure_ai_features():
             configure_mcp_name()
         configure_ai_observability()
     SETTINGS.save()
+    print(f.success("AI settings saved"))
     return enabled

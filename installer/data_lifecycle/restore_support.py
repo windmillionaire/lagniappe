@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from runner.presentation import read_input as input
+
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -918,8 +920,8 @@ def _confirm_mutation(expected, *, confirmation=None):
     from installer import FORMATTER
 
     formatter = FORMATTER.initialize()
-    prompt = formatter.warning(f"Type {expected} to continue: ")
-    actual = (confirmation or input)(format_prompt(prompt))
+    prompt = format_prompt("Confirm restore", hint=f"Type {expected} to continue")
+    actual = (confirmation or input)(prompt)
     if str(actual).strip() != expected:
         raise DataLifecycleError("Restore confirmation did not match; nothing changed.")
 

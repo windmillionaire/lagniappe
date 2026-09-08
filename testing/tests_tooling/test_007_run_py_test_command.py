@@ -2633,6 +2633,11 @@ def _release_check_repository(tmp_path: Path) -> Path:
                 encoding="utf-8"
             )
         ),
+        "runner/presentation.py": (
+            (Path(run.__file__).parent / "runner" / "presentation.py").read_text(
+                encoding="utf-8"
+            )
+        ),
         "runner/context.py": (
             (Path(run.__file__).parent / "runner" / "context.py").read_text(
                 encoding="utf-8"

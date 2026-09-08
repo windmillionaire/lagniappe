@@ -300,7 +300,7 @@ def test_automatic_reconciliation_failure_is_nonfatal_and_prints_retry_command(
         "config.SETTINGS",
         types.SimpleNamespace(APP=dict(SETTINGS)),
     )
-    formatter = types.SimpleNamespace(warning=lambda message: message)
+    formatter = types.SimpleNamespace(warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""))
     monkeypatch.setattr(
         "installer.FORMATTER",
         types.SimpleNamespace(initialize=lambda: formatter),

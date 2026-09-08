@@ -1,7 +1,19 @@
 """Lagniappe setup command-line boundary."""
 
+from runner.presentation import output as print
+from runner import presentation as ui
+
 import argparse
 import sys
+
+
+# @testable false
+# @covered-by installer/__main__.py::_parser
+# @reason keep argparse help plain across Python versions and nested commands
+class _SetupArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.color = False
 
 
 # @testable true
@@ -9,7 +21,7 @@ import sys
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
 # @matrix setup : argument-validation cli-routing
 def _parser():
-    parser = argparse.ArgumentParser(description="Lagniappe Setup Tool")
+    parser = _SetupArgumentParser(description="Lagniappe setup")
     commands = parser.add_subparsers(
         dest="command",
         metavar="COMMAND",
@@ -313,10 +325,10 @@ def _dispatch(args):
             from installer.data_lifecycle.validation import validate_archive
 
             result = validate_archive(args.validation_path)
-            print(
+            print(ui.success(
                 f"Archive {result['archive_id']} is valid "
                 f"({result['entities']} entities, {result['files']} files)."
-            )
+            ))
             return 0
         from installer.verify import prepare_existing_installation
 
@@ -388,17 +400,22 @@ def main(argv=None):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_treats_none_cancellation_as_failure
 # @matrix setup : cli-status failure-propagation unexpected-errors
 def cli(argv=None):
-    from installer.errors import SetupError
+    from installer.errors import SetupCancelled, SetupError, SetupInterrupted
 
     try:
         return main(argv)
+    except (SetupCancelled, SetupInterrupted) as error:
+        print(ui.status(str(error)))
+        if error.repair_action:
+            print(ui.info(f"Repair action: {error.repair_action}"))
+        return error.exit_code
     except SetupError as error:
-        print(f"Setup failed [{error.category}]: {error}")
+        print(ui.error(f"Setup failed [{error.category}]", error), raw=True)
         if error.repair_action:
             print(f"Repair action: {error.repair_action}")
         return error.exit_code
     except Exception as error:
-        print(f"Setup failed [unexpected]: {error}")
+        print(ui.error("Setup failed [unexpected]", error), raw=True)
         return 1
 
 

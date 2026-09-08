@@ -270,7 +270,10 @@ def setup_identity_platform(app_url=None):
         if SETTINGS.APP.get("CUSTOM_DOMAIN")
         else SETTINGS.APP["APP_URL"]
     )
-    with f.yaspin(text=f.success("Configure Identity Platform")) as sp:
+    with f.progress(
+        text="Configure Identity Platform",
+        success_text='Identity Platform configured',
+    ) as sp:
         try:
             access_token = _get_access_token()
             headers = _google_request_headers(access_token, project_id)
@@ -281,16 +284,17 @@ def setup_identity_platform(app_url=None):
                 app_url,
             )
         except Exception as error:
-            sp.fail(f.fail_glyph)
+            sp.fail()
             sp.write(
-                f.error(wrap_text("Could not configure Identity Platform:"), error)
+                f.error(wrap_text("Could not configure Identity Platform:"), error),
+                raw=True,
             )
             raise ProviderError("Could not configure Identity Platform.") from error
 
         if not _core_matches(config, app_url):
-            sp.fail(f.fail_glyph)
+            sp.fail()
             raise ProviderError("Identity Platform configuration did not verify.")
-        sp.ok(f.ok_glyph)
+        sp.ok()
 
     client_config = _public_client_config(config, project_id)
     if SETTINGS.APP.get("IDENTITY_PLATFORM_CONFIG") != client_config:

@@ -1,3 +1,5 @@
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
 from functools import wraps
 import subprocess
 
@@ -79,17 +81,13 @@ def validate_input(
             f = FORMATTER.initialize()
             has_default = default not in (None, "")
             default_value = str(default).strip() if has_default else ""
-            if has_default:
-                prompt_suffix = f" [{default_value}]: "
-            else:
-                prompt_suffix = " (x to exit): "
-
-            if has_default:
-                print(wrap_text("Press Enter to use the bracketed value; x to exit."))
             while True:
-                value = input(format_prompt(f.info(f"{prompt}{prompt_suffix}")))
+                value = input(format_prompt(
+                    prompt, default=default_value if has_default else None,
+                    hint="Enter to keep; x to exit" if has_default else "x to exit",
+                ))
                 if value.lower() == "x":
-                    print(f.error(wrap_text("Setup cancelled.")))
+                    print(ui.status(wrap_text("Setup cancelled.")))
                     raise SetupCancelled("Setup cancelled by the operator.")
                 if not value and has_default:
                     value = default_value
@@ -114,9 +112,9 @@ def validate_input(
 def check_gcloud_cli():
     if not GCLOUD_CLI:
         print(
-            wrap_text(
-                "ERROR: gcloud CLI not found. Please install and configure the Google Cloud SDK."
-            )
+            ui.error(wrap_text(
+                "gcloud CLI not found. Please install and configure the Google Cloud SDK."
+            ))
         )
         raise SetupError(
             "gcloud CLI not found. Install the Google Cloud CLI and retry."
@@ -190,7 +188,10 @@ def deploy_to_app_engine(
             "Deploying App Engine indexes and the application may take up to 10 minutes."
         )
     )
-    with f.yaspin(text="Deploying application") as spinner:
+    with f.progress(
+        text="Deploying application",
+        success_text='Application deployed',
+    ) as spinner:
         try:
             deploy(
                 build_assets=False,
@@ -201,14 +202,14 @@ def deploy_to_app_engine(
                 announce_completion=False,
             )
         except Exception:
-            spinner.fail(f.fail_glyph)
+            spinner.fail()
             raise
-        spinner.ok(f.ok_glyph)
+        spinner.ok()
 
     from installer.mcp import requested
 
     if requested(SETTINGS.APP):
-        print(wrap_text(f"{f.ok_glyph} {f.success('MCP server is ready')}"))
+        print(wrap_text(f.success('MCP server is ready')))
     elif SETTINGS.APP.get("MCP_RESOURCE"):
         print(wrap_text("External AI access is disabled."))
 
@@ -225,7 +226,7 @@ def deploy_to_app_engine(
         wait_for_managed_certificate(custom_domain, announce_ready=first_install)
 
     if print_final_summary:
-        print(wrap_text("Deployment complete!"))
+        print(ui.success(wrap_text("Deployment complete")))
         print_summary()
     if legacy_upgrade_notice:
         print_post_upgrade_maintenance_steps(f)

@@ -1,5 +1,8 @@
 """App Engine custom-domain mapping discovery and reconciliation."""
 
+from runner.presentation import output as print
+from runner import presentation as ui
+
 import json
 import subprocess
 import time
@@ -341,7 +344,8 @@ def wait_for_managed_certificate(
                 f"Managed TLS certificate {certificate_id} for "
                 f"https://{domain} in {target}: {last_status}"
             )
-            print(f"{detail}. Retrying in {next_delay} seconds...")
+            print(ui.status(detail, "pending"))
+            print(ui.activity(f"Retrying in {next_delay} seconds"))
 
     raise ProviderTimeout(
         "Deployment succeeded, but the App Engine managed TLS certificate for "

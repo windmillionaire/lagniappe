@@ -1,3 +1,6 @@
+from runner import presentation as ui
+from runner.presentation import output as print
+
 import ast
 import fnmatch
 import json
@@ -409,7 +412,7 @@ def ensure_production_frontend_bundle(*, announce_progress=True):
     )
     if validation is not None:
         if announce_progress:
-            print("Current production frontend bundle detected; preserving it.")
+            print(ui.status("Current production frontend bundle detected; preserving it."))
         return False
 
     if announce_progress:
@@ -481,5 +484,5 @@ def deploy(
 
     finish_deployment(mcp_deployment, SETTINGS.APP, announce_progress=announce_progress)
     if announce_completion:
-        print("Deployment complete!")
+        print(ui.success("Deployment complete"))
     return True

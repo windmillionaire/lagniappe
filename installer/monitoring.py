@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from runner.presentation import output as print
+
 from copy import deepcopy
 from urllib.parse import quote
 
@@ -453,7 +455,7 @@ def reconcile_memory_alert_after_deploy():
         print(
             f.warning(
                 wrap_text(
-                    "WARNING: deployment succeeded, but App Engine memory "
+                    "Deployment succeeded, but App Engine memory "
                     f"monitoring could not be reconciled ({type(error).__name__})."
                 )
             )

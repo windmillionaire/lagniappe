@@ -1,5 +1,8 @@
 """Console guidance for the custom-domain workflow."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 from installer import FORMATTER, wrap_text
 
 
@@ -9,7 +12,7 @@ from installer import FORMATTER, wrap_text
 def explain_domain_setup(*, configure_auth=True, google_signin=True):
     """Explain the supported App Engine and optional DNS automation."""
     f = FORMATTER.initialize()
-    print(wrap_text(f"\n{f.info('Custom domain setup')}"))
+    print(wrap_text(f"\n{ui.heading('Custom domain setup')}"))
     print(wrap_text("This flow will:"))
     print(wrap_text("  1. Confirm Google domain ownership verification"))
     print(wrap_text("  2. Create or discover the App Engine domain mapping"))

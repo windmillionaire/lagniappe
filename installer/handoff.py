@@ -1,5 +1,8 @@
 """Resumable delegated-installation handoff to the permanent business Owner."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 from config.storage import recovery_bucket_name, storage_bucket_names
 from installer import iam
 from installer.package_install import install_if_missing
@@ -52,7 +55,7 @@ def prepare_handoff_operator():
             SETTINGS.GCLOUD_CONFIG["ACCOUNT"] = saved_account
 
     role = "permanent Owner" if active_email == owner_email else "installer"
-    print(f"[OK] Handoff operator: {active_email} ({role})")
+    print(ui.success(f"Handoff operator: {active_email} ({role})"))
     return active_email
 
 
@@ -296,12 +299,12 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
         project_policy, installer_member
     )
 
-    print("\n=== Delegated installation handoff ===")
+    print(ui.heading("\nDelegated installation handoff"))
     print(f"Installer/source: {installer_email}")
     print(f"Permanent Owner/deployer: {owner_email}")
     print(f"Target project: {project_id}")
     print(f"Runtime service account: {runtime_email}")
-    print("Planned binding changes:")
+    print(ui.heading("Planned binding changes:"))
     for name in managed_bucket_names:
         print(f"  Bucket {name}:")
         print(f"    add Owner: {_role_list(iam.constants.OPERATOR_BUCKET_ROLES)}")
@@ -327,7 +330,7 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
     print(f"    remove installer: {_role_list(project_installer_roles)}")
     answer = (confirm or input)(format_prompt("Continue with handoff? [y/N]: "))
     if str(answer or "").strip().casefold() not in {"y", "yes"}:
-        print("Handoff cancelled. No changes were made.")
+        print(ui.status("Handoff cancelled. No changes were made."))
         return 1
 
     record_step("grant permanent Owner managed-resource access")
@@ -354,8 +357,8 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
         context, project_id, installer_email, owner_email
     )
 
-    print("\nHandoff complete. INSTALLER_EMAIL was retained as historical metadata.")
-    print("Remaining business cleanup:")
+    print(ui.success("\nHandoff complete. INSTALLER_EMAIL was retained as historical metadata."))
+    print(ui.heading("Remaining business cleanup:"))
     print("  Verify the installer is absent from Google Cloud project IAM.")
     print("  Revoke provider invitations and temporary access tokens.")
     print("  Remove local credentials and settings from the installer's machine.")

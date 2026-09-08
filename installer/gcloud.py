@@ -1,3 +1,5 @@
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
 import re
 import time
 import webbrowser
@@ -92,12 +94,7 @@ def _guide_google_service_terms_acceptance(
         except webbrowser.Error:
             pass
         answer = input(
-            format_prompt(
-                f.info(
-                    "Press Enter after completing the agreement to retry API "
-                    "activation, or X to cancel: "
-                )
-            )
+            format_prompt("Complete the agreement", hint="Enter to retry API activation; x to cancel")
         )
         if answer.strip().casefold() == "x":
             raise SetupCancelled(
@@ -139,14 +136,14 @@ def enable_gcloud_apis():
     f = FORMATTER.initialize()
     required_apis = constants.REQUIRED_GOOGLE_CLOUD_APIS
 
-    feedback_text = f.success("Enabling required Google Cloud APIs")
+    feedback_text = ui.info("Enabling required Google Cloud APIs")
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
     enabled_apis = getattr(
         SETTINGS,
         "_SETUP_ENABLED_GOOGLE_CLOUD_APIS",
         None,
     )
-    with f.yaspin(text=feedback_text) as sp:
+    with f.progress(text=feedback_text) as sp:
         if enabled_apis is None:
             result = retry_provider_call(
                 lambda: _enabled_google_cloud_apis(project_id),
@@ -246,7 +243,7 @@ def enable_gcloud_apis():
             )
 
         SETTINGS._SETUP_ENABLED_GOOGLE_CLOUD_APIS = set(enabled_apis)
-        sp.ok(f.ok_glyph)
+        sp.ok()
     return True
 
 
@@ -497,7 +494,10 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
     if include_production:
         managed_buckets[recovery_bucket_name(SETTINGS.APP)] = "recovery"
 
-    with f.yaspin(text=f.success("Configure Cloud Storage buckets")) as sp:
+    with f.progress(
+        text="Configure Cloud Storage buckets",
+        success_text='Cloud Storage buckets configured',
+    ) as sp:
         for bucket_name, bucket_kind in managed_buckets.items():
             created = False
             try:
@@ -602,7 +602,7 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
             if changed:
                 bucket.set_iam_policy(policy)
         iam_access.reconcile_runtime_project_policy(project_id, runtime_email)
-        sp.ok(f.ok_glyph)
+        sp.ok()
     return True
 
 
@@ -634,7 +634,10 @@ def create_app_engine_app():
     )
 
     client = appengine_admin_v1.ApplicationsClient()
-    with f.yaspin(text=f.success("Discover App Engine application")) as sp:
+    with f.progress(
+        text="Discover App Engine application",
+        success_text='App Engine application found',
+    ) as sp:
         try:
             application = retry_provider_call(
                 lambda: client.get_application(
@@ -649,7 +652,7 @@ def create_app_engine_app():
                 resource="app-engine-application",
                 identifier=project_id,
             )
-            sp.ok(f.ok_glyph)
+            sp.ok()
             return application
         except ProviderNotFound:
             sp.write(f.info(wrap_text("No App Engine application exists yet.")))
@@ -673,7 +676,7 @@ def create_app_engine_app():
     try:
         confirmation = input(
             format_prompt(
-                f.warning(f"Create the App Engine application in '{location}'? [y/N]: ")
+                f"Create the App Engine application in '{location}'? [y/N]: "
             )
         )
     except EOFError as error:
@@ -684,13 +687,12 @@ def create_app_engine_app():
         print(f.error(message))
         raise SetupCancelled(message) from error
     if confirmation.strip().lower() not in ("y", "yes"):
-        print(f.error(wrap_text("App Engine application creation cancelled.")))
+        print(ui.status(wrap_text("App Engine application creation cancelled.")))
         raise SetupCancelled("App Engine application creation was cancelled.")
 
-    with f.yaspin(
-        text=f.success(
-            "Create App Engine application (may take up to 5 minutes)"
-        )
+    with f.progress(
+        text="Create App Engine application (may take up to 5 minutes)",
+        success_text='App Engine application created',
     ) as sp:
         application_to_create = appengine_admin_v1.Application()
         application_to_create.id = project_id
@@ -722,7 +724,7 @@ def create_app_engine_app():
                     )
                 )
             )
-            sp.ok(f.ok_glyph)
+            sp.ok()
             return created_app
         except Exception as e:
             classified = classify_provider_error(
@@ -737,7 +739,7 @@ def create_app_engine_app():
                     "if creation finished."
                 )
                 sp.write(f.error(message))
-                sp.fail(f.fail_glyph)
+                sp.fail()
                 raise type(classified)(message) from e
             if isinstance(classified, ProviderTransientError):
                 message = (
@@ -747,7 +749,7 @@ def create_app_engine_app():
                     "creation finished."
                 )
                 sp.write(f.error(message))
-                sp.fail(f.fail_glyph)
+                sp.fail()
                 raise type(classified)(message) from e
             if isinstance(classified, ProviderConflict):
                 message = (
@@ -756,10 +758,10 @@ def create_app_engine_app():
                     "discover and reuse the provider application."
                 )
                 sp.write(f.error(message))
-                sp.fail(f.fail_glyph)
+                sp.fail()
                 raise ProviderConflict(message) from e
             sp.write(f.error(str(classified)))
-            sp.fail(f.fail_glyph)
+            sp.fail()
             raise classified from e
 
 
@@ -772,7 +774,10 @@ def create_task_queue():
 
     f = FORMATTER.initialize()
 
-    with f.yaspin(text=f.success("Configure Cloud Tasks queue")) as sp:
+    with f.progress(
+        text="Configure Cloud Tasks queue",
+        success_text='Cloud Tasks queue configured',
+    ) as sp:
         install_if_missing(
             "google.cloud.tasks_v2",
             "Google Cloud Tasks",
@@ -806,7 +811,7 @@ def create_task_queue():
                 identifier=queue_path,
             )
             SETTINGS.save()
-            sp.ok(f.ok_glyph)
+            sp.ok()
             return True
         except ProviderNotFound:
             sp.write(f.info(wrap_text("Creating new Cloud Tasks queue...")))
@@ -830,22 +835,24 @@ def create_task_queue():
                 sp.write(
                     f.success(wrap_text("Successfully created Cloud Tasks queue."))
                 )
-                sp.ok(f.ok_glyph)
+                sp.ok()
                 return True
             except Exception as e:
                 sp.write(
-                    f.error(wrap_text(f"Failed to create Cloud Tasks queue.\n{str(e)}"))
+                    f.error("Failed to create Cloud Tasks queue.", e),
+                    raw=True,
                 )
-                sp.fail(f.fail_glyph)
+                sp.fail()
                 raise classify_provider_error(
                     e,
                     message="Failed to create the Cloud Tasks queue.",
                 ) from e
         except Exception as e:
             sp.write(
-                f.error(wrap_text(f"Error checking for Cloud Tasks queue.\n{str(e)}"))
+                f.error("Error checking for Cloud Tasks queue.", e),
+                raw=True,
             )
-            sp.fail(f.fail_glyph)
+            sp.fail()
             raise classify_provider_error(
                 e,
                 message="Failed to discover the Cloud Tasks queue.",
@@ -898,7 +905,10 @@ def create_deferred_job_reconciler():
         f"--oidc-token-audience={endpoint}",
     ]
 
-    with f.yaspin(text=f.success("Configure background-job recovery")) as sp:
+    with f.progress(
+        text="Configure background-job recovery",
+        success_text='Background-job recovery configured',
+    ) as sp:
         run_gcloud_command(
             [
                 "services",
@@ -971,7 +981,7 @@ def create_deferred_job_reconciler():
             resource="cloud-scheduler-job",
             identifier=f"{region}/{name}",
         )
-        sp.ok(f.ok_glyph)
+        sp.ok()
     return True
 
 
@@ -1082,7 +1092,10 @@ def create_ocr_processor():
 
     f = FORMATTER.initialize()
 
-    with f.yaspin(text=f.success("Configure OCR processor")) as sp:
+    with f.progress(
+        text="Configure OCR processor",
+        success_text='OCR processor configured',
+    ) as sp:
         install_if_missing(
             "google.cloud.documentai",
             "Google Document AI",
@@ -1114,7 +1127,7 @@ def create_ocr_processor():
                             "Saved OCR processor display name does not match "
                             "the provider resource."
                         )
-                    sp.ok(f.ok_glyph)
+                    sp.ok()
                     record_mutation(
                         "reconcile OCR processor",
                         action="existing",
@@ -1138,7 +1151,7 @@ def create_ocr_processor():
                             resource="document-ai-processor",
                             identifier=processor.name,
                         )
-                        sp.ok(f.ok_glyph)
+                        sp.ok()
                         return True
 
             processor = retry_provider_call(
@@ -1168,10 +1181,10 @@ def create_ocr_processor():
                 f.info(wrap_text(f"Document AI processor '{display_name}' created."))
             )
             SETTINGS.save()
-            sp.ok(f.ok_glyph)
+            sp.ok()
         except Exception as e:
-            sp.write(f.error(wrap_text(f"Failed to create OCR processor.\n{str(e)}")))
-            sp.fail(f.fail_glyph)
+            sp.write(f.error("Failed to create OCR processor.", e), raw=True)
+            sp.fail()
             raise classify_provider_error(
                 e,
                 message="Failed to reconcile the OCR processor.",

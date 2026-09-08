@@ -62,6 +62,7 @@ annotated_source_roots:
   - run.py
   - runner/context.py
   - runner/console.py
+  - runner/presentation.py
   - runner/adc.py
   - runner/deploy.py
   - runner/development.py

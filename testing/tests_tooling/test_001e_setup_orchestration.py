@@ -55,11 +55,9 @@ def _fake_formatter():
         initialize=lambda: types.SimpleNamespace(
             success=lambda message: message,
             info=lambda message: message,
-            warning=lambda message: message,
+            warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
             error=lambda message, error=None: message,
-            ok_glyph="[OK]",
-            fail_glyph="[X]",
-            yaspin=spinner_factory(SpinnerRecorder()),
+            progress=spinner_factory(SpinnerRecorder()),
         )
     )
 
@@ -292,10 +290,10 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
     ]
     output = capsys.readouterr().out
     assert "Wrapping up installation..." in output
-    assert "Deployment complete!" in output
+    assert "Deployment complete" in output
     assert "every Gunicorn worker adds application memory use" in output
     assert "limits F2 and B2 to three workers" in output
-    assert output.index("Deployment complete!") < output.index("Setup complete!")
+    assert output.index("Deployment complete") < output.index("Setup complete")
     assert "Manual deployment steps:" not in output
 
 

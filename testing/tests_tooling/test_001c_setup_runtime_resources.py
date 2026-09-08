@@ -141,11 +141,9 @@ def _fake_formatter(spinner=None):
         initialize=lambda: types.SimpleNamespace(
             success=lambda message: message,
             info=lambda message: message,
-            warning=lambda message: message,
+            warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
             error=lambda message, error=None: message,
-            ok_glyph="[OK]",
-            fail_glyph="[X]",
-            yaspin=spinner_factory(recorder),
+            progress=spinner_factory(recorder),
         )
     )
 
@@ -372,11 +370,6 @@ def test_security_cli_configures_and_optionally_deploys_redis_tls(monkeypatch):
     assert events == ["verify", "enable", "deploy"]
 
 
-@pytest.fixture(autouse=True)
-def fake_yaspin_module(monkeypatch):
-    monkeypatch.setitem(
-        sys.modules, "yaspin", types.SimpleNamespace(yaspin=spinner_factory())
-    )
 
 
 def _install_cloud_module(monkeypatch, name, module):
@@ -690,7 +683,7 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     assert "AI generation observability is currently enabled." in " ".join(
         preserved_output.split()
     )
-    assert "Existing AI observability choice preserved." in (
+    assert "Existing AI observability choice preserved" in (
         preserved_output
     )
     assert [" ".join(unstyle(prompt).split()) for prompt in prompts] == [
@@ -830,7 +823,7 @@ def test_redis_cli_command_uses_visible_standard_input(monkeypatch, capsys):
         "port": 12345,
         "password": "redis-secret",
     }
-    assert prompts == ["? Paste copied Redis CLI command (x to exit) "] * 2
+    assert prompts == ["? Paste copied Redis CLI command [x to exit] "] * 2
     output = capsys.readouterr().out
     assert "find Access, click Connect, expand Redis CLI, click Copy" in output
     assert "begin with 'redis-cli' or 'redis:'" in output
@@ -900,7 +893,7 @@ def test_redis_eviction_policy_instructions_require_confirmation(
     assert "Wait for the pending-change indicator to clear" in output
     assert "displayed Data eviction policy is still volatile-ttl" in output
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Press Enter only after Redis Cloud confirms the eviction policy..."
+        "? Wait until Redis Cloud confirms the eviction policy [Enter to continue]"
     ]
 
 
@@ -1767,7 +1760,7 @@ def test_cloudflare_token_prompt_explains_dashboard_steps_and_scope(
     assert "does not save it" in output
     assert "delete it from Cloudflare after setup" in output
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Cloudflare API token (x to cancel)"
+        "? Cloudflare API token [x to cancel]"
     ]
 
     monkeypatch.setattr("builtins.input", lambda prompt: "x")
@@ -2007,7 +2000,7 @@ def test_upgrade_repository_preserves_report_before_branch_reset(
     assert " M installer/ai.py" in report
     assert "?? notes.txt" in report
     assert "git reset --hard origin/release/candidate" in report
-    assert spinner.oks == ["[OK]"]
+    assert len(spinner.oks) == 1
 
 
 # @matrix setup : branch failure-propagation git-upgrade
@@ -2032,7 +2025,7 @@ def test_upgrade_repository_handles_clean_status_and_status_failure(monkeypatch)
         ["git", "fetch", "--all"],
         ["git", "reset", "--hard", "origin/main"],
     ]
-    assert clean_spinner.oks == ["[OK]"]
+    assert len(clean_spinner.oks) == 1
 
     def failing_status(command, **_kwargs):
         assert command == ["git", "status", "--porcelain"]
@@ -2042,7 +2035,7 @@ def test_upgrade_repository_handles_clean_status_and_status_failure(monkeypatch)
     failure_spinner = SpinnerRecorder()
 
     assert not upgrade._update_repository(failure_spinner)
-    assert failure_spinner.fails == ["[X]"]
+    assert len(failure_spinner.fails) == 1
     assert any("Git status failed" in message for message in failure_spinner.messages)
 
 
@@ -2095,7 +2088,7 @@ def test_upgrade_target_fetches_and_reads_exact_remote_version(monkeypatch, tmp_
         ["git", "show", f"{commit}:package.json"],
     ]
     assert all(kwargs["cwd"] == tmp_path for _command, kwargs in calls)
-    assert spinner.oks == ["[OK]"]
+    assert len(spinner.oks) == 1
 
 
 # @matrix setup : branch failure-propagation git-upgrade version-validation
@@ -2142,7 +2135,7 @@ def test_upgrade_target_rejects_missing_ref_and_invalid_version(
     spinner = SpinnerRecorder()
 
     assert upgrade._fetch_upgrade_target(spinner) is None
-    assert spinner.fails == ["[X]"]
+    assert len(spinner.fails) == 1
     assert any(expected_message in message for message in spinner.messages)
 
 
@@ -2623,7 +2616,7 @@ def test_upgrade_restore_images_installs_storage_before_restore_spinner(monkeypa
 
     monkeypatch.setattr(upgrade, "save_images", fake_save_images)
 
-    def fake_yaspin(text):
+    def fake_progress(text, **kwargs):
         class Context:
             def __enter__(self):
                 events.append(("spinner", text))
@@ -2636,10 +2629,8 @@ def test_upgrade_restore_images_installs_storage_before_restore_spinner(monkeypa
 
     formatter = types.SimpleNamespace(
         success=lambda message: message,
-        warning=lambda message: message,
-        ok_glyph="[OK]",
-        fail_glyph="[X]",
-        yaspin=fake_yaspin,
+        warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
+        progress=fake_progress,
     )
     settings = _fake_settings()
 
@@ -2687,7 +2678,8 @@ def test_upgrade_restore_images_continues_when_no_remote_image_is_available(
 
     assert settings.APP["SITE_IMAGE_VERSION"] == 7
     assert spinner.fails == []
-    assert spinner.oks == ["[OK]", "[OK]"]
+    assert len(spinner.oks) == 1
+    assert "Custom images unchanged" in spinner.messages
 
 
 # @source config/deployment.py::normalize_deployment_settings
@@ -3054,7 +3046,7 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
         deployment_module, "get_deployment_settings", lambda: deployment_settings
     )
 
-    def fake_yaspin(text):
+    def fake_progress(text, **kwargs):
         class Context:
             def __enter__(self):
                 events.append(("spinner", text))
@@ -3067,10 +3059,8 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
 
     formatter = types.SimpleNamespace(
         success=lambda message: message,
-        warning=lambda message: message,
-        ok_glyph="[OK]",
-        fail_glyph="[X]",
-        yaspin=fake_yaspin,
+        warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
+        progress=fake_progress,
     )
 
     constants = types.SimpleNamespace(
@@ -3126,8 +3116,8 @@ def test_upgrade_restore_deployment_settings_continues_when_unavailable(monkeypa
     settings = _fake_settings(deploy={"entrypoint": "existing"})
     formatter = types.SimpleNamespace(
         success=lambda message: message,
-        warning=lambda message: message,
-        yaspin=spinner_factory(),
+        warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
+        progress=spinner_factory(),
     )
 
     monkeypatch.setattr(config, "SETTINGS", settings)
@@ -3166,7 +3156,7 @@ def test_upgrade_restore_ai_settings_applies_saved_app_config(monkeypatch):
 
     monkeypatch.setattr(ai_settings_module, "get_ai_settings", lambda: ai_settings)
 
-    def fake_yaspin(text):
+    def fake_progress(text, **kwargs):
         class Context:
             def __enter__(self):
                 events.append(("spinner", text))
@@ -3179,10 +3169,8 @@ def test_upgrade_restore_ai_settings_applies_saved_app_config(monkeypatch):
 
     formatter = types.SimpleNamespace(
         success=lambda message: message,
-        warning=lambda message: message,
-        ok_glyph="[OK]",
-        fail_glyph="[X]",
-        yaspin=fake_yaspin,
+        warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
+        progress=fake_progress,
     )
 
     constants = types.SimpleNamespace(
@@ -3227,8 +3215,8 @@ def test_upgrade_restore_ai_settings_continues_when_unavailable(monkeypatch):
     settings = _fake_settings(app={"AI_MODEL": "existing"})
     formatter = types.SimpleNamespace(
         success=lambda message: message,
-        warning=lambda message: message,
-        yaspin=spinner_factory(),
+        warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
+        progress=spinner_factory(),
     )
 
     monkeypatch.setattr(config, "SETTINGS", settings)
@@ -3257,10 +3245,8 @@ def test_upgrade_restore_public_page_settings_applies_saved_app_config(monkeypat
     )
     formatter = types.SimpleNamespace(
         success=lambda message: message,
-        warning=lambda message: message,
-        ok_glyph="[OK]",
-        fail_glyph="[X]",
-        yaspin=spinner_factory(),
+        warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
+        progress=spinner_factory(),
     )
     constants = types.SimpleNamespace(DEFAULT_PUBLIC_PAGE_INDEXING=False)
     _install_config_package(monkeypatch, constants, settings=settings)
@@ -3285,8 +3271,8 @@ def test_upgrade_restore_public_page_settings_continues_when_unavailable(monkeyp
     settings = _fake_settings(app={"PUBLIC_PAGE_INDEXING": False})
     formatter = types.SimpleNamespace(
         success=lambda message: message,
-        warning=lambda message: message,
-        yaspin=spinner_factory(),
+        warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
+        progress=spinner_factory(),
     )
     monkeypatch.setattr(config, "SETTINGS", settings)
 
@@ -3480,7 +3466,7 @@ def test_setup_package_install_helpers(monkeypatch):
         "PyYAML==6.0.3",
     ]
     assert package_install._pinned_requirement("redis") == "redis[hiredis]==8.1.0"
-    assert package_install._pinned_requirement("yaspin") == "yaspin==3.4.0"
+    assert package_install._pinned_requirement("rich") == "rich==15.0.0"
     assert package_install._pinned_requirement("certifi") == "certifi==2026.7.22"
     assert run_calls[1][0] == [sys.executable, "-m", "pip", "check"]
     assert invalidated == [True]
@@ -3717,9 +3703,6 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
 
     package_install._ACTIVE_SPINNERS.clear()
     installs = []
-    spinner = object()
-    spinner_calls = []
-
     class Output:
         encoding = "ascii"
 
@@ -3738,64 +3721,24 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
 
     output = Output()
 
-    class SpinnerContext:
-        def __enter__(self):
-            return spinner
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
     monkeypatch.setattr(
         package_install,
         "install_if_missing",
         lambda *args, **kwargs: installs.append((args, kwargs)),
     )
-    monkeypatch.setitem(
-        sys.modules,
-        "colorama",
-        types.SimpleNamespace(
-            Fore=types.SimpleNamespace(RED="", YELLOW="", GREEN="", CYAN=""),
-            Style=types.SimpleNamespace(RESET_ALL=""),
-            just_fix_windows_console=lambda: None,
-        ),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "yaspin",
-        types.SimpleNamespace(
-            yaspin=lambda **kwargs: spinner_calls.append(kwargs) or SpinnerContext()
-        ),
-    )
-    monkeypatch.setattr(
-        setup_pkg.sys,
-        "stdout",
-        output,
-    )
-
-    # Exercise factory tracking separately from terminal capability selection.
-    monkeypatch.setattr(setup_pkg, "_use_plain_progress", lambda stream=None: False)
+    monkeypatch.setattr(setup_pkg.sys, "stdout", output)
     formatter = setup_pkg.Formatter().initialize()
-
-    with formatter.yaspin(text="Configuring service account") as active_spinner:
-        assert active_spinner is spinner
-        assert package_install._ACTIVE_SPINNERS == [spinner]
-
+    with formatter.progress(text="Configuring service account") as active_spinner:
+        assert package_install._ACTIVE_SPINNERS == [active_spinner]
+        active_spinner.ok("Service account configured")
     assert package_install._ACTIVE_SPINNERS == []
-    assert formatter.ok_glyph == "[OK]"
-    assert formatter.fail_glyph == "[X]"
-    assert spinner_calls
-    assert "disable" not in spinner_calls[0]
-    animated_spinner_calls = len(spinner_calls)
-    monkeypatch.setattr(setup_pkg, "_use_plain_progress", lambda stream=None: True)
-    with formatter.yaspin(text="Windows progress") as windows_spinner:
-        windows_spinner.ok(formatter.ok_glyph)
-    assert len(spinner_calls) == animated_spinner_calls
-    assert "Windows progress" in "".join(output.messages)
     output.tty = False
-    with formatter.yaspin(text="Plain progress") as plain_spinner:
-        plain_spinner.ok(formatter.ok_glyph)
-    assert "Plain progress" in "".join(output.messages)
-    assert "[OK]" in "".join(output.messages)
+    with formatter.progress(text="Checking permissions") as progress:
+        progress.fail("Permission check failed")
+    transcript = "".join(output.messages)
+    assert "[OK] Service account configured" in transcript
+    assert "[X] Permission check failed" in transcript
+    assert "Configuring service account..." in transcript
     wrapped = setup_pkg.wrap_text(
         "Operational summaries include model, token totals, duration, "
         "retry categories, and tool names.",
@@ -3817,8 +3760,7 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
         "  several words.",
     ]
     assert installs == [
-        (("yaspin", "progress indicator for the setup script"), {}),
-        (("colorama", "colorizes setup script output"), {}),
+        (("rich", "portable setup presentation"), {}),
     ]
 
 
@@ -3838,19 +3780,6 @@ def test_install_if_missing_pauses_active_spinner_for_prompt(monkeypatch):
 
     spinner = PromptSpinner()
 
-    class SpinnerContext:
-        def __enter__(self):
-            events.append("enter")
-            return spinner
-
-        def __exit__(self, exc_type, exc, tb):
-            events.append("exit")
-            return False
-
-    def fake_yaspin(*args, **kwargs):
-        events.append(("factory", args, kwargs))
-        return SpinnerContext()
-
     class Tty:
         def isatty(self):
             return True
@@ -3868,26 +3797,20 @@ def test_install_if_missing_pauses_active_spinner_for_prompt(monkeypatch):
         lambda package, name: events.append(("install", package, name)),
     )
 
-    tracked_yaspin = package_install.track_spinner_factory(fake_yaspin)
-    with tracked_yaspin(text="Configuring service account") as active_spinner:
-        assert active_spinner is spinner
-        assert package_install._ACTIVE_SPINNERS == [spinner]
+    package_install._ACTIVE_SPINNERS.append(spinner)
+    try:
         package_install.install_if_missing(
             "google.cloud.iam_admin_v1",
             "Google IAM Admin API",
             package_name="google-cloud-iam",
         )
         assert package_install._ACTIVE_SPINNERS == [spinner]
-
-    assert package_install._ACTIVE_SPINNERS == []
+    finally:
+        package_install._ACTIVE_SPINNERS.clear()
     assert events == [
-        ("factory", (), {"text": "Configuring service account"}),
-        "enter",
-        "stop",
-        "input",
+        "stop", "input",
         ("install", "google-cloud-iam", "google.cloud.iam_admin_v1"),
         "start",
-        "exit",
     ]
 
 
@@ -4220,7 +4143,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     deployment_spinner = SpinnerRecorder()
     deployment_progress = []
     initialized_formatter = _fake_formatter(deployment_spinner).initialize()
-    initialized_formatter.yaspin = lambda **kwargs: (
+    initialized_formatter.progress = lambda **kwargs: (
         deployment_progress.append(kwargs["text"]) or nullcontext(deployment_spinner)
     )
     monkeypatch.setattr(
@@ -4247,10 +4170,10 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
 
     assert capsys.readouterr().out == (
         "Deploying App Engine indexes and the application may take up to 10 minutes.\n"
-        "Deployment complete!\n"
+        "✓ Deployment complete\n"
     )
     assert deployment_progress == ["Deploying application"]
-    assert deployment_spinner.oks == ["[OK]"]
+    assert len(deployment_spinner.oks) == 1
     assert deployment_spinner.fails == []
     assert deploy_commands == [
         (
@@ -4273,7 +4196,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     utils.deploy_to_app_engine(print_final_summary=False, first_install=True)
     assert capsys.readouterr().out == (
         "Deploying App Engine indexes and the application may take up to 10 minutes.\n"
-        "[OK] MCP server is ready\n"
+        "MCP server is ready\n"
     )
     assert deploy_commands[-1] == ("certificate", "app.example.com", {"announce_ready": True})
 
@@ -4282,8 +4205,8 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     )
     with pytest.raises(RuntimeError, match="provider deployment failed"):
         utils.deploy_to_app_engine(print_final_summary=False)
-    assert deployment_spinner.oks == ["[OK]", "[OK]"]
-    assert deployment_spinner.fails == ["[X]"]
+    assert len(deployment_spinner.oks) == 2
+    assert len(deployment_spinner.fails) == 1
     assert "MCP server is ready" not in capsys.readouterr().out
 
 
@@ -5042,7 +4965,7 @@ def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
     assert str(credential_path) in output
     assert "Complete the Google Auth Platform browser steps" in prompts[0]
     assert "signed in as 'operator@example.com'" in " ".join(prompts[0].split())
-    assert "press Enter to verify it" in prompts[0]
+    assert "[Enter to verify; x to stop]" in prompts[0]
     assert "already matches" in output
     assert "Google may still be applying" in output
 
@@ -5997,20 +5920,18 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
         def write(self, message):
             app_engine_events.append(("spinner-write", message))
 
-        def ok(self, mark):
+        def ok(self, mark=None):
             app_engine_events.append(("spinner-ok", mark))
 
-        def fail(self, mark):
+        def fail(self, mark=None):
             app_engine_events.append(("spinner-fail", mark))
 
     app_engine_formatter = types.SimpleNamespace(
         success=lambda message: message,
         info=lambda message: message,
-        warning=lambda message: message,
+        warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
         error=lambda message, error=None: message,
-        ok_glyph="[OK]",
-        fail_glyph="[X]",
-        yaspin=lambda **kwargs: AppEngineSpinner(kwargs["text"]),
+        progress=lambda **kwargs: AppEngineSpinner(kwargs["text"]),
     )
     monkeypatch.setattr(
         gcloud,

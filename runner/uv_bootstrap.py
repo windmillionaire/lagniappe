@@ -786,7 +786,7 @@ def main(arguments=None):
 
     if parsed.command == "install" and not parsed.non_interactive:
         print(
-            "Managed uv installation requires --non-interactive. "
+            "[X] Managed uv installation requires --non-interactive. "
             "Run ./setup.sh development.",
             file=sys.stderr,
         )
@@ -794,12 +794,12 @@ def main(arguments=None):
     try:
         if parsed.command == "install":
             executable = install_uv()
-            print(f"Managed uv is installed: {executable}")
+            print(f"[OK] Managed uv is installed: {executable}")
         else:
             executable = check_uv()
-            print(f"Managed uv is ready: {executable}")
+            print(f"[OK] Managed uv is ready: {executable}")
     except UvBootstrapError as error:
-        print(f"Managed uv check failed: {error}", file=sys.stderr)
+        print(f"[X] Managed uv check failed: {error}", file=sys.stderr)
         print("Run ./setup.sh development to repair it.", file=sys.stderr)
         return 1
     return 0

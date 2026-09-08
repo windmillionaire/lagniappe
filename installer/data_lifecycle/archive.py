@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
@@ -49,13 +52,13 @@ PRIVATE_ARCHIVE_NOTICE = (
 # @reason terminal animation wraps tested archive phases without changing their contracts
 @contextmanager
 def _progress(formatter, message):
-    with formatter.yaspin(text=formatter.success(message)) as spinner:
+    with formatter.progress(text=message) as spinner:
         try:
             yield spinner
         except BaseException:
-            spinner.fail(formatter.fail_glyph)
+            spinner.fail()
             raise
-        spinner.ok(formatter.ok_glyph)
+        spinner.ok()
 
 
 # @testable false
@@ -573,7 +576,7 @@ def build_archive(
     if state and state.get("status") == "complete":
         result = validate_archive(output)
         checkpoint.remove()
-        print(f"Archive {result['archive_id']} is already complete at {output}")
+        print(ui.status(f"Archive {result['archive_id']} is already complete at {output}"))
         return output
     if state and state.get("published_path"):
         validate_archive(output)
@@ -586,7 +589,7 @@ def build_archive(
                 f"Archive remains valid at {output}, but scratch cleanup failed again. "
                 f"Retained scratch database: {checkpoint.payload.get('scratch_database')}."
             ) from error
-        print(f"Archive published at {output}. {PRIVATE_ARCHIVE_NOTICE}")
+        print(ui.success(f"Archive published at {output}. {PRIVATE_ARCHIVE_NOTICE}"))
         return output
     _validate_output(output, zip_output=zip_output)
 
@@ -770,7 +773,7 @@ def build_archive(
             f"Retained scratch database: {scratch_database}; retained work state: {work}. "
             "Rerun the exact archive command to finish cleanup."
         ) from error
-    print(f"Archive published at {output}. {PRIVATE_ARCHIVE_NOTICE}")
+    print(ui.success(f"Archive published at {output}. {PRIVATE_ARCHIVE_NOTICE}"))
     return output
 
 

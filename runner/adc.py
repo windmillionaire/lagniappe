@@ -3,6 +3,8 @@
 import os
 import sys
 
+from runner import presentation as ui
+from runner.presentation import output as print
 from runner.context import GCLOUD_CLI, format_command, python_command, setup_command
 from runner.console import format_value, wrap_text
 from runner.process import run_command
@@ -206,7 +208,7 @@ def ensure_adc_target(
     )
     if not mismatches:
         if announce:
-            print(wrap_text("[OK] Application Default Credentials verified"))
+            print(ui.success("Application Default Credentials verified"))
             print(
                 format_value("Account", identity["principal"], column=10, verbatim=True)
             )
@@ -299,7 +301,7 @@ def ensure_adc_target(
         )
 
     if announce:
-        print(wrap_text("[OK] Application Default Credentials verified"))
+        print(ui.success("Application Default Credentials verified"))
         print(format_value("Account", identity["principal"], column=10, verbatim=True))
         print(format_value("Project", project, column=10, verbatim=True))
     return identity

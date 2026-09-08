@@ -1,5 +1,8 @@
 """Optional Cloudflare DNS-only reconciliation for custom domains."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 from runner.console import format_prompt
 from installer.errors import (
     ProviderError,
@@ -146,7 +149,7 @@ def get_cloudflare_api_token():
             raise SetupCancelled("Cloudflare DNS setup cancelled.")
         if validate_cloudflare_api_token(token):
             return token
-        print(wrap_text("Enter a non-empty scoped Cloudflare API token."))
+        print(ui.error(wrap_text("Enter a non-empty scoped Cloudflare API token.")))
 
 
 # @testable true

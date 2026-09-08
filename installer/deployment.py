@@ -1,3 +1,5 @@
+from runner import presentation as ui
+from runner.presentation import output as print
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_deployment_settings_applies_saved_app_config
 # @matrix setup : datastore deployment-settings
@@ -16,7 +18,7 @@ def get_deployment_settings():
         deployment_entity = ds.get(deployment_key, timeout=DATASTORE_TIMEOUT)
     except Exception as e:
         print(f.warning(f"Could not check Datastore for deployment settings: {e}"))
-        print(f.warning("Continuing update with existing app.yaml settings."))
+        print(ui.info("Continuing update with existing app.yaml settings."))
 
     return deployment_entity
 

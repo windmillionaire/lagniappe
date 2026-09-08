@@ -113,6 +113,7 @@ unchanged when that confirmation is declined.
 
 | Guide | Read before changing |
 | --- | --- |
+| [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) | Setup presentation, prompts, colors, progress, and terminal layout. |
 | [INFRA_SETUP_CLOUD.md](INFRA_SETUP_CLOUD.md) | Projects, billing, APIs, App Engine, IAM, buckets, Scheduler, domain/DNS. |
 | [INFRA_SETUP_RECOVERY.md](INFRA_SETUP_RECOVERY.md) | Recovery snapshots, doctor/repair, delegated handoff. |
 | [INFRA_DATA_LIFECYCLE.md](INFRA_DATA_LIFECYCLE.md) | Backup, archive, restore, safety clone, queue handling. |
@@ -164,29 +165,9 @@ for Windows. See [INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md).
 
 ## Operator output
 
-Use the standard-library helpers in `runner/console.py` for operator output;
-`installer.wrap_text()` remains available for existing callers.
-
-- `wrap_text()` wraps prose at the current terminal width (up to 100 cells),
-  preserving paragraphs and hanging list indentation. Long tokens stay intact.
-- `format_prompt()` uses one leading `?` marker, removes trailing question marks
-  and colons, keeps the final answer hint together, and leaves a space before
-  input: `? Enable AI features [Y/n]`. Use this for every setup question,
-  including confirmations and text entry. It preserves defaults and answer
-  parsing. This follows the [GitHub CLI Primer prompt example](https://github.com/cli/cli/blob/trunk/docs/primer/components/README.md#yesno).
-- `format_value(..., verbatim=True)` preserves resource identifiers, URLs, DNS
-  values, and command arguments exactly. Add `standalone=True` for commands so
-  they occupy their own line, even when longer than the terminal. Do not pass
-  padded tables or raw provider diagnostics through the prose wrapper.
-
-Use short, neutral spinner labels and print longer explanations separately.
-Write messages through the active spinner to avoid colliding with animation.
-Windows, redirected output, basic terminals, unsupported Unicode encodings, and
-terminals narrower than 20 columns use static progress. Animated labels adapt
-to shrinking terminal widths. Color remains optional and respects `NO_COLOR`.
-
-Successful summaries align short rows when space permits and stack values on
-narrow terminals. They retain the safe-field allowlist and never dump the
-application settings mapping. The setup test alias includes offline layout
-checks at widths 12, 40, 60, 80, and 100, including plain and colored output,
-Unicode cell widths, copyable values, and resizing.
+Follow [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) for the presentation contract.
+`runner/console.py` owns dependency-free layout; `runner/presentation.py` owns
+semantic styles and Rich progress. Bootstrap remains usable before Rich is
+installed. The shared renderer preserves literal values and existing input
+semantics, respects `NO_COLOR`, and uses static progress where animation is
+unavailable. Windows validation targets PowerShell running `.\setup.cmd`.

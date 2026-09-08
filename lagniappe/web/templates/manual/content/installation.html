@@ -559,7 +559,9 @@
     {% call callout("tip", False) %}
       Keep the terminal visible while setup runs. Longer operations announce
       an estimated maximum time. When setup needs you, it stops progress output
-      and displays a question ending in a colon.
+      and displays a question beginning with <code>?</code>, followed by any
+      answer choices or instructions. In yes/no choices, the capital letter
+      shows what pressing Enter will select.
     {% endcall %}
   {% endcall %}
   {{ heading("Installation") }}

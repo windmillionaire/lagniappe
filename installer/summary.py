@@ -1,5 +1,8 @@
 """Secret-safe setup summaries shared by install and diagnostics."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 import hashlib
 import json
 from runner.context import setup_command
@@ -325,4 +328,4 @@ def print_install_summary(
         deployed=deployed,
         width=width,
     ):
-        print(line)
+        print(ui.heading(line) if line == "Installation summary" else line)

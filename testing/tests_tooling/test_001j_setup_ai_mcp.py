@@ -42,7 +42,7 @@ def test_mcp_connection_name_prompt(monkeypatch, app, answers, expected):
     assert configure_mcp_name() == expected
     assert settings.APP["MCP_NAME"] == expected
     assert len(prompts) == len(answers)
-    assert all(prompt.startswith("? MCP connection name [") for prompt in prompts)
+    assert all(prompt.startswith("? MCP connection name (") for prompt in prompts)
 
 
 IMAGE_NOT_FOUND = """ERROR: (gcloud.artifacts.docker.images.describe) Image not found.
@@ -459,14 +459,14 @@ def test_mcp_unchanged_update_skips_build_and_revision(cloud, capsys, monkeypatc
     import installer
 
     monkeypatch.setattr(installer, "FORMATTER", SimpleNamespace(initialize=lambda: SimpleNamespace(
-        ok_glyph="✔", success=lambda message: f"<green>{message}</green>",
+        success=str,
     )))
     config = settings()
     prepared = mcp.prepare_deployment(config)
     capsys.readouterr()
     mcp.finish_deployment(prepared, config)
     output = capsys.readouterr().out
-    assert output.endswith("✔ <green>MCP server is ready</green>\n")
+    assert output.endswith("MCP server is ready\n")
     assert config["MCP_RESOURCE"] not in output
     cloud.calls.clear()
     prepared = mcp.prepare_deployment(config)

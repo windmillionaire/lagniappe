@@ -1,5 +1,8 @@
 """Read-only local and provider diagnostics for an existing installation."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 import hashlib
 import json
 import os
@@ -341,13 +344,13 @@ def run_doctor(
     local_issues.extend(_keyless_identity_issues(settings, deploy))
     issues = list(local_issues)
 
-    print("=== Lagniappe setup doctor (read-only) ===")
+    print(ui.heading("Lagniappe setup doctor") + " " + ui.secondary("(read-only)"))
     if local_issues:
-        print("Local generated state: DRIFT")
+        print(ui.warning("Local generated state: drift detected"))
         for issue in local_issues:
-            print(f"- {issue}")
+            print(ui.info(f"  - {issue}"))
     else:
-        print("Local generated state: OK")
+        print(ui.success("Local generated state: verified"))
 
     active = {}
     identity_issues = []
@@ -397,23 +400,23 @@ def run_doctor(
         print(f"Saved deployer: {settings.get('DEPLOYER_EMAIL') or '(not configured)'}")
         print(f"Saved owner: {settings.get('ADMIN_EMAIL') or '(not configured)'}")
         if identity_issues:
-            print("Identity state: DRIFT")
+            print(ui.warning("Identity state: drift detected"))
             for issue in identity_issues:
-                print(f"- {issue}")
+                print(ui.info(f"  - {issue}"))
         else:
-            print("Identity state: OK")
+            print(ui.success("Identity state: verified"))
     else:
         identity_issues.append("saved setup identity is unavailable")
         issues.extend(identity_issues)
-        print("Identity state: UNAVAILABLE")
+        print(ui.warning("Identity state: unavailable"))
 
-    print("Expected target and provider resources:")
+    print(ui.heading("Expected target and provider resources:"))
     for line in expected_resource_lines(
         settings,
         deploy=deploy,
         gcloud_config=saved_gcloud,
     ):
-        print(f"- {line}")
+        print(ui.info(f"  - {line}"))
 
     project = settings.get("GOOGLE_CLOUD_PROJECT") or saved_gcloud.get("PROJECT")
     provider_report = {}
@@ -441,20 +444,25 @@ def run_doctor(
     issues.extend(provider_issues)
     if provider_report:
         print(
-            "Provider state: DRIFT OR UNAVAILABLE"
+            ui.warning("Provider state: drift detected or unavailable")
             if provider_issues
-            else "Provider state: OK"
+            else ui.success("Provider state: verified")
         )
         for name in sorted(provider_report):
-            print(f"- {name}: {provider_report[name].get('state')}")
+            state = provider_report[name].get("state")
+            outcome = ui.styled(
+                str(state).lower().replace("_", " "),
+                "green" if state == "AVAILABLE" else "yellow",
+            )
+            print(ui.info(f"  {name}: {outcome}"))
     elif project:
-        print("Provider state: DRIFT OR UNAVAILABLE")
+        print(ui.warning("Provider state: drift detected or unavailable"))
     else:
         issues.append("target project is unavailable")
-        print("Provider state: UNAVAILABLE")
+        print(ui.warning("Provider state: unavailable"))
 
     if issues:
-        print(f"Repair command: {setup_command('repair')}")
+        print("Repair command:\n  " + setup_command("repair"))
         return 1
-    print("Doctor result: OK")
+    print(ui.success("Doctor result: verified"))
     return 0

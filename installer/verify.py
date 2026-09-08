@@ -1,5 +1,7 @@
 """Read-only validation and explicitly named setup activation/repair flows."""
 
+from runner.presentation import output as print
+
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_installation_is_read_only_and_activation_is_explicit

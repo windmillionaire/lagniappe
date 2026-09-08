@@ -298,7 +298,7 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
         == 0
     )
     assert provider_calls == [("Demo", "demo-project")]
-    assert "Provider state: OK" in capsys.readouterr().out
+    assert "Provider state: verified" in capsys.readouterr().out
 
     constants_path = tmp_path / doctor.GENERATION_SOURCE
     constants_path.write_text(
@@ -318,7 +318,7 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
     )
     assert provider_calls == [("Demo", "demo-project")]
     assert constants_path.read_bytes() == drift_before
-    assert "Local generated state: DRIFT" in capsys.readouterr().out
+    assert "Local generated state: drift detected" in capsys.readouterr().out
 
     after = {
         path.relative_to(tmp_path): (path.read_bytes(), path.stat().st_mode)

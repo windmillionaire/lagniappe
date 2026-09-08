@@ -1,5 +1,8 @@
 """Read public-page settings saved by the deployed application."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_public_page_settings_applies_saved_app_config
@@ -25,7 +28,7 @@ def get_public_page_settings():
             )
         )
         print(
-            formatter.warning(
+            ui.info(
                 "Continuing update with existing public-page settings."
             )
         )

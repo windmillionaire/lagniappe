@@ -1,5 +1,8 @@
 """Optional MCP service lifecycle shared by setup and ordinary app deployments."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 from dataclasses import dataclass
 import hashlib
 import json
@@ -525,7 +528,7 @@ def finish_deployment(target=None, settings=None, *, announce_progress=True):
     resource = settings["MCP_RESOURCE"]
     if _matches(_service(target), target, resource):
         if announce_progress:
-            print(f"MCP service {target.version} is unchanged; no new revision needed.")
+            print(ui.status(f"MCP service {target.version} is unchanged; no new revision needed."))
         return
     record_step("deploy MCP service after application")
     if announce_progress:
@@ -537,7 +540,7 @@ def finish_deployment(target=None, settings=None, *, announce_progress=True):
         from installer import FORMATTER
 
         f = FORMATTER.initialize()
-        print(f"{f.ok_glyph} {f.success('MCP server is ready')}")
+        print(f.success('MCP server is ready'))
 
 
 # @testable false

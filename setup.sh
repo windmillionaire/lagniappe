@@ -37,7 +37,7 @@ if [ ! -x "$LAGNIAPPE_VENV_PYTHON" ]; then
     if [ -z "$LAGNIAPPE_BOOTSTRAP_PYTHON" ]; then
         printf '%s\n' \
             "" \
-            "Lagniappe needs Python 3.12 or newer." \
+            "[X] Lagniappe needs Python 3.12 or newer" \
             "Install a current Google Cloud CLI with bundled Python, or install" \
             "Python 3.12 or newer, reopen this terminal, and run ./setup.sh again."
         exit 1
@@ -47,11 +47,11 @@ if [ ! -x "$LAGNIAPPE_VENV_PYTHON" ]; then
         "$LAGNIAPPE_REPOSITORY_ROOT/venv"; then
         printf '%s\n' \
             "" \
-            "Python could not create Lagniappe's isolated environment." \
+            "[X] Python could not create Lagniappe's isolated environment" \
             "Repair or reinstall Python or Google Cloud CLI, then run ./setup.sh again."
         exit 1
     fi
-    printf '%s\n\n' "Lagniappe's isolated Python environment is ready."
+    printf '%s\n\n' "[OK] Lagniappe's isolated Python environment is ready"
 fi
 
 exec "$LAGNIAPPE_VENV_PYTHON" -E -m installer "$@"

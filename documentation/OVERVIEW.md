@@ -14,7 +14,7 @@ begin in the [README](../README.md).
 | Frontend application | [FRONTEND_OVERVIEW.md](FRONTEND_OVERVIEW.md) |
 | Views and widgets | [FRONTEND_VIEWS.md](FRONTEND_VIEWS.md) |
 | Synchronization | [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md) |
-| Configuration and setup | [INFRA_CONFIG.md](INFRA_CONFIG.md), [INFRA_SETUP.md](INFRA_SETUP.md) |
+| Configuration and setup | [INFRA_CONFIG.md](INFRA_CONFIG.md), [INFRA_SETUP.md](INFRA_SETUP.md), [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) |
 | Tests | [TESTING.md](TESTING.md), [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) |
 
 ## AI

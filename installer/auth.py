@@ -1,5 +1,8 @@
 """Explicit interactive authentication for setup-managed Google Cloud access."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 from installer.errors import SetupError
 
 
@@ -23,7 +26,7 @@ def authenticate():
         raise SetupError(f"Authentication did not complete: {error}") from error
 
     print(
-        "Google Cloud CLI and Application Default Credentials are ready for "
-        "this installation."
+        ui.success("Google Cloud CLI and Application Default Credentials are ready for "
+        "this installation.")
     )
     return 0

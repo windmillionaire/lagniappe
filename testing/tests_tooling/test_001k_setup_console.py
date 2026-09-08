@@ -1,5 +1,6 @@
 """Portable, offline contracts for installer text and progress output."""
 
+import builtins
 import io
 import sys
 import types
@@ -55,29 +56,28 @@ def test_prompt_layout(width):
     assert not result.endswith("  ")
     assert all(len(line) <= width for line in result.splitlines())
     assert " ".join(result.split()) == "? Would you like to deploy the app now [y/N]"
-    assert "[My workspace] " in format_prompt(
+    assert "(My workspace) " in format_prompt(
         "Installation name [My workspace]: ", width
     )
     assert format_prompt("Continue? [Y/n]: ", width).endswith("[Y/n] ")
-    assert format_prompt("Value (x to exit): ", width).endswith("(x to exit) ")
+    assert format_prompt("Value (x to exit): ", width).endswith("[x to exit] ")
     assert format_prompt("Press Enter to continue: ", width).endswith("continue ")
     assert (
         " ".join(format_prompt("Continue? [Y/n] (x to exit): ", width).split())
-        == "? Continue [Y/n] (x to exit)"
+        == "? Continue [Y/n] [x to exit]"
     )
     assert (
         " ".join(
             format_prompt("Continue? [Y/n] (s to skip; x to exit): ", width).split()
         )
-        == "? Continue [Y/n] (s to skip; x to exit)"
+        == "? Continue [Y/n] [s to skip; x to exit]"
     )
-    assert "[Why?]" in format_prompt("Label [Why?]: ", width)
+    assert "(Why?)" in format_prompt("Label [Why?]: ", width)
     assert "https://example.test/?q=value" in format_prompt(
         "URL [https://example.test/?q=value]: ", width
     )
     colored = format_prompt("\n\x1b[36m" + message + "\x1b[0m", width)
     assert unstyle(colored) == "\n" + result
-    assert "\x1b[36m?\x1b[0m" in colored
     assert format_prompt(result, width) == result
 
 
@@ -204,25 +204,26 @@ def test_progress_label_tracks_terminal_width(monkeypatch):
 
 # @matrix setup : portability spinner
 @pytest.mark.parametrize(
-    "platform,tty,encoding,term,columns,plain",
+    "tty,legacy,encoding,term,columns,plain",
     [
-        ("posix", True, "utf-8", "xterm", 80, False),
-        ("nt", True, "utf-8", "xterm", 80, True),
-        ("posix", False, "utf-8", "xterm", 80, True),
-        ("posix", True, "ascii", "xterm", 80, True),
-        ("posix", True, "utf-8", "dumb", 80, True),
-        ("posix", True, "utf-8", "xterm", 12, True),
+        (True, False, "utf-8", "xterm", 80, False),
+        (True, False, "utf-8", "", 80, False),  # Windows Terminal may omit TERM
+        (True, True, "utf-8", "", 80, True),  # older Windows console host
+        (False, False, "utf-8", "xterm", 80, True),
+        (True, False, "ascii", "xterm", 80, True),
+        (True, False, "utf-8", "dumb", 80, True),
+        (True, False, "utf-8", "xterm", 12, True),
     ],
 )
-def test_progress_modes(monkeypatch, platform, tty, encoding, term, columns, plain):
-    import installer
+def test_progress_modes(monkeypatch, tty, legacy, encoding, term, columns, plain):
+    from runner.presentation import plain_progress
 
     stream = types.SimpleNamespace(isatty=lambda: tty, encoding=encoding)
-    with monkeypatch.context() as scoped:
-        scoped.setattr(installer.os, "name", platform)
-        scoped.setenv("TERM", term)
-        scoped.setenv("COLUMNS", str(columns))
-        assert installer._use_plain_progress(stream) is plain
+    console = types.SimpleNamespace(is_terminal=tty, legacy_windows=legacy)
+    monkeypatch.setenv("TERM", term)
+    monkeypatch.setenv("COLUMNS", str(columns))
+    assert plain_progress(console, stream) is plain
+    assert plain_progress(None, stream) is True
 
 
 # @matrix setup : package-install spinner
@@ -230,6 +231,7 @@ def test_progress_modes(monkeypatch, platform, tty, encoding, term, columns, pla
 def test_formatter_preserves_plain_and_colored_output(monkeypatch, tty, no_color):
     import installer
     from installer import package_install
+    from runner import presentation as ui
 
     output = io.StringIO()
     monkeypatch.setattr(output, "isatty", lambda: tty)
@@ -243,17 +245,154 @@ def test_formatter_preserves_plain_and_colored_output(monkeypatch, tty, no_color
         package_install, "install_if_missing", lambda *args, **kwargs: None
     )
     formatter = installer.Formatter().initialize()
-    assert ("\x1b" in formatter.info("Heading")) is (tty and not no_color)
-    assert unstyle(formatter.error("Failed.")) == "Failed."
+    assert ("\x1b" in ui.heading("Settings")) is (tty and not no_color)
+    assert formatter.info("An explanation.") == "An explanation."
+    assert unstyle(formatter.error("Failed.")) == "[X] Failed"
     diagnostic = "provider output:\n  command with    preserved spacing\nsecond line"
-    assert unstyle(formatter.error("Failed.", diagnostic)) == "Failed.\n" + diagnostic
-    # Static output retains the operation name beside the result.
-    monkeypatch.setattr(installer, "_use_plain_progress", lambda stream=None: True)
-    with formatter.yaspin(text=formatter.success("Deploying application")) as spinner:
-        assert package_install._ACTIVE_SPINNERS[-1] is spinner
-        spinner.write(wrap_text("A short progress detail."))
-        spinner.ok(formatter.ok_glyph)
+    assert unstyle(formatter.error("Failed.", diagnostic)) == "[X] Failed\n" + diagnostic
+    with formatter.progress(text="Deploying application", success_text="Application deployed") as progress:
+        assert package_install._ACTIVE_SPINNERS[-1] is progress
+        progress.write(wrap_text("A short progress detail."))
+        progress.ok()
     assert package_install._ACTIVE_SPINNERS == []
-    assert "Deploying application" in output.getvalue()
-    assert f"{formatter.ok_glyph} Deploying application" in output.getvalue()
-    assert "\x1b" not in output.getvalue()
+    text = unstyle(output.getvalue())
+    assert text == "Deploying application...\nA short progress detail.\n[OK] Application deployed\n"
+    assert ("\x1b" in output.getvalue()) is (tty and not no_color)
+
+
+# @matrix setup : encoding operator-summary portability terminal-wrapping
+def test_semantic_output(monkeypatch):
+    from rich.color import Color
+    from rich.text import Text
+    from runner import presentation as ui
+
+    class Terminal(io.StringIO):
+        encoding = "utf-8"
+
+        def isatty(self):
+            return True
+
+    stream = Terminal()
+    monkeypatch.setattr(sys, "stdout", stream)
+    monkeypatch.setenv("TERM", "xterm")
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("COLUMNS", "80")
+    for kind, marker, color in [
+        ("success", "✓", "green"), ("warning", "!", "yellow"),
+        ("error", "✗", "red"), ("pending", "-", "yellow"),
+    ]:
+        text = Text.from_ansi(ui.status("Configuration [value] saved.", kind))
+        assert text.plain == marker + " Configuration [value] saved"
+        assert len(text.spans) == 1
+        assert (text.spans[0].start, text.spans[0].end) == (0, len(marker))
+        assert text.spans[0].style.color.number == Color.parse(color).number
+    prompt = Text.from_ansi(format_prompt("Application name", default="[bold]", hint="x to exit"))
+    assert prompt.plain == "? Application name ([bold]) [x to exit] "
+    assert prompt.spans[0].style.color.number == 2
+    assert prompt.spans[1].style.bold
+    assert prompt.spans[-1].style.color.number == 6
+    assert Text.from_ansi(ui.heading("Settings:")).plain == "Settings"
+    choice = Text.from_ansi(ui.choice(1, "Existing project", "example-project"))
+    assert choice.plain == "  1. Existing project (example-project)"
+    assert choice.spans[0].style.color.number == 6
+    assert choice.spans[-1].style.color.number == 8
+    assert unstyle(ui.status("Deployment skipped.")) == "- Deployment skipped"
+    assert unstyle(ui.activity("Checking settings")) == "Checking settings..."
+    literal = '[red]literal[/red] :rocket: https://example.test/?a=[1]  two spaces'
+    ui.output(literal)
+    assert stream.getvalue() == literal + "\n"
+    monkeypatch.setenv("NO_COLOR", "")
+    ui.output(ui.heading("Settings"), ui.success("Saved"), format_prompt("Continue", hint="Y/n"))
+    assert "\x1b" not in stream.getvalue()
+    # Bootstrap still prints complete plain content before Rich is available.
+    monkeypatch.setitem(sys.modules, "rich.console", None)
+    assert ui.heading("Settings") == "Settings"
+    ui.output(literal)
+    assert stream.getvalue().endswith(literal + "\n")
+
+
+# @matrix setup : package-install spinner
+def test_progress_output_and_input(monkeypatch):
+    from runner import presentation as ui
+
+    class Terminal(io.StringIO):
+        encoding = "utf-8"
+
+        def isatty(self):
+            return True
+
+    stream = Terminal()
+    monkeypatch.setattr(sys, "stdout", stream)
+    monkeypatch.setenv("TERM", "xterm")
+    monkeypatch.setenv("COLUMNS", "80")
+    assert ui.ACTIVE_PROGRESS == []
+    with ui.Progress("Checking configuration", success_text="Configuration verified") as progress:
+        assert progress.running
+        assert sys.stdout is stream  # Rich must not intercept subprocess output.
+        ui.output("Normal [literal] detail.")
+        monkeypatch.setenv("COLUMNS", "24")
+        assert len(progress._render().text.plain) < 20
+
+        def answer(prompt):
+            assert not progress.running
+            assert prompt == "? Continue [Y/n] "
+            return "y"
+
+        monkeypatch.setattr(builtins, "input", answer)
+        with ui.pause_progress():
+            assert ui.read_input("? Continue [Y/n] ") == "y"
+            assert not progress.running  # nested pauses never resume early
+        assert progress.running
+        with ui.Progress("Nested check") as nested:
+            assert nested.running and not progress.running
+            with ui.pause_progress():
+                assert not nested.running
+            assert nested.running and not progress.running
+        assert progress.running
+        diagnostic = "provider\n  raw    spacing\n[red]literal"
+        sink = io.StringIO()
+        ui.output(diagnostic, file=sink, raw=True)
+        assert sink.getvalue() == diagnostic + "\n"
+        assert progress.running
+        progress.ok()
+        progress.ok()  # completion is emitted once
+        assert not progress.running
+    assert ui.ACTIVE_PROGRESS == []
+    transcript = unstyle(stream.getvalue())
+    assert " ".join(transcript.split()).count("Configuration verified") == 1
+    assert "Normal [literal] detail." in transcript
+    with pytest.raises(RuntimeError, match="provider failed"):
+        with ui.Progress("Failing operation"):
+            raise RuntimeError("provider failed")
+    assert ui.ACTIVE_PROGRESS == []
+    assert "✓ Failing operation" not in unstyle(stream.getvalue())
+    monkeypatch.setenv("COLUMNS", "80")
+    with ui.Progress("Restoring optional images") as progress:
+        progress.skip("Images unchanged")
+    assert "- Images unchanged" in unstyle(stream.getvalue())
+    assert "✓ Images unchanged" not in unstyle(stream.getvalue())
+
+
+# @matrix setup : spinner subprocess-output
+def test_visible_subprocess_output_pauses_progress(monkeypatch):
+    import subprocess
+    from runner import presentation as ui, process
+
+    events = []
+    progress = types.SimpleNamespace(
+        stop=lambda: events.append("paused"),
+        start=lambda: events.append("resumed"),
+    )
+    command = ["provider", "argument with spaces"]
+
+    def run(args, **kwargs):
+        assert args == command
+        assert kwargs["capture_output"] is False
+        assert events[-1] == "paused"
+        events.append("provider output")
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(process.subprocess, "run", run)
+    monkeypatch.setattr(ui, "ACTIVE_PROGRESS", [progress])
+    assert process.run_command(command, capture_output=False).returncode == 0
+    assert events == ["paused", "provider output", "resumed"]

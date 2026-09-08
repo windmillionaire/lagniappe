@@ -1,5 +1,8 @@
 """App Engine custom-domain setup with optional Cloudflare DNS automation."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 from runner.console import format_prompt
 from installer import wrap_text
 
@@ -23,7 +26,7 @@ def add_custom_domain():
 
     SETTINGS.save()
     print(
-        f.success(
+        ui.info(
             wrap_text(
                 "The app must be redeployed for custom-domain authentication "
                 "settings to take effect."
@@ -31,7 +34,7 @@ def add_custom_domain():
         )
     )
     consent = input(
-        format_prompt(f.info("Would you like to deploy the app now? [y/N]: "))
+        format_prompt("Would you like to deploy the app now? [y/N]: ")
     )
     if consent.casefold() == "y":
         utils.deploy_to_app_engine()
@@ -95,24 +98,28 @@ def _setup_custom_domain(*, configure_auth=True):
         )
         return False
 
-    with f.yaspin(
-        text=f.success("Creating or discovering App Engine domain mapping")
+    with f.progress(
+        text="Creating or discovering App Engine domain mapping",
+        success_text='App Engine domain mapping ready',
     ) as spinner:
         mapping = create_gcp_domain_mapping(domain, spinner)
-        spinner.ok(f.ok_glyph)
+        spinner.ok()
 
     resource_records = mapping["resourceRecords"]
     use_cloudflare = input(
-        format_prompt(f.info("Configure these DNS records through Cloudflare? [y/N]: "))
+        format_prompt("Configure these DNS records through Cloudflare? [y/N]: ")
     )
     if use_cloudflare.casefold() == "y":
         api_token = get_cloudflare_api_token()
-        with f.yaspin(text=f.success("Resolving Cloudflare DNS zone")) as spinner:
+        with f.progress(
+            text="Resolving Cloudflare DNS zone",
+            success_text='Cloudflare DNS zone found',
+        ) as spinner:
             zone = get_cloudflare_zone(domain, api_token)
-            spinner.write(f.success(wrap_text(f"Using Cloudflare zone {zone['name']}")))
-            spinner.ok(f.ok_glyph)
-        with f.yaspin(
-            text=f.success("Reconciling DNS-only Cloudflare records")
+            spinner.ok(f"Using Cloudflare zone {zone['name']}")
+        with f.progress(
+            text="Reconciling DNS-only Cloudflare records",
+            success_text='Cloudflare DNS records reconciled',
         ) as spinner:
             record_ids = reconcile_cloudflare_dns_records(
                 domain,
@@ -120,12 +127,7 @@ def _setup_custom_domain(*, configure_auth=True):
                 api_token,
                 resource_records,
             )
-            spinner.write(
-                f.success(
-                    f"Reconciled {len(record_ids)} DNS-only Cloudflare records"
-                )
-            )
-            spinner.ok(f.ok_glyph)
+            spinner.ok(f"Reconciled {len(record_ids)} DNS-only Cloudflare records")
         SETTINGS.APP["CLOUDFLARE_ZONE_ID"] = zone["id"]
         account_id = (zone.get("account") or {}).get("id")
         if account_id:
@@ -134,7 +136,7 @@ def _setup_custom_domain(*, configure_auth=True):
         print_manual_dns_instructions(domain, resource_records)
         configured = input(
             format_prompt(
-                f.info("Have you added all of the App Engine DNS records? [y/N]: ")
+                "Have you added all of the App Engine DNS records? [y/N]: "
             )
         )
         if configured.casefold() != "y":
@@ -157,7 +159,7 @@ def _setup_custom_domain(*, configure_auth=True):
             update_oauth_redirect_uris(domain)
             confirmed = input(
                 format_prompt(
-                    f.info("Have you updated the Google OAuth settings? [y/N]: ")
+                    "Have you updated the Google OAuth settings? [y/N]: "
                 )
             )
             if confirmed.casefold() != "y":

@@ -42,20 +42,13 @@ def _fake_formatter():
         initialize=lambda: types.SimpleNamespace(
             success=lambda message: message,
             info=lambda message: message,
-            warning=lambda message: message,
+            warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
             error=lambda message, error=None: message,
-            ok_glyph="[OK]",
-            fail_glyph="[X]",
-            yaspin=spinner_factory(SpinnerRecorder()),
+            progress=spinner_factory(SpinnerRecorder()),
         )
     )
 
 
-@pytest.fixture(autouse=True)
-def fake_yaspin_module(monkeypatch):
-    monkeypatch.setitem(
-        sys.modules, "yaspin", types.SimpleNamespace(yaspin=spinner_factory())
-    )
 
 
 @pytest.fixture
@@ -181,7 +174,7 @@ def test_validate_input_retries_allows_empty_and_exits(monkeypatch):
 
     assert get_default_value() == "chosen-value"
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Suggested [chosen-value]"
+        "? Suggested (chosen-value) [Enter to keep; x to exit]"
     ]
 
     monkeypatch.setattr("builtins.input", lambda prompt: "x")
@@ -308,7 +301,7 @@ def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
     assert "The active gcloud CLI account is: installer@example.com" in output
     assert "Enter Y to confirm this account" in output
     assert (
-        "[OK] Verified gcloud CLI installation account: installer@example.com"
+        "Verified gcloud CLI installation account: installer@example.com"
         in output
     )
 
@@ -381,7 +374,7 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     assert inspected == ["demo-app"]
     assert create_config.validate_project_id("demo-app")
     assert [" ".join(prompt.split()) for prompt in prompts] == [
-        "? Press Enter to use the suggested Google Cloud project ID [demo-app], or type a different project ID",
+        "? Google Cloud project ID (demo-app) [Enter to keep; or type a different project ID]",
         "? Create a new project 'demo-app' [y/N]",
     ]
 
@@ -452,9 +445,9 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
     assert [" ".join(prompt.split()) for prompt in prompts] == [
         "? Use the existing project 'active-project-1' [y/N]",
-        "? Press Enter to use the suggested Google Cloud project ID [demo-app], or type a different project ID",
+        "? Google Cloud project ID (demo-app) [Enter to keep; or type a different project ID]",
         "? Use the existing project 'demo-app' [y/N]",
-        "? Press Enter to use the suggested Google Cloud project ID [demo-app-abc123], or type a different project ID",
+        "? Google Cloud project ID (demo-app-abc123) [Enter to keep; or type a different project ID]",
         "? Create a new project 'demo-app-abc123' [y/N]",
     ]
 
@@ -474,7 +467,7 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
     assert [" ".join(prompt.split()) for prompt in prompts] == [
         "? Use the existing project 'demo-app' [y/N]",
-        "? Press Enter to use the suggested Google Cloud project ID [demo-app-abc123], or type a different project ID",
+        "? Google Cloud project ID (demo-app-abc123) [Enter to keep; or type a different project ID]",
         "? Create a new project 'demo-app-abc123' [y/N]",
     ]
 
@@ -869,7 +862,7 @@ def test_project_billing_authorization_uses_existing_account_and_project_console
     assert len(checks) == 2
     assert (
         " ".join(prompts[0].split())
-        == "? After the existing billing account is linked, press Enter to continue (x to exit)"
+        == "? Link the existing billing account [Enter to continue; x to exit]"
     )
     output = capsys.readouterr().out
     assert "select 'Link a billing account'" in output
@@ -1605,7 +1598,7 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
 
     assert create_config.set_application_defaults()
     output = capsys.readouterr().out
-    assert "=== Configuration ===" in output
+    assert "Configuration" in output
     assert "Creating the confirmed local configuration draft" not in output
     assert "ADC authentication: after project creation" not in output
     assert "Project state:" not in output
@@ -2339,7 +2332,7 @@ def test_upgrade_collects_missing_ai_choices(
             if expected_policy["AI_ENABLED"]:
                 assert prompts[1] == "? Enable external AI access and the MCP server [y/N]"
         else:
-            assert prompts[0] == "? MCP connection name [lagniappe-mcp]"
+            assert prompts[0] == "? MCP connection name (lagniappe-mcp)"
         assert saved[-1] == settings.APP
         prompts.clear()
         saved.clear()
@@ -2478,11 +2471,9 @@ def _configure_adc_quota_test(monkeypatch, spinner):
         initialize=lambda: types.SimpleNamespace(
             success=lambda message: message,
             info=lambda message: message,
-            warning=lambda message: message,
+            warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
             error=lambda message, error=None: message,
-            ok_glyph="[OK]",
-            fail_glyph="[X]",
-            yaspin=spinner_factory(spinner),
+            progress=spinner_factory(spinner),
         )
     )
     monkeypatch.setattr(setup_pkg, "FORMATTER", fake_formatter)
@@ -2737,7 +2728,7 @@ def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch
     with pytest.raises(SetupError) as error:
         create_config._set_adc_quota_project("project-1", spinner)
 
-    assert spinner.fails == ["[X]"]
+    assert len(spinner.fails) == 1
     assert any(
         message.startswith("ADC is separate") for message in spinner.messages
     )

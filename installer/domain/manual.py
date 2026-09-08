@@ -1,5 +1,8 @@
 """Provider-neutral domain verification and DNS instructions."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 from runner.console import format_prompt, format_value, wrap_text
 from installer import FORMATTER
 
@@ -13,7 +16,7 @@ def confirm_domain_ownership(domain):
 
     f = FORMATTER.initialize()
     account = SETTINGS.GCLOUD_CONFIG["ACCOUNT"]
-    print(wrap_text(f"\n{f.info('Verify domain ownership with Google')}"))
+    print(wrap_text(f"\n{ui.heading('Verify domain ownership with Google')}"))
     print(wrap_text("1. Use the Google account selected by this installation:"))
     print(f"   {account}")
     print(
@@ -33,7 +36,7 @@ def confirm_domain_ownership(domain):
     )
     verified = input(
         format_prompt(
-            f.info(f"Has Google confirmed that {account} owns {domain}? [y/N]: ")
+            f"Has Google confirmed that {account} owns {domain}? [y/N]: "
         )
     )
     return verified.casefold() == "y"
@@ -46,7 +49,7 @@ def confirm_domain_ownership(domain):
 def print_manual_dns_instructions(domain, resource_records):
     """Print the exact records returned by App Engine."""
     f = FORMATTER.initialize()
-    print(wrap_text(f"\n{f.info(f'DNS records for {domain}')}"))
+    print(wrap_text(f"\n{ui.heading(f'DNS records for {domain}')}"))
     print(
         wrap_text("Add every record below at your DNS provider with proxying disabled:")
     )

@@ -1,5 +1,8 @@
 """Process locking and secret-free setup operation journaling."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 from contextlib import contextmanager
 import json
 import os
@@ -27,8 +30,8 @@ def _restrict_state_file(path):
     username = str(os.environ.get("USERNAME") or "").strip()
     if not username:
         print(
-            f"WARNING: Could not restrict the Windows ACL for {path}; "
-            "USERNAME is unavailable."
+            ui.warning(f"Could not restrict the Windows ACL for {path}; "
+            "USERNAME is unavailable.")
         )
         return False
     try:
@@ -49,8 +52,8 @@ def _restrict_state_file(path):
         result = None
     if result is None or result.returncode != 0:
         print(
-            f"WARNING: Could not restrict the Windows ACL for {path}. "
-            "Protect this setup state file manually."
+            ui.warning(f"Could not restrict the Windows ACL for {path}. "
+            "Protect this setup state file manually.")
         )
         return False
     return True

@@ -1,5 +1,8 @@
 """Configure SMTP delivery for authentication action links."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 import re
 import smtplib
 import ssl
@@ -260,7 +263,7 @@ def test_smtp_delivery(
 # @covered-by installer/auth_email.py::setup_auth_email
 # @reason interactive browser guidance is owned by the public setup step
 def _print_gmail_instructions():
-    print(wrap_text("\nConfigure authentication email:"))
+    print(wrap_text(ui.heading("\nConfigure authentication email:")))
     print(
         wrap_text(
             "Lagniappe can send verification and password-reset "
@@ -293,9 +296,7 @@ def _print_gmail_instructions():
         )
     )
     ready = input(
-        format_prompt(
-            "Press Enter when you are ready to open Google App Passwords (x to exit): "
-        )
+        format_prompt("Open Google App Passwords", hint="Enter to continue; x to exit")
     ).strip()
     if ready.casefold() == "x":
         raise SetupCancelled("Installation cancelled before Google App Passwords.")
@@ -316,14 +317,10 @@ def _print_gmail_instructions():
 # @covered-by installer/auth_email.py::_setup_provider_auth_email
 # @reason interactive retry and cancellation behavior is owned by setup
 def _prompt(label, default=None):
-    if default not in (None, ""):
-        suffix = (
-            f" [{default}] "
-            "(press Enter to use the bracketed value; x to exit): "
-        )
-    else:
-        suffix = " (x to exit): "
-    value = input(format_prompt(f"{label}{suffix}")).strip()
+    value = input(format_prompt(
+        label, default=default if default not in (None, "") else None,
+        hint="Enter to keep; x to exit" if default not in (None, "") else "x to exit",
+    )).strip()
     if value.casefold() == "x":
         raise SetupCancelled("Installation cancelled during email installer.")
     return value or str(default or "").strip()
@@ -472,7 +469,7 @@ def _prompt_security(default="starttls"):
             return "starttls"
         if value in {"ssl", "tls", "465"}:
             return "ssl"
-        print(wrap_text("Choose STARTTLS or SSL/TLS."))
+        print(ui.error(wrap_text("Choose STARTTLS or SSL/TLS.")))
 
 
 # @testable false
@@ -487,7 +484,7 @@ def _prompt_port(default=587):
             port = 0
         if 1 <= port <= 65535:
             return port
-        print(wrap_text("Enter an SMTP port between 1 and 65535."))
+        print(ui.error(wrap_text("Enter an SMTP port between 1 and 65535.")))
 
 
 # @testable true
@@ -534,7 +531,7 @@ def _configure_dmarc_for_sender(sender_email):
         if use_cloudflare == "x":
             raise SetupCancelled("Authentication-email DMARC setup cancelled.")
         if use_cloudflare == "s":
-            print(wrap_text("Skipped optional DMARC setup."))
+            print(ui.status(wrap_text("Skipped optional DMARC setup.")))
             return False
         if use_cloudflare != "n":
             api_token = get_cloudflare_api_token()
@@ -566,7 +563,7 @@ def _configure_dmarc_for_sender(sender_email):
     if confirmed == "x":
         raise SetupCancelled("Authentication-email DMARC setup cancelled.")
     if confirmed == "s":
-        print(wrap_text("Skipped optional DMARC setup."))
+        print(ui.status(wrap_text("Skipped optional DMARC setup.")))
         return False
     if confirmed != "y":
         raise SetupCancelled(
@@ -588,7 +585,7 @@ def _setup_resend_auth_email(current, custom_domain):
         SETTINGS.APP.get("CLOUDFLARE_ZONE_ID")
         or SETTINGS.APP.get("CLOUDFLARE_ACCOUNT_ID")
     )
-    print(wrap_text(f"\n{f.info('Configure Resend')}"))
+    print(wrap_text(f"\n{ui.heading('Configure Resend')}"))
     if cloudflare_configured:
         print(
             wrap_text(
@@ -612,10 +609,7 @@ def _setup_resend_auth_email(current, custom_domain):
     except webbrowser.Error:
         pass
     domain_ready = input(
-        format_prompt(
-            "When Resend shows the sending domain as verified, press Enter "
-            "(x to exit): "
-        )
+        format_prompt("Wait until Resend shows the sending domain as verified", hint="Enter to continue; x to exit")
     ).strip()
     if domain_ready.casefold() == "x":
         raise SetupCancelled("Resend domain setup is incomplete.")
@@ -794,7 +788,7 @@ def _setup_provider_auth_email():
     f = FORMATTER.initialize()
     current = normalize_auth_email_config(SETTINGS.APP.get("AUTH_EMAIL_CONFIG")) or {}
     custom_domain = str(SETTINGS.APP["CUSTOM_DOMAIN"]).strip().lower()
-    print(wrap_text(f"\n{f.info('Authentication email configuration')}"))
+    print(wrap_text(f"\n{ui.heading('Authentication email configuration')}"))
     print(
         wrap_text(
             "Setup can configure Resend directly, or accept SMTP details from "
@@ -927,7 +921,7 @@ def configure_auth_email():
     else:
         setup_auth_email(replace=True)
     consent = input(
-        format_prompt(f.info("Deploy the updated email settings now? [Y/n]: "))
+        format_prompt("Deploy the updated email settings now? [Y/n]: ")
     )
     if consent.strip().casefold() != "n":
         utils.deploy_to_app_engine()

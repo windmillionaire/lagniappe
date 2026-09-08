@@ -25,13 +25,6 @@ from testing.utility.setup_fakes import (
 pytestmark = pytest.mark.tooling
 
 
-@pytest.fixture(autouse=True)
-def fake_yaspin_module(monkeypatch):
-    from testing.utility.setup_fakes import spinner_factory
-
-    monkeypatch.setitem(
-        sys.modules, "yaspin", types.SimpleNamespace(yaspin=spinner_factory())
-    )
 
 
 class FakeSMTP:
@@ -272,7 +265,7 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
     formatter = types.SimpleNamespace(
         initialize=lambda: types.SimpleNamespace(
             error=lambda message: message,
-            warning=lambda message: message,
+            warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
             success=lambda message: message,
         )
     )
@@ -317,7 +310,7 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
 
     def answer(prompt):
         prompts.append(prompt)
-        if prompt.startswith("? Press Enter when you are ready"):
+        if prompt.startswith("? Open Google App Passwords"):
             assert opened_urls == []
         return next(answers)
 
@@ -341,7 +334,7 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
     ]
     assert opened_urls == [auth_email.GMAIL_APP_PASSWORDS_URL]
     assert any(
-        prompt.startswith("? Press Enter when you are ready") for prompt in prompts
+        prompt.startswith("? Open Google App Passwords") for prompt in prompts
     )
     assert "accounts.google.com/AccountChooser" in opened_urls[0]
     assert "myaccount.google.com%2Fapppasswords" in opened_urls[0]
@@ -390,7 +383,7 @@ def test_setup_auth_email_replaces_existing_gmail_sender(monkeypatch):
         types.SimpleNamespace(
             initialize=lambda: types.SimpleNamespace(
                 error=lambda message: message,
-                warning=lambda message: message,
+                warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
                 success=lambda message: message,
             )
         ),
@@ -569,7 +562,7 @@ def test_provider_auth_email_uses_resend_cloudflare_shortcut(monkeypatch):
     formatter = types.SimpleNamespace(
         initialize=lambda: types.SimpleNamespace(
             error=lambda message: message,
-            warning=lambda message: message,
+            warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
             success=lambda message: message,
             info=lambda message: message,
         )
@@ -667,7 +660,7 @@ def test_resend_auth_email_rerun_reuses_saved_sending_key_without_prompt(
     formatter = types.SimpleNamespace(
         initialize=lambda: types.SimpleNamespace(
             error=lambda message: message,
-            warning=lambda message: message,
+            warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
             success=lambda message: message,
             info=lambda message: message,
         )
@@ -736,7 +729,7 @@ def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
     formatter = types.SimpleNamespace(
         initialize=lambda: types.SimpleNamespace(
             error=lambda message: message,
-            warning=lambda message: message,
+            warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
             success=lambda message: message,
             info=lambda message: message,
         )
@@ -1149,7 +1142,7 @@ def test_identity_platform_setup_finishes_spinner_before_reporting_error(
     spinner.fail = lambda mark: events.append(("fail", mark))
     formatter = types.SimpleNamespace(
         initialize=lambda: types.SimpleNamespace(
-            yaspin=spinner_factory(spinner),
+            progress=spinner_factory(spinner),
             fail_glyph="X",
             ok_glyph="OK",
             error=lambda message, detail="": (

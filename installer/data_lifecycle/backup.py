@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -44,13 +47,13 @@ RUNTIME_CATALOG_OBJECT = "data-lifecycle/recovery-catalog.json"
 # @reason terminal animation is a presentation wrapper around tested lifecycle phases
 @contextmanager
 def _progress(formatter, message):
-    with formatter.yaspin(text=formatter.success(message)) as spinner:
+    with formatter.progress(text=message) as spinner:
         try:
             yield spinner
         except BaseException:
-            spinner.fail(formatter.fail_glyph)
+            spinner.fail()
             raise
-        spinner.ok(formatter.ok_glyph)
+        spinner.ok()
 
 
 # @testable false
@@ -205,7 +208,7 @@ def _try_refresh_runtime_catalog(context):
     try:
         _refresh_runtime_catalog(context)
     except Exception as error:
-        print(f"Warning: manual backup is valid, but the admin catalog was not refreshed: {error}")
+        print(ui.warning(f"manual backup is valid, but the admin catalog was not refreshed: {error}"))
 
 
 # @testable false
@@ -373,7 +376,7 @@ def create_backup(
                     progress=lambda current, total: setattr(
                         spinner,
                         "text",
-                        formatter.success(
+                        ui.info(
                             f"Saving referenced file versions ({current}/{total})"
                         ),
                     ),
@@ -541,8 +544,8 @@ def delete_backup(
             expected_backup_id=backup_id,
             expected_bucket=context.recovery_bucket,
         )
-    print(f"This will permanently delete only gs://{context.recovery_bucket}/{prefix}")
-    if str(confirm(format_prompt("Type DELETE to continue: "))).strip() != "DELETE":
+    print(ui.warning(f"This will permanently delete only gs://{context.recovery_bucket}/{prefix}"))
+    if str(confirm(format_prompt("Delete this backup", hint="Type DELETE to continue"))).strip() != "DELETE":
         raise DataLifecycleError("Backup deletion cancelled; confirmation did not match.")
     if manifest_blob is not None:
         generation = int(manifest_blob.generation or 0)
@@ -561,7 +564,7 @@ def delete_backup(
             continue
         blob.delete()
     _try_refresh_runtime_catalog(context)
-    print(f"Deleted backup {backup_id} from its exact v3 prefix.")
+    print(ui.success(f"Deleted backup {backup_id} from its exact v3 prefix."))
     return True
 
 
@@ -692,7 +695,7 @@ def prepare_automatic_backup(native_backup_id, context=None):
     context.delete_database(scratch)
     checkpoint.finish()
     checkpoint.remove()
-    print(f"Prepared automatic backup {value} as manual backup {backup_id}.")
+    print(ui.success(f"Prepared automatic backup {value} as manual backup {backup_id}."))
     return manifest
 
 

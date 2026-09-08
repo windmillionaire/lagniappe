@@ -1,3 +1,6 @@
+from runner import presentation as ui
+from runner.presentation import output as print
+
 import json
 import os
 
@@ -73,7 +76,7 @@ def activate_repository_gcloud(
             target["PROJECT"],
             **adc_options,
         )
-    print(wrap_text("[OK] Google Cloud configuration verified"))
+    print(ui.success("Google Cloud configuration verified"))
     for label, value in (
         ("Configuration", target["NAME"]),
         ("Account", target["ACCOUNT"]),
@@ -149,7 +152,7 @@ def is_account_authenticated(account):
 def check_account_authentication(account):
     """Check if account is authenticated, exit with instructions if not."""
     if not is_account_authenticated(account):
-        print(wrap_text("\nERROR: The saved account is not authenticated with gcloud."))
+        print(ui.error("The saved account is not authenticated with gcloud"))
         print(format_value("Account", account, verbatim=True))
         print(wrap_text("\nTo authenticate this account, run:"))
         print(f"\n  {format_command([GCLOUD_CLI, 'auth', 'login', account])}")
@@ -158,7 +161,7 @@ def check_account_authentication(account):
         authenticated = get_authenticated_accounts()
         if authenticated:
             for acc in authenticated:
-                print(f"  [OK] {acc}")
+                print(f"  - {acc}")
         else:
             print("  (none)")
         raise RuntimeError(f"Account '{account}' is not authenticated.")
@@ -179,7 +182,7 @@ def create_configuration(name, account, project):
     run_command(
         [GCLOUD_CLI, "config", "set", "project", project, "--configuration", name]
     )
-    print(wrap_text(f"[OK] Configuration '{name}' created successfully"))
+    print(ui.success(f"Configuration '{name}' created"))
 
 
 # @testable false
@@ -241,15 +244,13 @@ def verify_active_configuration(name, account, project, *, announce=True):
 
     if active != name or active_account != account or active_project != project:
         print(
-            wrap_text(
-                "\nERROR: Active gcloud configuration does not match expected settings"
-            )
+            ui.error("Active gcloud configuration does not match expected settings")
         )
         for heading, values in (
             ("Expected", (name, account, project)),
             ("Actual", (active, active_account, active_project)),
         ):
-            print(wrap_text(heading + ":"))
+            print(ui.heading(heading))
             for label, value in zip(("Configuration", "Account", "Project"), values):
                 print(format_value(label, value, column=17, verbatim=True))
         raise RuntimeError(
@@ -262,7 +263,7 @@ def verify_active_configuration(name, account, project, *, announce=True):
     os.environ["GOOGLE_CLOUD_QUOTA_PROJECT"] = project
     # os.environ["LAGNIAPPE_GCLOUD_CONFIGURED"] = name
     if announce:
-        print(wrap_text("[OK] Google Cloud configuration verified"))
+        print(ui.success("Google Cloud configuration verified"))
         for label, value in (
             ("Configuration", name),
             ("Account", account),
@@ -279,7 +280,7 @@ def display_configurations():
     configs = list_configurations()
     active = get_active_configuration()
 
-    print(wrap_text("\nGoogle Cloud configurations"))
+    print(ui.heading("\nGoogle Cloud configurations"))
 
     for config in configs:
         is_active = " (ACTIVE)" if config["name"] == active else ""

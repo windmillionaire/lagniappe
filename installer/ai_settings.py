@@ -1,3 +1,5 @@
+from runner import presentation as ui
+from runner.presentation import output as print
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_ai_settings_applies_saved_app_config
 # @matrix setup : ai-settings datastore
@@ -16,7 +18,7 @@ def get_ai_settings():
         ai_entity = ds.get(ai_key, timeout=DATASTORE_TIMEOUT)
     except Exception as e:
         print(f.warning(f"Could not check Datastore for AI settings: {e}"))
-        print(f.warning("Continuing update with existing AI model settings."))
+        print(ui.info("Continuing update with existing AI model settings."))
 
     return ai_entity
 
