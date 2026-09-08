@@ -343,6 +343,10 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
                 "AI_IMAGE_MODEL": "imagen-test",
                 "BUILD_ID": "stale-local-build",
                 "FIREBASE_CONFIG": '{"apiKey": "demo"}',
+                "AI_ENABLED": "True",
+                "EXTERNAL_AI_ENABLED": "False",
+                "REDIS_PORT": "6379",
+                "AUTH_EMAIL_CONFIG": {"senderEmail": "owner@example.com"},
             }
         )
     )
@@ -402,6 +406,13 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
         assert APP_DIR == app_dir
         assert Directory.CONFIG.value == config_files_dir
         assert Environment.TESTING.value == "testing"
+        assert SETTINGS.APP["AI_ENABLED"] is True
+        assert SETTINGS.APP["EXTERNAL_AI_ENABLED"] is False
+        assert SETTINGS.APP["REDIS_PORT"] == 6379
+        assert SETTINGS.APP["FIREBASE_CONFIG"] == {"apiKey": "demo"}
+        assert SETTINGS.APP["AUTH_EMAIL_CONFIG"] == {
+            "senderEmail": "owner@example.com"
+        }
 
         for file_ref in [
             File.APP_YAML,
@@ -1470,7 +1481,9 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
             capture_output=True,
             announce_progress=False,
         )
-        assert capsys.readouterr().out == "Deployment complete!\n"
+        from runner.presentation import success
+
+        assert capsys.readouterr().out == success("Deployment complete") + "\n"
         assert preflight_snapshots == [
             {"version": "1.23", "chunk_exists": True, "commands": []}
         ]
@@ -1569,7 +1582,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
 
         assert deploy_app(announce_completion=False)
         output = capsys.readouterr().out
-        assert "Current production frontend bundle detected; preserving it." in output
+        assert "Current production frontend bundle detected; preserving it" in output
         assert "running npm run build" not in output
         assert preflight_snapshots == [
             {"version": "1.23", "chunk_exists": True, "commands": []}

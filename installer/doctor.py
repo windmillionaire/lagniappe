@@ -11,6 +11,7 @@ import re
 
 import yaml
 
+from config import decode_app_settings
 from runner.context import REPOSITORY_ROOT, setup_command
 from installer.summary import expected_resource_lines
 
@@ -39,7 +40,10 @@ def _load_document(path):
     with path.open("r", encoding="utf-8", newline="") as document:
         if path.suffix == ".json":
             return json.load(document)
-        return yaml.safe_load(document) or {}
+        data = yaml.safe_load(document) or {}
+        if path.name == "lagniappe_settings.yaml":
+            return decode_app_settings(data)
+        return data
 
 
 # @testable false
@@ -326,7 +330,8 @@ def _keyless_identity_issues(settings, deploy):
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reports_drift_without_writing
-# @matrix setup : doctor drift independent-provider-check provider-identity read-only
+# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_decodes_saved_settings_and_guides_adc_alignment
+# @matrix setup : adc doctor drift independent-provider-check parsing provider-identity read-only
 def run_doctor(
     *,
     root=REPOSITORY_ROOT,
@@ -447,7 +452,7 @@ def run_doctor(
             )
         )
         if identity_issues:
-            print(ui.warning("Identity state: drift detected"))
+            print(ui.error("Identity state: drift detected"))
             for issue in identity_issues:
                 print(ui.info(f"  - {issue}"))
         else:
@@ -455,7 +460,18 @@ def run_doctor(
     else:
         identity_issues.append("saved setup identity is unavailable")
         issues.extend(identity_issues)
-        print(ui.warning("Identity state: unavailable"))
+        print(ui.error("Identity state: unavailable"))
+
+    if identity_issues:
+        command = "auth" if settings and saved_gcloud else "repair"
+        print(ui.value(
+            "Authentication command" if command == "auth" else "Repair command",
+            setup_command(command),
+            action=True,
+            verbatim=True,
+            standalone=True,
+        ))
+        return 1
 
     print(ui.heading("Expected target and provider resources:"))
     for line in expected_resource_lines(
@@ -469,7 +485,7 @@ def run_doctor(
     project = settings.get("GOOGLE_CLOUD_PROJECT") or saved_gcloud.get("PROJECT")
     provider_report = {}
     provider_issues = []
-    if settings and project and not identity_issues:
+    if settings and project:
         try:
             checker = provider_checker or _default_provider_checker
             provider_report = checker(settings, project)

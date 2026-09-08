@@ -48,6 +48,12 @@ Writes use UTF-8/LF, a same-directory temporary file, flush/fsync,
 rejected. Secret-bearing files receive owner-only POSIX mode and a restricted
 Windows ACL where available.
 
+The application settings file stores booleans/numbers as text and structured
+values as JSON strings. `decode_app_settings` provides the shared conversion
+used by `File.load()` and doctor; native YAML values also remain supported.
+Diagnostics must decode this persisted format before applying runtime
+validation, rather than passing raw YAML strings to feature-policy checks.
+
 After all generated files exist, `lagniappe_generation.json` records the
 SHA-256 generation of `config/constants.py`, excluding the random `BUILD_ID`
 line. Deploy verifies the marker and every generated document. Frontend builds

@@ -80,9 +80,15 @@ file permissions, saved gcloud/ADC identity, active operator permissions,
 required APIs/resources, runtime IAM, buckets, Identity Platform, Redis, and
 focused provider state, including the managed App Engine memory policy and
 selected MCP endpoint/version.
+It decodes saved settings through the same parser as the normal configuration
+loader. If gcloud or ADC identity is unavailable or mismatched, doctor stops
+before the resource inventory and provider checks and points to
+`./setup.sh auth`. That command aligns both CLI and ADC credentials; a direct
+`gcloud auth login` updates only the CLI login. Doctor never opens an ADC login
+itself. Rerun doctor after authentication completes.
 Independent provider checks still run when only local
 generated files have drifted. It returns nonzero for drift and prints the
-repair command.
+applicable authentication or repair command.
 
 `./setup.sh repair` is the mutating path. Confirm the reported project and
 identities before running it. Repair uses the normal setup lock and journal,
