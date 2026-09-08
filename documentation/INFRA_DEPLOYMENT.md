@@ -149,7 +149,11 @@ default display omits the project number. Missing ownership metadata stops
 deployment separately from a confirmed project mismatch.
 
 The component runs in the owner's existing Google Cloud project and resource
-region. Standard resource names are:
+region. Setup creates the MCP runtime and build accounts there, records each
+successful creation, and waits with bounded backoff for IAM readback before
+applying their roles. A missing readback immediately after creation is retried;
+permission failures stop provisioning. Later runs reuse accounts already found.
+Standard resource names are:
 
 | Resource | Name / purpose |
 | --- | --- |

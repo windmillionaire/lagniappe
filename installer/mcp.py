@@ -6,14 +6,15 @@ import json
 from pathlib import Path
 import re
 import tempfile
+import time
 from types import SimpleNamespace
 
 from config import SETTINGS
 from config.ai_settings import normalize_ai_features
 from config.locations import normalize_resource_region
 from config.remote_mcp import https_url, mcp_issuer, normalize_mcp_config
-from installer import iam
-from installer.errors import SetupError
+from installer import iam, wrap_text
+from installer.errors import ProviderTransientError, SetupError, retry_provider_call
 from installer.state import record_mutation, record_step
 from installer.utils import run_gcloud_command
 from runner.context import REPOSITORY_ROOT, setup_command
@@ -223,10 +224,46 @@ def reconcile_access(target, command, resource, grants=(), *, flags=(), remove_m
 # @covered-by installer/mcp.py::reconcile_resources
 # @reason account discovery and creation are exercised by the resource reconciler
 def _ensure_account(target, email):
-    if describe(target, ["iam", "service-accounts", "describe", email], optional=True) is None:
+    arguments = ["iam", "service-accounts", "describe", email]
+    account = describe(target, arguments, optional=True)
+    if account is None:
         _run(target, ["iam", "service-accounts", "create", email.partition("@")[0],
                       "--display-name=Lagniappe MCP"])
-    account = describe(target, ["iam", "service-accounts", "describe", email])
+        record_mutation("MCP account creation", action="created",
+                        resource="service-account", identifier=email)
+        from installer.gcloud import (
+            GCLOUD_API_PROPAGATION_ATTEMPTS,
+            GCLOUD_API_PROPAGATION_DELAYS,
+        )
+
+        # @testable false
+        # @covered-by installer/mcp.py::reconcile_resources
+        # @reason newly created account visibility is owned by resource provisioning
+        def read_created_account():
+            result = describe(target, arguments, optional=True)
+            if result is None:
+                raise ProviderTransientError(
+                    f"New MCP service account {email} is not visible yet."
+                )
+            return result
+
+        # @testable false
+        # @covered-by installer/mcp.py::reconcile_resources
+        # @reason propagation feedback and backoff are exercised by provisioning
+        def wait_for_visibility(delay):
+            print(wrap_text(
+                f"Waiting for Google IAM to make {email} available; "
+                f"retrying in {delay} seconds..."
+            ))
+            time.sleep(delay)
+
+        account = retry_provider_call(
+            read_created_account,
+            description="Verify newly created MCP service account",
+            attempts=GCLOUD_API_PROPAGATION_ATTEMPTS,
+            delays=GCLOUD_API_PROPAGATION_DELAYS,
+            sleep=wait_for_visibility,
+        )
     if account.get("email") != email or account.get("disabled"):
         raise SetupError("MCP service account is disabled or differs from the saved identity.")
 
@@ -234,7 +271,10 @@ def _ensure_account(target, email):
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_resources_use_separate_build_identity_and_scoped_roles
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_resource_upgrade_covers_oauth_referrers_and_preserves_other_exclusions
+# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_account_creation_waits_for_visibility
+# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_account_readback_failure_stops_before_more_resources
 # @matrix mcp-install : iam resources keyless privacy idempotence
+# @matrix mcp-install : provider-convergence fail-closed
 def reconcile_resources(target, deployer):
     require_permissions(target)
     _run(target, ["services", "enable", *SERVICES])

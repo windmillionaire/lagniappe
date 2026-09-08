@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from installer import mcp
-from installer.errors import SetupError
+from installer.errors import ProviderTransientError, SetupError
 
 pytestmark = pytest.mark.tooling
 
@@ -18,6 +18,12 @@ A valid container image can be referenced by tag or digest, has the format of
   LOCATION-docker.DOMAIN/PROJECT-ID/REPOSITORY-ID/IMAGE:tag
   LOCATION-docker.DOMAIN/PROJECT-ID/REPOSITORY-ID/IMAGE@sha256:digest
 """
+ACCOUNT_NOT_FOUND = (
+    "ERROR: (gcloud.iam.service-accounts.describe) NOT_FOUND: Service account "
+    "projects/-/serviceAccounts/{email} does not exist. This command is authenticated "
+    "as owner@example.test which is the active account specified by the "
+    "[core/account] property."
+)
 
 
 def settings():
@@ -84,6 +90,11 @@ class Cloud:
             else:
                 output = self.accounts.get(args[3])
                 missing = output is None
+                if missing:
+                    return SimpleNamespace(
+                        returncode=1, stdout="",
+                        stderr=ACCOUNT_NOT_FOUND.format(email=args[3]),
+                    )
         elif args[:2] == ["artifacts", "repositories"]:
             if args[2] == "create":
                 self.repository = {"format": "DOCKER"}
@@ -287,6 +298,77 @@ def test_mcp_resources_use_separate_build_identity_and_scoped_roles(cloud):
         with pytest.raises(SetupError, match=message):
             mcp.reconcile_resources(cloud.target, "owner@example.test")
         assert not any("set-iam-policy" in call for call in cloud.calls)
+
+
+# @matrix mcp-install : iam resources provider-convergence idempotence
+def test_mcp_account_creation_waits_for_visibility(cloud, monkeypatch, capsys):
+    pending_reads = {cloud.target.runtime: 2, cloud.target.build_account: 2}
+    mutations, waits = [], []
+    monkeypatch.setattr(mcp, "record_mutation", lambda step, **values: mutations.append(values))
+    monkeypatch.setattr(mcp.time, "sleep", waits.append)
+
+    def run(target, arguments, **kwargs):
+        result = cloud.run(target, arguments, **kwargs)
+        if arguments[:3] == ["iam", "service-accounts", "describe"] and not result.returncode:
+            email = arguments[3]
+            if pending_reads[email]:
+                assert any(row["action"] == "created" and row["identifier"] == email for row in mutations)
+                pending_reads[email] -= 1
+                return SimpleNamespace(
+                    returncode=1, stdout="", stderr=ACCOUNT_NOT_FOUND.format(email=email),
+                )
+        return result
+
+    monkeypatch.setattr(mcp, "_run", run)
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+
+    assert set(cloud.accounts) == set(pending_reads)
+    assert all(remaining == 0 for remaining in pending_reads.values())
+    assert waits == [2, 4, 2, 4]
+    assert "Waiting for Google IAM" in capsys.readouterr().out
+    assert cloud.repository == {"format": "DOCKER"}
+    assert len([call for call in cloud.calls if call[:3] == ["iam", "service-accounts", "create"]]) == 2
+
+    cloud.calls.clear()
+    waits.clear()
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+    assert waits == []
+    assert not any("create" in call for call in cloud.calls)
+
+
+# @matrix mcp-install : iam resources provider-convergence fail-closed
+@pytest.mark.parametrize("failure", ["missing", "permission"])
+def test_mcp_account_readback_failure_stops_before_more_resources(cloud, monkeypatch, failure):
+    mutations, waits = [], []
+    monkeypatch.setattr(mcp, "record_mutation", lambda step, **values: mutations.append(values))
+    monkeypatch.setattr(mcp.time, "sleep", waits.append)
+
+    def run(target, arguments, **kwargs):
+        result = cloud.run(target, arguments, **kwargs)
+        if arguments[:3] == ["iam", "service-accounts", "describe"] and not result.returncode:
+            error = (
+                ACCOUNT_NOT_FOUND.format(email=arguments[3])
+                if failure == "missing" else "PERMISSION_DENIED: not allowed to read this account"
+            )
+            return SimpleNamespace(returncode=1, stdout="", stderr=error)
+        return result
+
+    monkeypatch.setattr(mcp, "_run", run)
+    error_type = ProviderTransientError if failure == "missing" else SetupError
+    with pytest.raises(error_type):
+        mcp.reconcile_resources(cloud.target, "owner@example.test")
+
+    assert len([call for call in cloud.calls if call[:3] == ["iam", "service-accounts", "create"]]) == 1
+    assert cloud.repository is None
+    assert cloud.bucket is None
+    assert mutations == [{
+        "action": "created", "resource": "service-account", "identifier": cloud.target.runtime,
+    }]
+    if failure == "missing":
+        assert 1 < len(waits) < 10
+        assert sum(waits) <= 120
+    else:
+        assert waits == []
 
 
 # @matrix mcp-install : resources privacy idempotence
