@@ -338,6 +338,33 @@ def configure_ai_observability():
 
 
 # @testable true
+# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_connection_name_prompt
+# @matrix setup : interactive-input settings-save validation
+def configure_mcp_name():
+    """Choose the saved connection name used by the installation's manual."""
+    from config import SETTINGS
+    from config.remote_mcp import mcp_connection_name
+
+    default = SETTINGS.APP.get("MCP_NAME")
+    if not default:
+        default = f"{SETTINGS.APP.get('GCLOUD_CONFIG') or 'lagniappe'}-mcp"
+    try:
+        mcp_connection_name(default)
+    except ValueError:
+        default = "lagniappe-mcp"
+    print(wrap_text("The manual uses this name in connection instructions and copyable commands."))
+    while True:
+        answer = input(format_prompt(f"MCP connection name [{default}]")).strip()
+        try:
+            name = mcp_connection_name(answer or default)
+        except ValueError as error:
+            print(wrap_text(str(error)))
+            continue
+        SETTINGS.APP["MCP_NAME"] = name
+        return name
+
+
+# @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
 # @matrix setup : ai-model ai-observability optional settings-save site-policy
 def configure_ai_features():
@@ -387,6 +414,8 @@ def configure_ai_features():
             .casefold()
         )
         SETTINGS.APP["EXTERNAL_AI_ENABLED"] = answer in {"y", "yes"} if answer else previous
+        if SETTINGS.APP["EXTERNAL_AI_ENABLED"]:
+            configure_mcp_name()
         configure_ai_observability()
     SETTINGS.save()
     return enabled

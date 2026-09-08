@@ -12,6 +12,39 @@ from installer.errors import ProviderTransientError, SetupError
 
 pytestmark = pytest.mark.tooling
 
+
+# @matrix setup : interactive-input settings-save validation
+@pytest.mark.parametrize(
+    "app,answers,expected",
+    [
+        ({"GCLOUD_CONFIG": "cwright"}, [""], "cwright-mcp"),
+        ({"MCP_NAME": "saved-mcp"}, [""], "saved-mcp"),
+        ({"MCP_NAME": "saved-mcp"}, ["cwright-mcp"], "cwright-mcp"),
+        ({}, [""], "lagniappe-mcp"),
+        ({"GCLOUD_CONFIG": "invalid name"}, [""], "lagniappe-mcp"),
+        ({}, ["bad name", "$(pwd)", "cwright-mcp"], "cwright-mcp"),
+    ],
+)
+def test_mcp_connection_name_prompt(monkeypatch, app, answers, expected):
+    import config
+    from installer.optional import configure_mcp_name
+
+    settings = SimpleNamespace(APP=dict(app))
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    responses = iter(answers)
+    prompts = []
+
+    def answer(prompt):
+        prompts.append(prompt)
+        return next(responses)
+
+    monkeypatch.setattr("builtins.input", answer)
+    assert configure_mcp_name() == expected
+    assert settings.APP["MCP_NAME"] == expected
+    assert len(prompts) == len(answers)
+    assert all(prompt.startswith("? MCP connection name [") for prompt in prompts)
+
+
 IMAGE_NOT_FOUND = """ERROR: (gcloud.artifacts.docker.images.describe) Image not found.
 
 A valid container image can be referenced by tag or digest, has the format of

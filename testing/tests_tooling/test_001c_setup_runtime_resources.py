@@ -4704,7 +4704,7 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     )
     settings._saves.clear()
     answers = iter(
-        ["n", "n", "y", "y", "y"]
+        ["n", "n", "y", "y", "cwright-mcp", "y"]
     )
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
@@ -4724,6 +4724,7 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     assert settings.APP["AI_IMAGE_MODEL"] == "imagen-old"
     assert settings.APP["AI_ENABLED"] is True
     assert settings.APP["EXTERNAL_AI_ENABLED"] is True
+    assert settings.APP["MCP_NAME"] == "cwright-mcp"
     assert "Admin → Site Settings → AI Models" in setup_output
     assert settings.APP["AI_OBSERVABILITY"] is True
     assert len(settings._saves) == 2

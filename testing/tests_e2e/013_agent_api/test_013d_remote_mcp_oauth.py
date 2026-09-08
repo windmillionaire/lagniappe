@@ -751,6 +751,7 @@ def test_site_policy_closes_oauth_discovery_and_external_routes(pilot, monkeypat
 # @source lagniappe/web/responses.py::manual_content
 def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pilot, monkeypatch):
     pilot.actor.access = lambda _: False
+    monkeypatch.setattr(CONFIG, "MCP_NAME", "cwright-mcp")
     monkeypatch.setattr(CONFIG, "CUSTOM_DOMAIN", "workspace.example.test")
     monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", True)
     _login(pilot)
@@ -761,22 +762,27 @@ def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pi
     assert "https://pilot.run.app/mcp" in text
     assert "https://workspace.example.test/api/v1/client-skill.md" in text
     assert (
-        "codex mcp add lagniappe-remote --url https://pilot.run.app/mcp "
+        "codex mcp add cwright-mcp --url https://pilot.run.app/mcp "
         "--oauth-client-id lagniappe-codex"
     ) in text
-    assert "codex mcp login lagniappe-remote" in text
+    assert "codex mcp login cwright-mcp" in text
+    assert 'data-role="external-ai-chatgpt-setup"' in text
     assert "Restart any existing Codex sessions" in text
     assert "MCP-ENDPOINT" not in text
     assert re.search(r'<details\s+data-role="external-ai-help">', text)
     assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
     # Another installation must render its own configured URL in the command.
     monkeypatch.setattr(CONFIG, "MCP_RESOURCE", "https://another-installation.run.app/mcp")
+    monkeypatch.setattr(CONFIG, "MCP_NAME", "another-mcp")
     another = _open(pilot, "GET", "/manual/section/ai").text
-    assert "--url https://another-installation.run.app/mcp " in another
+    assert "codex mcp add another-mcp --url https://another-installation.run.app/mcp " in another
+    assert "codex mcp login another-mcp" in another
+    assert "cwright-mcp" not in another
     assert "https://pilot.run.app/mcp" not in another
     monkeypatch.setattr(CONFIG, "MCP_RESOURCE", None)
     disabled = _open(pilot, "GET", "/manual/section/ai").text
     assert 'data-role="external-ai-codex-setup"' not in disabled
+    assert 'data-role="external-ai-chatgpt-setup"' not in disabled
     for anonymous in (False, True):
         pilot.actor.is_public = True
         if anonymous:
@@ -789,6 +795,7 @@ def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pi
         assert "https://pilot.run.app/mcp" not in response.text
         assert "https://another-installation.run.app/mcp" not in response.text
         assert "https://workspace.example.test" not in response.text
+        assert "another-mcp" not in response.text
         assert "/api/v1/client-skill.md" in response.text
         assert (
             "codex mcp add lagniappe-remote --url https://MCP-ENDPOINT/mcp "

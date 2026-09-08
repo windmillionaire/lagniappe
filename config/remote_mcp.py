@@ -16,6 +16,19 @@ PENDING_SECONDS = 10 * 60
 REFRESH_SECONDS = 30 * 24 * 60 * 60
 
 
+# @testable true
+# @tests tests_tooling/test_012c_remote_mcp_config.py::test_mcp_connection_name_is_safe_for_copyable_commands
+# @matrix mcp-oauth : configuration validation
+def mcp_connection_name(value="lagniappe-remote"):
+    """Validate the connection alias embedded in user-facing shell commands."""
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", value):
+        raise ValueError(
+            "MCP connection name must be 1–64 letters, numbers, hyphens or "
+            "underscores, starting with a letter or number"
+        )
+    return value
+
+
 # @testable false
 # @covered-by config/remote_mcp.py::normalize_mcp_config
 def https_url(value, *, origin=False):
@@ -49,10 +62,11 @@ def https_url(value, *, origin=False):
 # @matrix mcp-oauth : configuration validation
 def normalize_mcp_config(settings):
     """Validate the installed endpoint and identity, including while AI is off."""
+    name = mcp_connection_name(settings.get("MCP_NAME", "lagniappe-remote"))
     resource = settings.get("MCP_RESOURCE")
     service_account = settings.get("MCP_SERVICE_ACCOUNT")
     if resource is None and service_account is None:
-        return {"MCP_RESOURCE": None, "MCP_SERVICE_ACCOUNT": None}
+        return {"MCP_NAME": name, "MCP_RESOURCE": None, "MCP_SERVICE_ACCOUNT": None}
     issuer = mcp_issuer(settings)
     resource = https_url(resource)
     if urlsplit(resource).path != "/mcp" or resource == issuer + "/mcp":
@@ -62,7 +76,7 @@ def normalize_mcp_config(settings):
         service_account,
     ):
         raise ValueError("Remote MCP requires its exact runtime service account")
-    return {"MCP_RESOURCE": resource, "MCP_SERVICE_ACCOUNT": service_account}
+    return {"MCP_NAME": name, "MCP_RESOURCE": resource, "MCP_SERVICE_ACCOUNT": service_account}
 
 
 # @testable true

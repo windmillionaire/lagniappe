@@ -222,19 +222,32 @@ its email need not match the agent account. Eligible active non-public users
 may connect without an installation-specific actor list. No local
 MCP package or upload helper is installed.
 
-For Codex, configure the server URL and fixed public client:
+The AI Integration manual includes ChatGPT desktop/web plugin setup: enable
+Developer mode in Settings → Security and login, open Plugins, add a connection
+with the installation's saved `MCP_NAME` and full `MCP_RESOURCE`, and authorize
+with an eligible Lagniappe account. Availability follows the ChatGPT account
+and workspace policy. See OpenAI's
+[connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt).
+
+For Codex, configure the server URL and fixed public client. This example
+assumes setup saved `MCP_NAME: cwright-mcp`:
 
 ```bash
-codex mcp add lagniappe-remote --url https://MCP-ENDPOINT/mcp --oauth-client-id lagniappe-codex
-codex mcp login lagniappe-remote
+codex mcp add cwright-mcp --url https://MCP-ENDPOINT/mcp --oauth-client-id lagniappe-codex
+codex mcp login cwright-mcp
 ```
 
 The AI Integration manual gives signed-in non-public users the setup command
-using `MCP_RESOURCE` when external AI and MCP are configured. Public readers see a placeholder
+using `MCP_NAME` and `MCP_RESOURCE` when external AI and MCP are configured, so
+the copied command needs no edits. Public readers see placeholders
 and must obtain the installation's MCP URL and an eligible account. The add
 command can start sign-in automatically; use login if needed or to reconnect,
 then restart existing Codex sessions. OAuth uses current workspace permissions
 without scope negotiation; no `--scopes` option is needed.
+The name is the local Codex registration key; the fixed OAuth client ID remains
+`lagniappe-codex`. `./setup.sh ai` can change the saved name used for future
+connections. Codex in the ChatGPT desktop app shares the CLI's local MCP
+configuration; ChatGPT web uses its separately authorized plugin connection.
 
 A `tool_timeout_sec` of 300 and `startup_timeout_sec` of 60 accommodate uploads
 and startup. `required = true` makes missing initialization visible; it does not

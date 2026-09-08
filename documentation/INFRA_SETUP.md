@@ -85,7 +85,8 @@ The default flow is deliberately ordered:
    delegated installation, optional otherwise);
 8. configure Redis and optional TLS;
 9. choose error reporting, whether AI is enabled, external AI/MCP and AI observability;
-   show the default models once, with instructions to change them in Admin;
+   show the default models once, with instructions to change them in Admin,
+   and ask for the installation's MCP connection name when external AI is selected;
 10. write generated settings, indexes, and PWA metadata;
 11. optionally configure AI email when its prerequisites are present;
 12. prepare optional MCP resources, deploy App Engine, then activate/update MCP; and

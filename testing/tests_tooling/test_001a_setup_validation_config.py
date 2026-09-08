@@ -2288,14 +2288,15 @@ def test_verify_application_config_reports_missing_areas(monkeypatch, capsys):
 @pytest.mark.parametrize(
     "upgrade,policy,answers,expected_policy,expect_mcp",
     [
-        (True, {}, ["y", "y", "n"], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, True),
+        (True, {}, ["y", "y", "cwright-mcp", "n"], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, True),
         (True, {}, ["y", "n", "n"], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": False}, False),
         (True, {}, ["n"], {"AI_ENABLED": False, "EXTERNAL_AI_ENABLED": False}, False),
         (True, {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": False}, [], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": False}, False),
-        (True, {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, [], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, True),
+        (True, {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True, "MCP_NAME": "saved-mcp"}, [], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, True),
+        (True, {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, ["cwright-mcp"], {"AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True}, True),
         (False, {}, [], {}, False),
     ],
-    ids=["enable-mcp", "decline-mcp", "disable-ai", "saved-disabled", "saved-enabled", "ordinary-update"],
+    ids=["enable-mcp", "decline-mcp", "disable-ai", "saved-disabled", "saved-enabled", "missing-name", "ordinary-update"],
 )
 def test_upgrade_collects_missing_ai_choices(
     monkeypatch, upgrade, policy, answers, expected_policy, expect_mcp,
@@ -2330,10 +2331,15 @@ def test_upgrade_collects_missing_ai_choices(
     assert settings.APP["AI_MODEL"] == "saved-model"
     assert bool(saved) is bool(answers)
     assert len(prompts) == len(answers)
+    if expect_mcp:
+        assert settings.APP["MCP_NAME"] == policy.get("MCP_NAME", "cwright-mcp")
     if answers:
-        assert prompts[0] == "? Enable AI features [Y/n]"
-        if expected_policy["AI_ENABLED"]:
-            assert prompts[1] == "? Enable external AI access and the MCP server [y/N]"
+        if "EXTERNAL_AI_ENABLED" not in policy:
+            assert prompts[0] == "? Enable AI features [Y/n]"
+            if expected_policy["AI_ENABLED"]:
+                assert prompts[1] == "? Enable external AI access and the MCP server [y/N]"
+        else:
+            assert prompts[0] == "? MCP connection name [lagniappe-mcp]"
         assert saved[-1] == settings.APP
         prompts.clear()
         saved.clear()

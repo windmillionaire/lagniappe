@@ -1649,11 +1649,12 @@ def test_recovery_preserves_ai_policy_without_implicitly_selecting_mcp():
     legacy = recovery.validate_recovery_document(snapshot)
     assert "EXTERNAL_AI_ENABLED" not in legacy
     assert not requested(legacy)
-    snapshot.update(AI_ENABLED=False, EXTERNAL_AI_ENABLED=False, MCP_VERSION="a" * 32)
+    snapshot.update(AI_ENABLED=False, EXTERNAL_AI_ENABLED=False, MCP_VERSION="a" * 32, MCP_NAME="cwright-mcp")
     restored = recovery.validate_recovery_document(snapshot)
     assert restored["AI_ENABLED"] is False
     assert restored["EXTERNAL_AI_ENABLED"] is False
     assert restored["MCP_VERSION"] == "a" * 32
-    for field, value in (("AI_ENABLED", "false"), ("EXTERNAL_AI_ENABLED", 1), ("MCP_VERSION", "manual-version")):
+    assert restored["MCP_NAME"] == "cwright-mcp"
+    for field, value in (("AI_ENABLED", "false"), ("EXTERNAL_AI_ENABLED", 1), ("MCP_VERSION", "manual-version"), ("MCP_NAME", "bad;command")):
         with pytest.raises(recovery.RecoveryConfigurationError, match="AI configuration"):
             recovery.validate_recovery_document({**snapshot, field: value})

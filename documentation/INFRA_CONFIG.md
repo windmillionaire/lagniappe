@@ -207,6 +207,11 @@ choices are preserved by update/recovery. Source upgrade asks for AI choices
 when `EXTERNAL_AI_ENABLED` has not yet been recorded; selecting external AI
 provisions MCP during that upgrade's deployment. Later upgrades preserve the
 saved choice. `./setup.sh ai` changes these choices and offers to deploy them.
+When external AI is selected, setup also asks for an MCP connection name and
+saves it as `MCP_NAME`. The default is the installation's saved `GCLOUD_CONFIG`
+name plus `-mcp`; an existing choice is offered unchanged. Source upgrade asks
+only for this name when external AI is already selected but the name is absent.
+Updates and recovery retain it, including while AI is disabled.
 Legacy configurations lacking the flags retain their existing built-in and REST
 API behavior on ordinary update; missing external policy does **not** implicitly
 install a Cloud Run service. A previously enabled remote service
@@ -214,12 +219,13 @@ continues to be selected through its saved `MCP_RESOURCE`. New installations
 always save explicit choices. Normal config generation also writes the
 `AI_ENABLED` default explicitly when it was absent.
 
-MCP deployment details are flat application settings, validated by
-`config/remote_mcp.py`. Normal setup fills them from the selected project and
-verified Cloud Run service:
+MCP connection and deployment details are flat application settings, validated
+by `config/remote_mcp.py`. Setup collects the connection name and discovers the
+endpoint and runtime identity from the selected project and verified Cloud Run service:
 
 | Field | Contract |
 | --- | --- |
+| `MCP_NAME` | Installation's connection name for manual commands and ChatGPT plugin setup. 1–64 ASCII letters, digits, hyphens or underscores, starting with a letter or digit. |
 | `MCP_RESOURCE` | Exact canonical Cloud Run `status.url` plus `/mcp`, on a different origin from the application. |
 | `MCP_SERVICE_ACCOUNT` | Exact MCP runtime identity in this project. |
 | `MCP_VERSION` | Desired 32-character hexadecimal source fingerprint. |
@@ -228,6 +234,11 @@ The endpoint and service account must be present together. Without them, MCP
 OAuth is unavailable. Disabling external AI retains both values for re-enabling.
 There is no separate MCP or per-client switch, and no actor list in CONFIG.
 Eligible active non-public users may connect within their workspace permissions.
+The name is a client-facing alias, independent of the Cloud Run service,
+service accounts and OAuth client IDs. Changing it updates the manual for new
+connections; existing client registrations keep their local names. Runtime
+configuration without a saved name uses `lagniappe-remote` until setup collects
+the installation's choice.
 
 The issuer is derived from `CUSTOM_DOMAIN` when configured, otherwise `APP_URL`.
 It is a canonical HTTPS origin without a path or trailing slash. The upstream

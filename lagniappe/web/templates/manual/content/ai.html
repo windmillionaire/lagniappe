@@ -123,6 +123,7 @@
         {% if show_connection_details %}
           <div data-role="external-ai-account-details" class="space-y-2">
             {% if CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE %}
+              <p>Connection name: <code>{{ CONFIG.MCP_NAME }}</code></p>
               <p>MCP server: <code>{{ CONFIG.MCP_RESOURCE }}</code></p>
             {% else %}
               <p>Ask the installation Owner for the MCP server address once setup is complete.</p>
@@ -137,9 +138,46 @@
             example host with the installation's website address.</p>
         {% endif %}
         {% if not show_connection_details or (CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE) %}
-          {% set codex_mcp_url = CONFIG.MCP_RESOURCE if show_connection_details else 'https://MCP-ENDPOINT/mcp' %}
+          {% set mcp_url = CONFIG.MCP_RESOURCE if show_connection_details else 'https://MCP-ENDPOINT/mcp' %}
+          {% set mcp_name = CONFIG.MCP_NAME if show_connection_details else 'lagniappe-remote' %}
+          <div data-role="external-ai-chatgpt-setup" class="space-y-3">
+            <h3 class="font-semibold text-page-default">Connect ChatGPT: app or web plugin</h3>
+            <p>You can add this installation as a custom plugin in the ChatGPT
+              desktop app or on the web. No Codex CLI or Lagniappe API key is needed.</p>
+            <ol class="list-decimal pl-5 space-y-2">
+              <li>In ChatGPT, open <strong>Settings / Security and login</strong>
+                and enable <strong>Developer mode</strong>. Availability depends
+                on your ChatGPT account and workspace policy.</li>
+              <li>Open <strong>Plugins</strong> and select the <strong>+</strong>
+                button to add a connection. Enter <code>{{ mcp_name }}</code>
+                as the name and a description such as “Connect to my Lagniappe workspace.”</li>
+              <li>Under <strong>Connection</strong>, enter the MCP server URL:
+                <code>{{ mcp_url }}</code>.
+                {% if not show_connection_details %}
+                  Obtain the connection name and full MCP URL from the installation
+                  Owner and replace these examples.
+                {% endif %}
+                Choose <strong>OAuth</strong> if asked for an authentication method,
+                then create the connection.</li>
+              <li>Follow the sign-in prompt, sign in to your invited Lagniappe
+                account, check the account shown, and choose <strong>Allow</strong>.
+                ChatGPT may ask you to connect during setup or the first use.</li>
+              <li>Start a new chat, select the plugin from the tools menu, and
+                ask ChatGPT which Lagniappe account it is using. Then ask it to
+                find a page you know you can access.</li>
+            </ol>
+            <p>If ChatGPT asks you to reconnect later, use its
+              <strong>Reconnect</strong> action and authorize again.
+              Manage or remove the plugin from <strong>Plugins</strong>.
+              To revoke its Lagniappe access, open
+              <strong>Settings / Manage AI connections</strong> in Lagniappe.</p>
+            <p class="text-sm">See OpenAI's
+              {{ link('https://developers.openai.com/plugins/deploy/connect-chatgpt', 'connection instructions') }}
+              and {{ link('https://learn.chatgpt.com/docs/plugins', 'plugin guide') }}
+              for current ChatGPT controls.</p>
+          </div>
           <div data-role="external-ai-codex-setup" class="space-y-3">
-            <h3 class="font-semibold text-page-default">Connect Codex</h3>
+            <h3 class="font-semibold text-page-default">Connect Codex CLI</h3>
             <p>With Codex CLI installed, run this command in a terminal.
               No Lagniappe API key or local Lagniappe package is needed.</p>
             {% if not show_connection_details %}
@@ -147,14 +185,16 @@
                 replace <code>https://MCP-ENDPOINT/mcp</code> with its MCP
                 server URL. You need an invited, non-public Lagniappe account.</p>
             {% endif %}
-            {{ code('codex mcp add lagniappe-remote --url ' ~ codex_mcp_url ~ ' --oauth-client-id lagniappe-codex') }}
+            {{ code('codex mcp add ' ~ mcp_name ~ ' --url ' ~ mcp_url ~ ' --oauth-client-id lagniappe-codex') }}
             <p>Follow the sign-in link printed by Codex. Sign in to Lagniappe,
               check the account shown on the consent page, then choose <strong>Allow</strong>.</p>
             <p>If sign-in does not start, or you need to reconnect later, run:</p>
-            {{ code('codex mcp login lagniappe-remote') }}
+            {{ code('codex mcp login ' ~ mcp_name) }}
             <p>When the terminal confirms login, you can close the localhost
               completion tab. Restart any existing Codex sessions to load the
               connection, then ask Codex to check which Lagniappe account it is using.</p>
+            <p>Codex in the ChatGPT desktop app shares this local MCP configuration.
+              Restart it after setup. ChatGPT web uses the plugin connection above.</p>
             <p>To switch accounts, sign in to the intended account in Lagniappe
               first, then run the login command again and restart Codex.
               To revoke a connection, open <strong>Settings / Manage AI connections</strong>

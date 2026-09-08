@@ -2275,6 +2275,14 @@ def verify_application_config(upgrade=False):
         from installer.optional import configure_ai_features
 
         configure_ai_features()
+    elif upgrade and "MCP_NAME" not in SETTINGS.APP:
+        from installer.mcp import requested
+
+        if requested(SETTINGS.APP):
+            from installer.optional import configure_mcp_name
+
+            configure_mcp_name()
+            SETTINGS.save()
 
     print(f.success(wrap_text("Application configuration verified.")))
     return True
