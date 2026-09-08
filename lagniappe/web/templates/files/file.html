@@ -99,8 +99,8 @@
 {% endmacro %}
 
 {% macro linked_badges(file) %}
-  {% set linked_pages = file.pages if file.properties.get("pages") else [] %}
-  {% set linked_tasks = file.linked_tasks if file.properties.get("tasks") else [] %}
+  {% set linked_pages = [file.page] if file.properties.get("page") and file.page else [] %}
+  {% set linked_tasks = [file.task] if file.properties.get("task") and file.task else [] %}
   {% if linked_pages or linked_tasks %}
     <div class="flex flex-row flex-wrap items-center gap-2 mt-3"
          data-role="linked-entities">

@@ -236,6 +236,7 @@ class MutationIntent:
     cache_kind: str | None = None
     path: str | None = None
     visibility: str | None = None
+    depends_on: tuple[Any, ...] | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     # @testable false
@@ -268,6 +269,7 @@ class MutationIntent:
         property_updates=("modified",),
         refresh_cache=True,
         reason,
+        depends_on=None,
     ):
         mask = tuple(dict.fromkeys((*properties, *property_updates)))
         if not mask:
@@ -279,13 +281,14 @@ class MutationIntent:
             property_updates=tuple(property_updates),
             refresh_cache=refresh_cache,
             reason=reason,
+            depends_on=None if depends_on is None else tuple(depends_on),
         )
 
     @classmethod
     # @testable false
     # @covered-by lagniappe/core/definitions/mutations.py::MutationIntent
     # @reason intent factories are exercised through typed intent planning
-    def touch(cls, entity, *, refresh_cache=True, reason):
+    def touch(cls, entity, *, refresh_cache=True, reason, depends_on=None):
         return cls(
             MutationIntentType.TOUCH,
             entity=entity,
@@ -293,6 +296,7 @@ class MutationIntent:
             property_updates=("modified",),
             refresh_cache=refresh_cache,
             reason=reason,
+            depends_on=None if depends_on is None else tuple(depends_on),
         )
 
     @classmethod

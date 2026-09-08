@@ -1,32 +1,45 @@
-from ..mixins import RelatedEntityListMixin, RelatedEntityMixin
+from ..mixins import RelatedEntityMixin
 from .base_db import DBProperty
 
 
 # @testable true
-# @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_lists_pages_that_reference_it
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_page_shows_linked_page_and_task_badges
-# @matrix file : attached-pages badges permissions reverse-links
-class AttachedToPages(RelatedEntityListMixin, DBProperty):
-    """Pages that a file is attached to (permission-checked on get)."""
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_move_preserves_single_ownership
+# @matrix files : ownership cardinality parent-key
+class AttachedPage(RelatedEntityMixin, DBProperty):
+    """The single Page owning this File."""
 
-    _id = "pages"
+    _id = "page"
     _kind = "page"
-    _label = "Pages"
+    _label = "Page"
     _icon = "page"
+    other = "task"
+
+    @property
+    def value(self):
+        return RelatedEntityMixin.value.fget(self)
+
+    @value.setter
+    def value(self, value):
+        if value is not None:
+            if getattr(value, "entity_kind", None) != self._kind:
+                raise ValueError(f"File {self.id} must be a live {self._kind}")
+            if self.entity.db.get(self.other):
+                raise ValueError("A File cannot belong to both a Page and a Task")
+        RelatedEntityMixin.value.fset(self, value)
+        self.entity.properties.requires.unset()
+        self.entity.properties.restricted_to.unset()
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_file_reverse_task_links_drive_permissions_and_references
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_page_shows_linked_page_and_task_badges
-# @matrix file : attached-tasks badges permissions reverse-links
-class AttachedToTasks(RelatedEntityListMixin, DBProperty):
-    """Tasks and task history entries that reference a file."""
+# @testable false
+# @covered-by lagniappe/core/properties/file_related.py::AttachedPage
+class AttachedTask(AttachedPage):
+    """The single live Task owning this File; histories are references only."""
 
-    _id = "tasks"
+    _id = "task"
     _kind = "task"
-    _label = "Tasks"
+    _label = "Task"
     _icon = "task"
-    _touch_members = False
+    other = "page"
 
 
 # @testable true

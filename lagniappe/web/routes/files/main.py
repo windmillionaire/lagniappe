@@ -7,7 +7,6 @@ from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
-from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -72,29 +71,13 @@ def delete(key, **kwargs):
     abort_public_user_action()
 
     file = kwargs["entity"]
-    removed_pages = []
-
-    if hasattr(file.properties, "pages"):
-        Entities.fetch(*file.pages, request=Fetch.direct())
-        for p in [p for p in file.pages if p.allowed(Action.EDIT)]:
-            if file.properties.pages.remove(p):
-                removed_pages.append(p)
-    else:
-        Entities.delete(file)
-        return responses.ok()
-
-    if file.pages:
-        Entities.save(file, *file.pages, *removed_pages)
-    else:
-        Entities.delete(file)
-        Entities.save(*removed_pages)
-
+    Entities.delete(file)
     return responses.ok()
 
 
 # @testable true
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_update_persists_name_and_summary
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_page_links_can_be_added_and_removed
+# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_moves_between_page_and_task
 # @tests tests_unit/test_006_file_properties.py::test_extract_process
 # @tests tests_unit/test_006_file_properties.py::test_summarize_process
 # @matrix file : add display-name extract info-update linked-pages reload remove summarize summary
@@ -110,69 +93,24 @@ def update(key, **kwargs):
         require_ai_access(AI.CREATE)
 
     file = kwargs["entity"]
-    previous_pages = Entities.fetch(*file.pages, request=Fetch.direct())
+    if request.form.get("pages-control") or request.form.getlist("page"):
+        return responses.error("Select one File owner.")
+    changed = False
+    if request.form.get("owner-control"):
+        try:
+            owner = SubmittedReferenceResolver(current_user, request.form.get("owner-key")).one(
+                request.form.get("owner-key"), expected=(Entities.PAGE, Entities.TASK),
+                action=Action.EDIT, required=True,
+            )
+            changed = file.move_to(owner)
+        except (exceptions.ValidationError, ValueError) as error:
+            return responses.error(str(error))
     file.update(request.form)
-    if request.form.get("pages-control") == "true":
-        _update_file_pages(file, request.form)
-
-    removed_pages = _removed_pages(previous_pages, file.pages)
-    Entities.save(file, *file.pages, *removed_pages)
+    Entities.save(file)
     file.dispatch_pending_processing()
-
-    if _page_links_changed(previous_pages, file.pages):
+    if changed:
         return responses.json_response({"reload": True})
-
     return responses.file_info(file)
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/files/main.py::update
-# @reason route-local parser preserves uneditable relations while applying submitted page links
-def _update_file_pages(file, form):
-    submitted_ids = set(form.getlist("page"))
-    submitted_keys = {
-        key
-        for key in (database_get.datastore_key(identifier) for identifier in submitted_ids)
-        if key
-    }
-    loaded_pages = Entities.fetch(
-        *submitted_ids,
-        *file.pages,
-        request=Fetch.direct(),
-    )
-    pages_by_key = {page.key: page for page in loaded_pages}
-    submitted = [
-        page
-        for page in loaded_pages
-        if isinstance(page, Entities.PAGE)
-        and page.key in submitted_keys
-        and page.allowed(Action.EDIT)
-    ]
-    preserved = [
-        pages_by_key.get(page.key, page)
-        for page in file.pages
-        if not pages_by_key.get(page.key, page).allowed(Action.EDIT)
-    ]
-
-    pages = {page.key: page for page in [*preserved, *submitted] if page}
-    file.properties.pages.value = list(pages.values())
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/files/main.py::update
-# @reason small relation diff helper owned by the file info update route
-def _removed_pages(previous_pages, current_pages):
-    current_keys = {page.key for page in current_pages}
-    return [page for page in previous_pages if page.key not in current_keys]
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/files/main.py::update
-# @reason small relation diff helper owned by the file info update route
-def _page_links_changed(previous_pages, current_pages):
-    previous_keys = {page.key for page in previous_pages}
-    current_keys = {page.key for page in current_pages}
-    return previous_keys != current_keys
 
 
 # @testable false
@@ -235,7 +173,7 @@ def get_html(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_file_to_page
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_multiple_files_to_page_hides_existing_file_select
+# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_multiple_files_to_page_without_existing_file_select
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_page_editor_without_ai_create_is_rejected_before_batch_summary
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_text_file_renders_original_content_in_text_tab
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview
@@ -256,7 +194,10 @@ def upload(key, **kwargs):
     uploads = _uploaded_page_files()
     existing_file = request.form.get("existing-file")
 
-    if not uploads and not existing_file:
+    if existing_file:
+        return responses.error("Upload a new File or move it from File Info.")
+
+    if not uploads:
         return responses.error("No file uploaded")
 
     if uploads:
@@ -275,22 +216,6 @@ def upload(key, **kwargs):
             for upload in uploads
         ]
         _summarize_page_uploads(uploaded_files)
-    elif existing_file:
-        try:
-            existing = SubmittedReferenceResolver(
-                current_user,
-                existing_file,
-            ).one(
-                existing_file,
-                expected=Entities.FILE,
-                action=Action.VIEW,
-                required=True,
-            )
-        except exceptions.ValidationError as error:
-            return responses.error(str(error))
-        uploaded_files = [existing]
-        uploaded_files[0].properties.pages.add(page)
-
     Entities.save(*uploaded_files, page)
     for uploaded_file in uploaded_files:
         uploaded_file.dispatch_pending_processing()

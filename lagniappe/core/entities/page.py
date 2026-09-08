@@ -16,6 +16,7 @@ from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.context import current_context_user
 from ..tools.tasks.ordering import sort_tasks
 from .entity import Entity
+from ..tools.auth.restrictions import prepare_permissions
 
 
 # @testable true
@@ -132,6 +133,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             e.key: e for e in Entities.fetch(*results, self, request=Fetch.direct())
         }
 
+        prepare_permissions(*entities.values(), action=Action.EDIT)
         tasks = [
             e
             for e in entities.values()
@@ -181,7 +183,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @matrix page permissions users : attached-groups db-load group-views owner user-page view-access
     @property
     def view_access(self):
-        if "owner" in self.properties.restricted_to.stored:
+        if self.properties.restricted_to.stored == ["owner"]:
             return []
         elif self.groups:
             return self.groups

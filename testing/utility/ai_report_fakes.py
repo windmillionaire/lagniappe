@@ -112,19 +112,14 @@ def _patch_task_file_add(monkeypatch):
         field._value = current
         field.entity.db[field.id] = [item.key for item in current]
 
-        linked = list(attached_file.db.get("tasks") or [])
-        if field.entity.key not in linked:
-            linked.insert(0, field.entity.key)
-        attached_file.db["tasks"] = linked
+        if field.entity.entity_kind == "task_history":
+            return True
+        attached_file.task = field.entity
 
-        task_links = list(getattr(attached_file.properties.tasks, "_value", []) or [])
-        if field.entity not in task_links:
-            task_links.insert(0, field.entity)
-        attached_file.properties.tasks._value = task_links
         field.entity.add_mutation_intents(
             MutationIntent.patch(
                 attached_file,
-                "tasks",
+                "task",
                 "requires",
                 property_updates=("requires", "modified"),
                 reason="task-file-mirror",

@@ -8,6 +8,7 @@ from ...exceptions import ValidationError
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
 from .ordering import page_task_roots
+from ..auth.restrictions import prepare_permissions
 
 
 _MIN_DATETIME = datetime.min.replace(tzinfo=timezone.utc)
@@ -91,6 +92,7 @@ def compatible_tasks(task, page, user):
         for candidate in Entities.fetch(*ordered_roots, request=Fetch.direct())
         if isinstance(candidate, Entities.TASK)
     }
+    prepare_permissions(*loaded.values(), action=Action.DELETE)
     return tuple(
         candidate
         for root in ordered_roots
@@ -188,6 +190,14 @@ def combine_tasks(task, selected_keys, page, user):
             )
         )
 
-    main.save()
+    owned_files = Entities.fetch(
+        *[row for source in removed for row in database_get.task_files(source.key)],
+        request=Fetch.direct(),
+    )
+    for file in owned_files:
+        # These snapshots refer to the surviving Task, without making old
+        # attachments current again.
+        file.task = main
+    Entities.save(main, *owned_files)
     Entities.delete(*removed, *old_histories)
     return TaskCombineResult(main, removed, tuple(migrated))

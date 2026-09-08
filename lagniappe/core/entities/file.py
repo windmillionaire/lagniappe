@@ -1,16 +1,19 @@
 from flask import url_for
 
-from ..definitions import Action
+from ..definitions import Action, MutationIntent
 from ..mixins import AssetMixin
-from ..properties import file_assets, file_entity, file_options, file_related
+from ..properties import file_assets, file_entity, file_options, file_related, common_entity
 from ..tools.auth.context import current_context_user
 from .entity import Entity
+from ..tools.auth.restrictions import permission_relation
+from ..tools.auth.restrictions import prepare_permissions
 
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_records_metadata_before_asset_save
 # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_lists_pages_that_reference_it
-# @matrix file : asset-lifecycle attached-pages permissions upload
+# @tests tests_unit/test_006_file_properties.py::test_file_reverse_task_links_drive_permissions_and_references
+# @matrix file : asset-lifecycle attached-pages attached-tasks badges permissions references reverse-links task-history upload
 class File(AssetMixin, Entity):
     entity_kind = "file"
 
@@ -20,7 +23,7 @@ class File(AssetMixin, Entity):
     @property
     def searchable(self):
         """Keep report-only evidence out of workspace search until attachment."""
-        return not self.properties.report_user.exists or self.has_references
+        return self.has_references
 
     @property
     def exclude_from_index(self):
@@ -28,39 +31,64 @@ class File(AssetMixin, Entity):
 
     @property
     def required(self):
-        page_requirements = [r for page in self.pages for r in page.requires]
-        task_requirements = [r for task in self.tasks for r in task.requires]
-        requirements = page_requirements + task_requirements
-        return list([h for h in set([self.hash, "models"] + requirements) if h])
+        owner = self.owner
+        requirements = list(owner.requires) if owner else []
+        if self.properties.task.key:
+            requirements.append(owner.hash)
+        return list(dict.fromkeys(h for h in [self.hash, "models", *requirements] if h))
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_reverse_task_links_drive_permissions_and_references
-    # @matrix file : attached-tasks badges reverse-links task-history
     @property
-    def linked_tasks(self):
-        tasks = []
-        seen = set()
-        for linked in self.tasks:
-            task = (
-                linked.task
-                if getattr(linked, "entity_kind", None) == "task_history"
-                else linked
-            )
-            if not task or getattr(task, "entity_kind", None) != "task":
-                continue
-            key = getattr(task, "key", None)
-            if key in seen:
-                continue
-            seen.add(key)
-            tasks.append(task)
-        return tasks
+    def owner(self):
+        if self.properties.page.key and self.properties.task.key:
+            raise ValueError("A File cannot belong to both a Page and a Task")
+        if self.properties.page.key:
+            return permission_relation(self, "page", required=True)
+        return permission_relation(self, "task")
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_reverse_task_links_drive_permissions_and_references
-    # @pair file:references
     @property
     def has_references(self):
-        return bool(self.db.get("pages") or self.db.get("tasks"))
+        return bool(self.db.get("page") or self.db.get("task"))
+
+    # @testable true
+    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_move_preserves_single_ownership
+    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_move_does_not_load_previous_task_attachments
+    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_move_does_not_load_destination_task_attachments
+    # @matrix files : ownership move reverse-links unloaded-relation
+    def move_to(self, owner):
+        if getattr(owner, "entity_kind", None) not in {"page", "task"}:
+            raise ValueError("A File must belong to a Page or a live Task")
+        prepare_permissions(self, owner)
+        previous = self.owner
+        if previous and previous.key == owner.key:
+            return False
+        if previous and previous.entity_kind == "task":
+            files = previous.properties.files
+            if files.is_set:
+                files.remove(self)
+            else:
+                previous.db["files"] = [key for key in files.keys if key != self.key]
+                files._invalidate_projections()
+            self.add_mutation_intents(
+                MutationIntent.patch(previous, "files", reason="file-previous-task", depends_on=()),
+                MutationIntent.touch(previous.page, reason="file-previous-task-page", depends_on=()),
+            )
+        if previous:
+            self.add_mutation_intents(MutationIntent.touch(previous, reason="file-previous-owner", depends_on=()))
+        self.page = None
+        self.task = None
+        if owner.entity_kind == "page":
+            self.page = owner
+        else:
+            self.task = owner
+            files = owner.properties.files
+            if files.is_set or not files.keys:
+                files.add(self)
+            elif self.key not in files.keys:
+                owner.db["files"] = [*files.keys, self.key]
+                files._invalidate_projections()
+            self.add_mutation_intents(MutationIntent.patch(owner, "files", reason="file-task-owner", depends_on=()))
+        self.properties.requires.update()
+        return True
 
     @property
     def url(self):
@@ -81,8 +109,9 @@ class File(AssetMixin, Entity):
                 "html": file_entity.AsHTML,
                 "preview": file_entity.Preview,
                 "summary": file_entity.Summary,
-                "pages": file_related.AttachedToPages,
-                "tasks": file_related.AttachedToTasks,
+                "page": file_related.AttachedPage,
+                "task": file_related.AttachedTask,
+                "restricted_to": common_entity.RestrictedTo,
                 "report_user": file_related.ReportUser,
                 "extract": file_options.Extract,
                 "summarize": file_options.Summarize,
@@ -95,16 +124,15 @@ class File(AssetMixin, Entity):
         user = current_context_user(user)
         action = Action.EDIT if action.implies(Action.EDIT) else action
 
-        report_user = self.properties.report_user.value
-        if (
-            action is Action.VIEW
-            and user
-            and getattr(user, "is_authenticated", False)
-            and report_user
-            and report_user.key == user.key
-        ):
-            return True
-
+        owner = self.owner
+        if owner:
+            return owner.allowed(action, user=user)
+        report_key = self.properties.report_user.key
+        if report_key:
+            return bool(user and user.is_authenticated and (
+                getattr(user, "is_admin", False)
+                or (action is Action.VIEW and report_key == user.key)
+            ))
         return super().allowed(action, user=user)
 
     @classmethod
@@ -116,7 +144,7 @@ class File(AssetMixin, Entity):
             new_file.report_user = report_user
 
         if page:
-            new_file.properties.pages.add(page)
+            new_file.page = page
 
         if upload:
             new_file.filename = data.get("filename") or upload.filename

@@ -4,6 +4,7 @@ from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
+from ...auth.restrictions import prepare_permissions
 
 
 GET_ENTITY = types.FunctionDeclaration(
@@ -47,6 +48,7 @@ def execute_get_entity(args, user):
     if not entity:
         return {"error": "Entity not found"}
 
+    prepare_permissions(entity, action=Action.EDIT)
     if not entity.allowed(Action.VIEW, user):
         return {"error": "Access denied"}
 

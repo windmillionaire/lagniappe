@@ -131,17 +131,8 @@ class DeleteCollector:
             if isinstance(entity, self.entities.FILE)
         ]
         for file in files:
-            file.properties.pages.remove(page)
-            if not file.pages:
-                self.delete(file)
-            else:
-                self.repair(
-                    file,
-                    "pages",
-                    "requires",
-                    property_updates=("requires", "modified"),
-                    reason="page-delete-file-unlink",
-                )
+            self.delete(file)
+            self.file_tasks(file)
 
     # @testable infrastructure
     def page_tasks(self, page):
@@ -159,18 +150,11 @@ class DeleteCollector:
 
     # @testable infrastructure
     def task_files(self, task):
-        for file in task.files:
-            file.properties.tasks.remove(task)
-            if file.has_references:
-                self.repair(
-                    file,
-                    "tasks",
-                    "requires",
-                    property_updates=("requires", "modified"),
-                    reason="task-delete-file-unlink",
-                )
-            else:
-                self.delete(file)
+        if task.entity_kind == "task_history":
+            return
+        for file in self.entities.fetch(*database_get.task_files(task.key), request=Fetch.direct()):
+            self.delete(file)
+            self.file_tasks(file)
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_file_delete_unlinks_task_references_and_list_owners
@@ -183,7 +167,7 @@ class DeleteCollector:
         tasks = [
             entity
             for entity in self.entities.fetch(
-                *file.properties.tasks.keys,
+                *database_get.file_references(file.key),
                 request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
             )
             if isinstance(entity, (self.entities.TASK, self.entities.TASK_HISTORY))
@@ -397,6 +381,9 @@ class TaskDeleteMutation(StandardDeleteMutation):
         collector.delete(entity)
         collector.task_owners(entity)
         collector.task_files(entity)
+        if entity.entity_kind == "task":
+            for history in collector.entities.fetch(*database_get.task_history(entity), request=Fetch.direct()):
+                collector.delete(history)
 
 
 # @testable infrastructure
@@ -406,6 +393,8 @@ class FileDeleteMutation(StandardDeleteMutation):
     def collect(self, entity, collector):
         collector.delete(entity)
         collector.file_tasks(entity)
+        if entity.owner:
+            collector.repair(entity.owner, reason="file-delete-owner")
 
 
 # @testable false

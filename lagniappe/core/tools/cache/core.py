@@ -88,6 +88,7 @@ class Cache:
                 TextField("desc", weight=1, sortable=True),
                 TextField("doc", weight=0.5, sortable=True),
                 TextField("values", weight=0.25, sortable=True),
+                TagField("details_key", sortable=True, no_index=True),
                 TagField("kind"),
                 TagField("type"),
                 TagField("requires", index_empty=True),

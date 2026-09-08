@@ -16,7 +16,7 @@ from lagniappe.core.mutations import executor, plan_document_checkpoint
 from lagniappe.core.mixins.assets import AssetMixin
 from lagniappe.core.properties.common_assets import Document
 from lagniappe.core.tools import document_crdt as crdt, document_updates
-from lagniappe.core.tools.cache import documents
+from lagniappe.core.tools.cache import documents, restrictions
 from lagniappe.core.tools.ai.reporting.execution.actions import documents as actions
 from lagniappe.core.tools.database import utility
 from lagniappe.core.tools.files.html import render_markdown
@@ -74,6 +74,7 @@ def test_document_save_retires_only_superseded_blobs_after_commit(monkeypatch, f
     monkeypatch.setattr(executor.database_utility, "save_mutations", commit)
     monkeypatch.setattr(executor.database_utility, "delete_blobs", cleanup)
     monkeypatch.setattr(executor.cache, "update", refresh)
+    monkeypatch.setattr(restrictions, "previous_restrictions", lambda entities: [])
     monkeypatch.setattr(executor.cache, "update_owner_projection", lambda *args: None)
     monkeypatch.setattr(executor, "capture", lambda *args, **kwargs: None)
     for text in ("first", "second", "third"):

@@ -4,6 +4,7 @@ from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
+from ...auth.restrictions import prepare_permissions
 
 DEFAULT_HISTORY_LIMIT = 10
 MAX_HISTORY_LIMIT = 50
@@ -55,6 +56,7 @@ def execute_get_task_history(args, user):
     if not task or not isinstance(task, Entities.TASK):
         return {"error": "Task not found"}
 
+    prepare_permissions(task, action=Action.EDIT)
     if not task.allowed(Action.VIEW, user):
         return {"error": "Access denied"}
 

@@ -253,11 +253,11 @@ class AutofillAdapter(DeferredJobAdapter):
         if not isinstance(file, Entities.FILE):
             return DeferredJobInspection.NOT_APPLIED
         if isinstance(target, Entities.PAGE):
-            attached = target.key in file.properties.pages.keys
+            attached = target.key == file.properties.page.key
         else:
             attached = (
                 file.key in target.properties.files.keys
-                and target.key in file.properties.tasks.keys
+                and target.key == file.properties.task.key
             )
         return (
             DeferredJobInspection.APPLIED
@@ -313,7 +313,7 @@ class AutofillAdapter(DeferredJobAdapter):
                 )
 
             if isinstance(target, Entities.PAGE):
-                attached_file.properties.pages.add(target)
+                attached_file.move_to(target)
             else:
                 target.properties.files.add(attached_file)
 

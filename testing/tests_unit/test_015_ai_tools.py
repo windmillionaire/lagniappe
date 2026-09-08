@@ -1196,6 +1196,7 @@ def test_list_workspace_resources_caches_inventory(monkeypatch):
 # @matrix ai form-schema : form-instances permissions status submission truncation
 @pytest.mark.unit
 def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch):
+    monkeypatch.setattr(ai_get_form_instances, "prepare_permissions", lambda *entities, **kwargs: entities)
     class FakeForm:
         entity_kind = "form"
         kind = "form"
@@ -1482,6 +1483,7 @@ def test_get_guidelines_filters_actions_and_schema_field_types():
 # @matrix ai search : exact-name parent-scope permissions
 @pytest.mark.unit
 def test_ai_exact_name_search_is_parent_scoped_and_returns_permissions(monkeypatch):
+    monkeypatch.setattr(ai_search, "prepare_permissions", lambda *entities, **kwargs: entities)
     parent = SimpleNamespace(
         hash="category-hash",
         allowed=lambda action, user=None: True,
@@ -2143,6 +2145,8 @@ def test_get_schema_includes_values_by_id_without_label_collisions(monkeypatch, 
         {"id": "input-empty", "type": "input", "input": "text", "title": "Empty"},
     ]
     entity = TestEntities.get(kind, {"name": "Work", "hash": "details-target"})
+    if kind == "TASK":
+        entity.page = TestEntities.get("PAGE", {"name": "Work Page"})
     entity.form = form
     expected = {
         "input-first": "First",
@@ -2623,6 +2627,7 @@ def test_ai_provider_quota_error_is_wrapped_for_tool_loop(monkeypatch):
 # @matrix ai files : attachments content get-file page-file-list projection summary
 @pytest.mark.unit
 def test_ai_file_tools_return_summary_and_content(monkeypatch):
+    monkeypatch.setattr(ai_get_file, "prepare_permissions", lambda *entities, **kwargs: entities)
     user = SimpleNamespace(email="owner@example.com")
 
     class FakePage:
@@ -2830,6 +2835,7 @@ def test_ai_page_details_includes_file_summaries_by_default(monkeypatch):
 # @matrix ai files : attachments get-file large-file
 @pytest.mark.unit
 def test_ai_get_file_skips_large_original_unless_requested(monkeypatch):
+    monkeypatch.setattr(ai_get_file, "prepare_permissions", lambda *entities, **kwargs: entities)
     user = SimpleNamespace(email="owner@example.com")
     large_size = 330 * 1024 * 1024
 
@@ -2936,6 +2942,7 @@ def test_ai_get_file_skips_large_original_unless_requested(monkeypatch):
 # @matrix ai files : get-file unsupported
 @pytest.mark.unit
 def test_ai_get_file_reports_unsupported_original_file(monkeypatch):
+    monkeypatch.setattr(ai_get_file, "prepare_permissions", lambda *entities, **kwargs: entities)
     user = SimpleNamespace(email="owner@example.com")
 
     class FakeUnsupportedFile:

@@ -6,6 +6,7 @@ from ..properties import category, index
 from ..tools import cache
 from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.context import current_context_user
+from ..tools.auth.restrictions import prepare_permissions
 from ..tools.tasks.ordering import sort_tasks
 from .site import Site
 
@@ -119,7 +120,7 @@ class TaskIndex(Index):
 
         return [
             task
-            for task in Entities.fetch(*db.results, request=Fetch.direct())
+            for task in prepare_permissions(*Entities.fetch(*db.results, request=Fetch.direct()), action=Action.EDIT)
             if task.allowed(Action.VIEW)
         ]
 
@@ -145,7 +146,7 @@ class TaskIndex(Index):
             self.append = url_for("tasks.rows", undated=1)
         return [
             task
-            for task in Entities.fetch(*db.results, request=Fetch.direct())
+            for task in prepare_permissions(*Entities.fetch(*db.results, request=Fetch.direct()), action=Action.EDIT)
             if task.allowed(Action.VIEW)
         ]
 

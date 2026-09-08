@@ -8,6 +8,7 @@ from ...definitions import Action, Fetch
 from ...entities import Entities
 from ...exceptions import ValidationError
 from lagniappe.core.tools.database import get as database_get
+from .restrictions import prepare_permissions
 
 
 UNAVAILABLE_REFERENCE_ERROR = "One or more selected items are unavailable."
@@ -79,6 +80,7 @@ class SubmittedReferenceResolver:
             self._reject()
 
         try:
+            prepare_permissions(*self._entities.values(), action=action or Action.VIEW)
             if predicate is not None and predicate(entity) is False:
                 self._reject()
 

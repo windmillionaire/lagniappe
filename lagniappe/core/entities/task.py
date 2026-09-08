@@ -21,6 +21,7 @@ from . import Entities
 from lagniappe.core.tools.database import get as database_get
 from ..tools.tasks import scheduling
 from ..tools.auth.context import current_context_user
+from ..tools.auth.restrictions import permission_relation
 
 
 # @testable true
@@ -128,7 +129,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_assigned_user_page_override
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_models_view_requires_models_marker
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_restricted_form_blocks_page_permission
-    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_skips_unloaded_page_when_stored_permission_suffices
+    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_requires_loaded_page_even_with_stored_permission
     # @matrix permissions task users : allowed assignee-override lazy-parent-check models-scope parent-page restricted-access shallow-page stored-requires user-page
     # @pair task:stored-requires
     def allowed(self, action, user=None):
@@ -136,18 +137,20 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         if self.restricted_access(user):
             return False
 
-        if super().allowed(action, user=user):
+        page = permission_relation(self, "page", required=True)
+        if page.restricted_access(user):
+            return False
+        if action is Action.VIEW:
+            if page.allowed(Action.VIEW, user=user):
+                return True
+        elif page.allowed(Action.EDIT, user=user):
             return True
-
-        page_allowed = self.page.allowed(action, user=user) if self.page else False
-        if page_allowed:
-            return True
-
         user_page = getattr(user, "page", None)
-        if user_page and self.properties.assigned_to.key == user_page.key:
-            return Action.EDIT.implies(action)
-
-        return False
+        return bool(
+            user_page
+            and self.properties.assigned_to.key == user_page.key
+            and Action.EDIT.implies(action)
+        )
 
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_update_rejects_assignee_without_restricted_task_access

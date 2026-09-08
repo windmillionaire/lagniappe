@@ -339,7 +339,7 @@ def test_search_snippet_skips_highlighted_value_without_matching_key():
 # @matrix cache : details parent-key redis-storage
 @pytest.mark.unit
 def test_redis_details_store_parent_key_not_parent_blob():
-    entity = SimpleNamespace(
+    entity = SimpleNamespace(entity_kind="page", restricted_to=[],
         details={
             "id": "page-id",
             "kind": "page",
@@ -362,6 +362,7 @@ def test_redis_details_store_parent_key_not_parent_blob():
         "hash": "page-hash",
         "name": "Page",
         "parent_key": "category-hash",
+        "restricted_to": [],
     }
 
 
@@ -402,7 +403,7 @@ def test_cache_update_writes_pointer_search_rows_and_parent_free_details(monkeyp
         def pipeline(self):
             return FakePipe()
 
-    entity = SimpleNamespace(
+    entity = SimpleNamespace(entity_kind="page", key="page-id", properties={}, db={}, restricted_to=[],
         hash="page-hash",
         kind="page",
         urlsafe_key="page-id",
@@ -480,7 +481,7 @@ def test_cache_update_keeps_non_searchable_entity_hash_addressable(monkeypatch):
         "cache",
         SimpleNamespace(pipeline=lambda: FakePipe()),
     )
-    entity = SimpleNamespace(
+    entity = SimpleNamespace(entity_kind="file", key="staged-file-id", properties={}, owner=None,
         hash="staged-file-hash",
         kind="file",
         searchable=False,
@@ -863,6 +864,8 @@ def test_search_index_indexes_empty_requires_tags():
         "values": 0.25,
     }
     assert "INDEXEMPTY" in requires.redis_args()
+    pointer = next(field for field in captured["schema"] if field.name == "details_key")
+    assert "SORTABLE" in pointer.redis_args() and "NOINDEX" in pointer.redis_args()
     assert "SCORE_FIELD" in captured["definition"].args
     assert SEARCH_SCORE_FIELD in captured["definition"].args
 

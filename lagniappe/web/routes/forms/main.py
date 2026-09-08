@@ -174,29 +174,18 @@ def expand_table_cell(key, table_id, **kwargs):
 def restrictions(key, **kwargs):
     form = kwargs["entity"]
 
-    action = request.form.get("action")
-    group_key = request.form.get("group-key")
-    group = (
-        Entities.fetch_one(group_key, request=Fetch.direct()) if group_key else None
-    )
-    specific = request.form.get("specific")
-    added = False
-
-    if group and action == "add":
-        added = form.properties.groups.add(group)
-    elif group and action == "remove":
-        form.properties.groups.remove(group)
-    elif specific and action == "add":
-        form.properties.restricted_to.add(specific)
-    elif specific and action == "remove":
-        form.properties.restricted_to.remove(specific)
-
-    form.save()
-
-    if not group and not added:
-        return responses.ok()
-
-    return responses.new_form_restriction(group)
+    keys = request.form.getlist("group-key")
+    try:
+        resolver = SubmittedReferenceResolver(current_user, *keys)
+        groups = [resolver.one(key, expected=Entities.USER_GROUP, action=Action.VIEW, required=True)
+                  for key in keys]
+        form.groups = groups
+        form.properties.restricted_to.materialize(owner_only=request.form.get("owner") in {"on", "true"})
+        form._reconcile_restrictions = True
+        form.save()
+    except (exceptions.ValidationError, ValueError) as error:
+        return responses.error(str(error))
+    return responses.ok()
 
 
 # @testable true

@@ -48,7 +48,8 @@ def _writes(plan):
 
 # @matrix mutations : full-root masked-touch instance-precedence cache
 @pytest.mark.parametrize("file_first", [True, False])
-def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first):
+def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first, monkeypatch):
+    monkeypatch.setattr(Entities, "fetch", lambda *entities, request: list(entities))
     page = TestEntities.get("PAGE", {
         "name": "Current contact", "hash": "root-contact",
         "model": {"name": "Contacts", "hash": "root-contacts"},
@@ -58,7 +59,7 @@ def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first):
     record = datastore.Entity(key=datastore.Key("files", "contact-file", project="test-project"))
     record.update(type="file", name="Contact card", hash="root-contact-file")
     file = Entities.FILE(record)
-    file.properties.pages.value = [old_page]
+    file.page = old_page
     roots = (file, page) if file_first else (page, file)
 
     plan = plan_mutation(MutationOperation.SAVE, *roots, registry=Entities)
@@ -68,7 +69,7 @@ def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first):
         if effect.effect is MutationEffectType.CACHE_REFRESH and effect.entity.key == page.key
     )
     assert write.property_mask is None
-    assert "file-page-owner" in write.reasons
+    assert "file-owner" in write.reasons
     assert write.entity is page
     assert refresh.entity is page
     mutation_executor.prepare_durable_writes(plan)
@@ -182,8 +183,8 @@ def test_mutation_contract_registry_covers_persisted_entities_and_relations(caps
     )
     assert mutation_contracts.main(["--kind", "file", "--check"]) == 0
     output = capsys.readouterr().out
-    assert "pages -> page" in output
-    assert "tasks -> task, task_history" in output
+    assert "page -> page" in output
+    assert "task -> task" in output
 
 
 # @matrix mutations : durable-first plan save serialization typed-intent-preservation
@@ -623,23 +624,23 @@ def test_existing_user_save_does_not_implicitly_mutate_canonical_page():
 def test_delete_survivor_merge_combines_relation_removals():
     page_a = TestEntities.get("PAGE", {"name": "A", "hash": "merge-page-a"})
     page_b = TestEntities.get("PAGE", {"name": "B", "hash": "merge-page-b"})
-    file_a = TestEntities.get("FILE", {"name": "Shared", "hash": "shared-file"})
-    file_b = TestEntities.get("FILE", {"name": "Shared", "hash": "shared-file"})
-    file_b._key = file_a.key
-    file_a.db["pages"] = [page_b.key]
-    file_b.db["pages"] = [page_a.key]
+    task_a = TestEntities.get("TASK", {"name": "Shared", "hash": "shared-task"})
+    task_b = TestEntities.get("TASK", {"name": "Shared", "hash": "shared-task"})
+    task_b._key = task_a.key
+    task_a.db["linked_pages"] = [page_b.key]
+    task_b.db["linked_pages"] = [page_a.key]
 
     merged = _merge_survivors(
         [
-            Survivor(file_a, {"pages"}, {"modified"}, {"unlink-a"}),
-            Survivor(file_b, {"pages"}, {"modified"}, {"unlink-b"}),
+            Survivor(task_a, {"linked_pages"}, {"modified"}, {"unlink-a"}),
+            Survivor(task_b, {"linked_pages"}, {"modified"}, {"unlink-b"}),
         ]
     )
 
     assert len(merged) == 1
-    assert merged[0].entity is file_a
-    assert merged[0].properties == {"pages"}
-    assert file_a.db.get("pages") is None
+    assert merged[0].entity is task_a
+    assert merged[0].properties == {"linked_pages"}
+    assert task_a.db.get("linked_pages") is None
 
 
 # @pairs file:delete file:reverse-link mutations:delete mutations:unlink
@@ -684,6 +685,7 @@ def test_file_delete_unlinks_task_references_and_list_owners(monkeypatch):
         assert request.depth.name == "NESTED"
         return [linked[key] for key in identifiers]
 
+    monkeypatch.setattr("lagniappe.core.tools.database.get.file_references", lambda key: list(linked))
     monkeypatch.setattr(Entities, "fetch", fetch_linked_tasks)
 
     plan = plan_mutation(MutationOperation.DELETE, deleted, registry=Entities)
@@ -697,8 +699,8 @@ def test_file_delete_unlinks_task_references_and_list_owners(monkeypatch):
     assert deleted_entities == [deleted]
     assert task.files == [retained]
     assert history.files == []
-    assert deleted.properties.tasks.keys == []
-    assert retained.properties.tasks.keys == [task.key]
+    assert deleted.task is task
+    assert retained.task is task
     assert writes[task.key].property_mask == ("files", "modified")
     assert writes[history.key].property_mask == ("files",)
     assert writes[page.key].property_mask == ("modified",)

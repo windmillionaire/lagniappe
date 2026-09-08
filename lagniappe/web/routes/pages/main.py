@@ -737,9 +737,9 @@ def _page_view_access_response(page):
 def _apply_owner_access_restriction(page, owner):
     if owner == "add":
         page.groups = None
-        page.properties.restricted_to.add("owner")
+        page.properties.restricted_to.materialize(owner_only=True)
     elif owner == "remove":
-        page.properties.restricted_to.remove("owner")
+        page.properties.restricted_to.materialize(owner_only=False)
 
 
 # @testable true
@@ -753,6 +753,7 @@ def _apply_group_access_restriction(page, group_action, group_key):
         page.properties.groups.add(group)
     elif group_action == "remove":
         page.properties.groups.remove(group)
+    page.properties.restricted_to.materialize(owner_only=False)
 
 
 # @testable false
@@ -772,6 +773,7 @@ def view_access(key, **kwargs):
             _apply_owner_access_restriction(page, owner)
         elif group:
             _apply_group_access_restriction(page, group, request.form.get("group-key"))
+        page._reconcile_restrictions = True
         page.save()
         return _page_view_access_response(page)
 

@@ -533,7 +533,7 @@ def test_page_files_loads_database_files():
             "type": "file",
             "name": "Loaded File",
             "hash": "filehash",
-            "pages": [page.key],
+            "page": page.key,
         }
     )
     file_entity = page_related.Entities.FILE(raw_file)
@@ -569,7 +569,7 @@ def test_page_files_reloads_query_results_and_skips_unlinked_files():
         "FILE",
         {"filename": "linked.pdf", "hash": "freshlinked"},
     )
-    linked_file.db["pages"] = [page.key]
+    linked_file.page = page
     unlinked_file = TestEntities.get(
         "FILE",
         {"filename": "unlinked.pdf", "hash": "freshunlinked"},

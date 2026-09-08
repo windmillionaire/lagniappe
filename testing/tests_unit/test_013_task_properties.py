@@ -682,7 +682,7 @@ def test_task_allowed_assigned_user_page_override():
 
 # @matrix permissions task : lazy-parent-check shallow-page stored-requires
 @pytest.mark.unit
-def test_task_allowed_skips_unloaded_page_when_stored_permission_suffices():
+def test_task_allowed_requires_loaded_page_even_with_stored_permission():
     task = TestEntities.get(
         "TASK",
         {"name": "Stored Permission Task", "hash": "tsk013stored"},
@@ -691,7 +691,9 @@ def test_task_allowed_skips_unloaded_page_when_stored_permission_suffices():
     task.properties.page.unset()
 
     with patch("lagniappe.core.entities.task.Entity.allowed", return_value=True):
-        assert task.allowed(Action.VIEW)
+        from lagniappe.core.exceptions import UnloadedRelationError
+        with pytest.raises(UnloadedRelationError):
+            task.allowed(Action.VIEW)
 
     assert task.properties.page.is_set is False
 
@@ -897,8 +899,8 @@ def test_task_update_tracks_project_model_and_uploaded_file():
     assert task.properties.files.label == "Attachments"
     assert isinstance(task.properties.files, ColumnMixin)
     assert task.properties.files.sort_value == 1
-    assert file_entity.tasks == [task]
-    assert file_entity.db["tasks"] == [task.key]
+    assert file_entity.task is task
+    assert file_entity.db["task"] == task.key
 
     file_entity.properties.preview._value = "/preview/attachment"
     attachment = task.properties.files.column_value[0]
@@ -950,7 +952,7 @@ def test_task_update_saves_file_relations_from_upload_assets():
 
     assert task.files == [file_entity]
     assert task.db["files"] == [file_entity.key]
-    assert file_entity.tasks == [task]
+    assert file_entity.task is task
 
     assert task.assets == {}
 

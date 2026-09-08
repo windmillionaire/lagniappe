@@ -366,7 +366,7 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
                 submission=SimpleNamespace(value={}),
             )
             self.properties.files = Relation(
-                on_add=lambda file: file.properties.tasks.add(self)
+                on_add=lambda file: setattr(file.properties.task, "key", self.key)
             )
 
         def ai_submission(self, submission):
@@ -384,6 +384,12 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     created = []
 
     class File:
+        def move_to(self, owner):
+            self.properties.page.key = owner.key if owner.entity_kind == "page" else None
+            self.properties.task.key = owner.key if owner.entity_kind == "task" else None
+            if owner.entity_kind == "task":
+                owner.properties.files.add(self)
+
         @classmethod
         def create(cls, page=None, upload=None, data=None, key=None):
             file = cls()
@@ -392,11 +398,11 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
             file.upload = upload
             file.data = dict(data or {})
             file.properties = SimpleNamespace(
-                pages=Relation(),
-                tasks=Relation(),
+                page=SimpleNamespace(key=None),
+                task=SimpleNamespace(key=None),
             )
             if page:
-                file.properties.pages.add(page)
+                file.properties.page.key = page.key
             created.append(file)
             return file
 
@@ -465,10 +471,10 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     assert saved == [(created[0], target)]
     assert target.properties.submission.value == {"field-one": "Autofilled answer"}
     if target_kind == "page":
-        assert created[0].properties.pages.keys == [target.key]
+        assert created[0].properties.page.key == target.key
     else:
         assert target.properties.files.keys == [created[0].key]
-        assert created[0].properties.tasks.keys == [target.key]
+        assert created[0].properties.task.key == target.key
     assert result == {
         "target_key": target.key,
         "target_kind": target_kind,

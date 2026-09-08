@@ -13,6 +13,7 @@ from ..properties import (
     task_related,
 )
 from ..tools.files.html import strip_tags
+from ..tools.auth.restrictions import permission_relation
 
 
 # @testable true
@@ -33,6 +34,12 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     """
 
     entity_kind = "task_history"
+
+    # @testable true
+    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_history_permissions_follow_live_task
+    # @matrix permissions tasks : task-history live-task
+    def allowed(self, action, user=None):
+        return permission_relation(self, "task", required=True).allowed(action, user=user)
 
     @property
     def exclude_from_index(self):

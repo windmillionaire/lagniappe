@@ -330,7 +330,7 @@ def test_add_file_to_page(get_user):
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 @pytest.mark.ai
-def test_add_multiple_files_to_page_hides_existing_file_select(get_user, request):
+def test_add_multiple_files_to_page_without_existing_file_select(get_user, request):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_file_upload_page)
     report = request.node.ai_results
@@ -348,7 +348,7 @@ def test_add_multiple_files_to_page_hides_existing_file_select(get_user, request
         ]
     )
 
-    expect(upload_form.locator("[data-role='select-file']")).not_to_be_visible()
+    expect(upload_form.locator("[data-role='select-file']")).to_have_count(0)
     expect(upload_form.locator("[data-role='display-name']")).not_to_be_visible()
     expect(upload_form.locator("[data-role='dropzone']")).to_contain_text(
         "2 files selected"

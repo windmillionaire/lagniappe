@@ -335,7 +335,9 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 
     term_list = _build_term_list(query_string) if query_string else []
 
-    if kind == "project" and kwargs.get("models"):
+    if kind == "file-owner":
+        kinds = ["page", "task", "user"]
+    elif kind == "project" and kwargs.get("models"):
         kinds = ["project", "model"]
     elif kind == "page" and kwargs.get("include_users"):
         kinds = ["page", "user"]

@@ -50,8 +50,7 @@ def _move_file(action, _report, user, created):
     if not _file_attached_to_endpoint(file, source):
         raise exceptions.ValidationError("File is not attached to the source.")
 
-    _remove_file_from_endpoint(file, source)
-    _add_file_to_endpoint(file, target)
+    file.move_to(target)
     metadata = {
         "target": _entity_result(target),
         "moved": {
@@ -92,6 +91,8 @@ def _attach_file(action, report, user, created):
         "You do not have permission to attach files to this target.",
     )
     file = _resolve_report_file(data.get("file"), report)
+    if file.has_references:
+        _require_allowed(file.allowed(Action.EDIT, user=user), "You do not have permission to move this file.")
     _add_file_to_endpoint(file, target)
     return file, [file, target], {"file_summary": _file_summary_result(file)}
 

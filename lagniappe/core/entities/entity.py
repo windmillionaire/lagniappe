@@ -512,4 +512,4 @@ class Entity:
         if self._testing:
             return
 
-        Entities.save(self, *args)
+        return Entities.save(self, *args)

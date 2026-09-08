@@ -6,6 +6,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.mixins import AIMixin
+from ...auth.restrictions import prepare_permissions
 from ..debug import ai_debug
 from ..references import hash_reference
 
@@ -54,6 +55,7 @@ def execute_get_schema(args, user):
     if not entity:
         ai_debug("tool.get_schema.result", identifier=identifier, error="not found")
         return {"error": "Entity not found"}
+    prepare_permissions(entity)
     if not entity.allowed(Action.VIEW, user=user):
         ai_debug(
             "tool.get_schema.result",

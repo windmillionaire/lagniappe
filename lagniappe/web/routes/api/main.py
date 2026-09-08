@@ -17,6 +17,7 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, MutationOperation
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.auth.restrictions import prepare_permissions
 from lagniappe.core.mutations import (
     consume_mutation_intents,
     execute_post_commit,
@@ -2291,6 +2292,7 @@ def _original_file_download(tool_name, arguments, result):
 
     normalized = normalize_hash_references(arguments)
     entity = Entities.fetch_one(normalized.get("id"), request=Fetch.direct())
+    prepare_permissions(entity)
     if not isinstance(entity, Entities.FILE) or not entity.allowed(
         Action.VIEW, user=g.agent_api_user
     ):

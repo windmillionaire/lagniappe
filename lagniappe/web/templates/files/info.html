@@ -16,21 +16,18 @@
         data-route="{{ url_for('files.update', key=file.urlsafe_key) }}"
         data-visible="false"
         class="{{ styles.form.default }} mt-4 sm:mt-0">
-    {% set page_property = file.properties.get("pages") %}
-    {% set page_preload = page_property.column_value if page_property else [] %}
-    {% if page_property and file.allowed(Action.VIEW) and (file.allowed(Action.EDIT) or page_preload) %}
+    {% if file.kind == 'file' and file.owner %}
       <div class="{{ styles.select.container }}"
-           data-role="pages"
+           data-role="owner"
            data-readonly="{{ (not file.allowed(Action.EDIT))|yesno }}"
            lp-select
-           data-preload='{{ page_preload|tojson }}'>
-        <h3 class="{{ styles.label.sectionHeading }}">Pages</h3>
-        <input data-index="page"
-               data-multiple="true"
-               data-placeholder="add a page..."
-               name="page"
+           data-preload='{{ [file.owner.reference_details]|tojson }}'>
+        <h3 class="{{ styles.label.sectionHeading }}">Owner</h3>
+        <input data-index="file-owner"
+               data-placeholder="select a page or task..."
+               name="owner-key"
                class="{{ styles.input }}">
-        <input type="hidden" name="pages-control" value="true">
+        <input type="hidden" name="owner-control" value="true">
       </div>
     {% endif %}
     {{ controls.edited_marker(url_for('files.info', key=file.urlsafe_key)) }}

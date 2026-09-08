@@ -2,12 +2,14 @@
 
 from ..definitions import Fetch
 from .base import StandardMutation
+from ..tools.auth.restrictions import prepare_permissions
 
 
 # @testable infrastructure
 class PageMutation(StandardMutation):
     # @testable infrastructure
     def plan_save(self, entity, builder, *, reason, depends_on=()):
+        entity.properties.restricted_to.materialize()
         user = entity.user
         if user:
             builder.entities.fetch(user, request=Fetch.direct())
@@ -43,7 +45,9 @@ class CategoryMutation(StandardMutation):
 
 # @testable infrastructure
 class TaskMutation(StandardMutation):
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_task_move_updates_all_owned_file_search_permissions
+    # @matrix permissions search files : task-move ancestor-tags
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         super().plan_save(
             entity,
@@ -51,6 +55,13 @@ class TaskMutation(StandardMutation):
             reason=reason,
             depends_on=depends_on,
         )
+        if getattr(entity, "_page_changed", False) and not getattr(entity, "_testing", False):
+            from ..tools.database import get as database_get
+            for file in builder.entities.fetch(*database_get.task_files(entity.key), request=Fetch.direct()):
+                file.properties.task.attach({entity.key: entity})
+                builder.patch(file, "requires", property_updates=("requires", "modified"),
+                              reason="task-file-ancestry", depends_on=(entity,))
+            entity._page_changed = False
         for owner in entity.task_list_owners:
             builder.touch(owner, reason="task-list-owner")
 
@@ -93,6 +104,7 @@ class FormMutation(StandardMutation):
     # @tests tests_unit/test_004_form_properties.py::test_form_save_records_schema_history_on_version_change
     # @matrix form : relations save schema-history
     def plan_save(self, entity, builder, *, reason, depends_on=()):
+        entity.properties.restricted_to.materialize()
         previous_version = entity.version
         entity.properties.version.update()
         if previous_version != entity.version and entity.properties.schema.previous:
@@ -114,14 +126,27 @@ class FormMutation(StandardMutation):
 class FileMutation(StandardMutation):
     # @testable infrastructure
     def plan_save(self, entity, builder, *, reason, depends_on=()):
+        prepare_permissions(entity)
+        # Owner cache projections need their display relations as well as
+        # permission sources. Batch only the owners touched by this File save.
+        owners = list(dict.fromkeys(owner for owner in [
+            entity.owner, *(intent.entity for intent in entity.mutation_intents)
+        ] if owner is not None and owner.entity_kind in {"page", "task"}))
+        if owners:
+            builder.entities.fetch(*owners, request=Fetch.direct())
+            pages = [owner.page for owner in owners if owner.entity_kind == "task"]
+            if pages:
+                builder.entities.fetch(*pages, request=Fetch.direct())
         super().plan_save(
             entity,
             builder,
             reason=reason,
-            depends_on=depends_on,
+            depends_on=(*depends_on, entity.owner) if entity.owner else depends_on,
         )
-        for page in entity.pages:
-            builder.touch(page, reason="file-page-owner")
+        if entity.owner:
+            builder.touch(entity.owner, reason="file-owner")
+            if entity.owner.entity_kind == "task":
+                builder.touch(entity.owner.page, reason="file-task-page-owner")
 
 
 # @testable infrastructure

@@ -113,7 +113,7 @@ def test_ai_report_create_and_file_cleanup(monkeypatch):
     assert create_report.note == "Planning creation..."
 
     assert [f for f in report.input_files if not f.has_references] == [file]
-    file.db["pages"] = ["existing-page"]
+    file.db["page"] = "existing-page"
     assert [f for f in report.input_files if not f.has_references] == []
 
 

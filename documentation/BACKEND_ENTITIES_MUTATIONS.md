@@ -145,3 +145,27 @@ Trace the whole effect, not just the root method:
 5. Add focused unit coverage for commit failure, retry, and delete behavior.
 6. Run `mutation-contracts --check` and
    `venv/bin/python run.py traceability --changed --check`.
+
+## File ownership (1.3.0)
+
+Files have either `page` or `task`, each a single key. Unattached upload/report
+Files may have neither. A TaskHistory's `files` are non-owning references; the
+live Task remains the permission owner after a completion is archived. Removing
+a current attachment does not erase that ownership. `File.move_to()` updates
+current Task attachment lists and both owners' refresh intents.
+
+Deleting a Page or Task deletes its owned Files, including history-only Task
+attachments, and removes surviving history references. Combining Tasks transfers
+all owned Files before deleting the old Task. Moving a Task updates its owned
+Files' `requires` through masked writes, without persisting a derived Page key.
+
+Migration `FIL-001` converts unambiguous legacy lists and normalizes history links
+to live Tasks. Multiple owners or missing owners are reported for repair; those
+rows remain untouched and the migration ledger stays incomplete. `RST-001`
+materializes local Form/Page group hashes while preserving owner-only settings.
+Both migrations are introduced in 1.3.0 and precede the existing cache rebuild.
+
+File ownership updates use explicit empty `MutationIntent.depends_on` tuples
+for reverse links and owner touches. Those key-list writes do not depend on the
+File's computed fields; the File's `requires` calculation depends on its owner.
+Other patch/touch intents retain their default dependency on the emitting entity.

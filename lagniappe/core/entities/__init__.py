@@ -189,9 +189,16 @@ class EntityRegistry:
     # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_save_persists_relations_process_payloads_and_cache
     # @matrix entities : cache database dependent-owner process-state save
     def save(self, *entities):
-        return execute_mutation(
+        outcome = execute_mutation(
             plan_mutation(MutationOperation.SAVE, *entities, registry=self)
         )
+        if not outcome.post_commit_complete and any(
+            getattr(entity, "entity_kind", None) in {"form", "page", "task", "file"}
+            and not getattr(entity, "_testing", False) for entity in entities
+        ):
+            from ..exceptions import ValidationError
+            raise ValidationError("Saved, but permission/cache updates failed. Retry saving.")
+        return outcome
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache

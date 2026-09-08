@@ -15,6 +15,7 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.entities import Entities, index
+from lagniappe.core.tools.auth.restrictions import prepare_permissions
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools import collaboration
@@ -906,6 +907,7 @@ def delete_file(key, file_key, **kwargs):
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
     file = Entities.fetch_one(file_key, request=Fetch.direct())
+    prepare_permissions(file)
     if (
         not isinstance(file, Entities.FILE)
         or file.key not in task.properties.files.keys

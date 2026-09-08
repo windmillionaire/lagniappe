@@ -16,6 +16,7 @@ from ..tools import cache
 from lagniappe.core.tools.database import get as database_get
 from ..tools.files.html import strip_tags
 from .base_db import DBProperty
+from ..tools.auth.restrictions import combine_restrictions, permission_relation
 
 
 # @testable true
@@ -792,23 +793,60 @@ class RestrictedTo(CacheMixin, DBProperty):
         if self.is_set:
             return self._value
 
+        kind = getattr(self.entity, "entity_kind", None)
         restrictions = self.stored
-        if not restrictions:
-            page = getattr(self.entity, "page", None)
-            restrictions = page.restricted_to if page else None
-        if not restrictions:
-            form = getattr(self.entity, "form", None)
-            restrictions = form.restricted_to if form else None
-        if not restrictions:
-            groups = getattr(self.entity, "groups", None)
-            restrictions = [group.hash for group in groups] if groups else None
-
-        if isinstance(restrictions, list):
-            self._value = list(dict.fromkeys([*restrictions, "owner"]))
+        if kind == "form":
+            pass
+        elif kind == "page":
+            if not restrictions:
+                form = permission_relation(self.entity, "form")
+                restrictions = form.restricted_to if form else []
+        elif kind == "task":
+            page = permission_relation(self.entity, "page", required=True)
+            form = permission_relation(self.entity, "form")
+            restrictions = combine_restrictions(
+                page.restricted_to, form.restricted_to if form else []
+            )
+        elif kind == "file":
+            owner = self.entity.owner
+            restrictions = owner.restricted_to if owner else []
         else:
-            self._value = restrictions or False
-
+            if not restrictions:
+                page = getattr(self.entity, "page", None)
+                restrictions = page.restricted_to if page else None
+            if not restrictions:
+                form = getattr(self.entity, "form", None)
+                restrictions = form.restricted_to if form else None
+            if not restrictions:
+                groups = getattr(self.entity, "groups", None)
+                restrictions = [group.hash for group in groups] if groups else None
+        self._value = combine_restrictions(restrictions, []) or False
         return self._value
+
+    # @testable true
+    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_local_restrictions_materialize_without_persisting_inheritance
+    # @matrix permissions : local-restrictions materialization owner-only
+    def materialize(self, *, owner_only=None):
+        """Persist local settings only; inherited restrictions remain computed."""
+        if self.entity.entity_kind not in {"form", "page"}:
+            return
+        if owner_only is None:
+            owner_only = self.stored == ["owner"]
+        if owner_only:
+            restrictions = ["owner"]
+        else:
+            groups = self.entity.properties.groups
+            if groups.keys and not groups.is_set and self.stored:
+                return
+            hashes = [group.hash for group in groups.value] if groups.keys else []
+            restrictions = ["owner", *sorted(set(hashes) - {"owner"})] if hashes else []
+        if restrictions:
+            self.entity.db[self.id] = restrictions
+        else:
+            self.entity.db.pop(self.id, None)
+        self.unset()
+        self.entity._details = None
+        self.entity._to_cache = None
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources

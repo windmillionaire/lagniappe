@@ -18,6 +18,7 @@ from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai import references as ai_references
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.database import agent_api as credential_store
+from lagniappe.core.tools.database import get as database_get
 from testing.utility.ai_report_fakes import _patch_fake_keys, _test_file, _test_user
 from testing.utility.test_entities import TestEntities
 
@@ -836,6 +837,7 @@ def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
 # @matrix agent-api ai-report : browser-review cas delete file-cleanup save
 @pytest.mark.unit
 def test_external_browser_plan_save_and_delete_use_idle_transaction(monkeypatch):
+    monkeypatch.setattr(database_get, "file_references", lambda *_: [])
     _patch_fake_keys(monkeypatch)
     user = _test_user("external-browser-owner")
     file = _test_file("evidence.pdf")

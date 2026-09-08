@@ -269,6 +269,8 @@ def _run_asset_generation_migration(context):
     return result
 
 
+from .migration_steps.v1_3_permissions import migrate_file_ownership, migrate_local_restrictions
+
 MIGRATION_CATALOG = (
     MigrationDefinition(
         sequence=1,
@@ -291,6 +293,14 @@ MIGRATION_CATALOG = (
         introduced_in="1.0",
         label="Asset generation metadata",
         runner=_run_asset_generation_migration,
+    ),
+    MigrationDefinition(
+        sequence=4, id="FIL-001", introduced_in="1.3.0",
+        label="Single-owner Files", runner=migrate_file_ownership,
+    ),
+    MigrationDefinition(
+        sequence=5, id="RST-001", introduced_in="1.3.0",
+        label="Materialized local restrictions", runner=migrate_local_restrictions,
     ),
 )
 

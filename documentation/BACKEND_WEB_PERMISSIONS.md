@@ -34,7 +34,18 @@ The fixed authorization fetch uses the session user, user page, and requested
 entity as explicit roots. One batch resolves missing roots and a second attaches
 one relation level. This supplies groups, starred entities, the user page's
 direct relations, and the target's direct relations without expanding the full
-graph.
+graph. Permission preparation then batches only missing Page/Form dependencies
+for Tasks and Files, reusing objects already attached to the request. Permission
+checks never fetch their own relations or expand Group records. Page VIEW does
+not require loading the Page's User; renderers that need editing controls declare
+that additional action scope.
+
+Forms and Pages persist their own `restricted_to` hashes, including the owner
+fallback. Pages prefer their local list, then their Form's list. Tasks prefer the
+Page's effective list, then their own Form's list. Files use the restrictions of
+one owning Page or live Task. A Task's Page must be loaded and present; missing
+permission dependencies raise instead of treating the source as unrestricted.
+Task history references inherit access from their live Task.
 
 Handlers that require a deeper graph declare it at the point of use:
 
@@ -98,7 +109,7 @@ The current policies are:
 | Category, Page, Project, or ModelTask selection | Target `VIEW`, plus the route-parent relationship where applicable. |
 | Attached Form | Target `VIEW` and the expected Page/Task form type. Schema generation requires target `EDIT`. |
 | Task assignee | A user-backed Page accepted by the collaboration assignment policy. |
-| Existing File attached to a Page or Task | Target `VIEW`. |
+| File ownership move | Current File and destination Page/live Task both require `EDIT`. Page uploads only create new Files. |
 | Newly uploaded Task File | A short-lived signed claim bound to the actor, File, and authorized Task/Page upload scope. |
 | Internal form Link submitted by a browser | Target `VIEW` before any submission field is mutated. |
 

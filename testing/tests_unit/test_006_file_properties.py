@@ -1,6 +1,7 @@
+from lagniappe.core.definitions import Action
 """Unit tests for File entity properties.
 
-Heavy persistence (save/delete), ``AttachedToPages`` with real DB keys, and full
+Heavy persistence (save/delete), single File ownership with real DB keys, and full
 Document-AI / cloud upload paths are tracked as planned integration-shaped
 stories here and covered in e2e where possible.
 """
@@ -99,7 +100,7 @@ def test_report_file_is_searchable_only_after_workspace_attachment():
     assert file.searchable is False
 
     page = TestEntities.get("PAGE", {"name": "Evidence Page", "hash": "evidencepage"})
-    file.db["pages"] = [page.key]
+    file.page = page
 
     assert file.searchable is True
 
@@ -915,17 +916,13 @@ def test_image_asset_content_type_falls_back_without_recursing():
 @pytest.mark.unit
 def test_uploaded_file_story_lists_pages_that_reference_it():
     file = TestEntities.get("FILE", {"filename": "linked.pdf", "hash": "linkedfile"})
-    visible = TestEntities.get("PAGE", {"name": "Visible Page", "hash": "vispage"})
-    hidden = TestEntities.get("PAGE", {"name": "Hidden Page", "hash": "hiddenpage"})
-    hidden.allowed = lambda *_args, **_kwargs: False
-    file.db["pages"] = [visible.key, hidden.key]
-    file.properties.pages.attach({visible.key: visible, hidden.key: hidden})
-
-    pages = file.properties.pages.value
-    again = file.properties.pages.value
-    assert pages == [visible, hidden]
-    assert again is pages
-    assert file.properties.pages.column_value == [visible.reference_details]
+    page = TestEntities.get("PAGE", {"name": "Owner Page", "hash": "ownerpage"})
+    file.page = page
+    assert file.owner is page
+    assert file.db["page"] == page.key
+    assert "pages" not in file.db
+    page.allowed = lambda *_args, **_kwargs: False
+    assert file.allowed(Action.VIEW) is False
 
 
 # @matrix file : attached-tasks badges permissions references reverse-links task-history
@@ -943,16 +940,12 @@ def test_file_reverse_task_links_drive_permissions_and_references():
     history.task = task
 
     file = TestEntities.get("FILE", {"filename": "linked.pdf", "hash": "filetask"})
-    file.tasks = [task, history]
-
+    task.files = [file]
+    history.files = [file]
     assert file.has_references is True
-    assert set(file.required) == {"filetask", "models", "pgfile1"}
-    assert file.linked_tasks == [task]
-
-    file.properties.tasks.remove(task)
-    assert file.has_references is True
-    assert file.linked_tasks == [task]
-
-    file.properties.tasks.remove(history)
-    assert file.has_references is False
-    assert file.linked_tasks == []
+    assert set(file.required) == {"filetask", "models", "pgfile1", "tskfile1"}
+    assert file.owner is task
+    task.properties.files.remove(file)
+    assert file.owner is task and history.files == [file]
+    history.properties.files.remove(file)
+    assert file.owner is task

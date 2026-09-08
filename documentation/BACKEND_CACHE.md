@@ -27,7 +27,8 @@ store searchable fields plus pointers to compact details:
 | `doc` | Collaborative document text. |
 | `values` | Form submission text. |
 | `kind`, `type` | Tag filters. |
-| `requires` | Permission tags. |
+| `requires` | View-access ancestry tags; task-owned Files include the Task hash. |
+| `restricted_to` | Effective restriction hashes, intersected with the viewer’s memberships by the search query. |
 | `details_key`, `parent_key` | Pointers to current display details. |
 
 `details.py::get_details_by_hash()` hydrates current detail and parent blocks.
@@ -65,6 +66,40 @@ fallback retain their existing matching behavior.
 
 Saved filters use a separate Redis JSON projection keyed by parent and access
 scope. See [BACKEND_FILTERS.md](BACKEND_FILTERS.md).
+
+## Restriction reconciliation
+
+Form and Page details contain their effective `restricted_to`. Task details
+retain `form_key` and `parent_key`; File details retain one `parent_key`. These
+are hashes into the shared details cache, not derived Datastore relations.
+
+After a Form/Page/Task permission source changes, the save writes its source
+projection and dispatches `process/reconcile-restrictions`. The task carries a
+source key and optional continuation cursor/offset, and rereads current source
+state. Form jobs query matching Page/Task roots in batches of 100; explicit Page
+restrictions are preserved even if they equal the Form's previous restriction.
+Indexed descendants are found through `requires`, with Task roots included
+explicitly because a Task does not require its own hash.
+
+The worker resolves cached source metadata in batches, including the extra
+Task-parent hop for Files. It patches only existing search rows' `restricted_to`
+fields and inherited Page detail restrictions. It never saves descendants or
+updates their modified timestamps. Missing source metadata is recovered from
+Datastore rather than interpreted as unrestricted. Search keeps its indexed
+filtering and pagination, accepting a short delay after a permission save;
+direct authorization uses current source records.
+
+Reconciliation sorts batches by the existing `details_key` hash. That field is
+sortable but not indexed for matching. A stable unique order keeps field updates
+from moving rows across pagination boundaries, including when many Files have
+the same name. The release cache rebuild recreates this schema.
+
+Cache/dispatch failures are returned as failed saves. A Redis pending marker
+survives replacement of the source search row, allowing an unchanged retry to
+redispatch. Worker failures return 503 for Cloud Tasks retry; bounded continuation
+jobs make large updates repeatable. Local environments with Cloud Tasks disabled
+run the same worker inline. Migration-gated cache rebuilding materializes the new
+pointers after the 1.3.0 File/local-restriction migrations complete.
 
 ## Notification state
 

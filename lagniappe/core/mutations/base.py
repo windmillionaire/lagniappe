@@ -363,7 +363,7 @@ class MutationPlanBuilder:
                     property_updates=intent.property_updates,
                     refresh_cache=intent.refresh_cache,
                     reason=intent.reason,
-                    depends_on=(owner,),
+                    depends_on=(owner,) if intent.depends_on is None else intent.depends_on,
                 )
             elif intent.intent is MutationIntentType.CACHE_STATE_DELETE:
                 self.clear_cache_state(intent.cache_key, reason=intent.reason)

@@ -347,10 +347,10 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
     assert history.description == "Archived registration renewal."
     assert set(history.files) == {file_one, file_two}
     assert live_attachment not in history.files
-    assert set(file_one.db["tasks"]) == {history.key}
-    assert set(file_two.db["tasks"]) == {history.key}
-    assert file_one.linked_tasks == [task]
-    assert file_two.linked_tasks == [task]
+    assert file_one.db["task"] == task.key
+    assert file_two.db["task"] == task.key
+    assert file_one.task is task
+    assert file_two.task is task
     assert history.form is form
     assert history.submission == {
         "input-textab12": "Registration renewed at DMV."
@@ -366,11 +366,9 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
         intent.intent is MutationIntentType.STANDARD and intent.entity is history
         for intent in task.mutation_intents
     )
-    assert {
-        intent.entity
-        for intent in history.mutation_intents
-        if intent.intent is MutationIntentType.PATCH
-    } == {file_one, file_two}
+    # The live Task owns these Files; its historical snapshot is a nonowning
+    # reference. File saves carry the canonical relation.
+    assert all(any(file in batch for batch in saved) for file in (file_one, file_two))
     action = result["actions"][0]
     assert action["type"] == "create_task"
     assert action["entity"]["kind"] == "task_history"
@@ -482,7 +480,7 @@ def test_run_report_records_dateless_historical_task_completion(monkeypatch):
     assert task.completed is True
     assert task.completed_on is None
     assert task.files == [file]
-    assert file.db["tasks"] == [task.key]
+    assert file.db["task"] == task.key
     assert result["actions"][0]["note"] == (
         "Recorded as the task's current completion."
     )
@@ -595,13 +593,13 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
     assert history.description == "Previous registration details."
     assert history.files == [old_file]
     assert history.submission == {"input-textab12": "Previous registration."}
-    assert set(old_file.db["tasks"]) == {history.key}
+    assert old_file.db["task"] == task.key
     assert task.completed is True
     assert task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
     assert task.due_date is None
     assert task.files == [new_file]
     assert task.submission == {"input-textab12": "Registration renewed again."}
-    assert set(new_file.db["tasks"]) == {task.key}
+    assert new_file.db["task"] == task.key
     action = result["actions"][0]
     assert action["entity"]["kind"] == "task"
     assert action["created"] is False
@@ -1114,8 +1112,8 @@ def test_run_report_reuses_existing_task_for_completed_event(
     assert task.completed is True
     assert task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
     assert task.files == [file]
-    assert set(file.db["tasks"]) == {task.key}
-    assert file.linked_tasks == [task]
+    assert file.db["task"] == task.key
+    assert file.task is task
     assert task.name == "Registration"
     assert task.description == "Event-specific receipt text."
     assert task.due_date is None
@@ -1683,7 +1681,7 @@ def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wron
     assert created_task.completed is True
     assert created_task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
     assert created_task.files == [file]
-    assert set(file.db["tasks"]) == {created_task.key}
+    assert file.db["task"] == created_task.key
     assert len(histories) == 0
     assert result["actions"][0]["entity"]["name"] == "Registration"
     assert result["actions"][0]["target"]["id"] == result["actions"][0]["entity"]["id"]
@@ -1806,7 +1804,7 @@ def test_run_report_rejects_file_as_attachment_target_without_guessing_prior_pag
     ]
     assert result["actions"][4]["type"] == "attach_file"
     assert result["actions"][4]["error"] == "Attachment target must be a Page, Task or task history."
-    assert file_2025.db.get("pages") in (None, [])
+    assert file_2025.db.get("page") is None
     created_tasks = [
         entity
         for batch in saved

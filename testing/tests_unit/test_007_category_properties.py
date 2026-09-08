@@ -139,9 +139,9 @@ def test_category_restricted_to_follows_attached_form():
 
     category.form = form
 
-    assert category.restricted_to == ["secret_group", "owner"]
+    assert category.restricted_to == ["owner", "secret_group"]
     assert not category.allowed(Action.VIEW, user=viewer)
-    assert category.to_cache["restricted_to"] == "secret_group,owner"
+    assert category.to_cache["restricted_to"] == "owner,secret_group"
 
 
 # @matrix category pages : default-category get-create

@@ -5,6 +5,7 @@ from google.genai import types
 from lagniappe.core.definitions import Action, Fetch, SearchFacets
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
+from ...auth.restrictions import prepare_permissions
 
 SEARCH_LIMIT = 10
 MAX_SEARCH_LIMIT = 25
@@ -246,6 +247,7 @@ def _exact_results_with_permissions(results, user):
         *[result.get("id") for result in results if result.get("id")],
         request=Fetch.direct(),
     )
+    prepare_permissions(*entities, action=Action.CREATE)
     by_id = {entity.urlsafe_key: entity for entity in entities if entity}
     formatted = []
     for result in results:

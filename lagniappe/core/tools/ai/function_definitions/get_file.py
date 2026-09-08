@@ -4,6 +4,7 @@ from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
+from ...auth.restrictions import prepare_permissions
 
 GET_FILE = types.FunctionDeclaration(
     name="get_file",
@@ -60,6 +61,7 @@ def execute_get_file(args, user):
     if not entity or not isinstance(entity, Entities.FILE):
         return {"error": "File not found"}
 
+    prepare_permissions(entity, action=Action.EDIT)
     if not entity.allowed(Action.VIEW, user):
         return {"error": "Access denied"}
 

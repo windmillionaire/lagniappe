@@ -1215,7 +1215,7 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
         page=page,
     )
     file = _test_file("registration.pdf", "application/pdf")
-    file.db["pages"] = [page.key]
+    file.task = task
     history = task.create_history_entry(
         completed_on=datetime(2023, 6, 24, tzinfo=timezone.utc),
         files=[file],
@@ -1339,7 +1339,6 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
     assert task in deleted
     assert page in deleted
     assert file not in deleted
-    assert file.db.get("pages") is None
-    assert history.key not in file.db.get("tasks", [])
-    assert task.key not in file.db.get("tasks", [])
+    assert file.db.get("page") is None
+    assert file.db.get("task") is None
     assert all(action["status"] == "complete" for action in undo["actions"])

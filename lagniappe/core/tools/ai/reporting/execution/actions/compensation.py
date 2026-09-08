@@ -393,6 +393,13 @@ def _detach_report_files_before_delete(entity, action, report):
         files = _action_attachment_entities(action)
         if not files:
             files = list(getattr(entity, "files", []) or [])
+        if isinstance(entity, Entities.TASK):
+            # Historical attachments still belong to the live Task even after
+            # they leave its current list. Preserve report inputs before cascade.
+            files = _unique_entities([*files, *(
+                file for file in report.input_files
+                if file.properties.task.key == entity.key
+            )])
         for file in files:
             if _remove_task_file_reference(entity, file):
                 touched.append(file)
@@ -421,35 +428,22 @@ def _action_attachment_entities(action):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason relationship cleanup is exercised through public undo tests
 def _remove_file_page_reference(file, page):
-    before = list(file.db.get("pages") or [])
-    after = [key for key in before if key != page.key]
-    changed = before != after
-    if after:
-        file.db["pages"] = after
-    else:
-        file.db.pop("pages", None)
-    return changed
+    if file.properties.page.key != page.key:
+        return False
+    file.page = None
+    return True
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason relationship cleanup is exercised through public undo tests
 def _remove_task_file_reference(task, file, *, remove_task_attachment=True):
-    task_before = list(task.db.get("files") or [])
-    task_after = [key for key in task_before if key != file.key]
-    file_before = list(file.db.get("tasks") or [])
-    file_after = [key for key in file_before if key != task.key]
-    changed = file_before != file_after
+    changed = False
     if remove_task_attachment:
-        changed = changed or task_before != task_after
-        if task_after:
-            task.db["files"] = task_after
-        else:
-            task.db.pop("files", None)
-    if file_after:
-        file.db["tasks"] = file_after
-    else:
-        file.db.pop("tasks", None)
+        changed = task.properties.files.remove(file)
+    if file.properties.task.key == task.key:
+        file.task = None
+        changed = True
     return changed
 
 
@@ -457,15 +451,6 @@ def _remove_task_file_reference(task, file, *, remove_task_attachment=True):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason history parent reverse-link cleanup is exercised through public undo tests
 def _remove_history_task_file_reference(task, file, history):
-    if file.key in list(task.db.get("files") or []):
-        return False
-
-    for linked in getattr(file, "tasks", []) or []:
-        if getattr(linked, "key", None) == getattr(history, "key", None):
-            continue
-        if getattr(linked, "entity_kind", None) != "task_history":
-            continue
-        if getattr(getattr(linked, "task", None), "key", None) == task.key:
-            return False
-
-    return _remove_task_file_reference(task, file, remove_task_attachment=False)
+    # History references are non-owning. Undoing a snapshot must not change
+    # ownership or access to the live Task's other attachments.
+    return False

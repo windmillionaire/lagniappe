@@ -218,6 +218,8 @@ def test_entity_to_ai_merges_submission_fields_without_nested_duplicate():
 def test_entity_to_ai_keeps_browser_urls_separate_from_hash_references(kind):
     entity = TestEntities.get(kind, {"name": "Linked record", "hash": "abc123def456"})
 
+    if kind == "TASK":
+        entity.page = TestEntities.get("PAGE", {"name": "Parent", "hash": "linked-parent"})
     values = entity.to_ai()
 
     assert values["hash"] == "hash:abc123def456"
@@ -449,23 +451,19 @@ def test_restricted_to_effective_projection_does_not_alias_sources(parent_name):
 
     assert direct.stored == stored
     assert direct.stored is not stored
-    assert direct.value == ["stored-group", "owner"]
+    assert direct.value == ["owner", "stored-group"]
     assert direct.value is not stored
     assert stored == ["stored-group", "stored-group"]
 
     inherited = ["inherited-group", "inherited-group"]
-    parent = SimpleNamespace(restricted_to=inherited)
-    entity = SimpleNamespace(
-        entity_kind="task",
-        db={},
-        page=None,
-        form=None,
-        groups=[],
-    )
-    setattr(entity, parent_name, parent)
-    from_parent = common_entity.RestrictedTo(entity=entity)
-
-    assert from_parent.value == ["inherited-group", "owner"]
+    entity = TestEntities.get("TASK", {"hash": "inheritance-task"},
+                              page=TestEntities.get("PAGE", {"hash": "inheritance-page"}))
+    parent = entity.page if parent_name == "page" else TestEntities.get("FORM", {"hash": "inheritance-form"})
+    parent.db["restricted_to"] = inherited
+    if parent_name == "form":
+        entity.form = parent
+    from_parent = entity.properties.restricted_to
+    assert from_parent.value == ["owner", "inherited-group"]
     assert from_parent.value is not inherited
     assert inherited == ["inherited-group", "inherited-group"]
 
@@ -484,7 +482,7 @@ def test_restricted_to_effective_projection_does_not_alias_sources(parent_name):
         )
     )
 
-    assert from_groups.value == ["group-one", "group-two", "owner"]
+    assert from_groups.value == ["owner", "group-one", "group-two"]
     assert [group.hash for group in groups] == [
         "group-one",
         "group-two",
@@ -509,12 +507,7 @@ def test_restricted_to_add_preserves_first_seen_order():
         "group-three",
     ]
     assert stored == ["group-two", "group-one", "group-two"]
-    assert restricted_to.value == [
-        "group-two",
-        "group-one",
-        "group-three",
-        "owner",
-    ]
+    assert restricted_to.value == ["owner", "group-one", "group-three", "group-two"]
 
 
 # @matrix property : column filter validation

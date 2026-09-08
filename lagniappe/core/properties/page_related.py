@@ -194,7 +194,7 @@ class PageFiles(RelatedEntityListMixin, Property):
                 file
                 for file in loaded
                 if isinstance(file, Entities.FILE)
-                and self.entity.key in file.properties.pages.keys
+                and self.entity.key == file.properties.page.key
             ],
         )
         return self._value

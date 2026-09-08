@@ -6,7 +6,7 @@
                data-role="specific-access"
                data-kind="user"
                name="{{ type }}"
-               {{ 'checked' if form.restricted_to and type in form.restricted_to else '' }}
+               {{ 'checked' if form.properties.restricted_to.stored == ['owner'] else '' }}
                class="{{ styles.checkbox.default }}">
         {{ render_icon("check", (styles.checkbox.icon)) }}
       </div>
@@ -17,23 +17,24 @@
 
 {% macro group_access(group) %}
   <li class="{{ styles.form.restriction }}">
+    <input type="hidden" name="group-key" value="{{ group.urlsafe_key }}">
     <span class="text-base font-semibold text-user-default truncate">{{ group.name }}</span>
     <button class="{{ styles.toggle.container }}"
             data-role="remove-restriction"
             data-key="{{ group.urlsafe_key }}"
             data-kind="delete"
-            type="button">
+            method="post">
       {{ render_icon("x") }}
     </button>
   </li>
 {% endmacro %}
 
 {% macro restrict_access(form) %}
-  <div data-role="restrict-access"
+  <form data-role="restrict-access"
        class="outline-2 outline-user-default rounded-md shadow-sm"
        data-kind="user"
        data-route="{{ url_for('forms.restrictions', key=form.urlsafe_key) }}"
-       type="button">
+       method="post">
     <div class="{{ styles.iconLabel.wrapper }} rounded-t-md px-3 py-1.5 bg-user-bg text-base font-semibold">
       {{ render_icon("group", (styles.iconLabel.icon) ~ " text-user-default") }}
       <span>Access Restrictions</span>
@@ -55,5 +56,17 @@
       {{ specific_access(form, 'owner') }}
       {% for group in form.groups %}{{ group_access(group) }}{% endfor %}
     </ul>
-  </div>
+    <template data-role="restriction-template">
+      <li class="{{ styles.form.restriction }}">
+        <input type="hidden" name="group-key">
+        <span class="text-base font-semibold text-user-default truncate"></span>
+        <button class="{{ styles.toggle.container }}" data-role="remove-restriction" type="button">
+          {{ render_icon("x") }}
+        </button>
+      </li>
+    </template>
+    <div class="{{ styles.button.group }} p-3" data-role="submit-group">
+      <button type="submit" class="{{ styles.button.submit }}">Save Restrictions</button>
+    </div>
+  </form>
 {% endmacro %}

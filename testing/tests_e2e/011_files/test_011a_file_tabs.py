@@ -86,7 +86,7 @@ def _canvas_has_ink(canvas):
 
 
 def _select_file_page_link(info_form, file, page):
-    select = Select(info_form.locator(file.INFO_PAGES))
+    select = Select(info_form.locator(file.INFO_OWNER))
     panel = select.open()
     expect(select.input).to_be_focused()
     select.input.fill(page.definition.name)
@@ -155,16 +155,14 @@ def test_file_page_shows_linked_page_and_task_badges(get_user):
             "page": page.entity,
         }
     )
-    task_entity.properties.files.add(file_entity)
-    task_entity.save()
+    file_entity.move_to(task_entity)
+    Entities.save(task_entity, file_entity)
 
     user.go(file)
 
     linked = user.locate(file.LINKED_ENTITIES)
     expect(linked).to_be_visible()
-    expect(linked.locator("a[href*='/pages/']")).to_contain_text(
-        page.definition.name
-    )
+    expect(linked.locator("a[href*='/pages/']")).to_have_count(0)
     expect(linked.locator("a[href*='/tasks/']")).to_contain_text(task_entity.name)
 
 
@@ -185,8 +183,8 @@ def test_delete_file_removes_attached_task_badge(get_user):
             "page": page.entity,
         }
     )
-    task_entity.properties.files.add(file_entity)
-    task_entity.save()
+    file_entity.move_to(task_entity)
+    Entities.save(task_entity, file_entity)
 
     user.go(page)
     task_item = page.active_task_list.list.locator(
@@ -223,7 +221,7 @@ def test_delete_file_removes_attached_task_badge(get_user):
 # @matrix file : add linked-pages reload remove
 # @template files/info.html::info_form
 # @template files/file.html::linked_badges
-def test_file_info_page_links_can_be_added_and_removed(get_user):
+def test_file_info_moves_between_page_and_task(get_user):
     user = get_user(Users.OWNER)
     source_page, file = _upload_file(user, Uploads.plain_text_file)
     target_page = Pages.test_category_edit_page.get(user)
@@ -236,21 +234,24 @@ def test_file_info_page_links_can_be_added_and_removed(get_user):
         SpinnerButtons.UPDATE.click(info_form)
 
     linked_pages = user.locate(file.LINKED_ENTITIES).locator("a[href*='/pages/']")
-    expect(linked_pages.filter(has_text=source_page.definition.name)).to_be_visible()
+    expect(linked_pages.filter(has_text=source_page.definition.name)).to_have_count(0)
     expect(linked_pages.filter(has_text=target_page.definition.name)).to_be_visible()
-
-    info_form = file.info_form
-    _select_file_page_link(info_form, file, target_page)
-
-    with user.page.expect_response("**/update"):
-        SpinnerButtons.UPDATE.click(info_form)
-
-    linked_pages = user.locate(file.LINKED_ENTITIES).locator("a[href*='/pages/']")
-    expect(linked_pages.filter(has_text=source_page.definition.name)).to_be_visible()
-    expect(linked_pages.filter(has_text=target_page.definition.name)).to_have_count(0)
-
     file_entity = Entities.fetch_one(file.key, request=Fetch.direct())
-    assert {page.key for page in file_entity.pages} == {source_page.entity.key}
+    assert file_entity.page.key == target_page.entity.key
+    assert file_entity.task is None
+
+    task = Entities.TASK.create({"page": target_page.entity, "name": f"File owner task {uuid4().hex}"})
+    task.save()
+    info_form = file.info_form
+    Select(info_form.locator(file.INFO_OWNER)).select_by_key(task.urlsafe_key, query=task.name)
+    with expect_successful_response(user.page, method="PUT", path=f"/files/{file.key}/update"):
+        SpinnerButtons.UPDATE.click(info_form)
+    linked = user.locate(file.LINKED_ENTITIES)
+    expect(linked.locator("a[href*='/tasks/']")).to_contain_text(task.name)
+    expect(linked.locator("a[href*='/pages/']")).to_have_count(0)
+    file_entity = Entities.fetch_one(file.key, request=Fetch.direct())
+    assert file_entity.task.key == task.key and file_entity.page is None
+    assert file_entity.key in Entities.fetch_one(task.key, request=Fetch.root()).db["files"]
 
 
 # @matrix file : file-upload page-upload preview text-tab

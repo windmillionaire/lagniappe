@@ -195,8 +195,8 @@ def test_task_uncomplete_after_complete(get_test_entities):
     assert task.submission == {}
     assert task.files == []
     assert task.db.get("files", []) == []
-    assert file_entity.tasks == []
-    assert file_entity.db.get("tasks", []) == []
+    assert file_entity.task is task
+    assert file_entity.db["task"] == task.key
     delete_asset.assert_called_once_with("task-signature-field")
     assert task.db.get("history") is True
 
@@ -360,7 +360,7 @@ def test_task_history_create_snapshots_completed_task_state():
     assert history.description == "Finished carefully"
     assert history.linked_pages == [linked_page]
     assert history.files == [file_entity]
-    assert file_entity.tasks == [history, task]
+    assert file_entity.task is task
     assert history.form is task.form
     assert history.version == "schema-v1"
     assert history.db["completed_by"] == completed_by.page.key
@@ -700,7 +700,7 @@ def test_task_create_history_entry_accepts_completion_overrides(
     assert writes[task.key].property_mask is None
     assert writes[history.key].property_mask is None
     assert set(writes[event_file.key].property_mask) == {
-        "tasks",
+        "task",
         "requires",
         "modified",
     }

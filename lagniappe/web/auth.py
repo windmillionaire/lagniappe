@@ -20,10 +20,11 @@ from flask_login import current_user
 
 from lagniappe import CONFIG
 from uuid import uuid4
-from lagniappe.core.definitions import AI, Fetch
+from lagniappe.core.definitions import AI, Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
+from lagniappe.core.tools.auth.restrictions import prepare_permissions
 
 LOGIN_USER_KEY = CONFIG.LOGIN_USER_KEY
 LOGIN_USER_PAGE_KEY = CONFIG.LOGIN_USER_PAGE_KEY
@@ -351,6 +352,7 @@ def permission(resource=None, requested=None, *, no_store=False):
                 g.fingerprint = _etag_fingerprint(base_fingerprint, user)
 
             if entity:
+                prepare_permissions(entity, action=requested or Action.VIEW)
                 allowed = entity.allowed(requested, user)
             elif resource and user.has_permission(resource, requested):
                 allowed = True

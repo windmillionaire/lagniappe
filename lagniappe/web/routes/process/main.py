@@ -323,3 +323,25 @@ def ingress():
         return jsonify({"success": False, "error": str(e)}), 200
 
     return jsonify({"success": True}), 200
+
+
+# @testable true
+# @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants
+# @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_restriction_worker_retries_and_continues
+# @matrix permissions search : reconciliation queue retry continuation authentication
+@process.route("/reconcile-restrictions", methods=["POST"])
+def reconcile_restrictions():
+    from lagniappe.core.tools.cache.restrictions import reconcile_batch, enqueue
+    payload = authenticate_task(request)
+    if payload is None:
+        return make_response("Unauthorized", 401)
+    if not payload.get("source_key") or not set(payload) <= {"source_key", "cursor", "offset"}:
+        return jsonify({"success": False}), 400
+    try:
+        remaining = reconcile_batch(**payload)
+        if remaining:
+            enqueue(remaining)
+    except Exception as error:
+        exceptions.capture(error, context={"operation": "reconcile-restrictions"})
+        return jsonify({"success": False, "retry": True}), 503
+    return jsonify({"success": True})

@@ -11,6 +11,7 @@ from .common import (
     _unique_entities,
     _unique_values,
 )
+from lagniappe.core.tools.auth.restrictions import prepare_permissions
 
 
 # @testable false
@@ -137,9 +138,9 @@ def _resolve_file_endpoint(data, created, endpoint):
 # @reason attachment mutation is covered through move and undo tests
 def _file_attached_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
-        return endpoint.key in list(file.db.get("pages") or [])
+        return endpoint.key == file.db.get("page")
     if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
-        return endpoint.key in list(file.db.get("tasks") or []) or file.key in list(
+        return endpoint.key == file.db.get("task") or file.key in list(
             endpoint.db.get("files") or []
         )
     return False
@@ -151,9 +152,16 @@ def _file_attached_to_endpoint(file, endpoint):
 # @reason attachment mutation is covered through move and undo tests
 def _remove_file_from_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
-        return file.properties.pages.remove(endpoint)
+        if file.properties.page.key != endpoint.key:
+            return False
+        file.page = None
+        return True
     if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
-        return endpoint.properties.files.remove(file)
+        if file.properties.task.key != endpoint.key:
+            return False
+        endpoint.properties.files.remove(file)
+        file.task = None
+        return True
     return False
 
 
@@ -163,8 +171,15 @@ def _remove_file_from_endpoint(file, endpoint):
 # @reason attachment mutation is covered through move and undo tests
 def _add_file_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
-        return file.properties.pages.add(endpoint)
-    if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
+        return file.move_to(endpoint)
+    if isinstance(endpoint, Entities.TASK):
+        return file.move_to(endpoint)
+    if isinstance(endpoint, Entities.TASK_HISTORY):
+        # An older completion can reference a File, but its live Task owns it.
+        was_current = file.key in endpoint.task.properties.files.keys
+        file.move_to(endpoint.task)
+        if not was_current:
+            endpoint.task.properties.files.remove(file)
         return endpoint.properties.files.add(file)
     return False
 
@@ -238,13 +253,9 @@ def _page_from_non_page_reference(entity, page_name=None):
         if page and _page_name_matches(page, page_name):
             return page
     if isinstance(entity, Entities.FILE):
-        pages = [
-            page
-            for page in getattr(entity, "pages", []) or []
-            if _page_name_matches(page, page_name)
-        ]
-        if len(pages) == 1:
-            return pages[0]
+        page = entity.page or (entity.task.page if entity.task else None)
+        if _page_name_matches(page, page_name):
+            return page
     return None
 
 
@@ -260,13 +271,7 @@ def _page_from_created_context(created, page_name=None):
         elif isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
             page = getattr(entity, "page", None)
         elif isinstance(entity, Entities.FILE):
-            pages = [
-                linked_page
-                for linked_page in getattr(entity, "pages", []) or []
-                if _page_name_matches(linked_page, page_name)
-            ]
-            if len(pages) == 1:
-                page = pages[0]
+            page = entity.page or (entity.task.page if entity.task else None)
 
         if page and _page_name_matches(page, page_name):
             candidates[getattr(page, "key", id(page))] = page
@@ -431,4 +436,7 @@ def _fetch_report_entity(identifier, *, derived_page=False):
     else:
         request = Fetch.direct()
 
-    return Entities.fetch_one(entity, request=request)
+    entity = Entities.fetch_one(entity, request=request)
+    from lagniappe.core.definitions import Action
+    prepare_permissions(entity, action=Action.EDIT)
+    return entity

@@ -2,6 +2,7 @@ from flask_login import current_user
 
 from ..definitions import Action, FieldType, FilterOptions, MutationIntent, Ordering
 from ..entities import Entities
+from ..exceptions import ValidationError
 from ..mixins import (
     AIMixin,
     ColumnMixin,
@@ -13,6 +14,7 @@ from ..mixins import (
 from .base_db import DBProperty
 from .base_property import Property
 from .form_special import Signature, Status
+from ..tools.auth.restrictions import prepare_permissions
 
 
 # @testable true
@@ -126,7 +128,7 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         self.entity.add_mutation_intents(
             MutationIntent.patch(
                 file,
-                "tasks",
+                "task",
                 "requires",
                 property_updates=("requires", "modified"),
                 reason="task-file-mirror",
@@ -137,15 +139,23 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         if not file or not getattr(self.entity, "key", None):
             return
 
-        file.properties.tasks.add(self.entity)
+        if self.entity.entity_kind == "task_history":
+            if not file.has_references:
+                file.task = self.entity.task
+                self._track_file_update(file)
+            return
+        if file.has_references and file.properties.task.key != self.entity.key:
+            raise ValidationError("Move the File to this Task before attaching it")
+        file.task = self.entity
         self._track_file_update(file)
 
     def _unlink_file(self, file):
         if not file or not getattr(self.entity, "key", None):
             return
 
-        file.properties.tasks.remove(self.entity)
-        self._track_file_update(file)
+        # Removing a current attachment does not erase ownership: a completion
+        # history may still reference the File. Moves and deletion own unlinking.
+        return
 
     @property
     def value(self):
@@ -180,6 +190,7 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
     def preload(self):
         preload = {}
 
+        prepare_permissions(*self.value)
         for file in self.value:
             if (
                 not file.allowed(Action.VIEW, user=self.user)
@@ -199,6 +210,7 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         elif not self.value:
             return []
 
+        prepare_permissions(*self.value)
         self._column_value = [
             dict(file.details)
             for file in self.value
@@ -210,6 +222,7 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
     @property
     def ai_value(self):
         files = []
+        prepare_permissions(*self.value)
         for file in self.value:
             if (
                 not file
@@ -593,6 +606,9 @@ class TaskPage(RelatedEntityMixin, DetailsMixin, FilterMixin, AIMixin, DBPropert
 
         RelatedEntityMixin.value.fset(self, value)
 
+        if previous_key != next_key:
+            self.entity.properties.restricted_to.unset()
+            self.entity._page_changed = bool(previous_key)
         if previous and previous_key != next_key:
             self.entity.add_mutation_intents(
                 MutationIntent.touch(previous, reason="task-previous-page")

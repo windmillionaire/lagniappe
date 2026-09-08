@@ -82,7 +82,7 @@ def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatc
     assert result["actions"][0]["target"]["name"] == (
         "Pettis Remodeling & Garage Project"
     )
-    assert file.db["pages"] == [page.key]
+    assert file.db["page"] == page.key
     assert file.summary == "Proposal for the Pettis remodeling work."
     assert file.properties.summarize.retrieval_terms == ["Pettis", "remodeling"]
 
@@ -102,7 +102,7 @@ def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeyp
         {"name": "Family Records", "hash": "family-records"},
     )
     file = _test_file("richardson-family.pdf", "application/pdf")
-    file.properties.pages.add(source_page)
+    file.page = source_page
     report = TestEntities.get(
         "REPORT",
         {
@@ -159,7 +159,7 @@ def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeyp
         "move_file",
         "suggest_page_deletion",
     ]
-    assert file.db["pages"] == [target_page.key]
+    assert file.db["page"] == target_page.key
     assert result["actions"][0]["moved"]["from"]["id"] == source_page.urlsafe_key
     assert result["actions"][0]["moved"]["to"]["id"] == target_page.urlsafe_key
     cleanup = result["actions"][1]
@@ -173,7 +173,7 @@ def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeyp
     undo = report_undo.undo_report(report, user)
 
     assert undo["status"] == "complete"
-    assert file.db["pages"] == [source_page.key]
+    assert file.db["page"] == source_page.key
     assert undo["actions"][0]["type"] == "suggest_page_deletion"
     assert undo["actions"][0]["note"] == (
         "Manual cleanup suggestion; nothing was executed."
@@ -198,7 +198,7 @@ def test_run_report_moves_file_by_exact_source_attachment_name(monkeypatch):
         {"name": "Family Records", "hash": "family-records-by-name"},
     )
     file = _test_file("richardson-family.pdf", "application/pdf")
-    file.properties.pages.add(source_page)
+    file.page = source_page
     source_page.properties.files._value = [file]
     report = TestEntities.get(
         "REPORT",
@@ -247,7 +247,7 @@ def test_run_report_moves_file_by_exact_source_attachment_name(monkeypatch):
 
     assert result["status"] == "complete"
     assert result["actions"][0]["type"] == "move_file"
-    assert file.db["pages"] == [target_page.key]
+    assert file.db["page"] == target_page.key
     assert result["actions"][0]["moved"]["from"]["id"] == source_page.urlsafe_key
     assert result["actions"][0]["moved"]["to"]["id"] == target_page.urlsafe_key
     assert saved
@@ -327,7 +327,7 @@ def test_run_report_rejects_attachment_target_guessing_from_page_name(
     assert result["status"] == "failed"
     assert result["actions"][0]["status"] == "failed"
     assert "almost-the-right-page-key" in result["actions"][0]["error"]
-    assert file.db.get("pages") in (None, [])
+    assert file.db.get("page") is None
 
 
 
@@ -475,7 +475,7 @@ def test_run_report_marks_missing_file_placements_failed_and_continues(monkeypat
         for entity in batch
         if getattr(entity, "entity_kind", None) == "task"
     ]
-    assert file.db["pages"] == [pages[0].key]
+    assert file.db["page"] == pages[0].key
     assert len(completed_tasks) == 1
     assert completed_tasks[0].completed is True
     assert completed_tasks[0].files == []
@@ -555,4 +555,4 @@ def test_run_report_rejects_category_used_as_attachment_page(monkeypatch):
         "Attachment target must be a Page, Task or task history."
     )
     assert captured == ["Attachment target must be a Page, Task or task history."]
-    assert file.db.get("pages") in (None, [])
+    assert file.db.get("page") is None

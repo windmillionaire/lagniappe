@@ -49,6 +49,9 @@ class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProp
             raise ValueError("Value must be a form")
 
         RelatedEntityMixin.value.fset(self, value)
+        restricted_to = self.entity.properties.get("restricted_to")
+        if restricted_to is not None:
+            restricted_to.unset()
 
     # Filter Attributes
     @property
@@ -83,6 +86,22 @@ class AttachedTask(RelatedEntityMixin, FilterMixin, AIMixin, Property):
     _label = "Task"
     _icon = "task"
     _kind = "task"
+
+    @property
+    def key(self):
+        if self.is_set and self._value:
+            return self._value.key
+        return getattr(self.entity.key, "parent", None)
+
+    @property
+    def keys(self):
+        return [self.key] if self.key else []
+
+    def attach(self, key_map):
+        self._value = key_map.get(self.key)
+        self._cache_attached_entities()
+        self._invalidate_projections()
+
 
 
 # @testable true

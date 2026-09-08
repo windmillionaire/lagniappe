@@ -696,6 +696,8 @@ def test_submission_batch_persists_all_fields_with_fresh_entity_reads(
             return form
         if identifier in {"batch-target", "target-alias"}:
             target = TestEntities.get(kind, {"name": "Work", "hash": "batch-target"})
+            if kind == "TASK":
+                target.page = TestEntities.get("PAGE", {"name": "Work Page", "hash": "batch-page"})
             target.form = form
             target.properties.submission.value = copy.deepcopy(stored["submission"])
             return target

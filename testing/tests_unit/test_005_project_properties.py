@@ -344,7 +344,7 @@ def test_model_task_allowed_inherits_attached_form_restrictions():
     model.project = project
     model.form = restricted_form
 
-    assert model.restricted_to == ["restricted_group", "owner"]
+    assert model.restricted_to == ["owner", "restricted_group"]
     assert not model.allowed(Action.VIEW, user=viewer)
 
 

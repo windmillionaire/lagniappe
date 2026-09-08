@@ -7,6 +7,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
+from lagniappe.core.tools.auth.restrictions import prepare_permissions
 from lagniappe.core.tools.deferred_jobs.locks import deferred_job_lock_descriptors
 from lagniappe.core.tools.polling.contract import (
     POLL_TYPES,
@@ -178,9 +179,11 @@ def poll():
             *dict.fromkeys(entity_keys), request=Fetch.direct()
         )
     }
+    prepare_permissions(*entities.values())
     lock_entities = [
         entities.get(descriptor["key"]) for descriptor in grouped["form-lock"]
     ]
+    prepare_permissions(*lock_entities, action=Action.EDIT)
     lock_entities = [
         entity
         for entity in lock_entities

@@ -34,6 +34,7 @@ from lagniappe.core.tools.polling.projections import (
     render_operation_statuses,
 )
 from lagniappe.core.tools.tasks.ordering import page_task_roots
+from lagniappe.core.tools.auth.restrictions import prepare_permissions
 
 
 # --- General Responses ---
@@ -576,13 +577,18 @@ def new_model_task(model_task):
 # --- File Responses ---
 
 
+# @testable true
+# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_text_tab_renders_uploaded_text_content
+# @matrix file : text-tab
 def file_page(file):
+    prepare_permissions(file, action=Action.EDIT)
     return render_template("files/file.html", file=file), 200
 
 
 # @testable infrastructure
 # @covered-by lagniappe/web/responses.py::entity_response
 def file_info(file):
+    prepare_permissions(file, action=Action.EDIT)
     return entity_response(
         (get_template_attribute("files/info.html", "info_form")(file), 200),
         file,
@@ -1038,12 +1044,11 @@ def delete_entity(entity=None, key=None):
     kind = "user" if entity.kind == "page" and entity.db.get("user") else entity.kind
 
     if kind == "form":
+        loaded = Entities.fetch(*database_get.form_instance_users(entity.key), request=Fetch.direct())
+        prepare_permissions(*loaded)
         instances = [
             instance
-            for instance in Entities.fetch(
-                *database_get.form_instance_users(entity.key),
-                request=Fetch.direct(),
-            )
+            for instance in loaded
             if isinstance(instance, (Entities.PAGE, Entities.TASK))
             and instance.allowed(Action.VIEW, user=current_user)
         ]

@@ -96,7 +96,10 @@ def execute_post_commit(plan):
         if effect.effect is MutationEffectType.CACHE_REFRESH
     ]
     if refresh:
+        from ..tools.cache.restrictions import previous_restrictions, dispatch_changes
+        previous = previous_restrictions(refresh)
         cache.update(*refresh)
+        dispatch_changes(previous)
         cache.update_owner_projection(*refresh)
         complete(MutationEffectType.CACHE_REFRESH)
 

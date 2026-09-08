@@ -237,7 +237,7 @@ def test_report_undo_preserves_category_editor_access_and_uploaded_file():
     _assert_deleted(task)
     remaining_file = Entities.fetch_one(file.key, request=Fetch.direct())
     assert remaining_file is not None
-    assert page.key not in remaining_file.properties.pages.keys
+    assert remaining_file.page is None
     assert remaining_file.allowed(Action.VIEW, user=user)
     assert not remaining_file.searchable
 
@@ -324,8 +324,7 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
     doomed_file = _create_file("doomed-file", doomed_page)
     doomed_file_asset = _save_private_text_asset(doomed_file, "doomed-file")
 
-    survivor_file = _create_file("survivor-file", doomed_page)
-    survivor_file.properties.pages.add(survivor_page)
+    survivor_file = _create_file("survivor-file", survivor_page)
     survivor_file_asset = _save_private_text_asset(survivor_file, "survivor-file")
 
     assert _blob_exists(doomed_page_private)
@@ -365,7 +364,8 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
     assert {c.key for c in reloaded_page.categories} == {survivor_category.key}
 
     reloaded_file = Entities.fetch_one(survivor_file.key, request=Fetch.direct())
-    assert {p.key for p in reloaded_file.pages} == {survivor_page.key}
+    assert reloaded_file.page.key == survivor_page.key
+    assert reloaded_file.task is None
 
 
 # @matrix entities : cache cascade database delete forms
