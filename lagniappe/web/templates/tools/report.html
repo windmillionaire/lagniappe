@@ -480,6 +480,8 @@
                         Extended schema for {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.type == "append_page_document" %}
                         Page Document Updated: {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.type == "complete_task" %}
+                        Completed Task: {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.created is sameas false %}
                         Reused {{ action.entity.kind|title }}: {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity %}

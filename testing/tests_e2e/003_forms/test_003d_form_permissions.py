@@ -103,7 +103,11 @@ def test_form_builder_restrictions_visible_only_for_site_owner(get_user):
 
     form.user = owner
     form.builder
-    expect(owner.locate("[data-role='restrict-access']")).to_be_attached()
+    restrictions = owner.locate("[data-role='restrict-access']")
+    expect(restrictions).to_be_visible()
+    save = restrictions.get_by_role("button", name="Save Restrictions", exact=True)
+    expect(save).to_be_visible()
+    expect(save).to_be_enabled()
 
 
 # @matrix ai forms : submitted-reference
