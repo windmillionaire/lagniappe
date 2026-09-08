@@ -22,6 +22,7 @@ from .references import (
 )
 from .forms import _submission_previous_value
 from .task_completion import _completion_state
+from .task_dates import _due_date_state
 from .completed_tasks import (
     _is_completed_task_event,
     _task_state_fingerprint,
@@ -45,6 +46,8 @@ def _expected_action_state(action, record):
     if action_type == "complete_task":
         expected["completion_state"] = record.get("completion_state")
         expected["task_state_fingerprint"] = record.get("task_state_fingerprint")
+    if action_type == "set_task_due_date":
+        expected["due_date_state"] = record.get("due_date_state")
     if action_type == "update_form_values":
         applied = {
             item.get("index"): item
@@ -220,6 +223,8 @@ def _inspect_action_applied(action, report, user, record):
         if expected.get("task_state_fingerprint") and _task_state_fingerprint(entity) != expected["task_state_fingerprint"]:
             return ACTION_DRIFTED
         return ACTION_APPLIED if _completion_state(entity) == expected.get("completion_state") else ACTION_DRIFTED
+    if action_type == "set_task_due_date":
+        return ACTION_APPLIED if _due_date_state(entity) == expected.get("due_date_state") else ACTION_DRIFTED
     if action_type == "update_form_values":
         for update in expected.get("updates") or []:
             target_entity = _fetch_report_entity(update.get("entity"))
@@ -310,6 +315,10 @@ def _inspect_action_compensated(record, report, user):
             if _completion_state(entity) == before.get("completion_state")
             else ACTION_NOT_APPLIED
         )
+    if action_type == "set_task_due_date":
+        if not _recovery_entity_allowed(entity, user):
+            return ACTION_DRIFTED
+        return ACTION_APPLIED if _due_date_state(entity) == before.get("due_date_state") else ACTION_NOT_APPLIED
     if action_type == "add_form_to_page":
         previous_id = (before.get("form") or {}).get("id")
         return (

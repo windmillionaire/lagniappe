@@ -177,8 +177,20 @@ The client model answers first and offers to save afterward; `start_ask` is the
 explicit-save path, not the read bootstrap. Normal request/security logging
 still applies; this is not a promise that the external model retains nothing.
 
-Starters bundle current workflow context; Create, Organize and completed uploads use a
-compact contract summary. It retains all allowed action names and permissions,
+Starters bundle current workflow context. MCP clients can pass
+`start_create(actions=["create_task"])` to receive the selected permitted schemas
+in the initial `context.contract`, together with the current version, permissions
+and workflow guidance. Multiple action names are supported. Startup uses its
+existing contract read, so no additional client schema fetch is needed. The
+selection does not narrow future proposals or broaden permissions; submission
+still checks the full current contract. Omitting `actions` preserves the summary
+startup behavior. If the post-start schema read fails, keep the returned Plan
+and follow `context.recovery`; its arguments retain the requested selection.
+For rejected selections, read that Plan's summary to see current allowed actions
+and correct the selection rather than creating another Plan.
+
+Create without selected actions, Organize and completed uploads use a compact
+contract summary. It retains all allowed action names and permissions,
 but `proposal_schema` is null and `schema_scope` is `summary`. Fetch
 `get_plan_contract(actions=[...], view="schema")` for the selected schemas without
 repeating that context, or `view=full`
@@ -186,6 +198,42 @@ without actions for all schemas. `submit_plan` privately checks the full current
 before saving. Consume one complete result representation when the client
 provides both text and structured content. Legacy protocol clients receive an
 object wrapper for non-object results, with matching schemas and result paths.
+
+For task discovery or duplicate-work checks on a known Page, use
+`get_page_tasks(id=..., compact=true)`. It returns active `tasks` and
+`completed_tasks` with names, hashes, canonical browser URLs, completion state,
+view/edit permissions, visible project/model/form references, and descriptions
+bounded to 500 characters. `description_truncated` marks shortened descriptions;
+due/completion dates use the viewer's timezone. Compact projection does not call
+the full task serializer or load form schemas/submissions just to discard them.
+Use `get_entity` for a likely match when its full description or field values
+affect the decision, and `get_schema` on a task/form reference for exact fields.
+
+Compact task reads accept `limit` (default 25, maximum 100) and `cursor`.
+`task_list` describes the returned scope, limit, total visible active/completed
+counts, `returned_count`, `has_more`, and `next_cursor`. Tasks sort by completion
+state, name and hash. Continue with the same page and compact mode until the
+relevant scope is examined. Cursors are bound to the viewer, page, scope and
+ordered task revision snapshot; a changed list returns a restart instruction.
+`incomplete` and bounded `serialization_errors` disclose unreadable tasks even
+when `has_more` is false. Those errors and truncated descriptions are separate
+from pagination. Counts never include hidden tasks. The current Page relation
+loader still loads the authorized task collection; pagination bounds projection
+and response size, not database reads.
+
+`get_page_details(compact_tasks=true)` uses the same compact projection for its
+**active-task** list, retaining the existing page/category/file detail shape.
+Use `task_limit` and `task_cursor` to continue that endpoint's list, and
+`get_page_tasks` when completed tasks are relevant. `exclude_tasks=true` takes
+precedence and omits both tasks and `task_list`. Full-detail defaults remain
+unchanged on both tools; pagination arguments require their compact option.
+
+For a new task, locate its destination if unknown, compare the compact task
+list or sufficient existing search evidence, fetch only missing task/form
+details and guidance, then start with the known action selection and submit.
+Duplicate checking is an evidence comparison, not a requirement for both a
+search and a list read. A partial list or ambiguous description calls for
+continuation or focused details, not an assumption that no duplicate exists.
 
 `get_schema(id=<Page or Task>, include_values=true)` returns the schema and
 current AI-readable values keyed by exact field id. This avoids matching
@@ -564,6 +612,40 @@ The completion action uses only `data.task` and optional `task_name`; it never
 uses name-based matching or historical replacement semantics. Normal required
 fields, recurrence, permissions, retry and undo still apply.
 
+For `update_form_values`, the external action's `data` contains only `updates`.
+Every row supplies `schema_id` (the exact Form field id), `new_value`, and exactly
+one target: `page` or `task` for an existing entity, or `page_action` or
+`task_action` for an earlier creation action. Repeat the target for each field,
+including multiple fields on the same entity. Omitted fields retain their values.
+
+```json
+{
+  "type": "update_form_values",
+  "data": {
+    "updates": [
+      {"task": "hash:012345abcdef", "schema_id": "textarea-notes", "new_value": "Updated notes"}
+    ]
+  }
+}
+```
+
+The internal Organize planning stage uses a top-level `data.page` or `data.task`
+while values are pending. That shape is not an external submission: MCP/API
+clients author final update rows. The external schema rejects top-level targets,
+missing row targets, and multiple targets in one row before semantic validation.
+
+`set_task_due_date` edits an existing incomplete Task using `data.task` and a
+required `data.due_date`: a valid `YYYY-MM-DD` calendar date, or JSON `null` to
+clear it. It belongs to Organize's existing-record actions, not Form-value
+patches. Resolve relative wording using the plan's current date and timezone.
+Execution uses the acting user's timezone and the Task editor's calendar-date
+behavior; it preserves recurrence rules, postponement metadata, assignment, and
+submission values. A date already matching the requested local day is a no-op.
+Completed Tasks must be reopened separately before changing their due dates.
+The browser preview distinguishes setting a date from clearing it. Retry checks
+the recorded scheduling state; undo restores the prior timestamp and refuses to
+overwrite later due-date, recurrence, or completion changes.
+
 The current action vocabulary is deliberately not backward-compatible. Contract
 version 7 uses `update_form_values`, `extend_form_schema`, `add_page_category`,
 `suggest_page_deletion`, and one `attach_file` action. Recreate old saved proposals
@@ -609,6 +691,13 @@ submission shape: existing references use `hash:` tokens and generated rich text
 uses Markdown, while internal keys and executable HTML remain server-side. A
 ready Create or Organize proposal, or completed Ask answer, can therefore be
 edited and resubmitted directly while the plan remains reusable.
+
+First publication also creates one ordinary notification for the authenticated
+creator, linking to the report. Drafts remain silent. The notification and unread
+count commit atomically with the published Plan; retries and revisions do not
+create additional alerts or restore dismissed ones. Optional notification email
+follows the user's existing preferences. Existing published Plans are not bulk
+backfilled; a later changed submission can create their first notification.
 
 Opening, changing, executing, retrying, undoing, or deleting a saved report is
 provider-free and therefore does not require site AI access. Those browser

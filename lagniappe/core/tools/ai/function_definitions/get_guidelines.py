@@ -45,6 +45,7 @@ SCHEMA_FIELD_TYPES = (
     "todo",
 )
 ACTION_GUIDELINES = {
+    "set_task_due_date": "Set an exact editable, incomplete Task's calendar due date with data.task and data.due_date (YYYY-MM-DD in the acting user's timezone, or null to clear). Resolve relative wording to a date using the plan's current date/timezone. Preserve recurrence rules, completion state, and form values. This uses the Task editor's calendar-date behavior. Browser review, fresh permissions, retry, and undo apply.",
     "append_page_document": "Add only the requested text in document_markdown to one editable Page (page or page_action). Starts a missing document; never replaces existing text. The server adds trusted source/time attribution. Read existing content first. Unsaved collaborative edits or an uninitialized older document stop execution for a safe retry; undo stops if content has since changed.",
     "complete_task": "Check off one exact existing Task via data.task. No name-based matching, replacement submission, or historical completed_on override. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_form_values first and list its action id in depends_on when completing with details. An already-completed Task is a no-op. Undo reverses only this completion, not a reopen/reset of its form.",
     "create_form": "Create forms before actions that reference them; use the matching page_form or task_form bundle.",
@@ -56,7 +57,15 @@ ACTION_GUIDELINES = {
     "add_form_to_page": "Reference one editable existing Page and one page Form; this does not require a Category.",
     "add_page_category": "Reference both the editable existing Page and additional existing Category; readable names are not executable references.",
     "extend_form_schema": "Use additive fields or select/radio options only and place the schema update before actions that use it.",
-    "update_form_values": "Reference exactly one editable existing Page or Task and provide only grounded final field updates.",
+    "update_form_values": (
+        "Put the target inside every data.updates row, alongside schema_id and "
+        "new_value. Each row requires exactly one of page, task, page_action, or "
+        "task_action; action references identify earlier creation actions. "
+        "Top-level data.page/data.task are for internal pending planning only, "
+        "not external executable proposals. Include only grounded field changes. "
+        'Example data: {"updates":[{"task":"hash:012345abcdef",'
+        '"schema_id":"textarea-notes","new_value":"Updated notes"}]}.'
+    ),
     "attach_file": "Attach the exact report file ref to data.entity (an editable existing Page, Task or task history) or data.entity_action (an earlier create_page/create_task action). This links the file; it does not convert it into document text. Use the completed occurrence as the target for its evidence.",
     "move_page": "Use exact editable source and destination references; Organize should normally prefer needs_review for cleanup moves.",
     "move_task": "Use exact editable source and destination references; Organize should normally prefer needs_review for cleanup moves.",
@@ -176,6 +185,11 @@ EXTERNAL_ORGANIZE_WORKFLOW = """
   files; duplicate_check does not require a separate filename search per file.
   Search only when that evidence leaves an unresolved identity or occurrence
   question. Do not treat a similar filename or topic alone as proof of a match.
+- For discovery on a known Page, prefer get_page_tasks with compact=true. Reuse
+  sufficient search/list evidence; a duplicate check does not require both.
+  Follow task_list continuation and resolve incomplete results before claiming
+  no match exists. Use get_entity for likely matches when descriptions or form
+  values matter, and get_schema for the selected task/form's exact fields.
 - Choose a reusable collection when justified, or an Uncategorized Page for a
   one-off subject. Do not create one Page per artifact or a category-level
   catch-all. A category default form fits only a homogeneous collection of one
@@ -257,7 +271,10 @@ SUBMISSION_PATCH_BUNDLE = {
         "and values, or get_schema(include_values=true) when needed. Include only "
         "requested, evidence-supported changes; omitted fields remain unchanged. "
         "Do not invent missing facts or silently resolve conflicting evidence. "
-        "For newly added fields, depend on the preceding extend_form_schema action.",
+        "For newly added fields, depend on the preceding extend_form_schema action. "
+        "Every data.updates row must include its own page/task (or "
+        "page_action/task_action), schema_id, and new_value; a top-level target "
+        "does not apply to the rows.",
         SCHEMA_TYPE_GUIDELINES,
     ),
 }

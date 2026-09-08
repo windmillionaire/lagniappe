@@ -10,7 +10,7 @@ from pathlib import Path
 import stat
 import time
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx
 import pytest
@@ -2352,6 +2352,211 @@ def test_upstream_error_details_use_a_control_free_safe_key_allowlist() -> None:
             }
         ],
     }
+
+
+class _SelectedStartREST(_WorkflowREST):
+    def __init__(self):
+        super().__init__()
+        self.allowed = ["create_task", "create_page"]
+        self.failure = None
+
+    async def request_json(self, method, target, *, body=None, **kwargs):
+        if target.split("?", 1)[0] != "plans/abcdefghijkl/contract":
+            return await super().request_json(method, target, body=body, **kwargs)
+        self.requests.append((method, target, body))
+        if self.failure:
+            raise self.failure
+        query = parse_qs(urlsplit(target).query)
+        selected = query.get("actions", [None])[0]
+        actions = selected.split(",") if selected is not None else self.allowed
+        if any(action not in self.allowed for action in actions):
+            raise AdapterError(
+                "validation_failed", "private upstream details", status=422
+            )
+        contract = _contract()
+        contract["permissions"] = {"allowed_actions": list(self.allowed)}
+        contract["schema_actions"] = actions
+        contract["schema_scope"] = "selected" if selected is not None else "full"
+        contract["proposal_schema"] = {
+            "type": "object",
+            "required": ["actions"],
+            "additionalProperties": False,
+            "properties": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["type"],
+                        "properties": {"type": {"enum": actions}},
+                        "additionalProperties": False,
+                    },
+                }
+            },
+        }
+        if query.get("view") == ["summary"]:
+            contract.update(proposal_schema=None, schema_scope="summary")
+        return contract, "contract"
+
+
+# @pair mcp-adapter:product-contract
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
+@pytest.mark.parametrize(
+    "actions", [None, ["create_task"], ["create_task", "create_page"]]
+)
+def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
+    async def exercise():
+        rest = _SelectedStartREST()
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
+            rest=rest,
+        )
+        await adapter.initialize()
+        result = await adapter.execute(
+            "start_create",
+            {
+                "instructions": "File this bug.",
+                **({"actions": actions} if actions is not None else {}),
+            },
+        )
+        plan_id = result.value["id"]
+        contract = result.value["context"]["contract"]
+        assert contract["contract_version"] == CONTRACT_VERSION_MAX
+        assert contract["permissions"]["allowed_actions"] == rest.allowed
+        assert rest.requests == [
+            ("POST", "plans", {"tool": "create", "instructions": "File this bug."}),
+            (
+                "GET",
+                f"plans/{plan_id}/contract?"
+                + (
+                    urlencode({"actions": ",".join(actions)})
+                    if actions is not None
+                    else "view=summary"
+                ),
+                None,
+            ),
+        ]
+        if actions is None:
+            assert contract["proposal_schema"] is None
+            assert contract["schema_scope"] == "summary"
+            return
+        assert contract["schema_scope"] == "selected"
+        assert contract["schema_actions"] == actions
+        proposal = {"actions": [{"type": action} for action in actions]}
+        validate_value(contract["proposal_schema"], proposal, phase="proposal")
+        receipt = await adapter.execute(
+            "submit_plan",
+            {
+                "plan_id": plan_id,
+                "contract_version": contract["contract_version"],
+                "proposal": proposal,
+            },
+        )
+        assert receipt.value["id"] == plan_id
+        assert receipt.value["status"] == "ready"
+        # The only subsequent schema read is the adapter's fresh submission check.
+        assert rest.requests[-2] == ("GET", f"plans/{plan_id}/contract", None)
+        assert rest.requests[-1][2]["proposal"] == proposal
+        assert sum(target == "plans" for _, target, _ in rest.requests) == 1
+        rest.allowed = ["create_page"]
+        with pytest.raises(SchemaError):
+            await adapter.execute(
+                "submit_plan",
+                {
+                    "plan_id": plan_id,
+                    "contract_version": contract["contract_version"],
+                    "proposal": proposal,
+                },
+            )
+        assert sum(target.endswith("/submit") for _, target, _ in rest.requests) == 1
+        # The same Plan remains usable for later schemas and proposal revisions.
+        later = await adapter.execute(
+            "get_plan_contract", {"plan_id": plan_id, "actions": ["create_page"]}
+        )
+        assert later.value["schema_actions"] == ["create_page"]
+        revised = await adapter.execute(
+            "submit_plan",
+            {
+                "plan_id": plan_id,
+                "contract_version": contract["contract_version"],
+                "proposal": {"actions": [{"type": "create_page"}]},
+            },
+        )
+        assert revised.value["id"] == plan_id
+
+    asyncio.run(exercise())
+
+
+# @pair mcp-adapter:product-contract
+# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
+@pytest.mark.parametrize(
+    "actions",
+    [
+        [],
+        "create_task",
+        [None],
+        [""],
+        ["create_task,create_page"],
+        ["create_task"] * 101,
+    ],
+)
+def test_create_start_rejects_malformed_selections_before_creating_plan(actions):
+    async def exercise():
+        rest = _SelectedStartREST()
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
+            rest=rest,
+        )
+        await adapter.initialize()
+        with pytest.raises(SchemaError):
+            await adapter.execute(
+                "start_create", {"instructions": "File this bug.", "actions": actions}
+            )
+        assert rest.requests == []
+
+    asyncio.run(exercise())
+
+
+# @pair mcp-adapter:product-contract
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
+@pytest.mark.parametrize("failure", ["transport", "disallowed", "unknown"])
+def test_create_start_schema_recovery_preserves_selection_and_created_plan(failure):
+    async def exercise():
+        rest = _SelectedStartREST()
+        if failure == "transport":
+            rest.failure = TransportError("offline", "private upstream details")
+        elif failure == "disallowed":
+            rest.allowed = ["create_page"]
+        actions = ["unknown_action"] if failure == "unknown" else ["create_task"]
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
+            rest=rest,
+        )
+        await adapter.initialize()
+        started = await adapter.execute(
+            "start_create", {"instructions": "File this bug.", "actions": actions}
+        )
+        assert started.value["status"] == "draft"
+        recovery = started.value["context"]["recovery"]
+        assert recovery["tool"] == "get_plan_contract"
+        assert recovery["arguments"] == {
+            "plan_id": started.value["id"],
+            "actions": actions,
+            "view": "full",
+        }
+        assert "private upstream details" not in compact_json(started.value)
+        if failure != "transport":
+            assert "rejected" in recovery["message"]
+            assert "view=summary" in recovery["message"]
+        rest.failure = None
+        rest.allowed = ["create_task", "create_page"]
+        arguments = {**recovery["arguments"], "actions": ["create_task"]}
+        recovered = await adapter.execute(recovery["tool"], arguments)
+        assert recovered.value["schema_actions"] == ["create_task"]
+        assert sum(target == "plans" for _, target, _ in rest.requests) == 1
+
+    asyncio.run(exercise())
 
 
 class _LifecycleContextREST(_WorkflowREST):

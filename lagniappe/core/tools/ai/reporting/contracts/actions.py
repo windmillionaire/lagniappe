@@ -191,6 +191,10 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "fields": ("task", "task_name"),
         "required": ("task",),
     },
+    "set_task_due_date": {
+        "fields": ("task", "task_name", "due_date"),
+        "required": ("task", "due_date"),
+    },
     "attach_file": {
         "fields": ("entity", "entity_action", "entity_name", "file", "display_name"),
         "required": ("file",),

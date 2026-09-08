@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
 from types import SimpleNamespace
@@ -647,6 +648,65 @@ def test_status_reads_completed_migrations_across_builds_and_blocks_after_failur
         now=clock,
     )
     assert len(calls) == 1
+
+
+# @pair database-migrations:actionable-links
+def test_saved_file_migration_failures_gain_links_without_rewriting_history(monkeypatch):
+    file = _entity(migrations.KINDS.files.value, "conflict", {
+        "type": "file", "name": "Invoice <original>",
+    })
+    missing_key = _key(migrations.KINDS.files.value, "deleted")
+    identifier = migrations.encode_urlsafe_key(file.key)
+    missing_identifier = migrations.encode_urlsafe_key(missing_key)
+    definition = next(item for item in migrations.MIGRATION_CATALOG if item.id == "FIL-001")
+    attempt = {
+        "status": "failed", "totals": {"failed": 5}, "repairs": [],
+        "errors": [
+            {"key": identifier, "message": "File has multiple owners"},
+            {"key": identifier, "message": "Another issue with the same file"},
+            {"key": missing_identifier, "message": "File owner is missing"},
+            {"key": "files:query", "message": "Query failed"},
+            {"key": identifier, "message": "Already linked", "url": "/files/existing", "link_label": "Existing link"},
+        ],
+    }
+    ledger = _entity(migrations.KINDS.site.value, f"data-migration:{definition.id}", {
+        "ledger_schema": migrations.LEDGER_SCHEMA_VERSION,
+        "migration_id": definition.id, "sequence": definition.sequence,
+        "state": "failed", "attempts": json.dumps([attempt]),
+    })
+    datastore = _Datastore([file])
+    datastore.put(ledger)
+    before = deepcopy(datastore.records)
+    batches = []
+    get_multi = datastore.get_multi
+
+    def record_batch(keys, **kwargs):
+        batches.append(list(keys))
+        return get_multi(keys, **kwargs)
+
+    monkeypatch.setattr(datastore, "get_multi", record_batch)
+    status = migrations.get_migration_status(datastore=datastore, catalog=(definition,))
+    assert status["status"] == "failed"
+    assert status["cache_refresh_allowed"] is False
+    view = status["migrations"][0]
+    errors = view["latest_attempt"]["errors"]
+    assert errors == view["attempts"][-1]["errors"]
+    assert errors[0]["url"] == errors[1]["url"] == f"/files/{identifier}"
+    assert errors[0]["link_label"] == errors[1]["link_label"] == "Invoice <original>"
+    assert errors[0]["message"] == attempt["errors"][0]["message"]
+    assert errors[2]["url"] == f"/files/{missing_identifier}"
+    assert errors[2]["link_label"] == "Open file"
+    assert errors[3:] == attempt["errors"][3:]
+    assert batches[-1] == [file.key, missing_key]
+    assert len(batches) == 2  # Ledger batch, then one deduplicated file-name batch.
+    assert datastore.records == before
+    assert datastore.rows[file.key] == file
+
+    # New attempts already carry their link metadata and need no extra file reads.
+    ledger["attempts"] = json.dumps([view["latest_attempt"]])
+    batches.clear()
+    migrations.get_migration_status(datastore=datastore, catalog=(definition,))
+    assert len(batches) == 1
 
 
 # @matrix admin database-migrations : concurrency interrupted-attempt lease lost-lease stale-recovery

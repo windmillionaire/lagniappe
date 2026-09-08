@@ -1,5 +1,6 @@
 """Transactional credentials and Plan-operation claims for the external API."""
 
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -9,6 +10,7 @@ from google.cloud.datastore import Entity as DatastoreEntity
 
 from .core import DATA
 from . import get as database_get
+from . import notifications as database_notifications
 from . import utility as database_utility
 from .transactions import retry_aborted
 from .utility import create_named_key
@@ -334,7 +336,9 @@ def renew_plan_operation(
 
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_plan_operation_commit_rejects_a_replacement_owner
+# @tests tests_unit/test_032b_agent_plan_notifications.py::test_publication_notification_commits_with_plan_and_survives_replay
 # @matrix agent-api mcp-upload : atomic-checkpoint cas claim fencing transaction
+# @pairs agent-api:creator-bound agent-api:ready-state notifications:idempotency notifications:ordinary-count
 @retry_aborted
 def commit_plan_operation(
     report_key,
@@ -344,6 +348,7 @@ def commit_plan_operation(
     claim_token,
     expected_report,
     writes,
+    notification_user=None,
     now=None,
 ):
     """Commit prepared entity writes only while the exact claim is still owned.
@@ -380,6 +385,22 @@ def commit_plan_operation(
     if report_write is None:
         raise ValueError("Guarded Plan-operation commit must include its report")
 
+    notification = None
+    publication_manifest = None
+    if phase == "submit" and notification_user is not None:
+        notification, publication_manifest = _prepare_publication_notification(
+            report_write, notification_user
+        )
+        if notification is not None:
+            # Keep the caller's entity unchanged until its fenced commit succeeds.
+            report_write = deepcopy(report_write)
+            report_write["agent_manifest"] = json.dumps(publication_manifest)
+            prepared = [
+                (entity, report_write if row.key == report_key else row, mask)
+                for entity, row, mask in prepared
+            ]
+            database_notifications.ensure_notification_aggregate(notification_user)
+
     fingerprint_entities = [
         row
         for entity, row, mask in prepared
@@ -407,13 +428,54 @@ def commit_plan_operation(
         ):
             return PLAN_OPERATION_LOST
 
+        if notification is not None:
+            existing = DATA.datastore.get(notification.key, transaction=transaction)
+            if existing is None:
+                database_notifications.mutate_notification_aggregate(
+                    transaction, notification_user, ordinary_delta=1
+                )
+                transaction.put(notification)
+
         row["expires_at"] = now + timedelta(seconds=PLAN_OPERATION_LEASE_SECONDS)
         transaction.put(row)
         for _entity, row, property_mask in prepared:
             database_utility._put_mutation(transaction, row, property_mask)
         for fingerprint in fingerprint_rows:
             transaction.put(fingerprint)
+    if publication_manifest is not None:
+        for entity, row, _mask in prepared:
+            if row.key == report_key:
+                entity.agent_manifest = publication_manifest
     return PLAN_OPERATION_COMMITTED
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/database/agent_api.py::commit_plan_operation
+# @reason the fenced publication tests cover recipient, state, and durable replay identity
+def _prepare_publication_notification(report, user):
+    """Prepare the first publication alert; its manifest marker outlives dismissal."""
+    tool = report.get("tool")
+    if (
+        report.get("origin") != "api"
+        or report.get("user") != user.key
+        or tool not in {"ask", "create", "organize"}
+        or _report_status(report) != ("complete" if tool == "ask" else "ready")
+    ):
+        raise ValueError("Only the creator's published API Plan can notify them")
+    manifest = _json_field(report, "agent_manifest", dict, {})
+    if manifest is None:
+        raise ValueError("Invalid external Plan manifest")
+    if manifest.get("publication_notification"):
+        return None, None
+    identifier = f"plan-published-{database_get.urlsafe_key(report.key)}"
+    key = database_notifications.ordinary_notification_key(user, identifier)
+    notification = database_notifications.prepare_ordinary_notification(
+        key, user, body=f"{tool.title()} report is ready.", target=report.key
+    )
+    return notification, {
+        **manifest,
+        "publication_notification": database_get.urlsafe_key(key),
+    }
 
 
 # @testable true

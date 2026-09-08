@@ -28,6 +28,7 @@ from .references import (
 )
 from .forms import _resolve_submission_update_entity, _submission_previous_value
 from .task_completion import _completion_state
+from .task_dates import _due_date_state
 from .documents import prepare_document_append
 from .completed_tasks import (
     _capture_completed_task_before,
@@ -94,6 +95,9 @@ def _allocate_action_output_key(action, created, context):
 def _capture_action_before(action, report, user, created, context=None):
     action_type = action.get("type")
     data = _data(action)
+    if action_type == "set_task_due_date":
+        task = _resolve_entity(data.get("task"), created, expected=Entities.TASK)
+        return {"entity": _entity_result(task), "due_date_state": _due_date_state(task)}
     if action_type == "complete_task":
         task = _resolve_entity(data.get("task"), created, expected=Entities.TASK)
         return {"entity": _entity_result(task), "completion_state": _completion_state(task), "task": _task_checkpoint_state(task)}
@@ -285,7 +289,7 @@ def _assign_preallocated_key(entity, record, context):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
-# @matrix ai-report : attachments batch-field-patch moves result schema-update
+# @matrix ai-report : attachments batch-field-patch due-date moves result schema-update
 def _record_action_result(record, action, entity, to_save, metadata, created, context):
     metadata = _default_action_metadata(action, entity, metadata)
     if (
@@ -339,6 +343,7 @@ def _record_action_result(record, action, entity, to_save, metadata, created, co
         "manual",
         "task_state_fingerprint",
         "completion_state",
+        "due_date_state",
         "document_after",
     ):
         if key in metadata:

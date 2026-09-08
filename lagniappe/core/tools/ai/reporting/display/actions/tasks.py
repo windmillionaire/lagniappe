@@ -38,6 +38,14 @@ def move_task_details(details, data, action=None):
     details.reference("Page", data, "to_page", "page")
 
 
+# @testable true
+# @tests tests_unit/test_032f_task_due_date_action.py::test_due_date_proposal_displays_setting_and_clearing
+# @matrix ai-report : due-date proposal
+def due_date_details(details, data, action=None):
+    details.reference("Task", data, "task")
+    details.add("Due Date", data.get("due_date") if data.get("due_date") is not None else "Clear due date")
+
+
 TASK_ACTION_DISPLAYS = (
     ProposalActionDisplay("create_model_task", "Model Task", model_task_details),
     ProposalActionDisplay(
@@ -51,5 +59,6 @@ TASK_ACTION_DISPLAYS = (
         ),
     ),
     ProposalActionDisplay("complete_task", "Complete Task", task_details),
+    ProposalActionDisplay("set_task_due_date", "Set Task Due Date", due_date_details),
     ProposalActionDisplay("move_task", "Move Task", move_task_details),
 )

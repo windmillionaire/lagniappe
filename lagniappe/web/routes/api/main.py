@@ -36,6 +36,7 @@ from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.email.notifications.links import absolute_url
+from lagniappe.core.tools.notifications import service as notification_service
 
 from . import api, api_family
 
@@ -494,6 +495,7 @@ def _claimed_plan_save(report, *, phase, operation_id, claim_token):
                 claim_token=claim_token,
                 expected_report=expected_report,
                 writes=[(effect.entity, effect.property_mask) for effect in writes],
+                notification_user=g.agent_api_user if phase == "submit" else None,
             )
         except BaseException as error:
             error.checkpoint_disposition = CHECKPOINT_AMBIGUOUS
@@ -2501,6 +2503,7 @@ def submit_plan(plan_id):
                     if field in data
                 },
             )
+            notification_service.publish_plan_notification(submitted, g.agent_api_user)
         except exceptions.ValidationError as error:
             if report.status == reusable_status:
                 raise APIProblem("plan_state_conflict", str(error), 409) from error

@@ -38,6 +38,15 @@ completion. File jobs can use completion-only notifications. Reviewed report
 execution uses no Notification. AI email ingestion creates a Notification only
 when handoff fails before a report job owns the workflow.
 
+External API and MCP drafts do not notify. First publication creates one ordinary
+Notification for the Plan's creator, targeting the report: Ask at `complete`,
+Create and Organize at `ready`. The Plan, its `agent_manifest` publication marker,
+the Notification, and the aggregate increment commit together under the submit
+claim. Revisions retain the marker, including after the user dismisses the alert.
+Successful submissions (including identical retries) replay best-effort Redis
+projection and idempotent optional email capture from the existing Notification.
+Neither delivery failure nor a retry can duplicate the durable alert or count.
+
 ## Direct messages
 
 `MessageConversation` uses a deterministic key derived from two sorted User

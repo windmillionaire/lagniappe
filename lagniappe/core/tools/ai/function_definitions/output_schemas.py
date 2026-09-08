@@ -29,6 +29,49 @@ def _object(*required, properties=None):
 
 # These describe the successful direct shared-handler result. REST wraps those values
 # as {"result": <value>}; provider-native function calls receive <value>.
+TASK_LIST_METADATA = _object(
+    "scope",
+    "limit",
+    "total_count",
+    "active_count",
+    "completed_count",
+    "returned_count",
+    "has_more",
+    "next_cursor",
+    "incomplete",
+    properties={
+        "scope": {"type": "string", "enum": ["active", "active_and_completed"]},
+        "limit": {"type": "integer"},
+        "total_count": {
+            "type": "integer",
+            "description": "Visible tasks in this entire list scope, before pagination.",
+        },
+        "active_count": {"type": "integer"},
+        "completed_count": {"type": "integer"},
+        "returned_count": {
+            "type": "integer",
+            "description": "Successfully serialized tasks in this response.",
+        },
+        "has_more": {"type": "boolean"},
+        "next_cursor": {"type": ["string", "null"]},
+        "incomplete": {
+            "type": "boolean",
+            "description": "Some tasks in this response could not be serialized; inspect serialization_errors even when has_more is false.",
+        },
+        "serialization_errors": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["hash", "message"],
+                "properties": {
+                    "hash": {"type": "string"},
+                    "message": {"type": "string"},
+                },
+            },
+        },
+    },
+)
+
 OUTPUT_SCHEMAS = {
     "search_entities": ENTITY_LIST,
     "get_entity": ENTITY,
@@ -82,6 +125,7 @@ OUTPUT_SCHEMAS = {
             "category": ENTITY,
             "tasks": ENTITY_LIST,
             "files": ENTITY_LIST,
+            "task_list": TASK_LIST_METADATA,
         },
     ),
     "get_page_file_list": _object(
@@ -97,6 +141,7 @@ OUTPUT_SCHEMAS = {
             "page": REFERENCE,
             "tasks": ENTITY_LIST,
             "completed_tasks": ENTITY_LIST,
+            "task_list": TASK_LIST_METADATA,
         },
     ),
     "get_task_history": _object(
@@ -216,11 +261,24 @@ RESULT_PATHS = {
         },
     },
     "get_category_forms": {"primary_collection": "$.forms", "pagination": None},
-    "get_page_details": {"primary_entity": "$.page", "pagination": None},
+    "get_page_details": {
+        "primary_entity": "$.page",
+        "pagination": {
+            "has_more": "$.task_list.has_more",
+            "next_cursor": "$.task_list.next_cursor",
+            "returned": "$.task_list.returned_count",
+            "total": "$.task_list.total_count",
+        },
+    },
     "get_page_file_list": {"primary_collection": "$.files", "pagination": None},
     "get_page_tasks": {
         "primary_collections": ["$.tasks", "$.completed_tasks"],
-        "pagination": None,
+        "pagination": {
+            "has_more": "$.task_list.has_more",
+            "next_cursor": "$.task_list.next_cursor",
+            "returned": "$.task_list.returned_count",
+            "total": "$.task_list.total_count",
+        },
     },
     "get_task_history": {
         "primary_collection": "$.history",

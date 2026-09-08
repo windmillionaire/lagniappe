@@ -313,14 +313,11 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             {
                 "name": "MCP live Create",
                 "instructions": "Prepare a browser-reviewable field guide Page.",
+                "actions": ["create_page", "create_task"],
             },
         )
         create = _structured(create_start)
-        create_contract_call = await _call(client, "get_plan_contract", {
-            "plan_id": create["id"], "actions": ["create_page", "create_task"],
-            "view": "schema",
-        })
-        create_contract_value = _structured(create_contract_call)
+        create_contract_value = create["context"]["contract"]
         create_schedule_checks = _schedule_contract_checks(create_contract_value)
         create_proposal = {
             "summary": "Create a field guide Page.",
@@ -349,6 +346,12 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             },
         )
         create_get = await _call(client, "get_plan", {"plan_id": create["id"]})
+        # Startup supplied everything needed for the first submission. A later
+        # selected read and revision still use this same Plan.
+        create_contract_call = await _call(client, "get_plan_contract", {
+            "plan_id": create["id"], "actions": ["create_page", "create_task"],
+            "view": "schema",
+        })
         replacement = {
             **create_proposal,
             "summary": "Create the revised field guide Page.",

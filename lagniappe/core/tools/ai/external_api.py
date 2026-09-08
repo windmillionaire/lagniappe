@@ -552,8 +552,18 @@ def _schema_errors(value, schema, root, path):
         choices = schema.get(keyword) or []
         if choices:
             candidates = [_schema_errors(value, child, root, path) for child in choices]
-            if not any(not candidate for candidate in candidates):
+            matches = sum(not candidate for candidate in candidates)
+            if not matches:
                 errors.extend(min(candidates, key=len))
+            elif keyword == "oneOf" and matches != 1:
+                errors.append(
+                    {
+                        "code": "one_of",
+                        "path": path,
+                        "message": "Value must match exactly one schema alternative.",
+                        "expected": "exactly one alternative",
+                    }
+                )
 
     expected_type = schema.get("type")
     if expected_type and not _schema_type_matches(value, expected_type):
@@ -648,6 +658,14 @@ def _schema_errors(value, schema, root, path):
                     _schema_errors(item, item_schema, root, f"{path}[{index}]")
                 )
     elif isinstance(value, str):
+        if schema.get("format") == "date":
+            from .reporting.schedules import validate_task_due_date
+
+            try:
+                validate_task_due_date(value)
+            except exceptions.AIException as error:
+                errors.append({"code": "format", "path": path, "message": str(error),
+                               "expected": "YYYY-MM-DD"})
         minimum = schema.get("minLength")
         maximum = schema.get("maxLength")
         if minimum is not None and len(value) < minimum:
@@ -805,6 +823,12 @@ def plan_contract(report, user, *, submit_url, actions=None, view="full"):
                 "Reuse supplied personal Page, schema, and workspace context. "
                 "Inspect relevant existing structure when needed; use "
                 "list_workspace_resources when broader structure is unknown.",
+                "For task discovery on a known Page, prefer get_page_tasks with "
+                "compact=true. Reuse sufficient search/list evidence instead of "
+                "requiring both. Follow task_list.next_cursor when has_more is true "
+                "and resolve incomplete results before claiming no match exists. "
+                "Use get_entity for likely matches when descriptions or field values "
+                "matter; get_schema supplies the selected task/form's exact field ids.",
                 "Use get_guidelines for category, project, page_form, task_form, "
                 "form_autofill, page_document, or report_actions when relevant "
                 "rules are not already supplied by context or the current schema.",

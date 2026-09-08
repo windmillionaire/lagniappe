@@ -1434,6 +1434,19 @@ def test_external_tool_catalog_uses_id_for_subject_entity_references():
     for tool_name, forbidden in forbidden_legacy_subject_arguments.items():
         assert forbidden not in catalog[tool_name]["input_schema"]["properties"]
 
+    for tool_name, compact, limit, cursor in (
+        ("get_page_tasks", "compact", "limit", "cursor"),
+        ("get_page_details", "compact_tasks", "task_limit", "task_cursor"),
+    ):
+        tool = catalog[tool_name]
+        properties = tool["input_schema"]["properties"]
+        assert properties[compact]["type"] == "boolean"
+        assert properties[limit]["maximum"] == 100
+        assert properties[cursor]["type"] == "string"
+        metadata = tool["output_schema"]["properties"]["task_list"]["properties"]
+        assert {"incomplete", "serialization_errors", "total_count", "next_cursor"} <= metadata.keys()
+        assert tool["result_paths"]["pagination"]["next_cursor"] == "$.task_list.next_cursor"
+
     assert "form_id" in catalog["get_category_pages"]["input_schema"]["properties"]
     assert "parent_id" in catalog["search_entities"]["input_schema"]["properties"]
 

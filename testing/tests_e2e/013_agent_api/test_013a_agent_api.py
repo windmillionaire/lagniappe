@@ -1131,8 +1131,11 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     }
 
     class DownloadableFile:
+        key = "downloadable-file-key"
+        entity_kind = "file"
         properties = SimpleNamespace(
-            file=SimpleNamespace(value=SimpleNamespace(path="private/person.vcf"))
+            file=SimpleNamespace(value=SimpleNamespace(path="private/person.vcf")),
+            get=lambda _name: None,
         )
 
         def allowed(self, action, user=None):

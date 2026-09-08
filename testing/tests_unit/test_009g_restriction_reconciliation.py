@@ -161,21 +161,31 @@ def test_reconciliation_enqueue_uses_current_source_key(monkeypatch):
 
 
 # @matrix files migrations : single-owner history conflict idempotence
+# @pair database-migrations:actionable-links
 def test_file_migration_normalizes_history_and_preserves_conflicts():
-    from testing.tests_unit.test_018b_database_migrations import _Datastore, _entity
+    from testing.tests_unit.test_018b_database_migrations import _Datastore, _entity, _key
     page = _entity(KINDS.instances.value, "page", {"type": "page", "hash": "page", "requires": ["page", "models"]})
     task = _entity(KINDS.instances.value, "task", {"type": "task", "hash": "task", "page": page.key, "requires": ["page", "models"]})
     history = _entity(KINDS.history.value, "history", {"type": "task_history", "task": task.key})
     file = _entity(KINDS.files.value, "file", {"type": "file", "hash": "file", "tasks": [task.key, history.key]})
-    conflict = _entity(KINDS.files.value, "conflict", {"type": "file", "hash": "conflict", "tasks": [task.key], "pages": [page.key]})
-    datastore = _Datastore([page, task, history, file, conflict])
+    conflict = _entity(KINDS.files.value, "conflict", {"type": "file", "hash": "conflict", "name": "Conflicting attachment", "tasks": [task.key], "pages": [page.key]})
+    missing_owner = _entity(KINDS.files.value, "missing-owner", {
+        "type": "file", "filename": "scan.pdf", "pages": [_key(KINDS.instances.value, "gone-page")],
+    })
+    datastore = _Datastore([page, task, history, file, conflict, missing_owner])
     context = migrations.MigrationContext(datastore.query_factory, datastore.write, datastore)
     outcome = migrate_file_ownership(context)
-    assert outcome["changed"] == 1 and outcome["failed"] == 1
+    assert outcome["changed"] == 1 and outcome["failed"] == 2
+    for detail, affected, label in zip(
+        outcome["errors"], (conflict, missing_owner), ("Conflicting attachment", "scan.pdf")
+    ):
+        assert detail["url"] == f"/files/{migrations.encode_urlsafe_key(affected.key)}"
+        assert detail["link_label"] == label
     stored = datastore.rows[file.key]
     assert stored["task"] == task.key and "tasks" not in stored and "pages" not in stored
     assert {"task", "page", "file"} <= set(stored["requires"])
     assert datastore.rows[conflict.key] == conflict
+    assert datastore.rows[missing_owner.key] == missing_owner
     assert migrate_file_ownership(context)["changed"] == 0
 
 

@@ -7,8 +7,9 @@ from ..core import KINDS
 # @testable true
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_migration_normalizes_history_and_preserves_conflicts
 # @matrix files migrations : single-owner history conflict idempotence
+# @pair database-migrations:actionable-links
 def migrate_file_ownership(context):
-    from ..migrations import _result, scan_kind
+    from ..migrations import _file_record_reference, _result, scan_kind
 
     result = _result("FIL-001", "Single-owner Files")
     owners = {row.key: row for row in context.query_factory(KINDS.instances).fetch_iter()
@@ -51,7 +52,10 @@ def migrate_file_ownership(context):
         row.update(desired)
         return changed
 
-    scan_kind(result, context, KINDS.files, lambda row: row.get("type") == "file", transform)
+    scan_kind(
+        result, context, KINDS.files, lambda row: row.get("type") == "file",
+        transform, reference=_file_record_reference,
+    )
     return result
 
 

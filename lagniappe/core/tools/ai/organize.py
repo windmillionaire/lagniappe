@@ -299,7 +299,7 @@ def _organize_prompt_base(
 ):
     allowed_actions = _organize_allowed_actions(user)
     if getattr(report, "origin", None) in {"api", "email"}:
-        allowed_actions = (*allowed_actions, "complete_task")
+        allowed_actions = (*allowed_actions, "complete_task", "set_task_due_date")
     prompt = Prompt(intro, user=user, type="organize report")
     prompt.set_instructions_before_context()
     # Leave thinking unset so each primary model uses its native default; a raw

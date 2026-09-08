@@ -21,7 +21,8 @@ title/brief while retaining the original. See the API guide for exact shapes.
 Create is for new content; Organize handles existing-record updates as well as
 uploaded files. Remote updates need no file, unlike UI Organize. The Organize
 starter returns a compact contract, with selected action schemas fetched on
-demand. `complete_task` is a reviewed plan action, not a top-level MCP tool.
+demand. `complete_task` and `set_task_due_date` are reviewed Organize plan actions.
+For due-date edits, supply an exact Task and a calendar date, or null to clear it.
 When files are uploaded, every file still needs inspection, summary and placement.
 
 Tests live in `testing/tests_unit/test_033*.py`; live API and OAuth workflows

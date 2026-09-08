@@ -283,7 +283,9 @@ class LagniappeAdapter:
             body["name"] = arguments["name"]
         value, _request_id = await self.rest.request_json(method, route, body=body)
         plan = self._safe_plan(value, expected_tool=tool)
-        return await self._with_lifecycle_context(plan, plan_id=plan["id"])
+        return await self._with_lifecycle_context(
+            plan, plan_id=plan["id"], actions=arguments.get("actions")
+        )
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
@@ -293,12 +295,15 @@ class LagniappeAdapter:
         *,
         plan_id: str,
         organize_guidelines: bool = False,
+        actions: list[str] | None = None,
     ) -> AdapterResult:
         """Bundle a read without turning a successful mutation into a retry."""
         tool = "get_guidelines" if organize_guidelines else "get_plan_contract"
         arguments = {"plan_id": plan_id}
         if organize_guidelines:
             arguments["task"] = "organize"
+        elif actions is not None:
+            arguments.update(actions=actions, view="full")
         try:
             if organize_guidelines:
                 definition = self.tools.get(tool)
@@ -314,7 +319,11 @@ class LagniappeAdapter:
                     )
                 context = {"guidelines": result.value}
             else:
-                result = await self._get_contract_projection(plan_id, view="summary")
+                result = await self._get_contract_projection(
+                    plan_id,
+                    actions=actions,
+                    view="full" if actions is not None else "summary",
+                )
                 expected_tool = value.get("tool") or value["plan"]["tool"]
                 if result.value["tool"] != expected_tool:
                     raise TransportError(
@@ -345,7 +354,7 @@ class LagniappeAdapter:
             _reject_private_model_data(enriched.value, bearer=self.config.api_key)
             self._enforce_result_limits(enriched)
             return enriched
-        except AdapterError:
+        except AdapterError as exc:
             # Never reflect the failed read's body or error details. The Plan
             # or finalized upload already exists, so recovery must be a read.
             return AdapterResult(
@@ -356,7 +365,12 @@ class LagniappeAdapter:
                             "tool": tool,
                             "arguments": arguments,
                             "message": (
-                                "The operation succeeded, but its working context "
+                                "The Plan was created, but the requested action schemas "
+                                "were rejected. Read get_plan_contract with view=summary "
+                                "on this Plan to see current allowed actions, then correct "
+                                "the selection in this recovery read. Do not repeat the start."
+                                if actions is not None and exc.status in (400, 403, 422)
+                                else "The operation succeeded, but its working context "
                                 "could not be included. Use this recovery read; "
                                 "do not repeat the start or upload."
                             ),

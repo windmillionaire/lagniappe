@@ -9,7 +9,7 @@ from lagniappe.core.tools import dates
 from ...debug import ai_debug
 from ...references import normalize_hash_references, render_ai_markdown
 from ..contracts.actions import ALLOWED_ACTIONS
-from ..schedules import validate_task_schedule
+from ..schedules import validate_task_due_date, validate_task_schedule
 from .references import (
     _data_action_reference,
     _data_action_references,
@@ -267,6 +267,7 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
     rules = {
         "create_page": (("category", {"category"}),),
         "complete_task": (("task", {"task"}),),
+        "set_task_due_date": (("task", {"task"}),),
         "create_task": (
             ("page", {"page"}),
             ("task", {"task"}),
@@ -429,6 +430,14 @@ def _validate_action_data_shape(
             raise exceptions.AIException(
                 f"Action {action_label} only accepts task and task_name; use separate submission patches before completion."
             )
+    if action_type == "set_task_due_date":
+        if not _proposal_string(data.get("task")):
+            raise exceptions.AIException(f"Action {action_label} requires an exact data.task reference.")
+        if "due_date" not in data:
+            raise exceptions.AIException(f"Action {action_label} requires data.due_date; use null to clear it.")
+        if set(data) - {"task", "task_name", "due_date"}:
+            raise exceptions.AIException(f"Action {action_label} only accepts task, task_name, and due_date.")
+        validate_task_due_date(data["due_date"])
     entity_pair = ENTITY_PAIR_ACTION_REFERENCES.get(action_type)
     if entity_pair:
         source_root, target_roots = entity_pair
@@ -830,23 +839,18 @@ def _validate_submission_update_action_data(
             raise exceptions.AIException(
                 f"Action {action_label} {row_label} must be an object."
             )
-        page_reference = _first_data_reference(
-            update,
-            "page",
-            "page_id",
-            "page_ref",
-            "page_action",
-        )
-        task_reference = _first_data_reference(
-            update,
-            "task",
-            "task_id",
-            "task_ref",
-            "task_action",
-        )
-        if bool(page_reference) == bool(task_reference):
+        targets = [
+            update[field]
+            for field in (
+                "page", "page_id", "page_ref", "page_action",
+                "task", "task_id", "task_ref", "task_action",
+            )
+            if field in update
+        ]
+        if len(targets) != 1 or not _proposal_string(targets[0]):
             raise exceptions.AIException(
-                f"Action {action_label} {row_label} requires exactly one page or task."
+                f"Action {action_label} {row_label} requires exactly one page or task. "
+                "Put the target in every update row; top-level targets do not apply."
             )
         if not _proposal_string(update.get("schema_id") or update.get("field_id")):
             raise exceptions.AIException(

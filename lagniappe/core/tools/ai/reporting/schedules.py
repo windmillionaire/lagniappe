@@ -1,5 +1,7 @@
 """Validated task-schedule contracts shared by AI report planning and execution."""
 
+from datetime import date
+
 from lagniappe.core import exceptions
 
 
@@ -9,6 +11,22 @@ SCHEDULED_MODES = frozenset({"daily", "weekly", "monthly", "yearly"})
 SCHEDULE_PATTERN_TYPES = frozenset(
     {"specific_day", "ordinal_weekday", "last_day", "first_day"}
 )
+
+
+# @testable true
+# @tests tests_unit/test_032f_task_due_date_action.py::test_due_date_contract_validates_calendar_dates
+# @matrix ai-report task-scheduling : due-date validation
+def validate_task_due_date(value):
+    """Accept an explicit calendar date or an explicit request to clear it."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            if date.fromisoformat(value).isoformat() == value:
+                return value
+        except ValueError:
+            pass
+    raise exceptions.AIException("due_date must be a valid YYYY-MM-DD date or null to clear it.")
 
 
 # @testable true

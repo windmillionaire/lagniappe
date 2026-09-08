@@ -11,7 +11,7 @@ from .actions import ACTION_ORDER
 def allowed_report_actions(user):
     """Return report action types this user may ask the runner to execute."""
     capabilities = user.properties.restrictions.ai_action_capabilities
-    allowed = {"create_task", "complete_task", "skip", "needs_review"}
+    allowed = {"create_task", "complete_task", "set_task_due_date", "skip", "needs_review"}
 
     if capabilities["can_create_forms"]:
         allowed.add("create_form")
@@ -124,6 +124,8 @@ def report_action_permission_context(user, allowed_actions=None):
         rules.append("Creating tasks requires an editable target.")
     if "complete_task" in allowed_set:
         rules.append("Completing tasks requires an exact editable Task and its required fields.")
+    if "set_task_due_date" in allowed_set:
+        rules.append("Changing a due date requires an exact editable, incomplete Task.")
     if "append_page_document" in allowed_set:
         rules.append("Document appends require an exact editable Page and preserve existing content.")
     if "attach_file" in allowed_set:

@@ -18,6 +18,7 @@ from playwright.sync_api import expect
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI
+from lagniappe.core.tools.database import notifications as notification_database
 from runner import mcp_environment
 from testing.definitions import Pages, SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
@@ -40,7 +41,8 @@ LIFECYCLE_TOOLS = (
 )
 # Reviewed conversational contracts: plan-free context, optional brief revisions,
 # execution receipts, and compact/selected schemas in starter/upload context.
-# Version 7 changes only the supported contract-version bounds in these schemas.
+# Optional Create action selection uses the contract reader's identifier schema;
+# shared lifecycle recovery retains selected actions and the requested view.
 LIFECYCLE_SCHEMA_SHA256 = {
     "answer_question": (
         "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
@@ -52,27 +54,27 @@ LIFECYCLE_SCHEMA_SHA256 = {
     ),
     "start_ask": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "544d4448ac2af7f8d3685766fc86c5dadac524e062ba4ffa291a03808d54366d",
+        "1e7baa7baf7af2baef56465deb16baa50f38d35ec6e4317f9b72edab83bbda1f",
     ),
     "start_create": (
-        "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "544d4448ac2af7f8d3685766fc86c5dadac524e062ba4ffa291a03808d54366d",
+        "6ad98deac652b8e18d90e813977bfa39667d284bc0ed00171b5c4ae0a96e8c20",
+        "1e7baa7baf7af2baef56465deb16baa50f38d35ec6e4317f9b72edab83bbda1f",
     ),
     "start_organize": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "544d4448ac2af7f8d3685766fc86c5dadac524e062ba4ffa291a03808d54366d",
+        "1e7baa7baf7af2baef56465deb16baa50f38d35ec6e4317f9b72edab83bbda1f",
     ),
     "get_plan": (
         "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
         "93ac7fd41d6414596b6c4a9ad555af53fe97f37c410f44a8bd736f67a562c287",
     ),
     "get_plan_contract": (
-        "8054a33de0dcc82cb083398f7f8fb6bb0c2e72aa439f4bf21471e75ee7b44989",
+        "5b95dc7a76a81e9dea530ba2519c92c1de410e59d6e1e7f115068c604c961553",
         "ca7162560fcd6af6d04feb38860f43c10e55111951428d2dccf22baa029205c8",
     ),
     "upload_local_files": (
         "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
-        "95d57b63452cce0766c9ff0c636f61fc85fea02226d688435763b060bf556297",
+        "df2b7f84087a1b347b92bf2035fb7897d2dc689069fb780182afb4bae430a04a",
     ),
     "submit_plan": (
         "18e44236fd78c5fa56314d6df698b339be168781d967947a7ac9efcfee57a9ef",
@@ -461,6 +463,7 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 # @source mcp/src/lagniappe_mcp/files.py::upload_local_files
 # @styles modal.wrapper modal.content modal.header modal.actions button.close label.default
+# @template notifications.html::item
 def test_managed_mcp_adapter_exercises_the_real_api_boundary(
     get_user,
     tmp_path: Path,
@@ -629,6 +632,10 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             cookie["name"]: cookie["value"] for cookie in owner.page.context.cookies()
         }
         csrf_token = owner.page.locator("#token").input_value()
+        notification_counts = notification_database.ensure_notification_aggregate(owner.entity)
+        starting_notifications = (
+            notification_counts["ordinary_count"] + notification_counts["unread_message_count"]
+        )
         workflow = _run_driver(
             tmp_path,
             monkeypatch,
@@ -702,7 +709,8 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         create_contract = create_start["context"]["contract"]
         _assert_mcp_contract(create_contract, tool="create")
         assert "create_page" in create_contract["permissions"]["allowed_actions"]
-        assert create_contract["proposal_schema"] is None and create_contract["schema_scope"] == "summary"
+        assert create_contract["schema_scope"] == "selected"
+        assert set(create_contract["proposal_schema"]["$defs"]) == {"create_page", "create_task"}
         selected_contract = _structured(workflow["create"]["selected_contract"])
         assert selected_contract["schema_scope"] == "selected"
         assert "workflow_rules" not in selected_contract
@@ -880,6 +888,21 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             tool["name"] for tool in workflow["tools"]
         ]
         _error(foreign["foreign_plan"], code="not_found", status=404)
+
+        owner.go(SitePages.HOME)
+        notifications = owner.locate("[data-role='notifications']")
+        expect(notifications).to_have_attribute(
+            "aria-label", f"Notifications: {starting_notifications + 4}"
+        )
+        notifications.click()
+        panel = owner.page.locator("[role='listbox'][data-visible='true']")
+        for published in (ask_start, create_start, update_start, organize_start):
+            target = panel.locator(
+                f"[data-role='target'][href='/tools/reports/{published['id']}']"
+            )
+            expect(target).to_have_count(1)
+            expect(target).to_be_visible()
+        expect(panel).to_contain_text("Create report is ready.")
 
         review_response = owner.page.goto(
             create_receipt["review_url"], wait_until="load"

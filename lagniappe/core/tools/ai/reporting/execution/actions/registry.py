@@ -46,6 +46,7 @@ from .compensation import (
 from .tasks import _create_task
 from .documents import _append_page_document, _undo_page_document
 from .task_completion import _complete_task, _undo_complete_task
+from .task_dates import _set_task_due_date, _undo_task_due_date
 
 REPORT_ACTION_ADAPTERS = {
     adapter.action_type: adapter
@@ -61,6 +62,7 @@ REPORT_ACTION_ADAPTERS = {
         ReportActionAdapter("create_page", _create_page, _compensate_created, uses_context=True),
         ReportActionAdapter("append_page_document", _append_page_document, _undo_page_document, uses_context=True),
         ReportActionAdapter("complete_task", _complete_task, _undo_complete_task, uses_context=True),
+        ReportActionAdapter("set_task_due_date", _set_task_due_date, _undo_task_due_date),
         ReportActionAdapter(
             "create_task",
             _create_task,

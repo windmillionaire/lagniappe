@@ -3,6 +3,7 @@
 REMOTE_UPDATE_ACTIONS = frozenset(
     {
         "complete_task",
+        "set_task_due_date",
         "append_page_document",
         "update_form_values",
         "extend_form_schema",
@@ -35,6 +36,9 @@ guidance for a simple existing-record update.
 
 Use update_form_values for named field patches, preserving other values;
 read existing values before replacing them and clear a value only when requested.
+Use set_task_due_date for an existing incomplete Task's calendar due date;
+provide an exact task reference and due_date (YYYY-MM-DD, or null to clear it).
+The date uses the acting user's timezone and preserves the repeating schedule.
 Apply submission updates before complete_task and make completion depend on them.
 complete_task checks off one exact existing Task using normal completion rules,
 including required fields and recurrence; it is not create_task's historical

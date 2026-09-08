@@ -388,6 +388,13 @@ UPLOAD_RESULT_SCHEMA = {
     "additionalProperties": False,
 }
 
+ACTION_SELECTION_SCHEMA = {
+    "type": "array",
+    "minItems": 1,
+    "maxItems": 100,
+    "items": {"type": "string", "maxLength": 100, "pattern": "^[a-z][a-z0-9_]*$"},
+}
+
 LIFECYCLE_CONTEXT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -404,6 +411,8 @@ LIFECYCLE_CONTEXT_SCHEMA = {
                     "properties": {
                         "plan_id": {"type": "string"},
                         "task": {"const": "organize"},
+                        "actions": ACTION_SELECTION_SCHEMA,
+                        "view": {"enum": ["full", "summary", "schema"]},
                     },
                     "additionalProperties": False,
                 },
@@ -439,7 +448,7 @@ ENRICHED_UPLOAD_RESULT_SCHEMA = {
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
-def _plan_input_schema() -> dict[str, Any]:
+def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
     return {
         "type": "object",
         "required": ["instructions"],
@@ -450,6 +459,16 @@ def _plan_input_schema() -> dict[str, Any]:
                 "pattern": r"\S",
             },
             "name": {"type": "string", "maxLength": 120},
+            **(
+                {
+                    "actions": {
+                        **ACTION_SELECTION_SCHEMA,
+                        "description": "Known action types whose exact permitted schemas should be returned in context.contract, for example [create_task]. Omit for a summary without schemas.",
+                    }
+                }
+                if selected_actions
+                else {}
+            ),
         },
         "additionalProperties": False,
     }
@@ -690,8 +709,8 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_create",
-            f"Start a Create Plan to create pages, tasks, or workspace structure without uploads. Use start_organize to update existing records, including completing tasks or patching submissions. {common_start} Returns a compact context.contract with permissions and all allowed action names. Fetch get_plan_contract with selected actions for exact submission schemas, or view=full for all schemas. {review_only}",
-            _plan_input_schema(),
+            f"Start a Create Plan to create pages, tasks, or workspace structure without uploads. Use start_organize to update existing records, including completing tasks or patching submissions. {common_start} Pass actions=[\"create_task\"] or other known action names to receive their exact permitted schemas with the initial context.contract. Omit actions for a summary of permissions and allowed actions. Reuse supplied schemas; get_plan_contract can load additional schemas later on this same Plan. {review_only}",
+            _plan_input_schema(selected_actions=True),
             START_RESULT_SCHEMA,
             "start_create",
             START_ANNOTATIONS,
@@ -719,12 +738,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
                 **_plan_id_input(),
                 "properties": {
                     **_plan_id_input()["properties"],
-                    "actions": {
-                        "type": "array",
-                        "minItems": 1,
-                        "maxItems": 100,
-                        "items": {"type": "string"},
-                    },
+                    "actions": ACTION_SELECTION_SCHEMA,
                     "view": {"enum": ["full", "summary", "schema"]},
                 },
             },

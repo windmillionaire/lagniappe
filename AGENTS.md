@@ -21,6 +21,9 @@ These instructions apply to the whole repository unless a more specific
   - `venv/bin/python run.py test setup`
   - `venv/bin/python run.py traceability`
   - `venv/bin/python run.py template-contracts`
+- Run test commands directly, without shell redirection, pipes, or wrapper
+  shells. Read ongoing output through the tool session; use runner-generated
+  artifacts when saved output is needed.
 - The repo runner expects the user's gcloud and Application Default
   Credentials context to be aligned before cloud-aware tests run. If the
   runner reports an authentication or project mismatch, ask the user for
