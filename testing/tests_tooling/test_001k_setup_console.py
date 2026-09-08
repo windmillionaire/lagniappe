@@ -50,13 +50,13 @@ def test_prose_layout(width, monkeypatch):
 # @matrix setup : interactive-input terminal-wrapping
 @pytest.mark.parametrize("width", [12, 40, 60, 80, 100])
 def test_prompt_layout(width):
-    message = "Would you like to deploy the app now? [y/N]: "
+    message = "Deploy app now? [y/N]: "
     result = format_prompt(message, width)
     assert result.startswith("? ")
     assert result.endswith("[y/N] ")
     assert not result.endswith("  ")
     assert all(len(line) <= width for line in result.splitlines())
-    assert " ".join(result.split()) == "? Would you like to deploy the app now [y/N]"
+    assert " ".join(result.split()) == "? Deploy app now [y/N]"
     assert "(My workspace) " in format_prompt(
         "Installation name [My workspace]: ", width
     )

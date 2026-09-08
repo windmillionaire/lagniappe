@@ -25,7 +25,7 @@ environment exists is `venv/bin/python -m installer ...`.
 | `email` | Replace Gmail/Workspace or custom-domain authentication-email delivery. |
 | `oauth` | Configure the Google Sign-In Web client. |
 | `ai` | Configure AI and external-agent policy, observability and optional provider cache settings; offer deployment. |
-| `mcp` | Build/reconcile the selected MCP component and publish its app configuration. |
+| `mcp` | Confirm app deployment, then build/reconcile the selected MCP component and publish its app configuration. |
 | `ai-email` | Configure Resend receiving and the AI email webhook. |
 | `security` | Configure verified Redis TLS. |
 | `jobs` | Reconcile deferred-job Cloud Scheduler infrastructure. |

@@ -1,7 +1,7 @@
 """Optional MCP service lifecycle shared by setup and ordinary app deployments."""
 
 from runner import presentation as ui
-from runner.presentation import output as print
+from runner.presentation import output as print, read_input as input
 
 from dataclasses import dataclass
 import hashlib
@@ -16,6 +16,7 @@ from config import SETTINGS
 from config.ai_settings import normalize_ai_features
 from config.locations import normalize_resource_region
 from config.remote_mcp import https_url, mcp_issuer, normalize_mcp_config
+from runner.console import format_prompt
 from installer import iam, wrap_text
 from installer.errors import ProviderTransientError, SetupError, retry_provider_call
 from installer.state import record_mutation, record_step
@@ -621,12 +622,17 @@ def handoff_access(settings, *, owner=None, remove_installer=None):
 
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_focused_mcp_command_uses_normal_deployment_path
-# @matrix mcp-install : cli-routing retry
+# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_deployment_decline_preserves_configuration
+# @matrix mcp-install : cli-routing retry confirmation default-no no-mutation
 def configure_mcp():
     from installer.verify import prepare_existing_installation
     from installer.utils import deploy_to_app_engine
     prepare_existing_installation()
     if not requested(SETTINGS.APP) and not SETTINGS.APP.get("MCP_RESOURCE"):
         raise SetupError(f"External AI is disabled. Choose it with {setup_command('ai')} first.")
+    consent = input(format_prompt("Deploy app now", hint="y/N"))
+    if consent.strip().casefold() not in {"y", "yes"}:
+        print(ui.status("Deployment skipped"))
+        return 0
     deploy_to_app_engine(print_final_summary=False)
     return 0

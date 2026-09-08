@@ -624,19 +624,53 @@ def test_mcp_handoff_uses_selected_accounts_and_scoped_resources(cloud, app_name
     assert ("iam", "service-accounts", config["RUNTIME_SERVICE_ACCOUNT_EMAIL"]) not in cloud.policies
 
 
-# @matrix mcp-install : cli-routing retry
+# @matrix mcp-install : cli-routing retry confirmation
 def test_focused_mcp_command_uses_normal_deployment_path(monkeypatch):
     from installer import verify, utils
     events = []
     monkeypatch.setattr(mcp.SETTINGS, "APP", settings())
     monkeypatch.setattr(verify, "prepare_existing_installation", lambda: events.append("prepare"))
     monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: events.append(("confirm", prompt)) or "y",
+    )
+    monkeypatch.setattr(
         utils,
         "deploy_to_app_engine",
         lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
     assert mcp.configure_mcp() == 0
-    assert events == ["prepare", ("deploy", False)]
+    assert events[0] == "prepare"
+    assert events[1][0] == "confirm"
+    assert "Deploy app now" in events[1][1]
+    assert "[y/N]" in events[1][1]
+    assert events[2:] == [("deploy", False)]
+
+
+# @matrix mcp-install : confirmation default-no no-mutation
+@pytest.mark.parametrize("answer", ["", "n", "no", "not now"])
+def test_mcp_deployment_decline_preserves_configuration(monkeypatch, capsys, answer):
+    from installer import verify, utils
+
+    app = settings()
+    original = deepcopy(app)
+    monkeypatch.setattr(mcp.SETTINGS, "APP", app)
+    monkeypatch.setattr(verify, "prepare_existing_installation", lambda: None)
+    monkeypatch.setattr("builtins.input", lambda prompt: answer)
+    monkeypatch.setattr(
+        utils, "deploy_to_app_engine",
+        lambda **kwargs: pytest.fail("App deployment started without confirmation"),
+    )
+    monkeypatch.setattr(
+        mcp, "_run",
+        lambda *args, **kwargs: pytest.fail("MCP resources changed after deployment was declined"),
+    )
+
+    assert mcp.configure_mcp() == 0
+    assert app == original
+    output = capsys.readouterr().out
+    assert "Deployment skipped" in output
+    assert "MCP server is ready" not in output
 
 
 # @matrix deploy : app-failure update-order

@@ -72,6 +72,7 @@ receiving domains and between sending and receiving credentials.
 - Show yes/no choices as `[Y/n]` or `[y/N]`, capitalizing the actual Enter
   default. Show action hints in brackets, such as `[Enter to retry; x to exit]`.
   Advertise only actions the existing input loop accepts.
+- Use `Deploy app now [y/N]` for the standard app-deployment confirmation.
 - Show a text default in parentheses. Enter retains the existing default
   behavior. Text defaults are not completion suggestions and do not require
   a new input library.

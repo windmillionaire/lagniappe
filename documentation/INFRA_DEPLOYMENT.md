@@ -125,9 +125,11 @@ once. Cloud Build builds an image; the installer then deploys that image. A
 failed app deployment leaves the prepared MCP service disabled, or the previous
 service revision in place. A failed MCP activation returns an error even though
 the app may already be available. Retry with `./setup.sh mcp`; completed resources
-and images are reused. That focused command also publishes the matching app
-configuration using the normal prebuilt-app path. If initial setup defers app
-deployment, its final instructions include this command after manual app setup.
+and images are reused. That focused command asks `Deploy app now [y/N]`, then
+publishes the matching app configuration using the normal prebuilt-app path.
+Declining skips deployment and MCP reconciliation.
+If initial setup defers app deployment, its final instructions include this
+command after manual app setup.
 
 `MCP_VERSION` is a SHA-256 fingerprint (first 32 hexadecimal characters) of the
 service source, container/locked build inputs and managed runtime arguments. It is desired state,

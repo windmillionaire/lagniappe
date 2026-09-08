@@ -133,7 +133,7 @@ def install():
 
     deployed = False
     consent = input(
-        format_prompt("Would you like to deploy the app now? [y/N]: ")
+        format_prompt("Deploy app now", hint="y/N")
     )
     if consent.lower() == "y":
         record_step("deploy application")

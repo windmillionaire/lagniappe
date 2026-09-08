@@ -34,7 +34,7 @@ def add_custom_domain():
         )
     )
     consent = input(
-        format_prompt("Would you like to deploy the app now? [y/N]: ")
+        format_prompt("Deploy app now", hint="y/N")
     )
     if consent.casefold() == "y":
         utils.deploy_to_app_engine(print_final_summary=False)

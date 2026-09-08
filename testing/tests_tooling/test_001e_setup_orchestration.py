@@ -109,8 +109,10 @@ def _install_harness(
     deploy=False,
     with_ai_email=False,
 ):
+    import config
     import installer as setup_package
     from installer import install as install_module
+    from installer import mcp as mcp_module
 
     events = []
     settings = types.SimpleNamespace(
@@ -120,13 +122,11 @@ def _install_harness(
         GCLOUD_CONFIG={},
         save=lambda: events.append("settings.save"),
     )
-    config_module = types.ModuleType("config")
-    config_module.SETTINGS = settings
-    config_module.File = types.SimpleNamespace(
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setattr(config, "File", types.SimpleNamespace(
         INDEX_YAML=types.SimpleNamespace(value="index.yaml"),
         APP_YAML=types.SimpleNamespace(value="lagniappe.yaml"),
-    )
-    monkeypatch.setitem(sys.modules, "config", config_module)
+    ))
 
     def step(name, result=None):
         def invoke(*args, **kwargs):
@@ -165,6 +165,7 @@ def _install_harness(
         check_gcloud_cli=step("check_gcloud_cli"),
         deploy_to_app_engine=deploy_to_app_engine,
     )
+    _module(monkeypatch, setup_package, "mcp", requested=mcp_module.requested)
     gcloud_module = _module(
         monkeypatch,
         setup_package,
