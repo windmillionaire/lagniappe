@@ -35,10 +35,16 @@ export class FormSettings {
 		this._generateSchema = this._generateSchema.bind(this);
 		this._saveRestrictions = this._saveRestrictions.bind(this);
 		this._restrictionPromise = null;
-		this.restrictionForm = this.restrictions ? new BaseForm({
-			target: this.restrictions,
-			messages: { submit: "Save Restrictions", submitting: "Saving", submitted: "Saved" },
-		}) : null;
+		this.restrictionForm = this.restrictions
+			? new BaseForm({
+					target: this.restrictions,
+					messages: {
+						submit: "Save Restrictions",
+						submitting: "Saving",
+						submitted: "Saved",
+					},
+				})
+			: null;
 		this._input = this._input.bind(this);
 		this._click = this._click.bind(this);
 		this._restrictionUpdated = this._restrictionUpdated.bind(this);
@@ -77,7 +83,12 @@ export class FormSettings {
 		const list = this.restrictions.querySelector("ul");
 		const template = this.restrictions.querySelector("template");
 		for (const [key, option] of Object.entries(event.detail.options)) {
-			if ([...list.querySelectorAll("input[name='group-key']")].some(input => input.value === key)) continue;
+			if (
+				[...list.querySelectorAll("input[name='group-key']")].some(
+					(input) => input.value === key,
+				)
+			)
+				continue;
 			const item = template.content.firstElementChild.cloneNode(true);
 			item.querySelector("input").value = key;
 			item.querySelector("span").textContent = option.name;
@@ -148,19 +159,28 @@ export class FormSettings {
 		form.submitButton.disabled = true;
 		this._restrictionPromise = (async () => {
 			try {
-				const response = await request.put(this.restrictions.dataset.route, data);
+				const response = await request.put(
+					this.restrictions.dataset.route,
+					data,
+				);
 				if (this._destroyed) return;
 				if (response?.ok === true) {
-					if (JSON.stringify([...new FormData(this.restrictions)]) === snapshot) form.success();
+					if (JSON.stringify([...new FormData(this.restrictions)]) === snapshot)
+						form.success();
 					else {
 						form.resetSubmitButton();
 						form.markUnsavedState();
 					}
-				}
-				else form.showError(response?.error || "Could not save restrictions. Try again.");
+				} else
+					form.showError(
+						response?.error || "Could not save restrictions. Try again.",
+					);
 			} catch (error) {
-				captureError(error, this.restrictions, { context: "builder-save-restrictions" });
-				if (!this._destroyed) form.showError("Could not save restrictions. Try again.");
+				captureError(error, this.restrictions, {
+					context: "builder-save-restrictions",
+				});
+				if (!this._destroyed)
+					form.showError("Could not save restrictions. Try again.");
 			} finally {
 				if (!this._destroyed) form.submitButton.disabled = false;
 				this._restrictionPromise = null;
