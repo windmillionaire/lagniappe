@@ -14,7 +14,6 @@ from testing.elements import HeaderSearch, Select
 pytestmark = pytest.mark.e2e
 
 
-# @source lagniappe/core/mutations/save.py::TaskMutation.plan_save
 # @matrix permissions search files : task-move ancestor-tags
 def test_task_move_updates_all_owned_file_search_permissions():
     from lagniappe.core.tools.cache.core import cache
