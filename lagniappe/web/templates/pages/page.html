@@ -1,6 +1,6 @@
 {% set view_entry = "page" %}
 {% extends "layouts/base.html" %}
-{% from 'pages/photo.html' import card as photo_card %}
+{% from 'pages/photo.html' import card as photo_card, image_controls %}
 {% from 'pages/document.html' import document_tab %}
 {% from 'pages/info.html' import info_tab %}
 {% from 'pages/tasks.html' import task_tab %}
@@ -63,6 +63,10 @@
     {% if render_photo and show_photo %}
       <button lp-show="photo:active"
               data-kind="page"
+              data-visible="{{ has_image|yesno }}"
+              {% if not has_image %}hidden{% endif %}
+              title="Image"
+              aria-label="Image"
               class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("image") }}</button>
     {% endif %}
     <button lp-show="document:active"
@@ -128,13 +132,13 @@
     </div>
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
       <button data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
-      {{ toggles('mobile', has_image) }}
+      {{ toggles('mobile', true) }}
     </div>
   </div>
 {% endmacro %}
 
 {% macro page_photo(page) %}
-  {{ photo_card(page, has_image, is_public_user) }}
+  {{ photo_card(page, has_image, is_public_user or not can_edit_page) }}
 {% endmacro %}
 
 {% macro main() %}
@@ -147,6 +151,7 @@
        data-kind="page"
        data-focus-task="{{ focus_task.urlsafe_key if focus_task else '' }}"
        data-secondary="{{ has_image|yesno }}"
+       data-has-image="{{ has_image|yesno }}"
        class="group/view {{ 'max-w-5xl mx-auto' if not has_image else 'max-w-7xl mx-auto' }}"
        data-readonly="{{ page.readonly|yesno }}">
     <div class="{{ styles.layout.view.header }}">
@@ -174,6 +179,7 @@
           </div>
           {{ toggles('tabs', false) }}
         </div>
+        {% if render_photo %}{{ image_controls(page, has_image, can_edit_page and not is_public_user) }}{% endif %}
         {{ info_tab(page, is_owner_page, is_admin_viewer, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) }}
         {{ document_tab(page, public_context) }}
         {{ task_tab(page) }}

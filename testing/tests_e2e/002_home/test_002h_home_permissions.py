@@ -29,7 +29,7 @@ def test_anonymous_home_redirects_to_public_directory_without_entity_reads(
     assert response.headers["Location"] == "/public/"
 
 
-# @matrix public-directory : collapsible empty-state metadata page-cards redis-cache
+# @matrix public-directory : anonymous-access collapsible empty-state login metadata page-cards redis-cache
 def test_public_directory_renders_cached_page_groups(monkeypatch):
     snapshot = {
         "schema": 1,
@@ -73,10 +73,16 @@ def test_public_directory_renders_cached_page_groups(monkeypatch):
         "cached_public_directory",
         lambda builder: empty,
     )
-    empty_response = app.test_client().get("/public/")
+    empty_response = app.test_client().get("/public/", follow_redirects=False)
 
-    assert empty_response.headers["X-Robots-Tag"] == "noindex, follow"
-    assert "No public pages yet" in empty_response.get_data(as_text=True)
+    assert empty_response.status_code == 302
+    assert empty_response.headers["Location"] == "/users/login"
+    assert "No public pages yet" not in empty_response.get_data(as_text=True)
+
+    home_response = app.test_client().get("/", follow_redirects=True)
+
+    assert home_response.status_code == 200
+    assert home_response.request.path == "/users/login"
 
 
 # @matrix permissions : resource-gates search

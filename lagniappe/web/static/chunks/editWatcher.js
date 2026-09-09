@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as loadRevisionPreview } from './core-foundation.js?v=b9ebf388';
-import { STYLES } from './styles.js?v=b9ebf388';
-import { Modal } from './modal.js?v=b9ebf388';
-import { f as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=b9ebf388';
-import './connectivity.js?v=b9ebf388';
-import './upstreamUnavailable.js?v=b9ebf388';
+import { a as loadRevisionPreview } from './core-foundation.js?v=b78fefcd';
+import { STYLES } from './styles.js?v=b78fefcd';
+import { Modal } from './modal.js?v=b78fefcd';
+import { f as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=b78fefcd';
+import './connectivity.js?v=b78fefcd';
+import './upstreamUnavailable.js?v=b78fefcd';
 
 /**
  * @testable true
@@ -330,6 +330,8 @@ class WholeFormRevisionModal extends Modal {
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_form_submission_reconciliation_uses_latest_schema
  * @matrix edited-entity-notice : active-state clean-state coalescing comparison dirty-state focused-state latest-schema local-values mixed-submission overlap-follow-up owned-deferred-completion per-field-selection reload-fallback renderer-capability saved-default schema-only submission-choice targeted-reset transition whole-form-selection
  * @matrix forms : latest-schema mixed-submission per-field-selection saved-default submission-choice
+ * @pair edited-entity-notice:unchanged-form
+ * @pair pages:unsaved-preservation
  * @pairs form-schema:notice reconnect-refresh:dirty-form-preservation
  */
 class EditReconciler {
@@ -532,6 +534,18 @@ class EditReconciler {
 			widget.component?.active === widget && widget.visible === true;
 		const ownedDeferredCompletion =
 			!unsaved && !queued ? this.ownedDeferredCompletion(marker, widget) : null;
+		// A page image (or other metadata) can advance the entity revision without
+		// changing this form. Keep its DOM, focus, and draft; the probe still records
+		// the checked revision, and real value/schema changes follow normal review.
+		if (
+			!queued &&
+			!ownedDeferredCompletion &&
+			!schemaChanged &&
+			remoteSnapshot === widget.revisionBaseline
+		) {
+			this._hide(marker);
+			return;
+		}
 		const protectedRevision =
 			unsaved || queued || (!ownedDeferredCompletion && (active || focused));
 		if (!protectedRevision) {

@@ -95,6 +95,14 @@ forms only when present. Page activates its photo widget only when the card is
 visible or selected. These optimizations preserve the same published view and
 widget contracts.
 
+Page owns its persistent image controls outside the Info form. The desktop
+cloud toggles the empty upload panel; an existing image uses the visibility
+toggle, remembered per page in local storage. Mobile uses the Image tab and
+retains empty-image actions in Info. Desktop visibility does not change mobile
+tab availability. Readonly pages retain visibility controls without image
+editing controls. PagePhoto owns image mutations and only creates its generation
+form when AI creation is permitted.
+
 ## ViewComponent
 
 `views/base/component.mjs` manages one `[lp-component]` element.

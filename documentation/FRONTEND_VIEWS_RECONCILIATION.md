@@ -34,7 +34,8 @@ activation it compares baselines and catches up once when stale.
 For a changed active form, `EditReconciler` renders the focused response in a
 detached preview and compares normalized submissions:
 
-- equal state installs automatically;
+- an unchanged saved baseline and schema leave the live form and draft intact;
+- otherwise, equal state installs automatically;
 - schema-only change projects stable local field IDs into the current schema;
 - renderer-capable value drift offers field-by-field saved/local choices;
 - a dirty non-renderer form offers **Reset form**;

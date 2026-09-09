@@ -1,23 +1,23 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b9ebf388';
-import { s as sections } from './sections.js?v=b9ebf388';
-import { w as withTransition, r as request } from './foundation.js?v=b9ebf388';
-import './connectivity.js?v=b9ebf388';
-import { c as createIcon } from './icons.js?v=b9ebf388';
-import './styles.js?v=b9ebf388';
-import './buttons.js?v=b9ebf388';
-import './formatting.js?v=b9ebf388';
-import './dropdown.js?v=b9ebf388';
-import './combobox.js?v=b9ebf388';
-import './primitives.js?v=b9ebf388';
-import './upstreamUnavailable.js?v=b9ebf388';
-import './baseForm.js?v=b9ebf388';
-import './loader.js?v=b9ebf388';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b78fefcd';
+import { s as sections } from './sections.js?v=b78fefcd';
+import { w as withTransition, r as request } from './foundation.js?v=b78fefcd';
+import './connectivity.js?v=b78fefcd';
+import { c as createIcon } from './icons.js?v=b78fefcd';
+import './styles.js?v=b78fefcd';
+import './buttons.js?v=b78fefcd';
+import './formatting.js?v=b78fefcd';
+import './dropdown.js?v=b78fefcd';
+import './combobox.js?v=b78fefcd';
+import './primitives.js?v=b78fefcd';
+import './upstreamUnavailable.js?v=b78fefcd';
+import './baseForm.js?v=b78fefcd';
+import './loader.js?v=b78fefcd';
 
 /**
  * @testable true
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
- * @pair pages:image-generate
+ * @matrix pages : image-generate photo-visibility photo-prompt ai-disabled
  */
 class PagePhoto extends BaseUpload {
 	constructor(attributes) {
@@ -35,8 +35,8 @@ class PagePhoto extends BaseUpload {
 			"paste",
 		];
 		this.uploadMenu = new UploadMenu(this);
-		this.generateForm = sections.generateImageForm();
-		this.submitGroup = this.generateForm.submitGroup;
+		this.generateForm = this.aiCreate ? sections.generateImageForm() : null;
+		this.submitGroup = this.generateForm?.submitGroup;
 		this.messages = {
 			submit: "Generate",
 			submitting: "Thinking...",
@@ -77,7 +77,7 @@ class PagePhoto extends BaseUpload {
 		if (this.aiCreate) {
 			this.submitGroup.addEventListener("click", (e) => {
 				if (e.target.closest("[data-role='cancel']")) {
-					this.hideGenerateForm();
+					void this.view.cancelPhotoGeneration(this);
 				}
 			});
 
@@ -121,125 +121,50 @@ class PagePhoto extends BaseUpload {
 	}
 
 	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto.uploadImage
-	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._generateImage
-	 * @reason private page-shell reconciliation after a page image is created
-	 */
-	_markImageAvailable() {
-		if (!this.dropzone.containsImage) return;
-
-		if (typeof this.view.setSecondaryCardActive === "function") {
-			this.view.setSecondaryCardActive(this.component.elt, true);
-		} else {
-			this.view.elt.dataset.secondary = "true";
-			this.view.elt.classList.remove("max-w-5xl");
-			this.view.elt.classList.add("max-w-7xl");
-			this.component.elt.dataset.visible = "true";
-			this.component.elt.dataset.persistent = "true";
-		}
-
-		this._hidePhotoPrompt();
-	}
-
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._markImageAvailable
-	 * @reason prompt visibility is a small part of page image availability reconciliation
-	 */
-	_hidePhotoPrompt() {
-		const prompt = this.view.elt.querySelector("[data-role='photo-prompt']");
-		if (prompt) prompt.dataset.visible = "false";
-	}
-
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto.uploadImage
-	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._generateImage
-	 * @reason image upload/generation shares layout and prompt reconciliation
-	 */
-	async _updateImageLayout(mutate) {
-		if (typeof this.view.updateLayout === "function") {
-			await this.view.updateLayout({
-				secondary: this.component.elt,
-				secondaryActive: true,
-				mutate: () => () => {
-					mutate();
-					this._hidePhotoPrompt();
-				},
-			});
-			return;
-		}
-
-		return await withTransition(() => {
-			mutate();
-			this._markImageAvailable();
-		});
-	}
-
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._removeImage
-	 * @reason image removal restores the compact prompt and collapses the empty photo card
-	 */
-	async _hideEmptyPhotoLayout(mutate) {
-		const activeTabId =
-			localStorage.getItem(`${this.view.hash}-active`) === "photo"
-				? "info"
-				: null;
-		const commit = () => {
-			mutate();
-			const prompt = this.view.elt.querySelector("[data-role='photo-prompt']");
-			if (prompt) prompt.dataset.visible = "true";
-			this.view.elt
-				.querySelectorAll("button[lp-show='photo:active']")
-				.forEach((toggle) => {
-					toggle.dataset.visible = "false";
-				});
-		};
-
-		if (typeof this.view.updateLayout === "function") {
-			await this.view.updateLayout({
-				secondary: this.component.elt,
-				secondaryActive: false,
-				activeTabId,
-				mutate: () => commit,
-			});
-			return;
-		}
-
-		await withTransition(() => {
-			commit();
-			this.view.elt.dataset.secondary = "false";
-			this.view.elt.classList.remove("max-w-7xl");
-			this.view.elt.classList.add("max-w-5xl");
-			this.component.elt.dataset.visible = "false";
-			this.component.elt.dataset.persistent = "false";
-		});
-	}
-
-	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_replace_image_on_page
-	 * @matrix pages : image-add image-replace
+	 * @matrix pages : image-add image-replace upload-error
 	 */
 	async uploadImage() {
-		withTransition(() => {
-			this.existingImage.dataset.visible = "false";
-			this.newImage.dataset.visible = "true";
-			this.feedback.replaceChildren(createIcon("spinner"), " Uploading...");
+		return this._withImageMutation(async () => {
+			withTransition(() => {
+				this.existingImage.dataset.visible = "false";
+				this.newImage.dataset.visible = "true";
+				this.feedback.replaceChildren(createIcon("spinner"), " Uploading...");
+			});
+
+			const prepared = await this.prepareSubmit({
+				route: this.endpoints.upload,
+			});
+			if (!prepared) return;
+
+			const response = await request.post(this.endpoints.upload, this.formData);
+			if (!this.view.successfulResponse(response, this.component)) return;
+
+			await this.view.updatePhotoImage(true, () => {
+				this._replaceDropzone(response.html);
+			});
 		});
+	}
 
-		const prepared = await this.prepareSubmit({ route: this.endpoints.upload });
-		if (!prepared) return;
-
-		const response = await request.post(this.endpoints.upload, this.formData);
-		if (!this.view.successfulResponse(response, this.component)) return;
-
-		await this._updateImageLayout(() => {
-			this._replaceDropzone(response.html);
-		});
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto.uploadImage
+	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._generateImage
+	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._removeImage
+	 * @reason serialize image changes while keeping view controls and editor availability aligned
+	 */
+	async _withImageMutation(operation) {
+		if (this.view.photoBusy || this.readonly) return;
+		this.view.setPhotoBusy(true);
+		this.target.inert = true;
+		try {
+			return await operation();
+		} finally {
+			this.target.inert = false;
+			this.view.setPhotoBusy(false);
+		}
 	}
 
 	removeFile() {
@@ -253,11 +178,13 @@ class PagePhoto extends BaseUpload {
 	 * @pair pages:image-remove
 	 */
 	async _removeImage() {
-		const response = await request.delete(this.endpoints.remove);
-		if (!this.view.successfulResponse(response, this.component)) return;
+		return this._withImageMutation(async () => {
+			const response = await request.delete(this.endpoints.remove);
+			if (!this.view.successfulResponse(response, this.component)) return;
 
-		await this._hideEmptyPhotoLayout(() => {
-			this._replaceDropzone(response.html);
+			await this.view.updatePhotoImage(false, () => {
+				this._replaceDropzone(response.html);
+			});
 		});
 	}
 
@@ -267,38 +194,53 @@ class PagePhoto extends BaseUpload {
 	 * @pair pages:image-generate
 	 */
 	async _generateImage() {
-		const response = await request.post(this.endpoints.generate, this.formData);
-		if (!this.view.successfulResponse(response, this.component)) return;
+		return this._withImageMutation(async () => {
+			const response = await request.post(
+				this.endpoints.generate,
+				this.formData,
+			);
+			if (!this.view.successfulResponse(response, this.component)) return;
 
-		await this._updateImageLayout(() => {
-			this._replaceDropzone(response.html);
-			this.hideGenerateForm({ transition: false });
+			await this.view.updatePhotoImage(true, () => {
+				this._replaceDropzone(response.html);
+				this.hideGenerateForm({ transition: false });
+			});
 		});
 	}
 
 	reset() {
 		super.reset();
-		this.generateForm.reset();
+		this.generateForm?.reset();
 		this.hideError();
 	}
 
 	showError(message) {
 		withTransition(() => {
-			if (this.generateForm.visible()) {
+			if (this.generateForm?.visible()) {
 				this.form.showError(message);
 			} else {
 				this.newImage.dataset.visible = "true";
-				this.existingImage.dataset.visible = "false";
+				this.existingImage.dataset.visible = String(
+					this.dropzone.containsImage,
+				);
 				const error = document.createElement("span");
 				error.className = "text-delete text-base italic";
 				error.textContent = message;
-				this.feedback.replaceChildren(error);
+				if (this.dropzone.containsImage) {
+					this.newImage.dataset.visible = "false";
+					error.dataset.role = "image-error";
+					this.dropzone.element
+						.querySelector("[data-role='image-error']")
+						?.remove();
+					this.dropzone.element.append(error);
+				} else this.feedback.replaceChildren(error);
 			}
 		});
 	}
 
 	hideError() {
-		if (this.generateForm.visible()) {
+		this.dropzone.element.querySelector("[data-role='image-error']")?.remove();
+		if (this.generateForm?.visible()) {
 			this.form.hideError();
 		} else {
 			this.feedback.innerHTML = "drop image here<br>or click to upload";
@@ -306,6 +248,12 @@ class PagePhoto extends BaseUpload {
 	}
 
 	showGenerateForm({ transition = true } = {}) {
+		if (!this.aiCreate || this.readonly) return;
+		if (this.generateForm.visible()) {
+			this.generateForm.show();
+			return;
+		}
+		this.view.photoGenerationReturnOpen ??= this.view.photoOpen;
 		const show = () => {
 			this.reset();
 			this.dropzone.hide();
@@ -325,8 +273,9 @@ class PagePhoto extends BaseUpload {
 	hideGenerateForm({ transition = true } = {}) {
 		const hide = () => {
 			this.reset();
-			this.generateForm.hide();
+			this.generateForm?.hide();
 			this.dropzone.show();
+			this.view.photoGenerationReturnOpen = null;
 		};
 		const shouldTransition =
 			transition &&

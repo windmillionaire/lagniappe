@@ -87,7 +87,9 @@ Partial Content`, allowing PDF preview code to stream data through Flask.
 Anonymous requests to `/` take a session-only fast path to `/public/`; they do
 not construct the authenticated Home or load an entity. Authenticated requests
 continue to use `/` as Home. The public directory always offers a sign-in link
-and renders an empty state when it has no content.
+when rendered. If it has no public pages or enabled public manual, anonymous
+visitors are redirected to login; signed-in visitors can still see its empty
+state.
 
 The directory is a server-rendered, JavaScript-free set of collapsed native
 `details` groups. Discoverable Pages appear only when site discovery is on and

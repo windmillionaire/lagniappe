@@ -11,6 +11,11 @@
           sizes="32x32"
           href="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}">
     {% if CONFIG.production %}<link rel="icon" type="image/x-icon" href="/favicon.ico?v={{ CONFIG.BUILD_ID }}">{% endif %}
+    <link rel="preload"
+          href="/fonts/source-sans-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossorigin>
     <link rel="stylesheet" href="/style.css?v={{ CONFIG.BUILD_ID }}">
     <title>
 

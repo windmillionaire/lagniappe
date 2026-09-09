@@ -1,21 +1,21 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from '../styles.js?v=b9ebf388';
-import { ensureMessageComposer } from '../messageComposer.js?v=b9ebf388';
-import { r as request, E as ENDPOINTS } from '../foundation.js?v=b9ebf388';
-import '../connectivity.js?v=b9ebf388';
-import { c as createIcon } from '../icons.js?v=b9ebf388';
-import { C as Core } from '../core-foundation.js?v=b9ebf388';
-import '../modal.js?v=b9ebf388';
-import '../facets.js?v=b9ebf388';
-import '../remote.js?v=b9ebf388';
-import '../queryLifecycle.js?v=b9ebf388';
-import '../combobox.js?v=b9ebf388';
-import '../primitives.js?v=b9ebf388';
-import '../results.js?v=b9ebf388';
-import '../storage.js?v=b9ebf388';
-import '../formatting.js?v=b9ebf388';
-import '../submitter.js?v=b9ebf388';
-import '../upstreamUnavailable.js?v=b9ebf388';
+import { STYLES } from '../styles.js?v=b78fefcd';
+import { ensureMessageComposer } from '../messageComposer.js?v=b78fefcd';
+import { r as request, E as ENDPOINTS } from '../foundation.js?v=b78fefcd';
+import '../connectivity.js?v=b78fefcd';
+import { c as createIcon } from '../icons.js?v=b78fefcd';
+import { C as Core } from '../core-foundation.js?v=b78fefcd';
+import '../modal.js?v=b78fefcd';
+import '../facets.js?v=b78fefcd';
+import '../remote.js?v=b78fefcd';
+import '../queryLifecycle.js?v=b78fefcd';
+import '../combobox.js?v=b78fefcd';
+import '../primitives.js?v=b78fefcd';
+import '../results.js?v=b78fefcd';
+import '../storage.js?v=b78fefcd';
+import '../formatting.js?v=b78fefcd';
+import '../submitter.js?v=b78fefcd';
+import '../upstreamUnavailable.js?v=b78fefcd';
 
 const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
 
@@ -260,7 +260,7 @@ class Messages extends Core {
 		if (this.conversationDropdown || this._conversationDropdownPromise) {
 			return this.conversationDropdown || this._conversationDropdownPromise;
 		}
-		this._conversationDropdownPromise = import('../dropdown.js?v=b9ebf388')
+		this._conversationDropdownPromise = import('../dropdown.js?v=b78fefcd')
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				this.conversationDropdown = new Dropdown(this.selector).init({

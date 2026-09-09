@@ -1614,6 +1614,9 @@
   .pr-8 {
     padding-right: calc(var(--spacing) * 8);
   }
+  .pb-0 {
+    padding-bottom: 0px;
+  }
   .pb-1 {
     padding-bottom: var(--spacing);
   }
@@ -3118,7 +3121,7 @@ button.tab-icon .icon {
   font-style: normal;
   font-weight: 300 600;
   font-display: block;
-  src: url("/fonts/material-symbols-rounded.d15c2d01dd61.woff2") format("woff2");
+  src: url("/fonts/material-symbols-rounded.df9093ac10a1.woff2") format("woff2");
 }
 @font-face {
   font-family: "Bitter";

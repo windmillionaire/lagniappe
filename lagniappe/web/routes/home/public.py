@@ -1,6 +1,7 @@
 """Anonymous directory and crawler discovery endpoints."""
 
-from flask import Response, abort, make_response, render_template, url_for
+from flask import Response, abort, make_response, redirect, render_template, url_for
+from flask_login import current_user
 
 from lagniappe import CONFIG
 from lagniappe.core.exceptions import capture
@@ -26,6 +27,9 @@ def public_directory():
     groups.sort(key=lambda group: group["name"].casefold())
 
     has_content = any(group["pages"] for group in groups)
+    if not has_content and not current_user.is_authenticated:
+        return redirect(url_for("users.login"))
+
     indexing = snapshot["site_indexing"] and has_content
     title = f"Public — {CONFIG.APP_NAME}"
     description = f"Browse public pages from {CONFIG.APP_NAME}."

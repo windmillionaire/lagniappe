@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from '../foundation.js?v=b9ebf388';
-import '../connectivity.js?v=b9ebf388';
-import { C as Core } from '../core-foundation.js?v=b9ebf388';
-import '../upstreamUnavailable.js?v=b9ebf388';
+import { w as withTransition } from '../foundation.js?v=b78fefcd';
+import '../connectivity.js?v=b78fefcd';
+import { C as Core } from '../core-foundation.js?v=b78fefcd';
+import '../upstreamUnavailable.js?v=b78fefcd';
 
 const HOME_CHANNELS = Object.freeze({
 	HomeActivityList: "home-notes",

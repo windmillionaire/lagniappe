@@ -741,6 +741,16 @@ ICONS = {
 		"glyph": "group",
 		"fill": 1
 	},
+	"visibility": {
+		"visible": {
+			"glyph": "visibility",
+			"fill": 1
+		},
+		"hidden": {
+			"glyph": "visibility_off",
+			"fill": 1
+		}
+	},
 	"weekend": {
 		"glyph": "date_range",
 		"fill": 1

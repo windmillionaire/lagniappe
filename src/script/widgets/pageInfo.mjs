@@ -118,10 +118,6 @@ export class PageForm extends FormElement {
 		return section;
 	}
 
-	get photoPromptElement() {
-		return sections.photoPrompt(this);
-	}
-
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
@@ -137,7 +133,7 @@ export class PageForm extends FormElement {
 	}
 
 	get prepend() {
-		return [this.photoPromptElement, this.nameElement, this.descriptionElement];
+		return [this.nameElement, this.descriptionElement];
 	}
 
 	get append() {

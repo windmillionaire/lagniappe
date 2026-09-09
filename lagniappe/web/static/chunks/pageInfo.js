@@ -1,32 +1,32 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=b9ebf388';
-import { InputElement } from './input.js?v=b9ebf388';
-import { RadioElement } from './radio.js?v=b9ebf388';
-import { s as sections } from './sections.js?v=b9ebf388';
-import { S as SectionToggle } from './sectionToggle.js?v=b9ebf388';
-import { TextareaElement } from './textarea.js?v=b9ebf388';
-import { r as request, c as captureError, w as withTransition } from './foundation.js?v=b9ebf388';
-import './connectivity.js?v=b9ebf388';
-import { Modal } from './modal.js?v=b9ebf388';
-import { PagePermissions } from './pagePermissions.js?v=b9ebf388';
-import './baseForm.js?v=b9ebf388';
-import './icons.js?v=b9ebf388';
-import './primitives.js?v=b9ebf388';
-import './styles.js?v=b9ebf388';
-import './loader.js?v=b9ebf388';
-import './baseElement.js?v=b9ebf388';
-import './formatting.js?v=b9ebf388';
-import './baseUpload.js?v=b9ebf388';
-import './buttons.js?v=b9ebf388';
-import './dropdown.js?v=b9ebf388';
-import './combobox.js?v=b9ebf388';
-import './upstreamUnavailable.js?v=b9ebf388';
-import './facets.js?v=b9ebf388';
-import './remote.js?v=b9ebf388';
-import './queryLifecycle.js?v=b9ebf388';
-import './results.js?v=b9ebf388';
-import './storage.js?v=b9ebf388';
-import './submitter.js?v=b9ebf388';
+import { F as FormElement } from './form2.js?v=b78fefcd';
+import { InputElement } from './input.js?v=b78fefcd';
+import { RadioElement } from './radio.js?v=b78fefcd';
+import { s as sections } from './sections.js?v=b78fefcd';
+import { S as SectionToggle } from './sectionToggle.js?v=b78fefcd';
+import { TextareaElement } from './textarea.js?v=b78fefcd';
+import { r as request, c as captureError, w as withTransition } from './foundation.js?v=b78fefcd';
+import './connectivity.js?v=b78fefcd';
+import { Modal } from './modal.js?v=b78fefcd';
+import { PagePermissions } from './pagePermissions.js?v=b78fefcd';
+import './baseForm.js?v=b78fefcd';
+import './icons.js?v=b78fefcd';
+import './primitives.js?v=b78fefcd';
+import './styles.js?v=b78fefcd';
+import './loader.js?v=b78fefcd';
+import './baseElement.js?v=b78fefcd';
+import './formatting.js?v=b78fefcd';
+import './baseUpload.js?v=b78fefcd';
+import './buttons.js?v=b78fefcd';
+import './dropdown.js?v=b78fefcd';
+import './combobox.js?v=b78fefcd';
+import './upstreamUnavailable.js?v=b78fefcd';
+import './facets.js?v=b78fefcd';
+import './remote.js?v=b78fefcd';
+import './queryLifecycle.js?v=b78fefcd';
+import './results.js?v=b78fefcd';
+import './storage.js?v=b78fefcd';
+import './submitter.js?v=b78fefcd';
 
 /**
  * @testable infrastructure
@@ -139,10 +139,6 @@ class PageForm extends FormElement {
 		return section;
 	}
 
-	get photoPromptElement() {
-		return sections.photoPrompt(this);
-	}
-
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
@@ -158,7 +154,7 @@ class PageForm extends FormElement {
 	}
 
 	get prepend() {
-		return [this.photoPromptElement, this.nameElement, this.descriptionElement];
+		return [this.nameElement, this.descriptionElement];
 	}
 
 	get append() {
