@@ -1,4 +1,5 @@
 {% from 'common.html' import autofill %}
+{% from 'pages/photo.html' import image_controls %}
 {% import 'controls.html' as controls %}
 {% import 'pages/restrictions.html' as restrictions %}
 
@@ -289,6 +290,9 @@
         {% if page.form %}data-schema='{{ page.form.schema|tojson }}'{% endif %}
         {% if page.form %}data-submission='{{ page.properties.submission.form_value|tojson }}'{% endif %}
         class="{{ styles.form.default }} mt-4 sm:mt-0">
+    {% set can_edit_image = page.allowed(Action.EDIT) and not current_user.is_public %}
+    {% set has_image = page.image and not (current_user.is_public and current_user.page.key == page.key) %}
+    {% if has_image or can_edit_image %}{{ image_controls(page, has_image, can_edit_image) }}{% endif %}
     {% if page.allowed(Action.VIEW) %}
       {% set category_preload = page.properties.categories.column_value %}
       {% if page.allowed(Action.EDIT) or category_preload %}

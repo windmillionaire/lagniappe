@@ -1,6 +1,6 @@
 {% set view_entry = "page" %}
 {% extends "layouts/base.html" %}
-{% from 'pages/photo.html' import card as photo_card, image_controls %}
+{% from 'pages/photo.html' import card as photo_card %}
 {% from 'pages/document.html' import document_tab %}
 {% from 'pages/info.html' import info_tab %}
 {% from 'pages/tasks.html' import task_tab %}
@@ -179,7 +179,6 @@
           </div>
           {{ toggles('tabs', false) }}
         </div>
-        {% if render_photo %}{{ image_controls(page, has_image, can_edit_page and not is_public_user) }}{% endif %}
         {{ info_tab(page, is_owner_page, is_admin_viewer, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) }}
         {{ document_tab(page, public_context) }}
         {{ task_tab(page) }}

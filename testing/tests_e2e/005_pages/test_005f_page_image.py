@@ -23,7 +23,7 @@ def _photo_form(user):
 
 def _photo_prompt(page):
     page.wait_for_interaction_readiness()
-    prompt = page.user.locate(page.PHOTO_PROMPT)
+    prompt = page.info_form.locator(f":scope > {page.PHOTO_PROMPT}")
     expect(prompt).to_be_visible()
     return prompt
 
@@ -235,6 +235,7 @@ def test_remove_image_from_page(get_user):
 # @matrix pages : photo-visibility photo-prompt desktop-tabs mobile-photo-tab
 # @template pages/photo.html::image_controls
 # @template pages/page.html::main
+# @template pages/info.html::info_form
 def test_photo_controls_toggle_and_remember_desktop_visibility(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_generated_image_page.get(user)
@@ -259,11 +260,21 @@ def test_photo_controls_toggle_and_remember_desktop_visibility(get_user):
     expect(toggle.locator("[data-icon]")).to_have_attribute("data-icon", "visibility.hidden")
     expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-5xl.*"))
 
-    Tabs(user).tasks
-    expect(prompt).to_be_visible()
+    for tab in ("document", "files", "tasks"):
+        getattr(Tabs(user), tab)
+        expect(prompt).to_be_hidden()
     page.reload()
     expect(user.locate(page.PHOTO_FORM)).to_be_hidden()
+    expect(prompt).to_be_hidden()
+    info = page.info_form
     expect(prompt).to_be_visible()
+    original = info.element_handle()
+    with user.page.expect_response("**/update"):
+        info.get_by_role("button", name="Update Page", exact=True).click()
+    user.page.wait_for_function("element => !element.isConnected", arg=original)
+    expect(prompt).to_be_visible()
+    expect(toggle.locator("[data-icon]")).to_have_attribute("data-icon", "visibility.hidden")
+    expect(user.locate(page.PHOTO_FORM)).to_be_hidden()
 
     photo_tab = page.mobile_nav.select_section("photo")
     expect(photo_tab).to_be_visible()

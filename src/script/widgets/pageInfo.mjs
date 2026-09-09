@@ -132,8 +132,22 @@ export class PageForm extends FormElement {
 		return sections.autofill(this);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_controls_toggle_and_remember_desktop_visibility
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_readonly_viewer_can_toggle_image_without_editing
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_image_changes_preserve_page_info_dom_and_draft
+	 * @matrix pages : photo-prompt photo-visibility readonly desktop-tabs unsaved-preservation
+	 */
 	get prepend() {
-		return [this.nameElement, this.descriptionElement];
+		let imageControls = this.target.querySelector("[data-role='photo-prompt']");
+		if (this.revisionPreview) {
+			imageControls?.remove();
+			imageControls = null;
+		} else if (imageControls) {
+			this.view._syncPhotoControls(undefined, imageControls);
+		}
+		return [imageControls, this.nameElement, this.descriptionElement];
 	}
 
 	get append() {

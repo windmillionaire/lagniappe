@@ -1,32 +1,32 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=b78fefcd';
-import { InputElement } from './input.js?v=b78fefcd';
-import { RadioElement } from './radio.js?v=b78fefcd';
-import { s as sections } from './sections.js?v=b78fefcd';
-import { S as SectionToggle } from './sectionToggle.js?v=b78fefcd';
-import { TextareaElement } from './textarea.js?v=b78fefcd';
-import { r as request, c as captureError, w as withTransition } from './foundation.js?v=b78fefcd';
-import './connectivity.js?v=b78fefcd';
-import { Modal } from './modal.js?v=b78fefcd';
-import { PagePermissions } from './pagePermissions.js?v=b78fefcd';
-import './baseForm.js?v=b78fefcd';
-import './icons.js?v=b78fefcd';
-import './primitives.js?v=b78fefcd';
-import './styles.js?v=b78fefcd';
-import './loader.js?v=b78fefcd';
-import './baseElement.js?v=b78fefcd';
-import './formatting.js?v=b78fefcd';
-import './baseUpload.js?v=b78fefcd';
-import './buttons.js?v=b78fefcd';
-import './dropdown.js?v=b78fefcd';
-import './combobox.js?v=b78fefcd';
-import './upstreamUnavailable.js?v=b78fefcd';
-import './facets.js?v=b78fefcd';
-import './remote.js?v=b78fefcd';
-import './queryLifecycle.js?v=b78fefcd';
-import './results.js?v=b78fefcd';
-import './storage.js?v=b78fefcd';
-import './submitter.js?v=b78fefcd';
+import { F as FormElement } from './form2.js?v=bb100edc';
+import { InputElement } from './input.js?v=bb100edc';
+import { RadioElement } from './radio.js?v=bb100edc';
+import { s as sections } from './sections.js?v=bb100edc';
+import { S as SectionToggle } from './sectionToggle.js?v=bb100edc';
+import { TextareaElement } from './textarea.js?v=bb100edc';
+import { r as request, c as captureError, w as withTransition } from './foundation.js?v=bb100edc';
+import './connectivity.js?v=bb100edc';
+import { Modal } from './modal.js?v=bb100edc';
+import { PagePermissions } from './pagePermissions.js?v=bb100edc';
+import './baseForm.js?v=bb100edc';
+import './icons.js?v=bb100edc';
+import './primitives.js?v=bb100edc';
+import './styles.js?v=bb100edc';
+import './loader.js?v=bb100edc';
+import './baseElement.js?v=bb100edc';
+import './formatting.js?v=bb100edc';
+import './baseUpload.js?v=bb100edc';
+import './buttons.js?v=bb100edc';
+import './dropdown.js?v=bb100edc';
+import './combobox.js?v=bb100edc';
+import './upstreamUnavailable.js?v=bb100edc';
+import './facets.js?v=bb100edc';
+import './remote.js?v=bb100edc';
+import './queryLifecycle.js?v=bb100edc';
+import './results.js?v=bb100edc';
+import './storage.js?v=bb100edc';
+import './submitter.js?v=bb100edc';
 
 /**
  * @testable infrastructure
@@ -153,8 +153,22 @@ class PageForm extends FormElement {
 		return sections.autofill(this);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_controls_toggle_and_remember_desktop_visibility
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_readonly_viewer_can_toggle_image_without_editing
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_image_changes_preserve_page_info_dom_and_draft
+	 * @matrix pages : photo-prompt photo-visibility readonly desktop-tabs unsaved-preservation
+	 */
 	get prepend() {
-		return [this.nameElement, this.descriptionElement];
+		let imageControls = this.target.querySelector("[data-role='photo-prompt']");
+		if (this.revisionPreview) {
+			imageControls?.remove();
+			imageControls = null;
+		} else if (imageControls) {
+			this.view._syncPhotoControls(undefined, imageControls);
+		}
+		return [imageControls, this.nameElement, this.descriptionElement];
 	}
 
 	get append() {

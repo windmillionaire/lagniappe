@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from '../foundation.js?v=b78fefcd';
-import '../connectivity.js?v=b78fefcd';
-import { s as setIcon } from '../icons.js?v=b78fefcd';
-import { E as Entity } from '../entity-foundation.js?v=b78fefcd';
-import '../upstreamUnavailable.js?v=b78fefcd';
-import '../core-foundation.js?v=b78fefcd';
+import { w as withTransition } from '../foundation.js?v=bb100edc';
+import '../connectivity.js?v=bb100edc';
+import { s as setIcon } from '../icons.js?v=bb100edc';
+import { E as Entity } from '../entity-foundation.js?v=bb100edc';
+import '../upstreamUnavailable.js?v=bb100edc';
+import '../core-foundation.js?v=bb100edc';
 
 /**
  * @testable true
@@ -86,9 +86,9 @@ class Page extends Entity {
 
 	_syncPhotoControls(
 		tabId = this.photoActiveTab || this._initialTabId() || "info",
+		controls = this.elt.querySelector("[data-role='photo-prompt']"),
 	) {
 		this.photoActiveTab = tabId;
-		const controls = this.elt.querySelector("[data-role='photo-prompt']");
 		if (!controls) return;
 		controls.dataset.visible =
 			!this.mobile || (!this.photoHasImage && tabId === "info")

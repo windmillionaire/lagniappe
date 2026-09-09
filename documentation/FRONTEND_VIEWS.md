@@ -95,8 +95,11 @@ forms only when present. Page activates its photo widget only when the card is
 visible or selected. These optimizations preserve the same published view and
 widget contracts.
 
-Page owns its persistent image controls outside the Info form. The desktop
-cloud toggles the empty upload panel; an existing image uses the visibility
+Page owns image visibility state, with the controls at the top of the Info form
+and absent from other tabs. Form rendering retains the controls before the
+fields and restores their current visibility state; revision comparison previews
+omit these controls. The desktop cloud toggles
+the empty upload panel; an existing image uses the visibility
 toggle, remembered per page in local storage. Mobile uses the Image tab and
 retains empty-image actions in Info. Desktop visibility does not change mobile
 tab availability. Readonly pages retain visibility controls without image

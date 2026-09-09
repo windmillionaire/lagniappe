@@ -82,9 +82,9 @@ export default class Page extends Entity {
 
 	_syncPhotoControls(
 		tabId = this.photoActiveTab || this._initialTabId() || "info",
+		controls = this.elt.querySelector("[data-role='photo-prompt']"),
 	) {
 		this.photoActiveTab = tabId;
-		const controls = this.elt.querySelector("[data-role='photo-prompt']");
 		if (!controls) return;
 		controls.dataset.visible =
 			!this.mobile || (!this.photoHasImage && tabId === "info")
