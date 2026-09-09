@@ -76,7 +76,7 @@
         <span>Manual</span>
       </span>
     </a>
-    {% if not current_user.is_public %}
+    {% if CONFIG.AI_ENABLED and not current_user.is_public %}
       <div id="tools"
            lp-component
            data-report-user="{{ current_user.hash }}"

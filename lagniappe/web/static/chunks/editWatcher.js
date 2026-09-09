@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as loadRevisionPreview } from './core-foundation.js?v=be396a6a';
-import { STYLES } from './styles.js?v=be396a6a';
-import { Modal } from './modal.js?v=be396a6a';
-import { f as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=be396a6a';
-import './connectivity.js?v=be396a6a';
-import './upstreamUnavailable.js?v=be396a6a';
+import { a as loadRevisionPreview } from './core-foundation.js?v=b4e0e8e5';
+import { STYLES } from './styles.js?v=b4e0e8e5';
+import { Modal } from './modal.js?v=b4e0e8e5';
+import { f as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=b4e0e8e5';
+import './connectivity.js?v=b4e0e8e5';
+import './upstreamUnavailable.js?v=b4e0e8e5';
 
 /**
  * @testable true
