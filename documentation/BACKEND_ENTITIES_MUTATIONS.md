@@ -146,7 +146,7 @@ Trace the whole effect, not just the root method:
 6. Run `mutation-contracts --check` and
    `venv/bin/python run.py traceability --changed --check`.
 
-## File ownership (1.3.0)
+## File ownership (2.0.0)
 
 Files have either `page` or `task`, each a single key. Unattached upload/report
 Files may have neither. A TaskHistory's `files` are non-owning references; the
@@ -163,7 +163,7 @@ Migration `FIL-001` converts unambiguous legacy lists and normalizes history lin
 to live Tasks. Multiple owners or missing owners are reported for repair; those
 rows remain untouched and the migration ledger stays incomplete. `RST-001`
 materializes local Form/Page group hashes while preserving owner-only settings.
-Both migrations are introduced in 1.3.0 and precede the existing cache rebuild.
+Both migrations are introduced in 2.0.0 and precede the existing cache rebuild.
 
 File ownership updates use explicit empty `MutationIntent.depends_on` tuples
 for reverse links and owner touches. Those key-list writes do not depend on the

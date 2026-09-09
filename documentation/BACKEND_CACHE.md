@@ -99,7 +99,7 @@ survives replacement of the source search row, allowing an unchanged retry to
 redispatch. Worker failures return 503 for Cloud Tasks retry; bounded continuation
 jobs make large updates repeatable. Local environments with Cloud Tasks disabled
 run the same worker inline. Migration-gated cache rebuilding materializes the new
-pointers after the 1.3.0 File/local-restriction migrations complete.
+pointers after the 2.0.0 File/local-restriction migrations complete.
 
 ## Notification state
 

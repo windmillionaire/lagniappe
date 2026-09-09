@@ -11,7 +11,7 @@ from lagniappe.core.tools.auth.restrictions import combine_restrictions, permiss
 from lagniappe.core.tools.cache import restrictions as reconcile
 from lagniappe.core.tools.database import migrations
 from lagniappe.core.tools.database.core import KINDS
-from lagniappe.core.tools.database.migration_steps.v1_3_permissions import migrate_file_ownership, migrate_local_restrictions
+from lagniappe.core.tools.database.migration_steps.v2_0_permissions import migrate_file_ownership, migrate_local_restrictions
 from testing.utility.test_entities import TestEntities
 
 pytestmark = pytest.mark.unit

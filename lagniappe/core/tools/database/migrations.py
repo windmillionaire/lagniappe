@@ -23,7 +23,7 @@ from config.datastore import encode_urlsafe_key
 from lagniappe import CONFIG
 
 from . import utility
-from .migration_steps.v1_3_permissions import migrate_file_ownership, migrate_local_restrictions
+from .migration_steps.v2_0_permissions import migrate_file_ownership, migrate_local_restrictions
 from .get import datastore_key
 from .core import DATA, KINDS
 from .filter import Query
@@ -95,7 +95,7 @@ def _form_record_reference(entity):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/database/migration_steps/v1_3_permissions.py::migrate_file_ownership
+# @covered-by lagniappe/core/tools/database/migration_steps/v2_0_permissions.py::migrate_file_ownership
 # @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
 # @reason file scan failures and saved failure projection exercise the same raw-row link
 def _file_record_reference(entity):
@@ -308,11 +308,11 @@ MIGRATION_CATALOG = (
         runner=_run_asset_generation_migration,
     ),
     MigrationDefinition(
-        sequence=4, id="FIL-001", introduced_in="1.3.0",
+        sequence=4, id="FIL-001", introduced_in="2.0",
         label="Single-owner Files", runner=migrate_file_ownership,
     ),
     MigrationDefinition(
-        sequence=5, id="RST-001", introduced_in="1.3.0",
+        sequence=5, id="RST-001", introduced_in="2.0",
         label="Materialized local restrictions", runner=migrate_local_restrictions,
     ),
 )

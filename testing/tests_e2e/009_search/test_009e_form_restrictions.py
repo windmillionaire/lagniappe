@@ -1,15 +1,15 @@
 """Form saves must change existing search results without descendant saves."""
-from time import monotonic, sleep
 from uuid import uuid4
 
 import pytest
+from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.definitions import Groups, SitePages, Users
 from testing.definitions.form_definitions import FormDefinition
 from testing.resources.form import Form
-from testing.elements import Select
+from testing.elements import HeaderSearch, Select
 
 pytestmark = pytest.mark.e2e
 
@@ -50,6 +50,7 @@ def test_task_move_updates_all_owned_file_search_permissions():
 # @matrix permissions search : reconciliation removal page-override page-precedence source-save
 # @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
 # @template forms/restrictions.html::restrict_access
+# @template nav.html::search_results
 @pytest.mark.parametrize("form_type", ["page", "task"])
 def test_form_restrictions_reconcile_existing_descendants(get_user, browser_failures, form_type):
     owner = get_user(Users.OWNER)
@@ -88,21 +89,32 @@ def test_form_restrictions_reconcile_existing_descendants(get_user, browser_fail
     owner.page.on("request", lambda request: requests.append(request) if request.method == "PUT" and request.url.endswith("/restrictions") else None)
 
     def search_visible(expected):
-        deadline = monotonic() + 30
-        while True:
-            response = viewer.page.evaluate("""async query => {
+        # Hosted reconciliation finishes asynchronously. Observe its public
+        # search result before issuing the visible header-search query.
+        viewer.page.wait_for_function("""async ({query, affected, overrides, expected}) => {
                 const response = await fetch(`/l/search-bar?${new URLSearchParams({q: query})}`, {cache: "no-store"});
-                return {status: response.status, body: await response.json()};
-            }""", token)
-            assert response["status"] == 200
-            html = response["body"]["results"]
-            assert all(entity.urlsafe_key in html for entity in overrides), html
-            visible = all(entity.urlsafe_key in html for entity in affected)
-            hidden = all(entity.urlsafe_key not in html for entity in affected)
-            if (visible if expected else hidden):
-                return
-            assert monotonic() < deadline, html
-            sleep(0.2)
+                if (!response.ok) throw new Error(`Search returned ${response.status}`);
+                const html = new DOMParser().parseFromString((await response.json()).results, "text/html");
+                const urls = new Set([...html.querySelectorAll("[data-url]")].map(item => item.dataset.url));
+                return overrides.every(url => urls.has(url)) &&
+                    affected.every(url => urls.has(url) === expected);
+            }""", arg={
+                "query": token,
+                "affected": [f"/{entity.entity_kind}s/{entity.urlsafe_key}" for entity in affected],
+                "overrides": [f"/{entity.entity_kind}s/{entity.urlsafe_key}" for entity in overrides],
+                "expected": expected,
+            }, polling=250, timeout=30_000)
+        viewer.locate("[lp-search] input[name='q']").fill("")
+        search = HeaderSearch(viewer)
+        search.search(token)
+        for entity in overrides:
+            expect(search.panel.locator(f"[data-url='/{entity.entity_kind}s/{entity.urlsafe_key}']")).to_be_visible()
+        for entity in affected:
+            result = search.panel.locator(f"[data-url='/{entity.entity_kind}s/{entity.urlsafe_key}']")
+            if expected:
+                expect(result).to_be_visible()
+            else:
+                expect(result).to_have_count(0)
 
     search_visible(True)
     checkbox = restrictions.locator("input[name='owner']")
@@ -163,19 +175,32 @@ def test_form_restrictions_reconcile_existing_descendants(get_user, browser_fail
 
 # @matrix permissions search : reconciliation queue retry continuation authentication
 def test_restriction_worker_retries_and_continues(monkeypatch):
+    from google.oauth2 import id_token
+
+    from lagniappe import CONFIG
+    from lagniappe.core import exceptions
     from lagniappe.core.tools.cache import restrictions as worker
     from lagniappe.web import app
-    from lagniappe.web.routes.process import main as process
 
     client = app.test_client()
     assert client.post("/process/reconcile-restrictions", json={"source_key": "form"}).status_code == 401
-    monkeypatch.setattr(process, "authenticate_task", lambda request: request.get_json())
-    assert client.post("/process/reconcile-restrictions", json={"offset": 0}).status_code == 400
+
+    def verify_token(token, request, audience):
+        assert token == "restriction-worker-test"
+        assert audience.endswith("/process/reconcile-restrictions")
+        return {
+            "iss": "https://accounts.google.com",
+            "email": CONFIG.INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL,
+        }
+
+    monkeypatch.setattr(id_token, "verify_oauth2_token", verify_token)
+    headers = {"Authorization": "Bearer restriction-worker-test"}
+    assert client.post("/process/reconcile-restrictions", headers=headers, json={"offset": 0}).status_code == 400
     remaining = {"source_key": "form", "cursor": "next", "offset": 0}
     queued = []
     monkeypatch.setattr(worker, "reconcile_batch", lambda **payload: remaining)
     monkeypatch.setattr(worker, "enqueue", queued.append)
-    response = client.post("/process/reconcile-restrictions", json={"source_key": "form"})
+    response = client.post("/process/reconcile-restrictions", headers=headers, json={"source_key": "form"})
     assert response.status_code == 200 and response.json == {"success": True}
     assert queued == [remaining]
 
@@ -183,8 +208,8 @@ def test_restriction_worker_retries_and_continues(monkeypatch):
         raise RuntimeError("Cache unavailable")
 
     monkeypatch.setattr(worker, "reconcile_batch", unavailable)
-    monkeypatch.setattr(process.exceptions, "capture", lambda *args, **kwargs: None)
-    response = client.post("/process/reconcile-restrictions", json={"source_key": "form"})
+    monkeypatch.setattr(exceptions, "capture", lambda *args, **kwargs: None)
+    response = client.post("/process/reconcile-restrictions", headers=headers, json={"source_key": "form"})
     assert response.status_code == 503 and response.json == {"success": False, "retry": True}
 
 

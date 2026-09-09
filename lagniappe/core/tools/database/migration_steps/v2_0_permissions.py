@@ -1,4 +1,4 @@
-"""1.3.0 single-owner Files and materialized local restriction lists."""
+"""2.0.0 single-owner Files and materialized local restriction lists."""
 
 from .base import MigrationDataError
 from ..core import KINDS
@@ -25,7 +25,7 @@ def migrate_file_ownership(context):
             references.setdefault(file_key, set()).add(owner_key)
 
     # @testable false
-    # @covered-by lagniappe/core/tools/database/migration_steps/v1_3_permissions.py::migrate_file_ownership
+    # @covered-by lagniappe/core/tools/database/migration_steps/v2_0_permissions.py::migrate_file_ownership
     # @reason row adapter preserves conflicting legacy records for explicit repair
     def transform(row):
         candidates = set(references.get(row.key, ()))
@@ -70,7 +70,7 @@ def migrate_local_restrictions(context):
               if row.get("type") in {"group", "public_group"}}
 
     # @testable false
-    # @covered-by lagniappe/core/tools/database/migration_steps/v1_3_permissions.py::migrate_local_restrictions
+    # @covered-by lagniappe/core/tools/database/migration_steps/v2_0_permissions.py::migrate_local_restrictions
     # @reason row adapter materializes local groups without following any Form relation
     def transform(row):
         stored = row.get("restricted_to") or []
