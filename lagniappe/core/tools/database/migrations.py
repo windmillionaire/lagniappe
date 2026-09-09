@@ -23,6 +23,7 @@ from config.datastore import encode_urlsafe_key
 from lagniappe import CONFIG
 
 from . import utility
+from .migration_steps.v1_3_permissions import migrate_file_ownership, migrate_local_restrictions
 from .get import datastore_key
 from .core import DATA, KINDS
 from .filter import Query
@@ -282,7 +283,6 @@ def _run_asset_generation_migration(context):
     return result
 
 
-from .migration_steps.v1_3_permissions import migrate_file_ownership, migrate_local_restrictions
 
 MIGRATION_CATALOG = (
     MigrationDefinition(

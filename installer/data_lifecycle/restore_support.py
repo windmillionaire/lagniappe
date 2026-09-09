@@ -919,7 +919,7 @@ def _traffic_observation(service, versions):
 def _confirm_mutation(expected, *, confirmation=None):
     from installer import FORMATTER
 
-    formatter = FORMATTER.initialize()
+    FORMATTER.initialize()
     prompt = format_prompt("Confirm restore", hint=f"Type {expected} to continue")
     actual = (confirmation or input)(prompt)
     if str(actual).strip() != expected:

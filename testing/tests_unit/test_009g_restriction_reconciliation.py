@@ -3,7 +3,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from google.cloud.datastore import Entity, Key
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities

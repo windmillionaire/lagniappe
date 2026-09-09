@@ -11,7 +11,7 @@ from runner.console import format_prompt, wrap_text
 from runner.context import REPOSITORY_ROOT, format_command
 from installer.errors import PIP_TIMEOUT, SetupCancelled, SetupError
 
-from runner.presentation import ACTIVE_PROGRESS as _ACTIVE_SPINNERS
+from runner.presentation import ACTIVE_PROGRESS as _ACTIVE_SPINNERS  # noqa: F401 - compatibility export used by callers
 from runner.presentation import pause_progress as _pause_active_spinners
 _PROJECT_ROOT = REPOSITORY_ROOT
 _PINNED_REQUIREMENTS = (

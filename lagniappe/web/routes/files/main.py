@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from flask import request
 from flask_login import current_user
 
-from lagniappe.core.definitions import AI, Action, Fetch, Resource
+from lagniappe.core.definitions import AI, Action, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai

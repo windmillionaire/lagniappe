@@ -1,4 +1,3 @@
-from lagniappe.core.definitions import Action
 """Unit tests for File entity properties.
 
 Heavy persistence (save/delete), single File ownership with real DB keys, and full
@@ -13,7 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from lagniappe.core.definitions import asset as asset_defs
-from lagniappe.core.definitions import LARGE_ASSET_BYTES
+from lagniappe.core.definitions import Action, LARGE_ASSET_BYTES
 from lagniappe.core.definitions.asset import ImageAsset
 from lagniappe.core.entities.history import TaskHistory
 from lagniappe.core.properties.file_assets import FileAsset

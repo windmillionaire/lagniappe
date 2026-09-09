@@ -7,7 +7,6 @@ from lagniappe.core.entities import Entities
 from .references import (
     _add_file_to_endpoint,
     _file_attached_to_endpoint,
-    _remove_file_from_endpoint,
     _resolve_entity,
     _resolve_file_endpoint,
     _resolve_file_entity,
