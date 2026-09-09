@@ -62,7 +62,7 @@ permission-readonly Task forms use this mode.
 | Schema type | Class and behavior |
 | --- | --- |
 | `input` | Text, number, date, time, email, telephone, or URL. |
-| `textarea` | Multiline text. |
+| `textarea` | Plain text; read mode preserves line breaks and spacing while wrapping long lines. |
 | `checkbox` | One boolean control. |
 | `radio` | Option group with row or column layout. |
 | `select` | `SelectBox` over a native select. |

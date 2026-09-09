@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as ShellView, E as ENDPOINTS, r as request, w as withTransition } from '../foundation.js?v=bb100edc';
-import '../upstreamUnavailable.js?v=bb100edc';
-import '../connectivity.js?v=bb100edc';
+import { S as ShellView, E as ENDPOINTS, r as request, w as withTransition } from '../foundation.js?v=b6795d9d';
+import '../upstreamUnavailable.js?v=b6795d9d';
+import '../connectivity.js?v=b6795d9d';
 
 /**
  * @testable true
@@ -87,7 +87,7 @@ class Manual extends ShellView {
 		const mobileNavButton = this.elt.querySelector("#manual-nav-button");
 		if (!mobileNavButton) return null;
 
-		this._mobileDropdownPromise = import('../dropdown.js?v=bb100edc')
+		this._mobileDropdownPromise = import('../dropdown.js?v=b6795d9d')
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				const menu = {
