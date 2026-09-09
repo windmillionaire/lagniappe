@@ -129,14 +129,14 @@ export class LocationElement extends BaseElement {
 		container.className = `flex flex-row items-start gap-2`;
 
 		const out = container.appendChild(document.createElement("span"));
-		setIcon(out, "map", "mt-1");
+		setIcon(out, "map");
 
 		const text = container.appendChild(document.createElement("div"));
 		text.className = "flex flex-col";
 
 		const link = text.appendChild(document.createElement("a"));
 		link.dataset.kind = "page";
-		link.className = STYLES.link.default;
+		link.className = `${STYLES.link.default} ${STYLES.form.linkLabel}`;
 		link.target = "_blank";
 		link.href = mapsUrl(sub);
 
