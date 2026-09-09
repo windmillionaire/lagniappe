@@ -11,15 +11,15 @@
 {% set can_restrict_form = Resource.SITE.allowed(Action.PERMISSIONS) %}
 
 {% macro save() %}
-  <button class="{{ styles.nav.button }} group/toggle text-xl"
+  <button class="{{ styles.nav.button }} group/toggle"
           data-saved="true"
           data-role="save-form"
           data-kind="saved"
           type="button"
           aria-label="Save form"
           title="Save form">
-    {{ render_icon("builder.saved", "text-kind-default invisible group-data-[saved=true]/toggle:visible", "saved") }}
-    {{ render_icon("builder.unsaved", "text-kind-default invisible group-data-[saved=false]/toggle:visible", "unsaved") }}
+    {{ render_icon("builder.saved", "icon-2xl text-kind-default invisible group-data-[saved=true]/toggle:visible", "saved") }}
+    {{ render_icon("builder.unsaved", "icon-2xl text-kind-default invisible group-data-[saved=false]/toggle:visible", "unsaved") }}
   </button>
 {% endmacro %}
 
