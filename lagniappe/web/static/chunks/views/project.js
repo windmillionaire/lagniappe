@@ -1,2 +1,19 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.0.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="607a7642-17e7-4412-802a-6dddbe4ae9b3",e._sentryDebugIdIdentifier="sentry-dbid-607a7642-17e7-4412-802a-6dddbe4ae9b3");}catch(e){}}();import{E as t}from"../entity-foundation.js?v=b547bfc7";import"../core-foundation.js?v=b547bfc7";import"../connectivity.js?v=b547bfc7";import"../foundation.js?v=b547bfc7";import"../upstreamUnavailable.js?v=b547bfc7";class r extends t{get secondaryCard(){return this.elt.querySelector("#model-tasks")}}export{r as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as Entity } from '../entity-foundation.js?v=b41d0cfc';
+import '../core-foundation.js?v=b41d0cfc';
+import '../connectivity.js?v=b41d0cfc';
+import '../foundation.js?v=b41d0cfc';
+import '../upstreamUnavailable.js?v=b41d0cfc';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_model_tasks_rejoins_section_switching
+ * @matrix projects : mobile-model-tasks
+ */
+class Project extends Entity {
+	get secondaryCard() {
+		return this.elt.querySelector("#model-tasks");
+	}
+}
+
+export { Project as default };

@@ -7,8 +7,10 @@ from lagniappe.core import exceptions
 from ...definitions import Action, Fetch, Resource
 from ...entities import Entities, index
 from lagniappe.core.tools.database import utility as database_utility
+from ..auth.restrictions import prepare_permissions
 from ..filters import FilterCache
 from ..tasks.ordering import page_task_roots, sort_tasks
+from .projections import channel_revisions, filter_result_revision
 
 
 MAX_REFRESH_ROWS = 10_000
@@ -29,6 +31,7 @@ class RefreshView:
 
     entity: object
     fingerprint: str | None
+    reauthorize: bool = False
 
 
 @dataclass(frozen=True)
@@ -61,8 +64,10 @@ def _view_entity(view):
 
 # @testable true
 # @tests tests_unit/test_021_refresh.py::test_load_refresh_view_uses_entity_or_site_index_fingerprint
+# @tests tests_unit/test_021_refresh.py::test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change
+# @matrix filters polling : saved-filter permissions revision
 # @matrix reconnect-refresh : entity-view root-fingerprint site-index
-def load_refresh_view(view):
+def load_refresh_view(view, user=None):
     """Resolve a refresh view once, before any collection membership queries."""
     if not isinstance(view, dict):
         raise RefreshFallback("Unsupported refresh view")
@@ -72,11 +77,22 @@ def load_refresh_view(view):
     if isinstance(key, str) and key and entity is None:
         raise RefreshFallback("Refresh view no longer exists")
     if entity is not None:
-        return RefreshView(entity, getattr(entity, "fingerprint", None))
+        if isinstance(entity, Entities.FILTER) and user is not None:
+            return RefreshView(
+                entity, filter_result_revision(entity, user), reauthorize=True,
+            )
+        return RefreshView(
+            entity, getattr(entity, "fingerprint", None),
+            reauthorize=isinstance(entity, Entities.CATEGORY),
+        )
 
     view_index = view.get("index")
     if view_index not in FINGERPRINTED_INDEXES:
         return RefreshView(None, None)
+    if view_index == "tasks" and user is not None:
+        return RefreshView(
+            None, channel_revisions(("tasks",), user)["tasks"], reauthorize=True,
+        )
     return RefreshView(
         None,
         database_utility.site_fingerprint(f"/{view_index}/index"),
@@ -201,9 +217,11 @@ def _modified_token(entity):
 
 # @testable true
 # @tests tests_unit/test_021_refresh.py::test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_upsert
+# @tests tests_unit/test_021_refresh.py::test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change
+# @matrix filters polling : saved-filter permissions revision
 # @matrix permissions reconnect-refresh : authorization direct-depth modified ordering removal
-def resolve_refresh_delta(collection, rows, user):
-    """Compare roots, then direct-fetch and authorize only changed/new rows."""
+def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
+    """Compare roots, recheck access, and render only changed authorized rows."""
     client = _client_modified(rows)
     roots = {}
     for root in collection.roots:
@@ -218,9 +236,12 @@ def resolve_refresh_delta(collection, rows, user):
     changed_keys = {root.urlsafe_key for root in changed}
     expanded = {
         entity.urlsafe_key: entity
-        for entity in Entities.fetch(
-            *(root.urlsafe_key for root in changed),
-            request=Fetch.direct(),
+        for entity in prepare_permissions(
+            *Entities.fetch(
+                *(root.urlsafe_key for root in (roots.values() if reauthorize else changed)),
+                request=Fetch.direct(),
+            ),
+            action=Action.EDIT,
         )
     }
 
@@ -228,13 +249,14 @@ def resolve_refresh_delta(collection, rows, user):
     upsert = []
     order = []
     for key, root in roots.items():
-        if key not in changed_keys:
+        if key not in changed_keys and not reauthorize:
             order.append(key)
             continue
 
         entity = expanded.get(key)
         if entity and entity.allowed(Action.VIEW, user=user):
-            upsert.append(entity)
+            if key in changed_keys:
+                upsert.append(entity)
             order.append(key)
         elif key in client:
             remove.add(key)

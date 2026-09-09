@@ -74,7 +74,10 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
             with patch(
                 "lagniappe.core.tools.filters.cache.Entities.fetch",
                 return_value=[visible, hidden],
-            ) as load:
+            ) as load, patch(
+                "lagniappe.core.tools.filters.cache.prepare_permissions",
+                side_effect=lambda *entities, action: entities,
+            ) as prepare:
                 results = FilterCache(parent, user=viewer).query(entity_filter)
 
     query.assert_called_once_with(
@@ -84,6 +87,7 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
     load.assert_called_once_with(
         "visible-key", "hidden-key", request=Fetch.direct()
     )
+    prepare.assert_called_once_with(visible, hidden, action=Action.EDIT)
     assert results == [visible]
 
 

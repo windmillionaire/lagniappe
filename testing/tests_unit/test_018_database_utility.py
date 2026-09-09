@@ -396,6 +396,24 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     assert batch.mutations[4].upsert is fingerprint
 
 
+# @matrix permissions mutations : channel-invalidation no-descendant-writes
+@pytest.mark.unit
+@pytest.mark.parametrize("kind", ["page", "form"])
+@pytest.mark.parametrize("changed,mask", [(True, None), (False, None), (True, ("modified",))])
+def test_permission_source_save_invalidates_tasks_without_descendant_writes(monkeypatch, kind, changed, mask):
+    from contextlib import nullcontext
+
+    source = SimpleNamespace(key="permission-source", db={"type": kind}, _permission_sources_changed=changed)
+    saved, fingerprints = [], []
+    batch = SimpleNamespace(put=lambda row: saved.append(row))
+    monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=SimpleNamespace(batch=lambda: nullcontext(batch))))
+    monkeypatch.setattr(utility, "_put_mutation", lambda _batch, row, _mask: saved.append(row))
+    monkeypatch.setattr(utility, "update_site_fingerprints", lambda *rows: fingerprints.extend(rows) or [])
+    utility.save_mutations(((source, mask),))
+    assert saved == [source.db]
+    assert fingerprints == [source.db] + ([{"type": "task"}] if changed and mask is None else [])
+
+
 # @pair database:named-key-encoding
 @pytest.mark.unit
 def test_database_aware_urlsafe_key_round_trip():

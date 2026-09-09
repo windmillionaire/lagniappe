@@ -14,6 +14,7 @@ from lagniappe.core.tools.filters import (
     resolve_filter_field,
 )
 from lagniappe.core.tools.tasks.ordering import sort_tasks
+from lagniappe.core.tools.polling.projections import filter_result_revision
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
 
@@ -155,10 +156,8 @@ def _filter_results_owner(definitions):
 # @pair filters:view-access
 # @pair cache:permission-revalidation
 @filters.route("<key>/test", methods=["GET"])
-@permission(requested=Action.VIEW, no_store=True)
+@permission(requested=Action.VIEW, fingerprint=filter_result_revision)
 def test(key, **kwargs):
-    # The parent's fingerprint does not track every result's permission source.
-    # Each explicit run must apply current access checks to matching records.
     entity = kwargs["entity"]
     try:
         compiled = _compiled_from_request(entity)
@@ -220,7 +219,7 @@ def get(key, **kwargs):
 # @pair filters:view-access
 # @pair cache:permission-revalidation
 @filters.route("/<key>", methods=["GET"])
-@permission(requested=Action.VIEW, no_store=True)
+@permission(requested=Action.VIEW, fingerprint=filter_result_revision)
 def run(key, **kwargs):
     filter = kwargs["entity"]
     Entities.fetch(

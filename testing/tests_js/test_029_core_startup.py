@@ -424,12 +424,14 @@ vm.runInContext(source, context);
         fingerprint: "filter-v1",
         pollChannel: "tasks",
         pollRevision: "tasks-v1",
+        pollEntityRevision: "filter-entity-v1",
       },
       querySelector() { return null; },
     },
     kind: "task",
     key: "filter-key",
     async refresh() { filteredRefreshes += 1; },
+    async reconcileChange() { filteredRefreshes += 1; },
   });
   filtered._initPollingSubscription();
   const filteredSubscription = subscriptions[1];
@@ -439,12 +441,20 @@ vm.runInContext(source, context);
     filteredSubscription.descriptor.channel !== "tasks" ||
     filteredSubscription.descriptor.revision !== "tasks-v1"
   ) {
-    throw new Error("A keyed filtered root did not prefer its collection channel");
+    throw new Error("A keyed filtered root lost its collection channel");
   }
   await filteredSubscription.options.onResult({ status: "changed" });
   if (filteredRefreshes !== 1) {
     throw new Error("Filtered collection polling did not refresh");
   }
+  const filteredEntity = subscriptions[2];
+  if (filteredEntity.descriptor.id !== "view:entity:filter-key" ||
+      filteredEntity.descriptor.revision !== "filter-entity-v1" ||
+      filteredEntity.options.mode !== "periodic" || filteredSubscription.options.mode !== "periodic") {
+    throw new Error("Filtered Tasks must watch both authorities while foregrounded");
+  }
+  await filteredEntity.options.onResult({ status: "changed" });
+  if (filteredRefreshes !== 2) throw new Error("The Filter authority did not refresh");
 
   const changes = [];
   const editResults = [];
@@ -465,7 +475,7 @@ vm.runInContext(source, context);
     async reconcileChange(change) { changes.push(change); },
   });
   entity._initPollingSubscription();
-  const entitySubscription = subscriptions[2];
+  const entitySubscription = subscriptions[3];
   await entitySubscription.options.onResult({ status: "changed" });
   await entitySubscription.options.onResult({ status: "unavailable" });
   if (

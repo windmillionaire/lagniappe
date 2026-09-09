@@ -840,6 +840,8 @@ class RestrictedTo(CacheMixin, DBProperty):
                 return
             hashes = [group.hash for group in groups.value] if groups.keys else []
             restrictions = ["owner", *sorted(set(hashes) - {"owner"})] if hashes else []
+        if restrictions != self.stored:
+            self.entity._permission_sources_changed = True
         if restrictions:
             self.entity.db[self.id] = restrictions
         else:

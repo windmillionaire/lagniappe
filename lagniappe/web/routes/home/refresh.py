@@ -75,7 +75,10 @@ def _render_empty(collection, order):
 # @reason target orchestration is owned by the public batched route
 def _refresh_target(view, target, refresh_view):
     collection = load_refresh_collection(view, target, current_user, refresh_view)
-    delta = resolve_refresh_delta(collection, target.get("rows"), current_user)
+    delta = resolve_refresh_delta(
+        collection, target.get("rows"), current_user,
+        reauthorize=refresh_view.reauthorize,
+    )
     return {
         "id": target["id"],
         "fallback": False,
@@ -91,6 +94,7 @@ def _refresh_target(view, target, refresh_view):
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_reconnect_refreshes_external_page
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
 # @matrix reconnect-refresh : batched-request category-index component-identity fallback page-tasks root-fingerprint
 # @pairs category-index:refresh permissions:authorization
 @internal.route("/refresh", methods=["POST"])
@@ -108,7 +112,7 @@ def refresh():
         return responses.error("Invalid refresh targets.")
 
     try:
-        refresh_view = load_refresh_view(view)
+        refresh_view = load_refresh_view(view, current_user)
     except RefreshFallback:
         return responses.json_response(
             {"targets": [_fallback(target) for target in targets]}

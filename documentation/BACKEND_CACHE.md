@@ -7,12 +7,23 @@ background jobs.
 
 ## Filter result responses
 
-Filter previews and saved-filter runs return `no-store` responses and check each
-matching record's current view permission on every run. Their parent Project,
-Category, or Filter fingerprint does not cover all result permission sources:
-changing a Task Form restriction can change access without modifying the Task
-or its Project. Returning 304 from that parent fingerprint would reuse stale
-visible rows before the result permission checks run.
+Filter previews and saved-filter runs use normal permission-scoped ETags.
+Saving a changed Page/Form restriction, or changing a Page's attached Form,
+advances the existing Tasks collection fingerprint with the source save. This
+index invalidation adds no descendant reads or writes; existing asynchronous
+search-permission reconciliation remains unchanged. Existing Category/Project
+save effects remain unchanged; this requires no new fields or migration.
+
+Project filter result ETags include the Tasks fingerprint, so a permission
+change cannot return a stale 304. Mounted Project filter pages watch both their
+Filter entity (whose revision includes its Project) and the Tasks channel.
+Category filters watch their Filter/Category revision. Viewer authorization
+participates in both kinds of filtered result revision.
+
+When a Task index, Category index, or filtered table revision changes, refresh
+rechecks every matching row's permission, including rows whose timestamps match
+the browser manifest. Only changed/new authorized rows are rendered as upserts;
+rows that have become forbidden are removed.
 
 ## Initialization and namespace
 

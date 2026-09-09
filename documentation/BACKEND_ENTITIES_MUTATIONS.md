@@ -129,6 +129,14 @@ Changing a Page can touch its Category owners because their rendered Page lists
 changed. Those owners receive new fingerprints and ETags even though their own
 form fields did not change.
 
+Page/Form restriction changes and Page attached-Form changes mark a pending
+permission-source invalidation. The source's full save advances the existing
+Tasks collection fingerprint in its Datastore batch. This index invalidation
+adds no descendant query, descendant write, or additional Project/Filter touch;
+existing asynchronous search-permission reconciliation remains unchanged. The pending marker
+is consumed only after durable success; incidental masked touches do not consume
+it. Ordinary content saves do not add this Tasks invalidation.
+
 Redis search/detail refresh, filter-index updates, cache invalidation, and blob
 deletion happen after durable success. The browser receives entity revisions
 from mutation responses and obtains collection changes through durable site

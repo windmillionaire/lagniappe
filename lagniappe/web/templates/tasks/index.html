@@ -38,15 +38,18 @@
        {% if filtered %}
          {% if not filtered.temporary %}
          data-key="{{ filtered.urlsafe_key }}"
-         data-fingerprint="{{ filtered.fingerprint }}"
+         data-fingerprint="{{ fingerprint }}"
+         data-poll-entity-revision="{{ entity_revision }}"
          {% endif %}
        data-hash="{{ filtered.hash }}"
        {% else %}
        data-index="tasks"
        data-fingerprint="{{ fingerprint }}"
        {% endif %}
-       data-poll-channel="{{ poll_channel }}"
-       data-poll-revision="{{ poll_revision }}"
+       {% if poll_channel %}
+         data-poll-channel="{{ poll_channel }}"
+         data-poll-revision="{{ poll_revision }}"
+       {% endif %}
        class="group">
     <div class="{{ styles.layout.view.header }}">
       {{ view_header() }}

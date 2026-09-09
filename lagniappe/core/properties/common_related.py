@@ -48,6 +48,8 @@ class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProp
         if value is not None and getattr(value, "entity_kind", None) != "form":
             raise ValueError("Value must be a form")
 
+        if self.entity.entity_kind == "page" and self.key != getattr(value, "key", None):
+            self.entity._permission_sources_changed = True
         RelatedEntityMixin.value.fset(self, value)
         restricted_to = self.entity.properties.get("restricted_to")
         if restricted_to is not None:

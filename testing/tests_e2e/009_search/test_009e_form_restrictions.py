@@ -1,4 +1,4 @@
-"""Form saves must change existing search results without descendant saves."""
+"""Form saves update inherited search access without descendant content saves."""
 from uuid import uuid4
 
 import pytest
@@ -58,7 +58,10 @@ def test_form_restrictions_reconcile_existing_descendants(get_user, browser_fail
     other_group = Groups.general_forms_view_only.get(owner)
     token = f"permission{uuid4().hex[:12]}"
     form = Form(user=owner, definition=FormDefinition(name=f"{token} Form", form_type=form_type)).create()
-    page = Entities.PAGE.create({"name": f"{token} Page", "form": form.entity if form_type == "page" else None})
+    category = Entities.CATEGORY.create({"name": f"{token} Category"})
+    category.save()
+    page = Entities.PAGE.create({"name": f"{token} Page", "model": category,
+                                 "form": form.entity if form_type == "page" else None})
     page.save()
     task = Entities.TASK.create({"page": page, "name": f"{token} Task", "form": form.entity if form_type == "task" else None})
     task.save()

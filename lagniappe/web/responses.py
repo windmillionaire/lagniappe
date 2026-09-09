@@ -31,6 +31,8 @@ from lagniappe.core.tools import cache
 from lagniappe.core.tools.polling.projections import (
     channel_revision,
     channel_revisions,
+    filter_revision,
+    filter_result_revision,
     render_operation_statuses,
 )
 from lagniappe.core.tools.tasks.ordering import page_task_roots
@@ -190,7 +192,7 @@ def index(name, index, **context):
         render_template(
             f"{name}/index.html",
             index=index,
-            fingerprint=fingerprint,
+            fingerprint=poll_revision if name == "tasks" else fingerprint,
             poll_channel=poll_channel,
             poll_revision=poll_revision,
             **context,
@@ -876,7 +878,17 @@ def home_task_removed():
 # @covered-by lagniappe/web/responses.py::filtered_task_index
 # @covered-by lagniappe/web/responses.py::filtered_page_index
 # @reason filtered index response tests exercise the rendered polling contract
-def _filtered_index_poll_context(channel):
+def _filtered_index_poll_context(entity):
+    if not entity.temporary:
+        context = {"fingerprint": filter_result_revision(entity, current_user)}
+        if entity.parent.kind == "project":
+            context.update(
+                entity_revision=filter_revision(entity, current_user),
+                poll_channel="tasks",
+                poll_revision=channel_revisions(("tasks",), current_user)["tasks"],
+            )
+        return context
+    channel = "tasks" if entity.parent.kind == "project" else "categories"
     return {
         "poll_channel": channel,
         "poll_revision": channel_revisions((channel,), current_user)[channel],
@@ -908,7 +920,7 @@ def filtered_task_index(tasks, filter):
             "tasks/index.html",
             tasks=tasks,
             filtered=filter,
-            **_filtered_index_poll_context("tasks"),
+            **_filtered_index_poll_context(filter),
         ),
         200,
     )
@@ -923,7 +935,7 @@ def filtered_page_index(pages, filter):
             "categories/index.html",
             pages=pages,
             filtered=filter,
-            **_filtered_index_poll_context("categories"),
+            **_filtered_index_poll_context(filter),
         ),
         200,
     )

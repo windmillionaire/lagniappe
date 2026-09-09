@@ -46,6 +46,31 @@ def _writes(plan):
     ]
 
 
+# @matrix permissions : invalidation-retry
+@pytest.mark.parametrize("kind", ["PAGE", "FORM"])
+def test_permission_source_marker_is_consumed_only_after_durable_success(monkeypatch, kind):
+    from lagniappe.core.tools.database import get as database_get
+
+    source = TestEntities.get(kind, {"hash": "permission-source"})
+    source.properties.restricted_to.materialize(owner_only=True)
+    assert source._permission_sources_changed is True
+    monkeypatch.setattr(database_get, "form_users", lambda *_forms: [])
+    monkeypatch.setattr(Entities, "fetch", lambda *items, request: list(items))
+    monkeypatch.setattr(mutation_executor, "execute_post_commit", lambda _plan: ([], []))
+    plan = plan_mutation(MutationOperation.SAVE, source, registry=Entities)
+    assert [effect.entity for effect in _writes(plan)] == [source]
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations",
+                        lambda _writes: (_ for _ in ()).throw(RuntimeError("save failed")))
+    with pytest.raises(RuntimeError, match="save failed"):
+        execute_mutation(plan)
+    assert source._permission_sources_changed is True
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", lambda _writes: None)
+    execute_mutation(plan)
+    assert source._permission_sources_changed is False
+    source.properties.restricted_to.materialize()
+    assert source._permission_sources_changed is False
+
+
 # @matrix mutations : full-root masked-touch instance-precedence cache
 @pytest.mark.parametrize("file_first", [True, False])
 def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first, monkeypatch):

@@ -167,6 +167,7 @@ export default class Core extends ShellView {
 	_initPollingSubscription() {
 		if (!this.PollingCoordinator) return;
 		const pollChannel = this.elt.dataset.pollChannel;
+		const entityRevision = this.elt.dataset.pollEntityRevision;
 		if (pollChannel) {
 			this.PollingCoordinator.subscribe(
 				{
@@ -176,14 +177,14 @@ export default class Core extends ShellView {
 					revision: this.elt.dataset.pollRevision ?? null,
 				},
 				{
-					mode: "foreground",
+					mode: entityRevision ? "periodic" : "foreground",
 					initial: "scheduled",
 					onResult: async (result) => {
 						if (result.status === "changed") await this.refresh();
 					},
 				},
 			);
-			return;
+			if (!entityRevision) return;
 		}
 		if (this.key) {
 			const id = `view:entity:${this.key}`;
@@ -192,7 +193,7 @@ export default class Core extends ShellView {
 					id,
 					type: "entity",
 					key: this.key,
-					revision: this.elt.dataset.fingerprint ?? null,
+					revision: entityRevision ?? this.elt.dataset.fingerprint ?? null,
 				},
 				{
 					mode: "periodic",

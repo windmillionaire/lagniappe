@@ -45,7 +45,9 @@ def _prepare_write(effect):
         pass
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_022_mutation_contracts.py::test_permission_source_marker_is_consumed_only_after_durable_success
+# @matrix permissions : invalidation-retry
 def consume_mutation_intents(plan):
     for owner, captured in plan.consumed_intents:
         current = list(getattr(owner, "mutation_intents", ()))
@@ -53,6 +55,9 @@ def consume_mutation_intents(plan):
         owner._mutation_intents = [
             intent for intent in current if id(intent) not in captured_ids
         ]
+    for effect in plan.effects:
+        if effect.effect is MutationEffectType.UPSERT and effect.property_mask is None:
+            effect.entity._permission_sources_changed = False
 
 
 # @testable infrastructure

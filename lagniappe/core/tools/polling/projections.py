@@ -35,6 +35,27 @@ CHANNEL_REVISION_PATHS = {
 
 
 # @testable true
+# @tests tests_unit/test_024_autofill_form_state.py::test_filter_revision_tracks_parent_definition_and_viewer_permissions
+# @matrix filters polling : saved-filter permissions revision
+def filter_revision(entity, user):
+    """Scope a saved Filter's parent/definition revision to its viewer."""
+    return f"{entity.fingerprint}:{user.authorization_fingerprint}"
+
+
+# @testable true
+# @tests tests_unit/test_024_autofill_form_state.py::test_filter_result_revision_includes_tasks_only_for_projects
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
+# @matrix filters polling : saved-filter permissions revision
+def filter_result_revision(entity, user):
+    """Include every durable authority used by a preview or saved result page."""
+    parent = entity.parent if entity.entity_kind == "filter" else entity
+    revision = filter_revision(entity, user)
+    if parent.entity_kind == "project":
+        revision += f":{database_utility.site_fingerprint('/tasks/index')}"
+    return revision
+
+
+# @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
 # @matrix polling : channel mounted-scope permissions revision
 def channel_paths(channel):

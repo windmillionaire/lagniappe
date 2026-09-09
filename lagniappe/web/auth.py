@@ -317,9 +317,10 @@ def _load_request_context(entity_identifier=None):
 # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
 # @tests tests_e2e/008_users/test_008d_admin_data_protection.py::test_backups_tab_reveals_static_status_panel
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_route_is_forbidden_without_model_or_page_permission
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
 # @matrix permissions : authorization-before-cache etag no-store resource-gates
-def permission(resource=None, requested=None, *, no_store=False):
-    """Check route access using the fixed direct request-auth graph."""
+def permission(resource=None, requested=None, *, no_store=False, fingerprint=None):
+    """Check route access and optionally use a route-specific revision resolver."""
 
     # @testable false
     # @covered-by lagniappe/web/auth.py::permission
@@ -345,9 +346,10 @@ def permission(resource=None, requested=None, *, no_store=False):
 
             if request.method == "GET" and not no_store:
                 base_fingerprint = (
-                    entity.fingerprint
-                    if entity
-                    else database_utility.site_fingerprint(request.path)
+                    fingerprint(entity, user) if fingerprint else (
+                        entity.fingerprint if entity
+                        else database_utility.site_fingerprint(request.path)
+                    )
                 )
                 g.fingerprint = _etag_fingerprint(base_fingerprint, user)
 

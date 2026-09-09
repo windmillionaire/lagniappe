@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lagniappe.core.definitions import Fetch, Restriction
+from lagniappe.core.definitions import Action, Fetch, Restriction
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities.index import PageIndex, TaskIndex, UserIndex
 from lagniappe.core.tools.polling.refresh import (
@@ -73,6 +73,42 @@ def test_load_refresh_view_uses_entity_or_site_index_fingerprint():
     assert task_view == RefreshView(None, "tasks-fingerprint")
     assert load_entity.call_count == 2
     site_fingerprint.assert_called_once_with("/tasks/index")
+
+
+# @matrix filters polling : saved-filter permissions revision
+@pytest.mark.unit
+def test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change(monkeypatch):
+    from lagniappe.core.tools.polling.projections import filter_result_revision
+
+    parent = TestEntities.get("PROJECT", {"hash": "reauthorize-project"})
+    entity = Entities.FILTER(testing=True)
+    entity.parent = parent
+    entity.modified = parent.modified
+    viewer = SimpleNamespace(authorization_fingerprint="before")
+    monkeypatch.setattr("lagniappe.core.tools.polling.refresh._view_entity", lambda _view: entity)
+    monkeypatch.setattr("lagniappe.core.tools.polling.projections.database_utility.site_fingerprint", lambda _path: "tasks")
+    view = {"key": "filter", "fingerprint": filter_result_revision(entity, viewer)}
+    initial = load_refresh_view(view, viewer)
+    assert initial.reauthorize is True
+    assert initial.fingerprint == view["fingerprint"]
+    viewer.authorization_fingerprint = "after"
+    loaded = load_refresh_view(view, viewer)
+    assert loaded.reauthorize is True
+    assert loaded.fingerprint != view["fingerprint"]
+
+    task = _task("Hidden now", "reauthorize-task", parent.modified)
+    task.allowed = lambda _action, user: False
+    collection = RefreshCollection("filtered-task-index", entity, (task,))
+    monkeypatch.setattr(Entities, "fetch", lambda *_keys, request: [task])
+    delta = resolve_refresh_delta(collection, [{"key": task.urlsafe_key, "modified": task.modified.isoformat()}], viewer,
+                                  reauthorize=loaded.reauthorize)
+    assert delta.remove == (task.urlsafe_key,)
+    assert delta.order == delta.upsert == ()
+    task.allowed = lambda _action, user: True
+    delta = resolve_refresh_delta(collection, [{"key": task.urlsafe_key, "modified": task.modified.isoformat()}], viewer,
+                                  reauthorize=True)
+    assert delta.order == (task.urlsafe_key,)
+    assert delta.remove == delta.upsert == ()
 
 
 # @matrix reconnect-refresh task-index : ordering root-depth
@@ -262,10 +298,14 @@ def test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_
     with patch(
         "lagniappe.core.tools.polling.refresh.Entities.fetch",
         return_value=[changed_full, rejected_full],
-    ) as fetch:
+    ) as fetch, patch(
+        "lagniappe.core.tools.polling.refresh.prepare_permissions",
+        side_effect=lambda *entities, action: entities,
+    ) as prepare:
         delta = resolve_refresh_delta(collection, rows, _viewer())
 
     fetch.assert_called_once_with("b", "c", request=Fetch.direct())
+    prepare.assert_called_once_with(changed_full, rejected_full, action=Action.EDIT)
     assert delta.upsert == (changed_full,)
     assert delta.remove == ("deleted",)
     assert delta.order == ("a", "b")

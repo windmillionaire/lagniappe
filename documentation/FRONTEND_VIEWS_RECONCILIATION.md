@@ -65,8 +65,9 @@ queued, or staged-review rows are protected. Hidden clean rows may refresh
 silently. If a changed row belongs to a loaded DOM collection whose widget has
 not been instantiated, Core loads the collection owner before refreshing it.
 
-Index roots keep raw refresh fingerprints separate from opaque poll-channel
-revisions. Home widgets own independent channels—Notes, Tasks, Starred, Pages,
+Task-index refresh fingerprints include the same viewer-scoped Tasks revision as
+their poll channel. Other index roots retain their established fingerprints.
+Home widgets own independent channels—Notes, Tasks, Starred, Pages,
 Projects, Categories, Ingress, and Tool Reports—so a change refreshes only its
 consumer.
 
@@ -77,10 +78,13 @@ rows or their deferred-operation markers. Collection replacements preserve the
 widget's selected categories and reapply counts and visibility. Its panel stays
 visible when empty, so users can change filters after clearing executed reports.
 
-Full-page saved filters subscribe to the collection they project: project
-filters use the Tasks channel and category filters use the Categories channel.
+Full-page saved Project filters subscribe to both their Filter/Project entity
+revision and the Tasks channel. Both subscriptions run periodically while active.
+Saved Category filters subscribe to their Filter/Category entity revision.
 Their durable filter key and hash let `/l/refresh` recompute membership through
-the saved filter cache. Temporary project status filters use the same Tasks
+the saved filter cache and recheck access even for rows with unchanged timestamps.
+Only changed or newly visible rows need replacement HTML; unchanged authorized
+rows keep their DOM. Temporary project status filters use the Tasks
 channel but retain their complete focused route, including query parameters,
 and fall back to replacing that collection from the route.
 

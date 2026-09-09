@@ -170,11 +170,13 @@ def acknowledge_user_cache(key, revision):
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_save_mutations_applies_property_masks_and_fingerprints
+# @tests tests_unit/test_018_database_utility.py::test_permission_source_save_invalidates_tasks_without_descendant_writes
+# @matrix permissions mutations : channel-invalidation no-descendant-writes
 # @tests tests_unit/test_018_database_utility.py::test_notification_save_and_delete_skip_site_fingerprints
 # @matrix database mutations : document-checkpoint full-upsert property-mask site-fingerprint update
 # @matrix notifications : mutation site-fingerprint-isolation
 def save_mutations(writes, *, guards=None):
-    """Persist full and property-masked entity writes in one Datastore batch.
+    """Persist full and property-masked writes with their collection revisions.
 
     ``writes`` contains ``(typed_entity, property_mask)`` pairs. A ``None`` mask
     is a normal full upsert. A non-empty mask is converted to an ``update``
@@ -198,6 +200,13 @@ def save_mutations(writes, *, guards=None):
     fingerprint_entities = [
         entity.db for entity, mask in writes if _advances_site_fingerprint(entity, mask)
     ]
+    if any(
+        mask is None and entity.db.get("type") in {"page", "form"}
+        and getattr(entity, "_permission_sources_changed", False)
+        for entity, mask in writes
+    ):
+        # One collection invalidation replaces a write to every affected Task.
+        fingerprint_entities.append({"type": "task"})
     fingerprints = (
         update_site_fingerprints(*fingerprint_entities) if fingerprint_entities else []
     )

@@ -16,6 +16,7 @@ from lagniappe.core.tools.polling.contract import (
 )
 from lagniappe.core.tools.polling.projections import (
     channel_revisions as _channel_revisions,
+    filter_revision,
     lock_result as _project_lock_result,
     operation_statuses as _operation_statuses,
 )
@@ -82,15 +83,19 @@ def _revision_result(descriptor, revision, payload=None):
 def _entity_result(descriptor, entity, *, ingress=False):
     if not entity or not entity.allowed(Action.VIEW, user=current_user):
         return _result(descriptor, "unavailable")
+    revision = (
+        filter_revision(entity, current_user)
+        if isinstance(entity, Entities.FILTER) else entity.fingerprint
+    )
     payload = (
         {"refresh": True}
         if ingress
         else {
-            "fingerprint": entity.fingerprint,
+            "fingerprint": revision,
             "modified": entity.modified.isoformat() if entity.modified else None,
         }
     )
-    return _revision_result(descriptor, entity.fingerprint, payload)
+    return _revision_result(descriptor, revision, payload)
 
 
 # @testable false
@@ -127,6 +132,7 @@ def _document_result(descriptor, entity, client_id):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001f_edited_entities.py::test_poll_endpoint_batches_entity_changes
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
 # @tests tests_e2e/001_site/test_001f_edited_entities.py::test_cold_notification_state_seeds_through_one_poll
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query

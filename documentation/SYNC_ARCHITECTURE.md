@@ -174,6 +174,15 @@ invalidate a viewer's list even when membership is unchanged. Home widgets use
 independent channels. Personal Starred and Tool Reports channels combine their
 narrow User/report authorities.
 
+Saved filtered Task indexes subscribe to both their Filter entity and the Tasks
+channel, periodically while active. Filter entity revisions include their parent
+Project and the viewer's authorization; result-page revisions also include Tasks.
+The independent entity cursor is rendered as `data-poll-entity-revision`.
+Saved filtered Page indexes watch their Filter/Category entity revision.
+Task indexes, Category indexes, and filtered tables recheck candidate row access
+when their result revision changes, even when row timestamps are unchanged.
+Unchanged authorized rows retain their DOM; newly forbidden rows are removed.
+
 Operation and notification bookkeeping do not modify User or site collection
 fingerprints.
 

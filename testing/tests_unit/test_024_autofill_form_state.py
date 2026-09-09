@@ -18,6 +18,42 @@ from lagniappe.core.tools.polling import projections as polling
 pytestmark = pytest.mark.unit
 
 
+# @matrix filters polling : saved-filter permissions revision
+def test_filter_revision_tracks_parent_definition_and_viewer_permissions():
+    from testing.utility.test_entities import TestEntities
+
+    parent = TestEntities.get("PROJECT", {"name": "Project", "hash": "revision-project"})
+    entity = Entities.FILTER(testing=True)
+    entity.modified = parent.modified
+    entity.properties.parent._value = parent
+    user = SimpleNamespace(authorization_fingerprint="viewer-one")
+    initial = polling.filter_revision(entity, user)
+    assert polling.filter_revision(entity, user) == initial
+    user.authorization_fingerprint = "viewer-two"
+    assert polling.filter_revision(entity, user) != initial
+    user.authorization_fingerprint = "viewer-one"
+    parent.modified = parent.modified.replace(year=2020)
+    parent_revision = polling.filter_revision(entity, user)
+    assert parent_revision != initial
+    entity.modified = entity.modified.replace(year=2020)
+    assert polling.filter_revision(entity, user) not in {initial, parent_revision}
+
+
+# @matrix filters polling : saved-filter permissions revision
+def test_filter_result_revision_includes_tasks_only_for_projects(monkeypatch):
+    viewer = SimpleNamespace(authorization_fingerprint="viewer")
+    project = SimpleNamespace(entity_kind="project", fingerprint="project")
+    category = SimpleNamespace(entity_kind="category", fingerprint="category")
+    saved = SimpleNamespace(entity_kind="filter", fingerprint="saved", parent=project)
+    channel = {"revision": "tasks-before"}
+    monkeypatch.setattr(polling.database_utility, "site_fingerprint", lambda _path: channel["revision"])
+    before = [polling.filter_result_revision(entity, viewer) for entity in (project, category, saved)]
+    channel["revision"] = "tasks-after"
+    after = [polling.filter_result_revision(entity, viewer) for entity in (project, category, saved)]
+    assert before[0] != after[0] and before[2] != after[2]
+    assert before[1] == after[1]
+
+
 # @pairs ai:autofill deferred-jobs:form-lock
 def test_autofill_explicit_lock_opt_out_skips_target_lock():
     adapter = deferred_job_adapters.AutofillAdapter()
