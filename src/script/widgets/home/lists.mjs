@@ -1,4 +1,21 @@
 import { BaseList } from "../../elements/base/baseList";
+import { localStore } from "../../shared/storage";
+import { withTransition } from "../../shared/utilities";
+
+const REPORT_FILTERS = ["active", "executed", "ask"];
+
+/**
+ * @testable true
+ * @tests tests_js/test_047_home_report_filters.py::test_report_categories_and_saved_filter_selection
+ * @matrix ai-report : filter-categories
+ */
+function reportCategory(report) {
+	if (report.tool === "ask") return "ask";
+	return ["create", "organize"].includes(report.tool) &&
+		report.status === "complete"
+		? "executed"
+		: "active";
+}
 
 /**
  * @testable false
@@ -135,16 +152,142 @@ export class IngressList extends LoadedHomeList {
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_lazy_report_list_reconciles_active_job_status
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
+ * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_report_filters_persist_and_follow_live_status
  * @matrix ai-report : deferred-refresh delete-modal empty-count lazy-load list operation-poll stage-labels status-reconciliation toggle
+ * @matrix ai-report : filter-create filter-persistence
  */
 export class ToolReportList extends BaseList {
 	constructor(attributes) {
 		super(attributes);
 		this._listToggle = _listToggle(this.component, this.name);
+		this.storageKey = `home-report-filters:${this.component.elt.dataset.reportUser}`;
+		const saved = localStore.getJSON(this.storageKey);
+		this.filters = new Set(
+			Array.isArray(saved) &&
+				saved.every((value) => REPORT_FILTERS.includes(value))
+				? saved
+				: ["active", "ask"],
+		);
+		this._click = this._click.bind(this);
+		this._deleteMessage = "";
+	}
+
+	init() {
+		this.component.elt.addEventListener("click", this._click);
+	}
+
+	get reportItems() {
+		return Array.from(
+			this.target.querySelectorAll("li[lp-entity][data-kind='report']"),
+		);
+	}
+
+	get itemCount() {
+		return this.reportItems.length;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
+	 * @tests tests_js/test_047_home_report_filters.py::test_report_filters_count_hidden_categories_and_empty_selections
+	 * @matrix ai-report : filter-create filter-persistence
+	 */
+	created(response) {
+		super.created(response);
+		const items =
+			response.html?.querySelectorAll("li[lp-entity][data-kind='report']") ||
+			[];
+		for (const item of items) this.filters.add(reportCategory(item.dataset));
+		if (items.length) localStore.setJSON(this.storageKey, [...this.filters]);
+	}
+
+	_click(event) {
+		const filter = event.target.closest("[data-role='report-filter']");
+		if (filter && this.target.contains(filter)) {
+			const value = filter.dataset.filter;
+			if (this.filters.has(value)) this.filters.delete(value);
+			else this.filters.add(value);
+			localStore.setJSON(this.storageKey, [...this.filters]);
+			void withTransition(() => this._renderFilters(), {
+				label: "reports:filter",
+			});
+		}
+		const clear = event.target.closest("[data-role='delete-executed-reports']");
+		if (clear && this.target.contains(clear)) void this._openDelete(clear);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_report_filters_persist_and_follow_live_status
+	 * @tests tests_js/test_047_home_report_filters.py::test_report_filters_count_hidden_categories_and_empty_selections
+	 * @matrix ai-report : filter-categories filter-counts filter-empty
+	 */
+	_renderFilters() {
+		const counts = { active: 0, executed: 0, ask: 0 };
+		let visible = 0;
+		for (const item of this.reportItems) {
+			const category = reportCategory(item.dataset);
+			counts[category]++;
+			item.hidden = !this.filters.has(category);
+			if (!item.hidden) visible++;
+		}
+		for (const button of this.target.querySelectorAll(
+			"[data-role='report-filter']",
+		)) {
+			const selected = this.filters.has(button.dataset.filter).toString();
+			button.dataset.active = selected;
+			button.setAttribute("aria-pressed", selected);
+			button.querySelector("[data-role='report-count']").textContent =
+				counts[button.dataset.filter];
+		}
+		const empty = this.target.querySelector("[data-role='report-empty']");
+		if (empty) {
+			empty.hidden = visible > 0;
+			empty.textContent = !this.filters.size
+				? "Select a report type to show."
+				: this.filters.size === 1
+					? {
+							active: "No active proposals.",
+							executed: "No executed proposals.",
+							ask: "No Ask reports.",
+						}[[...this.filters][0]]
+					: "No reports match the selected types.";
+		}
+		const clear = this.target.querySelector(
+			"[data-role='delete-executed-reports']",
+		);
+		if (clear) {
+			clear.hidden = !(
+				this.filters.size === 1 &&
+				this.filters.has("executed") &&
+				counts.executed > 0
+			);
+			clear.disabled = Boolean(this._deleting);
+		}
+		const result = this.target.querySelector(
+			"[data-role='report-delete-result']",
+		);
+		if (result) {
+			result.textContent = this._deleteMessage;
+			result.hidden = !this._deleteMessage;
+		}
 	}
 
 	postreconcile() {
+		const created = this._created;
+		this._created = [];
 		super.postreconcile();
+		if (created.length) {
+			this.target
+				.querySelector("[data-role='report-items']")
+				?.prepend(...created);
+			this.view.addFlash(...created);
+		}
+		this.target.dataset.visible = Boolean(
+			this.visible || this.component.active === this,
+		).toString();
+		this._renderFilters();
 		void this.view
 			.ensureDeferredOperations?.()
 			.then((manager) => manager?.scan(this.target));
@@ -153,6 +296,125 @@ export class ToolReportList extends BaseList {
 			this._listToggle.classList.remove("opacity-50", "pointer-events-none");
 		}
 		this.target.setAttribute("loaded", "");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
+	 * @matrix ai-report : bulk-delete confirmation delete-snapshot
+	 */
+	async _openDelete(trigger) {
+		if (this._openingDelete || this._deleting || this._deleteModal?.modal)
+			return;
+		if (this.filters.size !== 1 || !this.filters.has("executed")) return;
+		if (!this.view.online) {
+			this._deleteMessage = "Connect to the server to delete reports.";
+			this._renderFilters();
+			return;
+		}
+		const keys = this.reportItems
+			.filter((item) => reportCategory(item.dataset) === "executed")
+			.map((item) => item.dataset.key);
+		if (!keys.length) return;
+		const element = this.target
+			.querySelector("[data-role='report-delete-template']")
+			?.content.querySelector("#modal")
+			?.cloneNode(true);
+		if (!element) return;
+		this._openingDelete = true;
+		try {
+			const { Modal } = await import("../../shared/modal");
+			if (this._destroyed) return;
+			this._deleteModal?.destroy();
+			const modal = new Modal(this.view, trigger);
+			this._deleteModal = modal;
+			const content = element.querySelector("#modal-content");
+			content.setAttribute("role", "dialog");
+			content.setAttribute("aria-modal", "true");
+			content.setAttribute("aria-labelledby", "report-delete-title");
+			const noun = keys.length === 1 ? "proposal" : "proposals";
+			element.querySelector(
+				"[data-role='report-delete-description']",
+			).textContent =
+				`Delete ${keys.length} executed ${noun}? Their reports, undo history, and report-only uploads will be deleted. Pages, tasks, and other workspace changes will remain.`;
+			const confirm = element.querySelector(
+				"[data-role='confirm-delete-reports']",
+			);
+			confirm.querySelector("[data-role='text']").textContent =
+				`Delete ${keys.length} ${noun}`;
+			confirm.addEventListener("click", () => {
+				void this._deleteExecuted(keys, trigger.dataset.route, modal);
+			});
+			await modal.attach(element);
+			confirm.focus();
+		} finally {
+			this._openingDelete = false;
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
+	 * @tests tests_js/test_047_home_report_filters.py::test_bulk_delete_recovers_from_partial_and_network_failures
+	 * @matrix ai-report : bulk-delete delete-failure delete-snapshot loading-indicator
+	 */
+	async _deleteExecuted(keys, route, modal) {
+		if (this._deleting) return;
+		this._deleting = true;
+		const confirm = modal.modal.querySelector(
+			"[data-role='confirm-delete-reports']",
+		);
+		const error = modal.modal.querySelector(
+			"[data-role='report-delete-error']",
+		);
+		const spinner = confirm.querySelector("#spinner");
+		confirm.disabled = true;
+		spinner.dataset.visible = "true";
+		error.hidden = true;
+		this._renderFilters();
+		try {
+			const { request } = await import("../../shared/request");
+			const response = await request.delete(route, { keys });
+			if (!response?.ok)
+				throw new Error("Reports could not be deleted. Please try again.");
+			const deleted = new Set(response.deleted || []);
+			const skipped = response.skipped?.length || 0;
+			const failed = response.failed?.length || 0;
+			this._deleteMessage = [
+				skipped ? `${skipped} no longer eligible or already deleted.` : "",
+				failed ? `${failed} could not be deleted. Please try again.` : "",
+			]
+				.filter(Boolean)
+				.join(" ");
+			await modal.remove();
+			if (this._destroyed) return;
+			await withTransition(
+				() => {
+					for (const item of this.reportItems)
+						if (deleted.has(item.dataset.key)) item.remove();
+					this.postreconcile();
+				},
+				{ label: "reports:delete-executed" },
+			);
+			await this.view._refreshHomeWidget(this.component, this);
+		} catch {
+			this._deleteMessage = "Reports could not be deleted. Please try again.";
+			if (modal.modal) {
+				error.textContent = this._deleteMessage;
+				error.hidden = false;
+				confirm.disabled = false;
+			}
+		} finally {
+			spinner.dataset.visible = "false";
+			this._deleting = false;
+			if (!this._destroyed) this._renderFilters();
+		}
+	}
+
+	destroy() {
+		this._destroyed = true;
+		this.component.elt.removeEventListener("click", this._click);
+		this._deleteModal?.destroy();
 	}
 }
 

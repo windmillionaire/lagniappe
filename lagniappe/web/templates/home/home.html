@@ -79,6 +79,7 @@
     {% if not current_user.is_public %}
       <div id="tools"
            lp-component
+           data-report-user="{{ current_user.hash }}"
            data-open="false"
            data-kind="default"
            data-persistent="true"
@@ -112,11 +113,11 @@
         {% if current_user.access(AI.ASK) %}
           {{ tools.create_report() }}
         {% endif %}
-        <ul lp-load
+        <div lp-load
             data-widget="ToolReportList"
             data-route='{{ url_for("internal.get", kind="tools") }}'
             data-visible="false">
-        </ul>
+        </div>
       </div>
     {% endif %}
   </div>

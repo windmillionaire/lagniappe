@@ -69,6 +69,13 @@ revisions. Home widgets own independent channels—Notes, Tasks, Starred, Pages,
 Projects, Categories, Ingress, and Tool Reports—so a change refreshes only its
 consumer.
 
+`ToolReportList` owns a panel containing filter controls, empty-state messaging,
+and a nested `ul[data-role="report-items"]`. Report rows expose `data-tool` and
+`data-status`; filtering changes row visibility locally without dropping hidden
+rows or their deferred-operation markers. Collection replacements preserve the
+widget's selected categories and reapply counts and visibility. Its panel stays
+visible when empty, so users can change filters after clearing executed reports.
+
 Full-page saved filters subscribe to the collection they project: project
 filters use the Tasks channel and category filters use the Categories channel.
 Their durable filter key and hash let `/l/refresh` recompute membership through

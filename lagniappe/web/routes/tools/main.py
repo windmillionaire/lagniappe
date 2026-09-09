@@ -18,7 +18,7 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
-from lagniappe.core.tools.ai import external_operations
+from lagniappe.core.tools.ai import external_operations, report_history
 from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
@@ -229,6 +229,9 @@ def _start_tool_report(
         )
         return responses.new_tool_report(report)
 
+    # Starting the adapter may replace its report instance while recording the
+    # operation. Render that saved state for an already-open homepage list too.
+    report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct()) or report
     return responses.deferred_tool_report(report, notification, job=job)
 
 
@@ -645,34 +648,28 @@ def delete_report(key):
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
-    if report.origin == "api" and (
-        report.deferred_job or report.status == "undoing"
-    ):
-        return _external_plan_mutation_error(agent_api_store.PLAN_OPERATION_BUSY)
-
-    files_to_delete = [file for file in report.input_files if not file.has_references]
-    if report.origin == "api":
-        external_snapshot = external_operations.report_snapshot(report)
-        deferred_job = report.deferred_job
-        upload_manifest = report.upload_manifest
-        outcome = external_operations.delete_plan_if_idle(
-            report,
-            external_snapshot,
-            report,
-            *files_to_delete,
-        )
-        if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
-            return _external_plan_mutation_error(outcome)
-
-        # Provider and queue effects happen only after the guarded durable
-        # delete. A rejected stale browser request must not destroy inputs that
-        # still belong to the authoritative Plan.
-        DeferredJobs.cancel(deferred_job)
-        report.upload_manifest = upload_manifest
-        ai.cleanup_report_upload_manifest(report)
-    else:
-        DeferredJobs.cancel(report.deferred_job)
-        ai.cleanup_report_upload_manifest(report)
-        Entities.delete(report, *files_to_delete)
+    outcome = report_history.delete_report_record(report)
+    if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+        return _external_plan_mutation_error(outcome)
     Entities.touch(current_user)
     return responses.ok()
+
+
+# @testable true
+# @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
+# @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_bulk_report_delete_rechecks_ownership_and_validates_input
+# @matrix ai-report : bulk-delete ownership validation
+@tools.route("/reports/executed", methods=["DELETE"])
+@logged_in
+def delete_executed_reports():
+    if getattr(current_user, "is_public", False):
+        abort(403)
+    data = request.get_json(silent=True)
+    keys = data.get("keys") if isinstance(data, dict) else None
+    if not isinstance(keys, list) or any(
+        not isinstance(key, str) or not key.strip() for key in keys
+    ):
+        return responses.error("Provide the report keys to delete.")
+    return responses.json_response(
+        report_history.delete_executed_reports(current_user, keys)
+    )

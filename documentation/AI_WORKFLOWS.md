@@ -151,6 +151,23 @@ partial-extraction note.
 
 ## Reviewed report execution
 
+The homepage Plans & Reports panel has independent Active, Executed, and Ask
+filters. Active includes unfinished Create/Organize proposals (including failed,
+revising, and undone states); Executed includes only complete Create/Organize
+proposals. All Ask reports stay in Ask regardless of status. Counts include
+hidden reports. The browser remembers each user's choices, initially Active and
+Ask, and reveals a newly created report's category.
+
+Selecting Executed alone exposes bulk history deletion with one count-based
+confirmation. `DELETE /tools/reports/executed` accepts JSON `{"keys": [...]}`
+and returns `deleted`, `skipped`, and `failed` key lists. The server rechecks
+creator ownership and current completion, then guards each deletion against a
+changed report or active API claim. Only the confirmed keys are considered;
+later completions are retained. Cleanup shares the individual report-delete
+path: report-only uploads and undo history are removed, while workspace changes
+and attached files remain. Missing, changed, busy, or ineligible reports are
+skipped; individual failures do not stop the remaining deletions.
+
 Create and Organize proposals may include reviewed create, move, rename,
 attach, schema, and submission actions. `reporting/execution/` owns deterministic
 application; the model is not called during execution.

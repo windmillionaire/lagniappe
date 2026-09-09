@@ -616,7 +616,8 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
             expect(user.locate(home.CREATE_TOOL_REPORT_FORM)).to_have_count(0)
             report_toggle.click()
             report_list = user.locate(home.TOOL_REPORT_LIST)
-            expect(report_list).to_be_hidden()
+            expect(report_list).to_be_visible()
+            expect(report_list.locator("[data-role='report-empty']")).to_be_visible()
             expect(user.locate(home.TOOL_REPORT_LOADING)).to_be_visible()
             expect(user.locate(home.TOOL_REPORT_LOADING)).to_have_text("0")
             expect(user.locate(home.TOOLS_COMPONENT)).to_have_attribute(
@@ -728,11 +729,24 @@ def test_saved_report_controls_do_not_require_provider_access(get_user):
     assert Entities.fetch_one(report.urlsafe_key, request=Fetch.root()) is None
 
 
-# @matrix ai-report : async create persistence title-truncation
+# @matrix ai-report : async create persistence title-truncation filter-create
 # @template home/tools.html::create_report
-def test_create_tool_starts_pending_report(get_user):
+@pytest.mark.parametrize("cold_list", [False, True])
+def test_create_tool_starts_pending_report(get_user, cold_list):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
+    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+    report_panel = user.locate(home.TOOL_REPORT_LIST)
+    expect(report_panel).to_have_attribute("loaded", "")
+    for category in ("active", "ask", "executed"):
+        report_panel.locator(
+            f"[data-role='report-filter'][data-filter='{category}']"
+        ).click()
+    expect(report_panel.locator("[data-filter='active']")).to_have_attribute(
+        "aria-pressed", "false"
+    )
+    if cold_list:
+        home = user.go(SitePages.HOME)
     instructions = (
         f"Create {_suffix()} a household inventory tracker with rooms, warranties, "
         "purchase dates, serial numbers, and replacement values"
@@ -751,6 +765,9 @@ def test_create_tool_starts_pending_report(get_user):
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
     report_name = f"Create: {instructions[:80]}..."
     item = report_list.new_item(report_name, flash=False)
+    expect(report_panel.locator("[data-filter='active']")).to_have_attribute(
+        "aria-pressed", "true"
+    )
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
     expect(item).to_have_attribute("data-operation", re.compile(".+"))
     expect(item.locator("[data-role='deferred-phase']")).to_have_text(
@@ -1086,6 +1103,7 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     }
     Entities.save(report)
     item = reload_item()
+    user.locate("[data-role='report-filter'][data-filter='executed']").click()
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal executed")
 
     report.tool = "ask"

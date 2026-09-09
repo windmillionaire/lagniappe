@@ -1,0 +1,14 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  <span id="report-delete-title">Delete executed proposals</span>
+{%- endblock name %}
+
+{% block description -%}
+  <p data-role="report-delete-description" class="text-delete-default text-sm"></p>
+  <p data-role="report-delete-error" role="alert" class="mt-3 text-delete-default text-sm" hidden></p>
+{%- endblock description %}
+
+{% block button -%}
+  {{ delete_action(url_for('tools.delete_executed_reports'), "Delete proposals", role="confirm-delete-reports") }}
+{%- endblock button %}

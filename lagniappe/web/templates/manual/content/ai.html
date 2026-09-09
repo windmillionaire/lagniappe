@@ -25,6 +25,22 @@
       <li>Suggest workspace-native actions, such as adding pages, tasks, files, forms, or projects in the right place.</li>
     </ul>
   {% endcall %}
+  {{ heading("Plans & Reports", icon="generate", kind="form") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      On the homepage, combine the Active, Executed, and Ask filters to choose
+      which saved reports to show. Active includes proposals that are ready,
+      still processing, or need attention. Executed contains completed
+      Create and Organize proposals. Ask contains questions and answers.
+      Each count includes reports hidden by the current filters.
+    </p>
+    <p class="text-base-medium">
+      Select Executed alone to delete all displayed executed proposals after
+      one confirmation. This removes their reports, undo history, and
+      report-only uploads. Created pages, tasks, and other workspace changes
+      remain. Your browser remembers your filter choices.
+    </p>
+  {% endcall %}
   {{ heading("Per-User AI Access", icon="user", kind="user") }}
   {% call card() %}
     <p class="text-base-medium mb-3">

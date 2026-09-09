@@ -640,6 +640,18 @@ home:
     surfaces: [server]
     hooks: [home-generate-button]
     css: [src/style/interaction.css]
+  reportFilter:
+    classes: flex min-h-9 flex-1 items-center justify-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-base-medium shadow-sm outline outline-base-light/50 data-[active=true]:bg-kind-light data-[active=true]:text-kind-dark data-[active=true]:outline-kind-default focus-visible:outline-2
+    intent: independently pressed report category filter with total count
+    surfaces: [server]
+  reportList:
+    classes: rounded-md bg-white outline-2 outline-base-light text-base-dark
+    intent: report list outline around rows or an empty message, with dividers owned by the rows
+    surfaces: [server]
+  reportClear:
+    classes: flex w-full items-center gap-2 rounded-t-md border-b border-base-light/50 bg-base-bg px-3 py-2 text-left text-sm font-semibold text-delete-default hover:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default
+    intent: bulk deletion action shown only for executed report results
+    surfaces: [server]
   ingress:
     details:
       classes: flex flex-col gap-1 text-sm px-3 pb-2
@@ -648,10 +660,6 @@ home:
     item:
       classes: group/item
       intent: item presentation within home ingress
-      surfaces: [server]
-    list:
-      classes: divide-y rounded-md bg-white outline-2 outline-base-light/50 divide-base-light/50 text-base-dark
-      intent: list presentation within home ingress
       surfaces: [server]
   pagination:
     container:

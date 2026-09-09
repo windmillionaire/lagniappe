@@ -167,7 +167,7 @@ class HomePage(SitePage):
     CREATE_TOOL_REPORT_TOGGLE = (
         "button[lp-show='tools:CreateToolReport'][data-toggle]"
     )
-    TOOL_REPORT_LIST = "#tools ul[data-widget='ToolReportList']"
+    TOOL_REPORT_LIST = "#tools [data-widget='ToolReportList']"
     CREATE_TOOL_REPORT_FORM = "form[data-widget='CreateToolReport']"
     TOOL_REPORT_LOADING = (
         "#tools [data-role='list-loading']"

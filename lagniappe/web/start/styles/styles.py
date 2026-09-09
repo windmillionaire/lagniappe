@@ -188,10 +188,12 @@ STYLES = {
 		"component": "flex flex-col gap-4 group",
 		"form": "group/form flex flex-col gap-6 rounded-md bg-kind-bg p-4 outline-2 outline-kind-default",
 		"generate": "home-generate-button flex w-full min-w-0 flex-row items-center justify-center gap-2 rounded-md bg-white p-2 px-3 font-semibold text-kind-default shadow-sm sm:grow data-[active=true]:bg-kind-light data-[active=true]:text-kind-dark",
+		"reportFilter": "flex min-h-9 flex-1 items-center justify-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-base-medium shadow-sm outline outline-base-light/50 data-[active=true]:bg-kind-light data-[active=true]:text-kind-dark data-[active=true]:outline-kind-default focus-visible:outline-2",
+		"reportList": "rounded-md bg-white outline-2 outline-base-light text-base-dark",
+		"reportClear": "flex w-full items-center gap-2 rounded-t-md border-b border-base-light/50 bg-base-bg px-3 py-2 text-left text-sm font-semibold text-delete-default hover:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default",
 		"ingress": {
 			"details": "flex flex-col gap-1 text-sm px-3 pb-2",
-			"item": "group/item",
-			"list": "divide-y rounded-md bg-white outline-2 outline-base-light/50 divide-base-light/50 text-base-dark"
+			"item": "group/item"
 		},
 		"pagination": {
 			"container": "flex flex-row items-center",
