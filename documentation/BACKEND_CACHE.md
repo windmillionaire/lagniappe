@@ -5,6 +5,15 @@ polling, collaborative documents, rate limits, and short-lived presence. It is
 never the sole authority for entity content, permissions, notifications, or
 background jobs.
 
+## Filter result responses
+
+Filter previews and saved-filter runs return `no-store` responses and check each
+matching record's current view permission on every run. Their parent Project,
+Category, or Filter fingerprint does not cover all result permission sources:
+changing a Task Form restriction can change access without modifying the Task
+or its Project. Returning 304 from that parent fingerprint would reuse stale
+visible rows before the result permission checks run.
+
 ## Initialization and namespace
 
 `tools/cache/core.py` creates one Redis client and the RediSearch index. TLS

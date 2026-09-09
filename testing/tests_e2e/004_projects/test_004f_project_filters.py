@@ -36,7 +36,11 @@ from uuid import uuid4
 import pytest
 from playwright.sync_api import expect
 
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Forms, ModelTasks, Projects, Tasks, Users
+from testing.definitions.form_definitions import FormDefinition
+from testing.definitions.project_definitions import ProjectDefinition
 from testing.elements import (
     Badges,
     Buttons,
@@ -45,7 +49,7 @@ from testing.elements import (
     Modal,
     ProjectFilterConditions,
 )
-from testing.resources import Task
+from testing.resources import Form, Project, Task
 from testing.utility.polling import expect_poll_result
 from testing.utility.reconnect import expect_reconnect_refresh
 
@@ -225,27 +229,75 @@ def _attached_form_filter_context(user):
 
 
 # @matrix filters : run-results string-condition view-access
-def test_project_filter_results_respect_task_permissions(get_user):
+# @pair cache:permission-revalidation
+@pytest.mark.parametrize("mode", ["preview", "saved"])
+def test_project_filter_results_respect_task_permissions(get_user, mode):
     owner = get_user(Users.OWNER)
-    visible_task = Tasks.test_filter_permission_visible.get(owner)
-    hidden_task = Tasks.test_filter_permission_hidden.get(owner)
-    if "owner" not in hidden_task.entity.properties.restricted_to.stored:
-        hidden_task.entity.properties.restricted_to.add("owner")
-        hidden_task.entity.save()
-    project = visible_task.project
+    token = f"Permission Filter {uuid4().hex}"
+    project = Project(
+        user=owner, definition=ProjectDefinition(name=f"{token} Project")
+    ).create()
+    form = Form(
+        user=owner,
+        definition=FormDefinition(name=f"{token} Form", form_type="task"),
+    ).create()
+    page = Entities.PAGE.create({"name": f"{token} Page"})
+    page.save()
+    visible_task = Entities.TASK.create({
+        "name": f"{token} Visible", "page": page, "project": project.entity,
+    })
+    restricted_task = Entities.TASK.create({
+        "name": f"{token} Restricted", "page": page,
+        "project": project.entity, "form": form.entity,
+    })
+    Entities.save(visible_task, restricted_task)
+
+    if mode == "saved":
+        owner.go(project)
+        owner_filters = Filters(owner, project)
+        owner_filters.set_condition(ProjectFilterConditions.NAME)
+        owner_filters.name_contains(token).add_filter()
+        saved_filter = owner_filters.save_filter()
+        saved_key = saved_filter.get_attribute("data-key")
 
     viewer = get_user(Users.general_models_view_only)
     project = viewer.go(project)
-
     filters = Filters(viewer, project)
-    filters.set_condition(ProjectFilterConditions.NAME)
+    if mode == "preview":
+        filters.set_condition(ProjectFilterConditions.NAME)
+        expect(filters.name_contains(token).add_filter()).to_be_visible()
+        results = filters.run()
+    else:
+        saved_row = filters.section.locator(f"{Filters.SAVED_FILTERS} li[data-key='{saved_key}']")
+        with viewer.page.expect_navigation(url=f"**/filters/{saved_key}"):
+            saved_row.get_by_role("link", name="Run saved filter").click()
+        results = viewer.locate("[lp-view][data-kind='task'] #table")
 
-    badges = filters.name_contains("Permission Filter").add_filter()
-    expect(badges).to_be_visible()
+    def rerun():
+        if mode == "preview":
+            filters.run()
+        else:
+            viewer.reload()
 
-    results = filters.run()
-    expect(results).to_be_visible()
-    _expect_only_matching_task(results, visible_task, hidden_task)
+    # Both records must match before the form's real save changes access.
+    visible_row = results.locator(f"tr[data-key='{visible_task.urlsafe_key}']")
+    restricted_row = results.locator(f"tr[data-key='{restricted_task.urlsafe_key}']")
+    expect(visible_row).to_be_visible()
+    expect(restricted_row).to_be_visible()
+
+    builder = form.builder
+    builder.restrict_to_owner()
+    rerun()
+    expect(visible_row).to_be_visible()
+    expect(restricted_row).to_have_count(0)
+
+    builder.restrictions().locator(builder.SPECIFIC_ACCESS_OWNER).uncheck()
+    builder.save_restrictions()
+    stored_form = Entities.fetch_one(form.key, request=Fetch.root())
+    assert stored_form.properties.restricted_to.stored == []
+    rerun()
+    expect(visible_row).to_be_visible()
+    expect(restricted_row).to_be_visible()
 
 
 # @matrix filters : category entity-condition run-results

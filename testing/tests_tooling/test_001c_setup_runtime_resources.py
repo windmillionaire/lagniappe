@@ -3694,7 +3694,7 @@ def test_setup_dependency_transaction_repairs_transitive_conflicts(monkeypatch):
     assert check_calls == [True, True]
 
 
-# @matrix setup : encoding package-install portability spinner terminal-wrapping
+# @matrix setup : package-install portability spinner terminal-wrapping
 def test_setup_formatter_tracks_active_spinners(monkeypatch):
     import installer as setup_pkg
     from installer import package_install
@@ -3706,13 +3706,12 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
 
         def __init__(self):
             self.tty = True
-            self.messages = []
 
         def isatty(self):
             return self.tty
 
         def write(self, message):
-            self.messages.append(message)
+            return len(message)
 
         def flush(self):
             return None
@@ -3726,17 +3725,16 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
     )
     monkeypatch.setattr(setup_pkg.sys, "stdout", output)
     formatter = setup_pkg.Formatter().initialize()
+    formatter.initialize()
     with formatter.progress(text="Configuring service account") as active_spinner:
         assert package_install._ACTIVE_SPINNERS == [active_spinner]
         active_spinner.ok("Service account configured")
     assert package_install._ACTIVE_SPINNERS == []
     output.tty = False
     with formatter.progress(text="Checking permissions") as progress:
+        assert package_install._ACTIVE_SPINNERS == [progress]
         progress.fail("Permission check failed")
-    transcript = "".join(output.messages)
-    assert "[OK] Service account configured" in transcript
-    assert "[X] Permission check failed" in transcript
-    assert "Configuring service account..." in transcript
+    assert package_install._ACTIVE_SPINNERS == []
     wrapped = setup_pkg.wrap_text(
         "Operational summaries include model, token totals, duration, "
         "retry categories, and tool names.",

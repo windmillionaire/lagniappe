@@ -298,9 +298,13 @@ export class FilterResults extends EmbeddedTable {
 		return this.tbody.querySelector("tr[data-role='empty']");
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
+	 * @pair filters:run-results
+	 */
 	postreconcile() {
-		if (this.target.children.length) return;
-		if (!this.table) return;
+		if (!this.table || this.target.contains(this.table)) return;
 
 		this.container = document.createElement("div");
 		this.container.className =

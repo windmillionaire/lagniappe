@@ -131,7 +131,6 @@ def choice(key, label, detail=None):
 
 # @testable true
 # @tests tests_tooling/test_001k_setup_console.py::test_semantic_output
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
 # @matrix setup : encoding operator-summary portability terminal-wrapping
 def status(message, kind="neutral", *, stream=None):
     """Style only the status marker, leaving explanatory prose neutral."""
