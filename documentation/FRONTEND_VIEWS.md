@@ -71,7 +71,9 @@ It owns:
 - moving secondary cards between desktop and mobile layouts.
 
 Initial tab selection and later responsive changes prepare their state before
-one synchronous commit. Empty readonly document tabs are omitted; editors and
+one synchronous commit. Each commit creates and runs its own tab and secondary
+card reconciliation callbacks so overlapping preparations cannot consume another
+update's layout state. Empty readonly document tabs are omitted; editors and
 saved documents retain the document surface.
 
 ## Entity indexes

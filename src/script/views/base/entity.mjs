@@ -169,9 +169,10 @@ export default class Entity extends Core {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_012_entity_layout_frontend.py::test_dynamic_mobile_secondary_uses_final_layout_state
+	 * @tests tests_js/test_012_entity_layout_frontend.py::test_overlapping_mobile_layout_updates_keep_secondary_nonpersistent
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_model_tasks_rejoins_section_switching
-	 * @matrix entity-layout : dynamic-secondary page-mobile project-mobile
+	 * @matrix entity-layout : dynamic-secondary nested-layout page-mobile project-mobile
 	 */
 	async updateLayout({
 		secondary = null,
@@ -280,6 +281,10 @@ export default class Entity extends Core {
 		});
 
 		layout.dataset.visible = "true";
+		this._reconcileTabsCard(tabs, activeTabId);
+		if (secondary) {
+			this._reconcileSecondaryCard(secondary, activeTabId);
+		}
 		if (typeof tabs.reconcile === "function") tabs.reconcile();
 		if (typeof secondary?.reconcile === "function") secondary.reconcile();
 		tabs.elt.dataset.visible = "true";
@@ -355,11 +360,6 @@ export default class Entity extends Core {
 		}
 		if (!this._tabElement(tabId)) {
 			tabId = this._defaultTabId;
-		}
-
-		this._reconcileTabsCard(tabs, tabId);
-		if (secondary) {
-			this._reconcileSecondaryCard(secondary, tabId);
 		}
 
 		return [tabs, secondary, tabId];

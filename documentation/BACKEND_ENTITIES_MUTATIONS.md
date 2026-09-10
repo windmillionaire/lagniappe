@@ -80,6 +80,12 @@ its ModelTasks and orphaned Forms. Non-owning references are not rewritten by
 an unrelated delete unless the mutation contract declares that survivor
 effect.
 
+Category deletion preserves Pages that still belong to another Category and
+deletes those with no remaining Category. Decide this before removing the
+Category: ordinary Page category removal can assign the Uncategorized Pages
+fallback. Surviving Page repairs persist both `categories` and `model` so a
+deleted model Category cannot remain as a stale durable reference.
+
 ## Mutation contracts
 
 `core/definitions/mutation_contracts.py` is the machine-readable inventory for

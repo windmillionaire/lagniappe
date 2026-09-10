@@ -31,6 +31,8 @@ import re
 import pytest
 from playwright.sync_api import expect
 
+from lagniappe.core.entities import Entities
+from lagniappe.core.tools.database import get as database_get
 from testing.definitions import Categories, SitePages, Users
 from testing.elements import (
     HeaderSearch,
@@ -249,13 +251,20 @@ def test_create_category_with_form(get_user):
 
 
 # @pair categories:delete
+# @matrix categories : cascade model-category
 # @template categories/index.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
 def test_delete_category(get_user):
-    """Verify category deletion from its title menu."""
+    """Deleting a category from its menu deletes pages created in it."""
     user = get_user(Users.OWNER)
     category = Categories.test_delete_category.get(user)
+    page = Entities.PAGE.create({
+        "name": "Category deletion page",
+        "model": category.entity,
+    })
+    page.save()
+    assert database_get.entity(page.key)["model"] == category.entity.key
     user.go(category)
 
     user.page.get_by_role("button", name="Category actions").click()
@@ -264,3 +273,5 @@ def test_delete_category(get_user):
 
     Modal(user.page).delete()
     expect(user.page).to_have_url(re.compile(r"/$"))
+    assert database_get.entity(category.entity.key) is None
+    assert database_get.entity(page.key) is None

@@ -370,3 +370,42 @@ if (infoElement.dataset.visible !== "true") {
 }
 """,
     )
+
+
+# @matrix entity-layout : dynamic-secondary nested-layout page-mobile
+def test_overlapping_mobile_layout_updates_keep_secondary_nonpersistent(run_node):
+    run_entity_layout_check(
+        run_node,
+        """
+const view = new context.Entity(root);
+view.mobile = true;
+
+await Promise.all([
+  view.updateLayout({
+    activeTabId: "photo", secondary: photoElement, secondaryActive: true,
+  }),
+  view.updateLayout({
+    activeTabId: "photo", secondary: photoElement, secondaryActive: true,
+  }),
+]);
+
+if (
+  photoElement.parentElement !== tabsElement ||
+  photoElement.dataset.persistent !== "false" ||
+  photoElement.dataset.visible !== "true"
+) {
+  throw new Error("Overlapping updates left the image outside normal mobile tab behavior");
+}
+
+await view.updateLayout({
+  activeTabId: "info", secondary: photoElement, secondaryActive: true,
+});
+if (
+  photoElement.dataset.persistent !== "false" ||
+  photoElement.dataset.visible !== "false" ||
+  infoElement.dataset.visible !== "true"
+) {
+  throw new Error("Image remained visible after leaving its mobile tab");
+}
+""",
+    )

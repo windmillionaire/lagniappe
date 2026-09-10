@@ -114,11 +114,12 @@ def _create_category(label, form=None):
     return category
 
 
-def _create_page(label, categories, form=None, submission=None):
+def _create_page(label, categories, form=None, submission=None, model=None):
     page = Entities.PAGE.create(
         {
             "name": _name(label),
             "categories": categories,
+            "model": model,
             "form": form,
             "submission": submission,
         }
@@ -282,7 +283,9 @@ def test_entity_save_persists_relations_process_payloads_and_cache():
 
 
 # @matrix entities : assets cache cascade database delete
-def test_entity_delete_cascades_dependents_assets_and_cache():
+# @matrix categories : cascade model-category shared-page
+@pytest.mark.parametrize("category_as_model", [False, True])
+def test_entity_delete_cascades_dependents_assets_and_cache(category_as_model):
     creator = _create_page("category-filter-creator", [])
     page_form = _create_form("category-page-form")
     task_form = _create_form("category-task-form", form_type="task")
@@ -294,7 +297,8 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
 
     doomed_page = _create_page(
         "doomed-page",
-        [doomed_category],
+        [] if category_as_model else [doomed_category],
+        model=doomed_category if category_as_model else None,
         form=page_form,
         submission={FIELD_ID: "deleted page value"},
     )
@@ -303,7 +307,8 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
 
     survivor_page = _create_page(
         "survivor-page",
-        [doomed_category, survivor_category],
+        [survivor_category] if category_as_model else [doomed_category, survivor_category],
+        model=doomed_category if category_as_model else None,
         form=page_form,
         submission={FIELD_ID: "survivor page value"},
     )
@@ -362,6 +367,7 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
 
     reloaded_page = Entities.fetch_one(survivor_page.key, request=Fetch.direct())
     assert {c.key for c in reloaded_page.categories} == {survivor_category.key}
+    assert database_get.entity(survivor_page.key).get("model") is None
 
     reloaded_file = Entities.fetch_one(survivor_file.key, request=Fetch.direct())
     assert reloaded_file.page.key == survivor_page.key

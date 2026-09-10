@@ -101,7 +101,9 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_entities_deletes_user_and_page_together
+    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
     # @matrix entities : cascade delete user-page
+    # @pair categories:shared-page
     def page(self, page, *, force=False):
         if force or not page.categories:
             self.page_notes(page)
@@ -115,6 +117,7 @@ class DeleteCollector:
             self.repair(
                 page,
                 "categories",
+                "model",
                 "requires",
                 property_updates=("requires", "modified"),
                 reason="category-delete-page-unlink",
@@ -323,7 +326,10 @@ class DeleteCollector:
         for filter_key in database_get.filters(entity):
             self.delete(self.entities.FILTER(filter_key))
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_e2e/002_home/test_002c_home_categories.py::test_delete_category
+    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
+    # @matrix categories : cascade model-category shared-page
     def category_pages(self, category):
         entities = database_get.pages(
             category.key,
@@ -337,8 +343,11 @@ class DeleteCollector:
             if isinstance(page, self.entities.PAGE)
         ]
         for page in pages:
-            page.properties.categories.remove(category)
-            self.page(page)
+            if any(owner.key != category.key for owner in page.categories):
+                page.properties.categories.remove(category)
+                self.page(page)
+            else:
+                self.page(page, force=True)
 
     # @testable infrastructure
     def collect(self, entity):
