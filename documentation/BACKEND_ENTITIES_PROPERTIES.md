@@ -45,6 +45,12 @@ Mixins provide a projection and mark the property as eligible for that context.
 Add a mixin only when the property belongs in that projection. A new property
 does not automatically become searchable, filterable, or model-visible.
 
+`entity.kind` reads the stored type; `entity_kind` is the class discriminator
+used to construct entities and Datastore keys. The display exception is a Page
+backed by a User: its stored kind is `page`, but its details/cache kind is
+`user`. `tools/cache/details.py::identify_entity()` maps that display projection
+back to the Page identity. Cached details do not need an `entity_kind` field.
+
 ## DB-backed relationships
 
 Relation properties store keys and receive entity instances through

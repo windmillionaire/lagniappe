@@ -131,6 +131,7 @@ def test_delete_executed_reports_confirms_snapshot_and_preserves_workspace(
 ):
     user = _reader(get_user)
     owner = Entities.USER.load(user.email)
+    owner_page = Entities.fetch_one(owner.page, request=Fetch.direct())
     task_name = f"Task retained after report deletion {uuid4().hex[:8]}"
     report = _report(
         user,
@@ -160,7 +161,7 @@ def test_delete_executed_reports_confirms_snapshot_and_preserves_workspace(
     files = []
     for name, attached in (("report-only.txt", False), ("retained.txt", True)):
         file = Entities.FILE.create(
-            page=owner.page if attached else None,
+            page=owner_page if attached else None,
             upload=FileStorage(stream=BytesIO(b"Report evidence"), filename=name),
             data={"filename": name, "mimetype": "text/plain"},
             report_user=owner,

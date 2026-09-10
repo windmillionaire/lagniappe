@@ -62,7 +62,7 @@ def consume_mutation_intents(plan):
             if getattr(effect.entity, "_permission_sources_changed", False):
                 effect.entity._reconcile_restrictions = True
             effect.entity._permission_sources_changed = False
-            if effect.entity.entity_kind == "task":
+            if effect.entity.kind == "task":
                 effect.entity._page_changed = False
 
 

@@ -68,7 +68,7 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
     create_user = tools.locate(user_index.CREATE_USER_WIDGET)
     expect(create_user).to_be_visible()
 
-    row = owner.locate(f"#table tbody tr[data-key='{member.key}']")
+    row = owner.locate(f"#table tbody tr[data-key='{member.entity.page.urlsafe_key}']")
     expect(row).to_be_visible()
     group_link = row.locator("td[data-column='groups'] a[data-kind='group']")
     expect(group_link).to_have_attribute(

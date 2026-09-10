@@ -29,7 +29,7 @@ VERIFICATION_ATTEMPTS = 3
 # @matrix permissions cache : change-detection retry form-version
 def previous_restrictions(entities):
     sources = [entity for entity in entities
-               if entity.entity_kind in SOURCES and not getattr(entity, "_testing", False)]
+               if entity.kind in SOURCES and not getattr(entity, "_testing", False)]
     if not sources:
         return []
     with cache.pipeline() as pipe:
@@ -90,7 +90,7 @@ def enqueue(payload):
 def _source_signature(entity, details=None):
     restrictions = entity.restricted_to if details is None else details.get("restricted_to")
     version = None
-    if entity.entity_kind == "form":
+    if entity.kind == "form":
         version = (entity.version or "") if details is None else details.get("form_version")
     return normalize_restrictions(restrictions), version
 
@@ -103,9 +103,9 @@ def _projection(current, source, *, own_form=False):
     """Replace only this source's clauses and recalculate the cached revision."""
     restrictions = normalize_restrictions(current.get("restricted_to"))
     source_restrictions = normalize_restrictions(source.restricted_to)
-    if source.entity_kind == "form":
+    if source.kind == "form":
         clauses = ("task_form" if source.form_type == "task" else "page_form",)
-    elif source.entity_kind == "page":
+    elif source.kind == "page":
         clauses = ("page", "page_form")
     else:
         clauses = RESTRICTION_SOURCES
@@ -176,10 +176,10 @@ def _collection_owner_keys(entities):
     """Collect list owners from stored references in root Page/Task rows."""
     keys = set()
     for entity in entities:
-        if entity.entity_kind == "page":
+        if entity.kind == "page":
             keys.update(entity.db.get("categories") or ())
             parent = entity.db.get("model")
-        elif entity.entity_kind == "task":
+        elif entity.kind == "task":
             parent = entity.db.get("project")
         else:
             continue
@@ -217,7 +217,7 @@ def reconcile_batch(source_key, cursor=None, offset=0, revision=None, owner_keys
     source = Entities.fetch_one(source_key, request=nested)
     if source is None:
         return None
-    if source.entity_kind not in SOURCES:
+    if source.kind not in SOURCES:
         raise ValueError("Invalid restriction reconciliation source")
     source_fingerprint = source.fingerprint
     owner_keys = set(owner_keys or ())
@@ -227,11 +227,11 @@ def reconcile_batch(source_key, cursor=None, offset=0, revision=None, owner_keys
         return restart
     revision = current_revision
     next_cursor = None
-    if source.entity_kind == "form":
+    if source.kind == "form":
         instances = Query(KINDS.instances).filter(Filter().eq("form", source.key)).limit(BATCH_SIZE).cursor(cursor).fetch()
         next_cursor = instances.next_cursor
         roots = [entity for entity in Entities.fetch(*instances, request=Fetch.root())
-                 if entity.entity_kind in {"page", "task"}]
+                 if entity.kind in {"page", "task"}]
     else:
         roots = [source]
     owner_keys.update(_collection_owner_keys(roots))
@@ -252,7 +252,7 @@ def reconcile_batch(source_key, cursor=None, offset=0, revision=None, owner_keys
     projections = {
         entity_hash: _projection(
             current, source,
-            own_form=source.entity_kind == "form" and entity_hash in root_hashes,
+            own_form=source.kind == "form" and entity_hash in root_hashes,
         )
         for entity_hash, current in details.items()
     }
@@ -296,5 +296,5 @@ def reconcile_batch(source_key, cursor=None, offset=0, revision=None, owner_keys
         return {**restart, "cursor": next_cursor,
                 "offset": 0, "revision": revision}
     owners = Entities.fetch(*sorted(owner_keys), request=Fetch.direct()) if owner_keys else []
-    _publish_completion([owner for owner in owners if owner.entity_kind in {"category", "project"}])
+    _publish_completion([owner for owner in owners if owner.kind in {"category", "project"}])
     return None

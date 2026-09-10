@@ -385,7 +385,9 @@ class MutationPlanBuilder:
             else:
                 raise ValueError(f"Unsupported mutation intent: {intent.intent}")
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_write_order_preserves_distinct_roots_and_dependencies
+    # @matrix mutations : write-identity dependency-order
     def _ordered_writes(self, effects):
         writes = [
             effect
@@ -395,22 +397,26 @@ class MutationPlanBuilder:
         by_key = {_entity_key(effect.entity): effect for effect in writes}
         remaining = list(writes)
         ordered = []
+        ordered_keys = set()
         while remaining:
             ready = [
                 effect
                 for effect in remaining
                 if all(
                     _entity_key(dependency) not in by_key
-                    or by_key[_entity_key(dependency)] in ordered
+                    or _entity_key(dependency) in ordered_keys
                     for dependency in effect.depends_on
                 )
             ]
             if not ready:
                 keys = [_entity_key(effect.entity) for effect in remaining]
                 raise ValueError(f"Cyclic mutation write dependencies: {keys}")
-            for effect in ready:
-                remaining.remove(effect)
-                ordered.append(effect)
+            # MutationEffect equality excludes the entity and dependencies.
+            # Remove the actual ready objects, not an equal write for another root.
+            ready_ids = {id(effect) for effect in ready}
+            remaining = [effect for effect in remaining if id(effect) not in ready_ids]
+            ordered.extend(ready)
+            ordered_keys.update(_entity_key(effect.entity) for effect in ready)
         return ordered
 
     # @testable infrastructure

@@ -46,6 +46,27 @@ def _writes(plan):
     ]
 
 
+# @matrix mutations : write-identity dependency-order
+@pytest.mark.parametrize("report_first", [False, True])
+def test_mutation_write_order_preserves_distinct_roots_and_dependencies(report_first):
+    user = TestEntities.get("USER", {"hash": "ordered-report-user"})
+    page = TestEntities.get("PAGE", {"hash": "ordered-file-page"})
+    detached = TestEntities.get("FILE", {"hash": "ordered-detached-file"})
+    attached = TestEntities.get("FILE", {"hash": "ordered-attached-file"})
+    attached.page = page
+    report = TestEntities.get("REPORT", {
+        "hash": "ordered-report", "parent": user, "user": user,
+    })
+    roots = (report, detached, attached) if report_first else (detached, attached, report)
+
+    plan = plan_mutation(MutationOperation.SAVE, *roots, registry=Entities)
+
+    keys = [effect.entity.key for effect in _writes(plan)]
+    assert len(keys) == len(set(keys))
+    assert set(keys) == {detached.key, attached.key, page.key, report.key, user.key}
+    assert keys.index(page.key) < keys.index(attached.key)
+
+
 # @matrix ai-report mutations : input-files no-database-read owner-touch
 def test_report_save_does_not_touch_input_files(monkeypatch):
     user = TestEntities.get("USER", {"hash": "report-planner-user"})

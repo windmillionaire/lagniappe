@@ -114,7 +114,7 @@ class _SaveOrderProperty:
 
 
 class _SaveOrderEntity:
-    entity_kind = "category"
+    kind = "category"
     key = "save-order-entity"
     exclude_from_index = frozenset()
     processes = {}

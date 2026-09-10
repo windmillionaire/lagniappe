@@ -127,7 +127,7 @@ def test_cached_restrictions_resolve_file_task_page_and_form(kind, form_type, so
     current = {"kind": "file", "modified": "base", "restricted_to": {
         "page": ["admin"], "page_form": ["old"], "task_form": ["task"],
     }}
-    source = SimpleNamespace(entity_kind=kind, form_type=form_type, restricted_to=source_policy)
+    source = SimpleNamespace(kind=kind, form_type=form_type, restricted_to=source_policy)
     assert reconcile._projection(current, source)["restricted_to"] == expected
     assert current["restricted_to"] == {"page": ["admin"], "page_form": ["old"], "task_form": ["task"]}
 
@@ -190,9 +190,13 @@ def test_user_page_cache_identity_preserves_permission_projection(monkeypatch):
     from lagniappe.core.tools.cache.details import identify_entity
 
     modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
-    page = TestEntities.get("PAGE", {"hash": "user-page", "modified": modified})
+    page = TestEntities.get("PAGE", {
+        "hash": "user-page", "modified": modified,
+        "user": {"email": "cache-identity@example.com"},
+    })
     page.form = None
-    page._details = {"id": page.urlsafe_key, "kind": "user"}
+    assert page.kind == page.entity_kind == "page"
+    assert page.details["kind"] == "user"
     file = TestEntities.get("FILE", {"hash": "user-page-file", "modified": modified})
     file.page = page
     file._details = {"id": file.urlsafe_key, "kind": "file"}
@@ -222,7 +226,7 @@ def test_user_page_cache_identity_preserves_permission_projection(monkeypatch):
 def test_restriction_projection_preserves_own_form_versions_and_base_modified(form_type):
     base = "b" * 32
     clause = f"{form_type}_form"
-    source = SimpleNamespace(entity_kind="form", form_type=form_type, version="source-v2",
+    source = SimpleNamespace(kind="form", form_type=form_type, version="source-v2",
                              restricted_to={clause: ["new"]})
     targets = [(form_type, True, "source-v2"), ("file", False, None)]
     if form_type == "page":
@@ -249,7 +253,7 @@ def test_reconciliation_completion_publishes_existing_collection_revisions(monke
     datastore = SimpleNamespace(put_multi=Mock())
     monkeypatch.setattr(utility, "update_site_fingerprints", loader)
     monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=datastore))
-    owner = SimpleNamespace(entity_kind="category", key="category")
+    owner = SimpleNamespace(kind="category", key="category")
     touch = Mock()
     update = Mock()
     monkeypatch.setattr(Entities, "touch", touch)
@@ -370,6 +374,8 @@ def test_reconcile_preserves_local_page_groups_and_removes_form_restrictions(mon
         Entities.CATEGORY(DatastoreEntity(key=Key(KINDS.models.value, name, project="owner-discovery")), testing=True)
         for name in ("page-category", "additional-category", "last-category")
     )
+    for owner in (category, additional, last_owner):
+        owner.kind = "category"
     page.db["model"] = category.key
     explicit.db.update(model=category.key, categories=[category.key, additional.key, additional.key])
     owner_keys = sorted([category.urlsafe_key, additional.urlsafe_key])
@@ -651,7 +657,7 @@ def test_reconciliation_verifies_repairs_and_retries(monkeypatch, change):
 
     source = make_page(["a"])
     target = make_file(source)
-    owner = SimpleNamespace(entity_kind="category", key=owner_key)
+    owner = SimpleNamespace(kind="category", key=owner_key)
     owner_keys = [owner_key.to_legacy_urlsafe().decode()]
     details = {entity.hash: _redis_details(entity) for entity in (source, target)}
     values = {

@@ -23,6 +23,9 @@ If a dependency touch carries a different instance of the same entity, the
 complete root save supplies the authoritative instance for both the durable
 write and cache refresh, regardless of planning order. A shallow dependency
 copy must never replace the complete root's fields or permission requirements.
+Dependency ordering tracks completed entity keys and removes each ready write
+by object identity. Mutation-effect equality excludes its entity and dependencies,
+so equal-looking effects for different roots must remain distinct.
 
 An entity may declare `retired_fields` for obsolete stored keys. The executor
 discards those keys while preparing any otherwise-requested complete save,
