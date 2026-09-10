@@ -19,6 +19,69 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 pytestmark = pytest.mark.unit
 
 
+# @matrix ai-report : input-files no-extra-read fresh-read
+@pytest.mark.parametrize("phase", ["input", "started", "inspect", "failure", "cleanup", "execution-inspect", "execution-failure", "execution-cleanup"])
+def test_report_phases_reuse_current_report_without_loading_input_files(monkeypatch, phase):
+    from lagniappe.core.definitions import FetchDepth
+    from lagniappe.core.tools.deferred_jobs import common
+
+    class Report:
+        entity_kind = "report"
+        urlsafe_key = "report-key"
+        origin = "web"
+        proposal = None
+        result = None
+        status = "running"
+
+        def __init__(self, file):
+            self.db = {}
+            self.input_files = [file]
+            self.deferred_job = {"key": "job"}
+            self.properties = SimpleNamespace(process=SimpleNamespace(
+                fail=lambda *_args, **_kwargs: None,
+                restore_after_execution_failure=lambda *_args, **_kwargs: None,
+            ))
+
+    stale = Report(SimpleNamespace(name="old-file"))
+    current = Report(SimpleNamespace(name="current-file"))
+    events = []
+    monkeypatch.setattr(report_adapters.Entities, "REPORT", Report)
+
+    def fetch_one(_report, *, request):
+        assert request.depth is FetchDepth.DIRECT
+        events.append("report-read")
+        return current
+
+    def save(*entities):
+        assert events == ["report-read"]
+        assert entities[0] is current
+        assert current.input_files[0] not in entities
+        events.append("saved")
+
+    monkeypatch.setattr(report_adapters.Entities, "fetch_one", fetch_one)
+    monkeypatch.setattr(report_adapters.Entities, "fetch", lambda *_args, **_kwargs: pytest.fail("Report status needs no input file reads"))
+    monkeypatch.setattr(report_adapters.Entities, "save", save)
+    context = DeferredJobContext(
+        job=SimpleNamespace(urlsafe_key="job", idempotency_key="job-input", status_revision=1),
+        actor=SimpleNamespace(), notification=None, inputs={"report": stale},
+        parameters={}, checkpoint={},
+    )
+    if phase == "input":
+        assert common._load_reference({"kind": "report", "id": "report-key"}) is current
+    else:
+        adapter = report_adapters.ReportExecutionAdapter() if phase.startswith("execution-") else report_adapters.ReportAdapter()
+        adapter.validate_apply = lambda _context: None
+        method = phase.removeprefix("execution-")
+        if method == "failure":
+            adapter.failure(context, ValueError("failed"))
+        elif method == "cleanup":
+            adapter.cleanup(context, terminal=True)
+        else:
+            getattr(adapter, method)(context)
+        assert context.input("report") is current
+    assert events.count("report-read") == 1
+
+
 # @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::OrganizeReportAdapter
 # @matrix ai-report : remote-update transport-boundary plan-resume
 # @matrix deferred-jobs : checkpoint
@@ -201,6 +264,7 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
                 self.report.result = result
 
     class FakeReport:
+        input_files = ()
         entity_kind = "report"
         urlsafe_key = "report-key"
 
@@ -307,6 +371,7 @@ def test_external_report_execution_start_rejects_stale_browser_snapshot(monkeypa
             self.report.pending = True
 
     class FakeReport:
+        input_files = ()
         origin = "api"
         urlsafe_key = "external-report-key"
 
@@ -387,6 +452,7 @@ def test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal(
     adapter = report_adapters.ReportExecutionAdapter()
 
     class FakeReport:
+        input_files = ()
         origin = "api"
         urlsafe_key = "external-report-key"
 
@@ -468,6 +534,7 @@ def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
     adapter = report_adapters.ReportExecutionAdapter()
 
     class FakeReport:
+        input_files = ()
         entity_kind = "report"
         urlsafe_key = "report-key"
 
@@ -531,6 +598,7 @@ def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypat
     events = []
 
     class FakeReport:
+        input_files = ()
         def __init__(self):
             self.urlsafe_key = "report-key"
             self.deferred_job = {"key": "old-operation"}

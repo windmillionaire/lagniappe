@@ -56,6 +56,19 @@ queued state take precedence:
 `showError()` inserts one error before the submit action and clears the previous
 error. Starting another submit hides it.
 
+Page restriction controls keep administrator and group edits local until
+**Save Restrictions**. The request submits the complete local setting, and the
+normal form replacement refreshes the saved Page and Form restriction rows.
+Unrestricted sources are omitted; when both sources list groups, the summary
+explains that a viewer must match at least one group in each set. The same
+controls in User Settings save with **Update User Settings**.
+
+Administrator-only access and local group restrictions are mutually exclusive.
+Checking **Administrators only** removes the selected local groups from the
+draft; saving also clears their stored relationship keys. Unchecking it does
+not restore those groups. Selecting a group clears the administrator-only
+checkbox. An attached Form's restrictions remain independent.
+
 ## Committed baselines
 
 A marked FormElement retains an in-memory normalized snapshot of its form data.

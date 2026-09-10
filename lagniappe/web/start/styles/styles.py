@@ -139,7 +139,7 @@ STYLES = {
 		},
 		"icon": "text-kind-default hover:text-kind-dark focus-visible:text-kind-dark focus-visible:bg-kind-bg focus-visible:outline-none ml-1 inline-grid place-items-center rounded-full",
 		"linkLabel": "form-link-label",
-		"restriction": "flex flex-row items-center gap-2 px-3 py-2 justify-between border-t border-user-light",
+		"restriction": "flex flex-row items-center gap-2 px-3 py-2 justify-between",
 		"table": {
 			"body": "divide-y-kind-bg w-full border-t border-base-light",
 			"container": "max-w-full flex flex-col gap-2 min-w-0",

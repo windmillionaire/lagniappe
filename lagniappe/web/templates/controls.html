@@ -85,13 +85,14 @@
   </button>
 {% endmacro %}
 
-{% macro delete(label="Delete") %}
+{% macro delete(label="Delete", modal_route=None) %}
   <button class="{{ styles.toggle.container }}"
           lp-control="delete"
           data-controls="delete"
           lp-delete
           data-kind="delete"
           data-active="false"
+          {% if modal_route %}data-delete-modal-route="{{ modal_route }}"{% endif %}
           type="button"
           aria-label="{{ label }}"
           title="{{ label }}">

@@ -7,6 +7,7 @@ from redis.commands.search.query import Query
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import Restriction
+from ..auth.restrictions import RESTRICTION_SOURCES
 
 from .core import cache
 from .details import hydrate_search_results
@@ -169,7 +170,7 @@ def _build_term_list(user_query, expanded=False):
 
 
 # @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_require_lists
+# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_validate_scope_and_membership
 # @matrix search : permissions validation
 def _add_required(required):
     if not isinstance(required, list):
@@ -180,14 +181,28 @@ def _add_required(required):
 
 
 # @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_require_lists
+# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_validate_scope_and_membership
+# @tests tests_unit/test_017_cache_query.py::test_search_restrictions_require_membership_in_each_source
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_redis_search_matches_each_restriction_source_before_pagination
+# @matrix search permissions : source-clauses canonical-policy
 # @matrix search : permissions validation
-def _add_restricted_to(restricted_to):
-    if not isinstance(restricted_to, list):
-        raise TypeError("Restricted to must be a list of hashes")
-    if not restricted_to:
-        return "(ismissing(@restricted_to))"
-    return f"(ismissing(@restricted_to) | @restricted_to:{{ {' | '.join(restricted_to)} }})"
+def _add_restricted_to(belongs_to):
+    """Match any group within every present restriction source before paging."""
+    if belongs_to is Restriction.BELONGS_TO_ALL:
+        return ""
+    if belongs_to is Restriction.BELONGS_TO_NONE:
+        belongs_to = []
+    if not isinstance(belongs_to, list):
+        raise TypeError(
+            "Group membership must be hashes, Restriction.BELONGS_TO_ALL, "
+            "or Restriction.BELONGS_TO_NONE"
+        )
+    groups = " | ".join(sorted(set(belongs_to)))
+    return " ".join(
+        f"(ismissing(@restricted_to_{source}) | @restricted_to_{source}:{{ {groups} }})"
+        if groups else f"(ismissing(@restricted_to_{source}))"
+        for source in RESTRICTION_SOURCES
+    )
 
 
 # @testable false
@@ -292,7 +307,7 @@ def entity_search(query_string, restrictions, belongs_to):
     term_list.append(_add_restricted_to(belongs_to))
 
     if term_list:
-        redis_query = Query(" ".join(term_list))
+        redis_query = Query(" ".join(filter(None, term_list)) or "*").dialect(SEARCH_QUERY_DIALECT)
         results = cache.search(redis_query)
         formatted_results = [
             _format_result(doc, snippets=False) for doc in results.docs
@@ -302,8 +317,10 @@ def entity_search(query_string, restrictions, belongs_to):
         return []
 
 
-# @testable infrastructure
-def _add_models(results, project_hashes):
+# @testable true
+# @tests tests_unit/test_017_cache_query.py::test_model_expansion_keeps_viewer_restrictions
+# @matrix search permissions : model-expansion restricted-access
+def _add_models(results, project_hashes, restriction_clause):
     if not project_hashes:
         return [doc for doc in results.docs]
 
@@ -311,7 +328,9 @@ def _add_models(results, project_hashes):
     result_ids = set([doc.id for doc in results.docs])
     expanded_results = []
 
-    models = cache.search(Query(f"@kind:{{ model }} @requires:{{ {get_models} }}"))
+    models = cache.search(Query(
+        f"@kind:{{ model }} @requires:{{ {get_models} }} {restriction_clause}".strip()
+    ).dialect(SEARCH_QUERY_DIALECT))
     to_append = {h: [m for m in models.docs if h in m.requires] for h in project_hashes}
 
     for result in results.docs:
@@ -348,7 +367,8 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 
     term_list.append(f"(@kind:{{ {' | '.join(kinds)} }})")
 
-    term_list.append(_add_restricted_to(belongs_to))
+    restriction_clause = _add_restricted_to(belongs_to)
+    term_list.append(restriction_clause)
 
     if kwargs.get("form_type"):
         term_list.append(f"(@type:{{ {kwargs.get('form_type')} }})")
@@ -356,12 +376,12 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
     if not Restriction.is_unrestricted(restrictions):
         term_list.append(_add_required(restrictions))
 
-    redis_query = Query(" ".join(term_list))
+    redis_query = Query(" ".join(filter(None, term_list))).dialect(SEARCH_QUERY_DIALECT)
     results = cache.search(redis_query)
 
     if kind == "project" and kwargs.get("models"):
         project_hashes = [doc.hash for doc in results.docs if doc.kind == "project"]
-        expanded = _add_models(results, project_hashes)
+        expanded = _add_models(results, project_hashes, restriction_clause)
         formatted_results = [_format_result(doc, snippets=False) for doc in expanded]
     else:
         formatted_results = [
@@ -376,7 +396,9 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_primary_name_matches_rank_above_file_name_and_description_matches
 # @tests tests_e2e/009_search/test_009c_search_authorization.py::test_search_matches_explicit_denial_and_administrator_content_access
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_redis_search_matches_each_restriction_source_before_pagination
 # @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
+# @matrix search permissions : source-clauses pagination restricted-access
 # @matrix search : empty-access no-results permissions primary-name-ranking redis-cloud results tag-syntax
 def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
     """Run a full-text search with highlighting, snippets, and pagination."""
@@ -396,7 +418,7 @@ def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
 
     if term_list:
         redis_query = (
-            Query(" ".join(term_list))
+            Query(" ".join(filter(None, term_list)) or "*")
             .dialect(SEARCH_QUERY_DIALECT)
             .highlight(
                 fields=["desc", "doc", "values"],
@@ -450,7 +472,7 @@ def exact_name_search(
         max(int(limit or 1) * 4, 25),
     )
     redis_query = (
-        Query(" ".join(term_list) or "*")
+        Query(" ".join(filter(None, term_list)) or "*")
         .dialect(SEARCH_QUERY_DIALECT)
         .paging(offset=0, num=candidate_limit)
     )
@@ -534,7 +556,7 @@ def candidate_search(
 # @reason bounded Redis retrieval and cached hydration belong to candidate search
 def _candidate_query(clauses, limit):
     redis_query = (
-        Query(" ".join(clauses))
+        Query(" ".join(filter(None, clauses)))
         .dialect(SEARCH_QUERY_DIALECT)
         .with_scores()
         .highlight(

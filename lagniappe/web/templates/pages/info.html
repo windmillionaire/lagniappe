@@ -6,6 +6,7 @@
 {% macro permissions_form(page, close_target='PageInfo') %}
   <form data-widget="PagePermissions"
         lp-update
+        data-route="{{ url_for('pages.view_access', key=page.urlsafe_key) }}"
         data-title="Page Restrictions"
         data-help="restrictions"
         data-close="info:{{ close_target }}"
@@ -17,6 +18,9 @@
     {{ restrictions.visible_to(page) }}
     {{ restrictions.restrict_access(page) }}
     {{ controls.edited_marker(url_for('pages.permissions', key=page.urlsafe_key)) }}
+    <div class="{{ styles.button.group }}" data-role="submit-group">
+      <button type="submit" class="{{ styles.button.submit }}">Save Restrictions</button>
+    </div>
   </form>
 {% endmacro %}
 
@@ -265,10 +269,12 @@
             </fieldset>
           {% endif %}
         </div>
-        {{ controls.edited_marker(url_for('pages.user_settings', key=page.urlsafe_key)) }}
-        <button type="submit" data-kind="user" class="{{ styles.button.submit }}"></button>
       </div>
     </section>
+    {{ controls.edited_marker(url_for('pages.user_settings', key=page.urlsafe_key)) }}
+    <div class="{{ styles.button.group }}" data-role="submit-group">
+      <button type="submit" data-kind="user" class="{{ styles.button.submit }}"></button>
+    </div>
   </form>
 {% endmacro %}
 

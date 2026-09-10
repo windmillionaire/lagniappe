@@ -47,7 +47,9 @@ def _prepare_write(effect):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_permission_source_marker_is_consumed_only_after_durable_success
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_cold_source_details_preserve_programmatic_restriction_changes
 # @matrix permissions : invalidation-retry
+# @matrix permissions cache : cache-miss source-intent programmatic-save
 def consume_mutation_intents(plan):
     for owner, captured in plan.consumed_intents:
         current = list(getattr(owner, "mutation_intents", ()))
@@ -57,7 +59,11 @@ def consume_mutation_intents(plan):
         ]
     for effect in plan.effects:
         if effect.effect is MutationEffectType.UPSERT and effect.property_mask is None:
+            if getattr(effect.entity, "_permission_sources_changed", False):
+                effect.entity._reconcile_restrictions = True
             effect.entity._permission_sources_changed = False
+            if effect.entity.entity_kind == "task":
+                effect.entity._page_changed = False
 
 
 # @testable infrastructure

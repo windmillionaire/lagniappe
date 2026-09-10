@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities.index import Index, TaskHistoryIndex, TaskIndex
 from lagniappe.core.tools.database import get as database_get
 
@@ -456,7 +456,9 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
         assigned_to=None,
     )
     undated_query.assert_not_called()
-    load.assert_called_once_with("dated-key", request=Fetch.direct())
+    load.assert_called_once_with(
+        "dated-key", request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+    )
     assert tasks == [dated_task]
     assert index.cursor is None
     assert index.append == "/tasks.rows&undated=1"
@@ -499,7 +501,9 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
         hashes=["cat010"],
         assigned_to=None,
     )
-    load.assert_called_once_with("undated-key", request=Fetch.direct())
+    load.assert_called_once_with(
+        "undated-key", request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+    )
     assert tasks == [undated_task]
     assert index.cursor == "cursor-2"
     assert index.append == "/tasks.rows&cursor=cursor-2&undated=1"

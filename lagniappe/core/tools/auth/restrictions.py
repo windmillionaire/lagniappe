@@ -1,19 +1,33 @@
-"""Explicit permission dependencies and the shared restriction-list contract."""
+"""Explicit permission dependencies and canonical source restrictions."""
 
-from ...definitions import Action, Fetch
 from ...exceptions import UnloadedRelationError
 
 
+RESTRICTION_SOURCES = ("page", "page_form", "task_form")
+
+
 # @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_page_restrictions_take_precedence
-# @matrix permissions : page-precedence owner-fallback
-def combine_restrictions(page, form):
-    """Normalize the first restricted source, with the site-owner fallback."""
-    page, form = set(page or ()), set(form or ())
-    groups = page or form
-    if not page and not form:
-        return []
-    return ["owner", *sorted(groups - {"owner"})]
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_restrictions_normalize_source_clauses
+# @matrix permissions : source-clauses stable-order admin-only
+def normalize_restrictions(mapping):
+    """Copy nonempty source clauses, preserving their independent requirements."""
+    normalized = {}
+    for source in RESTRICTION_SOURCES:
+        groups = set((mapping or {}).get(source) or ())
+        if groups:
+            normalized[source] = ["admin"] if "admin" in groups else sorted(groups)
+    return normalized
+
+
+# @testable true
+# @tests tests_unit/test_002_entity_general_properties.py::test_restriction_fields_keep_source_boundaries
+# @matrix permissions cache : source-clauses stable-order
+def restriction_fields(mapping):
+    """Encode each source independently as a Redis TAG field."""
+    return {
+        f"restricted_to_{source}": ",".join(groups)
+        for source, groups in normalize_restrictions(mapping).items()
+    }
 
 
 # @testable true
@@ -28,56 +42,3 @@ def permission_relation(entity, name, *, required=False):
     if not prop.is_set or prop.value is None:
         raise UnloadedRelationError(f"{entity.entity_kind}.{name} must be loaded")
     return prop.value
-
-
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_permission_preparation_only_loads_missing_sources
-# @matrix permissions relations : batch explicit-fetch-depth no-group-expansion
-def prepare_permissions(*entities, action=Action.VIEW):
-    """Attach only missing permission sources; never expand a Group graph."""
-    from ...entities import Entities
-
-    known = {entity.key: entity for entity in entities if entity is not None}
-    visited = set()
-    pending = list(known.values())
-    while pending:
-        missing, relations, next_entities = set(), [], []
-        for entity in pending:
-            if entity.key in visited:
-                continue
-            visited.add(entity.key)
-            kind = entity.entity_kind
-            names = []
-            if kind == "file":
-                names = ["page", "task"]
-            elif kind == "task_history":
-                names = ["task"]
-            elif kind == "task":
-                names = ["page", "form"]
-            elif kind == "page":
-                if not entity.db.get("restricted_to"):
-                    names.append("form")
-                if action.value > Action.VIEW.value:
-                    names.append("user")
-            for name in names:
-                prop = entity.properties.get(name)
-                if prop is None or not prop.key:
-                    continue
-                if prop.is_set and prop.value is not None:
-                    known[prop.key] = prop.value
-                    next_entities.append(prop.value)
-                else:
-                    relations.append(prop)
-                    if prop.key in known:
-                        next_entities.append(known[prop.key])
-                    else:
-                        missing.add(prop.key)
-        missing -= known.keys()
-        if missing:
-            loaded = Entities.fetch(*missing, request=Fetch.root())
-            known.update((entity.key, entity) for entity in loaded)
-            next_entities.extend(loaded)
-        for prop in relations:
-            prop.attach(known)
-        pending = next_entities
-    return entities

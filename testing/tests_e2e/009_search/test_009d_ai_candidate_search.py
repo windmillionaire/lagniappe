@@ -49,7 +49,7 @@ def test_candidate_search_keeps_redis_scope_and_ranks_partial_names(monkeypatch)
                     "desc": description,
                     "kind": kind,
                     "requires": requires,
-                    "restricted_to": restricted_to,
+                    "restricted_to_page": restricted_to,
                     "details_key": entity_hash,
                 })
                 pipe.hset(Keys.ENTITY_HASHES.value, entity_hash, json.dumps({

@@ -55,7 +55,7 @@ class Page(SiteResource):
     PAGE_PERMISSIONS_FORM = "[data-widget='PagePermissions'][data-visible='true']"
     PAGE_PERMISSIONS_VISIBLE_TO = "[data-role='visible-to']"
     PAGE_PERMISSIONS_RESTRICT_ACCESS = "[data-role='restrict-access']"
-    PAGE_RESTRICT_OWNER = "input[data-role='specific-access'][name='owner']"
+    PAGE_RESTRICT_OWNER = "input[data-role='specific-access'][name='admin']"
     PAGE_RESTRICT_GROUP_INPUT = "[data-role='restrict-group-input']"
     PAGE_RESTRICTED_GROUP_LIST = "[data-role='restricted-group-list'] li"
 

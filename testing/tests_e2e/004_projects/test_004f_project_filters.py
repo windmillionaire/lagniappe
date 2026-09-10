@@ -146,7 +146,8 @@ def test_filter_preview_rejects_malformed_and_forged_contracts(
 # --- String conditions (Task Name) ---
 
 
-# @matrix filters : run-results string-condition
+# @matrix filters : results-layout run-results string-condition
+# @template projects/filters.html::task_filters
 def test_filter_by_task_name(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_task_name.get(user)
@@ -164,6 +165,14 @@ def test_filter_by_task_name(get_user):
     expect(results).to_be_visible()
     row = results.locator("tr").filter(has_text=task.definition.name)
     expect(row).to_be_visible()
+    table_frame = results.locator("[data-role='results-table']")
+    expect(table_frame).to_have_css("border-top-width", "1px")
+    expect(table_frame).to_have_css("outline-style", "none")
+    expect(table_frame.locator("[data-role='table']")).to_have_css("border-top-width", "0px")
+    form_box = filters.form.bounding_box()
+    table_box = table_frame.bounding_box()
+    assert table_box["x"] == pytest.approx(form_box["x"], abs=1)
+    assert table_box["width"] == pytest.approx(form_box["width"], abs=1)
 
 
 # @matrix filters : exact-match run-results string-condition
@@ -366,8 +375,9 @@ def test_project_filter_results_respect_task_permissions(get_user, mode, permiss
         )
         with boundary:
             if permission_source == "page":
+                restriction.set_checked(restrict)
                 with expect_successful_response(owner.page, method="PUT", path=f"/pages/{page_resource.key}/view-access"):
-                    restriction.set_checked(restrict)
+                    owner.locate(Page.PAGE_PERMISSIONS_FORM).locator("button[type='submit']").click()
             else:
                 restriction.set_checked(restrict)
                 builder.save_restrictions()

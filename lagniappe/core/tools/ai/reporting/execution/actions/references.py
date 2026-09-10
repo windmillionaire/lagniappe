@@ -1,7 +1,7 @@
 """Entity, page, and file reference resolution for report actions."""
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Fetch, FetchReason
+from lagniappe.core.definitions import Fetch, FetchReason, Restriction
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
 
@@ -11,7 +11,6 @@ from .common import (
     _unique_entities,
     _unique_values,
 )
-from lagniappe.core.tools.auth.restrictions import prepare_permissions
 
 
 # @testable false
@@ -138,7 +137,7 @@ def _resolve_file_endpoint(data, created, endpoint):
 # @reason attachment mutation is covered through move and undo tests
 def _file_attached_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
-        return endpoint.key == file.db.get("page")
+        return not file.db.get("task") and endpoint.key == file.db.get("page")
     if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
         return endpoint.key == file.db.get("task") or file.key in list(
             endpoint.db.get("files") or []
@@ -152,7 +151,7 @@ def _file_attached_to_endpoint(file, endpoint):
 # @reason attachment mutation is covered through move and undo tests
 def _remove_file_from_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
-        if file.properties.page.key != endpoint.key:
+        if file.properties.task.key or file.properties.page.key != endpoint.key:
             return False
         file.page = None
         return True
@@ -161,6 +160,7 @@ def _remove_file_from_endpoint(file, endpoint):
             return False
         endpoint.properties.files.remove(file)
         file.task = None
+        file.page = None
         return True
     return False
 
@@ -288,7 +288,7 @@ def _resolve_page_by_exact_name(page_name, user):
 
     restrictions = getattr(getattr(user, "properties", None), "restrictions", None)
     required = getattr(restrictions, "search", [])
-    belongs_to = getattr(restrictions, "belongs_to", [])
+    belongs_to = getattr(restrictions, "belongs_to", Restriction.BELONGS_TO_NONE)
     results, _total = cache.search(
         page_name,
         required,
@@ -429,14 +429,19 @@ def _fetch_report_entity(identifier, *, derived_page=False):
     if entity is None:
         return None
 
+    if isinstance(entity, Entities.TASK_HISTORY):
+        Entities.fetch(
+            entity, entity.properties.task.key, *entity.db.get("files", []),
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+        )
+        return entity
+
     if derived_page and not isinstance(entity, Entities.PAGE):
         request = Fetch.nested(because=FetchReason.DERIVED_PAGE_SAVE_REQUIREMENTS)
-    elif isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
+    elif isinstance(entity, (Entities.FILE, Entities.TASK)):
         request = Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS)
     else:
         request = Fetch.direct()
 
     entity = Entities.fetch_one(entity, request=request)
-    from lagniappe.core.definitions import Action
-    prepare_permissions(entity, action=Action.EDIT)
     return entity

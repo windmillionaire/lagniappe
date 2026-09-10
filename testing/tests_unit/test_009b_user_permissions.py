@@ -102,6 +102,20 @@ def test_user_permissions_fingerprint_tracks_permissions_and_owner_state():
     assert admin.authorization_fingerprint != ordinary_authorization
 
 
+# @matrix permissions cache : authorization-fingerprint group-membership
+@pytest.mark.unit
+def test_authorization_fingerprint_tracks_group_membership():
+    user = TestEntities.get("USER", {"hash": "membershipviewer", "permissions": {"models": "VIEW"}})
+    permissions = user.permissions_fingerprint
+    user.requires = ["users", "groupa", "groupb"]
+    first = user.authorization_fingerprint
+    user.requires = ["groupb", "users", "groupa", "groupa"]
+    assert user.authorization_fingerprint == first
+    user.requires = ["users", "groupa"]
+    assert user.authorization_fingerprint != first
+    assert user.permissions_fingerprint == permissions
+
+
 # @matrix admin : delete edit page privileged-account view
 # @pair owner:owner-only
 @pytest.mark.unit

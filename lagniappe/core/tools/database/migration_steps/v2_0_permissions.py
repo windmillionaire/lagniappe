@@ -28,12 +28,28 @@ def migrate_file_ownership(context):
     # @covered-by lagniappe/core/tools/database/migration_steps/v2_0_permissions.py::migrate_file_ownership
     # @reason row adapter preserves conflicting legacy records for explicit repair
     def transform(row):
-        candidates = set(references.get(row.key, ()))
-        candidates.update(row.get("pages") or [])
-        candidates.update(row.get("tasks") or [])
-        candidates.update(key for key in (row.get("page"), row.get("task")) if key)
+        # Singular links are authoritative after FIL-001. Historical snapshots
+        # may still reference a File that has since moved to another owner.
+        explicit = {key for key in (row.get("page"), row.get("task")) if key}
+        candidates = set() if explicit else set(references.get(row.key, ()))
+        legacy = set(row.get("pages") or []) | set(row.get("tasks") or [])
+        legacy = {histories[key].get("task") or key.parent if key in histories else key
+                  for key in legacy}
+        candidates.update(legacy)
+        candidates.update(explicit)
         candidates = {histories[key].get("task") or key.parent if key in histories else key
                       for key in candidates}
+        # An interim build mirrored a singular Task's Page in File.page.
+        # A legacy plural Page link is an independent attachment, so never
+        # collapse that conflict merely because it is also the Task's Page.
+        task_key = row.get("task")
+        if task_key in histories:
+            task_key = histories[task_key].get("task") or task_key.parent
+        task = owners.get(task_key)
+        mirrored_page = row.get("page")
+        if (task and task.get("type") == "task" and mirrored_page
+                and mirrored_page == task.get("page") and mirrored_page not in legacy):
+            candidates.discard(mirrored_page)
         if len(candidates) > 1:
             raise MigrationDataError("File has multiple owners; repair its Page/Task references before retrying")
         desired = {}
@@ -74,7 +90,7 @@ def migrate_local_restrictions(context):
     # @reason row adapter materializes local groups without following any Form relation
     def transform(row):
         stored = row.get("restricted_to") or []
-        if stored == ["owner"]:
+        if stored in (["owner"], ["admin"]):
             desired = stored
         else:
             keys = row.get("groups") or []

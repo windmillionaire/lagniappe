@@ -3,7 +3,7 @@
 import copy
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 
 from ...references import hash_reference
@@ -461,7 +461,11 @@ def _completion_action(context, reference):
 def _load_completion_entity(reference, expected):
     if not reference or not isinstance(reference, str):
         return None
-    entity = Entities.fetch_one(reference, request=Fetch.direct())
+    request = (
+        Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION)
+        if expected in (Entities.TASK, Entities.FILE) else Fetch.direct()
+    )
+    entity = Entities.fetch_one(reference, request=request)
     return entity if isinstance(entity, expected) else None
 
 

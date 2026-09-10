@@ -5,11 +5,11 @@
              data-role="specific-access"
              data-kind="user"
              name="{{ type }}"
-             {{ 'checked' if form.properties.restricted_to.stored == ['owner'] else '' }}
+             {{ 'checked' if form.properties.restricted_to.stored == ['admin'] else '' }}
              class="{{ styles.checkbox.default }}">
       {{ render_icon("check", (styles.checkbox.icon)) }}
     </div>
-    <span>Restrict to site {{ type }}</span>
+    <span>Administrators only</span>
   </label>
 {% endmacro %}
 
@@ -41,11 +41,11 @@
         </h3>
         <p class="text-sm text-base-dark italic"
            data-role="restricted-description">
-          If a form is restricted to a specific group, only application Administrators and users in that
-          group can view it and any tasks or forms that are defined by it.
+          Administrators can always view restricted content. When groups are listed, other users must belong
+          to at least one to view this form and the pages or tasks that use it. Page restrictions also apply.
         </p>
       </div>
-      {{ specific_access(form, 'owner') }}
+      {{ specific_access(form, 'admin') }}
       <div class="flex flex-col gap-3">
         <div class="{{ styles.select.container }}" lp-select>
           <label for="restriction-group" class="{{ styles.label.sectionHeading }}">Group Restrictions</label>

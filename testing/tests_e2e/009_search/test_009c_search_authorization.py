@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 from urllib.parse import urlencode
 
@@ -5,7 +6,7 @@ import pytest
 import requests
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import General, Levels
+from lagniappe.core.definitions import General, Levels, Restriction
 from lagniappe.core.entities import Entities
 from lagniappe import CONFIG
 from testing.definitions import Forms, Pages, Users
@@ -17,6 +18,87 @@ from testing.utility.user_cache import acknowledge_user_cache_invalidation
 
 
 pytestmark = pytest.mark.e2e
+
+
+# @matrix search permissions : source-clauses pagination restricted-access
+def test_redis_search_matches_each_restriction_source_before_pagination():
+    from lagniappe.core.tools.auth.restrictions import restriction_fields
+    from lagniappe.core.tools.cache import query
+    from lagniappe.core.tools.cache.core import cache
+    from lagniappe.core.tools.cache.keys import Keys, Search
+
+    token = f"policy{uuid4().hex}"
+    group_a, group_b, group_c, group_d = (uuid4().hex[:12] for _ in range(4))
+    policies = {
+        "open": {},
+        "choice": {"page": [group_a, group_b]},
+        "a": {"page": [group_a]},
+        "b": {"page_form": [group_b]},
+        "two": {"page": [group_a, group_b], "task_form": [group_c, group_d]},
+        "three": {"page": [group_a, group_b], "page_form": [group_b, group_c],
+                  "task_form": [group_c, group_d]},
+        "administrators": {"task_form": ["admin"]},
+    }
+    ids = {name: f"{token}{name}" for name in policies}
+    hashes = {name: uuid4().hex[:12] for name in policies}
+    keys = [Search.page.value.format(key) for key in ids.values()]
+    try:
+        with cache.pipeline() as pipe:
+            for name, restrictions in policies.items():
+                row = {
+                    "name": f"{token} {name}", "kind": "page",
+                    "requires": token, "details_key": hashes[name],
+                }
+                row.update(restriction_fields(restrictions))
+                pipe.hset(Search.page.value.format(ids[name]), mapping=row)
+                pipe.hset(Keys.ENTITY_HASHES.value, hashes[name], json.dumps({
+                    "id": ids[name], "hash": hashes[name], "kind": "page",
+                    "name": row["name"],
+                }))
+            pipe.execute()
+
+        raw = cache.search(query.Query(f"@requires:{{ {token} }}").dialect(2))
+        assert raw.total == len(policies)
+        for memberships, permitted in (
+            ([], {"open"}),
+            (Restriction.BELONGS_TO_NONE, {"open"}),
+            ([group_a], {"open", "choice", "a"}),
+            ([group_b], {"open", "choice", "b"}),
+            ([group_c], {"open"}),
+            ([group_a, group_b], {"open", "choice", "a", "b"}),
+            ([group_a, group_c], {"open", "choice", "a", "two", "three"}),
+            ([group_b, group_d], {"open", "choice", "b", "two", "three"}),
+            ([group_a, group_b, group_c, group_d], set(policies) - {"administrators"}),
+            (Restriction.BELONGS_TO_ALL, set(policies)),
+        ):
+            results, total = query.search(
+                token, [token], memberships, kinds=["page"], limit=20,
+            )
+            assert total == len(permitted)
+            assert {result["id"] for result in results} == {ids[name] for name in permitted}
+
+        ungrouped, ungrouped_total = query.search(
+            token, Restriction.UNRESTRICTED, Restriction.BELONGS_TO_NONE, kinds=["page"], limit=20,
+        )
+        assert ungrouped_total == 1
+        assert [result["id"] for result in ungrouped] == [ids["open"]]
+
+        first, first_total = query.search(
+            token, [token], [group_a, group_b], kinds=["page"], page=1, limit=2,
+        )
+        second, second_total = query.search(
+            token, [token], [group_a, group_b], kinds=["page"], page=2, limit=2,
+        )
+        assert first_total == second_total == 4
+        assert len(first) == len(second) == 2
+        assert {row["id"] for row in [*first, *second]} == {
+            ids[name] for name in ("open", "choice", "a", "b")
+        }
+    finally:
+        with cache.pipeline() as pipe:
+            pipe.delete(*keys)
+            pipe.hdel(Keys.ENTITY_HASHES.value, *hashes.values())
+            pipe.execute()
 
 
 # @matrix cache : invalidation no-store etag conditional-response
@@ -184,7 +266,7 @@ def test_search_matches_explicit_denial_and_administrator_content_access(get_use
     )
     unrestricted_form = Forms.test_basic_inputs_form.get(owner)
     restricted_page = Pages.test_owner_restricted_page.get(owner)
-    restricted_page.entity.properties.restricted_to.add("owner")
+    restricted_page.entity.properties.restricted_to.materialize(admin_only=True)
     restricted_page.entity.save()
 
     user.entity.properties.permissions.create({General.FORMS.value: Levels.NONE.name})

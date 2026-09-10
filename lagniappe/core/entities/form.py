@@ -87,9 +87,18 @@ class Form(Entity, AssetMixin):
     def html_fields(self):
         return self.properties.schema.html_fields
 
+    # @testable true
+    # @tests tests_unit/test_004_form_properties.py::test_form_save_refreshes_users_with_edited_form_schema
+    # @matrix forms cache : owner-reuse no-extra-read
+    # @pair form-schema:cache
     @property
     def used_by(self):
-        return Entities.fetch(*database_get.form_users(self), request=Fetch.direct())
+        return [
+            entity for entity in Entities.fetch(
+                self, *database_get.form_users(self), request=Fetch.direct(),
+            )
+            if entity.key != self.key
+        ]
 
     @classmethod
     def create(cls, data):

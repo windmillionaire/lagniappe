@@ -9,7 +9,7 @@ import pytest
 from google.cloud.datastore import Entity as DatastoreEntity
 from google.cloud.datastore import Key
 
-from lagniappe.core.definitions import MutationIntent, Ordering
+from lagniappe.core.definitions import Fetch, MutationIntent, Ordering
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities import site as site_module
 from lagniappe.core.entities.entity import Entity
@@ -451,8 +451,8 @@ def test_restricted_to_effective_projection_does_not_alias_sources(parent_name):
 
     assert direct.stored == stored
     assert direct.stored is not stored
-    assert direct.value == ["owner", "stored-group"]
-    assert direct.value is not stored
+    assert direct.value == {"page_form": ["stored-group"]}
+    assert direct.value["page_form"] is not stored
     assert stored == ["stored-group", "stored-group"]
 
     inherited = ["inherited-group", "inherited-group"]
@@ -463,31 +463,171 @@ def test_restricted_to_effective_projection_does_not_alias_sources(parent_name):
     if parent_name == "form":
         entity.form = parent
     from_parent = entity.properties.restricted_to
-    assert from_parent.value == ["owner", "inherited-group"]
-    assert from_parent.value is not inherited
+    source = "page" if parent_name == "page" else "task_form"
+    assert from_parent.value == {source: ["inherited-group"]}
+    assert from_parent.value[source] is not inherited
     assert inherited == ["inherited-group", "inherited-group"]
 
+# @matrix permissions : source-clauses
+# @source lagniappe/core/properties/common_entity.py::RestrictedTo.value
+@pytest.mark.parametrize("form_type,source", [("page", "page_form"), ("task", "task_form")])
+def test_form_restrictions_keep_local_storage_and_select_source(form_type, source):
+    form = TestEntities.get("FORM", {"hash": "typedform", "restricted_to": ["b", "a", "b"]})
+    form.form_type = form_type
+
+    assert form.restricted_to == {source: ["a", "b"]}
+    assert form.properties.restricted_to.stored == ["b", "a", "b"]
+    assert form.db["restricted_to"] == ["b", "a", "b"]
+
+
+# @matrix permissions relations : attached-groups local-restrictions materialization
+@pytest.mark.parametrize("kind", ["PAGE", "FORM"])
+@pytest.mark.parametrize("admin_only", [False, True])
+def test_direct_fetch_materializes_local_restrictions_from_attached_groups(
+    monkeypatch, kind, admin_only,
+):
     groups = [
-        SimpleNamespace(hash="group-one"),
-        SimpleNamespace(hash="group-two"),
-        SimpleNamespace(hash="group-one"),
+        TestEntities.get("USER_GROUP", {"name": name, "hash": name, "permissions": {}})
+        for name in ("groupb", "groupa")
     ]
-    from_groups = common_entity.RestrictedTo(
-        entity=SimpleNamespace(
-            entity_kind="user",
-            db={},
-            page=None,
-            form=None,
-            groups=groups,
-        )
+    row = DatastoreEntity(key=Key(
+        "instances" if kind == "PAGE" else "models", "local-policy-source",
+        project="test-project",
+    ))
+    row.update({
+        "type": kind.lower(),
+        "name": "Local policy source", "hash": f"attach{kind.lower()}",
+        "restricted_to": ["admin"] if admin_only else ["oldgroup"],
+    })
+    source = getattr(Entities, kind)(row)
+    if kind == "PAGE":
+        source.form = TestEntities.get("FORM", {
+            "name": "Inherited policy", "hash": "attachedform", "restricted_to": ["inherited"],
+        })
+    source.db["groups"] = [groups[0].key, groups[1].key, groups[0].key]
+    source.properties.groups.unset()
+    before = source.restricted_to
+    calls = []
+
+    def load(keys):
+        if keys:
+            calls.append(set(keys))
+        return [group for group in groups if group.key in keys]
+
+    monkeypatch.setattr("lagniappe.core.entities.database_get.entities", load)
+    assert Entities.fetch(source, request=Fetch.direct()) == [source]
+    assert calls == [{group.key for group in groups}]
+    expected = ["admin"] if admin_only else ["groupa", "groupb"]
+    clause = "page" if kind == "PAGE" else "page_form"
+    effective = {clause: expected}
+    original = {clause: ["admin"] if admin_only else ["oldgroup"]}
+    if kind == "PAGE":
+        effective["page_form"] = original["page_form"] = ["inherited"]
+        assert source.form.db["restricted_to"] == ["inherited"]
+    assert source.db["restricted_to"] == expected
+    assert source.restricted_to == effective
+    assert before == original
+    assert source.properties.groups.keys == [groups[0].key, groups[1].key, groups[0].key]
+
+
+# @source lagniappe/core/properties/common_entity.py::RestrictedTo.materialize
+# @matrix permissions relations : local-restrictions materialization unresolved
+# @matrix permissions : owner-only
+@pytest.mark.parametrize("kind", ["PAGE", "FORM"])
+@pytest.mark.parametrize("groups_loaded", [False, True])
+def test_admin_only_replaces_local_groups_without_restoring_them(kind, groups_loaded):
+    group = TestEntities.get("USER_GROUP", {
+        "name": "Local group", "hash": "replacedgroup", "permissions": {},
+    })
+    source = TestEntities.get(kind, {"hash": f"adminreplace{kind.lower()}"})
+    source.groups = [group]
+    source.properties.restricted_to.materialize(admin_only=False)
+    if not groups_loaded:
+        source.properties.groups.unset()
+
+    source.properties.restricted_to.materialize(admin_only=True)
+
+    assert source.properties.restricted_to.stored == ["admin"]
+    assert source.groups == []
+    assert source.properties.groups.keys == []
+    assert "groups" not in source.db
+
+    source.properties.restricted_to.materialize(admin_only=False)
+
+    assert source.properties.restricted_to.stored == []
+    assert source.groups == []
+    assert "groups" not in source.db
+
+
+# @matrix permissions relations : local-restrictions materialization unresolved
+@pytest.mark.parametrize("stored", [[], ["storedgroup"]])
+def test_materialize_preserves_hashes_until_groups_are_attached(monkeypatch, stored):
+    form = TestEntities.get("FORM", {"name": "Unresolved groups", "hash": "unresolvedform"})
+    form.db["groups"] = ["unresolved-group-key"]
+    if stored:
+        form.db["restricted_to"] = list(stored)
+    form.properties.groups.unset()
+    monkeypatch.setattr(
+        "lagniappe.core.mixins.related.capture_unloaded_relation",
+        lambda *_args, **_kwargs: pytest.fail("materialize read unresolved Groups.value"),
     )
 
-    assert from_groups.value == ["owner", "group-one", "group-two"]
-    assert [group.hash for group in groups] == [
-        "group-one",
-        "group-two",
-        "group-one",
-    ]
+    form.properties.restricted_to.materialize()
+
+    assert form.properties.restricted_to.stored == stored
+    assert form.properties.groups.is_set is False
+
+
+# @matrix permissions relations : stored-restrictions group-free no-extra-read
+def test_task_file_restrictions_use_stored_hashes_without_group_reads(monkeypatch):
+    page_form = TestEntities.get("FORM", {
+        "name": "Page form", "hash": "hashpageform", "restricted_to": ["groupa"],
+    })
+    task_form = TestEntities.get("FORM", {
+        "name": "Task form", "hash": "hashtaskform", "restricted_to": ["groupb"],
+    })
+    page = TestEntities.get("PAGE", {"name": "Policy page", "hash": "hashpage"})
+    page.form = page_form
+    task = TestEntities.get("TASK", {"name": "Policy task", "hash": "hashtask"}, page=page)
+    task.form = task_form
+    file = TestEntities.get("FILE", {"name": "Policy file", "hash": "hashfile"})
+    file.task = task
+    # Attaching an empty display relation must not erase stored hash policies.
+    page_form.properties.groups.attach({})
+    task_form.properties.groups.attach({})
+    for source in (page_form, task_form, page):
+        source.db["groups"] = [f"{source.hash}-unloaded-group"]
+        source.properties.groups.unset()
+    monkeypatch.setattr(
+        "lagniappe.core.mixins.related.capture_unloaded_relation",
+        lambda *_args, **_kwargs: pytest.fail("permission projection read unresolved groups"),
+    )
+    monkeypatch.setattr(
+        "lagniappe.core.entities.database_get.entities",
+        lambda *_args, **_kwargs: pytest.fail("permission projection fetched entities"),
+    )
+
+    assert task.restricted_to == file.restricted_to == {
+        "page_form": ["groupa"], "task_form": ["groupb"],
+    }
+    assert page.properties.restricted_to.stored == []
+    assert page_form.db["restricted_to"] == ["groupa"]
+    assert task_form.db["restricted_to"] == ["groupb"]
+    assert all(not source.properties.groups.is_set for source in (page_form, task_form, page))
+
+    changed_group = TestEntities.get("USER_GROUP", {
+        "name": "Changed Page group", "hash": "groupc", "permissions": {},
+    })
+    page_form.db["groups"] = [changed_group.key]
+    page_form.properties.groups.attach({changed_group.key: changed_group})
+    assert page_form.db["restricted_to"] == ["groupc"]
+    assert page.restricted_to == {"page_form": ["groupc"]}
+    assert task.restricted_to == file.restricted_to == {
+        "page_form": ["groupc"], "task_form": ["groupb"],
+    }
+    projected = file.restricted_to
+    projected["page_form"].append("unrelated")
+    assert file.restricted_to["page_form"] == task.restricted_to["page_form"] == ["groupc"]
 
 
 # @matrix forms : access-restrictions owner-restricted side-effect-free stable-order
@@ -507,7 +647,45 @@ def test_restricted_to_add_preserves_first_seen_order():
         "group-three",
     ]
     assert stored == ["group-two", "group-one", "group-two"]
-    assert restricted_to.value == ["owner", "group-one", "group-three", "group-two"]
+    assert restricted_to.value == {"page_form": ["group-one", "group-three", "group-two"]}
+
+
+# @matrix permissions cache : source-clauses stable-order
+def test_restriction_fields_keep_source_boundaries():
+    from lagniappe.core.tools.auth.restrictions import normalize_restrictions, restriction_fields
+
+    original = {"task_form": ["c", "b", "b"], "page": ["b", "a"], "page_form": []}
+    normalized = normalize_restrictions(original)
+    assert normalized == {"page": ["a", "b"], "task_form": ["b", "c"]}
+    assert restriction_fields(original) == {
+        "restricted_to_page": "a,b", "restricted_to_task_form": "b,c",
+    }
+    normalized["page"].append("other")
+    assert original["page"] == ["b", "a"]
+    assert restriction_fields({}) == {}
+
+    page = TestEntities.get("PAGE", {"hash": "clausepage", "restricted_to": ["b", "a"]})
+    task = TestEntities.get("TASK", {"hash": "clausetask"}, page=page)
+    task.form = TestEntities.get("FORM", {"hash": "clauseform", "restricted_to": ["c", "b", "b"]})
+    cached = task.to_cache
+    assert cached["restricted_to_page"] == "a,b"
+    assert cached["restricted_to_task_form"] == "b,c"
+    assert "restricted_to_page_form" not in cached
+    assert "restricted_to" not in cached
+
+
+# @matrix permissions cache : source-clauses fingerprint form-version stable-order
+def test_restriction_fingerprint_preserves_source_boundaries():
+    from lagniappe.core.definitions.fingerprints import restricted_fingerprint
+
+    baseline = restricted_fingerprint("base", {"page": ["a", "b"]}, form_version="v1")
+    assert baseline == restricted_fingerprint(
+        "base", {"page_form": [], "page": ["b", "a", "a"]}, form_version="v1",
+    )
+    assert baseline != restricted_fingerprint(
+        "base", {"page": ["a"], "page_form": ["b"]}, form_version="v1",
+    )
+    assert baseline != restricted_fingerprint("base", {"page": ["a", "b"]}, form_version="v2")
 
 
 # @matrix property : column filter validation

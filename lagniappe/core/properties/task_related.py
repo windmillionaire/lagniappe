@@ -14,7 +14,6 @@ from ..mixins import (
 from .base_db import DBProperty
 from .base_property import Property
 from .form_special import Signature, Status
-from ..tools.auth.restrictions import prepare_permissions
 
 
 # @testable true
@@ -125,10 +124,13 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         return file.filename or file.name or file.hash
 
     def _track_file_update(self, file):
+        file.normalize_owner()
         self.entity.add_mutation_intents(
             MutationIntent.patch(
                 file,
+                "page",
                 "task",
+                "task_page",
                 "requires",
                 property_updates=("requires", "modified"),
                 reason="task-file-mirror",
@@ -190,7 +192,6 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
     def preload(self):
         preload = {}
 
-        prepare_permissions(*self.value)
         for file in self.value:
             if (
                 not file.allowed(Action.VIEW, user=self.user)
@@ -210,7 +211,6 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         elif not self.value:
             return []
 
-        prepare_permissions(*self.value)
         self._column_value = [
             dict(file.details)
             for file in self.value
@@ -222,7 +222,6 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
     @property
     def ai_value(self):
         files = []
-        prepare_permissions(*self.value)
         for file in self.value:
             if (
                 not file

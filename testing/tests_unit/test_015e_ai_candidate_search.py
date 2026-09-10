@@ -74,7 +74,7 @@ def test_candidate_search_groups_relaxed_terms_inside_access_scope(monkeypatch):
     results = query.candidate_search(
         "Rain garden",
         ["models", "actor"],
-        ["garden-team"],
+        ["gardenteam"],
         kinds=["task"],
         parent_hash="garden-category",
         limit=2,
@@ -85,7 +85,9 @@ def test_candidate_search_groups_relaxed_terms_inside_access_scope(monkeypatch):
     scope = (
         "(@kind:{ task | model }) (@requires:{ garden-category }) "
         "(@requires:{ models | actor }) "
-        "(ismissing(@restricted_to) | @restricted_to:{ garden-team })"
+        "(ismissing(@restricted_to_page) | @restricted_to_page:{ gardenteam }) "
+        "(ismissing(@restricted_to_page_form) | @restricted_to_page_form:{ gardenteam }) "
+        "(ismissing(@restricted_to_task_form) | @restricted_to_task_form:{ gardenteam })"
     )
     assert all(request._query_string.endswith(scope) for request in cache.queries)
     assert cache.queries[1]._query_string.startswith(
@@ -108,7 +110,7 @@ def test_candidate_search_ranks_exact_strict_and_name_coverage(monkeypatch):
     cache = _install_cache(monkeypatch, [[strict], [weak, duplicate, shared_name]])
 
     results = query.candidate_search(
-        "Rain garden planning", Restriction.UNRESTRICTED, [], limit=3
+        "Rain garden planning", Restriction.UNRESTRICTED, Restriction.BELONGS_TO_ALL, limit=3
     )
 
     assert [result["id"] for result in results] == ["strict", "many", "weak"]
@@ -160,7 +162,7 @@ def test_candidate_search_keeps_default_search_and_stale_repair(monkeypatch):
     results = query.candidate_search("rain garden", ["models"], [])
 
     assert [result["id"] for result in results] == ["live"]
-    assert cache.deleted == [f"{query.CONFIG.PREFIX}page:stale"]
+    assert cache.deleted == [query.Search.page.value.format("stale")]
     assert len(cache.queries) == 2
 
     cache = _install_cache(monkeypatch, [[]])

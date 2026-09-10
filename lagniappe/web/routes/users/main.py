@@ -25,7 +25,9 @@ def user_index():
 # @testable true
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
 # @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
+# @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
 # @matrix users : index-mode-toggle refresh table-row
+# @pair user-index:page-canonical
 # @pair user-index:public-group
 @users.route("/rows", methods=["GET"])
 @permission(Resource.USERS, Action.VIEW)
@@ -102,6 +104,7 @@ def create():
 # @testable true
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
 # @matrix pages users : category-fallback default-cascade delete preserve-page
+# @pair user-index:delete
 @users.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.USERS, Action.DELETE)
 def delete(key, **kwargs):

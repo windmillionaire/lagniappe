@@ -470,8 +470,8 @@ form:
     hooks: [form-link-label]
     css: [src/style/forms.css]
   restriction:
-    classes: flex flex-row items-center gap-2 px-3 py-2 justify-between border-t border-user-light
-    intent: restriction presentation within form
+    classes: flex flex-row items-center gap-2 px-3 py-2 justify-between
+    intent: selected restriction group row separated by spacing without dividers
     surfaces: [server]
   table:
     body:

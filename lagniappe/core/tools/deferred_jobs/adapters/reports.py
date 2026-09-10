@@ -25,7 +25,9 @@ from ..errors import (
 )
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
+# @matrix ai-report : input-files no-extra-read fresh-read
 class ReportAdapter(DeferredJobAdapter):
     """Shared report generation and revision behavior."""
 
@@ -364,11 +366,13 @@ class CreateReportAdapter(ReportAdapter):
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_failure_preserves_a_retryable_ledger
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_execution_start_rejects_stale_browser_snapshot
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal
+# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
 # @matrix ai-report : deterministic-run entitlement-independent recovery
 # @matrix deferred-jobs : cancellation provider-boundary report-execution tier-declaration
 # @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution terminal-delivery
+# @matrix ai-report : input-files no-extra-read fresh-read
 class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 

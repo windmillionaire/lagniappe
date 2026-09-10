@@ -15,6 +15,42 @@ import Entity from "./base/entity";
  * @matrix entity-layout : flipper page-mobile
  */
 export default class Page extends Entity {
+	/**
+	 * @testable true
+	 * @tests tests_js/test_022_refresh_frontend.py::test_page_task_collection_watches_task_form_changes
+	 * @matrix polling tasks : channel refresh
+	 */
+	async reconcilePollingSubscriptions() {
+		await super.reconcilePollingSubscriptions();
+		const component = this.components.tasks;
+		const list = Object.values(component?.widgets || {}).find(
+			(widget) => widget.name === "PageTaskList" && widget.loaded,
+		);
+		if (!list || !this.PollingCoordinator) {
+			this._taskChannelUnsubscribe?.();
+			this._taskChannelUnsubscribe = null;
+			return;
+		}
+		if (this._taskChannelUnsubscribe) return;
+		this._taskChannelUnsubscribe = this.PollingCoordinator.subscribe(
+			{
+				id: `page:tasks:${this.key}`,
+				type: "channel",
+				channel: "tasks",
+				revision: this.elt.dataset.collectionRevision || null,
+			},
+			{
+				mode: "periodic",
+				initial: "scheduled",
+				onResult: async (result) => {
+					if (result.status === "changed") {
+						await this._refreshCollectionComponents([component]);
+					}
+				},
+			},
+		);
+	}
+
 	async init() {
 		this.photoHasImage = this.elt.dataset.hasImage === "true";
 		this.photoOpen =

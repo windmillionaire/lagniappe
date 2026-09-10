@@ -91,6 +91,7 @@
 
 {% macro main() %}
   <div lp-view
+       data-authorization="{{ current_user.authorization_fingerprint }}"
        lp-entity
        data-key="{{ project.urlsafe_key }}"
        data-fingerprint="{{ project.fingerprint }}"

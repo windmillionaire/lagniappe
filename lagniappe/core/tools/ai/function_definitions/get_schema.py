@@ -3,10 +3,9 @@
 from google.genai import types
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.mixins import AIMixin
-from ...auth.restrictions import prepare_permissions
 from ..debug import ai_debug
 from ..references import hash_reference
 
@@ -51,11 +50,19 @@ def execute_get_schema(args, user):
         ai_debug("tool.get_schema.result", error="id is required")
         return {"error": "id is required"}
 
-    entity = Entities.fetch_one(identifier, request=Fetch.direct())
+    entity = Entities.fetch_one(identifier, request=Fetch.root())
     if not entity:
         ai_debug("tool.get_schema.result", identifier=identifier, error="not found")
         return {"error": "Entity not found"}
-    prepare_permissions(entity)
+    if isinstance(entity, (Entities.TASK, Entities.FILE)):
+        Entities.fetch_one(entity, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    elif isinstance(entity, Entities.TASK_HISTORY):
+        Entities.fetch(
+            entity, entity.properties.task.key, *entity.db.get("files", []),
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+        )
+    else:
+        Entities.fetch_one(entity, request=Fetch.direct())
     if not entity.allowed(Action.VIEW, user=user):
         ai_debug(
             "tool.get_schema.result",

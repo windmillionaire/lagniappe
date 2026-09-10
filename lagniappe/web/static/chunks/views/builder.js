@@ -1,22 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.0.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="bd27aab9-0904-4132-9736-083243d70d72",e._sentryDebugIdIdentifier="sentry-dbid-bd27aab9-0904-4132-9736-083243d70d72");}catch(e){}}();import"../search.js?v=b25669f8";import"../entityMenu.js?v=b25669f8";import"../foundation.js?v=b25669f8";import"../connectivity.js?v=b25669f8";import"../modal.js?v=b25669f8";import{F as q}from"../builder.js?v=b25669f8";import"../styles.js?v=b25669f8";import"../remote.js?v=b25669f8";import"../queryLifecycle.js?v=b25669f8";import"../combobox.js?v=b25669f8";import"../primitives.js?v=b25669f8";import"../icons.js?v=b25669f8";import"../results.js?v=b25669f8";import"../storage.js?v=b25669f8";import"../formatting.js?v=b25669f8";import"../upstreamUnavailable.js?v=b25669f8";import"../dropdown.js?v=b25669f8";import"../baseForm.js?v=b25669f8";import"../loader.js?v=b25669f8";import"../facets.js?v=b25669f8";import"../submitter.js?v=b25669f8";export{q as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=b41d0cfc';
-import '../entityMenu.js?v=b41d0cfc';
-import '../foundation.js?v=b41d0cfc';
-import '../connectivity.js?v=b41d0cfc';
-import '../modal.js?v=b41d0cfc';
-export { F as default } from '../builder.js?v=b41d0cfc';
-import '../styles.js?v=b41d0cfc';
-import '../remote.js?v=b41d0cfc';
-import '../queryLifecycle.js?v=b41d0cfc';
-import '../combobox.js?v=b41d0cfc';
-import '../primitives.js?v=b41d0cfc';
-import '../icons.js?v=b41d0cfc';
-import '../results.js?v=b41d0cfc';
-import '../storage.js?v=b41d0cfc';
-import '../formatting.js?v=b41d0cfc';
-import '../upstreamUnavailable.js?v=b41d0cfc';
-import '../dropdown.js?v=b41d0cfc';
-import '../baseForm.js?v=b41d0cfc';
-import '../loader.js?v=b41d0cfc';
-import '../facets.js?v=b41d0cfc';
-import '../submitter.js?v=b41d0cfc';

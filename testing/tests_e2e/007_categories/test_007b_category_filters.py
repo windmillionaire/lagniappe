@@ -211,8 +211,8 @@ def test_category_filter_results_respect_page_permissions(get_user):
     category = Categories.test_category_filter_pages.get(owner)
     visible = Pages.test_category_filter_permission_visible.get(owner)
     hidden = Pages.test_category_filter_permission_hidden.get(owner)
-    if "owner" not in hidden.entity.properties.restricted_to.stored:
-        hidden.entity.properties.restricted_to.add("owner")
+    if hidden.entity.properties.restricted_to.stored != ["admin"]:
+        hidden.entity.properties.restricted_to.materialize(admin_only=True)
         hidden.entity.save()
 
     subject = get_user(Users.general_models_view_only)

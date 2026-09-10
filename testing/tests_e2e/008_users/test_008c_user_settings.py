@@ -104,7 +104,7 @@ def _session_page_key(user):
 
 
 # @matrix notification-email : default-daily user-setting
-# @matrix user-settings : field-order group-selector-hidden personal-page readonly-email sign-out
+# @matrix user-settings : field-order group-selector-hidden personal-page readonly-email restrictions sign-out
 # @template pages/info.html::user_settings
 def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     owner = get_user(Users.OWNER)
@@ -170,6 +170,26 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
         )
     assert forged["status"] == 403
     assert Entities.USER.load(user.email).ai_access == "NONE"
+
+    stored_restrictions = list(
+        Entities.fetch_one(user.entity.page.key, request=Fetch.root()).db.get("restricted_to") or []
+    )
+    with browser_failures.expect_http_error(user, status=403, path=update_path):
+        forged_restrictions = browser_fetch(
+            user,
+            update_path,
+            method="PUT",
+            data={
+                "role": "user-settings",
+                "name": user.name,
+                "restrictions": "true",
+                "admin": "on",
+            },
+        )
+    assert forged_restrictions["status"] == 403
+    assert list(
+        Entities.fetch_one(user.entity.page.key, request=Fetch.root()).db.get("restricted_to") or []
+    ) == stored_restrictions
 
     _assert_sign_out_button_in_user_header(settings_panel)
 
@@ -372,7 +392,7 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     created_user_page_key = created_user.entity.page.urlsafe_key
 
     owner.go(SitePages.USER_INDEX)
-    target_row = owner.locate(f"#table tr[data-key='{created_user.key}']")
+    target_row = owner.locate(f"#table tr[data-key='{created_user_page_key}']")
     expect(target_row).to_be_visible()
     with owner.page.expect_navigation():
         target_row.get_by_role("link", name=created_user.name, exact=True).click()
@@ -419,7 +439,9 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     expect(controls.locator("button[lp-help='user_settings']")).to_be_visible()
     expect(controls.locator(Buttons.LP_CLOSE)).to_be_visible()
     expect(settings_panel.locator("[data-role='restrict-access']")).to_be_visible()
-    expect(settings_panel.locator("[data-role='visible-to']")).to_be_visible()
+    expect(settings_panel.locator("[data-role='visible-to']")).not_to_be_visible()
+    expect(settings_panel.locator("[data-role='user-card'] button[type='submit']")).to_have_count(0)
+    expect(settings_panel.locator(":scope > [data-role='submit-group'] > button[type='submit']")).to_be_visible()
 
     restrictions_help = controls.locator(Buttons.LP_HELP)
     restrictions_close = controls.locator(Buttons.LP_CLOSE)
@@ -577,6 +599,7 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
 
 # @matrix user-settings : attached-form categories restrictions submit-boundary
 # @pair cache:invalidation-acknowledgement
+# @template pages/info.html::user_settings
 def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_basic_inputs_submission.get(owner)
@@ -623,6 +646,9 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     restriction_keys = {g.key for g in page_entity.groups}
 
     settings_panel = open_user_settings(owner, user_page)
+    expect(settings_panel.locator("[data-role='user-card'] button[type='submit']")).to_have_count(0)
+    shared_submit = settings_panel.locator(":scope > [data-role='submit-group'] > button[type='submit']")
+    expect(shared_submit).to_be_visible()
     updated_name = f"Updated Settings User {suffix}"
     updated_email = f"updated-settings-user-{suffix}@example.test"
     settings_panel.locator("input[name='name']").fill(updated_name)
@@ -630,9 +656,20 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     Select(settings_panel.locator("[data-role='user-groups']")).select_by_name(
         membership_group.definition.name
     )
+    settings_panel.locator(
+        f"button[data-role='remove-restriction'][data-key='{restriction_group.key}']"
+    ).click()
+    Select(settings_panel.locator(Page.PAGE_RESTRICT_GROUP_INPUT)).select_by_key(
+        membership_group.key, query=membership_group.definition.name
+    )
+    # User settings submits Page restrictions with the rest of its draft.
+    assert {
+        group.key
+        for group in Entities.fetch_one(user_page.key, request=Fetch.direct()).groups
+    } == restriction_keys
 
     with owner.page.expect_response("**/pages/*/update"):
-        SpinnerButtons.UPDATE.click(settings_panel)
+        shared_submit.click()
     assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_panel)
 
     saved_page = Entities.fetch_one(user_page.key, request=Fetch.direct())
@@ -643,7 +680,7 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     assert saved_user.invalidate_cache is True
     assert saved_page.form.key == form_key
     assert {c.key for c in saved_page.categories} == category_keys
-    assert {g.key for g in saved_page.groups} == restriction_keys
+    assert {g.key for g in saved_page.groups} == {membership_group.entity.key}
 
     affected_user = get_user(Users.ANONYMOUS)
     login_page = affected_user.go(SitePages.LOGIN_PAGE)
@@ -691,7 +728,7 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     )
     expect(
         settings_panel.locator(Page.PAGE_RESTRICTED_GROUP_LIST).filter(
-            has_text=restriction_group.definition.name
+            has_text=membership_group.definition.name
         )
     ).to_be_visible()
 

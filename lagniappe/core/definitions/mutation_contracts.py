@@ -122,10 +122,12 @@ ENTITY_MUTATION_CONTRACTS = {
         EntityMutationContract(
             "file",
             (
-                relation("page", "page", gateway="AttachedPage", on_target_delete=DeletePolicy.CASCADE),
+                relation("page", "page", on_target_delete=DeletePolicy.CASCADE),
                 relation("task", "task", authority=RelationAuthority.MIRRORED,
                          gateway="TaskFiles", on_source_delete=DeletePolicy.UNLINK,
                          on_target_delete=DeletePolicy.CASCADE, mirrored=True),
+                relation("task_page", "page", authority=RelationAuthority.MIRRORED,
+                         gateway="File.normalize_owner", mirrored=True),
                 relation("report_user", "user"),
             ),
         ),

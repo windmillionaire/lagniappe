@@ -2,9 +2,8 @@
 
 from google.genai import types
 
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from ...auth.restrictions import prepare_permissions
 
 
 GET_ENTITY = types.FunctionDeclaration(
@@ -48,7 +47,6 @@ def execute_get_entity(args, user):
     if not entity:
         return {"error": "Entity not found"}
 
-    prepare_permissions(entity, action=Action.EDIT)
     if not entity.allowed(Action.VIEW, user):
         return {"error": "Access denied"}
 
@@ -61,11 +59,16 @@ def execute_get_entity(args, user):
 # @covered-by lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
 # @reason entity lookup shape is exercised through the public get_entity tool
 def _load_entity(identifier):
-    entity = Entities.fetch_one(identifier, request=Fetch.direct())
-    if isinstance(entity, Entities.TASK) and entity.page:
-        # Task AI output includes categories derived from its parent Page. Make
-        # that Page an explicit direct root without widening every entity kind.
-        Entities.fetch(entity, entity.page, request=Fetch.direct())
+    entity = Entities.fetch_one(identifier, request=Fetch.root())
+    if isinstance(entity, (Entities.TASK, Entities.FILE)):
+        Entities.fetch_one(entity, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    elif isinstance(entity, Entities.TASK_HISTORY):
+        Entities.fetch(
+            entity, entity.properties.task.key, *entity.db.get("files", []),
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+        )
+    elif entity is not None:
+        Entities.fetch_one(entity, request=Fetch.direct())
     return entity
 
 

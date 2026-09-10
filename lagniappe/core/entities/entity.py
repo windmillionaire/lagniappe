@@ -1,17 +1,18 @@
 import json
-import hashlib
 from datetime import datetime, timezone
 
 from google.cloud import datastore
 
 from .. import mixins
-from ..definitions import Action, MutationIntent
+from ..definitions import Action, MutationIntent, Restriction
+from ..definitions.fingerprints import base_fingerprint
 from ..entities import Entities
 from ..exceptions import PropertyError
 from ..properties import common_entity
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
 from ..tools.auth.context import current_context_user
+from ..tools.auth.restrictions import restriction_fields
 
 
 # @testable infrastructure
@@ -151,10 +152,13 @@ class Entity:
     def temporary(self):
         return self._temporary
 
+    # @testable true
+    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_restricted_fingerprints_share_the_entity_and_cache_formula
+    # @matrix cache permissions : fingerprint modified
     @property
     def fingerprint(self):
         modified = self.modified or datetime.now(timezone.utc)
-        return hashlib.md5(modified.isoformat().encode("utf-8")).hexdigest()
+        return base_fingerprint(modified)
 
     @property
     def properties(self):
@@ -278,7 +282,9 @@ class Entity:
     # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_default_entity_fields_are_not_duplicated_in_submission_search_cache
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_cache_stores_detail_parent_pointers
+    # @tests tests_unit/test_002_entity_general_properties.py::test_restriction_fields_keep_source_boundaries
     # @matrix cache : cache-deduplication default-fields details-key parent-key
+    # @matrix permissions cache : source-clauses stable-order
     @property
     def to_cache(self):
         if self.reserved or not self.hash:
@@ -292,6 +298,7 @@ class Entity:
             for p in self.properties.implementing(mixins.CacheMixin)
             if isinstance(p.cache_value, str)
         }
+        cache.update(restriction_fields(getattr(self, "restricted_to", {})))
 
         details = self.details
         cache["id"] = details["id"]
@@ -377,6 +384,9 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
+    # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
+    # @matrix task permissions : source-clauses assignee-override parent-page restricted-access
+    # @matrix task permissions : source-clauses admin-only
     # @matrix page permissions user-groups : group-match restricted-access
     def restricted_access(self, user):
         if not user or not user.is_authenticated:
@@ -384,11 +394,17 @@ class Entity:
         elif getattr(user, "is_admin", getattr(user, "is_owner", False)):
             return False
 
-        if getattr(self, "restricted_to", False):
+        restrictions = getattr(self, "restricted_to", {})
+        if restrictions:
             belongs_to = user.properties.restrictions.belongs_to
-            view_access = set(self.restricted_to) & set(belongs_to)
-            if not view_access:
+            if belongs_to is Restriction.BELONGS_TO_ALL:
+                return False
+            if belongs_to is Restriction.BELONGS_TO_NONE:
                 return True
+            return any(
+                "admin" in groups or not set(groups).intersection(belongs_to)
+                for groups in restrictions.values()
+            )
 
         return False
 

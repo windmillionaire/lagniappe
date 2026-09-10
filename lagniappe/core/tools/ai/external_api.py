@@ -6,7 +6,7 @@ import hashlib
 import json
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools import cache, dates
@@ -1120,7 +1120,7 @@ def _validate_reference_visibility(proposal, report, user):
 
     entities = Entities.fetch(
         *[details[value].get("id") for value in hashes],
-        request=Fetch.direct(),
+        request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
     )
     by_hash = {entity.hash: entity for entity in entities if entity}
     report_files = {file.hash for file in report.input_files}
@@ -1296,7 +1296,10 @@ def public_execution_receipt(report, user):
     entities = (
         {
             entity.urlsafe_key: entity
-            for entity in Entities.fetch(*identifiers, request=Fetch.direct())
+            for entity in Entities.fetch(
+                *identifiers,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )
             if entity and entity.allowed(Action.VIEW, user=user)
         }
         if identifiers

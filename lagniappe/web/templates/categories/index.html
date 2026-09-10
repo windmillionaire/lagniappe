@@ -102,6 +102,7 @@
 {% macro view() %}
   {% set category = index.entity if index else filtered.parent %}
   <div lp-view
+       data-authorization="{{ current_user.authorization_fingerprint }}"
        lp-entity
        data-kind="category"
        data-index="category"

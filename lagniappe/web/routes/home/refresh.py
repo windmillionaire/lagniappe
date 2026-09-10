@@ -1,4 +1,4 @@
-"""Batched collection refresh with root-depth modified-time comparison."""
+"""Batched collection refresh with cached-fingerprint comparisons."""
 
 from flask import get_template_attribute, request
 from flask_login import current_user
@@ -46,7 +46,10 @@ def _render_upserts(collection, entities):
     return [
         {
             "key": entity.urlsafe_key,
-            "html": render(entity, collection.parent).strip(),
+            "html": render(
+                entity.user if collection.kind == "user-index" else entity,
+                collection.parent,
+            ).strip(),
         }
         for entity in entities
     ]
@@ -123,14 +126,13 @@ def refresh():
             {"targets": [_fallback(target) for target in targets]}
         )
 
-    client_fingerprint = view.get("fingerprint")
-    if (
-        isinstance(client_fingerprint, str)
-        and client_fingerprint
-        and client_fingerprint == refresh_view.fingerprint
-    ):
+    # Form tables use full fragments; their rows cannot change independently
+    # of the Forms collection revision.
+    if view.get("index") == "forms" and refresh_view.matches(view):
         return responses.json_response(
-            {"fingerprint": refresh_view.fingerprint, "targets": []}
+            {"fingerprint": refresh_view.fingerprint,
+             "authorization": refresh_view.authorization,
+             "collection_revision": refresh_view.collection_revision, "targets": []}
         )
 
     refreshed = []
@@ -157,5 +159,7 @@ def refresh():
             refreshed.append(_fallback(target))
 
     return responses.json_response(
-        {"fingerprint": refresh_view.fingerprint, "targets": refreshed}
+        {"fingerprint": refresh_view.fingerprint,
+         "authorization": refresh_view.authorization,
+         "collection_revision": refresh_view.collection_revision, "targets": refreshed}
     )

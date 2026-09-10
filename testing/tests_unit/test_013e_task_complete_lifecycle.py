@@ -701,6 +701,8 @@ def test_task_create_history_entry_accepts_completion_overrides(
     assert writes[history.key].property_mask is None
     assert set(writes[event_file.key].property_mask) == {
         "task",
+        "page",
+        "task_page",
         "requires",
         "modified",
     }

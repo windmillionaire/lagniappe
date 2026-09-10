@@ -159,9 +159,15 @@ older startup request cannot overwrite newer permissions or their invalidation.
 
 `entities/index.py` contains site-level paginated list models. `TaskIndex`,
 `PageIndex`, `FormIndex`, and `UserIndex` apply the viewer's restrictions,
-preserve Datastore query order, load results through `Fetch.direct()`, and
+preserve Datastore query order, load results through `Fetch.direct()` (nested
+for Tasks and Users so their Page/Form dependencies are resolved), and
 publish cursors used by lazy row routes. Task pages combine two ordered query
 streams: due-dated tasks first, then undated tasks by recent modification.
+
+User table rows use their Page's key, hash, and cached fingerprint. The User
+still supplies columns and authorization. A changed Users collection revision
+refreshes those columns, including User-only fields such as groups and last login;
+an unchanged collection compares the existing Page projections in cache.
 
 ## Package imports
 

@@ -1,12 +1,12 @@
 from flask import url_for
 
 from ..definitions import Action, MutationIntent
+from ..definitions.fingerprints import restricted_fingerprint
 from ..mixins import AssetMixin
 from ..properties import file_assets, file_entity, file_options, file_related, common_entity
 from ..tools.auth.context import current_context_user
 from .entity import Entity
 from ..tools.auth.restrictions import permission_relation
-from ..tools.auth.restrictions import prepare_permissions
 
 
 # @testable true
@@ -19,15 +19,16 @@ class File(AssetMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_report_file_is_searchable_only_after_workspace_attachment
+    # @tests tests_unit/test_006_file_properties.py::test_unattached_upload_is_private_to_its_uploader_and_admin
     # @pairs ai-report:pre-execution files:search-visibility
     @property
     def searchable(self):
-        """Keep report-only evidence out of workspace search until attachment."""
+        """Keep staged uploads out of workspace search until attachment."""
         return self.has_references
 
     @property
     def exclude_from_index(self):
-        return frozenset({"summary", "options", "assets"})
+        return frozenset({"summary", "options", "assets", "task_page"})
 
     @property
     def required(self):
@@ -39,11 +40,32 @@ class File(AssetMixin, Entity):
 
     @property
     def owner(self):
-        if self.properties.page.key and self.properties.task.key:
-            raise ValueError("A File cannot belong to both a Page and a Task")
-        if self.properties.page.key:
-            return permission_relation(self, "page", required=True)
-        return permission_relation(self, "task")
+        if self.properties.task.key:
+            return permission_relation(self, "task", required=True)
+        return permission_relation(self, "page")
+
+    # @testable true
+    # @tests tests_unit/test_006_file_properties.py::test_file_save_normalizes_task_page_and_restriction_fingerprint
+    # @matrix files : ownership parent-key fingerprint restrictions
+    @property
+    def fingerprint(self):
+        return restricted_fingerprint(super().fingerprint, self.restricted_to)
+
+    # @testable true
+    # @tests tests_unit/test_006_file_properties.py::test_file_save_normalizes_task_page_and_restriction_fingerprint
+    # @matrix files : ownership parent-key restrictions
+    def normalize_owner(self):
+        """Keep direct ownership separate from the primary Task's Page."""
+        if self.properties.task.key:
+            task = permission_relation(self, "task", required=True)
+            self.page = None
+            self.task_page = permission_relation(task, "page", required=True)
+        else:
+            self.task_page = None
+        self.properties.requires.unset()
+        self.properties.restricted_to.unset()
+        self._details = None
+        self._to_cache = None
 
     @property
     def has_references(self):
@@ -57,7 +79,6 @@ class File(AssetMixin, Entity):
     def move_to(self, owner):
         if getattr(owner, "entity_kind", None) not in {"page", "task"}:
             raise ValueError("A File must belong to a Page or a live Task")
-        prepare_permissions(self, owner)
         previous = self.owner
         if previous and previous.key == owner.key:
             return False
@@ -111,6 +132,7 @@ class File(AssetMixin, Entity):
                 "summary": file_entity.Summary,
                 "page": file_related.AttachedPage,
                 "task": file_related.AttachedTask,
+                "task_page": file_related.TaskPage,
                 "restricted_to": common_entity.RestrictedTo,
                 "report_user": file_related.ReportUser,
                 "extract": file_options.Extract,
@@ -120,6 +142,11 @@ class File(AssetMixin, Entity):
         )
         return properties
 
+    # @testable true
+    # @tests tests_unit/test_006_file_properties.py::test_unattached_upload_is_private_to_its_uploader_and_admin
+    # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_lists_pages_that_reference_it
+    # @matrix files : uploads temporary-view-ownership
+    # @matrix file : attached-pages permissions
     def allowed(self, action, user=None):
         user = current_context_user(user)
         action = Action.EDIT if action.implies(Action.EDIT) else action
@@ -133,7 +160,7 @@ class File(AssetMixin, Entity):
                 getattr(user, "is_admin", False)
                 or (action is Action.VIEW and report_key == user.key)
             ))
-        return super().allowed(action, user=user)
+        return bool(user and user.is_authenticated and getattr(user, "is_admin", False))
 
     @classmethod
     def create(cls, page=None, upload=None, data=None, *, key=None, report_user=None):

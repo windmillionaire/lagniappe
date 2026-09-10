@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lagniappe.core.definitions import Action, Comparator, MutationIntentType
+from lagniappe.core.definitions import Action, Comparator, MutationIntentType, Restriction
 from lagniappe.core.exceptions import unloaded_relations as unloaded_relations_module
 from lagniappe.core.exceptions import UnloadedRelationError, ValidationError
 from lagniappe.core.entities.task import Task
@@ -678,6 +678,62 @@ def test_task_allowed_assigned_user_page_override():
         assert task.allowed(Action.VIEW, user=assigned)
         assert task.allowed(Action.EDIT, user=assigned)
         assert not task.allowed(Action.VIEW, user=other)
+
+
+# @matrix permissions : source-clauses inherited-restrictions
+# @matrix task permissions : source-clauses assignee-override parent-page restricted-access
+@pytest.mark.parametrize("groups,allowed", [
+    (Restriction.BELONGS_TO_NONE, False), (["a"], False), (["b"], False),
+    (["a", "d"], False), (["b", "d"], True), (["a", "c", "e"], True),
+    (["a", "b", "c", "d", "e"], True),
+])
+@pytest.mark.unit
+def test_task_restrictions_require_each_source_with_any_group(groups, allowed):
+    page_form = TestEntities.get("FORM", {"hash": "pageform", "restricted_to": ["b", "c"]})
+    task_form = TestEntities.get("FORM", {"hash": "taskform", "restricted_to": ["d", "e"]})
+    page = TestEntities.get("PAGE", {"hash": "restrictedpage", "restricted_to": ["a", "b"]})
+    page.form = page_form
+    task = TestEntities.get("TASK", {"hash": "restrictedtask"}, page=page)
+    task.form = task_form
+    viewer = UtilityTestUser(owner=False, permissions={page.hash: "EDIT"})
+    viewer.db["belongs_to"] = groups
+
+    assert page.restricted_to == {"page": ["a", "b"], "page_form": ["b", "c"]}
+    assert task.restricted_to == {
+        "page": ["a", "b"], "page_form": ["b", "c"], "task_form": ["d", "e"],
+    }
+    assert task.allowed(Action.VIEW, user=viewer) is allowed
+    assert task.allowed(Action.EDIT, user=viewer) is allowed
+
+    viewer.db["permissions"] = {}
+    viewer.page = SimpleNamespace(key="assignedpage")
+    task.db["assigned_to"] = viewer.page.key
+    assert task.allowed(Action.VIEW, user=viewer) is allowed
+    assert task.allowed(Action.EDIT, user=viewer) is allowed
+    assert task.allowed(Action.DELETE, user=viewer) is False
+
+
+# @matrix task permissions : source-clauses admin-only
+# @source lagniappe/core/properties/common_entity.py::RestrictedTo.value
+# @source lagniappe/core/entities/entity.py::Entity.restricted_access
+@pytest.mark.parametrize("admin_source", ["page", "page_form", "task_form"])
+def test_task_restrictions_preserve_other_sources_when_one_requires_admin(admin_source):
+    page = TestEntities.get("PAGE", {"hash": "adminpage", "restricted_to": ["a"]})
+    page_form = TestEntities.get("FORM", {"hash": "adminpageform", "restricted_to": ["b"]})
+    task_form = TestEntities.get("FORM", {"hash": "admintaskform", "restricted_to": ["c"]})
+    page.form = page_form
+    task = TestEntities.get("TASK", {"hash": "admintask"}, page=page)
+    task.form = task_form
+    sources = {"page": page, "page_form": page_form, "task_form": task_form}
+    expected = {"page": ["a"], "page_form": ["b"], "task_form": ["c"]}
+    sources[admin_source].db["restricted_to"].append("admin")
+    expected[admin_source] = ["admin"]
+
+    assert task.restricted_to == expected
+    viewer = UtilityTestUser(owner=False, permissions={page.hash: "EDIT"})
+    viewer.db["belongs_to"] = ["a", "b", "c", "admin"]
+    assert task.allowed(Action.VIEW, user=viewer) is False
+    assert task.allowed(Action.VIEW, user=UtilityTestUser(owner=True)) is True
 
 
 # @matrix permissions task : lazy-parent-check shallow-page stored-requires

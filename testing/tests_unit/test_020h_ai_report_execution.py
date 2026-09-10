@@ -20,6 +20,7 @@ from lagniappe.core.tools.ai.reporting.execution.actions.registry import (
 )
 from testing.utility.ai_report_fakes import (
     _attach_report_process,
+    _fetch_from,
     _fetch_one_from,
     _patch_fake_keys,
     _recovery_store,
@@ -158,7 +159,8 @@ def test_complete_task_action_preserves_details_retries_and_undoes(
     assert report_runner.run_report(report, user)["status"] == "complete"
     assert calls.count("complete") == 1
     assert task.completed_on == completion
-    assert report_undo.undo_report(report, user)["status"] == "complete"
+    undone = report_undo.undo_report(report, user)
+    assert undone["status"] == "complete", undone
     assert _completion_state(task) == before
     assert task.submission == {"notes": "Keep these values"}
     assert task.files == old_files
@@ -1315,6 +1317,7 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
         "fetch_one",
         _fetch_one_from(entities),
     )
+    monkeypatch.setattr(report_runner.Entities, "fetch", _fetch_from(entities))
     monkeypatch.setattr(
         report_runner.Entities,
         "save",
@@ -1328,7 +1331,7 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
 
     undo = report_undo.undo_report(report, user)
 
-    assert undo["status"] == "complete"
+    assert undo["status"] == "complete", undo
     assert report.status == "ready"
     assert report.pending is False
     assert report.result["status"] == "undone"

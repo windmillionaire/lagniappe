@@ -77,7 +77,10 @@
         {{- format_name(value, link=column.link, parent=column.parent, icon=value.form_type if value.kind == 'form' else False) -}}
       </span>
       {% if not parent.table.embedded %}
-        <span class="sm:hidden">{{ delete(label='Delete ' ~ entity.name) }}</span>
+        <span class="sm:hidden">
+          {{ delete(label='Delete ' ~ entity.name,
+                    modal_route=url_for('internal.delete', key=entity.urlsafe_key) if entity.entity_kind == 'user' else None) }}
+        </span>
       {% endif %}
     </div>
   {%- elif field.is_entity_valued and value is mapping -%}

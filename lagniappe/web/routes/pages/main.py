@@ -45,12 +45,17 @@ def _is_public_users_own_page(page):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_preloads_existing_groups
+# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
 # @matrix user-settings : group-selector preload relation-loading
-def _load_user_settings_groups(page):
-    """Attach group relations needed by another user's settings selector."""
+# @matrix pages : access-restrictions group-restricted
+def _load_page_settings_relations(page, *, restrictions=False):
+    """Attach the group relations rendered by Page settings at the route boundary."""
+    entities = [page.form] if restrictions and page.form else []
     is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
     if page.user and current_user.is_admin and not is_own_page:
-        Entities.fetch_one(page.user, request=Fetch.direct())
+        entities.append(page.user)
+    if entities:
+        Entities.fetch(*entities, request=Fetch.direct())
     return page
 
 
@@ -58,11 +63,16 @@ def _load_user_settings_groups(page):
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_is_forbidden_without_model_or_page_permission
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_can_read_document_content
+# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_page_restriction_summary_does_not_invent_local_badges
 # @matrix pages : document-tab load permission-gates readonly tabs
+# @matrix pages : access-restrictions source-summary
 @pages.route("<key>", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def view(key, **kwargs):
-    page = _load_user_settings_groups(kwargs["entity"])
+    page = _load_page_settings_relations(
+        kwargs["entity"],
+        restrictions=Resource.USER.allowed(Action.PERMISSIONS),
+    )
 
     return responses.page(page)
 
@@ -82,10 +92,13 @@ def info(key, **kwargs):
 @pages.route("<key>/user-settings/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def user_settings(key, **kwargs):
-    page = _load_user_settings_groups(kwargs["entity"])
+    page = kwargs["entity"]
     is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
     if not page.user or not (is_own_page or Resource.USER.allowed(Action.PERMISSIONS)):
         abort(403)
+    _load_page_settings_relations(
+        page, restrictions=Resource.USER.allowed(Action.PERMISSIONS)
+    )
     return responses.user_settings(page)
 
 
@@ -94,7 +107,8 @@ def user_settings(key, **kwargs):
 @pages.route("<key>/permissions/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.PERMISSIONS)
 def permissions(key, **kwargs):
-    return responses.page_permissions(kwargs["entity"])
+    page = _load_page_settings_relations(kwargs["entity"], restrictions=True)
+    return responses.page_permissions(page)
 
 
 # @testable infrastructure
@@ -292,11 +306,10 @@ def _is_offline_replay(form):
     return str(form.get("offline", "")).lower() == "true"
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::_page_form_submission_response
-# @covered-by lagniappe/web/routes/pages/main.py::_apply_page_submission
-# @covered-by lagniappe/web/routes/pages/main.py::_apply_page_metadata_update
-# @reason endpoint coordinates request flow while focused helpers own page form and submission behavior
+# @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
+# @matrix user-settings : restrictions submit-boundary
 @pages.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def update(key, **kwargs):
@@ -342,15 +355,24 @@ def update(key, **kwargs):
     except exceptions.ValidationError as error:
         return responses.error(str(error))
     if role == "user-settings":
+        if request.form.get("restrictions") == "true" and not page.allowed(
+            Action.PERMISSIONS
+        ):
+            abort(403)
         try:
+            if request.form.get("restrictions") == "true":
+                _apply_page_access_restrictions(page, request.form)
             _apply_user_settings_update(page, page_data, user=current_user)
         except PermissionError:
             abort(403)
-        except ValueError as error:
+        except (exceptions.ValidationError, ValueError) as error:
             return responses.error(str(error))
         page.save()
         if not page.user:
             return responses.json_response({"reload": True})
+        _load_page_settings_relations(
+            page, restrictions=Resource.USER.allowed(Action.PERMISSIONS)
+        )
         return responses.user_settings(page)
 
     if role in ["autofill-submit", "explain"]:
@@ -725,41 +747,22 @@ def public_image(public_id, asset_name):
 
 
 # @testable true
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_owner_can_open_page_permissions_panel
-# @matrix pages : permission-gates permissions-panel
-def _page_view_access_response(page):
-    return responses.page_view_access(page)
-
-
-# @testable true
 # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_owner_restricted_page_is_hidden_from_model_viewer
-# @matrix pages : access-restrictions owner-restricted
-def _apply_owner_access_restriction(page, owner):
-    if owner == "add":
-        page.groups = None
-        page.properties.restricted_to.materialize(owner_only=True)
-    elif owner == "remove":
-        page.properties.restricted_to.materialize(owner_only=False)
-
-
-# @testable true
 # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
-# @matrix pages : access-restrictions group-restricted
-def _apply_group_access_restriction(page, group_action, group_key):
-    group = Entities.fetch_one(group_key, request=Fetch.direct())
-    if not group:
-        abort(404)
-    if group_action == "add":
-        page.properties.groups.add(group)
-    elif group_action == "remove":
-        page.properties.groups.remove(group)
-    page.properties.restricted_to.materialize(owner_only=False)
+# @matrix pages : access-restrictions group-restricted owner-restricted submitted-reference
+def _apply_page_access_restrictions(page, form):
+    admin_only = form.get("admin") in {"on", "true"}
+    keys = [] if admin_only else form.getlist("group-key")
+    groups = SubmittedReferenceResolver(current_user, *keys).many(
+        keys, expected=Entities.USER_GROUP, action=Action.VIEW
+    )
+    page.groups = groups
+    page.properties.restricted_to.materialize(admin_only=admin_only)
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::_page_view_access_response
-# @covered-by lagniappe/web/routes/pages/main.py::_apply_owner_access_restriction
-# @covered-by lagniappe/web/routes/pages/main.py::_apply_group_access_restriction
+# @covered-by lagniappe/web/routes/pages/main.py::_apply_page_access_restrictions
+# @covered-by lagniappe/web/responses.py::page_permissions
 # @reason endpoint coordinates page access requests while focused helpers own response and mutation behavior
 @pages.route("<key>/view-access", methods=["GET", "PUT"])
 @permission(Resource.PAGE, Action.PERMISSIONS)
@@ -767,14 +770,11 @@ def view_access(key, **kwargs):
     page = kwargs["entity"]
 
     if request.method == "PUT":
-        owner = request.form.get("owner")
-        group = request.form.get("group")
-        if owner:
-            _apply_owner_access_restriction(page, owner)
-        elif group:
-            _apply_group_access_restriction(page, group, request.form.get("group-key"))
-        page._reconcile_restrictions = True
-        page.save()
-        return _page_view_access_response(page)
+        try:
+            _apply_page_access_restrictions(page, request.form)
+            page.save()
+        except (exceptions.ValidationError, ValueError) as error:
+            return responses.error(str(error))
 
-    return _page_view_access_response(page)
+    _load_page_settings_relations(page, restrictions=True)
+    return responses.page_permissions(page)

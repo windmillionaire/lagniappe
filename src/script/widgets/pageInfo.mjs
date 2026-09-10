@@ -800,9 +800,11 @@ export class UserSettings extends PagePermissions {
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
 	 * @pair public-users:email-consent
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
+	 * @pair user-settings:restrictions
 	 */
 	get formData() {
-		const data = new FormData();
+		const data = super.formData;
 		const card = this.userCardElement;
 		const name = card?.querySelector("[name='name']");
 		const email = card?.querySelector("[name='email']");

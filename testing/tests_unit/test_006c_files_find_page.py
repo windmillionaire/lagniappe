@@ -29,7 +29,7 @@ def test_find_page_exact_name_match(monkeypatch):
         "warnings": [],
         "errors": [],
     }
-    assert calls == [("Target Page", "page", Restriction.UNRESTRICTED, ["owner"])]
+    assert calls == [("Target Page", "page", Restriction.UNRESTRICTED, Restriction.BELONGS_TO_ALL)]
 
 
 # @matrix ingress link : no-match page-match

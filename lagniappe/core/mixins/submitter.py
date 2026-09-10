@@ -4,6 +4,7 @@ from copy import deepcopy
 import hashlib
 import json
 
+from ..definitions.fingerprints import restricted_fingerprint
 from ..exceptions import ValidationError
 from ..entities import Entities
 from lagniappe.core.tools.database import get as database_get
@@ -125,8 +126,8 @@ class SubmitterMixin:
         save_submission(): Persist ``submission.db_value`` and form metadata.
         save_default_field(field_id, submission): Persist one field as a repeating
             default without running the entity's normal save plan.
-        fingerprint: MD5 combining the entity fingerprint with the form's cached
-            fingerprint (form modification), used when the entity has a form.
+        fingerprint: MD5 combining the base entity revision, its own Form's
+            schema version, and every effective restriction group.
     """
 
     # @testable true
@@ -393,15 +394,17 @@ class SubmitterMixin:
 
         return keys
 
+    # @testable true
+    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_restricted_fingerprints_share_the_entity_and_cache_formula
+    # @matrix permissions cache : fingerprint form-version
     @property
     def fingerprint(self):
-        fingerprint = super().fingerprint
-        if not self.form:
-            return fingerprint
-
-        return hashlib.md5(
-            f"{fingerprint}:{self.form.version}".encode("utf-8")
-        ).hexdigest()
+        form = self.form
+        return restricted_fingerprint(
+            super().fingerprint,
+            self.restricted_to,
+            form_version=(form.version or "") if form else "",
+        )
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_revision_tracks_only_form_apply_state

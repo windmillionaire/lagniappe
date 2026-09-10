@@ -36,7 +36,7 @@ class Builder:
     ADD_BUTTON = "button[data-role='add']"
     PREVIEW_TOGGLE = "#preview-toggle"
     RESTRICT_ACCESS = "[data-role='restrict-access']"
-    SPECIFIC_ACCESS_OWNER = "input[data-role='specific-access'][name='owner']"
+    SPECIFIC_ACCESS_OWNER = "input[data-role='specific-access'][name='admin']"
     RESTRICT_GROUP_INPUT = "[data-role='restrict-group-input']"
     RESTRICTED_GROUP_LIST = "li"
     SCHEMA_INPUT = "input[name='schema']"

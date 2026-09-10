@@ -19,6 +19,7 @@ import pytest
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.database import get as database_get
 from testing.definitions import Pages, Uploads, Users
 from testing.definitions.page_definitions import PageDefinition
 from testing.elements import MobileNav, Modal, Select, SpinnerButtons, Tabs
@@ -162,7 +163,7 @@ def test_file_page_shows_linked_page_and_task_badges(get_user):
 
     linked = user.locate(file.LINKED_ENTITIES)
     expect(linked).to_be_visible()
-    expect(linked.locator("a[href*='/pages/']")).to_have_count(0)
+    expect(linked.locator("a[href*='/pages/']")).to_have_count(1)
     expect(linked.locator("a[href*='/tasks/']")).to_contain_text(task_entity.name)
 
 
@@ -239,6 +240,7 @@ def test_file_info_moves_between_page_and_task(get_user):
     file_entity = Entities.fetch_one(file.key, request=Fetch.direct())
     assert file_entity.page.key == target_page.entity.key
     assert file_entity.task is None
+    assert file_entity.task_page is None
 
     task = Entities.TASK.create({"page": target_page.entity, "name": f"File owner task {uuid4().hex}"})
     task.save()
@@ -248,10 +250,13 @@ def test_file_info_moves_between_page_and_task(get_user):
         SpinnerButtons.UPDATE.click(info_form)
     linked = user.locate(file.LINKED_ENTITIES)
     expect(linked.locator("a[href*='/tasks/']")).to_contain_text(task.name)
-    expect(linked.locator("a[href*='/pages/']")).to_have_count(0)
+    expect(linked.locator("a[href*='/pages/']")).to_contain_text(target_page.definition.name)
     file_entity = Entities.fetch_one(file.key, request=Fetch.direct())
-    assert file_entity.task.key == task.key and file_entity.page is None
+    assert file_entity.task.key == task.key
+    assert file_entity.page is None
+    assert file_entity.task_page.key == task.page.key
     assert file_entity.key in Entities.fetch_one(task.key, request=Fetch.root()).db["files"]
+    assert file_entity.key not in {row.key for row in database_get.page_files(task.page.key)}
 
 
 # @matrix file : file-upload page-upload preview text-tab

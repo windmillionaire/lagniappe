@@ -383,7 +383,7 @@ def pages(
 # @testable false
 # @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
 def page_files(page_key):
-    """Fetch all file entities attached to a page."""
+    """Fetch Files owned directly by the Page."""
     return (
         Query(KINDS.files)
         .filter(Filter().eq("page", datastore_key(page_key)))

@@ -17,6 +17,53 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
+# @matrix ai-report files : execution-inputs initial-load staged-inputs
+@pytest.mark.unit
+@pytest.mark.parametrize("attached,skip", [(False, False), (True, False), (True, True)])
+def test_run_report_loads_attached_inputs_only_for_pending_file_work(monkeypatch, attached, skip):
+    from lagniappe.core.definitions import FetchDepth
+
+    _patch_fake_keys(monkeypatch)
+    user = _test_user("execution-input-owner")
+    page = TestEntities.get("PAGE", {"hash": "input-page", "restricted_to": ["page-group"]})
+    task = TestEntities.get("TASK", {"hash": "input-task"}, page=page)
+    task.form = TestEntities.get("FORM", {"hash": "input-task-form", "restricted_to": ["task-group"]})
+    file = _test_file("execution-input.pdf")
+    if attached:
+        file.db.update({"task": task.key, "task_page": page.key})
+        file.properties.task.unset()
+        file.properties.task_page.unset()
+    report = TestEntities.get("REPORT", {
+        "hash": "execution-input-report", "parent": user, "user": user,
+        "status": "ready", "input_files": [file],
+        "proposal": {
+            "summary": "Save the reviewed file summary.", "confidence": 0.9,
+            "actions": [{"id": "summary", "type": "summarize_file", "skip": skip,
+                         "data": {"file": file.urlsafe_key, "summary": "Reviewed summary."}}],
+        },
+    })
+    loaded = []
+
+    def fetch(*files, request):
+        assert attached and not skip
+        assert files == (file,) and request.depth is FetchDepth.NESTED
+        file.properties.task.attach({task.key: task})
+        file.properties.task_page.attach({page.key: page})
+        loaded.extend(files)
+        return list(files)
+
+    monkeypatch.setattr(report_runner.Entities, "fetch", fetch)
+    monkeypatch.setattr(report_runner.Entities, "save", lambda *_entities: None)
+
+    result = report_runner.run_report(report, user)
+
+    assert result["status"] == "complete"
+    assert loaded == ([file] if attached and not skip else [])
+    if not skip:
+        assert file.summary == "Reviewed summary."
+        assert file.restricted_to == ({"page": ["page-group"], "task_form": ["task-group"]} if attached else {})
+
+
 # @matrix ai-report : deterministic-run exact-id file-summary report-file-reference
 # @matrix files : deterministic-run exact-id report-file-reference
 @pytest.mark.unit

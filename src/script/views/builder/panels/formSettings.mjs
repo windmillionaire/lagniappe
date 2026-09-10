@@ -78,8 +78,16 @@ export class FormSettings {
 		}
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
+	 * @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
+	 */
 	_restrictionUpdated(event) {
 		if (this._destroyed) return;
+		if (Object.keys(event.detail.options).length) {
+			this.restrictions.querySelector("[name='admin']").checked = false;
+		}
 		const list = this.restrictions.querySelector("ul");
 		const template = this.restrictions.querySelector("template");
 		for (const [key, option] of Object.entries(event.detail.options)) {
@@ -102,9 +110,15 @@ export class FormSettings {
 	/**
 	 * @testable true
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
-	 * @matrix forms : access-restrictions owner-restricted
+	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
+	 * @matrix forms : access-restrictions explicit-submit owner-restricted
 	 */
 	_input(event) {
+		if (event.target.name === "admin" && event.target.checked) {
+			this.restrictions.querySelector("ul").replaceChildren();
+			this.selectGroup.clear({ notify: false });
+			this.restrictionForm.markUnsavedState();
+		}
 		if (event.target.name === "description" && this.generateForm?.target) {
 			const explain = this.generateForm.target.querySelector(
 				"[data-role='explain']",

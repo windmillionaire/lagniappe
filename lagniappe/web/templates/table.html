@@ -95,10 +95,12 @@
 {% endmacro %}
 
 {% macro row(e, parent) %}
-  <tr data-key="{{ e.urlsafe_key }}"
+  {% set identity = e.page if e.entity_kind == 'user' else e %}
+  <tr data-key="{{ identity.urlsafe_key }}"
+      data-hash="{{ identity.hash }}"
       lp-entity
-      data-fingerprint="{{ e.fingerprint }}"
-      data-modified="{{ e.modified.isoformat() }}"
+      data-fingerprint="{{ identity.fingerprint }}"
+      data-modified="{{ identity.modified.isoformat() }}"
       lp-link
       {% if not parent.table.embedded %}class="cursor-pointer"{% endif %}
       {% if parent.table.kind == 'user' %}data-public="{{ e.is_public|yesno }}"{% endif %}
@@ -106,7 +108,10 @@
     {% for column in parent.table.fields.values() %}{{ cell(column, e, parent) }}{% endfor %}
     {% if not parent.table.embedded %}
       <td class="{{ styles.table.cell.action }}" data-column="delete">
-        {% if e.allowed(Action.DELETE) %}{{ delete(label='Delete ' ~ e.name) }}{% endif %}
+        {% if e.allowed(Action.DELETE) %}
+          {{ delete(label='Delete ' ~ e.name,
+                    modal_route=url_for('internal.delete', key=e.urlsafe_key) if e.entity_kind == 'user' else None) }}
+        {% endif %}
       </td>
     {% endif %}
   </tr>

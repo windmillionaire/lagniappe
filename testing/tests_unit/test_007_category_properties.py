@@ -117,9 +117,10 @@ def test_category_schema(get_test_entities, get_schema):
             assert category.schema is None
 
 
-# @matrix category form permissions : attached-form cache restricted-access
+# @matrix category permissions : attached-form cache restricted-access
+# @source lagniappe/core/entities/category.py::Category
 @pytest.mark.unit
-def test_category_restricted_to_follows_attached_form():
+def test_category_access_is_independent_of_attached_form_restrictions():
     viewer = UtilityTestUser(
         owner=False,
         permissions={"models": "VIEW", "forms": "VIEW"},
@@ -138,10 +139,21 @@ def test_category_restricted_to_follows_attached_form():
     )
 
     category.form = form
+    page = TestEntities.get(
+        "PAGE", {"name": "Restricted Form Page", "hash": "page007r"}
+    )
+    page.form = form
+    page.model = category
 
-    assert category.restricted_to == ["owner", "secret_group"]
-    assert not category.allowed(Action.VIEW, user=viewer)
-    assert category.to_cache["restricted_to"] == "owner,secret_group"
+    assert not form.allowed(Action.VIEW, user=viewer)
+    assert category.allowed(Action.VIEW, user=viewer)
+    assert not any(field.startswith("restricted_to") for field in category.to_cache)
+    assert not page.allowed(Action.VIEW, user=viewer)
+    assert page.to_cache["restricted_to_page_form"] == "secret_group"
+    assert not category.allowed(
+        Action.VIEW,
+        user=UtilityTestUser(owner=False, permissions={"forms": "VIEW"}),
+    )
 
 
 # @matrix category pages : default-category get-create

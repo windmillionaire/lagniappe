@@ -174,13 +174,14 @@ def expand_table_cell(key, table_id, **kwargs):
 def restrictions(key, **kwargs):
     form = kwargs["entity"]
 
-    keys = request.form.getlist("group-key")
+    admin_only = request.form.get("admin") in {"on", "true"}
+    keys = [] if admin_only else request.form.getlist("group-key")
     try:
         resolver = SubmittedReferenceResolver(current_user, *keys)
         groups = [resolver.one(key, expected=Entities.USER_GROUP, action=Action.VIEW, required=True)
                   for key in keys]
         form.groups = groups
-        form.properties.restricted_to.materialize(owner_only=request.form.get("owner") in {"on", "true"})
+        form.properties.restricted_to.materialize(admin_only=admin_only)
         form._reconcile_restrictions = True
         form.save()
     except (exceptions.ValidationError, ValueError) as error:

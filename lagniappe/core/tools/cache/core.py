@@ -11,6 +11,7 @@ from redis.commands.search.query import Query
 from config.redis import redis_client_kwargs
 from lagniappe import CONFIG
 from lagniappe.core.exceptions import capture
+from ..auth.restrictions import RESTRICTION_SOURCES
 
 from .keys import SEARCH_SCORE_FIELD, Keys, Search
 
@@ -92,7 +93,8 @@ class Cache:
                 TagField("kind"),
                 TagField("type"),
                 TagField("requires", index_empty=True),
-                TagField("restricted_to", index_missing=True),
+                *(TagField(f"restricted_to_{source}", index_missing=True)
+                  for source in RESTRICTION_SOURCES),
             )
             definition = IndexDefinition(
                 index_type=IndexType.HASH,

@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
 
@@ -35,7 +35,9 @@ def _publish_operation_projection(job, *, operation):
 
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
+# @matrix ai-report : input-files no-extra-read fresh-read
 def _load_reference(reference):
     if reference is None:
         return None
@@ -43,7 +45,12 @@ def _load_reference(reference):
         return reference
     if not isinstance(reference, dict) or not reference.get("id"):
         raise exceptions.ValidationError("Deferred job input reference is invalid.")
-    entity = Entities.fetch_one(reference["id"], request=Fetch.direct())
+    request = (
+        Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION)
+        if reference.get("kind") in {"file", "task", "task_history"}
+        else Fetch.direct()
+    )
+    entity = Entities.fetch_one(reference["id"], request=request)
     if entity is None or entity.entity_kind != reference.get("kind"):
         raise exceptions.ValidationError(
             f"Deferred job input {reference.get('kind')} is missing."

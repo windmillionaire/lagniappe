@@ -380,14 +380,18 @@ def _undo_summarize_file(action, user):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason report file preservation is exercised through public undo tests
+# @testable true
+# @tests tests_unit/test_006_file_properties.py::test_report_undo_distinguishes_primary_page_link_from_task_ancestry
+# @matrix ai-report files : undo parent-key
 def _detach_report_files_before_delete(entity, action, report):
     touched = []
     if isinstance(entity, Entities.PAGE):
         for file in report.input_files:
-            if _remove_file_page_reference(file, entity):
+            if entity.key in {file.properties.page.key, file.properties.task_page.key}:
+                # Page deletion also owns its Tasks. Preserve report inputs
+                # from both cascades before the owned File queries execute.
+                file.task = None
+                file.page = None
                 touched.append(file)
     elif isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
         files = _action_attachment_entities(action)
@@ -424,11 +428,11 @@ def _action_attachment_entities(action):
     return entities
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason relationship cleanup is exercised through public undo tests
+# @testable true
+# @tests tests_unit/test_006_file_properties.py::test_report_undo_distinguishes_primary_page_link_from_task_ancestry
+# @matrix ai-report files : undo parent-key
 def _remove_file_page_reference(file, page):
-    if file.properties.page.key != page.key:
+    if file.properties.task.key or file.properties.page.key != page.key:
         return False
     file.page = None
     return True
@@ -443,6 +447,7 @@ def _remove_task_file_reference(task, file, *, remove_task_attachment=True):
         changed = task.properties.files.remove(file)
     if file.properties.task.key == task.key:
         file.task = None
+        file.page = None
         changed = True
     return changed
 

@@ -5,7 +5,7 @@ from uuid import uuid4
 from flask_login import current_user
 from flask import url_for
 
-from ..definitions import Action, Fetch, MutationIntent, MutationIntentType
+from ..definitions import Action, Fetch, FetchReason, MutationIntent, MutationIntentType
 from ..exceptions import TaskCompletionError, ValidationError
 from ..mixins import AssetMixin, SubmitterMixin
 from ..properties import (
@@ -130,6 +130,8 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_models_view_requires_models_marker
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_restricted_form_blocks_page_permission
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_requires_loaded_page_even_with_stored_permission
+    # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
+    # @matrix task permissions : source-clauses assignee-override parent-page restricted-access
     # @matrix permissions task users : allowed assignee-override lazy-parent-check models-scope parent-page restricted-access shallow-page stored-requires user-page
     # @pair task:stored-requires
     def allowed(self, action, user=None):
@@ -138,12 +140,8 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             return False
 
         page = permission_relation(self, "page", required=True)
-        if page.restricted_access(user):
-            return False
-        if action is Action.VIEW:
-            if page.allowed(Action.VIEW, user=user):
-                return True
-        elif page.allowed(Action.EDIT, user=user):
+        page_action = Action.VIEW if action is Action.VIEW else Action.EDIT
+        if page.allowed(page_action, user=user):
             return True
         user_page = getattr(user, "page", None)
         return bool(
@@ -188,10 +186,26 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     @property
     def history(self):
         return sorted(
-            Entities.fetch(*database_get.task_history(self), request=Fetch.direct()),
+            self.load_history(*database_get.task_history(self)),
             key=lambda h: h.completed_on or datetime.min.replace(tzinfo=timezone.utc),
             reverse=True,
         )
+
+    # @testable true
+    # @tests tests_unit/test_006_file_properties.py::test_history_loading_resolves_moved_task_and_independently_moved_files
+    # @matrix files tasks : task-history parent-key restrictions
+    # @pair tasks:single-batch
+    def load_history(self, *records):
+        """Load snapshots with their live Task and current attachment owners."""
+        records = [record for record in records if record is not None]
+        file_keys = {key for record in records for key in record.get("files", [])}
+        return [
+            entity for entity in Entities.fetch(
+                self, *records, *file_keys,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )
+            if isinstance(entity, Entities.TASK_HISTORY)
+        ]
 
     def save_submission(self):
         super().save_submission()

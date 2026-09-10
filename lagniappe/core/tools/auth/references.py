@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 
-from ...definitions import Action, Fetch
+from ...definitions import Action, Fetch, FetchReason
 from ...entities import Entities
 from ...exceptions import ValidationError
 from lagniappe.core.tools.database import get as database_get
-from .restrictions import prepare_permissions
 
 
 UNAVAILABLE_REFERENCE_ERROR = "One or more selected items are unavailable."
@@ -51,6 +50,13 @@ class SubmittedReferenceResolver:
             for entity in Entities.fetch(*identifiers, request=Fetch.direct())
             if entity and getattr(entity, "key", None)
         }
+        Entities.fetch(
+            *(entity for entity in self._entities.values()
+              if isinstance(entity, (Entities.TASK, Entities.FILE))),
+            *(entity.task for entity in self._entities.values()
+              if isinstance(entity, Entities.TASK_HISTORY)),
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+        )
 
     @staticmethod
     def _reject():
@@ -80,7 +86,6 @@ class SubmittedReferenceResolver:
             self._reject()
 
         try:
-            prepare_permissions(*self._entities.values(), action=action or Action.VIEW)
             if predicate is not None and predicate(entity) is False:
                 self._reject()
 

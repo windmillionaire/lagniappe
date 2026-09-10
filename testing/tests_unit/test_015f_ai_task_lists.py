@@ -275,7 +275,7 @@ def test_compact_tasks_real_entities_support_focused_schema_and_detail_reads(
     monkeypatch.setattr(
         get_page_tasks.Entities,
         "fetch_one",
-        lambda identifier, request: registry[identifier],
+        lambda identifier, request: registry[identifier] if isinstance(identifier, str) else identifier,
     )
     monkeypatch.setattr(
         get_entity.Entities, "fetch", lambda *entities, request: list(entities)

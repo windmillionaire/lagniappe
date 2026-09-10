@@ -70,11 +70,33 @@ Site Settings summarizes the catalog as:
 Completed release groups are collapsed. Incomplete groups show attempts,
 repairs, errors, and links to the affected application surface.
 
-File-ownership (`FIL-001`) failures link to the affected File, using its display
+File-ownership (`FIL-001`, `FIL-002`) failures link to the affected File, using its display
 name or filename when available. Saved failures from builds that recorded only
 keys gain those links when Site Settings loads, without rerunning the migration
 or rewriting audit history. Only old unlinked failures require a bounded batch
 of file-name reads; missing files retain an “Open file” link.
+
+The 2.0 follow-up migrations are append-only. `FIL-002` persists a Task File's
+current Page in the unindexed `task_page` relation and removes its direct `page` link. A directly
+attached File keeps `page` and has neither `task` nor `task_page`. The migration
+normalizes legacy TaskHistory ownership to the live Task, recalculates stale
+`task_page` values, and preserves private staged uploads without inferring an
+attachment from that derived field. An interim singular `task`/`page` pair that
+matches the Task's Page becomes `task`/`task_page`; conflicting direct ownership
+still requires repair. The preceding `FIL-001` resolves legacy plural
+`pages`/`tasks` references and reports multiple attachments, including a Page and
+a Task on that same Page, without discarding either reference.
+
+`RST-002` sorts and deduplicates local Form/Page
+restriction arrays, removes the old owner bypass token, and converts owner-only
+settings to admin-only. Page and Form arrays remain independent local sources;
+their effective restrictions combine at load and cache projection time. The
+migration never stores inherited Form groups on a Page. Refresh Cache after
+both migrations complete so cached permissions and fingerprints use the new
+representations. Stop ordinary traffic and older app processes before deploying
+this change. **Refresh Cache** fully clears the existing cache, recreates its
+indexes, and reloads all entities; complete it after **Apply Updates** and before
+reopening traffic. Startup alone does not replace old permission projections.
 
 ## When a migration is required
 

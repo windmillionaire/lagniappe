@@ -29,7 +29,7 @@ def find_page(value, match_field_label="Name", fuzzy=False, error_label=None):
         return result
 
     search_results = cache.kind_search(
-        lookup_value, "page", Restriction.UNRESTRICTED, ["owner"]
+        lookup_value, "page", Restriction.UNRESTRICTED, Restriction.BELONGS_TO_ALL
     )
     candidates = _page_candidates(search_results, match_field_label)
 

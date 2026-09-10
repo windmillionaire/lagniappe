@@ -19,6 +19,7 @@ import pytest
 from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import (
     Fetch,
+    FetchReason,
     MutationEffectType,
     MutationIntent,
     MutationOperation,
@@ -555,7 +556,7 @@ def test_page_files_loads_database_files():
         again = page.properties.files.value
 
     page_files.assert_called_once_with(page.key)
-    load.assert_called_once_with(raw_file.key, page, request=Fetch.direct())
+    load.assert_called_once_with(raw_file.key, page, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     assert files == [file_entity]
     assert again is files
     assert page.properties.files.sort_value == 1
@@ -576,23 +577,27 @@ def test_page_files_reloads_query_results_and_skips_unlinked_files():
     )
     stale_query_result = SimpleNamespace(key=unlinked_file.key)
     linked_query_result = SimpleNamespace(key=linked_file.key)
+    task = TestEntities.get("TASK", {"hash": "files-task"}, page=page)
+    task_file = TestEntities.get("FILE", {"hash": "mirrored-task-file"})
+    task_file.task = task
 
     with (
         patch.object(
             page_related.database_get,
             "page_files",
-            return_value=[stale_query_result, linked_query_result],
+            return_value=[stale_query_result, linked_query_result, task_file],
         ),
         patch.object(
             page_related.Entities,
             "fetch",
-            return_value=[unlinked_file, linked_file, page],
+            return_value=[unlinked_file, linked_file, task_file, page],
         ) as load,
     ):
         files = page.properties.files.value
 
     load.assert_called_once_with(
-        unlinked_file.key, linked_file.key, page, request=Fetch.direct()
+        unlinked_file.key, linked_file.key, task_file.key, page,
+        request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
     )
     assert files == [linked_file]
 

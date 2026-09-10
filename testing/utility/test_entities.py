@@ -19,7 +19,7 @@ import json
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions.asset import AssetVisibility, LARGE_ASSET_BYTES
-from lagniappe.core.definitions.permissions import Action, Resource
+from lagniappe.core.definitions.permissions import Action, Resource, Restriction
 from lagniappe.core.tools.files.html import strip_tags
 from smartypants import smartypants
 
@@ -56,7 +56,10 @@ class TestUser:
 
     @property
     def properties(self):
-        restrictions = SimpleNamespace(belongs_to=self.db.get("belongs_to", []))
+        restrictions = SimpleNamespace(belongs_to=(
+            Restriction.BELONGS_TO_ALL if self.is_owner
+            else self.db.get("belongs_to") or Restriction.BELONGS_TO_NONE
+        ))
         return SimpleNamespace(restrictions=restrictions)
 
     def has_permission(self, resource, action=Action.ALL):
@@ -402,7 +405,7 @@ class TestEntityMixin:
             self.properties.form.value = TestEntities.get("FORM", test_spec["form"])
         if self.entity_kind in {"form", "page"} and "groups" in test_spec:
             self.properties.groups.value = [TestEntities.get("USER_GROUP", group) for group in test_spec["groups"]]
-            self.properties.restricted_to.materialize(owner_only=False)
+            self.properties.restricted_to.materialize(admin_only=False)
         if "restricted_to" in test_spec:
             self.db["restricted_to"] = list(test_spec["restricted_to"])
 

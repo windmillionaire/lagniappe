@@ -315,13 +315,13 @@ def test_project_filter_conditions_include_only_viewable_entity_fields(monkeypat
 
     assert visible_model.hash in entity_hashes
     assert visible_form.hash in entity_hashes
-    assert hidden_model.hash not in entity_hashes
+    assert hidden_model.hash in entity_hashes
     assert hidden_form.hash not in entity_hashes
 
 
 # @matrix model-task permissions project : attached-form restricted-access
 @pytest.mark.unit
-def test_model_task_allowed_inherits_attached_form_restrictions():
+def test_model_task_access_is_independent_of_attached_form_restrictions():
     viewer = UtilityTestUser(
         owner=False, permissions={"models": "VIEW", "forms": "VIEW"}
     )
@@ -344,8 +344,13 @@ def test_model_task_allowed_inherits_attached_form_restrictions():
     model.project = project
     model.form = restricted_form
 
-    assert model.restricted_to == ["owner", "restricted_group"]
-    assert not model.allowed(Action.VIEW, user=viewer)
+    assert not restricted_form.allowed(Action.VIEW, user=viewer)
+    assert model.allowed(Action.VIEW, user=viewer)
+    assert not any(field.startswith("restricted_to") for field in model.to_cache)
+    assert not model.allowed(
+        Action.VIEW,
+        user=UtilityTestUser(owner=False, permissions={"forms": "VIEW"}),
+    )
 
 
 # @matrix project : db-load model-tasks ordering relation-attach

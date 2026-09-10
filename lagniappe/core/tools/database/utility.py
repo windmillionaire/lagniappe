@@ -321,6 +321,16 @@ def update_site_fingerprints(*entities):
     return records
 
 
+# @testable true
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_completion_publishes_existing_collection_revisions
+# @matrix permissions cache : channel-invalidation reconciliation
+def advance_site_fingerprints(*kinds):
+    """Publish completed projection changes through the existing channels."""
+    records = update_site_fingerprints(*({"type": kind} for kind in kinds))
+    if records:
+        DATA.datastore.put_multi(records)
+
+
 # @testable false
 # @reason site fingerprint creation is persistence-owned and covered by route/E2E workflows
 def site_fingerprint(path):

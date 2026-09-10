@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from lagniappe.core.definitions import (
+    DeferredJobInspection,
     DeferredJobPhase,
     DeferredJobSpec,
     DeferredJobType,
@@ -20,6 +21,35 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.tools.files import extract as file_extract
 
 pytestmark = pytest.mark.unit
+
+
+# @matrix deferred-jobs files : inspection loaded-input no-database-read
+@pytest.mark.parametrize("kind", ["extract", "summary"])
+@pytest.mark.parametrize("applied", [False, True])
+def test_file_job_inspection_uses_loaded_input_without_fetch(monkeypatch, kind, applied):
+    def unexpected_fetch(*_args, **_kwargs):
+        raise AssertionError("inspection must use the loaded apply context")
+
+    monkeypatch.setattr(file_adapters.Entities, "fetch_one", unexpected_fetch)
+    monkeypatch.setattr(file_adapters.Entities, "fetch", unexpected_fetch)
+    file = SimpleNamespace(
+        summary="prepared" if applied else "old",
+        properties=SimpleNamespace(
+            extract=SimpleNamespace(complete=applied),
+            summarize=SimpleNamespace(complete=applied),
+        ),
+        get_asset=lambda _name: object(),
+    )
+    context = SimpleNamespace(
+        input=lambda name: file if name == "file" else None,
+        checkpoint={"summary": "prepared"},
+    )
+    adapter = (file_adapters.FileExtractAdapter() if kind == "extract"
+               else file_adapters.FileSummarizeAdapter())
+
+    assert adapter.inspect(context) is (
+        DeferredJobInspection.APPLIED if applied else DeferredJobInspection.NOT_APPLIED
+    )
 
 
 # @matrix file : extraction text-asset

@@ -178,22 +178,68 @@ def test_restrictions_only_project_permissions_that_imply_view():
 
 # @pair restrictions:search
 @pytest.mark.unit
-def test_administrator_search_membership_uses_owner_capability():
+@pytest.mark.parametrize("owner", [False, True])
+def test_administrator_search_membership_bypasses_restrictions(monkeypatch, owner):
     administrator = TestEntities.get(
         "USER",
         {
             "name": "Additional Administrator",
             "hash": "additional-administrator",
             "page": {"name": "Administrator Page", "hash": "admin-page"},
+            "owner": owner,
         },
     )
     administrator.is_admin = True
+    monkeypatch.setattr(user_restrictions_module, "current_user", administrator)
 
-    with MockRestrictions().patch_cache():
+    with _app().test_request_context("/"), MockRestrictions().patch_cache():
         restrictions = administrator.properties.restrictions
 
         assert restrictions.search is Restriction.UNRESTRICTED
-        assert restrictions.belongs_to == ["owner"]
+        assert restrictions.belongs_to is Restriction.BELONGS_TO_ALL
+        assert restrictions.user_message_restrictions is Restriction.UNRESTRICTED
+        assert not Restriction.is_unrestricted(Restriction.BELONGS_TO_ALL)
+        assert session["restrictions"]["belongs_to"] == "BELONGS_TO_ALL"
+        assert session["restrictions"]["search"] == "UNRESTRICTED"
+
+        _reset_restrictions(administrator)
+        monkeypatch.setattr(
+            restrictions, "_create",
+            lambda: pytest.fail("administrator marker should hydrate from its session"),
+        )
+        assert restrictions.belongs_to is Restriction.BELONGS_TO_ALL
+        assert restrictions.search is Restriction.UNRESTRICTED
+
+
+# @matrix permissions restrictions : session-blob validation
+@pytest.mark.unit
+@pytest.mark.parametrize("field,value", [
+    ("belongs_to", "UNRESTRICTED"),
+    ("belongs_to", {"unexpected": True}),
+    ("search", "BELONGS_TO_ALL"),
+    ("search", "BELONGS_TO_NONE"),
+])
+def test_restriction_session_markers_validate_their_own_scope(field, value):
+    administrator = TestEntities.get("USER", {
+        "name": "Marker Administrator", "hash": "markeradministrator",
+        "page": {"name": "Administrator Page", "hash": "markerpage"},
+    })
+    administrator.is_admin = True
+    with MockRestrictions().patch_cache():
+        restrictions = administrator.properties.restrictions
+        assert restrictions.belongs_to is Restriction.BELONGS_TO_ALL
+    blob = restrictions._session_blob()
+
+    restored = restrictions._deserialize_session_state(blob)
+    assert restored["belongs_to"] is Restriction.BELONGS_TO_ALL
+    assert restored["search"] is Restriction.UNRESTRICTED
+    assert restrictions._deserialize_session_state({**blob, field: value}) is None
+    assert restrictions._deserialize_session_state({
+        **blob, "version": restrictions._session_version - 1, "belongs_to": [],
+    }) is None
+    assert restrictions._deserialize_session_state({
+        **blob, "version": restrictions._session_version - 1, "belongs_to": ["none"],
+    }) is None
 
 
 # @matrix permissions restrictions : empty-access session-blob stale-session
@@ -251,7 +297,9 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         blob = session["restrictions"]
         assert blob["version"] == restrictions._session_version
         assert blob["task"] == ["page001", "session-page"]
-        assert blob["belongs_to"] == []
+        assert blob["belongs_to"] == "BELONGS_TO_NONE"
+        assert restrictions.belongs_to is Restriction.BELONGS_TO_NONE
+        assert not Restriction.is_unrestricted(Restriction.BELONGS_TO_NONE)
         assert blob["can_initiate_messages"] is True
         assert restrictions.can_initiate_messages is True
         assert owner_projection_calls == [True]
@@ -270,6 +318,7 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         )
 
         assert user.properties.restrictions.task == ["page001", "session-page"]
+        assert user.properties.restrictions.belongs_to is Restriction.BELONGS_TO_NONE
         assert user.properties.restrictions.can_initiate_messages is True
         assert owner_projection_calls == [True]
 
@@ -295,7 +344,7 @@ def test_restrictions_builds_group_membership_from_stored_requires(monkeypatch):
         {
             "name": "Root Loaded Group User",
             "hash": "root-group-user",
-            "requires": ["users", "group-one"],
+            "requires": ["users", "group-one", "group-two"],
             "permissions": {"page-one": "VIEW"},
         },
     )
@@ -310,7 +359,10 @@ def test_restrictions_builds_group_membership_from_stored_requires(monkeypatch):
 
     with _app().test_request_context("/"):
         with MockRestrictions().patch_cache():
-            assert user.properties.restrictions.belongs_to == ["group-one"]
+            restrictions = user.properties.restrictions
+            assert restrictions.belongs_to == ["group-one", "group-two"]
+            assert session["restrictions"]["belongs_to"] == ["group-one", "group-two"]
+            assert restrictions.user_message_restrictions == ["group-one", "group-two"]
 
 
 # @matrix permissions restrictions : empty-access loaded-state
@@ -333,6 +385,8 @@ def test_restrictions_empty_list_is_loaded_state():
         assert restrictions.task == []
         assert restrictions.form == []
         assert restrictions.users == []
+        assert restrictions.belongs_to is Restriction.BELONGS_TO_NONE
+        assert restrictions.user_message_restrictions == []
         assert restrictions.can_initiate_messages is False
 
     assert restrictions.is_set
@@ -341,6 +395,23 @@ def test_restrictions_empty_list_is_loaded_state():
     assert restrictions.value == []
     assert restrictions._value is not UNSET
     assert details.call_count == 0
+
+
+# @matrix permissions restrictions : group-membership session-blob
+@pytest.mark.unit
+def test_session_membership_refreshes_without_permission_map_change(monkeypatch):
+    user = TestEntities.get("USER", {"hash": "sessionmembership", "permissions": {"models": "VIEW"}})
+    monkeypatch.setattr(user_restrictions_module, "current_user", user)
+    user.requires = ["users", "groupa"]
+    permissions = user.permissions_fingerprint
+    with _app().test_request_context("/"), MockRestrictions().patch_cache():
+        assert user.properties.restrictions.belongs_to == ["groupa"]
+        previous = session["restrictions"]["fingerprint"]
+        user.requires = ["users", "groupb"]
+        _reset_restrictions(user)
+        assert user.properties.restrictions.belongs_to == ["groupb"]
+        assert session["restrictions"]["fingerprint"] != previous
+        assert user.permissions_fingerprint == permissions
 
 
 # @matrix permissions restrictions : clear session-blob

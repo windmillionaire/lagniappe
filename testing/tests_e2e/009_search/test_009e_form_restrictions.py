@@ -23,7 +23,7 @@ def test_task_move_updates_all_owned_file_search_permissions():
     category.save()
     source = Entities.PAGE.create({"name": "Open source", "model": category})
     destination = Entities.PAGE.create({"name": "Restricted destination", "model": category})
-    destination.properties.restricted_to.materialize(owner_only=True)
+    destination.properties.restricted_to.materialize(admin_only=True)
     Entities.save(source, destination)
     task = Entities.TASK.create({"page": source, "name": "Moving Task"})
     task.save()
@@ -34,19 +34,20 @@ def test_task_move_updates_all_owned_file_search_permissions():
     Entities.save(task, current, archived)
     assert archived.key not in task.properties.files.keys
 
-    for target, previous, restriction in ((destination, source, "owner"), (source, destination, None)):
+    for target, previous, restriction in ((destination, source, "admin"), (source, destination, None)):
         task.page = target
         task.save()
         for file in (current, archived):
             stored = Entities.fetch_one(file.key, request=Fetch.root())
             assert stored.properties.task.key == task.key
-            assert not stored.properties.page.key
+            assert stored.properties.page.key is None
+            assert stored.properties.task_page.key == target.key
             assert {task.hash, target.hash} <= set(stored.requires)
             assert previous.hash not in stored.requires
-            assert cache.hget(Search.file.key(file), "restricted_to") == restriction
+            assert cache.hget(Search.file.key(file), "restricted_to_page") == restriction
 
 
-# @matrix permissions search : reconciliation removal page-override page-precedence source-save
+# @matrix permissions search : reconciliation removal local-restrictions source-clauses source-save
 # @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
 # @template forms/restrictions.html::restrict_access
 # @template nav.html::search_results
@@ -69,20 +70,21 @@ def test_form_restrictions_reconcile_existing_descendants(get_user, browser_fail
     task_file = Entities.FILE.create(data={"name": f"{token} TaskFile"})
     task.files = [task_file]
     Entities.save(task, task_file, page_file)
-    overrides = []
+    local_entities = []
     if form_type == "page":
-        override_page = Entities.PAGE.create({"name": f"{token} Override", "form": form.entity,
+        local_page = Entities.PAGE.create({"name": f"{token} Local", "form": form.entity,
                                              "model": Entities.fetch_one(page.model, request=Fetch.direct())})
-        override_page.groups = [group.entity]
-        override_page.save()
-        override_task = Entities.TASK.create({"page": override_page, "name": f"{token} OverrideTask"})
-        override_task.save()
-        override_file = Entities.FILE.create(data={"name": f"{token} OverrideFile"})
-        override_task.files = [override_file]
-        Entities.save(override_task, override_file)
-        overrides = [override_page, override_task, override_file]
-    affected = [task, task_file] + ([page, page_file] if form_type == "page" else [])
+        local_page.groups = [group.entity]
+        local_page.save()
+        local_task = Entities.TASK.create({"page": local_page, "name": f"{token} LocalTask"})
+        local_task.save()
+        local_file = Entities.FILE.create(data={"name": f"{token} LocalFile"})
+        local_task.files = [local_file]
+        Entities.save(local_task, local_file)
+        local_entities = [local_page, local_task, local_file]
+    affected = [task, task_file, *local_entities] + ([page, page_file] if form_type == "page" else [])
     baseline = {entity.key: Entities.fetch_one(entity.key, request=Fetch.root()).modified for entity in affected}
+    local_groups = {entity.key: list(entity.db.get("restricted_to") or []) for entity in affected}
 
     viewer.go(SitePages.HOME)
     builder = form.builder
@@ -93,24 +95,20 @@ def test_form_restrictions_reconcile_existing_descendants(get_user, browser_fail
     def search_visible(expected):
         # Hosted reconciliation finishes asynchronously. Observe its public
         # search result before issuing the visible header-search query.
-        viewer.page.wait_for_function("""async ({query, affected, overrides, expected}) => {
+        viewer.page.wait_for_function("""async ({query, affected, expected}) => {
                 const response = await fetch(`/l/search-bar?${new URLSearchParams({q: query})}`, {cache: "no-store"});
                 if (!response.ok) throw new Error(`Search returned ${response.status}`);
                 const html = new DOMParser().parseFromString((await response.json()).results, "text/html");
                 const urls = new Set([...html.querySelectorAll("[data-url]")].map(item => item.dataset.url));
-                return overrides.every(url => urls.has(url)) &&
-                    affected.every(url => urls.has(url) === expected);
+                return affected.every(url => urls.has(url) === expected);
             }""", arg={
                 "query": token,
                 "affected": [f"/{entity.entity_kind}s/{entity.urlsafe_key}" for entity in affected],
-                "overrides": [f"/{entity.entity_kind}s/{entity.urlsafe_key}" for entity in overrides],
                 "expected": expected,
             }, polling=250, timeout=30_000)
         viewer.locate("[lp-search] input[name='q']").fill("")
         search = HeaderSearch(viewer)
         search.search(token)
-        for entity in overrides:
-            expect(search.panel.locator(f"[data-url='/{entity.entity_kind}s/{entity.urlsafe_key}']")).to_be_visible()
         for entity in affected:
             result = search.panel.locator(f"[data-url='/{entity.entity_kind}s/{entity.urlsafe_key}']")
             if expected:
@@ -119,7 +117,7 @@ def test_form_restrictions_reconcile_existing_descendants(get_user, browser_fail
                 expect(result).to_have_count(0)
 
     search_visible(True)
-    checkbox = restrictions.locator("input[name='owner']")
+    checkbox = restrictions.locator("input[name='admin']")
     checkbox.check()
     # A draft must neither issue a save nor hide existing search results.
     assert requests == []
@@ -153,18 +151,18 @@ def test_form_restrictions_reconcile_existing_descendants(get_user, browser_fail
     for entity in affected:
         current = Entities.fetch_one(entity.key, request=Fetch.root())
         assert current.modified == baseline[entity.key]
-        assert not current.db.get("restricted_to")
+        assert list(current.db.get("restricted_to") or []) == local_groups[entity.key]
 
     if form_type == "task":
-        # A Page's local restriction takes precedence; clearing it exposes the
-        # Task Form again. Each source save must reconcile the existing File.
+        # Page membership cannot override the Task Form restriction. Each source
+        # save must reconcile the existing File with both source clauses.
         checkbox.check()
         builder.save_restrictions()
         search_visible(False)
         current_page = Entities.fetch_one(page.key, request=Fetch.direct())
         current_page.groups = [group.entity]
         current_page.save()
-        search_visible(True)
+        search_visible(False)
         current_page.groups = []
         current_page.save()
         search_visible(False)
@@ -198,12 +196,20 @@ def test_restriction_worker_retries_and_continues(monkeypatch):
     monkeypatch.setattr(id_token, "verify_oauth2_token", verify_token)
     headers = {"Authorization": "Bearer restriction-worker-test"}
     assert client.post("/process/reconcile-restrictions", headers=headers, json={"offset": 0}).status_code == 400
-    remaining = {"source_key": "form", "cursor": "next", "offset": 0}
+    payload = {"source_key": "form", "owner_keys": ["category"]}
+    remaining = {**payload, "cursor": "next", "offset": 0}
+    received = []
     queued = []
-    monkeypatch.setattr(worker, "reconcile_batch", lambda **payload: remaining)
+
+    def continue_batch(**payload):
+        received.append(payload)
+        return remaining
+
+    monkeypatch.setattr(worker, "reconcile_batch", continue_batch)
     monkeypatch.setattr(worker, "enqueue", queued.append)
-    response = client.post("/process/reconcile-restrictions", headers=headers, json={"source_key": "form"})
+    response = client.post("/process/reconcile-restrictions", headers=headers, json=payload)
     assert response.status_code == 200 and response.json == {"success": True}
+    assert received == [payload]
     assert queued == [remaining]
 
     def unavailable(**payload):
@@ -232,11 +238,121 @@ def test_restriction_reconciliation_visits_every_indexed_batch(monkeypatch):
     task.files = files
     Entities.save(task, *files)
     monkeypatch.setattr(worker, "BATCH_SIZE", 2)
-    form.properties.restricted_to.materialize(owner_only=True)
+    form.properties.restricted_to.materialize(admin_only=True)
     form.save()
     for entity in (page, task, *files):
-        assert worker.cache.redis.hget(Search[entity.kind].key(entity), "restricted_to") == b"owner"
-    form.properties.restricted_to.materialize(owner_only=False)
+        assert worker.cache.redis.hget(Search[entity.kind].key(entity), "restricted_to_page_form") == b"admin"
+    form.properties.restricted_to.materialize(admin_only=False)
     form.save()
     for entity in (page, task, *files):
-        assert worker.cache.redis.hget(Search[entity.kind].key(entity), "restricted_to") is None
+        assert worker.cache.redis.hget(Search[entity.kind].key(entity), "restricted_to_page_form") is None
+
+
+# @matrix permissions cache : concurrent-save deleted-row preserved-fields fingerprint reconciliation
+@pytest.mark.parametrize("change", ["move", "task-form", "delete"])
+def test_restriction_reconciliation_repairs_concurrent_changes(monkeypatch, change):
+    import json
+
+    from lagniappe.core.tools import cache as entity_cache
+    from lagniappe.core.tools.auth.restrictions import RESTRICTION_SOURCES, restriction_fields
+    from lagniappe.core.tools.cache import restrictions as worker
+    from lagniappe.core.tools.cache.keys import Keys, Search
+
+    token = uuid4().hex
+    source = Entities.FORM.create({"name": f"Source {token}", "form-type": "page"})
+    source.properties.restricted_to.materialize(admin_only=True)
+    source.save()
+    task_form = Entities.FORM.create({"name": f"Task Form {token}", "form-type": "task"})
+    task_form.save()
+    category = Entities.CATEGORY.create({"name": f"Concurrent permissions {token}"})
+    category.save()
+    page = Entities.PAGE.create({"name": "Original Page", "form": source, "model": category})
+    destination = Entities.PAGE.create({"name": "Restricted destination", "model": category})
+    destination.properties.restricted_to.materialize(admin_only=True)
+    Entities.save(page, destination)
+    task = Entities.TASK.create({"name": "Original Task", "page": page, "form": task_form})
+    task.save()
+    file = Entities.FILE.create(data={"name": "Original attachment"})
+    task.files = [file]
+    Entities.save(task, file)
+    initial_modified = Entities.fetch_one(file.key, request=Fetch.root()).modified
+    search_key = Search.file.key(file)
+    client = worker.cache.redis
+    queued = []
+    monkeypatch.setattr(worker, "enqueue", queued.append)
+    source.properties.restricted_to.materialize(admin_only=False)
+    source.save()
+    payload = next(payload for payload in queued if payload["source_key"] == source.urlsafe_key)
+
+    write_projections = worker._write_projections
+    update_cache = entity_cache.update
+    delete_cache = entity_cache.delete
+    injected = False
+
+    def write_then_change(details, rows, projections):
+        nonlocal injected
+        result = write_projections(details, rows, projections)
+        if injected or file.hash not in rows:
+            return result
+        injected = True
+        current = Entities.fetch_one(file.key, request=Fetch.nested(
+            because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION,
+        ))
+        if change == "task-form":
+            # Another Form save changes the computed File fingerprint without
+            # changing the File's durable modified value or running its worker.
+            task_form.properties.restricted_to.materialize(admin_only=True)
+            task_form.save()
+        else:
+            # Hold only this File's post-commit cache publication so verification
+            # observes a real durable save/delete with the old projected row.
+            with monkeypatch.context() as pending_publication:
+                if change == "move":
+                    pending_publication.setattr(entity_cache, "update", lambda *entities, **kwargs: update_cache(
+                        *(entity for entity in entities if entity.key != file.key), **kwargs,
+                    ))
+                    target = Entities.fetch_one(destination.key, request=Fetch.nested(
+                        because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION,
+                    ))
+                    current.move_to(target)
+                    current.name = "Moved attachment"
+                    current.save()
+                else:
+                    pending_publication.setattr(entity_cache, "delete", lambda entities: delete_cache(
+                        [entity for entity in entities if entity.key != file.key],
+                    ))
+                    Entities.delete(current)
+        assert client.hexists(Keys.ENTITY_HASHES.value, file.hash)
+        return result
+
+    monkeypatch.setattr(worker, "_write_projections", write_then_change)
+    while payload is not None:
+        payload = worker.reconcile_batch(**payload)
+    assert injected
+
+    current = Entities.fetch_one(file.key, request=Fetch.nested(
+        because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION,
+    ))
+    if change == "delete":
+        assert current is None
+        assert not client.hexists(Keys.ENTITY_HASHES.value, file.hash)
+        assert not client.exists(search_key)
+        return
+
+    details = json.loads(client.hget(Keys.ENTITY_HASHES.value, file.hash))
+    assert details["fingerprint"] == current.fingerprint
+    expected = {"page" if change == "move" else "task_form": ["admin"]}
+    assert details.get("restricted_to", {}) == current.restricted_to == expected
+    assert details["parent_key"] == current.owner.hash
+    assert details["name"] == current.name
+    fields = restriction_fields(current.restricted_to)
+    for source_name in RESTRICTION_SOURCES:
+        field = f"restricted_to_{source_name}"
+        stored = client.hget(search_key, field)
+        assert (stored.decode() if stored else None) == fields.get(field)
+    assert client.hget(search_key, "name").decode() == current.name
+    if change == "move":
+        assert current.owner.key == destination.key
+        assert current.name == "Moved attachment"
+    else:
+        assert current.modified == initial_modified

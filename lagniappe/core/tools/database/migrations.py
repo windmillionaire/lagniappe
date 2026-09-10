@@ -24,6 +24,7 @@ from lagniappe import CONFIG
 
 from . import utility
 from .migration_steps.v2_0_permissions import migrate_file_ownership, migrate_local_restrictions
+from .migration_steps.v2_0_file_pages import migrate_file_pages, migrate_canonical_restrictions
 from .get import datastore_key
 from .core import DATA, KINDS
 from .filter import Query
@@ -314,6 +315,14 @@ MIGRATION_CATALOG = (
     MigrationDefinition(
         sequence=5, id="RST-001", introduced_in="2.0",
         label="Materialized local restrictions", runner=migrate_local_restrictions,
+    ),
+    MigrationDefinition(
+        sequence=6, id="FIL-002", introduced_in="2.0",
+        label="File Page ancestry", runner=migrate_file_pages,
+    ),
+    MigrationDefinition(
+        sequence=7, id="RST-002", introduced_in="2.0",
+        label="Canonical restriction groups", runner=migrate_canonical_restrictions,
     ),
 )
 

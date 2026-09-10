@@ -9,7 +9,6 @@ from lagniappe.core.tools.database import get as database_get
 from ...tools.database.core import KINDS
 from ...tools.database.filter import Filter, Query
 from ...tools.auth.context import current_context_user
-from ...tools.auth.restrictions import prepare_permissions
 from ..cache import Keys, filter_cache
 from ..services.task_queue import create_task
 from .build import FilterExpression
@@ -71,9 +70,9 @@ class FilterCache:
         """Query the cache with a filter and return matching entities."""
         return [
             entity
-            for entity in prepare_permissions(
-                *Entities.fetch(*self._query_keys(filter), request=Fetch.direct()),
-                action=Action.EDIT,
+            for entity in Entities.fetch(
+                *self._query_keys(filter),
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
             )
             if entity.allowed(Action.VIEW, user=self.user)
         ]

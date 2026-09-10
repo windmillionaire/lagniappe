@@ -46,13 +46,30 @@ def _writes(plan):
     ]
 
 
+# @matrix ai-report mutations : input-files no-database-read owner-touch
+def test_report_save_does_not_touch_input_files(monkeypatch):
+    user = TestEntities.get("USER", {"hash": "report-planner-user"})
+    file = TestEntities.get("FILE", {"hash": "report-planner-file"})
+    report = TestEntities.get("REPORT", {"hash": "report-planner", "parent": user, "user": user})
+    report.input_files = [file]
+    monkeypatch.setattr(Entities, "fetch", lambda *_args, **_kwargs: pytest.fail("Report save needs no file graph"))
+
+    plan = plan_mutation(MutationOperation.SAVE, report, registry=Entities)
+
+    writes = {effect.entity.key: effect for effect in _writes(plan)}
+    assert set(writes) == {report.key, user.key}
+    assert writes[report.key].property_mask is None
+    assert writes[user.key].property_updates == ("modified",)
+    assert all(effect.entity is not file for effect in plan.effects)
+
+
 # @matrix permissions : invalidation-retry
 @pytest.mark.parametrize("kind", ["PAGE", "FORM"])
 def test_permission_source_marker_is_consumed_only_after_durable_success(monkeypatch, kind):
     from lagniappe.core.tools.database import get as database_get
 
     source = TestEntities.get(kind, {"hash": "permission-source"})
-    source.properties.restricted_to.materialize(owner_only=True)
+    source.properties.restricted_to.materialize(admin_only=True)
     assert source._permission_sources_changed is True
     monkeypatch.setattr(database_get, "form_users", lambda *_forms: [])
     monkeypatch.setattr(Entities, "fetch", lambda *items, request: list(items))
@@ -69,6 +86,51 @@ def test_permission_source_marker_is_consumed_only_after_durable_success(monkeyp
     assert source._permission_sources_changed is False
     source.properties.restricted_to.materialize()
     assert source._permission_sources_changed is False
+
+
+# @matrix permissions mutations : owner-reuse no-extra-read repeated-save
+@pytest.mark.parametrize("kind", ["PAGE", "FORM"])
+def test_permission_save_reuses_resolved_collection_owner_keys(monkeypatch, kind):
+    source = TestEntities.get(kind, {"name": "Permission source", "hash": "owner-source"})
+    category = TestEntities.get("CATEGORY", {"name": "Category", "hash": "owner-category"})
+    other = TestEntities.get("PROJECT" if kind == "FORM" else "CATEGORY", {
+        "name": "Other collection", "hash": "other-owner",
+    })
+    user = TestEntities.get("USER", {"name": "Viewer", "hash": "owner-user"})
+    group = TestEntities.get("USER_GROUP", {"name": "Group", "hash": "owner-group"})
+    if kind == "FORM":
+        source.groups = [group]
+    owners = [category, other, user, category]
+    reads = []
+
+    def resolved_owners(_source):
+        reads.append(True)
+        return list(owners)
+
+    monkeypatch.setattr(
+        type(source), "used_by" if kind == "FORM" else "page_list_owners",
+        property(resolved_owners),
+    )
+    monkeypatch.setattr(
+        Entities, "fetch",
+        lambda *_args, **_kwargs: pytest.fail("already-resolved owners must be reused"),
+    )
+    source._restriction_owner_keys = ("stale-owner",)
+
+    for current in ([category, other, user, category], [other], []):
+        owners[:] = current
+        plan = plan_mutation(MutationOperation.SAVE, source, registry=Entities)
+
+        assert source._restriction_owner_keys == tuple(sorted({
+            owner.urlsafe_key for owner in current
+            if owner.entity_kind in {"category", "project"}
+        }))
+        assert "_restriction_owner_keys" not in source.db
+        expected = {source.key, *(owner.key for owner in current)}
+        if kind == "FORM":
+            expected.add(group.key)
+        assert {write.entity.key for write in _writes(plan)} == expected
+    assert len(reads) == 3
 
 
 # @matrix mutations : full-root masked-touch instance-precedence cache

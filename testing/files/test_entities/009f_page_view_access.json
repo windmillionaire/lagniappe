@@ -1,45 +1,4 @@
 {
-	"test_page_view_access_owner_stored_only": {
-		"entities": [
-			[
-				"PAGE",
-				{
-					"name": "Owner-only stored restriction",
-					"hash": "pgown1",
-					"restricted_to": ["owner"],
-					"model": { "name": "Cat", "hash": "cat001" }
-				}
-			]
-		]
-	},
-	"test_page_view_access_from_group_views": {
-		"entities": [
-			[
-				"PAGE",
-				{
-					"name": "Page resolved via views index",
-					"hash": "pgdb1",
-					"model": { "name": "Cat", "hash": "cat001" }
-				}
-			]
-		]
-	},
-	"test_page_view_access_returns_attached_groups": {
-		"entities": [
-			[
-				"PAGE",
-				{
-					"name": "Page with viewer groups",
-					"hash": "pggrp1",
-					"model": { "name": "Cat", "hash": "cat001" },
-					"groups": [
-						{ "name": "Editors", "hash": "grpedit", "permissions": {} },
-						{ "name": "Viewers", "hash": "grpview", "permissions": {} }
-					]
-				}
-			]
-		]
-	},
 	"test_page_restricted_access_group_match": {
 		"entities": [
 			[

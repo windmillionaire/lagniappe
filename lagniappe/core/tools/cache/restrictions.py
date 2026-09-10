@@ -6,57 +6,62 @@ from uuid import uuid4
 from flask import url_for
 from redis.commands.search.query import Query as SearchQuery
 
+from config.datastore import encode_urlsafe_key
 from lagniappe import CONFIG
-from ...definitions import Fetch
-from ...tools.auth.restrictions import combine_restrictions, prepare_permissions
+from ...definitions import Fetch, FetchReason
+from ...definitions.fingerprints import restricted_fingerprint
+from ...tools.auth.restrictions import RESTRICTION_SOURCES, normalize_restrictions, restriction_fields
 from ...tools.database.core import KINDS
 from ...tools.database.filter import Filter, Query
 from ...tools.services import task_queue
 from .core import cache
-from .details import _load_cached_details
+from .add import update
+from .details import _load_cached_details, identify_entity
 from .keys import Keys, Search
 
 BATCH_SIZE = 100
 SOURCES = {"form", "page", "task"}
+VERIFICATION_ATTEMPTS = 3
 
 
 # @testable true
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_change_detection_and_forced_retry
-# @matrix permissions cache : change-detection retry
+# @matrix permissions cache : change-detection retry form-version
 def previous_restrictions(entities):
     sources = [entity for entity in entities
                if entity.entity_kind in SOURCES and not getattr(entity, "_testing", False)]
     if not sources:
         return []
-    prepare_permissions(*sources)
     with cache.pipeline() as pipe:
         for entity in sources:
-            pipe.hget(Search[entity.properties.kind.cache_value].key(entity), "restricted_to")
+            pipe.hget(Keys.ENTITY_HASHES.value, entity.hash)
             pipe.hget(Keys.RESTRICTION_PENDING.value, entity.urlsafe_key)
         previous = pipe.execute()
     changes = []
     with cache.pipeline() as pipe:
         for entity, old, pending in zip(sources, previous[::2], previous[1::2]):
-            before = old.decode() if isinstance(old, bytes) else old
-            if pending or before != entity.properties.restricted_to.cache_value or getattr(entity, "_reconcile_restrictions", False):
+            before = _source_signature(entity, json.loads(old) if old else {})
+            if pending or before != _source_signature(entity) or getattr(entity, "_reconcile_restrictions", False):
                 # Keep this intent outside the replaceable search row so a
                 # failed source projection/queue write remains retryable.
                 pipe.hset(Keys.RESTRICTION_PENDING.value, entity.urlsafe_key, "1")
                 entity._reconcile_restrictions = True
-            changes.append((entity, old))
+            changes.append((entity, before))
         pipe.execute()
     return changes
 
 
 # @testable true
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_change_detection_and_forced_retry
-# @matrix permissions cache : change-detection retry
+# @matrix permissions cache : change-detection retry form-version
 def dispatch_changes(previous):
     for entity, old in previous:
-        before = old.decode() if isinstance(old, bytes) else old
-        after = entity.properties.restricted_to.cache_value
-        if before != after or getattr(entity, "_reconcile_restrictions", False):
-            enqueue({"source_key": entity.urlsafe_key})
+        after = _source_signature(entity)
+        if old != after or getattr(entity, "_reconcile_restrictions", False):
+            enqueue({
+                "source_key": entity.urlsafe_key,
+                "owner_keys": list(getattr(entity, "_restriction_owner_keys", ())),
+            })
             with cache.pipeline() as pipe:
                 pipe.hdel(Keys.RESTRICTION_PENDING.value, entity.urlsafe_key)
                 pipe.execute()
@@ -79,106 +84,158 @@ def enqueue(payload):
         raise RuntimeError("Restriction reconciliation could not be queued; retry saving.")
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/cache/restrictions.py::previous_restrictions
+# @reason source signature comparison owns restriction and schema invalidation
+def _source_signature(entity, details=None):
+    restrictions = entity.restricted_to if details is None else details.get("restricted_to")
+    version = None
+    if entity.entity_kind == "form":
+        version = (entity.version or "") if details is None else details.get("form_version")
+    return normalize_restrictions(restrictions), version
+
+
 # @testable true
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_cached_restrictions_resolve_file_task_page_and_form
-# @matrix permissions cache : cached-sources file-parent page-precedence
-def effective(details, entity_hash):
-    item = details[entity_hash]
-    kind = item.get("kind")
-    if kind in {"page", "user", "form"}:
-        return combine_restrictions(item.get("restricted_to"), [])
-    if kind == "task":
-        parent = item.get("parent_key")
-        if not parent or "form_key" not in item:
-            raise RuntimeError("Task permission metadata needs rebuilding")
-        form = item.get("form_key")
-        return combine_restrictions(effective(details, parent), effective(details, form) if form else [])
-    if kind == "file" and item.get("parent_key"):
-        return effective(details, item["parent_key"])
-    raise RuntimeError("Missing File permission parent")
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_restriction_projection_preserves_own_form_versions_and_base_modified
+# @matrix permissions cache : source-clauses preserved-fields fingerprint form-version no-descendant-writes
+def _projection(current, source, *, own_form=False):
+    """Replace only this source's clauses and recalculate the cached revision."""
+    restrictions = normalize_restrictions(current.get("restricted_to"))
+    source_restrictions = normalize_restrictions(source.restricted_to)
+    if source.entity_kind == "form":
+        clauses = ("task_form" if source.form_type == "task" else "page_form",)
+    elif source.entity_kind == "page":
+        clauses = ("page", "page_form")
+    else:
+        clauses = RESTRICTION_SOURCES
+    for clause in clauses:
+        if source_restrictions.get(clause):
+            restrictions[clause] = source_restrictions[clause]
+        else:
+            restrictions.pop(clause, None)
+    _, kind = identify_entity(current)
+    version = None
+    if kind in {"page", "task"}:
+        version = (source.version or "") if own_form else current.get("form_version", "")
+    return {
+        "restricted_to": restrictions,
+        "form_version": version,
+        "fingerprint": restricted_fingerprint(
+            current["modified"], restrictions, form_version=version,
+        ),
+    }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/restrictions.py::reconcile_batch
-# @reason source records only need permission fields, not display projections
-def _permission_details(entity):
-    details = {"kind": entity.entity_kind}
-    if entity.entity_kind in {"form", "page"}:
-        details["restricted_to"] = entity.restricted_to or []
-    elif entity.entity_kind == "task":
-        details["parent_key"] = entity.page.hash
-        details["form_key"] = entity.form.hash if entity.form else None
-    elif entity.entity_kind == "file":
-        details["parent_key"] = entity.owner.hash if entity.owner else None
-    return details
+# @testable true
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_restriction_batch_updates_only_projection_fields
+# @matrix permissions cache : preserved-fields restriction-removal batch-write
+def _write_projections(details, rows, projections):
+    """Write calculated permissions and fingerprints as one Redis batch."""
+    with cache.pipeline() as pipe:
+        for key in rows.values():
+            pipe.exists(key)
+        indexed = pipe.execute()
+    with cache.pipeline() as pipe:
+        for (entity_hash, key), exists in zip(rows.items(), indexed):
+            patch = projections[entity_hash]
+            current = {**details[entity_hash], **patch}
+            if not current["restricted_to"]:
+                current.pop("restricted_to")
+            if current["form_version"] is None:
+                current.pop("form_version")
+            pipe.hset(Keys.ENTITY_HASHES.value, entity_hash, json.dumps(current))
+            if exists:
+                fields = restriction_fields(patch["restricted_to"])
+                for clause in RESTRICTION_SOURCES:
+                    field = f"restricted_to_{clause}"
+                    if field in fields:
+                        pipe.hset(key, field, fields[field])
+                    else:
+                        pipe.hdel(key, field)
+        pipe.execute()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/restrictions.py::reconcile_batch
-# @reason batched permission metadata loading belongs to reconciliation
-def _details(hashes, overrides):
+# @testable true
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_completion_publishes_existing_collection_revisions
+# @matrix permissions cache : channel-invalidation reconciliation
+def _publish_completion(owners):
     from ...entities import Entities
+    from ..database import utility as database_utility
 
-    details = dict(overrides)
-    pending = set(hashes)
-    for item in overrides.values():
-        if item.get("kind") in {"task", "file"}:
-            pending.update(value for value in (item.get("parent_key"), item.get("form_key")) if value)
-    pending -= details.keys()
-    for _depth in range(4):
-        if not pending:
-            break
-        found = _load_cached_details(sorted(pending))
-        missing = pending - found.keys()
-        if missing:
-            # Cache holes must not silently remove a permission source. Only
-            # missing metadata is recovered from root Datastore records.
-            for kind in (KINDS.models, KINDS.instances, KINDS.files):
-                rows = []
-                missing_hashes = list(missing)
-                for start in range(0, len(missing_hashes), 30):
-                    rows.extend(Query(kind).filter(Filter().contains("hash", missing_hashes[start:start + 30])).fetch_all())
-                entities = Entities.fetch(*rows, request=Fetch.root())
-                prepare_permissions(*entities)
-                found.update((entity.hash, _permission_details(entity)) for entity in entities)
-                missing -= found.keys()
-                if not missing:
-                    break
-            if missing:
-                raise RuntimeError("Permission source details are unavailable; retry reconciliation")
-        details.update(found)
-        pending = set()
-        for item in found.values():
-            if item.get("kind") in {"task", "file"}:
-                pending.update(value for value in (item.get("parent_key"), item.get("form_key")) if value)
-        pending -= details.keys()
-    return details
+    database_utility.advance_site_fingerprints("task")
+    if owners:
+        Entities.touch(*owners)
+        update(*owners)
 
 
 # @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconcile_preserves_page_overrides_and_removes_restrictions
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_collects_owner_keys_without_loading_relations
+# @matrix permissions cache : owner-reuse no-extra-read
+def _collection_owner_keys(entities):
+    """Collect list owners from stored references in root Page/Task rows."""
+    keys = set()
+    for entity in entities:
+        if entity.entity_kind == "page":
+            keys.update(entity.db.get("categories") or ())
+            parent = entity.db.get("model")
+        elif entity.entity_kind == "task":
+            parent = entity.db.get("project")
+        else:
+            continue
+        if parent:
+            keys.add(parent)
+    return {encode_urlsafe_key(key) for key in keys}
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/cache/restrictions.py::reconcile_batch
+# @reason existing membership revisions make offset continuation safe across moves
+def _membership_revision():
+    from ..database import utility as database_utility
+
+    paths = ("/pages/index", "/tasks/index")
+    revisions = database_utility.site_fingerprints(paths)
+    return ":".join(revisions[path] for path in paths)
+
+
+# @testable true
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconcile_preserves_local_page_groups_and_removes_form_restrictions
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_restarts_when_membership_changes_between_or_during_batches
 # @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants
 # @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_restriction_reconciliation_visits_every_indexed_batch
-# @matrix permissions search : reconciliation page-override removal batching duplicate-names page-precedence source-save
-def reconcile_batch(source_key, cursor=None, offset=0):
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_verifies_repairs_and_retries
+# @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_restriction_reconciliation_repairs_concurrent_changes
+# @matrix permissions search : reconciliation local-restrictions removal batching duplicate-names source-clauses source-save
+# @matrix permissions cache : owner-reuse
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_reads_available_cache_details_without_recovery
+# @matrix permissions cache : batching concurrent-move continuation-restart concurrent-save deleted-row preserved-fields fingerprint reconciliation retry cache-miss no-extra-read
+def reconcile_batch(source_key, cursor=None, offset=0, revision=None, owner_keys=None):
     from ...entities import Entities
 
-    source = Entities.fetch_one(source_key, request=Fetch.root())
+    nested = Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION)
+    source = Entities.fetch_one(source_key, request=nested)
     if source is None:
         return None
     if source.entity_kind not in SOURCES:
         raise ValueError("Invalid restriction reconciliation source")
+    source_fingerprint = source.fingerprint
+    owner_keys = set(owner_keys or ())
+    restart = {"source_key": source_key, "owner_keys": sorted(owner_keys)}
+    current_revision = _membership_revision()
+    if revision is not None and revision != current_revision:
+        return restart
+    revision = current_revision
     next_cursor = None
     if source.entity_kind == "form":
         instances = Query(KINDS.instances).filter(Filter().eq("form", source.key)).limit(BATCH_SIZE).cursor(cursor).fetch()
         next_cursor = instances.next_cursor
-        roots = Entities.fetch(*instances, request=Fetch.root())
-        roots = [entity for entity in roots if entity.entity_kind in {"page", "task"}
-                 and not (entity.entity_kind == "page" and entity.db.get("restricted_to"))]
+        roots = [entity for entity in Entities.fetch(*instances, request=Fetch.root())
+                 if entity.entity_kind in {"page", "task"}]
     else:
         roots = [source]
-    prepare_permissions(source, *roots)
-    overrides = {entity.hash: _permission_details(entity) for entity in [source, *roots]}
+    owner_keys.update(_collection_owner_keys(roots))
+    restart["owner_keys"] = sorted(owner_keys)
     root_hashes = [entity.hash for entity in roots]
     docs, total = [], 0
     if root_hashes:
@@ -187,40 +244,57 @@ def reconcile_batch(source_key, cursor=None, offset=0):
         ).dialect(2).sort_by("details_key").paging(int(offset), BATCH_SIZE)
         result = cache.search(query)
         docs, total = result.docs, result.total
-    rows = {doc.id: (doc.details_key, getattr(doc, "restricted_to", None)) for doc in docs}
-    with cache.pipeline() as pipe:
-        for entity in roots:
-            pipe.hgetall(Search[entity.properties.kind.cache_value].key(entity))
-        stored_roots = pipe.execute()
-    for entity, stored in zip(roots, stored_roots):
-        if stored:
-            old = stored.get(b"restricted_to", stored.get("restricted_to"))
-            rows[Search[entity.properties.kind.cache_value].key(entity)] = (entity.hash, old)
-    details = _details([h for h, _old in rows.values()], overrides)
-    with cache.pipeline() as pipe:
-        for key, (entity_hash, old) in rows.items():
-            value = ",".join(effective(details, entity_hash)) or None
-            old = old.decode() if isinstance(old, bytes) else old
-            if old == value:
-                continue
-            # Conditional field patch: a deleted search row is never resurrected.
-            pipe.eval("if redis.call('EXISTS',KEYS[1]) == 1 then "
-                      "if ARGV[1] == '' then return redis.call('HDEL',KEYS[1],'restricted_to') "
-                      "else return redis.call('HSET',KEYS[1],'restricted_to',ARGV[1]) end end",
-                      1, key, value or "")
-        for entity in roots:
-            if entity.entity_kind == "page":
-                # Patch the JSON value in place so unrelated cached details are
-                # preserved; no full descendant projection is regenerated.
-                pipe.eval("local raw=redis.call('HGET',KEYS[1],ARGV[1]); if raw then "
-                          "local d=cjson.decode(raw); d.restricted_to=cjson.decode(ARGV[2]); "
-                          "return redis.call('HSET',KEYS[1],ARGV[1],cjson.encode(d)) end",
-                          1, Keys.ENTITY_HASHES.value, entity.hash,
-                          json.dumps(entity.restricted_to or []))
-        pipe.execute()
-    if int(offset) + BATCH_SIZE < total:
-        return {"source_key": source_key, "cursor": cursor, "offset": int(offset) + BATCH_SIZE}
-    if next_cursor:
-        return {"source_key": source_key, "cursor": next_cursor, "offset": 0}
-    return None
+    rows = {doc.details_key: doc.id for doc in docs}
+    # Task.requires omits its own hash. Roots also retain details when their
+    # search row is absent, so always include roots explicitly.
+    rows.update((entity.hash, Search[entity.properties.kind.cache_value].key(entity)) for entity in roots)
+    details = _load_cached_details(rows)
+    projections = {
+        entity_hash: _projection(
+            current, source,
+            own_form=source.entity_kind == "form" and entity_hash in root_hashes,
+        )
+        for entity_hash, current in details.items()
+    }
+    rows = {h: key for h, key in rows.items() if h in projections}
+    _write_projections(details, rows, projections)
 
+    # Fresh keys force a new read. The resolved fingerprint includes inherited
+    # permissions even when the descendant's own modified value is unchanged.
+    for _attempt in range(VERIFICATION_ATTEMPTS):
+        identifiers = {identify_entity(details[h])[0] for h in rows} | {source_key}
+        current = {entity.hash: entity for entity in Entities.fetch(*sorted(identifiers), request=nested)}
+        missing = rows.keys() - current.keys()
+        if missing:
+            with cache.pipeline() as pipe:
+                for entity_hash in missing:
+                    pipe.hdel(Keys.ENTITY_HASHES.value, entity_hash)
+                    pipe.delete(rows.pop(entity_hash))
+                    entity_key, kind = identify_entity(details[entity_hash])
+                    if kind == "page":
+                        pipe.delete(Search.page.value.format(entity_key), Search.user.value.format(entity_key))
+                pipe.execute()
+        cached = _load_cached_details(rows)
+        changed = [current[h] for h in rows
+                   if h in cached and current[h].fingerprint != cached[h].get("fingerprint")]
+        if not changed:
+            break
+        update(*changed, update=False)
+    else:
+        raise RuntimeError("Entities kept changing during restriction reconciliation; retry")
+
+    if source.hash not in current:
+        return None
+    if current[source.hash].fingerprint != source_fingerprint:
+        return restart
+    if _membership_revision() != revision:
+        return restart
+    if int(offset) + BATCH_SIZE < total:
+        return {**restart, "cursor": cursor,
+                "offset": int(offset) + BATCH_SIZE, "revision": revision}
+    if next_cursor:
+        return {**restart, "cursor": next_cursor,
+                "offset": 0, "revision": revision}
+    owners = Entities.fetch(*sorted(owner_keys), request=Fetch.direct()) if owner_keys else []
+    _publish_completion([owner for owner in owners if owner.entity_kind in {"category", "project"}])
+    return None

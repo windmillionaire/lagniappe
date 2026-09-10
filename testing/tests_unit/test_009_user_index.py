@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lagniappe.core.definitions import Fetch, Restriction
+from lagniappe.core.definitions import Fetch, FetchReason, Restriction
 from testing.utility.test_entities import TestEntities
 
 
@@ -169,7 +169,9 @@ def test_user_index_loads_users_groups_public_group_and_append_cursor():
     details.assert_called_once_with(["grp001"])
     assert load.call_args_list[0].args == ("usr-key-1", "usr-key-2")
     assert load.call_args_list[1].args == ("grp-key-1", "grp-key-2")
-    assert load.call_args_list[0].kwargs == {"request": Fetch.direct()}
+    assert load.call_args_list[0].kwargs == {
+        "request": Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION)
+    }
     assert load.call_args_list[1].kwargs == {"request": Fetch.direct()}
     get_public_group.assert_called_once_with()
     assert users == [visible_user]
@@ -311,7 +313,7 @@ def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mo
                     with patch(
                         "lagniappe.core.entities.index.Entities.fetch",
                         return_value=[public_user, regular_user, hidden_public_user],
-                    ):
+                    ) as load:
                         index = UserIndex(
                             mode="public",
                             cursor="public-cursor",
@@ -327,6 +329,10 @@ def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mo
     )
     assert index.mode == "public"
     assert users == [public_user]
+    load.assert_called_once_with(
+        "usr-key-5", "usr-key-6", "usr-key-7",
+        request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+    )
     assert index.append == "/users.rows&cursor=next-public&mode=public"
 
 

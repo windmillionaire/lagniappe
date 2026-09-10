@@ -72,7 +72,7 @@ def _patch_fake_keys(monkeypatch):
     )
     monkeypatch.setattr(
         "lagniappe.core.properties.common_entity.cache.check_hash",
-        lambda value: False,
+        lambda value, **kwargs: False,
     )
     monkeypatch.setattr(
         "lagniappe.core.entities.page.database_get.page_tasks",
@@ -140,6 +140,18 @@ def _fetch_one_from(entities):
         return entities.get(identifier)
 
     return fetch_one
+
+
+def _fetch_from(entities):
+    fetch_one = _fetch_one_from(entities)
+
+    def fetch(*identifiers, request):
+        return [
+            entity for identifier in identifiers
+            if (entity := fetch_one(identifier, request=request)) is not None
+        ]
+
+    return fetch
 
 
 def _test_user(hash_value):
@@ -220,6 +232,7 @@ def _recovery_store(monkeypatch, *initial):
 
     monkeypatch.setattr(report_runner.Entities, "save", save)
     monkeypatch.setattr(report_runner.Entities, "fetch_one", fetch_one)
+    monkeypatch.setattr(report_runner.Entities, "fetch", _fetch_from(stored))
     return stored, saves
 
 
@@ -227,6 +240,7 @@ __all__ = (
     "FakeKey",
     "_assert_repair_prompt_contract",
     "_attach_report_process",
+    "_fetch_from",
     "_fetch_one_from",
     "_patch_fake_keys",
     "_patch_task_file_add",

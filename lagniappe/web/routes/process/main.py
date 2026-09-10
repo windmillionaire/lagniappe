@@ -335,7 +335,13 @@ def reconcile_restrictions():
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
-    if not payload.get("source_key") or not set(payload) <= {"source_key", "cursor", "offset"}:
+    if (not payload.get("source_key")
+            or not set(payload) <= {"source_key", "cursor", "offset", "revision", "owner_keys"}
+            or ("revision" in payload and not isinstance(payload["revision"], str))
+            or ("owner_keys" in payload and (
+                not isinstance(payload["owner_keys"], list)
+                or any(not isinstance(key, str) for key in payload["owner_keys"])
+            ))):
         return jsonify({"success": False}), 400
     try:
         remaining = reconcile_batch(**payload)

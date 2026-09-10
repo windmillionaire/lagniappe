@@ -338,6 +338,7 @@ def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
 
 
 # @matrix ai deferred-jobs files pages tasks : attachment autofill idempotency inspection naming upload
+# @pair deferred-jobs:loaded-input
 @pytest.mark.parametrize("target_kind", ["page", "task"])
 def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     class Relation:
@@ -359,6 +360,7 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
 
     class Target:
         def __init__(self):
+            self.db = {}
             self.key = f"{target_kind}-key"
             self.urlsafe_key = self.key
             self.entity_kind = target_kind
@@ -418,9 +420,13 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     stored = {}
     saved = []
     upload_loads = []
+    attachment_loads = []
 
     def fetch_one(key, request):
         del request
+        if key is target:
+            return target
+        attachment_loads.append(key)
         return stored.get(key)
 
     def save(*entities):
@@ -453,11 +459,13 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
                 "mimetype": "application/pdf",
             },
         },
-        input=lambda name: target if name == "target" else None,
+        inputs={"target": target},
         ensure_active=lambda: None,
     )
+    context.input = lambda name: context.inputs.get(name)
 
     adapter = autofill_adapters.AutofillAdapter()
+    adapter.load(context)
     result = adapter.apply(context)
 
     assert len(created) == 1
@@ -485,3 +493,10 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     adapter.apply(context)
     assert len(created) == 1
     assert upload_loads == [{"token": "signed-upload"}]
+    assert attachment_loads == ["encoded-file-key"]
+
+    # A retry refreshes attachment state at the load boundary, then reuses it.
+    context.inputs = {"target": target}
+    adapter.load(context)
+    assert adapter.inspect(context) is DeferredJobInspection.APPLIED
+    assert attachment_loads == ["encoded-file-key", "encoded-file-key"]

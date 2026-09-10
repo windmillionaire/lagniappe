@@ -9,7 +9,7 @@ state. Collaborative documents use their own revision protocol in
 
 | Surface | Authority | Browser owner |
 | --- | --- | --- |
-| Entity/form values | Durable `fingerprint` and `modified`. | `EditWatcher` / `EditReconciler`. |
+| Entity/form values | Fingerprint derived from durable state, effective restrictions, and own form version. | `EditWatcher` / `EditReconciler`. |
 | Collection membership | Durable site/channel revision. | Core collection refresh. |
 | Deferred work | `DeferredJob.status_revision` and destination metadata. | `DeferredOperationManager`. |
 | Form operation lock | `DeferredJobLock`. | Form widget plus `form-lock` polling. |
@@ -60,6 +60,20 @@ back to a widget's focused GET route. Data fetch and detached preparation
 finish first; root fingerprint, row changes, deletions, supplemental nav, and
 widget commits apply together.
 
+Each row manifest contains `key`, `hash`, and `fingerprint`. The server loads the
+parent revision. A changed parent or authorization revision triggers a root
+membership/order query; an unchanged parent reuses the manifest's membership.
+Both paths compare a batch of cached detail fingerprints.
+It resolves only new, changed, or uncached rows with `Fetch.nested()` before
+authorization and rendering. The view carries a separate authorization revision;
+a change to that revision rechecks all candidates. Cache loss triggers canonical
+loading rather than treating the row as deleted. Display/sort timestamps remain
+independent of refresh fingerprints.
+
+User rows identify their cached Page. A changed Users collection also refreshes
+User-backed columns such as groups and last login. Form indexes retain full
+fragment replacement when their collection revision changes.
+
 Forms never participate in generic collection replacement. Active, dirty,
 queued, or staged-review rows are protected. Hidden clean rows may refresh
 silently. If a changed row belongs to a loaded DOM collection whose widget has
@@ -70,6 +84,11 @@ their poll channel. Other index roots retain their established fingerprints.
 Home widgets own independent channels—Notes, Tasks, Starred, Pages,
 Projects, Categories, Ingress, and Tool Reports—so a change refreshes only its
 consumer.
+
+A loaded Page task list owns a periodic Tasks channel subscription. Its
+`collection_revision` is independent of the Page fingerprint so Task Form
+restriction/schema changes invalidate the list without changing the Page's
+form revision.
 
 `ToolReportList` owns a panel containing filter controls, empty-state messaging,
 and a nested `ul[data-role="report-items"]`. Report rows expose `data-tool` and
@@ -82,7 +101,8 @@ Full-page saved Project filters subscribe to both their Filter/Project entity
 revision and the Tasks channel. Both subscriptions run periodically while active.
 Saved Category filters subscribe to their Filter/Category entity revision.
 Their durable filter key and hash let `/l/refresh` recompute membership through
-the saved filter cache and recheck access even for rows with unchanged timestamps.
+the saved filter cache. Restriction changes alter row fingerprints even when the
+entity's modification timestamp is unchanged.
 Only changed or newly visible rows need replacement HTML; unchanged authorized
 rows keep their DOM. Temporary project status filters use the Tasks
 channel but retain their complete focused route, including query parameters,

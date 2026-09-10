@@ -4,7 +4,8 @@ import json
 
 from .core import cache, filter_cache
 from .keys import SEARCH_SCORE_FIELD, Keys, Search
-from ..auth.restrictions import prepare_permissions
+from ...definitions.fingerprints import base_fingerprint
+from ..auth.restrictions import normalize_restrictions
 
 DEFAULT_SEARCH_SCORE = "0.75"
 KIND_SEARCH_SCORES = {
@@ -30,7 +31,11 @@ def _escape_pipe(text):
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_redis_details_store_parent_key_not_parent_blob
+# @tests tests_unit/test_017_cache_query.py::test_redis_details_preserve_restriction_sources
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reserved_form_is_not_a_cached_permission_source
 # @matrix cache : details parent-key redis-storage
+# @pair cache:source-clauses
+# @matrix permissions cache : reserved-form form-version no-extra-read
 def _redis_details(entity):
     """Return entity details as Redis stores them, with parent represented by hash."""
     details = dict(entity.details)
@@ -38,12 +43,21 @@ def _redis_details(entity):
     if isinstance(parent, dict) and parent.get("hash"):
         details["parent_key"] = parent["hash"]
     kind = entity.entity_kind
-    if kind in {"form", "page"}:
-        details["restricted_to"] = entity.restricted_to or []
-    elif kind == "task":
+    modified = getattr(entity, "modified", None)
+    if modified:
+        details["modified"] = base_fingerprint(modified)
+    details["fingerprint"] = entity.fingerprint
+    restrictions = normalize_restrictions(getattr(entity, "restricted_to", None))
+    if restrictions:
+        details["restricted_to"] = restrictions
+    else:
+        details.pop("restricted_to", None)
+    if kind == "form":
+        details["form_version"] = entity.version or ""
+    elif kind in {"page", "task"}:
         form = entity.form
-        details["form_key"] = form.hash if form else None
-    elif kind == "file":
+        details["form_version"] = (form.version or "") if form else ""
+    if kind == "file":
         owner = entity.owner
         if owner:
             details["parent_key"] = owner.hash
@@ -70,10 +84,11 @@ def delete_entity_from_search(kind, entity):
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_cache_update_writes_pointer_search_rows_and_parent_free_details
 # @tests tests_unit/test_017_cache_query.py::test_cache_update_keeps_non_searchable_entity_hash_addressable
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reserved_form_is_not_a_cached_permission_source
 # @matrix cache : details parent-key redis-storage search-visibility
+# @matrix permissions cache : reserved-form form-version no-extra-read
 def update(*entities, update=True):
     """Write entity data to the hash cache and update JSON indexes."""
-    prepare_permissions(*entities)
     cacheable = [e for e in entities if getattr(e, "to_cache", None)]
     if not cacheable:
         return

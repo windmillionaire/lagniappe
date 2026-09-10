@@ -2,9 +2,8 @@
 
 from google.genai import types
 
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from ...auth.restrictions import prepare_permissions
 from lagniappe.core.tools.database import get as database_get
 from ..references import hash_reference
 
@@ -101,8 +100,7 @@ def execute_get_form_instances(args, user):
         }
 
     limit = _limit(args.get("limit"))
-    loaded = Entities.fetch(*database_get.form_instance_users(form.key), request=Fetch.direct())
-    prepare_permissions(*loaded, action=Action.EDIT)
+    loaded = Entities.fetch(*database_get.form_instance_users(form.key), request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     instances = [entity for entity in loaded if _include_instance(entity, user, kinds, task_completed)]
     instances.sort(key=lambda entity: (entity.kind, (entity.name or "").lower()))
     returned = instances[:limit]
