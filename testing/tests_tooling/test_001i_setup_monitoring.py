@@ -137,7 +137,7 @@ def test_memory_policy_payload_uses_per_instance_query_and_actionable_documentat
     assert "resource.version_id, resource.zone" in query
     assert "val(0) / val(1)" in query
     assert "sum(value.instance_count)" in query
-    assert "condition val() > 644245094.4" in query
+    assert query.splitlines()[-1] == "| condition val() > 644245094.4 'By'"
 
     documentation = payload["documentation"]["content"]
     for expected in (
@@ -300,7 +300,7 @@ def test_automatic_reconciliation_failure_is_nonfatal_and_prints_retry_command(
         "config.SETTINGS",
         types.SimpleNamespace(APP=dict(SETTINGS)),
     )
-    formatter = types.SimpleNamespace(warning=lambda message: message)
+    formatter = types.SimpleNamespace(warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""))
     monkeypatch.setattr(
         "installer.FORMATTER",
         types.SimpleNamespace(initialize=lambda: formatter),
@@ -308,9 +308,9 @@ def test_automatic_reconciliation_failure_is_nonfatal_and_prints_retry_command(
 
     assert monitoring.reconcile_memory_alert_after_deploy() is False
     output = capsys.readouterr().out
-    assert "deployment succeeded" in output
-    assert "monitoring could not be reconciled" in output
-    assert "Retry with: ./setup.sh monitoring" in output
+    assert "Deployment succeeded" in output
+    assert "monitoring could not be reconciled" in " ".join(output.split())
+    assert "Retry with:\n  ./setup.sh monitoring" in output
 
 
 # @matrix doctor monitoring setup : drift read-only

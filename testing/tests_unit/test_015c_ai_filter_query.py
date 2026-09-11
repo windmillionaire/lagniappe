@@ -8,6 +8,8 @@ import pytest
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     Comparator,
+    FetchDepth,
+    FetchReason,
     FieldType,
     FilterOptions,
 )
@@ -418,6 +420,15 @@ def test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
             return [hidden, older, inactive, visible]
 
     monkeypatch.setattr(ai_query, "FilterCache", FakeFilterCache)
+    visible.page = SimpleNamespace()
+    monkeypatch.setattr(ai_query.Entities, "TASK", _Entity)
+    monkeypatch.setattr(
+        ai_query.Entities,
+        "fetch",
+        lambda *entities, request: calls.update(
+            fetch=(entities, request)
+        ) or list(entities),
+    )
 
     result = ai_query.query_workspace_filter(
         project,
@@ -438,6 +449,41 @@ def test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
     assert visible.to_ai_users == [user]
     assert hidden.to_ai_users == []
     assert inactive.to_ai_users == []
+    assert calls["fetch"][1].depth is FetchDepth.NESTED
+    assert (
+        calls["fetch"][1].reason
+        is FetchReason.AI_FILTER_RESULT_SERIALIZATION
+    )
+
+
+# @matrix ai-filter : legacy-record bounded-error output
+@pytest.mark.unit
+def test_query_workspace_filter_reports_bounded_row_serialization_errors():
+    user = object()
+    good = _Entity("task", "good-task", "Good")
+    broken = []
+    for index in range(ai_query.MAX_SERIALIZATION_ERRORS + 2):
+        item = _Entity("task", f"broken-{index}", f"Broken {index}")
+        item.to_ai = lambda _user: (_ for _ in ()).throw(
+            exceptions.PropertyError("legacy relation")
+        )
+        broken.append(item)
+
+    serialized, errors = ai_query._serialize_results([good, *broken], user)
+
+    assert serialized == [
+        {"kind": "task", "hash": "hash:good-task", "name": "Good"}
+    ]
+    assert len(errors) == ai_query.MAX_SERIALIZATION_ERRORS + 1
+    assert all(
+        error["code"] == "unrepresentable_result"
+        for error in errors[:-1]
+    )
+    assert errors[-1] == {
+        "code": "additional_unrepresentable_results",
+        "count": 2,
+        "message": "Additional matching records could not be represented.",
+    }
 
 
 # @matrix ai-filter : permissions tool-handler validation
@@ -466,7 +512,7 @@ def test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
     )
 
     schema_result = workspace_filter.execute_get_filter_schema(
-        {"parent_id": project.hash},
+        {"id": project.hash},
         user,
     )
     assert schema_result == {
@@ -474,16 +520,16 @@ def test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
         "user": user,
     }
     assert workspace_filter.execute_query_workspace_filter(
-        {"parent_id": project.hash, "conditions": []},
+        {"id": project.hash, "conditions": []},
         user,
     ) == {"error": "bad condition"}
     assert workspace_filter.execute_get_filter_schema({}, user) == {
-        "error": "parent_id is required"
+        "error": "id is required"
     }
 
     project._allowed = False
     denied_result = workspace_filter.execute_get_filter_schema(
-        {"parent_id": project.hash},
+        {"id": project.hash},
         user,
     )
     assert denied_result == {

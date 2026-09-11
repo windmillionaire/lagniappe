@@ -27,6 +27,7 @@ selected through runtime configuration.
 | `site` | Singleton settings, fingerprints, controls, and ledgers. |
 | `jobs`, `job_locks` | Durable background work and target locks. |
 | `agent_api_credentials` | One expiring, digest-only external-agent credential per user. |
+| `agent_api_plan_operation_claims` | Shared per-report fence keys for leased API Plan transitions and one-shot browser mutations. |
 
 ## Keys, reads, and writes
 
@@ -58,9 +59,51 @@ Domain-specific transaction modules stay concrete:
 - `site.py` owns singleton site settings; and
 - `analytics.py` owns analytics and AI-observability rows.
 
-`agent_api.py` owns transactional bearer-key rotation and revocation. Its
-stable opaque credential id supports lookup without exposing the user's key;
-the row never stores the shown-once bearer secret.
+`agent_api.py` owns transactional bearer-key rotation and revocation, plus the
+shared per-report Plan-operation fence. Its stable opaque credential id supports
+lookup without exposing the user's key; the credential row never stores the
+shown-once bearer secret. API create-upload, finalize-upload, and submit claims
+contain only an operation id, phase, random fencing token, and expiry. Each API
+operation re-reads the authoritative report after acquiring its claim. Every
+report/File checkpoint compares the pre-mutation report snapshot and verifies
+the exact claim token in the same Datastore transaction that writes the prepared
+entity mutations, so a lease takeover cannot commit a stale report.
+
+Browser mutations of an API-origin report use the same claim key as a one-shot
+fence without retaining a browser lease. Skip, execution start, every undo
+checkpoint, execution-failure persistence, terminal execution cleanup, and
+delete compare the raw Report snapshot, reject an active valid API claim, and
+delete even an absent or expired claim key in the transaction that commits
+their entity writes or deletes. That claim-key mutation conflicts with a
+simultaneous API claimant, while the Report compare-and-set catches an API
+operation that completed and released its claim first. Delete also rejects a
+report with a deferred execution or `undoing` status; it does not cancel an
+active queued execution. An eligible guarded delete includes report-only File
+entity deletion, while temporary-upload and other blob/cache cleanup remain
+post-commit effects.
+
+Storage session creation and blob copying necessarily remain outside Datastore.
+The File key is deterministic per upload batch and record, but each finalization
+owner copies into an attempt-unique destination path derived from its internal
+claim nonce. The provider copy requires the exact temporary-source generation
+and a previously absent destination. As soon as the copy succeeds, its path and
+generation are registered on the upload attempt before the content-type metadata
+patch, which is conditional on that same generation. The path and generation
+are then stored in the File checkpoint, and the temporary source remains until
+that fenced checkpoint commits. A definitely uncommitted outcome conditionally
+deletes only the copied generation; a generation mismatch preserves a
+replacement. An ambiguous checkpoint outcome retains the copy for later
+reconciliation rather than risking deletion of committed data.
+
+Temporary-source deletion is likewise generation-conditional and treats an
+already absent object as success. Finalization records the exact source
+generation it verified and copied before checkpointing. If deletion fails after
+the File/Report checkpoint, the completed upload-manifest entry remains durable
+and finalization fails. A retry uses that completed entry to repeat the
+idempotent source cleanup without copying or checkpointing the File again; the
+manifest is cleared only after all completed sources have been cleaned. Report
+and terminal-job cleanup also retry every valid manifest source, including a
+completed entry left by an earlier cleanup failure.
 
 Shared bounded Datastore contention retry lives in `transactions.py`. A retry
 must repeat the complete read/check/write transaction body.
@@ -101,8 +144,12 @@ size is checked from Cloud Storage metadata before download. Provider-side copy
 stays unbounded because bytes do not enter the application process. See
 [BACKEND_TOOLS.md](BACKEND_TOOLS.md#file-tools).
 
-Blob deletion is a post-commit effect. Never delete an asset before the
-Datastore mutation that removes or replaces its descriptor commits.
+Blob deletion is normally a post-commit effect. Never delete an asset before the
+Datastore mutation that removes or replaces its descriptor commits. The narrow
+pre-commit exception is cleanup of a definitely uncommitted upload-finalization
+attempt, and that deletion must name the exact attempt-unique path and generation.
+Temporary upload sources are instead deleted after their File/Report checkpoint,
+using a generation precondition and idempotent already-absent handling.
 
 ## Data migrations
 

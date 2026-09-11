@@ -265,6 +265,7 @@ vm.createContext(context);
 
 let source = fs.readFileSync("src/script/views/page.mjs", "utf8");
 source = source.replace('import { withTransition } from "../shared";\n', "");
+source = source.replace('import { setIcon } from "../shared/icons";\n', "");
 source = source.replace(
   'import Entity from "./base/entity";',
   `
@@ -284,6 +285,7 @@ const photo = {};
 const createPage = ({ active = null, visible = false } = {}) => {
   const page = new context.Page({
     dataset: {},
+    addEventListener() {},
     querySelector(selector) { return selector === "#photo" ? photo : null; },
   });
   let activations = 0;

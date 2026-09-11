@@ -18,6 +18,8 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai import external_operations, report_history
+from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
@@ -62,6 +64,7 @@ def _uploaded_report_files():
                 "filename": upload.filename,
                 "mimetype": upload.content_type,
             },
+            report_user=current_user._get_current_object(),
         )
         files.append(file)
     return files
@@ -226,6 +229,9 @@ def _start_tool_report(
         )
         return responses.new_tool_report(report)
 
+    # Starting the adapter may replace its report instance while recording the
+    # operation. Render that saved state for an already-open homepage list too.
+    report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct()) or report
     return responses.deferred_tool_report(report, notification, job=job)
 
 
@@ -335,6 +341,23 @@ def _get_report(key):
     return report
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/tools/main.py::skip_report_action
+# @covered-by lagniappe/web/routes/tools/main.py::delete_report
+# @reason browser conflict responses are exercised by both guarded routes
+def _external_plan_mutation_error(outcome):
+    if outcome == agent_api_store.PLAN_OPERATION_MISSING:
+        return responses.not_found("Report not found")
+    message = (
+        "This plan is being updated. Refresh it before trying again."
+        if outcome == agent_api_store.PLAN_OPERATION_BUSY
+        else "This plan changed. Refresh it before trying again."
+    )
+    response = responses.error(message)
+    response.status_code = 409
+    return response
+
+
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
@@ -363,7 +386,9 @@ def report(key):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_run_start_error_does_not_save_stale_report
 # @matrix ai-report : detail deterministic-run entitlement-independent idempotent recovery repeat-run retry
+# @matrix agent-api ai-report : browser-review error-isolation report-execution
 @tools.route("/reports/<key>/run", methods=["POST"])
 @logged_in
 def run_report(key):
@@ -420,11 +445,12 @@ def run_report(key):
     except Exception as error:
         message = "Report execution could not be started. Please try again."
         current = _get_report(key) or report
-        if current.status == "running":
-            current.status = "ready"
-            current.pending = False
-        current.error = message
-        Entities.save(current, current_user)
+        if current.origin != "api":
+            if current.status == "running":
+                current.status = "ready"
+                current.pending = False
+            current.error = message
+            Entities.save(current, current_user)
         exceptions.capture(
             error,
             context={
@@ -443,7 +469,9 @@ def run_report(key):
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_undo_delete_first_fence_stops_before_compensation
 # @matrix ai-report : deterministic-undo entitlement-independent failed-prefix recovery undo
+# @matrix agent-api ai-report : browser-review cas compensation delete undo
 @tools.route("/reports/<key>/undo", methods=["POST"])
 @logged_in
 def undo_report(key):
@@ -462,8 +490,28 @@ def undo_report(key):
             "Only complete or partially completed reports can be undone."
         )
 
+    save = None
+    if report.origin == "api":
+        expected_report = external_operations.report_snapshot(report)
+
+        # @testable false
+        # @covered-by lagniappe/web/routes/tools/main.py::undo_report
+        # @reason the callback delegates undo checkpoints to the guarded route workflow
+        def save(current):
+            nonlocal expected_report
+            outcome = external_operations.save_plan_if_idle(
+                current,
+                expected_report,
+            )
+            if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+                raise exceptions.ValidationError(
+                    "This plan changed while undo was in progress. Refresh it "
+                    "before trying again."
+                )
+            expected_report = external_operations.report_snapshot(current)
+
     try:
-        ai.undo_report(report, current_user)
+        ai.undo_report(report, current_user, save=save)
     except exceptions.ValidationError as error:
         return responses.error(str(error))
     Entities.touch(current_user)
@@ -541,7 +589,9 @@ def revise_report(key):
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_browser_mutations_reject_fenced_state_without_side_effects
 # @matrix ai-report : dependencies entitlement-independent skip-action
+# @matrix agent-api ai-report : browser-review cas skip-action
 @tools.route("/reports/<key>/actions/<int:action_index>/skip", methods=["POST"])
 @logged_in
 def skip_report_action(key, action_index):
@@ -550,7 +600,14 @@ def skip_report_action(key, action_index):
         return responses.not_found("Report not found")
     if report.status != "ready":
         return responses.error("Only ready reports can be changed.")
+    if report.origin == "api" and report.deferred_job:
+        return _external_plan_mutation_error(agent_api_store.PLAN_OPERATION_BUSY)
 
+    external_snapshot = (
+        external_operations.report_snapshot(report)
+        if report.origin == "api"
+        else None
+    )
     proposal = report.proposal
     payload = request.get_json(silent=True) or {}
     action_indexes = payload.get("action_indexes") or []
@@ -565,24 +622,54 @@ def skip_report_action(key, action_index):
     else:
         result = ai.toggle_proposal_action_skip(proposal, action_index - 1)
     report.proposal = proposal
-    Entities.save(report, current_user)
+    if external_snapshot is not None:
+        outcome = external_operations.save_plan_if_idle(
+            report,
+            external_snapshot,
+        )
+        if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+            return _external_plan_mutation_error(outcome)
+    else:
+        Entities.save(report, current_user)
     return responses.json_response(result)
 
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_browser_mutations_reject_fenced_state_without_side_effects
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_delete_rejects_active_execution_without_side_effects
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_delete_rejects_undo_in_progress_without_side_effects
 # @matrix ai-report : delete delete-modal entitlement-independent file-cleanup
+# @matrix agent-api ai-report : browser-review cas delete report-execution undo
 @tools.route("/reports/<key>", methods=["DELETE"])
 @logged_in
 def delete_report(key):
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
-
-    files_to_delete = [file for file in report.input_files if not file.has_references]
-    DeferredJobs.cancel(report.deferred_job)
-    ai.cleanup_report_upload_manifest(report)
-    Entities.delete(report, *files_to_delete)
+    outcome = report_history.delete_report_record(report)
+    if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+        return _external_plan_mutation_error(outcome)
     Entities.touch(current_user)
     return responses.ok()
+
+
+# @testable true
+# @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
+# @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_bulk_report_delete_rechecks_ownership_and_validates_input
+# @matrix ai-report : bulk-delete ownership validation
+@tools.route("/reports/executed", methods=["DELETE"])
+@logged_in
+def delete_executed_reports():
+    if getattr(current_user, "is_public", False):
+        abort(403)
+    data = request.get_json(silent=True)
+    keys = data.get("keys") if isinstance(data, dict) else None
+    if not isinstance(keys, list) or any(
+        not isinstance(key, str) or not key.strip() for key in keys
+    ):
+        return responses.error("Provide the report keys to delete.")
+    return responses.json_response(
+        report_history.delete_executed_reports(current_user, keys)
+    )

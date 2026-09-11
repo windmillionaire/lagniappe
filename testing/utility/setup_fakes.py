@@ -51,13 +51,16 @@ class SpinnerRecorder:
     starts: int = 0
     stops: int = 0
 
-    def write(self, message):
+    def write(self, message, *, raw=False):
         self.messages.append(message)
 
-    def ok(self, mark):
+    def ok(self, mark=None):
         self.oks.append(mark)
 
-    def fail(self, mark):
+    def skip(self, message):
+        self.messages.append(message)
+
+    def fail(self, mark=None):
         self.fails.append(mark)
 
     def start(self):

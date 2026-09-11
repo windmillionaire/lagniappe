@@ -78,10 +78,17 @@ Run after installation, recovery, or a manual configuration edit:
 `doctor` is read-only. It checks generated-file completeness and source marker,
 file permissions, saved gcloud/ADC identity, active operator permissions,
 required APIs/resources, runtime IAM, buckets, Identity Platform, Redis, and
-focused provider state, including the managed App Engine memory policy.
+focused provider state, including the managed App Engine memory policy and
+selected MCP endpoint/version.
+It decodes saved settings through the same parser as the normal configuration
+loader. If gcloud or ADC identity is unavailable or mismatched, doctor stops
+before the resource inventory and provider checks and points to
+`./setup.sh auth`. That command aligns both CLI and ADC credentials; a direct
+`gcloud auth login` updates only the CLI login. Doctor never opens an ADC login
+itself. Rerun doctor after authentication completes.
 Independent provider checks still run when only local
 generated files have drifted. It returns nonzero for drift and prints the
-repair command.
+applicable authentication or repair command.
 
 `./setup.sh repair` is the mutating path. Confirm the reported project and
 identities before running it. Repair uses the normal setup lock and journal,
@@ -102,7 +109,10 @@ recovered working copy. A clean clone alone is insufficient because handoff
 also needs the exact saved settings and generated deployment files. Neither
 path requires the other person's password or credentials.
 
-After default-no review, the command:
+The review names the installer, permanent Owner and project, then describes
+the access transfer without listing IAM role identifiers. Its default-no
+`Deploy app and complete handoff [y/N]` prompt explicitly authorizes deployment.
+After confirmation, the command:
 
 1. grants the Owner bucket operator and exact runtime-account act-as/signing
    bindings;
@@ -111,6 +121,13 @@ After default-no review, the command:
 4. removes the installer from managed bucket and runtime-account IAM; and
 5. removes the installer's direct project IAM bindings and verifies the Owner
    remains.
+
+The completion output reports removal of installation roles and uses dashed
+instructions for this installation's remaining cleanup. It identifies the
+installer's Workspace account for deletion if no longer needed. When the saved
+authentication-email sender or SMTP login is that installer, it first directs
+the Owner to `./setup.sh email` and deployment to replace that mailbox dependency.
+It does not print generic provider-token or local-credential cleanup advice.
 
 The operation preserves unrelated IAM members/conditions and runtime
 self-bindings. It does not manage Workspace accounts, billing-account IAM, or
@@ -147,3 +164,16 @@ The settings file does not contain application entities, documents, uploads,
 or Redis data. The recovery bucket and recovery-set workflow protect those
 assets. If both provider data and the recovery bucket are lost, configuration
 alone cannot reconstruct the application workspace.
+
+## Optional AI and MCP recovery
+
+Recovery retains and validates the site AI switches, exact MCP OAuth endpoint
+and runtime identity, and desired `MCP_VERSION`. An older snapshot without
+explicit external policy preserves REST access without silently opting into a
+new Cloud Run service. Normal repair/update prepares the selected service,
+publishes App Engine configuration, then activates or updates MCP. An unchanged
+service is reused. `./setup.sh mcp` retries interrupted component deployment.
+
+Delegated handoff also transfers the MCP runtime/build accounts, build bucket,
+Artifact Registry repository and Cloud Run service. The running MCP account
+never receives the main application's database or general Storage permissions.

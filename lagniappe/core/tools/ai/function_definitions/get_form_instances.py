@@ -2,7 +2,7 @@
 
 from google.genai import types
 
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from ..references import hash_reference
@@ -35,7 +35,7 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
-            "form_id": {
+            "id": {
                 "type": "string",
                 "description": "The form hash token from prompt context or tool results.",
             },
@@ -60,7 +60,7 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
                 ),
             },
         },
-        "required": ["form_id"],
+        "required": ["id"],
     },
 )
 
@@ -70,11 +70,11 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
 # @matrix ai form-schema : form-instances permissions status submission truncation
 def execute_get_form_instances(args, user):
     """Return viewable page/task instances attached to a form."""
-    form_id = args.get("form_id")
-    if not form_id:
-        return {"error": "form_id is required"}
+    identifier = args.get("id")
+    if not identifier:
+        return {"error": "id is required"}
 
-    form = Entities.fetch_one(form_id, request=Fetch.direct())
+    form = Entities.fetch_one(identifier, request=Fetch.direct())
     if not form or not isinstance(form, Entities.FORM):
         return {"error": "Form not found"}
     if (
@@ -100,14 +100,8 @@ def execute_get_form_instances(args, user):
         }
 
     limit = _limit(args.get("limit"))
-    instances = [
-        entity
-        for entity in Entities.fetch(
-            *database_get.form_instance_users(form.key),
-            request=Fetch.direct(),
-        )
-        if _include_instance(entity, user, kinds, task_completed)
-    ]
+    loaded = Entities.fetch(*database_get.form_instance_users(form.key), request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    instances = [entity for entity in loaded if _include_instance(entity, user, kinds, task_completed)]
     instances.sort(key=lambda entity: (entity.kind, (entity.name or "").lower()))
     returned = instances[:limit]
 

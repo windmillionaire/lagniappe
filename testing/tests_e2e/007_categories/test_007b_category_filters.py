@@ -211,8 +211,8 @@ def test_category_filter_results_respect_page_permissions(get_user):
     category = Categories.test_category_filter_pages.get(owner)
     visible = Pages.test_category_filter_permission_visible.get(owner)
     hidden = Pages.test_category_filter_permission_hidden.get(owner)
-    if "owner" not in hidden.entity.properties.restricted_to.stored:
-        hidden.entity.properties.restricted_to.add("owner")
+    if hidden.entity.properties.restricted_to.stored != ["admin"]:
+        hidden.entity.properties.restricted_to.materialize(admin_only=True)
         hidden.entity.save()
 
     subject = get_user(Users.general_models_view_only)
@@ -373,9 +373,8 @@ def test_category_saved_filter_save_and_run(get_user, browser_failures):
 
     root = user.locate("[lp-view]")
     expect(root).to_have_attribute("data-key", filter_key)
-    expect(root).to_have_attribute("data-poll-channel", "categories")
+    expect(root).not_to_have_attribute("data-poll-channel", re.compile(r".+"))
     expect(root).to_have_attribute("data-fingerprint", re.compile(r".+"))
-    expect(root).to_have_attribute("data-poll-revision", re.compile(r".+"))
 
     table = user.locate("#table")
     expect(
@@ -399,7 +398,7 @@ def test_category_saved_filter_save_and_run(get_user, browser_failures):
 
     with expect_poll_result(
         user.page,
-        subscription_id="view:channel:categories",
+        subscription_id=f"view:entity:{filter_key}",
     ):
         with expect_reconnect_refresh(user, browser_failures):
             refreshed_page.create()

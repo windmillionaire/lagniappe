@@ -89,9 +89,7 @@ def test_provider_describe_distinguishes_absence_from_operational_errors(monkeyp
 def test_cloud_build_identity_waits_for_first_setup_propagation(monkeypatch):
     results = iter(
         (
-            subprocess.CompletedProcess(
-                ["gcloud"], returncode=0, stdout="", stderr=""
-            ),
+            subprocess.CompletedProcess(["gcloud"], returncode=0, stdout="", stderr=""),
             subprocess.CompletedProcess(
                 ["gcloud"],
                 returncode=0,
@@ -157,9 +155,7 @@ def test_soft_routing_guard_preflight_requires_marker(monkeypatch):
     _verify_soft_routing_guard(_infrastructure())
 
     assert calls[0][0].startswith("https://e2e-")
-    assert calls[0][0].endswith(
-        "-dot-e2e-dot-project-1.uc.r.appspot.com/users/login"
-    )
+    assert calls[0][0].endswith("-dot-e2e-dot-project-1.uc.r.appspot.com/users/login")
     assert calls[0][1] == {"allow_redirects": False, "timeout": 30}
 
     Response.headers = {}
@@ -196,9 +192,7 @@ def test_hosted_anchor_redeploys_only_when_its_contract_is_stale(
         calls.append((arguments, options))
         if arguments[:2] == ("app", "deploy"):
             events.append("deploy")
-            descriptors.append(
-                yaml.safe_load(arguments[2].read_text(encoding="utf-8"))
-            )
+            descriptors.append(yaml.safe_load(arguments[2].read_text(encoding="utf-8")))
         elif arguments[:3] == ("app", "services", "set-traffic"):
             events.append("traffic")
         return subprocess.CompletedProcess(
@@ -233,9 +227,7 @@ def test_hosted_anchor_redeploys_only_when_its_contract_is_stale(
         hosted_e2e,
         "_describe",
         lambda _arguments: {
-            "envVariables": {
-                "HOSTED_E2E_ANCHOR_REVISION": hosted_e2e.ANCHOR_REVISION
-            }
+            "envVariables": {"HOSTED_E2E_ANCHOR_REVISION": hosted_e2e.ANCHOR_REVISION}
         },
     )
 
@@ -296,13 +288,14 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
     monkeypatch.setattr(
         hosted_e2e,
         "run_command",
-        lambda command, **options: commands.append((command, options))
-        or subprocess.CompletedProcess(command, returncode=0),
+        lambda command, **options: (
+            commands.append((command, options))
+            or subprocess.CompletedProcess(command, returncode=0)
+        ),
     )
 
     assert (
-        hosted_e2e._run_create_preflight(revision, base_ref="release-base")
-        == revision
+        hosted_e2e._run_create_preflight(revision, base_ref="release-base") == revision
     )
 
     command_arguments = [list(map(str, command)) for command, _options in commands]
@@ -357,6 +350,18 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
     with pytest.raises(HostedE2EError, match="preflight stopped"):
         hosted_e2e.create(base_ref="release-base")
 
+    assert events == [
+        "source",
+        "build",
+        ("preflight", revision, "release-base"),
+    ]
+
+    events.clear()
+    with pytest.raises(HostedE2EError, match="preflight stopped"):
+        hosted_e2e.create(
+            base_ref="release-base",
+            environment="standard",
+        )
     assert events == [
         "source",
         "build",
@@ -611,6 +616,7 @@ def test_hosted_manifest_records_exact_suite_window(monkeypatch):
         "LAGNIAPPE_HOSTED_E2E_SOURCE": "a" * 40,
         "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT": "b" * 64,
         "LAGNIAPPE_HOSTED_E2E_BUILD_ID": "b1234567",
+        "LAGNIAPPE_HOSTED_E2E_JOB": "lagniappe-e2e",
     }
     for name, value in environment.items():
         monkeypatch.setenv(name, value)
@@ -628,18 +634,28 @@ def test_hosted_manifest_records_exact_suite_window(monkeypatch):
     assert manifest["suite_started_at"] == "2026-08-20T01:00:00+00:00"
     assert manifest["suite_finished_at"] == "2026-08-20T01:30:00+00:00"
 
+    monkeypatch.setenv("CLOUD_RUN_JOB", "lagniappe-e2e-spoofed")
+    monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E_JOB", "lagniappe-e2e-spoofed")
+    with pytest.raises(RuntimeError, match="identity does not match"):
+        hosted_e2e_job._artifact_manifest(
+            suite="all",
+            exit_status=1,
+            execution="lagniappe-e2e-example",
+            started_at=started_at,
+            finished_at=finished_at,
+        )
+
 
 # @matrix hosted-e2e : argument-injection focused-execution target-validation
 def test_hosted_focused_targets_require_existing_e2e_nodeids():
-    target = (
-        "testing/tests_e2e/001_site/test_001a_environment.py::"
-        "test_database_setup"
-    )
+    target = "testing/tests_e2e/001_site/test_001a_environment.py::test_database_setup"
 
     assert hosted_e2e_job.validate_focused_targets([target]) == (target,)
     focused_command = hosted_e2e_job._pytest_command("focused", [target])
     assert target in focused_command
-    assert focused_command[focused_command.index("-m") + 1] == "not unfinished"
+    assert focused_command[focused_command.index("-m") + 1] == (
+        "not unfinished"
+    )
     with pytest.raises(RuntimeError):
         hosted_e2e_job.validate_focused_targets([target, target])
 
@@ -673,13 +689,9 @@ def test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract():
 
 # @matrix hosted-e2e : cloud-run focused-execution local-dispatch override
 def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
-    target = (
-        "testing/tests_e2e/001_site/test_001a_environment.py::"
-        "test_database_setup"
-    )
+    target = "testing/tests_e2e/001_site/test_001a_environment.py::test_database_setup"
     second_target = (
-        "testing/tests_e2e/001_site/test_001a_environment.py::"
-        "test_cache_setup"
+        "testing/tests_e2e/001_site/test_001a_environment.py::test_cache_setup"
     )
     calls = []
     writes = []
@@ -946,18 +958,18 @@ def test_hosted_execute_command_defaults_to_all_and_imports(
     monkeypatch.setattr(
         hosted_e2e,
         "execute",
-        lambda **options: calls.append(options)
-        or {
-            "execution": "lagniappe-e2e-alltest",
-            "exit_status": 0,
-            "suite": "all",
-        },
+        lambda **options: (
+            calls.append(options)
+            or {
+                "execution": "lagniappe-e2e-alltest",
+                "exit_status": 0,
+                "suite": "all",
+            }
+        ),
     )
 
     assert hosted_e2e.run_hosted_e2e_command(["execute"]) == 0
-    assert hosted_e2e.run_hosted_e2e_command(
-        ["execute", "--no-import-results"]
-    ) == 0
+    assert hosted_e2e.run_hosted_e2e_command(["execute", "--no-import-results"]) == 0
     assert calls == [
         {"suite": "all", "targets": (), "import_results": True},
         {"suite": "all", "targets": (), "import_results": False},
@@ -974,13 +986,12 @@ def test_hosted_create_command_routes_preflight_base(monkeypatch, capsys):
     monkeypatch.setattr(
         hosted_e2e,
         "create",
-        lambda **options: calls.append(options)
-        or {"base_url": "https://e2e.example.test"},
+        lambda **options: (
+            calls.append(options) or {"base_url": "https://e2e.example.test"}
+        ),
     )
 
-    assert hosted_e2e.run_hosted_e2e_command(
-        ["create", "--base", "release-base"]
-    ) == 0
+    assert hosted_e2e.run_hosted_e2e_command(["create", "--base", "release-base"]) == 0
 
     assert calls == [{"base_ref": "release-base"}]
     assert "Hosted E2E version ready" in capsys.readouterr().out
@@ -995,26 +1006,31 @@ def test_hosted_release_evidence_command_routes_validation(monkeypatch, capsys):
     monkeypatch.setattr(
         hosted_e2e,
         "validate_release_evidence",
-        lambda *arguments, **options: calls.append((arguments, options))
-        or {
-            "base": base,
-            "candidate": candidate,
-            "evidence": evidence,
-            "mode": "continuation",
-        },
+        lambda *arguments, **options: (
+            calls.append((arguments, options))
+            or {
+                "base": base,
+                "candidate": candidate,
+                "evidence": evidence,
+                "mode": "continuation",
+            }
+        ),
     )
 
-    assert hosted_e2e.run_hosted_e2e_command(
-        [
-            "validate-release-evidence",
-            "--base",
-            base,
-            "--candidate",
-            candidate,
-            "--evidence",
-            evidence,
-        ]
-    ) == 0
+    assert (
+        hosted_e2e.run_hosted_e2e_command(
+            [
+                "validate-release-evidence",
+                "--base",
+                base,
+                "--candidate",
+                candidate,
+                "--evidence",
+                evidence,
+            ]
+        )
+        == 0
+    )
 
     assert calls == [((candidate, evidence), {"base": base})]
     assert json.loads(capsys.readouterr().out)["mode"] == "continuation"
@@ -1138,10 +1154,10 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
     assert hosted_e2e._load_json(state_path)["status"] == "torn-down"
     assert not result_root.exists()
     assert setup_path.exists()
-    assert cors_changes == [
-        ((infrastructure, state["base_url"]), {"present": False})
-    ]
-    assert f"Removed local hosted E2E artifacts: {result_root}" in capsys.readouterr().out
+    assert cors_changes == [((infrastructure, state["base_url"]), {"present": False})]
+    assert (
+        f"Removed local hosted E2E artifacts: {result_root}" in capsys.readouterr().out
+    )
 
 
 # @matrix hosted-e2e traceability : evidence merge provenance
@@ -1248,9 +1264,10 @@ def test_hosted_result_directory_import_requires_the_exact_source(
     evidence = traceability_common.load_json(
         tmp_path / traceability_common.LATEST_TEST_RUN
     )
-    assert evidence["tests"]["tests_e2e/test_remote.py::test_remote"][
-        "outcome"
-    ] == "failed"
+    assert (
+        evidence["tests"]["tests_e2e/test_remote.py::test_remote"]["outcome"]
+        == "failed"
+    )
 
     manifest["source"] = "b" * 40
     traceability_common.write_json(result_dir / "manifest.json", manifest)
@@ -1313,9 +1330,7 @@ def test_hosted_runner_installs_complete_test_collection_dependencies():
         if line.strip().startswith("-r ")
     }
     dockerfile = " ".join(
-        (hosted_e2e.CONTAINER_ROOT / "Dockerfile")
-        .read_text(encoding="utf-8")
-        .split()
+        (hosted_e2e.CONTAINER_ROOT / "Dockerfile").read_text(encoding="utf-8").split()
     )
 
     assert {
@@ -1326,7 +1341,8 @@ def test_hosted_runner_installs_complete_test_collection_dependencies():
         "COPY requirements.txt requirements-dev.txt requirements-installer.txt ./"
         in dockerfile
     )
-    assert "FROM node:24-bookworm-slim AS node-runtime" in dockerfile
+    assert "FROM node:24-bookworm-slim@sha256:" in dockerfile
+    assert "AS node-runtime" in dockerfile
     assert "apt-get install --yes --no-install-recommends git procps" in dockerfile
     assert "ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm" in (
         dockerfile
@@ -1334,8 +1350,7 @@ def test_hosted_runner_installs_complete_test_collection_dependencies():
     assert "COPY package.json package-lock.json ./" in dockerfile
     assert "RUN npm ci" in dockerfile
     assert (
-        "COPY runner/hosted_e2e_container/root.gcloudignore .gcloudignore"
-        in dockerfile
+        "COPY runner/hosted_e2e_container/root.gcloudignore .gcloudignore" in dockerfile
     )
 
 
@@ -1401,7 +1416,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "needs.request.outputs.execute == 'true'" in quality["if"]
     assert "evidence_changed != 'true'" in quality["if"]
     assert "inputs.mode == 'continuation'" in quality["if"]
-    assert attest["needs"] == "quality"
+    assert attest["needs"] == ["quality"]
     assert "needs.quality.result == 'success'" in attest["if"]
     assert "Publish current-head release status" in attest["name"]
     assert "ref: ${{ needs.request.outputs.candidate_sha }}" in workflow_text
@@ -1420,10 +1435,12 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "attempt<=720" in workflow_text
     assert "completion manifest" in workflow_text
     assert "hosted-e2e import-results" in workflow_text
-    assert "--execution \"$EXECUTION\"" in workflow_text
+    assert '--execution "$EXECUTION"' in workflow_text
     assert 'rm -f -- "$credentials_file"' in workflow_text
-    assert 'statuses/$EVIDENCE_SHA' in workflow_text
-    assert "Exact hosted evidence and release gates passed" in workflow_text
+    assert "statuses/$EVIDENCE_SHA" in workflow_text
+    assert "Hosted evidence and release gates passed" in (
+        workflow_text
+    )
     assert "EVIDENCE_SHA: ${{ needs.quality.outputs.evidence_sha }}" in workflow_text
 
     quality_text = yaml.dump(quality, sort_keys=False)
@@ -1437,6 +1454,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "run.py test" not in quality_text
 
 
+
 def test_hosted_workflow_retains_results_before_reporting_and_guards_movement():
     """Failed evidence is returned before red, without overwriting a moved ref."""
     workflow_path = hosted_e2e.APP_DIR / ".github/workflows/hosted-e2e.yml"
@@ -1445,15 +1463,18 @@ def test_hosted_workflow_retains_results_before_reporting_and_guards_movement():
     steps = workflow["jobs"]["execute"]["steps"]
     positions = {step["name"]: index for index, step in enumerate(steps)}
 
-    assert positions["Merge hosted evidence"] < positions[
-        "Commit evidence to the tested branch"
-    ]
-    assert positions["Commit evidence to the tested branch"] < positions[
-        "Dispatch validation on the evidence child"
-    ]
-    assert positions["Dispatch validation on the evidence child"] < positions[
-        "Report the hosted suite result"
-    ]
+    assert (
+        positions["Merge hosted evidence"]
+        < positions["Commit evidence to the tested branch"]
+    )
+    assert (
+        positions["Commit evidence to the tested branch"]
+        < positions["Dispatch validation on the evidence child"]
+    )
+    assert (
+        positions["Dispatch validation on the evidence child"]
+        < positions["Report the hosted suite result"]
+    )
     report = steps[positions["Report the hosted suite result"]]
     assert "always()" in report["if"]
     assert "manifest.json" in report["run"]
@@ -1466,6 +1487,14 @@ def test_hosted_workflow_retains_results_before_reporting_and_guards_movement():
     assert 'git push origin "HEAD:refs/heads/$BRANCH"' in workflow_text
     assert "git push --force" not in workflow_text
     assert '"$head_sha" != "$DISPATCH_EVIDENCE"' in workflow_text
+    assert (
+        "github.event_name != 'workflow_dispatch'"
+        in steps[positions["Merge hosted evidence"]]["if"]
+    )
+    assert (
+        "github.event_name != 'workflow_dispatch'"
+        in steps[positions["Commit evidence to the tested branch"]]["if"]
+    )
 
 
 # @matrix hosted-e2e : artifact-download identity least-privilege
@@ -1521,9 +1550,7 @@ def test_settings_and_redis_ca_use_separate_secret_versions(tmp_path, monkeypatc
     hosted_e2e._sync_settings_secret(_infrastructure())
 
     additions = [
-        arguments
-        for arguments in calls
-        if arguments[1:3] == ("versions", "add")
+        arguments for arguments in calls if arguments[1:3] == ("versions", "add")
     ]
     assert len(additions) == 2
     assert additions[0][3] == "lagniappe-e2e-settings"
@@ -1705,11 +1732,35 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
     assert "--async" in arguments
     assert "--format=json" in arguments
     assert options == {"timeout": 600}
-    assert (
-        container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY
-    ).read_text(encoding="utf-8") == (
-        tmp_path / ".gcloudignore"
-    ).read_text(encoding="utf-8")
+    assert (container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY).read_text(
+        encoding="utf-8"
+    ) == (tmp_path / ".gcloudignore").read_text(encoding="utf-8")
+
+
+# @matrix hosted-e2e : deployment-source image-boundary symlink-safety
+def test_runner_image_refuses_an_unsafe_staged_root_ignore(tmp_path, monkeypatch):
+    container_root = tmp_path / hosted_e2e.CONTAINER_RELATIVE_ROOT
+    container_root.mkdir(parents=True)
+    (tmp_path / ".gcloudignore").write_text("/mcp/\n", encoding="utf-8")
+    (container_root / "cloudbuild.yaml").write_text("steps: []\n", encoding="utf-8")
+    (container_root / "gcloudignore").write_text("config/files/\n", encoding="utf-8")
+    staged_ignore = container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY
+    staged_ignore.symlink_to(tmp_path / ".gcloudignore")
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_gcloud",
+        lambda *_arguments, **_options: pytest.fail(
+            "unsafe staging must fail before Cloud Build"
+        ),
+    )
+
+    with pytest.raises(HostedE2EError, match="staged root .gcloudignore path"):
+        hosted_e2e._build_runner_image(
+            _infrastructure(),
+            "a" * 40,
+            tmp_path,
+            environment="standard",
+        )
 
 
 # @matrix hosted-e2e : build-resume failure-recovery provider-status
@@ -1867,8 +1918,7 @@ def test_hosted_descriptor_preserves_native_static_handlers():
         source_snapshot="b" * 64,
         build_id="b1234567",
         base_url=(
-            "https://e2e-abcdef1234567890-dot-e2e-dot-"
-            "project-1.uc.r.appspot.com"
+            "https://e2e-abcdef1234567890-dot-e2e-dot-project-1.uc.r.appspot.com"
         ),
         session_key="s" * 48,
     )
@@ -1905,12 +1955,10 @@ def test_hosted_descriptor_preserves_native_static_handlers():
     }
     assert "automatic_scaling" not in descriptor
     assert descriptor["env_variables"]["LAGNIAPPE_HOSTED_E2E_ROLE"] == "server"
-    assert descriptor["env_variables"][
-        "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT"
-    ] == "b" * 64
-    assert descriptor["env_variables"]["LAGNIAPPE_HOSTED_E2E_BUILD_ID"] == (
-        "b1234567"
+    assert (
+        descriptor["env_variables"]["LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT"] == "b" * 64
     )
+    assert descriptor["env_variables"]["LAGNIAPPE_HOSTED_E2E_BUILD_ID"] == ("b1234567")
     assert descriptor["service_account"] == infrastructure.runtime_email
 
 
@@ -2025,3 +2073,162 @@ def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
     )
     assert "lagniappe_settings.yaml=lagniappe-e2e-settings:latest" in secret_argument
     assert "redis_ca.pem=lagniappe-e2e-redis-ca:latest" in secret_argument
+
+
+# @matrix hosted-e2e : environment-selection deletion-safety image-boundary fail-closed
+def test_hosted_environment_rejects_retired_lifecycle(
+    tmp_path,
+    monkeypatch,
+):
+    standard_state = tmp_path / "state.json"
+    monkeypatch.setattr(hosted_e2e, "STATE_ROOT", tmp_path)
+    monkeypatch.setattr(hosted_e2e, "STATE_PATH", standard_state)
+
+    standard = hosted_e2e._environment("standard")
+
+    assert standard.job == "lagniappe-e2e"
+    assert standard.state_path == standard_state
+    assert standard.result_root == tmp_path / "results"
+    assert standard.image_base(_infrastructure()).endswith("/runner")
+    with pytest.raises(HostedE2EError, match="standard"):
+        hosted_e2e._environment("mcp-package")
+
+
+
+# @matrix hosted-e2e : cli-routing environment-selection target-validation
+def test_hosted_cli_routes_closed_environment(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(
+        hosted_e2e,
+        "create",
+        lambda **options: (
+            calls.append(("create", options))
+            or {"base_url": "https://hosted.example.test"}
+        ),
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "execute",
+        lambda **options: (
+            calls.append(("execute", options))
+            or {
+                "execution": "lagniappe-e2e-example1",
+                "exit_status": 0,
+                "suite": "focused",
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "status",
+        lambda **options: calls.append(("status", options)) or {"status": "ready"},
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "teardown",
+        lambda **options: (
+            calls.append(("teardown", options)) or {"version": "e2e-abcdef1234567890"}
+        ),
+    )
+
+    environment = ["--environment", "standard"]
+    assert hosted_e2e.run_hosted_e2e_command(["create", *environment]) == 0
+    assert (
+        hosted_e2e.run_hosted_e2e_command(
+            [
+                "execute",
+                *environment,
+                "--target",
+                "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py",
+                "--no-import-results",
+            ]
+        )
+        == 0
+    )
+    assert hosted_e2e.run_hosted_e2e_command(["status", *environment]) == 0
+    assert hosted_e2e.run_hosted_e2e_command(["teardown", *environment]) == 0
+
+    assert calls == [
+        (
+            "create",
+            {"base_ref": None},
+        ),
+        (
+            "execute",
+            {
+                "suite": "focused",
+                "targets": ["testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py"],
+                "import_results": False,
+            },
+        ),
+        ("status", {}),
+        (
+            "teardown",
+            {"force": False},
+        ),
+    ]
+    assert "--environment mcp-package" not in capsys.readouterr().out
+
+
+
+# @matrix hosted-e2e : identity setup-contract
+def test_hosted_setup_provisions_only_supported_runtime_identities(monkeypatch):
+    infrastructure = _infrastructure()
+    service_accounts = []
+    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
+    monkeypatch.setattr(hosted_e2e, "_infrastructure", lambda: infrastructure)
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: {})
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_gcloud",
+        lambda *_arguments, **_options: None,
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_ensure_service_account",
+        lambda _infrastructure, account, display_name: service_accounts.append(
+            (account, display_name)
+        ),
+    )
+    monkeypatch.setattr(hosted_e2e, "_project_role", lambda *_arguments: None)
+    monkeypatch.setattr(hosted_e2e, "_remove_project_role", lambda *_arguments: None)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_grant_runtime_identity_roles",
+        lambda *_arguments: None,
+    )
+    monkeypatch.setattr(hosted_e2e, "_deployer_member", lambda: "user:owner@test")
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_cloud_build_service_account",
+        lambda _infrastructure: "cloud-build@project-1.iam.gserviceaccount.com",
+    )
+    monkeypatch.setattr(hosted_e2e, "_ensure_artifact_bucket", lambda *_args: None)
+    monkeypatch.setattr(hosted_e2e, "_grant_ci_result_access", lambda *_args: None)
+    monkeypatch.setattr(hosted_e2e, "_test_bucket_names", lambda: ())
+    monkeypatch.setattr(hosted_e2e, "_ensure_workload_identity", lambda *_args: None)
+    monkeypatch.setattr(hosted_e2e, "_ensure_anchor", lambda *_args: None)
+    monkeypatch.setattr(hosted_e2e, "_write_json", lambda *_args, **_kwargs: None)
+
+    payload = hosted_e2e.setup(github_repository="owner/repository")
+
+    assert service_accounts == [
+        ("lagniappe-e2e-runtime", "Lagniappe E2E runtime"),
+        ("lagniappe-e2e-invoker", "Lagniappe E2E CI invoker"),
+    ]
+    assert payload["runtime_email"] == infrastructure.runtime_email
+
+
+
+# @matrix hosted-e2e : provider-status
+def test_hosted_status_reads_only_the_supported_job(monkeypatch):
+    monkeypatch.setattr(hosted_e2e, "_activate", lambda **options: None)
+    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
+    monkeypatch.setattr(hosted_e2e, "_load_json", lambda path: {"status": "absent"})
+    requests = []
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda args: requests.append(args) or {})
+    result = hosted_e2e.status()
+    assert result["app_version_present"] is False
+    assert result["job_present"] is True
+    assert len(requests) == 1
+    assert requests[0][:4] == ["run", "jobs", "describe", "lagniappe-e2e"]

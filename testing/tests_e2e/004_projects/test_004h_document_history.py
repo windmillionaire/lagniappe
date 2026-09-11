@@ -1,14 +1,13 @@
 """
 Tests for document history and restore functionality.
 
-Verifies that editing a document creates history entries and that
-restoring from history replaces the current content with the
-historical snapshot.
+Verifies that ordinary saves do not create history, explicitly pinned versions
+remain restorable, and legacy automatic versions can still be cleared.
 
 Related Files:
     Application:
         - src/script/elements/editor/options/documentHistory.mjs: History button
-        - lagniappe/core/properties/common_assets.py: Document.save history creation
+        - lagniappe/core/properties/common_assets.py: Document.save current state
         - lagniappe/web/routes/assets/editor.py: History list/restore endpoints
 
     Test Framework:
@@ -23,6 +22,9 @@ import pytest
 import requests
 from playwright.sync_api import expect
 
+from lagniappe.core.entities import Entities
+from lagniappe.core.definitions import Fetch
+
 from testing.definitions import Projects, Users
 from testing.utility.network import assert_lagniappe_error_response
 
@@ -31,7 +33,7 @@ pytestmark = pytest.mark.e2e
 
 
 # @pair editor:history-list
-def test_document_history_created_on_save(get_user):
+def test_document_saves_do_not_create_automatic_history(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_document_history_created)
     editor = project.editor
@@ -65,8 +67,9 @@ def test_document_history_created_on_save(get_user):
 
     panel = user.page.locator("[role='listbox'][data-visible='true']")
     expect(panel).to_be_visible()
-    expect(panel.get_by_role("option", name="Clear Unpinned Versions")).to_be_visible()
-    expect(panel.locator("[role='option']").nth(3)).to_be_visible()
+    expect(panel.get_by_role("option", name="Clear Unpinned Versions")).to_have_count(0)
+    expect(panel.get_by_role("option")).to_have_count(1)
+    expect(editor.text_entry).to_have_text("Second version of the document")
 
 
 # @pair editor:history-restore
@@ -77,6 +80,13 @@ def test_document_history_restore(get_user):
 
     editor.clear_text()
     editor.type_text("Original content to preserve")
+    editor.history.get_by_role("option", name="Pin Version").click()
+    pin_form = editor.toolbar.locator("[data-option='pinVersion']")
+    pin_form.locator("input[name='name']").fill("Original notes")
+    with user.page.expect_response("**/document/history/pin") as pin_response:
+        pin_form.locator("button[type='submit']").click()
+    assert pin_response.value.ok
+    editor.focus()
     editor.blur()
 
     user.go(project)
@@ -91,13 +101,17 @@ def test_document_history_restore(get_user):
 
     history = editor.history
     expect(history).to_be_visible()
-    earliest_history = history.locator("[role='option']").last
+    earliest_history = history.get_by_role("option", name=re.compile(r"Original notes — .+"))
     expect(earliest_history).to_be_visible()
 
     with user.page.expect_response("**/history/*"):
         earliest_history.click()
 
     expect(editor.text_entry).to_contain_text("Original content to preserve")
+    editor.focus()
+    editor.blur()
+    user.go(project)
+    expect(project.editor.text_entry).to_have_text("Original content to preserve")
 
 
 # @matrix editor : confirmation current-content history-clear history-pin parent-scope validation
@@ -112,12 +126,18 @@ def test_pin_and_clear_document_history(get_user, browser_failures):
     editor.clear_text()
     editor.type_text("First automatic version")
     editor.blur()
+    # Arrange pre-upgrade automatic history; new ordinary saves no longer
+    # produce these records. The browser still owns clearing them below.
+    legacy_first = Entities.DOCUMENT_HISTORY.create(Entities.fetch_one(project.key, request=Fetch.direct()))
+    Entities.save(legacy_first)
 
     user.go(project)
     editor = project.editor
     editor.clear_text()
     editor.type_text("Saved live document")
     editor.blur()
+    legacy_second = Entities.DOCUMENT_HISTORY.create(Entities.fetch_one(project.key, request=Fetch.direct()))
+    Entities.save(legacy_second)
 
     user.go(project)
     editor = project.editor

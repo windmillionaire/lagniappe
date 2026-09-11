@@ -36,7 +36,7 @@ from .owner import (
     owner_search_result,
     update_owner_projection,
 )
-from .query import entity_search, kind_search, search
+from .query import candidate_search, entity_search, exact_name_search, kind_search, search
 from .utility import (
     check_hash,
     cleanup_test_data,
@@ -55,6 +55,8 @@ __all__ = [
     "delete_entity_from_search",
     "get_details_by_hash",
     "entity_search",
+    "candidate_search",
+    "exact_name_search",
     "kind_search",
     "search",
     "check_hash",

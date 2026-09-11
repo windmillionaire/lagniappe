@@ -1,6 +1,6 @@
 from flask import url_for
 
-from ..definitions import Action, Fetch, MutationIntent, NotificationEmailMode
+from ..definitions import Action, Fetch, FetchReason, MutationIntent, NotificationEmailMode
 from ..entities import Entities
 from ..mixins import AssetMixin, SubmitterMixin
 from ..properties import (
@@ -129,7 +129,10 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     def _load_tasks(self):
         results = database_get.page_tasks(self)
         entities = {
-            e.key: e for e in Entities.fetch(*results, self, request=Fetch.direct())
+            e.key: e for e in Entities.fetch(
+                *results, self,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )
         }
 
         tasks = [
@@ -162,6 +165,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_009f_page_view_access.py::test_page_view_does_not_require_loaded_owner
     # @matrix admin : page privileged-account
     # @matrix page : group-match restricted-access view-owner-short-circuit
+    # @matrix page permissions users : models-scope user-page
     # @pair owner:owner-only
     def allowed(self, action, user=None):
         user = current_context_user(user)
@@ -172,24 +176,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             if target_user and target_user.is_admin and user and not user.is_owner:
                 return False
         return super().allowed(action, user=user)
-
-    # @testable true
-    # @tests tests_unit/test_009f_page_view_access.py::test_page_view_access_owner_stored_only
-    # @tests tests_unit/test_009f_page_view_access.py::test_page_view_access_returns_attached_groups
-    # @tests tests_unit/test_009f_page_view_access.py::test_page_view_access_from_group_views
-    # @tests tests_unit/test_009f_page_view_access.py::test_user_page_uses_users_permissions_not_models_permissions
-    # @matrix page permissions users : attached-groups db-load group-views owner user-page view-access
-    @property
-    def view_access(self):
-        if "owner" in self.properties.restricted_to.stored:
-            return []
-        elif self.groups:
-            return self.groups
-        else:
-            return Entities.fetch(
-                *database_get.group_view_access(self.required),
-                request=Fetch.direct(),
-            )
 
     @classmethod
     def create(cls, data):

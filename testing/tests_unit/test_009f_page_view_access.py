@@ -1,66 +1,68 @@
-"""Page ``view_access`` (disclosure) vs ``restricted_access`` / task visibility."""
+"""Page restriction sources, resource access, and task visibility."""
 
 from unittest.mock import patch
 
 import pytest
 
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities.task import Task
 
 from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
 
-# @matrix page : owner view-access
+# @source lagniappe/core/properties/common_entity.py::RestrictedTo.value
+# @source lagniappe/core/properties/common_entity.py::RestrictedTo.materialize
+# @matrix permissions : local-restrictions source-clauses no-extra-read
 @pytest.mark.unit
-def test_page_view_access_owner_stored_only(get_test_entities):
-    """Stored ``restricted_to`` containing ``owner`` yields no group disclosure list."""
-    page = get_test_entities()[0]
-    assert page.view_access == []
-
-
-# @matrix page : attached-groups view-access
-@pytest.mark.unit
-def test_page_view_access_returns_attached_groups(get_test_entities):
-    """When the page has attached groups, ``view_access`` returns them (not DB lookup)."""
-    page = get_test_entities()[0]
-    groups = page.groups
-    assert groups
-    assert [g.hash for g in page.view_access] == [g.hash for g in groups] == [
-        "grpedit",
-        "grpview",
-    ]
-
-
-# @matrix page : db-load group-views view-access
-@pytest.mark.unit
-def test_page_view_access_from_group_views(get_test_entities):
-    """No attached groups: load groups whose ``views`` index hits ``page.required``."""
-    page = get_test_entities()[0]
-    g1 = TestEntities.get(
-        "USER_GROUP",
-        {"name": "Via views", "hash": "grpv1", "permissions": {"models": "VIEW"}},
-    )
-    g1.db["views"] = ["pgdb1", "cat001", "models"]
-
+def test_page_restrictions_keep_local_storage_separate_from_form_without_reads():
+    page = TestEntities.get("PAGE", {
+        "name": "Inherited restriction", "hash": "inheritpage",
+        "form": {"name": "Restricted form", "hash": "inheritform", "groups": [
+            {"name": "Form team", "hash": "formteam", "permissions": {}},
+        ]},
+    })
+    form = page.form
+    form.properties.groups.unset()
     with (
         patch(
             "lagniappe.core.entities.page.database_get.group_view_access",
-            return_value=[g1.key],
-        ) as mock_gva,
+            side_effect=AssertionError("Restriction properties must not query groups"),
+        ),
         patch(
             "lagniappe.core.entities.page.Entities.fetch",
-            return_value=[g1],
-        ) as mock_load,
+            side_effect=AssertionError("Restriction properties must not fetch entities"),
+        ),
     ):
-        out = page.view_access
+        assert page.restricted_to == {"page_form": ["formteam"]}
+        assert page.properties.restricted_to.stored == []
+        assert form.properties.groups.is_set is False
 
-    mock_gva.assert_called_once()
-    mock_load.assert_called_once()
-    assert out == [g1]
+        local = TestEntities.get("USER_GROUP", {
+            "name": "Local team", "hash": "localteam", "permissions": {},
+        })
+        page.groups = [local]
+        page.properties.restricted_to.materialize(admin_only=False)
+        assert page.properties.restricted_to.stored == ["localteam"]
+        assert page.restricted_to == {"page": ["localteam"], "page_form": ["formteam"]}
+
+        page.properties.restricted_to.materialize(admin_only=True)
+        assert page.properties.restricted_to.stored == ["admin"]
+        assert page.restricted_to == {"page": ["admin"], "page_form": ["formteam"]}
+
+        page.groups = []
+        page.properties.restricted_to.materialize(admin_only=False)
+        form.properties.restricted_to.materialize(admin_only=True)
+        assert page.properties.restricted_to.stored == []
+        assert page.restricted_to == {"page_form": ["admin"]}
+
+    form.groups = []
+    form.properties.restricted_to.materialize(admin_only=False)
+    assert page.restricted_to == {}
 
 
-# @matrix page permissions users : models-scope user-page view-access
+# @source lagniappe/core/entities/page.py::Page.allowed
+# @matrix page permissions users : models-scope user-page
 @pytest.mark.unit
 def test_user_page_uses_users_permissions_not_models_permissions():
     """Users-only pages use Users access; attached categories still grant page access."""
@@ -115,22 +117,10 @@ def test_user_page_uses_users_permissions_not_models_permissions():
     assert default_page.allowed(Action.VIEW, user=category_viewer) is False
     assert categorized_page.allowed(Action.VIEW, user=category_viewer) is True
 
-    with (
-        patch(
-            "lagniappe.core.entities.page.database_get.group_view_access",
-            return_value=[],
-        ) as mock_gva,
-        patch("lagniappe.core.entities.page.Entities.fetch", return_value=[]),
-    ):
-        assert default_page.view_access == []
-
-    mock_gva.assert_called_once_with(["users", "pguserscope"])
-
-
 # @matrix page permissions user-groups : group-match restricted-access
 @pytest.mark.unit
 def test_page_restricted_access_group_match(get_test_entities):
-    """``restricted_access`` uses intersection of page restriction and user's groups."""
+    """The viewer must match a group in the Page restriction."""
     entities = get_test_entities()
     page = entities[0]
     member = entities[1]
@@ -232,4 +222,7 @@ def test_page_tasks_filtered_by_task_allowed(get_test_entities, monkeypatch):
         visible = page.tasks
 
     assert visible == [t_show]
-    fetch.assert_called_once_with(*keys, page, request=Fetch.direct())
+    fetch.assert_called_once_with(
+        *keys, page,
+        request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+    )

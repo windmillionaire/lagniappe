@@ -24,13 +24,14 @@ environment exists is `venv/bin/python -m installer ...`.
 | `url` | Configure an App Engine custom domain and DNS. |
 | `email` | Replace Gmail/Workspace or custom-domain authentication-email delivery. |
 | `oauth` | Configure the Google Sign-In Web client. |
-| `ai` | Configure AI models and observability choice. |
+| `ai` | Configure AI and external-agent policy, observability and optional provider cache settings; offer deployment. |
+| `mcp` | Confirm app deployment, then build/reconcile the selected MCP component and publish its app configuration. |
 | `ai-email` | Configure Resend receiving and the AI email webhook. |
 | `security` | Configure verified Redis TLS. |
 | `jobs` | Reconcile deferred-job Cloud Scheduler infrastructure. |
 | `handoff` | Transfer a delegated installation to the permanent Owner/deployer. |
 | `update` | Regenerate configuration and restore app-saved settings without replacing source. |
-| `upgrade [--branch BRANCH]` | Replace tracked source from the selected remote branch, then run update. |
+| `upgrade [--branch BRANCH]` | Replace tracked source from the selected remote branch, collect missing AI choices, then update and offer deployment. |
 
 Only one mode may be selected. Cancellation, validation failure, provider
 failure, and incomplete required work return nonzero. Helpers raise typed
@@ -44,8 +45,9 @@ The installer separates inspection from mutation:
   state;
 - `activate_installation()` selects the checkout's saved gcloud target;
 - `initialize_installation()` owns first-time project/settings work;
-- `prepare_existing_installation()` composes activation and validation for
-  focused mutating commands; and
+- `prepare_existing_installation()` validates local setup for focused mutating
+  commands after the CLI has activated the target and verified CLI access and
+  ADC; it does not repeat that activation; and
 - `repair_installation()` is the explicitly authorized reconciliation path.
 
 `doctor` activates the saved target at the CLI boundary and remains read-only.
@@ -82,10 +84,12 @@ The default flow is deliberately ordered:
 7. initialize Identity Platform and configure Google Sign-In (automatic for a
    delegated installation, optional otherwise);
 8. configure Redis and optional TLS;
-9. choose error reporting, AI models, and AI observability;
+9. choose error reporting, whether AI is enabled, external AI/MCP and AI observability;
+   show the default models once, with instructions to change them in Admin,
+   and ask for the installation's MCP connection name when external AI is selected;
 10. write generated settings, indexes, and PWA metadata;
 11. optionally configure AI email when its prerequisites are present;
-12. deploy the prepared artifacts; and
+12. prepare optional MCP resources, deploy App Engine, then activate/update MCP; and
 13. create the deferred-job Scheduler contract after a successful deployment.
 
 Setup re-reads provider state after create/update calls and accepts success only
@@ -109,6 +113,7 @@ unchanged when that confirmation is declined.
 
 | Guide | Read before changing |
 | --- | --- |
+| [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) | Setup presentation, prompts, colors, progress, and terminal layout. |
 | [INFRA_SETUP_CLOUD.md](INFRA_SETUP_CLOUD.md) | Projects, billing, APIs, App Engine, IAM, buckets, Scheduler, domain/DNS. |
 | [INFRA_SETUP_RECOVERY.md](INFRA_SETUP_RECOVERY.md) | Recovery snapshots, doctor/repair, delegated handoff. |
 | [INFRA_DATA_LIFECYCLE.md](INFRA_DATA_LIFECYCLE.md) | Backup, archive, restore, safety clone, queue handling. |
@@ -152,12 +157,17 @@ Developer onboarding is two-stage:
 ./setup.sh development
 ```
 
-The second command is additive and idempotent. See
-[INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md).
+The second command is additive and idempotent. It also provisions the
+repository-pinned, digest-verified `uv` executable used only for the standalone
+MCP package build/test environment; ordinary owner setup and deployment build
+selected MCP images in Cloud Build without installing MCP dependencies locally. Unsupported host tuples fail closed with WSL guidance
+for Windows. See [INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md).
 
 ## Operator output
 
-Pass prose through `installer.wrap_text()` so prompts remain readable at the
-current terminal width. Keep resource identifiers, URLs, commands, and other
-copy-sensitive values verbatim. Successful summaries use a safe-field allowlist
-and never dump the application settings mapping.
+Follow [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) for the presentation contract.
+`runner/console.py` owns dependency-free layout; `runner/presentation.py` owns
+semantic styles and Rich progress. Bootstrap remains usable before Rich is
+installed. The shared renderer preserves literal values and existing input
+semantics, respects `NO_COLOR`, and uses static progress where animation is
+unavailable. Windows validation targets PowerShell running `.\setup.cmd`.

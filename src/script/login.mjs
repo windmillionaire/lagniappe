@@ -69,6 +69,49 @@ initializeAgentLoginForms();
 
 /**
  * @testable true
+ * @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_native_consent_reaches_loopback_and_shows_submit_progress
+ * @matrix mcp-oauth : consent browser-callback submit-progress
+ */
+function initializeOAuthForms(root = document) {
+	root.addEventListener("submit", (event) => {
+		const form = event.target;
+		if (
+			!(form instanceof HTMLFormElement) ||
+			!form.hasAttribute("data-oauth-form")
+		)
+			return;
+		if (form.dataset.submitting === "true") {
+			event.preventDefault();
+			return;
+		}
+		form.dataset.submitting = "true";
+		const button = event.submitter;
+		if (!button) return;
+		button.dataset.idleText =
+			button.querySelector("[data-role='text']")?.textContent ||
+			button.textContent.trim();
+		button.setAttribute("aria-busy", "true");
+		button.setAttribute("aria-disabled", "true");
+		setLoginActionButton(button, button.dataset.idleText, "spinner");
+		// Keep native navigation and the submitter's name/value. Disabling it
+		// here would omit the Allow/Cancel decision from the actual POST.
+	});
+	window.addEventListener("pageshow", () => {
+		for (const form of root.querySelectorAll("form[data-oauth-form]")) {
+			delete form.dataset.submitting;
+			for (const button of form.querySelectorAll("button[data-idle-text]")) {
+				setLoginActionButton(button, button.dataset.idleText);
+				button.removeAttribute("aria-busy");
+				button.removeAttribute("aria-disabled");
+			}
+		}
+	});
+}
+
+initializeOAuthForms();
+
+/**
+ * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
  * @pair login:page-load
  */

@@ -84,6 +84,71 @@ def test_task_complete_raises_when_required_submission_missing(get_test_entities
                     task.complete()
 
 
+# @source lagniappe/core/entities/task.py::Task._check_required
+# @source lagniappe/core/entities/task.py::Task.complete
+# @matrix submission task-completion : required-fields validation
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "field_type,required,value,can_complete",
+    [
+        ("radio", True, "no", True),
+        ("select", True, "no", True),
+        ("radio", True, None, False),
+        ("checkbox", True, False, False),
+        ("checkbox", True, True, True),
+        ("checkbox", False, False, True),
+    ],
+)
+def test_task_completion_distinguishes_negative_answers_and_acknowledgements(
+    field_type, required, value, can_complete
+):
+    """Real fields preserve No answers without weakening required acknowledgements."""
+    field_id = f"{field_type}-answerab"
+    field_schema = {
+        "id": field_id,
+        "type": field_type,
+        "title": "Needs attention?",
+        "required": required,
+    }
+    if field_type in {"radio", "select"}:
+        field_schema["options"] = [
+            {"label": "Yes", "value": "yes"},
+            {"label": "No", "value": "no"},
+        ]
+    task = TestEntities.get(
+        "TASK",
+        {
+            "name": "Irrigation check",
+            "hash": "required-answer-task",
+            "page": {"name": "Garden", "hash": "required-answer-page"},
+            "form": {"name": "Check", "hash": "required-answer-form"},
+        },
+    )
+    task.form.schema = [field_schema]
+    task.submission = {field_id: value}
+    completer = TestEntities.get(
+        "USER",
+        {
+            "name": "Completer",
+            "hash": "required-answer-user",
+            "page": {"name": "Completer", "hash": "required-answer-user-page"},
+        },
+    )
+
+    missing = task._check_required()
+    assert [field.id for field in missing] == ([] if can_complete else [field_id])
+    with patch("lagniappe.core.entities.task.current_user", completer):
+        if can_complete:
+            task.complete()
+            assert task.completed is True
+            assert task.completed_on is not None
+        else:
+            with pytest.raises(TaskCompletionError, match="Needs attention"):
+                task.complete()
+            assert task.completed is False
+    assert task.properties.submission.fields[field_id].value == value
+
+
 # @matrix signature task-completion : asset-cleanup history uncomplete
 @pytest.mark.unit
 def test_task_uncomplete_after_complete(get_test_entities):
@@ -130,8 +195,8 @@ def test_task_uncomplete_after_complete(get_test_entities):
     assert task.submission == {}
     assert task.files == []
     assert task.db.get("files", []) == []
-    assert file_entity.tasks == []
-    assert file_entity.db.get("tasks", []) == []
+    assert file_entity.task is task
+    assert file_entity.db["task"] == task.key
     delete_asset.assert_called_once_with("task-signature-field")
     assert task.db.get("history") is True
 
@@ -295,7 +360,7 @@ def test_task_history_create_snapshots_completed_task_state():
     assert history.description == "Finished carefully"
     assert history.linked_pages == [linked_page]
     assert history.files == [file_entity]
-    assert file_entity.tasks == [history, task]
+    assert file_entity.task is task
     assert history.form is task.form
     assert history.version == "schema-v1"
     assert history.db["completed_by"] == completed_by.page.key
@@ -635,7 +700,9 @@ def test_task_create_history_entry_accepts_completion_overrides(
     assert writes[task.key].property_mask is None
     assert writes[history.key].property_mask is None
     assert set(writes[event_file.key].property_mask) == {
-        "tasks",
+        "task",
+        "page",
+        "task_page",
         "requires",
         "modified",
     }

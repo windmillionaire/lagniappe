@@ -72,7 +72,7 @@ def _patch_fake_keys(monkeypatch):
     )
     monkeypatch.setattr(
         "lagniappe.core.properties.common_entity.cache.check_hash",
-        lambda value: False,
+        lambda value, **kwargs: False,
     )
     monkeypatch.setattr(
         "lagniappe.core.entities.page.database_get.page_tasks",
@@ -112,19 +112,14 @@ def _patch_task_file_add(monkeypatch):
         field._value = current
         field.entity.db[field.id] = [item.key for item in current]
 
-        linked = list(attached_file.db.get("tasks") or [])
-        if field.entity.key not in linked:
-            linked.insert(0, field.entity.key)
-        attached_file.db["tasks"] = linked
+        if field.entity.entity_kind == "task_history":
+            return True
+        attached_file.task = field.entity
 
-        task_links = list(getattr(attached_file.properties.tasks, "_value", []) or [])
-        if field.entity not in task_links:
-            task_links.insert(0, field.entity)
-        attached_file.properties.tasks._value = task_links
         field.entity.add_mutation_intents(
             MutationIntent.patch(
                 attached_file,
-                "tasks",
+                "task",
                 "requires",
                 property_updates=("requires", "modified"),
                 reason="task-file-mirror",
@@ -145,6 +140,18 @@ def _fetch_one_from(entities):
         return entities.get(identifier)
 
     return fetch_one
+
+
+def _fetch_from(entities):
+    fetch_one = _fetch_one_from(entities)
+
+    def fetch(*identifiers, request):
+        return [
+            entity for identifier in identifiers
+            if (entity := fetch_one(identifier, request=request)) is not None
+        ]
+
+    return fetch
 
 
 def _test_user(hash_value):
@@ -225,6 +232,7 @@ def _recovery_store(monkeypatch, *initial):
 
     monkeypatch.setattr(report_runner.Entities, "save", save)
     monkeypatch.setattr(report_runner.Entities, "fetch_one", fetch_one)
+    monkeypatch.setattr(report_runner.Entities, "fetch", _fetch_from(stored))
     return stored, saves
 
 
@@ -232,6 +240,7 @@ __all__ = (
     "FakeKey",
     "_assert_repair_prompt_contract",
     "_attach_report_process",
+    "_fetch_from",
     "_fetch_one_from",
     "_patch_fake_keys",
     "_patch_task_file_add",

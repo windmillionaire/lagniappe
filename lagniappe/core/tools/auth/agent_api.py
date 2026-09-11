@@ -94,6 +94,8 @@ def _public_metadata(row, *, now=None):
 # @matrix agent-api : authentication expiry issue shown-once
 def issue_credential(user, *, now=None):
     """Rotate the user's credential and return the secret exactly once."""
+    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
+        raise AgentAPICredentialError("External AI access is disabled.")
     now = _utc(now)
     identifier = credential_id(user)
     secret = secrets.token_urlsafe(32)
@@ -137,6 +139,8 @@ def credential_status(user, *, now=None):
 # @matrix agent-api : authentication expiry revoke tamper user-binding
 def authenticate_credential(token, *, now=None):
     """Return the current User for a valid external-agent bearer token."""
+    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
+        raise AgentAPICredentialError("External AI access is disabled.")
     match = TOKEN_PATTERN.fullmatch(str(token or "").strip())
     if not match:
         raise AgentAPICredentialError("Invalid API credential.")

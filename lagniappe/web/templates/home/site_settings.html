@@ -342,6 +342,7 @@
           <button type="submit" data-kind="page" class="{{ styles.button.submit }}">Save Deployment Settings</button>
         </form>
       {% endcall %}
+      {% if CONFIG.AI_ENABLED %}
       {% call site_settings_section('ai-models', 'SiteAiModels', 'AI Models', 'site_ai_models', 'Primary, utility, and image models') %}
         <form data-role="ai-settings" class="flex flex-col gap-4">
           <div class="grid grid-cols-1 gap-3 text-sm text-base-dark lg:grid-cols-2">
@@ -411,6 +412,7 @@
           <button type="submit" data-kind="page" class="{{ styles.button.submit }}">Save AI Model Settings</button>
         </form>
       {% endcall %}
+      {% endif %}
       {% call site_settings_section('service-providers', 'SiteServiceProviders', 'Service Providers', 'site_service_providers', 'External service dashboards') %}
         <div data-role="service-providers" class="flex flex-col gap-4"></div>
       {% endcall %}

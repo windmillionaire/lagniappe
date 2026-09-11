@@ -14,9 +14,9 @@ import pytest
 from jinja2 import Undefined
 from markupsafe import Markup
 
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache
+from lagniappe.core.tools import ai, cache
 from lagniappe.core.tools.cache.core import cache as redis_cache
 from lagniappe.core.tools.cache.keys import Search
 from lagniappe.core.tools.database.core import DATA
@@ -27,6 +27,34 @@ from lagniappe.web.start.jinja import render_safe_html
 pytestmark = pytest.mark.e2e
 
 FIELD_ID = "input-lifecycle-text"
+
+
+# @matrix cache session timezone : concurrent-permissions property-mask
+def test_masked_timezone_save_preserves_newer_user_state():
+    actor = Entities.USER.create({
+        "name": "Timezone Concurrency", "email": f"timezone-snapshot-{uuid4().hex}@example.test",
+        "test_user": True,
+    })
+    actor.save()
+    snapshot = Entities.USER.load(actor.email)
+    current = Entities.USER.load(actor.email)
+    current.is_admin = True
+    current.save()
+    revision = current.db["cache_invalidation_revision"]
+    try:
+        # This is a Datastore mutation contract, not a synthetic route call.
+        # The independent HTTP test covers the authenticated timezone endpoint.
+        snapshot.db["timezone"] = "UTC"
+        Entities.save_root(snapshot, property_mask=("timezone",))
+        persisted = Entities.USER.load(actor.email)
+        assert persisted.db["timezone"] == "UTC"
+        assert persisted.is_admin is True
+        assert persisted.invalidate_cache is True
+        assert persisted.db["cache_invalidation_revision"] == revision
+    finally:
+        persisted = Entities.USER.load(actor.email)
+        persisted.is_admin = False
+        persisted.save()
 
 
 # @matrix templates security : safe-html strict-filter
@@ -86,11 +114,12 @@ def _create_category(label, form=None):
     return category
 
 
-def _create_page(label, categories, form=None, submission=None):
+def _create_page(label, categories, form=None, submission=None, model=None):
     page = Entities.PAGE.create(
         {
             "name": _name(label),
             "categories": categories,
+            "model": model,
             "form": form,
             "submission": submission,
         }
@@ -158,6 +187,62 @@ def _assert_hash_cached(entity):
     assert details[entity.hash]["id"] == entity.urlsafe_key
 
 
+# @matrix ai-report : undo category-editor file-links created-entities
+def test_report_undo_preserves_category_editor_access_and_uploaded_file():
+    category = _create_category("undo-editor-category")
+    user = Entities.USER.create(
+        {"name": _name("undo-editor"), "email": f"undo-{uuid4().hex}@example.test"}
+    )
+    user.permissions = {category.hash: "EDIT", user.page.hash: "EDIT"}
+    Entities.save(user)
+    assert not user.is_admin
+    assert category.allowed(Action.EDIT, user=user)
+
+    file = Entities.FILE.create(data={"name": _name("undo-upload")}, report_user=user)
+    Entities.save(file)
+    report = Entities.REPORT.create({
+        "parent": user,
+        "user": user,
+        "name": _name("undo-contact"),
+        "status": "ready",
+        "pending": False,
+        "input_files": [file],
+        "proposal": {
+            "summary": "Create a contact with its original file and follow-up.",
+            "actions": [
+                {"id": "page", "type": "create_page", "data": {
+                    "name": _name("undo-contact-page"), "category": category.urlsafe_key,
+                }},
+                {"id": "attachment", "type": "attach_file", "data": {
+                    'entity_action': "page", "file": file.urlsafe_key,
+                }},
+                {"id": "task", "type": "create_task", "data": {
+                    "name": _name("undo-follow-up"), "page_action": "page",
+                }},
+            ],
+        },
+    })
+    Entities.save(report)
+    ai.run_report(report, user)
+    assert report.status == "complete", report.error
+    actions = {action["id"]: action for action in report.result["actions"]}
+    page = Entities.fetch_one(actions["page"]["entity"]["id"], request=Fetch.direct())
+    task = Entities.fetch_one(actions["task"]["entity"]["id"], request=Fetch.direct())
+    assert page.allowed(Action.EDIT, user=user)
+    assert category.hash in page.requires
+
+    report = Entities.fetch_one(report.key, request=Fetch.direct())
+    ai.undo_report(report, user)
+    assert report.result["undo"]["status"] == "complete", report.error
+    _assert_deleted(page)
+    _assert_deleted(task)
+    remaining_file = Entities.fetch_one(file.key, request=Fetch.direct())
+    assert remaining_file is not None
+    assert remaining_file.page is None
+    assert remaining_file.allowed(Action.VIEW, user=user)
+    assert not remaining_file.searchable
+
+
 # @matrix entities : cache database dependent-owner process-state save
 def test_entity_save_persists_relations_process_payloads_and_cache():
     form = _create_form("save-form")
@@ -185,12 +270,12 @@ def test_entity_save_persists_relations_process_payloads_and_cache():
     assert _blob_exists(assets["document"])
     assert _blob_exists(assets["snapshot"])
 
-    history = database_get.document_history(page)
-    assert len(history) == 1
-    assert history[0]["type"] == "document_history"
-    assert database_get.entity(history[0].key) is not None
+    # Ordinary saves persist the current document without creating a version.
+    assert database_get.document_history(page) == []
 
     reloaded = Entities.fetch_one(page.key, request=Fetch.direct())
+    assert reloaded.assets["document"] == assets["document"]
+    assert reloaded.assets["snapshot"] == assets["snapshot"]
     assert reloaded.name == page.name
     assert reloaded.form.key == form.key
     assert {c.key for c in reloaded.categories} == {category.key}
@@ -198,7 +283,9 @@ def test_entity_save_persists_relations_process_payloads_and_cache():
 
 
 # @matrix entities : assets cache cascade database delete
-def test_entity_delete_cascades_dependents_assets_and_cache():
+# @matrix categories : cascade model-category shared-page
+@pytest.mark.parametrize("category_as_model", [False, True])
+def test_entity_delete_cascades_dependents_assets_and_cache(category_as_model):
     creator = _create_page("category-filter-creator", [])
     page_form = _create_form("category-page-form")
     task_form = _create_form("category-task-form", form_type="task")
@@ -210,7 +297,8 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
 
     doomed_page = _create_page(
         "doomed-page",
-        [doomed_category],
+        [] if category_as_model else [doomed_category],
+        model=doomed_category if category_as_model else None,
         form=page_form,
         submission={FIELD_ID: "deleted page value"},
     )
@@ -219,7 +307,8 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
 
     survivor_page = _create_page(
         "survivor-page",
-        [doomed_category, survivor_category],
+        [survivor_category] if category_as_model else [doomed_category, survivor_category],
+        model=doomed_category if category_as_model else None,
         form=page_form,
         submission={FIELD_ID: "survivor page value"},
     )
@@ -240,8 +329,7 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
     doomed_file = _create_file("doomed-file", doomed_page)
     doomed_file_asset = _save_private_text_asset(doomed_file, "doomed-file")
 
-    survivor_file = _create_file("survivor-file", doomed_page)
-    survivor_file.properties.pages.add(survivor_page)
+    survivor_file = _create_file("survivor-file", survivor_page)
     survivor_file_asset = _save_private_text_asset(survivor_file, "survivor-file")
 
     assert _blob_exists(doomed_page_private)
@@ -279,9 +367,11 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
 
     reloaded_page = Entities.fetch_one(survivor_page.key, request=Fetch.direct())
     assert {c.key for c in reloaded_page.categories} == {survivor_category.key}
+    assert database_get.entity(survivor_page.key).get("model") is None
 
     reloaded_file = Entities.fetch_one(survivor_file.key, request=Fetch.direct())
-    assert {p.key for p in reloaded_file.pages} == {survivor_page.key}
+    assert reloaded_file.page.key == survivor_page.key
+    assert reloaded_file.task is None
 
 
 # @matrix entities : cache cascade database delete forms

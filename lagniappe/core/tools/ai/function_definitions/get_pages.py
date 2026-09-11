@@ -8,12 +8,16 @@ from lagniappe.core.tools.database import get as database_get
 
 CATEGORY_PAGES_LIMIT = 5
 SEARCH_LIMIT = 10
+NAMES_LIMIT = 100
 
 
 GET_CATEGORY_PAGES = types.FunctionDeclaration(
     name="get_category_pages",
     description=(
-        "Load pages from a category. Use compact=true for a lightweight "
+        "Load pages from a category. Use names_only=true for a bounded name/hash/URL "
+        "inventory (up to 100), including when a user's wording may be an alias or "
+        "abbreviation. Prefer keyword search for discovery; exact-name matching is "
+        "not a prerequisite. Use compact=true for a lightweight "
         "name/hash/description scan before creating a new page. Use the default "
         "full result when you need page examples with form data, document text, "
         "and metadata. When filtered by form_id, returns only pages of that "
@@ -34,10 +38,10 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
             "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": SEARCH_LIMIT,
+                "maximum": NAMES_LIMIT,
                 "description": (
                     f"Maximum number of pages to return (default {CATEGORY_PAGES_LIMIT}). "
-                    f"The hard maximum is {SEARCH_LIMIT}; follow next_cursor when "
+                    f"The maximum is {SEARCH_LIMIT}, or {NAMES_LIMIT} with names_only=true; follow next_cursor when "
                     "has_more is true for a more thorough scan."
                 ),
             },
@@ -57,6 +61,10 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
                     "submission fields or document text."
                 ),
             },
+            "names_only": {
+                "type": "boolean",
+                "description": "Return only name, hash, kind and URL; defaults to 100 results and preserves permission filtering and pagination.",
+            },
         },
         "required": ["id"],
     },
@@ -71,25 +79,34 @@ def execute_get_category_pages(args, user):
     identifier = args.get("id")
     form_identifier = args.get("form_id")
     compact = _bool_arg(args.get("compact"))
+    names_only = _bool_arg(args.get("names_only"))
+    maximum = NAMES_LIMIT if names_only else SEARCH_LIMIT
     if not identifier:
         return {"error": "id is required"}
 
-    entities = Entities.fetch(identifier, form_identifier, request=Fetch.direct())
-    category = next((e for e in entities if isinstance(e, Entities.CATEGORY)), None)
-    form = next((e for e in entities if isinstance(e, Entities.FORM)), None)
-    if not category:
+    category = Entities.fetch_one(identifier, request=Fetch.direct())
+    if not category or not isinstance(category, Entities.CATEGORY):
         return {"error": "Category not found"}
+    if not category.allowed(Action.RESTRICTED, user=user):
+        return {"error": "Access denied"}
+    form = None
+    if form_identifier:
+        form = Entities.fetch_one(form_identifier, request=Fetch.direct())
+        if not form or not isinstance(form, Entities.FORM):
+            return {"error": "Form not found"}
+        if not form.allowed(Action.VIEW, user=user) or getattr(form, "reserved", False):
+            return {"error": "Access denied"}
 
-    raw_limit = args.get("limit", CATEGORY_PAGES_LIMIT)
+    raw_limit = args.get("limit", NAMES_LIMIT if names_only else CATEGORY_PAGES_LIMIT)
     if isinstance(raw_limit, bool) or not isinstance(raw_limit, int):
         return {
-            "error": f"limit must be an integer from 1 to {SEARCH_LIMIT}",
+            "error": f"limit must be an integer from 1 to {maximum}",
             "minimum": 1,
-            "maximum": SEARCH_LIMIT,
+            "maximum": maximum,
         }
     requested_limit = raw_limit
     # Preserve older integer callers while making the clamp visible in output.
-    effective_limit = min(max(requested_limit, 1), SEARCH_LIMIT)
+    effective_limit = min(max(requested_limit, 1), maximum)
     cursor = args.get("cursor")
     if cursor is not None and not isinstance(cursor, str):
         return {"error": "cursor must be a string"}
@@ -103,7 +120,11 @@ def execute_get_category_pages(args, user):
         hashes=restrictions,
     )
 
-    pages = Entities.fetch(*db.results, request=Fetch.direct())
+    pages = [
+        page
+        for page in Entities.fetch(*db.results, request=Fetch.direct())
+        if page.allowed(Action.VIEW, user=user)
+    ]
     next_cursor = getattr(db, "next_cursor", None)
 
     return {
@@ -116,7 +137,16 @@ def execute_get_category_pages(args, user):
         # Retained for older callers; returned_count is the unambiguous name.
         "page_count": len(pages),
         "pages": [
-            _compact_page_reference(p, user) if compact else p.to_ai(user)
+            {
+                "name": p.name,
+                "hash": f"hash:{p.hash}",
+                "kind": p.entity_kind,
+                "url": p._ai_url(),
+            }
+            if names_only
+            else _compact_page_reference(p, user)
+            if compact
+            else p.to_ai(user)
             for p in pages
         ],
     }

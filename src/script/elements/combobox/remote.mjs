@@ -27,6 +27,7 @@ export class RemoteQueryCombobox extends Combobox {
 		if (this._destroyed) return;
 		this.element.addEventListener("input", this._queryInput);
 		super.init();
+		this.element.setAttribute("aria-busy", "false");
 	}
 
 	_queryInput(event) {
@@ -34,6 +35,7 @@ export class RemoteQueryCombobox extends Combobox {
 		const inputValue = event.target?.value;
 		this.queries.invalidate();
 		this._queryPending = true;
+		this.element.setAttribute("aria-busy", "true");
 		super.hidePanel();
 		if (event.target === this.element && typeof inputValue === "string") {
 			this.element.value = inputValue;
@@ -44,6 +46,7 @@ export class RemoteQueryCombobox extends Combobox {
 	invalidateQuery() {
 		this.queries.invalidate();
 		this._queryPending = false;
+		this.element.setAttribute("aria-busy", "false");
 	}
 
 	settleQueryInput({ clear = false } = {}) {
@@ -70,6 +73,7 @@ export class RemoteQueryCombobox extends Combobox {
 	) {
 		if (this._destroyed) return Promise.resolve(false);
 		this._queryPending = true;
+		this.element.setAttribute("aria-busy", "true");
 		let activeToken = null;
 		return this.queries
 			.run(
@@ -80,6 +84,7 @@ export class RemoteQueryCombobox extends Combobox {
 				},
 				(result, token) => {
 					this._queryPending = false;
+					this.element.setAttribute("aria-busy", "false");
 					return publisher(result, token);
 				},
 				{ getCurrentKey, cancelTransport },
@@ -87,6 +92,7 @@ export class RemoteQueryCombobox extends Combobox {
 			.catch((error) => {
 				if (this.queries.isCurrent(activeToken, getCurrentKey())) {
 					this._queryPending = false;
+					this.element.setAttribute("aria-busy", "false");
 				}
 				throw error;
 			});
@@ -109,5 +115,6 @@ export class RemoteQueryCombobox extends Combobox {
 		this._queryPending = false;
 		this.element.removeEventListener("input", this._queryInput);
 		super.destroy();
+		this.element.removeAttribute("aria-busy");
 	}
 }

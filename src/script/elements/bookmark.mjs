@@ -42,7 +42,8 @@ export class BookmarkElement extends BaseElement {
 				icon: "out",
 				kind: "page",
 				content: link,
-				iconClasses: "text-default",
+				classes: STYLES.form.linkLabel,
+				iconClasses: "text-base-default",
 			}),
 		);
 

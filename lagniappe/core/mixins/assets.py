@@ -1,6 +1,8 @@
 """Asset storage and retrieval for entities (images, documents, files)."""
 
 import json
+import hashlib
+from uuid import uuid4
 
 from ..definitions import AssetTypes
 from lagniappe.core.tools.database import assets as database_assets
@@ -89,7 +91,7 @@ class AssetMixin:
     # @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
     # @covered-by lagniappe/core/properties/common_assets.py::Document.save
     # @reason asset persistence plumbing is owned by the asset-backed property contracts
-    def save_asset(self, content, name, type, visibility="private"):
+    def save_asset(self, content, name, type, visibility="private", *, isolated=False):
         asset = self.get_asset(name)
         if not content:
             self.delete_asset(name)
@@ -100,6 +102,22 @@ class AssetMixin:
             asset.content_type = getattr(
                 content, "lagniappe_content_type", None
             ) or getattr(content, "content_type", None)
+
+        if isolated:
+            # A losing checkpoint must never overwrite the winning checkpoint's
+            # blob before its guarded Datastore metadata commit.
+            if type == "html" and asset.fingerprint == hashlib.md5(content.strip().encode()).hexdigest():
+                return asset
+            asset = Assets.create(type, name, self)
+            # Never reuse a retired path: delayed cleanup from an older save
+            # must not delete a newer document that happens to have equal text.
+            asset._path = f"{self.hash}_{name}_{uuid4().hex}.{asset.extension}"
+
+        if getattr(content, "lagniappe_direct_upload", False):
+            asset._path = database_assets.direct_upload_destination_path(
+                asset.path,
+                content,
+            )
 
         saved = asset.save(content)
         if not saved:
@@ -140,6 +158,7 @@ class AssetMixin:
             source_visibility,
             copied.path,
             copied.visibility.value,
+            **({"source_generation": asset.generation} if getattr(asset, "generation", None) else {}),
         )
         if not blob:
             return None

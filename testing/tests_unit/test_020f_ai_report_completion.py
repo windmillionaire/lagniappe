@@ -101,8 +101,8 @@ def test_generate_organize_report_completes_planned_submissions(monkeypatch):
             },
             {
                 "id": "attach_receipt",
-                "type": "attach_file_to_page",
-                "data": {"page_action": "receipt_page", "file": file.urlsafe_key},
+                "type": "attach_file",
+                "data": {'entity_action': "receipt_page", "file": file.urlsafe_key},
             },
         ],
     }
@@ -131,7 +131,7 @@ def test_generate_organize_report_completes_planned_submissions(monkeypatch):
             "create_form",
             "create_category",
             "create_page",
-            "attach_file_to_page",
+            "attach_file",
             "needs_review",
         ),
         output_format={"type": "JSON", "description": "Return report JSON."},
@@ -205,13 +205,13 @@ def test_complete_organize_submissions_uses_one_focused_prompt(
             },
             {
                 "id": "attach_visit",
-                "type": "attach_file_to_page",
-                "data": {"page_action": "provider_page", "file": first.urlsafe_key},
+                "type": "attach_file",
+                "data": {'entity_action': "provider_page", "file": first.urlsafe_key},
             },
             {
                 "id": "attach_card",
-                "type": "attach_file_to_page",
-                "data": {"page_action": "provider_page", "file": second.urlsafe_key},
+                "type": "attach_file",
+                "data": {'entity_action': "provider_page", "file": second.urlsafe_key},
             },
         ],
     }
@@ -411,14 +411,14 @@ def test_complete_organize_submissions_updates_existing_task_submission(
         "actions": [
             {
                 "id": "update_invoice",
-                "type": "update_submission_fields",
+                "type": "update_form_values",
                 "display_label": "Update Acme invoice",
                 "data": {"task": task.urlsafe_key},
             },
             {
                 "id": "attach_confirmation",
-                "type": "attach_file_to_task",
-                "data": {"task": task.urlsafe_key, "file": file.urlsafe_key},
+                "type": "attach_file",
+                "data": {'entity': task.urlsafe_key, "file": file.urlsafe_key},
             },
         ],
     }
@@ -467,7 +467,7 @@ def test_complete_organize_submissions_updates_existing_task_submission(
             "new_value": "Confirmation 834921",
         }
     ]
-    assert completed["actions"][1]["type"] == "attach_file_to_task"
+    assert completed["actions"][1]["type"] == "attach_file"
 
 
 
@@ -515,8 +515,8 @@ def test_complete_organize_submissions_preserves_empty_form_records(
             },
             {
                 "id": "attach_provider",
-                "type": "attach_file_to_page",
-                "data": {"page_action": "provider_page", "file": file.urlsafe_key},
+                "type": "attach_file",
+                "data": {'entity_action': "provider_page", "file": file.urlsafe_key},
             },
         ],
     }
@@ -547,7 +547,7 @@ def test_complete_organize_submissions_preserves_empty_form_records(
     )
 
     assert completed["actions"][0]["type"] == "create_page"
-    assert completed["actions"][1]["type"] == "attach_file_to_page"
+    assert completed["actions"][1]["type"] == "attach_file"
     assert completed["actions"][0]["data"]["submission"] == {}
     assert completed["actions"][0]["data"]["submission_empty_reason"] == (
         "The assigned summary supports no form fields."

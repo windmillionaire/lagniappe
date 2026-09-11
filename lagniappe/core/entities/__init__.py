@@ -189,13 +189,22 @@ class EntityRegistry:
     # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_save_persists_relations_process_payloads_and_cache
     # @matrix entities : cache database dependent-owner process-state save
     def save(self, *entities):
-        return execute_mutation(
+        outcome = execute_mutation(
             plan_mutation(MutationOperation.SAVE, *entities, registry=self)
         )
+        if not outcome.post_commit_complete and any(
+            getattr(entity, "entity_kind", None) in {"form", "page", "task", "file"}
+            and not getattr(entity, "_testing", False) for entity in entities
+        ):
+            from ..exceptions import ValidationError
+            raise ValidationError("Saved, but permission/cache updates failed. Retry saving.")
+        return outcome
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache
+    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_masked_timezone_save_preserves_newer_user_state
     # @matrix mutations : cache-isolation direct-save exclusions intent-isolation lifecycle-isolation root-save
+    # @matrix cache session timezone : concurrent-permissions property-mask
     def save_root(self, entity, *, property_mask=None):
         """Persist one root, optionally updating only selected properties."""
         return execute_mutation(plan_root(entity, property_mask=property_mask))
@@ -216,14 +225,15 @@ class EntityRegistry:
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_document_checkpoint_masks_parent_state_and_optionally_advances_lists
     # @matrix mutations sync : checkpoint document history parent-fingerprint property-mask
-    def save_document_checkpoint(self, entity, *, advance_parent=False):
+    def save_document_checkpoint(self, entity, *, advance_parent=False, expected_state=None):
         """Persist a document checkpoint without rewriting sibling state."""
         return execute_mutation(
             plan_document_checkpoint(
                 entity,
                 advance_parent=advance_parent,
                 registry=self,
-            )
+            ),
+            **({"guards": [(entity.key, expected_state)]} if expected_state is not None else {}),
         )
 
     # @testable true

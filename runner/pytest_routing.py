@@ -13,6 +13,14 @@ import sys
 PYTEST_CONFIG = "testing/pytest.ini"
 TRACEABILITY_RESULTS_PLUGIN = "testing.utility.traceability_results"
 PYTEST_ROUTING_PLUGIN = "runner.pytest_routing"
+MCP_ADAPTER_TEST = "testing/tests_unit/test_033_mcp_adapter.py"
+MCP_TEST_FILES = (
+    MCP_ADAPTER_TEST,
+    "testing/tests_unit/test_033b_mcp_files.py",
+    "testing/tests_unit/test_033c_mcp_server.py",
+    "testing/tests_unit/test_033d_mcp_attachments.py",
+    "testing/tests_unit/test_033e_mcp_terminal_files.py",
+)
 
 SETUP_TEST_GROUPS = {
     "ordinary": (
@@ -24,6 +32,8 @@ SETUP_TEST_GROUPS = {
         "testing/tests_tooling/test_001g_setup_release_readiness.py",
         "testing/tests_tooling/test_001h_setup_ai_email.py",
         "testing/tests_tooling/test_001i_setup_monitoring.py",
+        "testing/tests_tooling/test_001j_setup_ai_mcp.py",
+        "testing/tests_tooling/test_001k_setup_console.py",
     ),
     "setup_drift": ("testing/tests_tooling/test_001d_setup_drift.py",),
     "setup_provider": (
@@ -73,6 +83,14 @@ class PytestInvocation:
     collection_targets: tuple[str, ...]
     strict_relations: bool
     includes_e2e: bool
+
+
+@dataclass(frozen=True)
+class PytestPartitions:
+    """Root and standalone-package pytest arguments for one invocation."""
+
+    root_args: tuple[str, ...] | None
+    mcp_args: tuple[str, ...] | None
 
 
 # @testable true
@@ -174,6 +192,69 @@ def targets_include_e2e(targets: tuple[str, ...], repository_root: Path) -> bool
         if e2e_root.is_relative_to(target_path):
             return True
     return False
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_partition_mcp_adapter_test_selection
+# @matrix mcp-package testing : cli-routing environment-isolation no-duplicate-collection
+def partition_mcp_adapter_tests(
+    invocation: PytestInvocation, repository_root: Path
+) -> PytestPartitions:
+    """Run MCP unit tests in the service environment without collecting twice."""
+    paths = {
+        (repository_root / relative).resolve(): relative
+        for relative in MCP_TEST_FILES
+    }
+    targets = invocation.collection_targets
+    pytest_args = invocation.pytest_args
+    explicit = bool(targets and tuple(pytest_args[-len(targets):]) == targets)
+    passthrough = pytest_args[:-len(targets)] if explicit else pytest_args
+    broad = set()
+    exact = {}
+    root_targets = []
+    for target in targets:
+        path = _target_path(target, repository_root)
+        if path in paths:
+            if explicit:
+                exact.setdefault(paths[path], []).append(target)
+            else:
+                broad.add(paths[path])
+            continue
+        broad.update(relative for candidate, relative in paths.items()
+                     if candidate.is_relative_to(path))
+        if explicit:
+            root_targets.append(target)
+
+    if not broad and not exact:
+        return PytestPartitions(root_args=pytest_args, mcp_args=None)
+    mcp_targets = []
+    for relative in MCP_TEST_FILES:
+        mcp_targets.extend([relative] if relative in broad
+                           else dict.fromkeys(exact.get(relative, [])))
+    if broad or root_targets:
+        root_args = (
+            *passthrough,
+            *(f"--ignore={relative}" for relative in MCP_TEST_FILES if relative in broad),
+            *root_targets,
+        )
+    else:
+        root_args = None
+    return PytestPartitions(root_args=root_args, mcp_args=(*passthrough, *mcp_targets))
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_targets_include_repository_file
+# @matrix mcp-package testing : cli-routing local-preflight
+def targets_include_repository_file(
+    targets: tuple[str, ...], relative_path: str, repository_root: Path
+) -> bool:
+    """Return whether a collection target includes a repository file."""
+    candidate = (repository_root / relative_path).resolve()
+    return any(
+        candidate == (target_path := _target_path(target, repository_root))
+        or candidate.is_relative_to(target_path)
+        for target in targets
+    )
 
 
 # @testable true

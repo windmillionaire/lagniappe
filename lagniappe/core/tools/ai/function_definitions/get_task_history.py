@@ -2,7 +2,7 @@
 
 from google.genai import types
 
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 
 DEFAULT_HISTORY_LIMIT = 10
@@ -23,7 +23,7 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
-            "task_id": {
+            "id": {
                 "type": "string",
                 "description": (
                     "The task hash token from search_entities, get_entity, "
@@ -38,7 +38,7 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
                 ),
             },
         },
-        "required": ["task_id"],
+        "required": ["id"],
     },
 )
 
@@ -47,11 +47,11 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
 # @tests tests_unit/test_015_ai_tools.py::test_get_task_history_returns_dates_submissions_and_files
 # @matrix ai tasks : files task-history tool-context
 def execute_get_task_history(args, user):
-    task_id = args.get("task_id") or args.get("id")
-    if not task_id:
-        return {"error": "task_id is required"}
+    identifier = args.get("id")
+    if not identifier:
+        return {"error": "id is required"}
 
-    task = Entities.fetch_one(task_id, request=Fetch.direct())
+    task = Entities.fetch_one(identifier, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     if not task or not isinstance(task, Entities.TASK):
         return {"error": "Task not found"}
 

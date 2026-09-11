@@ -1,9 +1,12 @@
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
 import json
 import re
 import webbrowser
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from runner.console import format_prompt
 from installer import wrap_text
 from installer.errors import (
     ProviderInvalidInput,
@@ -42,17 +45,25 @@ def print_oauth_instructions():
         else SETTINGS.APP["APP_URL"]
     )
 
-    print("\nConfigure Google Sign-In:")
+    print(wrap_text(ui.heading("\nConfigure Google Sign-In:")))
     print(
         wrap_text(
             "Identity Platform is ready. Google Auth Platform registration and "
             "OAuth client creation are the remaining one-time browser steps."
         )
     )
-    print(f"\nOpening Google Auth Platform for project '{project_id}':")
-    print(f"  {clients_url}")
+    print(
+        wrap_text(
+            f"\nOpening Google Auth Platform for project '{ui.literal(project_id)}':"
+        )
+    )
+    print(f"  {ui.literal(clients_url)}")
     if account:
-        print(f"  Required browser account: {account}")
+        print(
+            ui.value(
+                "  Required browser account", f"{ui.literal(account)}", verbatim=True
+            )
+        )
     try:
         webbrowser.open_new_tab(clients_url)
     except webbrowser.Error:
@@ -61,63 +72,93 @@ def print_oauth_instructions():
     if account:
         print(
             wrap_text(
-                "\nBefore continuing, confirm the Google Cloud Console "
-                f"profile is '{account}'. If Google says you need additional "
-                "access, switch the browser to this account and reload the "
-                "page; setup already verified this account's project "
-                "permissions."
+                (
+                    "\nBefore continuing, confirm the Google Cloud Console profile is '"
+                    f"{ui.literal(account)}'. If Google says you need additional access, "
+                    "switch the browser to this account and reload the page; setup already "
+                    "verified this account's project permissions."
+                )
             )
         )
 
     print(
         wrap_text(
-            "\n1. If Google says the Auth Platform is not configured, "
-            "click 'Get started':"
+            (
+                f"\n{ui.literal('1.')} If Google says the Auth Platform is not "
+                f"configured, click '{ui.literal('Get started')}':"
+            )
         )
     )
     print(
         wrap_text(
-            f"   - App information: use '{app_name}' and select a support email"
+            (
+                f"   - {ui.literal('App information')}: use '{ui.literal(app_name)}' and "
+                "select a support email"
+            )
         )
     )
-    print(wrap_text("   - Audience: choose 'External'"))
+    print(wrap_text((f"   - Audience: choose '{ui.literal('External')}'")))
     print(
         wrap_text(
-            "   - Contact information: enter your email and finish registration"
+            (
+                f"   - {ui.literal('Contact information')}: enter your email and finish "
+                "registration"
+            )
         )
     )
     print(
         wrap_text(
-            "2. For a new or replacement client, click 'Create client'. For "
-            "secret rotation, open the existing Web application client and "
-            "create a new Client secret instead."
+            (
+                f"{ui.literal('2.')} For a new or replacement client, click '"
+                f"{ui.literal('Create client')}'. For secret rotation, open the existing "
+                f"{ui.literal('Web application')} client and create a new "
+                f"{ui.literal('Client secret')} instead."
+            )
         )
     )
     print(
         wrap_text(
-            "3. For a new client, choose 'Web application' and enter the "
-            "values below. The "
-            "client type must say 'Web application'; a 'Desktop app' client "
-            "will not work."
+            (
+                f"{ui.literal('3.')} For a new client, choose '"
+                f"{ui.literal('Web application')}' and enter the values below. The "
+                f"client type must say '{ui.literal('Web application')}'; a 'Desktop "
+                "app' client will not work."
+            )
         )
     )
-    print(f"   - Name: {app_name}")
-    print(f"   - Authorized JavaScript origin: {app_origin}")
-    print(f"   - Authorized redirect URI: {SETTINGS.APP['GOOGLE_LOGIN_URI']}")
+    print(ui.value("   Name", app_name, action=True, verbatim=True))
     print(
-        wrap_text(
-            "4. Click 'Create'. Under Client secrets, click 'Download JSON'. "
-            "Move the downloaded file to the exact path below, renaming it "
-            "'google_oauth_credentials.json':"
+        ui.value(
+            "   Authorized JavaScript origin", app_origin, action=True, verbatim=True
         )
     )
-    print(f"   {OAUTH_CLIENT_FILE}")
+    print(
+        ui.value(
+            "   Authorized redirect URI",
+            SETTINGS.APP["GOOGLE_LOGIN_URI"],
+            action=True,
+            verbatim=True,
+        )
+    )
     print(
         wrap_text(
-            "5. Return to setup and press Enter. Setup will verify the Web "
-            "client type, project, JavaScript origin, and redirect URI from "
-            "that file before sending its client ID and secret to Identity "
-            "Platform. The secret will not be saved in Lagniappe settings.\n"
+            (
+                f"{ui.literal('4.')} Click '{ui.literal('Create')}'. Under "
+                f"{ui.literal('Client secrets')}, click '{ui.literal('Download JSON')}'. "
+                "Move the downloaded file to the exact path below, renaming it '"
+                f"{ui.literal('google_oauth_credentials.json')}':"
+            )
+        )
+    )
+    print(f"   {ui.literal(OAUTH_CLIENT_FILE)}")
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('5.')} Return to setup and press Enter. Setup will verify "
+                "the Web client type, project, JavaScript origin, and redirect URI from "
+                "that file before sending its client ID and secret to Identity Platform. "
+                "The secret will not be saved in Lagniappe settings.\n"
+            )
         )
     )
 
@@ -339,17 +380,21 @@ def _get_verified_oauth_credentials(settings, credential_path=OAUTH_CLIENT_FILE)
     )
     redirect_uri = settings.APP["GOOGLE_LOGIN_URI"]
     credentials = None
-    print("\nPlace the downloaded Google OAuth JSON at:")
-    print(f"  {credential_path}")
+    print(wrap_text("\nPlace the downloaded Google OAuth JSON at:"))
+    print(f"  {ui.literal(credential_path)}")
     account = str(settings.GCLOUD_CONFIG.get("ACCOUNT") or "").strip()
     account_guidance = f" while signed in as '{account}'" if account else ""
-    choice = input(
-        f.info(
-            "Complete the Google Auth Platform browser steps"
-            f"{account_guidance}, place the downloaded JSON at the path "
-            "above, then press Enter to verify it, or X to stop: "
+    choice = (
+        input(
+            format_prompt(
+                f"Complete the Google Auth Platform browser steps{account_guidance} "
+                "and place the downloaded JSON at the path above",
+                hint="Enter to verify; x to stop",
+            )
         )
-    ).strip().casefold()
+        .strip()
+        .casefold()
+    )
     if choice in {"x", "exit"}:
         raise ProviderInvalidInput(
             "Google OAuth credential setup stopped before verification.",
@@ -370,12 +415,16 @@ def _get_verified_oauth_credentials(settings, credential_path=OAUTH_CLIENT_FILE)
                 )
             except ProviderInvalidInput as error:
                 print(f.error(wrap_text(str(error))))
-                choice = input(
-                    f.info(
-                        "Place or correct the JSON at the path above, then "
-                        "press Enter to retry, or X to stop: "
+                choice = (
+                    input(
+                        format_prompt(
+                            "Place or correct the JSON at the path above",
+                            hint="Enter to retry; x to stop",
+                        )
                     )
-                ).strip().casefold()
+                    .strip()
+                    .casefold()
+                )
                 if choice in {"x", "exit"}:
                     raise ProviderInvalidInput(
                         str(error),
@@ -401,12 +450,16 @@ def _get_verified_oauth_credentials(settings, credential_path=OAUTH_CLIENT_FILE)
                     "client may no longer be active."
                 )
             )
-            choice = input(
-                f.info(
-                    "Press Enter to retry Google, R to reload a replaced JSON "
-                    "file, or X to stop: "
+            choice = (
+                input(
+                    format_prompt(
+                        "Retry Google",
+                        hint="Enter to retry; r to reload replaced JSON; x to stop",
+                    )
                 )
-            ).strip().casefold()
+                .strip()
+                .casefold()
+            )
             if choice in {"x", "exit"}:
                 raise
             if choice in {"r", "reload", "replace"}:
@@ -426,12 +479,17 @@ def _verify_saved_oauth_client(client_id, redirect_uri):
             return verify_oauth_web_client(client_id, redirect_uri)
         except ProviderInvalidInput as error:
             print(f.error(wrap_text(str(error))))
-            choice = input(
-                f.info(
-                    "Press Enter to retry this saved client, or X to stop and "
-                    f"run {setup_command('oauth')} with a replacement: "
+            choice = (
+                input(
+                    format_prompt(
+                        "Retry the saved client, or stop and run "
+                        f"{setup_command('oauth')} with a replacement",
+                        hint="Enter to retry; x to stop",
+                    )
                 )
-            ).strip().casefold()
+                .strip()
+                .casefold()
+            )
             if choice in {"x", "exit"}:
                 raise
 
@@ -443,13 +501,14 @@ def _print_oauth_file_retention_message(credential_path=OAUTH_CLIENT_FILE):
     """Explain the local credential file's post-setup retention choices."""
     print(
         wrap_text(
-            "Identity Platform now stores the OAuth client secret. Lagniappe "
-            f"runtime does not need {credential_path}. You may delete the "
-            "local JSON or move it to secure storage. The config/files path "
-            "is excluded from Git and App Engine uploads, but the JSON still "
-            "contains a secret. To replace or rotate Google OAuth later, "
-            "place the new downloaded JSON at that path and run "
-            f"{setup_command('oauth')}."
+            (
+                "Identity Platform now stores the OAuth client secret. Lagniappe runtime "
+                f"does not need {ui.literal(credential_path)}. You may delete the local JSON "
+                "or move it to secure storage. The config/files path is excluded from Git "
+                "and App Engine uploads, but the JSON still contains a secret. To replace or "
+                "rotate Google OAuth later, place the new downloaded JSON at that path and "
+                f"run {ui.literal(setup_command('oauth'))}."
+            )
         )
     )
 
@@ -487,10 +546,10 @@ def configure_google_signin_choice():
                 raise ValueError("GOOGLE_SIGNIN_ENABLED must be true or false.")
             existing = normalized == "true"
         SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = existing
-        print(f"Google sign-in is {'enabled' if existing else 'disabled'}.")
+        print(wrap_text(f"Google sign-in is {'enabled' if existing else 'disabled'}."))
         return existing
 
-    print("\nOptional Google Sign-In")
+    print(wrap_text(ui.heading("\nOptional Google Sign-In")))
     print(
         wrap_text(
             "Email and password authentication will remain available either "
@@ -498,12 +557,14 @@ def configure_google_signin_choice():
             "OAuth client setup steps."
         )
     )
-    enabled = input("Enable Google sign-in? [Y/n]: ").strip().casefold() not in {
+    enabled = input(
+        format_prompt("Enable Google sign-in? [Y/n]: ")
+    ).strip().casefold() not in {
         "n",
         "no",
     }
     SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = enabled
-    print(f"Google sign-in {'enabled' if enabled else 'disabled'}.")
+    print(wrap_text(f"Google sign-in {'enabled' if enabled else 'disabled'}."))
     return enabled
 
 
@@ -519,7 +580,7 @@ def collect_owner_and_signin_choice(installer_email=None):
         str(SETTINGS.APP.get(key) or "").strip()
         for key in ("ADMIN_NAME", "ADMIN_EMAIL")
     ):
-        print("\nPermanent site Owner")
+        print(wrap_text(ui.heading("\nPermanent site Owner")))
         print(
             wrap_text(
                 "This person will own the Lagniappe site and its singleton "
@@ -569,7 +630,7 @@ def setup_admin_and_oauth():
         SETTINGS.save()
 
     if not google_signin_enabled:
-        print("Skipping Google OAuth and Identity Platform provider setup.")
+        print(ui.status(wrap_text("Skipping Google OAuth and Identity Platform provider setup.")))
         return True
 
     if "GOOGLE_CLIENT_ID" not in SETTINGS.APP:
@@ -621,9 +682,11 @@ def configure_oauth():
 
     f = FORMATTER.initialize()
     current_client_id = str(SETTINGS.APP.get("GOOGLE_CLIENT_ID") or "").strip()
-    print(f"\n{f.info('Lagniappe Google OAuth Configuration')}")
+    print(wrap_text(f"\n{ui.heading('Google OAuth configuration')}"))
     if current_client_id:
-        print(f"Current OAuth client ID: {current_client_id}")
+        print(
+            ui.value("Current OAuth client ID", f"{current_client_id}", verbatim=True)
+        )
     print_oauth_instructions()
 
     client_id, client_secret = _get_verified_oauth_credentials(SETTINGS)
@@ -631,19 +694,23 @@ def configure_oauth():
     SETTINGS.APP["GOOGLE_CLIENT_ID"] = client_id
     SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = True
     SETTINGS.save()
-    print(f.success("Google OAuth settings verified and saved."))
+    print(f.success(wrap_text("Google OAuth settings verified and saved.")))
     _print_oauth_file_retention_message()
 
-    consent = input(f.info("Deploy the updated OAuth settings now? [Y/n]: "))
+    consent = input(
+        format_prompt("Deploy the updated OAuth settings now? [Y/n]: ")
+    )
     if consent.strip().casefold() != "n":
-        utils.deploy_to_app_engine()
-        print(f.success("Google OAuth settings deployed."))
+        utils.deploy_to_app_engine(print_final_summary=False)
+        print(f.success(wrap_text("Google OAuth settings deployed.")))
     else:
         print(
             f.warning(
-                "OAuth settings were saved locally but are not active in the "
-                "deployed app. Google sign-in may remain unavailable until "
-                "the app is deployed."
+                wrap_text(
+                    "OAuth settings were saved locally but are not active in the "
+                    "deployed app. Google sign-in may remain unavailable until "
+                    "the app is deployed."
+                )
             )
         )
     return 0

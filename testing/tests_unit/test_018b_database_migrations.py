@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
 from types import SimpleNamespace
@@ -9,6 +10,99 @@ from lagniappe.core.tools.database import migrations, utility
 
 
 pytestmark = pytest.mark.unit
+
+
+# @matrix files migrations : history parent-key conflict idempotence
+def test_file_page_migration_backfills_task_ancestry_and_preserves_staging():
+    from lagniappe.core.tools.database.core import KINDS
+    from lagniappe.core.tools.database.migration_steps.v2_0_file_pages import migrate_file_pages
+
+    page = _entity(KINDS.instances.value, "file-page", {"type": "page", "hash": "page", "requires": ["page", "models"]})
+    other_page = _entity(KINDS.instances.value, "other-file-page", {"type": "page", "hash": "other-page"})
+    task = _entity(KINDS.instances.value, "file-task", {"type": "task", "hash": "task", "page": page.key, "requires": ["page", "models"]})
+    history = _entity(KINDS.history.value, "file-history", {"type": "task_history", "task": task.key})
+    direct = _entity(KINDS.files.value, "direct", {"type": "file", "hash": "direct", "page": page.key, "task_page": other_page.key})
+    owned = _entity(KINDS.files.value, "owned", {"type": "file", "hash": "owned", "task": task.key, "description": "Preserved", "active": False})
+    historical = _entity(KINDS.files.value, "historical", {"type": "file", "hash": "historical", "task": history.key})
+    mirrored = _entity(KINDS.files.value, "mirrored", {"type": "file", "hash": "mirrored", "task": task.key, "page": page.key})
+    stale_ancestry = _entity(KINDS.files.value, "stale-ancestry", {
+        "type": "file", "hash": "stale-ancestry", "task": task.key, "task_page": other_page.key,
+    })
+    canonical = _entity(KINDS.files.value, "canonical", {
+        "type": "file", "hash": "canonical", "task": task.key, "task_page": page.key,
+        "requires": ["canonical", "models", "page", "task"],
+    })
+    canonical.exclude_from_indexes.add("task_page")
+    indexed_ancestry = _entity(KINDS.files.value, "indexed-ancestry", {
+        "type": "file", "hash": "indexed-ancestry", "task": task.key, "task_page": page.key,
+        "requires": ["indexed-ancestry", "models", "page", "task"], "description": "Preserved exclusion",
+    })
+    indexed_ancestry.exclude_from_indexes.add("description")
+    staged = _entity(KINDS.files.value, "staged", {"type": "file", "hash": "staged", "report_user": _key(KINDS.users.value, "uploader")})
+    staged_ancestry = _entity(KINDS.files.value, "staged-ancestry", {
+        "type": "file", "hash": "staged-ancestry", "report_user": staged["report_user"],
+        "task_page": page.key, "requires": ["staged-ancestry", "page"],
+    })
+    broken = _entity(KINDS.files.value, "broken", {"type": "file", "hash": "broken", "task": _key(KINDS.instances.value, "missing")})
+    conflict = _entity(KINDS.files.value, "conflict", {"type": "file", "hash": "conflict", "task": task.key, "page": other_page.key})
+    ingress = _entity(KINDS.files.value, "ingress", {"type": "ingress", "hash": "ingress"})
+    datastore = _Datastore([page, other_page, task, history, direct, owned, historical, mirrored,
+                            stale_ancestry, canonical, indexed_ancestry, staged, staged_ancestry, broken, conflict, ingress])
+    context = migrations.MigrationContext(datastore.query_factory, datastore.write, datastore)
+
+    result = migrate_file_pages(context)
+
+    assert result["changed"] == 7 and result["failed"] == 2
+    for file in (owned, historical, mirrored, stale_ancestry, canonical, indexed_ancestry):
+        assert datastore.rows[file.key]["task_page"] == page.key
+        assert datastore.rows[file.key]["task"] == task.key
+        assert "page" not in datastore.rows[file.key]
+        assert "task_page" in datastore.rows[file.key].exclude_from_indexes
+    assert datastore.rows[owned.key]["description"] == "Preserved"
+    assert datastore.rows[owned.key]["active"] is False
+    assert set(datastore.rows[owned.key]["requires"]) == {"owned", "models", "task", "page"}
+    assert datastore.rows[direct.key]["page"] == page.key
+    assert "task" not in datastore.rows[direct.key]
+    assert "task_page" not in datastore.rows[direct.key]
+    assert datastore.rows[canonical.key] == canonical
+    assert dict(datastore.rows[indexed_ancestry.key]) == dict(indexed_ancestry)
+    assert datastore.rows[indexed_ancestry.key].exclude_from_indexes == {"description", "task_page"}
+    assert datastore.rows[staged.key] == staged
+    assert datastore.rows[staged_ancestry.key] == {
+        "type": "file", "hash": "staged-ancestry", "report_user": staged["report_user"],
+        "requires": ["staged-ancestry", "models"],
+    }
+    assert datastore.rows[broken.key] == broken
+    assert datastore.rows[conflict.key] == conflict
+    assert datastore.rows[ingress.key] == ingress
+    assert result["errors"][0]["url"] == f"/files/{migrations.encode_urlsafe_key(broken.key)}"
+    assert result["errors"][1]["url"] == f"/files/{migrations.encode_urlsafe_key(conflict.key)}"
+    assert migrate_file_pages(context)["changed"] == 0
+
+
+# @matrix permissions migrations : local-restrictions admin-only idempotence
+def test_canonical_restrictions_migration_preserves_local_settings_and_inheritance():
+    from lagniappe.core.tools.database.core import KINDS
+    from lagniappe.core.tools.database.migration_steps.v2_0_file_pages import migrate_canonical_restrictions
+
+    group = _entity(KINDS.users.value, "local-group", {"type": "group", "hash": "local"})
+    form = _entity(KINDS.models.value, "local-form", {"type": "form", "groups": [group.key]})
+    admin = _entity(KINDS.instances.value, "admin-page", {"type": "page", "restricted_to": ["owner"], "groups": [group.key]})
+    mixed = _entity(KINDS.instances.value, "mixed-page", {"type": "page", "restricted_to": ["owner", "z", "a", "z"]})
+    inherited = _entity(KINDS.instances.value, "inherited-page", {"type": "page", "form": form.key})
+    task = _entity(KINDS.instances.value, "unchanged-task", {"type": "task", "restricted_to": ["owner"]})
+    datastore = _Datastore([group, form, admin, mixed, inherited, task])
+    context = migrations.MigrationContext(datastore.query_factory, datastore.write, datastore)
+
+    result = migrate_canonical_restrictions(context)
+
+    assert result["changed"] == 3 and result["failed"] == 0
+    assert datastore.rows[form.key]["restricted_to"] == ["local"]
+    assert datastore.rows[admin.key]["restricted_to"] == ["admin"]
+    assert datastore.rows[mixed.key]["restricted_to"] == ["a", "z"]
+    assert "restricted_to" not in datastore.rows[inherited.key]
+    assert datastore.rows[task.key] == task
+    assert migrate_canonical_restrictions(context)["changed"] == 0
 
 
 def _key(kind, identifier):
@@ -647,6 +741,65 @@ def test_status_reads_completed_migrations_across_builds_and_blocks_after_failur
         now=clock,
     )
     assert len(calls) == 1
+
+
+# @pair database-migrations:actionable-links
+def test_saved_file_migration_failures_gain_links_without_rewriting_history(monkeypatch):
+    file = _entity(migrations.KINDS.files.value, "conflict", {
+        "type": "file", "name": "Invoice <original>",
+    })
+    missing_key = _key(migrations.KINDS.files.value, "deleted")
+    identifier = migrations.encode_urlsafe_key(file.key)
+    missing_identifier = migrations.encode_urlsafe_key(missing_key)
+    definition = next(item for item in migrations.MIGRATION_CATALOG if item.id == "FIL-001")
+    attempt = {
+        "status": "failed", "totals": {"failed": 5}, "repairs": [],
+        "errors": [
+            {"key": identifier, "message": "File has multiple owners"},
+            {"key": identifier, "message": "Another issue with the same file"},
+            {"key": missing_identifier, "message": "File owner is missing"},
+            {"key": "files:query", "message": "Query failed"},
+            {"key": identifier, "message": "Already linked", "url": "/files/existing", "link_label": "Existing link"},
+        ],
+    }
+    ledger = _entity(migrations.KINDS.site.value, f"data-migration:{definition.id}", {
+        "ledger_schema": migrations.LEDGER_SCHEMA_VERSION,
+        "migration_id": definition.id, "sequence": definition.sequence,
+        "state": "failed", "attempts": json.dumps([attempt]),
+    })
+    datastore = _Datastore([file])
+    datastore.put(ledger)
+    before = deepcopy(datastore.records)
+    batches = []
+    get_multi = datastore.get_multi
+
+    def record_batch(keys, **kwargs):
+        batches.append(list(keys))
+        return get_multi(keys, **kwargs)
+
+    monkeypatch.setattr(datastore, "get_multi", record_batch)
+    status = migrations.get_migration_status(datastore=datastore, catalog=(definition,))
+    assert status["status"] == "failed"
+    assert status["cache_refresh_allowed"] is False
+    view = status["migrations"][0]
+    errors = view["latest_attempt"]["errors"]
+    assert errors == view["attempts"][-1]["errors"]
+    assert errors[0]["url"] == errors[1]["url"] == f"/files/{identifier}"
+    assert errors[0]["link_label"] == errors[1]["link_label"] == "Invoice <original>"
+    assert errors[0]["message"] == attempt["errors"][0]["message"]
+    assert errors[2]["url"] == f"/files/{missing_identifier}"
+    assert errors[2]["link_label"] == "Open file"
+    assert errors[3:] == attempt["errors"][3:]
+    assert batches[-1] == [file.key, missing_key]
+    assert len(batches) == 2  # Ledger batch, then one deduplicated file-name batch.
+    assert datastore.records == before
+    assert datastore.rows[file.key] == file
+
+    # New attempts already carry their link metadata and need no extra file reads.
+    ledger["attempts"] = json.dumps([view["latest_attempt"]])
+    batches.clear()
+    migrations.get_migration_status(datastore=datastore, catalog=(definition,))
+    assert len(batches) == 1
 
 
 # @matrix admin database-migrations : concurrency interrupted-attempt lease lost-lease stale-recovery

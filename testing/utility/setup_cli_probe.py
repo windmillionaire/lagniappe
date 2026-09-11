@@ -62,6 +62,7 @@ def main():
         _entry_point("oauth", behavior, status),
     )
     _install_module("ai", "configure_ai", _entry_point("ai", behavior, status))
+    _install_module("mcp", "configure_mcp", _entry_point("mcp", behavior, status))
     _install_module(
         "ai_email",
         "configure_ai_email",

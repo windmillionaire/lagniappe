@@ -2,7 +2,7 @@
 
 from google.genai import types
 
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 
 GET_FILE = types.FunctionDeclaration(
@@ -56,7 +56,7 @@ def execute_get_file(args, user):
     if not file_id:
         return {"error": "id is required"}
 
-    entity = Entities.fetch_one(file_id, request=Fetch.direct())
+    entity = Entities.fetch_one(file_id, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     if not entity or not isinstance(entity, Entities.FILE):
         return {"error": "File not found"}
 

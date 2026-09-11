@@ -39,6 +39,7 @@ from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web import deferred_autofill
 
+from ..pages.main import _load_page_settings_relations
 from . import tasks
 
 
@@ -127,6 +128,9 @@ def view(key, **kwargs):
     if not page.allowed(Action.VIEW) and task.is_assigned_to(current_user):
         page = Entities.fetch_one(current_user.page, request=Fetch.direct())
 
+    _load_page_settings_relations(
+        page, restrictions=Resource.USER.allowed(Action.PERMISSIONS)
+    )
     return responses.page(page, focus_task=task)
 
 
@@ -303,7 +307,11 @@ def _create_task_file():
         "filename": uploaded_file.filename,
         "mimetype": request.form.get("mimetype"),
     }
-    file = Entities.FILE().create(upload=uploaded_file, data=data)
+    file = Entities.FILE().create(
+        upload=uploaded_file,
+        data=data,
+        report_user=current_user._get_current_object(),
+    )
     file.save()
     return file
 
@@ -513,7 +521,7 @@ def task_data(request, page, task=None):
         scope = task or page
 
         def file_authorized(file):
-            return file.allowed(Action.VIEW, user=current_user) or any(
+            return (file.has_references and file.allowed(Action.VIEW, user=current_user)) or any(
                 valid_task_attachment_claim(
                     claim,
                     actor=current_user,
@@ -853,9 +861,8 @@ def _home_task_response(task):
 @permission(Resource.TASK, Action.VIEW)
 def latest_history_submission(key, **kwargs):
     task = kwargs["entity"]
-    history = Entities.fetch_one(
-        database_get.latest_task_history(task), request=Fetch.direct()
-    )
+    histories = task.load_history(database_get.latest_task_history(task))
+    history = histories[0] if histories else None
     submission = history.properties.submission.form_value if history else {}
     return responses.json_response({"latest_submission": submission})
 
@@ -874,9 +881,8 @@ def save_default_field(key, **kwargs):
     if not field_id:
         return responses.error("A submission field is required")
 
-    history = Entities.fetch_one(
-        database_get.latest_task_history(task), request=Fetch.direct()
-    )
+    histories = task.load_history(database_get.latest_task_history(task))
+    history = histories[0] if histories else None
     if not history:
         return responses.error("No task history is available")
 
@@ -905,7 +911,7 @@ def delete_file(key, file_key, **kwargs):
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
-    file = Entities.fetch_one(file_key, request=Fetch.direct())
+    file = Entities.fetch_one(file_key, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     if (
         not isinstance(file, Entities.FILE)
         or file.key not in task.properties.files.keys

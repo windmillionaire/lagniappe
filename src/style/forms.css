@@ -128,6 +128,11 @@ input[role="combobox"] {
 }
 
 /* @style form.default form.tools */
+[data-deferred-lock="form"] {
+	opacity: 0.5;
+}
+
+/* @style form.default form.tools */
 [data-readonly="true"] {
 	& :where(input:not([data-role="complete-toggle"]), select, textarea) {
 		&:focus-visible,

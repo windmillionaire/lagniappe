@@ -510,3 +510,72 @@ for (const action of actions) {
 }
 '''
     )
+
+
+# @matrix forms : access-restrictions explicit-submit retryable-action single-flight
+def test_restriction_save_submits_snapshot_and_releases_failed_submitter(run_node):
+    run_node(r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+const assert = require("node:assert/strict");
+const requests = [];
+let settle;
+const context = {
+  captureError() {},
+  FormData: class {
+    constructor(form) { this.groups = [...form.groups]; }
+    *[Symbol.iterator]() { for (const group of this.groups) yield ["group-key", group]; }
+  },
+  request: { put(route, data) {
+    requests.push({route, data});
+    return new Promise(resolve => { settle = resolve; });
+  } },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/views/builder/panels/formSettings.mjs", "utf8")
+  .replace(/^import .*$/gm, "")
+  .replace("export class FormSettings", "class FormSettings");
+vm.runInContext(source + "\nglobalThis.FormSettings = FormSettings;", context);
+(async () => {
+  const messages = [];
+  const button = {disabled: false};
+  const settings = {
+    _destroyed: false, _restrictionPromise: null,
+    restrictions: {dataset: {route: "/forms/example/restrictions"}, groups: ["group-one"]},
+    restrictionForm: {
+      submitButton: button,
+      submitting() { messages.push("spinner"); },
+      success() { messages.push("saved"); },
+      resetSubmitButton() { messages.push("reset"); },
+      markUnsavedState() { messages.push("unsaved"); },
+      showError(error) { messages.push(error); },
+    },
+  };
+  const event = {preventDefault() {}, stopPropagation() {}};
+  const save = () => context.FormSettings.prototype._saveRestrictions.call(settings, event);
+  const first = save();
+  assert.equal(save(), first);
+  assert.equal(requests.length, 1);
+  assert.equal(button.disabled, true);
+  assert.equal(messages[0], "spinner");
+  settings.restrictions.groups.push("group-two");
+  assert.equal(requests[0].data.groups.length, 1);
+  settle({ok: false, error: "Queue unavailable"});
+  await first;
+  assert.equal(button.disabled, false);
+  assert.equal(messages.at(-1), "Queue unavailable");
+  const retry = save();
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].data.groups.length, 2);
+  settle({ok: true});
+  await retry;
+  assert.equal(button.disabled, false);
+  assert.equal(messages.at(-1), "saved");
+  const pending = save();
+  settings.restrictions.groups.push("group-three");
+  settle({ok: true});
+  await pending;
+  assert.equal(messages.at(-1), "unsaved");
+  assert.equal(button.disabled, false);
+})().catch(error => { console.error(error); process.exitCode = 1; });
+''')

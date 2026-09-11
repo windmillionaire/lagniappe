@@ -1,8 +1,12 @@
 """Secret-safe setup summaries shared by install and diagnostics."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 import hashlib
 import json
 from runner.context import setup_command
+from runner.console import cell_width, terminal_width, wrap_text
 
 
 # @testable false
@@ -42,8 +46,8 @@ def _enabled(value, *, default=False):
 # @testable false
 # @covered-by installer/summary.py::install_summary_lines
 # @reason private aligned display adapter is exercised through the public summary allowlist
-def _install_line(label, value):
-    return f"{label + ':':<27}{_value(value)}"
+def _install_line(label, value, *, verbatim=False, standalone=False):
+    return label, _value(value), verbatim and bool(value), standalone
 
 
 # @testable false
@@ -116,6 +120,19 @@ def expected_resource_lines(
         f"Redis endpoint: {_value(redis_endpoint)}",
         f"App Engine runtime: {_value(deploy.get('runtime'))}",
     ]
+    from config.ai_settings import normalize_ai_features
+    from installer.mcp import requested
+    features = normalize_ai_features(settings)
+    lines.append(f"AI features: {'enabled' if features['AI_ENABLED'] else 'disabled'}")
+    lines.append(f"External AI (MCP and API/skill): {'enabled' if features['EXTERNAL_AI_ENABLED'] else 'disabled'}")
+    if requested(settings):
+        lines.extend([
+            f"MCP URL: {_value(settings.get('MCP_RESOURCE'))}",
+            f"MCP desired version: {_value(settings.get('MCP_VERSION'))}",
+            f"MCP runtime account: {_value(settings.get('MCP_SERVICE_ACCOUNT'))}",
+            f"MCP build account: lagniappe-mcp-build@{project}.iam.gserviceaccount.com",
+            f"MCP build bucket: {project}-mcp-builds",
+        ])
     for kind, name in _bucket_names(settings).items():
         lines.append(f"{kind.title()} bucket: {name}")
     return lines
@@ -123,6 +140,7 @@ def expected_resource_lines(
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_redacted_install_summary_is_allowlisted
+# @tests tests_tooling/test_001k_setup_console.py::test_install_summary_is_responsive
 # @matrix setup : operator-summary secret-redaction
 def install_summary_lines(
     settings,
@@ -131,6 +149,7 @@ def install_summary_lines(
     node=None,
     gcloud_config=None,
     deployed=False,
+    width=None,
 ):
     """Return a compact, decision-focused successful-install handoff."""
     settings = settings or {}
@@ -159,35 +178,59 @@ def install_summary_lines(
         redis_state = f"configured; TLS {redis_tls}"
 
     lines = [
-        "=== Final install summary (secrets omitted) ===",
+        "Installation summary",
         _install_line("Application", settings.get("APP_NAME")),
-        _install_line("Application URL", app_url),
         _install_line(
             "Lagniappe version",
             settings.get("VERSION") or node.get("version"),
         ),
-        _install_line("Target project", project),
-        _install_line("gcloud configuration", gcloud_config.get("NAME")),
+        _install_line("Target project", project, verbatim=True),
+        _install_line("gcloud configuration", gcloud_config.get("NAME"), verbatim=True),
     ]
+    if not deployed:
+        lines.append(_install_line("Application URL", app_url, verbatim=True))
+    from config.ai_settings import normalize_ai_features
+    from installer.mcp import requested
+    features = normalize_ai_features(settings)
+    lines.append(_install_line("AI features", "enabled" if features["AI_ENABLED"] else "disabled"))
+    lines.append(_install_line("External AI (MCP and API/skill)", "enabled" if features["EXTERNAL_AI_ENABLED"] else "disabled"))
+    if requested(settings):
+        lines.append(
+            _install_line(
+                "MCP server", settings.get("MCP_RESOURCE") or "selected", verbatim=True
+            )
+        )
+        if not settings.get("MCP_RESOURCE"):
+            lines.append(
+                _install_line(
+                    "Finish MCP setup",
+                    setup_command("mcp"),
+                    verbatim=True,
+                    standalone=True,
+                )
+            )
     if (
         installer
         and deployer
         and str(installer).strip().casefold() == str(deployer).strip().casefold()
     ):
-        lines.append(_install_line("Installer / deployer", installer))
+        lines.append(_install_line("Installer / deployer", installer, verbatim=True))
     else:
         lines.extend(
             [
-                _install_line("Installer", installer),
-                _install_line("Deployer", deployer),
+                _install_line("Installer", installer, verbatim=True),
+                _install_line("Deployer", deployer, verbatim=True),
             ]
         )
     lines.extend(
         [
-            _install_line("Application Owner", settings.get("ADMIN_EMAIL")),
+            _install_line(
+                "Application Owner", settings.get("ADMIN_EMAIL"), verbatim=True
+            ),
             _install_line(
                 "Temporary Administrator",
                 settings.get("BOOTSTRAP_ADMIN_EMAIL"),
+                verbatim=True,
             ),
             _install_line(
                 "App Engine location",
@@ -203,8 +246,15 @@ def install_summary_lines(
             _install_line("AI utility model", settings.get("AI_UTILITY_MODEL")),
             _install_line("AI image model", settings.get("AI_IMAGE_MODEL")),
             _install_line("Deployment completed", "yes" if deployed else "no"),
-            _install_line("Health check", setup_command("doctor")),
-            _install_line("Repair if needed", setup_command("repair")),
+            _install_line(
+                "Health check", setup_command("doctor"), verbatim=True, standalone=True
+            ),
+            _install_line(
+                "Repair if needed",
+                setup_command("repair"),
+                verbatim=True,
+                standalone=True,
+            ),
         ]
     )
     if deployed:
@@ -217,13 +267,99 @@ def install_summary_lines(
             lines.append(
                 _install_line(
                     "Installer handoff",
-                    f"{setup_command('handoff')} after Owner review",
+                    f"After Owner review:\n{ui.literal(setup_command('handoff'))}",
+                    verbatim=True,
+                    standalone=True,
                 )
             )
-        lines.append(_install_line("Open this installation", app_url))
+        lines.append(
+            _install_line(
+                "Open this installation", app_url, verbatim=True, standalone=True
+            )
+        )
     else:
-        lines.append(f"After manual deployment: {setup_command('jobs')}")
-    return lines
+        lines.append(
+            _install_line(
+                "After manual deployment",
+                setup_command("jobs"),
+                verbatim=True,
+                standalone=True,
+            )
+        )
+    width = terminal_width(width)
+    rows = {row[0]: row for row in lines if isinstance(row, tuple)}
+    groups = (
+        (
+            "Application",
+            (
+                "Application",
+                "Application URL",
+                "Lagniappe version",
+                "Target project",
+                "gcloud configuration",
+                "App Engine location",
+                "Regional resources",
+                "OCR location",
+                "Deployment completed",
+            ),
+        ),
+        (
+            "Access",
+            (
+                "Installer / deployer",
+                "Installer",
+                "Deployer",
+                "Application Owner",
+                "Temporary Administrator",
+                "Google sign-in",
+            ),
+        ),
+        ("Services", ("Redis", "Error monitoring")),
+        (
+            "AI",
+            (
+                "AI features",
+                "External AI (MCP and API/skill)",
+                "MCP server",
+                "AI observability",
+                "AI model",
+                "AI utility model",
+                "AI image model",
+            ),
+        ),
+        (
+            "Next steps",
+            (
+                "Health check",
+                "Repair if needed",
+                "Finish MCP setup",
+                "Installer handoff",
+                "After manual deployment",
+                "Open this installation",
+            ),
+        ),
+    )
+    rendered = [wrap_text(ui.heading("Installation summary"), width)]
+    for title, labels in groups:
+        selected = [rows[label] for label in labels if label in rows]
+        if not selected:
+            continue
+        rendered.extend(("", wrap_text(ui.heading(title), width)))
+        column = max(cell_width(row[0]) + 3 for row in selected)
+        for row in selected:
+            label, value, verbatim, standalone = row
+            text = ui.value(
+                label,
+                value,
+                action=(title == "Next steps" and label != "Installer handoff")
+                or label == "MCP server",
+                width=width,
+                column=column,
+                verbatim=verbatim,
+                standalone=standalone or width - column < 20,
+            )
+            rendered.extend(text.split("\n"))
+    return rendered
 
 
 # @testable false
@@ -236,6 +372,7 @@ def print_install_summary(
     node=None,
     gcloud_config=None,
     deployed=False,
+    width=None,
 ):
     """Print the allowlisted final install summary."""
     print()
@@ -245,5 +382,6 @@ def print_install_summary(
         node=node,
         gcloud_config=gcloud_config,
         deployed=deployed,
+        width=width,
     ):
         print(line)

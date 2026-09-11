@@ -10,10 +10,14 @@ from lagniappe.core.definitions import (
     DeferredJobPhase,
     DeferredJobType,
     Fetch,
+    MutationIntent,
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai import external_operations
+from lagniappe.core.tools.ai.reporting.contracts.workflows import is_remote_organize_update
+from lagniappe.core.tools.database import agent_api as agent_api_store
 
 from .base import DeferredJobAdapter
 from ..errors import (
@@ -21,7 +25,9 @@ from ..errors import (
 )
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
+# @matrix ai-report : input-files no-extra-read fresh-read
 class ReportAdapter(DeferredJobAdapter):
     """Shared report generation and revision behavior."""
 
@@ -167,6 +173,7 @@ class ReportAdapter(DeferredJobAdapter):
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_prepare_stops_before_report_save_after_cancellation
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_resumes_plan_checkpoint_without_second_planning_call
 # @matrix ai-report : plan-resume submission-completion
+# @matrix ai-report : remote-update transport-boundary
 # @matrix deferred-jobs : cancellation checkpoint quota retry service-tier
 class OrganizeReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_ORGANIZE
@@ -215,6 +222,15 @@ class OrganizeReportAdapter(ReportAdapter):
             )
             stage_index = 1
 
+        update_only = is_remote_organize_update(report)
+        if not report.input_files and not update_only:
+            raise exceptions.ValidationError("Organize requires at least one uploaded file in the UI.")
+        if update_only and stage_index < 2:
+            context.checkpoint_stage(
+                "summaries_ready", phase=DeferredJobPhase.PREPARING_INPUTS.value
+            )
+            stage_index = 2
+
         if stage_index < 2:
             context.set_phase(DeferredJobPhase.SUMMARIZING)
             summary_options = {
@@ -236,9 +252,13 @@ class OrganizeReportAdapter(ReportAdapter):
 
         if stage_index < 3:
             context.set_phase(DeferredJobPhase.GENERATING)
-            retrieval_context = ai.prepare_organize_retrieval_context(
-                report,
-                actor,
+            retrieval_context = (
+                {}
+                if update_only
+                else ai.prepare_organize_retrieval_context(
+                    report,
+                    actor,
+                )
             )
             if context.parameters.get("mode") == "revise":
                 prompt = ai.revise_organize_prompt(
@@ -263,12 +283,13 @@ class OrganizeReportAdapter(ReportAdapter):
 
         if stage_index < 4:
             context.set_phase(DeferredJobPhase.FINALIZING)
-            proposal = ai.complete_organize_submissions(
-                proposal,
-                report,
-                actor,
-                service_tier=service_tier,
-            )
+            if not update_only:
+                proposal = ai.complete_organize_submissions(
+                    proposal,
+                    report,
+                    actor,
+                    service_tier=service_tier,
+                )
             context.ensure_active()
             context.checkpoint_stage(
                 "ready_to_apply",
@@ -343,10 +364,15 @@ class CreateReportAdapter(ReportAdapter):
 # @testable true
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_adapter_runs_the_reviewed_proposal
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_failure_preserves_a_retryable_ledger
+# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_execution_start_rejects_stale_browser_snapshot
+# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal
+# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
 # @matrix ai-report : deterministic-run entitlement-independent recovery
 # @matrix deferred-jobs : cancellation provider-boundary report-execution tier-declaration
+# @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution terminal-delivery
+# @matrix ai-report : input-files no-extra-read fresh-read
 class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 
@@ -370,6 +396,11 @@ class ReportExecutionAdapter(DeferredJobAdapter):
 
     def started(self, context):
         report = context.input("report")
+        external_snapshot = (
+            external_operations.report_snapshot(report)
+            if getattr(report, "origin", None) == "api"
+            else None
+        )
         previous = report.deferred_job or {}
         previous_status = (
             previous.get("previous_status")
@@ -387,7 +418,25 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             "revision": int(getattr(context.job, "status_revision", 0) or 0),
         }
         report.properties.process.begin_execution()
-        Entities.save(report, context.actor)
+        if external_snapshot is not None:
+            if hasattr(report, "add_mutation_intents"):
+                report.add_mutation_intents(
+                    MutationIntent.touch(
+                        context.actor,
+                        reason="external-report-execution-owner-invalidation",
+                    )
+                )
+            outcome = external_operations.save_plan_if_idle(
+                report,
+                external_snapshot,
+            )
+            if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+                raise exceptions.ValidationError(
+                    "This plan changed while execution was starting. Refresh it "
+                    "before trying again."
+                )
+        else:
+            Entities.save(report, context.actor)
 
     def authorize(self, context):
         report = context.input("report")
@@ -461,6 +510,11 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         if active_job.get("key") != context.job.urlsafe_key:
             return
 
+        external_snapshot = (
+            external_operations.report_snapshot(report)
+            if getattr(report, "origin", None) == "api"
+            else None
+        )
         result = report.result if isinstance(report.result, dict) else None
         if result and result.get("ledger_version") == ai.REPORT_LEDGER_VERSION:
             result["status"] = "failed"
@@ -475,7 +529,17 @@ class ReportExecutionAdapter(DeferredJobAdapter):
                 str(error),
                 previous_status=active_job.get("previous_status"),
             )
-        Entities.save(report, context.actor)
+        if external_snapshot is not None:
+            if hasattr(report, "add_mutation_intents"):
+                report.add_mutation_intents(
+                    MutationIntent.touch(
+                        context.actor,
+                        reason="external-report-execution-owner-invalidation",
+                    )
+                )
+            external_operations.save_plan_if_idle(report, external_snapshot)
+        else:
+            Entities.save(report, context.actor)
 
     def cleanup(self, context, *, terminal):
         if not terminal:
@@ -488,8 +552,23 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             return
         context.inputs["report"] = report
         if (report.deferred_job or {}).get("key") == context.job.urlsafe_key:
+            external_snapshot = (
+                external_operations.report_snapshot(report)
+                if getattr(report, "origin", None) == "api"
+                else None
+            )
             report.deferred_job = None
-            Entities.save(report, context.actor)
+            if external_snapshot is not None:
+                if hasattr(report, "add_mutation_intents"):
+                    report.add_mutation_intents(
+                        MutationIntent.touch(
+                            context.actor,
+                            reason="external-report-execution-owner-invalidation",
+                        )
+                    )
+                external_operations.save_plan_if_idle(report, external_snapshot)
+            else:
+                Entities.save(report, context.actor)
 
     def terminal_message(self, context, *, succeeded, error=None):
         if succeeded:

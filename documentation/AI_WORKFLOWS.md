@@ -15,6 +15,12 @@ contract.
 | File summary | One File and summary options. | Utility-model generation with extraction/provider fallback. | Summary/process state on the File. |
 | Report execution | Approved proposal; no model tools. | No provider call. | Action ledger, domain mutations, and optional undo. |
 
+Lagniappe preserves canonical MIME types on stored Files and downloads. At the
+Gemini request boundary, recognized Markdown (`text/markdown`) and vCard
+(`text/vcard`) inputs are sent as the provider-supported `text/plain` media type;
+their content remains unchanged. The same normalization applies to stored-file
+URI parts and direct inline autofill attachments.
+
 ## Ask
 
 Ask uses a lean initial prompt and retrieves workspace data on demand. Its
@@ -65,6 +71,13 @@ Organize evaluates an upload batch as a whole:
 6. repair locally or through one model pass when needed; and
 7. run a focused form-completion generation only for form-backed targets.
 
+Finalized uploads remain report-only evidence before browser execution. They
+are addressable through the owning report and its exact file references, but
+are omitted from ordinary workspace search while they have no Page or Task
+attachment. A successful attachment action makes the File searchable through
+the normal post-commit cache refresh. This boundary is shared by API, email,
+and on-site Organize uploads.
+
 The stages `uploads_finalized`, `summaries_ready`, `plan_ready`, and
 `ready_to_apply` are durable. A retry resumes without repeating completed
 uploads, summaries, or planning.
@@ -79,8 +92,20 @@ exact target. If repair cannot produce complete safe coverage, the result is a
 review-only proposal. Large or unreadable Files remain represented by metadata
 and visible issues so the proposal does not silently drop evidence.
 
-An instruction-only Organize request uses Ask because no file placement stage
-is needed.
+UI Organize remains file-backed; its instruction-only fallback remains Ask.
+API/MCP and email Organize also support a fileless existing-record update
+profile. Trusted intake origin and the absence of uploads select that profile;
+clients cannot opt a UI report into it. The email classifier can choose
+Organize for an update without attachments, but does not discover targets itself.
+The planner discovers exact editable records, reads relevant schemas, and
+proposes bounded updates for the same browser approval and execution pipeline.
+No additional toolbar option or top-level completion command is introduced.
+
+The update profile omits upload summaries, retrieval prepasses, and secondary
+form completion. Its planner authors final field patches directly, including
+on revision or validation repair. Once uploads are supplied, normal file
+coverage and completion obligations apply. External starters return a compact
+action contract; clients request selected schemas and guidance on demand.
 
 ## Autofill
 
@@ -126,6 +151,23 @@ partial-extraction note.
 
 ## Reviewed report execution
 
+The homepage Plans & Reports panel has independent Active, Executed, and Ask
+filters. Active includes unfinished Create/Organize proposals (including failed,
+revising, and undone states); Executed includes only complete Create/Organize
+proposals. All Ask reports stay in Ask regardless of status. Counts include
+hidden reports. The browser remembers each user's choices, initially Active and
+Ask, and reveals a newly created report's category.
+
+Selecting Executed alone exposes bulk history deletion with one count-based
+confirmation. `DELETE /tools/reports/executed` accepts JSON `{"keys": [...]}`
+and returns `deleted`, `skipped`, and `failed` key lists. The server rechecks
+creator ownership and current completion, then guards each deletion against a
+changed report or active API claim. Only the confirmed keys are considered;
+later completions are retained. Cleanup shares the individual report-delete
+path: report-only uploads and undo history are removed, while workspace changes
+and attached files remain. Missing, changed, busy, or ineligible reports are
+skipped; individual failures do not stop the remaining deletions.
+
 Create and Organize proposals may include reviewed create, move, rename,
 attach, schema, and submission actions. `reporting/execution/` owns deterministic
 application; the model is not called during execution.
@@ -144,6 +186,7 @@ Supported action families include:
 - adding a Category or Form to a Page;
 - renaming one exact entity;
 - updating exact existing submission fields;
+- completing one exact existing Task with `complete_task`;
 - adding fields or missing options to a Form schema; and
 - recording a manual Page-deletion suggestion instead of deleting it directly.
 
@@ -156,6 +199,18 @@ entities/links. Interrupted undo resumes from its own checkpoints.
 Task actions with completion evidence may reuse exactly one matching editable
 Task; the newest event stays on the live Task and earlier dates become history.
 Ambiguous matches remain separate.
+
+`complete_task` is distinct from historical `create_task` occurrences: it calls
+normal Task completion with the executing actor and validates required fields.
+It preserves submission values, descriptions, assignments and attachments,
+except that normal recurrence may archive the completed occurrence and reset
+the next occurrence immediately. Its completion history key is preallocated for
+retry safety. Put field updates before completion and make it depend on them.
+The existing scheduling policy is unchanged: near-term tasks reopen immediately
+so the next occurrence appears on the homepage; other production completions
+retain their midnight reopening job. Nonproduction still reopens immediately.
+Already-completed Tasks are unchanged. Undo restores the prior task without
+ordinary reopening's form/file reset and refuses conflicting later changes.
 
 ## Workspace semantics
 

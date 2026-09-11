@@ -14,7 +14,9 @@ from installer import doctor, summary, verify
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _write_generation(root):
+def _write_generation(root, app_updates=None):
+    from config import File
+
     documents = {
         "lagniappe.yaml": {
             "runtime": "python314",
@@ -54,11 +56,14 @@ def _write_generation(root):
         "index.yaml": {"indexes": []},
         "lagniappe/web/static/manifest.json": {"name": "Demo"},
     }
+    documents["config/files/lagniappe_settings.yaml"].update(app_updates or {})
     for relative, document in documents.items():
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.suffix == ".json":
             content = f"{json.dumps(document, sort_keys=True)}\n"
+        elif relative == "config/files/lagniappe_settings.yaml":
+            content = File.APP_SETTINGS_YAML._serialize_yaml(document)
         else:
             content = yaml.safe_dump(document, sort_keys=True)
         path.write_text(content, encoding="utf-8")
@@ -106,6 +111,10 @@ def test_redacted_install_summary_is_allowlisted():
         "AI_UTILITY_MODEL": "gemini-2.5-flash",
         "AI_IMAGE_MODEL": "gemini-3.1-flash-image",
         "AI_OBSERVABILITY": False,
+        "AI_ENABLED": True,
+        "EXTERNAL_AI_ENABLED": True,
+        "MCP_RESOURCE": "https://agent.example.test/mcp",
+        "MCP_VERSION": "diagnostic-revision-only",
         "CAPTURE_ERRORS": "False",
         "REDIS_TLS": False,
         "TASK_QUEUE_NAME": "lagniappe-tasks",
@@ -132,22 +141,23 @@ def test_redacted_install_summary_is_allowlisted():
         deployed=True,
     )
     text = "\n".join(lines)
+    prose = " ".join(text.split())
 
-    assert "Application:               Demo" in text
-    assert "Temporary Administrator:   installer@example.test" in text
-    assert "Lagniappe version:         0.2" in text
-    assert "Google sign-in:            enabled" in text
-    assert "Redis:                     configured; TLS disabled" in text
-    assert "Error monitoring:          disabled" in text
-    assert "AI observability:          disabled" in text
-    assert "AI model:                  gemini-2.5-pro" in text
-    assert "Deployment completed:      yes" in text
-    assert "Health check:              ./setup.sh doctor" in text
-    assert "Repair if needed:          ./setup.sh repair" in text
-    assert (
-        "Installer handoff:         ./setup.sh handoff after Owner review"
-        in text
-    )
+    assert "Application: Demo" in prose
+    assert "Temporary Administrator: installer@example.test" in prose
+    assert "Lagniappe version: 0.2" in prose
+    assert "Google sign-in: enabled" in prose
+    assert "Redis: configured; TLS disabled" in prose
+    assert "Error monitoring: disabled" in prose
+    assert "AI observability: disabled" in prose
+    assert "AI model: gemini-2.5-pro" in prose
+    assert "MCP server: https://agent.example.test/mcp" in prose
+    assert "diagnostic-revision-only" not in text
+    assert text.count("https://demo.example.test") == 1
+    assert "Deployment completed: yes" in prose
+    assert "Health check:\n  ./setup.sh doctor" in text
+    assert "Repair if needed:\n  ./setup.sh repair" in text
+    assert "Installer handoff:\n  After Owner review:\n  ./setup.sh handoff" in text
     for omitted_detail in (
         "runtime@demo-project.iam.gserviceaccount.com",
         "lagniappe-tasks",
@@ -158,9 +168,7 @@ def test_redacted_install_summary_is_allowlisted():
         "Identity Platform project",
     ):
         assert omitted_detail not in text
-    assert lines[-1] == (
-        "Open this installation:    https://demo.example.test"
-    )
+    assert lines[-2:] == ["Open this installation:", "  https://demo.example.test"]
     for secret in (
         "bucket-source-secret",
         "redis-secret",
@@ -170,7 +178,7 @@ def test_redacted_install_summary_is_allowlisted():
         assert secret not in text
 
     manual_lines = summary.install_summary_lines(settings)
-    assert manual_lines[-1] == "After manual deployment: ./setup.sh jobs"
+    assert manual_lines[-2:] == ["After manual deployment:", "  ./setup.sh jobs"]
 
 
 # @matrix doctor setup : operator-summary provider-resources secret-redaction
@@ -302,7 +310,7 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
         == 0
     )
     assert provider_calls == [("Demo", "demo-project")]
-    assert "Provider state: OK" in capsys.readouterr().out
+    assert "Provider state: verified" in capsys.readouterr().out
 
     constants_path = tmp_path / doctor.GENERATION_SOURCE
     constants_path.write_text(
@@ -322,7 +330,7 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
     )
     assert provider_calls == [("Demo", "demo-project")]
     assert constants_path.read_bytes() == drift_before
-    assert "Local generated state: DRIFT" in capsys.readouterr().out
+    assert "Local generated state: drift detected" in capsys.readouterr().out
 
     after = {
         path.relative_to(tmp_path): (path.read_bytes(), path.stat().st_mode)
@@ -334,6 +342,89 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
         for relative, value in before.items()
         if relative != Path(doctor.GENERATION_SOURCE)
     }
+
+
+# @matrix setup : adc doctor parsing provider-identity read-only
+def test_doctor_decodes_saved_settings_and_guides_adc_alignment(
+    tmp_path, capsys, monkeypatch
+):
+    _write_generation(tmp_path, {
+        "AI_ENABLED": True,
+        "EXTERNAL_AI_ENABLED": False,
+        "REDIS_PORT": 6379,
+        "IDENTITY_PLATFORM_CONFIG": {"apiKey": "identity-key-not-for-output"},
+    })
+    settings_path = tmp_path / "config/files/lagniappe_settings.yaml"
+    raw_settings = yaml.safe_load(settings_path.read_text())
+    assert raw_settings["AI_ENABLED"] == "True"
+    assert raw_settings["EXTERNAL_AI_ENABLED"] == "False"
+    before = {
+        path.relative_to(tmp_path): (path.read_bytes(), path.stat().st_mode)
+        for path in tmp_path.rglob("*") if path.is_file()
+    }
+    active_values = {
+        "configurations": "demo",
+        "account": "deployer@example.test",
+        "project": "demo-project",
+    }
+
+    def gcloud(command, check=False):
+        key = "configurations" if "configurations" in command else command[-1]
+        return types.SimpleNamespace(returncode=0, stdout=active_values[key])
+
+    calls = []
+    expected_resources = doctor.expected_resource_lines
+
+    def resources(*args, **kwargs):
+        calls.append("expected resources")
+        return expected_resources(*args, **kwargs)
+
+    monkeypatch.setattr(doctor, "expected_resource_lines", resources)
+
+    def provider(settings, project):
+        assert settings["AI_ENABLED"] is True
+        assert settings["EXTERNAL_AI_ENABLED"] is False
+        assert settings["REDIS_PORT"] == 6379
+        assert settings["IDENTITY_PLATFORM_CONFIG"] == {
+            "apiKey": "identity-key-not-for-output"
+        }
+        calls.append(project)
+        return {"mcp-service": {"state": "AVAILABLE"}}
+
+    adc = {
+        "state": "success",
+        "principal": "installer@example.test",
+        "project": "demo-project",
+        "quota_project": "demo-project",
+    }
+    assert doctor.run_doctor(
+        root=tmp_path, gcloud_runner=gcloud, adc_checker=lambda: adc,
+        provider_checker=provider,
+    ) == 1
+    output = capsys.readouterr().out
+    assert "ADC principal differs from the saved deployer" in output
+    assert "Authentication command" in output
+    assert "./setup.sh auth" in output
+    assert "./setup.sh repair" not in output
+    assert "Expected target and provider resources" not in output
+    assert "Provider state" not in output
+    assert calls == []
+    assert "identity-key-not-for-output" not in output
+
+    adc["principal"] = "deployer@example.test"
+    assert doctor.run_doctor(
+        root=tmp_path, gcloud_runner=gcloud, adc_checker=lambda: adc,
+        provider_checker=provider,
+    ) == 0
+    assert calls == ["expected resources", "demo-project"]
+    output = capsys.readouterr().out
+    assert "Doctor result: verified" in output
+    assert "identity-key-not-for-output" not in output
+    after = {
+        path.relative_to(tmp_path): (path.read_bytes(), path.stat().st_mode)
+        for path in tmp_path.rglob("*") if path.is_file()
+    }
+    assert after == before
 
 
 # @matrix setup : adc doctor provider-identity read-only
@@ -417,6 +508,7 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
             "state": "AVAILABLE",
             "details": {"policy": "current"},
         },
+        "mcp-service": {"state": "AVAILABLE", "details": {"message": "MCP is not selected."}},
     }
     assert calls == [
         (

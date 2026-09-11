@@ -251,33 +251,6 @@ const processing = ({ aiCreate = true } = {}) => {
 /**
  * @testable infrastructure
  */
-const selectFile = () => {
-	const section = document.createElement("div");
-	section.dataset.role = "select-file";
-	section.setAttribute("lp-select", "");
-	const input = primitives.input({
-		label: "Link to an existing file",
-		name: "existing-file",
-		kind: "file",
-		data: {
-			index: "file",
-			placeholder: "search files...",
-		},
-	});
-	section.appendChild(input);
-
-	return {
-		element: section,
-		input: input,
-		clear: () => {
-			input.value = "";
-		},
-	};
-};
-
-/**
- * @testable infrastructure
- */
 const menuButton = () => {
 	const menuButtonContainer = document.createElement("div");
 	menuButtonContainer.dataset.role = "upload-menu";
@@ -808,7 +781,6 @@ export const uploadElement = {
 	mimeType,
 	access,
 	processing,
-	selectFile,
 	menuButton,
 	contextUpload,
 	generateDocumentImage,

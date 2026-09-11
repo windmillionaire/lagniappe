@@ -15,6 +15,7 @@ from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, collaboration
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.site import images as site_image
 from lagniappe.core.tools.site import public_pages as public_page_service
 from lagniappe.core.tools.services import places
@@ -358,7 +359,9 @@ def site_settings():
     else:
         site_image_response = None
 
-    ai_settings, ai_model_options = load_ai_settings_payload(config=CONFIG)
+    ai_settings, ai_model_options = (
+        load_ai_settings_payload(config=CONFIG) if CONFIG.AI_ENABLED else ({}, {})
+    )
 
     administrators, administrator_candidates = _administrator_payload()
     payload = {
@@ -455,6 +458,8 @@ def set_deployment_settings():
 @internal.route("/set-ai-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_ai_settings():
+    if not CONFIG.AI_ENABLED:
+        abort(403)
     data = request.form if request.form else request.get_json(silent=True) or {}
     current = runtime_ai_settings(config=CONFIG)
     _, model_options = load_ai_settings_payload(current, config=CONFIG)
@@ -603,7 +608,9 @@ def identity_config():
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
 # @tests tests_e2e/001_site/test_001a_environment.py::test_update_session_rejects_invalid_timezone_and_location_atomically
+# @tests tests_e2e/001_site/test_001a_environment.py::test_timezone_update_preserves_permissions_and_cache_revision
 # @matrix location session timezone : atomic-update coordinates validation
+# @matrix cache session timezone : permissions-preserved
 # @pair login:remember-cookie
 @internal.route("/update-session", methods=["POST"])
 @logged_in
@@ -639,7 +646,8 @@ def update_session():
         session["location"] = json.dumps(location, separators=(",", ":"))
 
     if save_user:
-        current_user.save()
+        # Startup requests may hold a snapshot from before a permission edit.
+        Entities.save_root(current_user, property_mask=("timezone",))
 
     return responses.json_response({"userHash": current_user.hash})
 
@@ -654,6 +662,7 @@ def update_session():
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
 # @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_settings_requires_administrator
 # @tests tests_e2e/009_search/test_009c_search_authorization.py::test_search_matches_explicit_denial_and_administrator_content_access
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_cache_acknowledgement_preserves_newer_permissions
 # @pair cache:invalidation-acknowledgement
 @internal.route("/validate-user", methods=["POST"])
 @logged_in
@@ -663,10 +672,21 @@ def validate_user():
         data.get("cacheCleared") is True and data.get("responseCacheCleared") is True
     )
 
+    revision = data.get("cacheRevision")
+    expected = session.get(CONFIG.LOGIN_INVALIDATE_CACHE_KEY)
+    if cache_cleared and expected and revision != str(expected):
+        cache_cleared = False
+    if cache_cleared and current_user.invalidate_cache:
+        prefix = f"user:{current_user.urlsafe_key}:"
+        cache_cleared = (
+            isinstance(revision, str)
+            and revision.startswith(prefix)
+            and database_utility.acknowledge_user_cache(
+                current_user.key, revision[len(prefix):]
+            )
+        )
     if cache_cleared:
         clear_client_cache_invalidation()
-        if current_user.invalidate_cache:
-            current_user.invalidate_cache = False
-            current_user.save()
+        current_user.invalidate_cache = False
 
-    return responses.json_response({"cacheCleared": cache_cleared})
+    return responses.json_response({"cacheCleared": cache_cleared, "retry": not cache_cleared})

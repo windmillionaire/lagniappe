@@ -383,10 +383,10 @@ def pages(
 # @testable false
 # @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
 def page_files(page_key):
-    """Fetch all file entities attached to a page."""
+    """Fetch Files owned directly by the Page."""
     return (
         Query(KINDS.files)
-        .filter(Filter().eq("pages", datastore_key(page_key)))
+        .filter(Filter().eq("page", datastore_key(page_key)))
         .fetch_all()
     )
 
@@ -808,3 +808,16 @@ def ai_report_by_hash(user_key, report_hash):
         .filter(Filter().eq("hash", report_hash))
         .fetch_one()
     )
+
+
+# @testable false
+# @reason persistence-owned query used by ownership mutation workflows
+def task_files(task_key):
+    return Query(KINDS.files).filter(Filter().eq("task", datastore_key(task_key))).fetch_all()
+
+
+# @testable false
+# @reason persistence-owned query used by File deletion and history cleanup
+def file_references(file_key):
+    return [row for kind in (KINDS.instances, KINDS.history)
+            for row in Query(kind).filter(Filter().eq("files", datastore_key(file_key))).fetch_all()]

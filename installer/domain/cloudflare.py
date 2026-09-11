@@ -1,5 +1,9 @@
 """Optional Cloudflare DNS-only reconciliation for custom domains."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
+from runner.console import format_prompt
 from installer.errors import (
     ProviderError,
     ProviderNotFound,
@@ -106,46 +110,61 @@ def get_cloudflare_api_token():
             "Lagniappe uses it only during this run and does not save it."
         )
     )
-    print("1. Open Cloudflare's API Tokens page:")
-    print(f"   {CLOUDFLARE_API_TOKEN_URL}")
+    print(wrap_text((f"{ui.literal('1.')} Open Cloudflare's API Tokens page:")))
+    print(f"   {ui.literal(CLOUDFLARE_API_TOKEN_URL)}")
     print(
         wrap_text(
-            "   Or, in the Cloudflare dashboard, open My Profile > API Tokens."
+            (
+                "   Or, in the Cloudflare dashboard, open "
+                f"{ui.literal('My Profile > API Tokens')}."
+            )
         )
     )
-    print(wrap_text("2. Select Create Token."))
+    print(wrap_text((f"{ui.literal('2.')} Select {ui.literal('Create Token')}.")))
     print(
         wrap_text(
-            "3. Find the 'Edit zone DNS' template and select Use template."
-        )
-    )
-    print(
-        wrap_text(
-            "4. Under Zone Resources, choose Include > Specific zone, then "
-            "select the DNS zone you are configuring."
-        )
-    )
-    print(
-        wrap_text(
-            "5. Under Permissions, keep the template's Zone > DNS > Edit row. "
-            "Select + Add more, then add Zone > Zone > Read. Do not select "
-            "Edit for Zone."
+            (
+                f"{ui.literal('3.')} Find the '{ui.literal('Edit zone DNS')}' template "
+                f"and select {ui.literal('Use template')}."
+            )
         )
     )
     print(
         wrap_text(
-            "6. Continue to summary and confirm the selected domain lists both "
-            "DNS:Edit and Zone:Read. Create the token, then paste the token "
-            "shown once below. You can delete it from Cloudflare after setup."
+            (
+                f"{ui.literal('4.')} Under {ui.literal('Zone Resources')}, choose "
+                f"{ui.literal('Include > Specific zone')}, then select the DNS zone you "
+                "are configuring."
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('5.')} Under {ui.literal('Permissions')}, keep the "
+                f"template's {ui.literal('Zone > DNS > Edit')} row. Select "
+                f"{ui.literal('+ Add more')}, then add {ui.literal('Zone > Zone > Read')}"
+                ". Do not select Edit for Zone."
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"{ui.literal('6.')} Continue to summary and confirm the selected domain "
+                f"lists both {ui.literal('DNS:Edit')} and {ui.literal('Zone:Read')}. "
+                "Create the token, then paste the token shown once below. You can delete "
+                "it from Cloudflare after setup."
+            )
         )
     )
     while True:
-        token = input("Cloudflare API token (x to cancel): ").strip()
+        token = input(format_prompt("Cloudflare API token (x to cancel): ")).strip()
         if token.casefold() == "x":
             raise SetupCancelled("Cloudflare DNS setup cancelled.")
         if validate_cloudflare_api_token(token):
             return token
-        print("Enter a non-empty scoped Cloudflare API token.")
+        print(ui.error(wrap_text("Enter a non-empty scoped Cloudflare API token.")))
 
 
 # @testable true

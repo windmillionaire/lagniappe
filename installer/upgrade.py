@@ -1,10 +1,14 @@
 """Update configuration or replace and upgrade an existing installation."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 import json
 import subprocess
 from datetime import datetime
 from importlib import reload
 
+from runner.console import format_prompt, wrap_text
 from runner.context import GIT_CLI, REPOSITORY_ROOT, setup_command
 from installer.image import get_images, save_images
 from installer.utils import ensure_datastore_dependency, ensure_storage_dependency
@@ -22,9 +26,9 @@ from .verify import activate_installation
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
 # @matrix setup : config-files deferred-jobs post-deploy public-page-settings storage-buckets
-def update():
+def update(*, announce=True):
     """Apply app-saved configuration without replacing repository code."""
-    activate_installation()
+    activate_installation(announce=announce)
     return _apply_update(upgrade=False)
 
 
@@ -32,9 +36,9 @@ def update():
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
 # @matrix setup : branch config-files git-upgrade post-deploy
 # @pairs migrations:major-version setup:major-version
-def upgrade(branch=None):
+def upgrade(branch=None, *, announce=True):
     """Replace tracked source from a remote branch, then apply and deploy it."""
-    activate_installation()
+    activate_installation(announce=announce)
 
     from config import SETTINGS
     import installer
@@ -46,8 +50,9 @@ def upgrade(branch=None):
         SETTINGS.APP.get("VERSION") or SETTINGS.NODE.get("version") or ""
     ).strip()
 
-    with formatter.yaspin(
-        text=formatter.success("Inspecting upgrade target")
+    with formatter.progress(
+        text="Inspecting upgrade target",
+        success_text="Upgrade target verified",
     ) as spinner:
         target = _fetch_upgrade_target(spinner, branch=branch)
     if target is None:
@@ -57,35 +62,38 @@ def upgrade(branch=None):
         target["version"],
     )
 
-    print(f"\n{formatter.info('Lagniappe Software Upgrade')}")
-    print("=" * 40)
+    print(wrap_text(f"\n{ui.heading('Lagniappe software upgrade')}"))
     print(
-        "\nThis will replace the installed Lagniappe source with "
-        f"{reset_target} at {target['commit'][:12]}, apply saved settings, "
-        "and offer to deploy it."
+        wrap_text(
+            "This will replace the installed Lagniappe source with "
+            f"{reset_target} at {target['commit'][:12]}, apply saved settings, "
+            "and offer to deploy it."
+        )
     )
-    print(f"  Installed version: {installed_version or 'unknown'}")
-    print(f"  Target version: {target['version']}")
+    print(wrap_text(f"  Installed version: {installed_version or 'unknown'}"))
+    print(wrap_text(f"  Target version: {target['version']}"))
 
-    print(f"\n{formatter.success('What will be preserved:')}")
-    print("  • All app data, users, and uploaded files")
-    print("  • Generated installation settings and provider configuration")
-    print("  • App-saved deployment settings, AI settings, and site images")
+    print(wrap_text(f"\n{ui.heading('What will be preserved:')}"))
+    print(wrap_text("  - All app data, users, and uploaded files"))
+    print(wrap_text("  - Generated installation settings and provider configuration"))
+    print(wrap_text("  - App-saved deployment settings, AI settings, and site images"))
 
-    print(f"\n{formatter.warning('What will be replaced:')}")
-    print(f"  • Tracked repository files, using git reset --hard {reset_target}")
-    print("  • Generated deployment files rebuilt from the new source")
+    print(wrap_text(f"\n{ui.heading('What will be replaced:')}"))
+    print(wrap_text("  - Tracked repository files, using:"))
+    print(f"    git reset --hard {reset_target}")
+    print(wrap_text("  - Generated deployment files rebuilt from the new source"))
 
-    print(f"\n{formatter.error('What will be lost:')}")
-    print("  • Tracked local code modifications in this checkout")
+    print(wrap_text(f"\n{ui.heading('What will be lost:')}"))
+    print(wrap_text("  - Tracked local code modifications in this checkout"))
 
-    consent = input(f"\n{formatter.info('Ready to upgrade? [y/N]: ')}")
+    consent = input(format_prompt(f"\n{'Ready to upgrade? [y/N]: '}"))
     if consent.strip().casefold() not in {"y", "yes"}:
-        print(formatter.success("Upgrade cancelled."))
+        print(ui.status(wrap_text("Upgrade cancelled.")))
         return 1
 
-    with formatter.yaspin(
-        text=formatter.success("Replacing tracked source")
+    with formatter.progress(
+        text="Replacing tracked source",
+        success_text="Tracked source replaced",
     ) as spinner:
         if not _update_repository(
             spinner,
@@ -154,9 +162,9 @@ def _apply_update(
     create_config.verify_application_config(upgrade=upgrade)
     verify_runtime_deploy_surface()
     if upgrade:
-        print(f.success(f"Upgrading to version {new_version}"))
+        print(ui.info(wrap_text(f"Upgrading to version {new_version}")))
     else:
-        print(f.success(f"Updating configuration for version {new_version}"))
+        print(ui.info(wrap_text(f"Updating configuration for version {new_version}")))
 
     gcloud.enable_gcloud_apis()
     gcloud.setup_app_engine()
@@ -177,31 +185,51 @@ def _apply_update(
             installed_version,
             new_version,
         )
-    consent = input(f.info("Would you like to deploy the app now? [y/N]: "))
+    consent = input(
+        format_prompt("Deploy app now", hint="y/N")
+    )
     if consent.casefold() == "y":
         utils.deploy_to_app_engine(
             print_final_summary=False,
             upgrade_notice_handled=True,
         )
-        print(f"\n{f.info('Wrapping up installation...')}")
         recovery_ready = _configure_deferred_job_recovery(f, gcloud)
-        print(f"\n{f.success('Deployment complete!')}")
+        print(wrap_text(f"\n{f.success('Deployment complete')}"))
         if SETTINGS.APP.get("CUSTOM_DOMAIN"):
-            print(f"Your app is available at: https://{SETTINGS.APP['CUSTOM_DOMAIN']}")
+            print(
+                ui.value(
+                    "Your app is available at",
+                    f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}",
+                    verbatim=True,
+                    standalone=True,
+                    action=True,
+                )
+            )
         else:
             print(
-                "Your app is available at: "
-                f"{SETTINGS.APP.get('APP_URL', 'your App Engine URL')}"
+                ui.value(
+                    "Your app is available at",
+                    SETTINGS.APP.get("APP_URL", "your App Engine URL"),
+                    verbatim=True,
+                    standalone=True,
+                    action=True,
+                )
             )
         if maintenance_required:
             print_post_upgrade_maintenance_steps(f)
         return 0 if recovery_ready else 1
 
-    print(f.success(f"Remember to deploy when ready: {setup_command()}"))
-    print(f"After deployment, run: {setup_command('jobs')}")
-    print(f"Then reconcile memory monitoring: {setup_command('monitoring')}")
+    print(
+        ui.value(
+            "Deploy when ready",
+            setup_command("update"),
+            verbatim=True,
+            standalone=True,
+            action=True,
+        )
+    )
     if maintenance_required:
-        print("The currently deployed application was not changed.")
+        print(wrap_text("The currently deployed application was not changed."))
         print_post_upgrade_maintenance_steps(f)
     return 0
 
@@ -219,10 +247,18 @@ def _configure_deferred_job_recovery(f, gcloud):
             "configured. This does not invalidate the completed update; "
             "active deferred jobs may fail until recovery is repaired."
         )
+        print(f.warning(wrap_text(message)))
         if not isinstance(error, SystemExit) and str(error).strip():
-            message = f"{message} Reason: {error}"
-        print(f.warning(message))
-        print(f"Retry with: {setup_command('jobs')}")
+            print(str(error), raw=True)
+        print(
+            ui.value(
+                "Retry with",
+                setup_command("jobs"),
+                verbatim=True,
+                standalone=True,
+                action=True,
+            )
+        )
         return False
     return True
 
@@ -240,30 +276,34 @@ def _update_custom_images(f):
     except Exception as error:
         print(
             f.warning(
-                f"Could not inspect custom images; continuing with existing "
-                f"images. Reason: {error}"
-            )
+                wrap_text('Could not inspect custom images; continuing with existing images.'), str(error)
+            ),
+            raw=True,
         )
         return
 
     site_image_entity = None
-    with f.yaspin(text=f.success("Checking for custom images")) as spinner:
+    with f.progress(
+        text="Checking for custom images",
+        success_text='Custom images checked',
+    ) as spinner:
         try:
             site_image_entity = get_images()
-            spinner.ok(f.ok_glyph)
         except Exception as error:
             spinner.write(
                 f.warning(
-                    f"Could not inspect custom images; continuing with existing "
-                    f"images. Reason: {error}"
-                )
+                    wrap_text('Could not inspect custom images; continuing with existing images.'), str(error)
+                ),
+                raw=True,
             )
-            spinner.ok(f.ok_glyph)
+            spinner.skip("Custom images unchanged")
             return
 
     if not site_image_entity:
+        print(ui.status("Custom images unchanged"))
         return
     if not any(key != "version" for key in site_image_entity):
+        print(ui.status("Custom images unchanged"))
         return
 
     try:
@@ -271,13 +311,16 @@ def _update_custom_images(f):
     except Exception as error:
         print(
             f.warning(
-                f"Could not restore custom images; continuing with existing "
-                f"images. Reason: {error}"
-            )
+                wrap_text('Could not restore custom images; continuing with existing images.'), str(error)
+            ),
+            raw=True,
         )
         return
 
-    with f.yaspin(text=f.success("Restoring custom images")) as spinner:
+    with f.progress(
+        text="Restoring custom images",
+        success_text='Local site images updated',
+    ) as spinner:
         try:
             restored = save_images(spinner, site_image_entity)
             if restored:
@@ -288,19 +331,24 @@ def _update_custom_images(f):
                 except (TypeError, ValueError):
                     spinner.write(
                         f.warning(
-                            "Site images were restored, but their cache version "
-                            "was invalid; keeping the existing cache version."
+                            wrap_text(
+                                "Site images were restored, but their cache version "
+                                "was invalid; keeping the existing cache version."
+                            )
                         )
                     )
-            spinner.ok(f.ok_glyph)
+            if restored:
+                spinner.ok()
+            else:
+                spinner.skip("Custom images unchanged")
         except Exception as error:
             spinner.write(
                 f.warning(
-                    f"Could not restore custom images; continuing with existing "
-                    f"images. Reason: {error}"
-                )
+                    wrap_text('Could not restore custom images; continuing with existing images.'), str(error)
+                ),
+                raw=True,
             )
-            spinner.ok(f.ok_glyph)
+            spinner.skip("Custom images unchanged")
 
 
 # @testable true
@@ -315,22 +363,36 @@ def _update_deployment_settings(f):
     try:
         ensure_datastore_dependency()
     except Exception as error:
-        print(f.warning(f"Could not update deployment settings: {error}"))
+        print(
+            f.warning(
+                wrap_text('Could not update deployment settings:'), str(error)
+            ),
+            raw=True,
+        )
         return
 
-    with f.yaspin(text=f.success("Checking for deployment settings")) as spinner:
+    with f.progress(
+        text="Checking for deployment settings",
+        success_text='Deployment settings checked',
+    ) as spinner:
         try:
             deployment_entity = deployment_module.get_deployment_settings()
-            spinner.ok(f.ok_glyph)
         except Exception as error:
-            print(f.warning(f"Could not update deployment settings: {error}"))
-            spinner.fail(f.fail_glyph)
+            spinner.write(
+                f.warning(wrap_text("Could not update deployment settings:"))
+                + f"\n{error}"
+            )
+            spinner.fail()
             return
 
     if not deployment_entity:
+        print(ui.status("Deployment settings unchanged"))
         return
 
-    with f.yaspin(text=f.success("Applying deployment settings")) as spinner:
+    with f.progress(
+        text="Applying deployment settings",
+        success_text='Deployment settings applied',
+    ) as spinner:
         try:
             # Preserve the operator's saved deployment settings during an
             # update. The worker ceiling applies only when settings are newly
@@ -339,10 +401,15 @@ def _update_deployment_settings(f):
                 deployment_entity,
                 enforce_worker_limit=False,
             )
-            spinner.ok(f.ok_glyph)
+            spinner.ok()
         except Exception as error:
-            spinner.write(f.warning(f"Could not apply deployment settings: {error}"))
-            spinner.fail(f.fail_glyph)
+            spinner.write(
+                f.warning(
+                    wrap_text('Could not apply deployment settings:'), str(error)
+                ),
+                raw=True,
+            )
+            spinner.fail()
 
 
 # @testable true
@@ -357,28 +424,39 @@ def _update_ai_settings(f):
     try:
         ensure_datastore_dependency()
     except Exception as error:
-        print(f.warning(f"Could not update AI settings: {error}"))
+        print(f.warning(wrap_text('Could not update AI settings:'), str(error)), raw=True)
         return
 
-    with f.yaspin(text=f.success("Checking for AI settings")) as spinner:
+    with f.progress(
+        text="Checking for AI settings",
+        success_text='AI settings checked',
+    ) as spinner:
         try:
             ai_entity = ai_settings_module.get_ai_settings()
-            spinner.ok(f.ok_glyph)
         except Exception as error:
-            print(f.warning(f"Could not update AI settings: {error}"))
-            spinner.fail(f.fail_glyph)
+            spinner.write(
+                f.warning(wrap_text("Could not update AI settings:")) + f"\n{error}"
+            )
+            spinner.fail()
             return
 
     if not ai_entity:
+        print(ui.status("AI settings unchanged"))
         return
 
-    with f.yaspin(text=f.success("Applying AI settings")) as spinner:
+    with f.progress(
+        text="Applying AI settings",
+        success_text='AI settings applied',
+    ) as spinner:
         try:
             apply_ai_settings(ai_entity)
-            spinner.ok(f.ok_glyph)
+            spinner.ok()
         except Exception as error:
-            spinner.write(f.warning(f"Could not apply AI settings: {error}"))
-            spinner.fail(f.fail_glyph)
+            spinner.write(
+                f.warning(wrap_text('Could not apply AI settings:'), str(error)),
+                raw=True,
+            )
+            spinner.fail()
 
 
 # @testable true
@@ -393,28 +471,47 @@ def _update_public_page_settings(f):
     try:
         ensure_datastore_dependency()
     except Exception as error:
-        print(f.warning(f"Could not update public-page settings: {error}"))
+        print(
+            f.warning(
+                wrap_text('Could not update public-page settings:'), str(error)
+            ),
+            raw=True,
+        )
         return
 
-    with f.yaspin(text=f.success("Checking for public-page settings")) as spinner:
+    with f.progress(
+        text="Checking for public-page settings",
+        success_text='Public-page settings checked',
+    ) as spinner:
         try:
             entity = public_pages_module.get_public_page_settings()
-            spinner.ok(f.ok_glyph)
         except Exception as error:
-            print(f.warning(f"Could not update public-page settings: {error}"))
-            spinner.fail(f.fail_glyph)
+            spinner.write(
+                f.warning(wrap_text("Could not update public-page settings:"))
+                + f"\n{error}"
+            )
+            spinner.fail()
             return
 
     if not entity:
+        print(ui.status("Public-page settings unchanged"))
         return
 
-    with f.yaspin(text=f.success("Applying public-page settings")) as spinner:
+    with f.progress(
+        text="Applying public-page settings",
+        success_text='Public-page settings applied',
+    ) as spinner:
         try:
             apply_public_page_settings(entity)
-            spinner.ok(f.ok_glyph)
+            spinner.ok()
         except Exception as error:
-            spinner.write(f.warning(f"Could not apply public-page settings: {error}"))
-            spinner.fail(f.fail_glyph)
+            spinner.write(
+                f.warning(
+                    wrap_text('Could not apply public-page settings:'), str(error)
+                ),
+                raw=True,
+            )
+            spinner.fail()
 
 
 # @testable true
@@ -451,8 +548,8 @@ def _fetch_upgrade_target(spinner, branch="main"):
     formatter = FORMATTER.initialize()
     branch = str(branch or "").strip()
     if not branch:
-        spinner.write(formatter.error("Upgrade branch cannot be empty."))
-        spinner.fail(formatter.fail_glyph)
+        spinner.write(formatter.error(wrap_text("Upgrade branch cannot be empty.")))
+        spinner.fail()
         return None
     reset_target = _reset_target_for_branch(branch)
     git = GIT_CLI or "git"
@@ -466,8 +563,8 @@ def _fetch_upgrade_target(spinner, branch="main"):
             check=False,
         )
         if fetched.returncode != 0:
-            spinner.write(formatter.error(f"Git fetch failed: {fetched.stderr}"))
-            spinner.fail(formatter.fail_glyph)
+            spinner.write(formatter.error("Git fetch failed", fetched.stderr), raw=True)
+            spinner.fail()
             return None
 
         resolved = subprocess.run(
@@ -481,9 +578,11 @@ def _fetch_upgrade_target(spinner, branch="main"):
         if resolved.returncode != 0 or not commit:
             detail = resolved.stderr.strip() or "remote branch was not found"
             spinner.write(
-                formatter.error(f"Could not resolve {reset_target}: {detail}")
+                formatter.error(
+                    wrap_text(f"Could not resolve {reset_target}: {detail}")
+                )
             )
-            spinner.fail(formatter.fail_glyph)
+            spinner.fail()
             return None
 
         package = subprocess.run(
@@ -500,28 +599,31 @@ def _fetch_upgrade_target(spinner, branch="main"):
                     f"{package.stderr.strip()}"
                 )
             )
-            spinner.fail(formatter.fail_glyph)
+            spinner.fail()
             return None
         try:
             version = json.loads(package.stdout).get("version")
         except (AttributeError, json.JSONDecodeError) as error:
             spinner.write(
                 formatter.error(
-                    f"Could not parse package.json from {reset_target}: {error}"
-                )
+                    wrap_text(f'Could not parse package.json from {reset_target}:'), str(error)
+                ),
+                raw=True,
             )
-            spinner.fail(formatter.fail_glyph)
+            spinner.fail()
             return None
         if parse_release_version(version) is None:
             spinner.write(
                 formatter.error(
-                    f"{reset_target} package.json must use a stable X.Y.Z version."
+                    wrap_text(
+                        f"{reset_target} package.json must use a stable X.Y.Z version."
+                    )
                 )
             )
-            spinner.fail(formatter.fail_glyph)
+            spinner.fail()
             return None
 
-        spinner.ok(formatter.ok_glyph)
+        spinner.ok()
         return {
             "branch": branch,
             "ref": reset_target,
@@ -529,8 +631,13 @@ def _fetch_upgrade_target(spinner, branch="main"):
             "version": str(version),
         }
     except (OSError, subprocess.SubprocessError) as error:
-        spinner.write(formatter.error(f"Failed to inspect upgrade target: {error}"))
-        spinner.fail(formatter.fail_glyph)
+        spinner.write(
+            formatter.error(
+                wrap_text('Failed to inspect upgrade target:'), str(error)
+            ),
+            raw=True,
+        )
+        spinner.fail()
         return None
 
 
@@ -545,8 +652,8 @@ def _update_repository(spinner, branch="main", *, target_commit=None):
     formatter = FORMATTER.initialize()
     branch = str(branch or "").strip()
     if not branch:
-        spinner.write(formatter.error("Upgrade branch cannot be empty."))
-        spinner.fail(formatter.fail_glyph)
+        spinner.write(formatter.error(wrap_text("Upgrade branch cannot be empty.")))
+        spinner.fail()
         return False
     reset_target = _reset_target_for_branch(branch)
     replacement_target = str(target_commit or reset_target).strip()
@@ -561,15 +668,17 @@ def _update_repository(spinner, branch="main", *, target_commit=None):
             check=False,
         )
         if status.returncode != 0:
-            spinner.write(formatter.error(f"Git status failed: {status.stderr}"))
-            spinner.fail(formatter.fail_glyph)
+            spinner.write(formatter.error("Git status failed", status.stderr), raw=True)
+            spinner.fail()
             return False
 
         if status.stdout.strip():
             spinner.write(
                 formatter.warning(
-                    "Local changes detected. Upgrade will discard tracked "
-                    f"changes with git reset --hard {replacement_target}."
+                    wrap_text(
+                        "Local changes detected. Upgrade will discard tracked "
+                        f"changes with git reset --hard {replacement_target}."
+                    )
                 )
             )
             report_path = _write_local_changes_report(
@@ -578,7 +687,9 @@ def _update_repository(spinner, branch="main", *, target_commit=None):
             )
             if report_path:
                 spinner.write(
-                    formatter.warning(f"Saved local changes report: {report_path}")
+                    ui.info(
+                        wrap_text(f"Saved local changes report: {report_path}")
+                    )
                 )
 
         if target_commit is None:
@@ -590,8 +701,8 @@ def _update_repository(spinner, branch="main", *, target_commit=None):
                 check=False,
             )
             if fetched.returncode != 0:
-                spinner.write(formatter.error(f"Git fetch failed: {fetched.stderr}"))
-                spinner.fail(formatter.fail_glyph)
+                spinner.write(formatter.error("Git fetch failed", fetched.stderr), raw=True)
+                spinner.fail()
                 return False
 
         replaced = subprocess.run(
@@ -602,15 +713,20 @@ def _update_repository(spinner, branch="main", *, target_commit=None):
             check=False,
         )
         if replaced.returncode != 0:
-            spinner.write(formatter.error(f"Git reset failed: {replaced.stderr}"))
-            spinner.fail(formatter.fail_glyph)
+            spinner.write(formatter.error("Git reset failed", replaced.stderr), raw=True)
+            spinner.fail()
             return False
 
-        spinner.ok(formatter.ok_glyph)
+        spinner.ok()
         return True
     except (OSError, subprocess.SubprocessError) as error:
-        spinner.write(formatter.error(f"Failed to update repository: {error}"))
-        spinner.fail(formatter.fail_glyph)
+        spinner.write(
+            formatter.error(
+                wrap_text('Failed to update repository:'), str(error)
+            ),
+            raw=True,
+        )
+        spinner.fail()
         return False
 
 

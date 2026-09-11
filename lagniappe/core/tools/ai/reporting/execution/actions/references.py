@@ -1,7 +1,7 @@
 """Entity, page, and file reference resolution for report actions."""
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Fetch, FetchReason
+from lagniappe.core.definitions import Fetch, FetchReason, Restriction
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
 
@@ -137,9 +137,9 @@ def _resolve_file_endpoint(data, created, endpoint):
 # @reason attachment mutation is covered through move and undo tests
 def _file_attached_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
-        return endpoint.key in list(file.db.get("pages") or [])
-    if isinstance(endpoint, Entities.TASK):
-        return endpoint.key in list(file.db.get("tasks") or []) or file.key in list(
+        return not file.db.get("task") and endpoint.key == file.db.get("page")
+    if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
+        return endpoint.key == file.db.get("task") or file.key in list(
             endpoint.db.get("files") or []
         )
     return False
@@ -151,9 +151,17 @@ def _file_attached_to_endpoint(file, endpoint):
 # @reason attachment mutation is covered through move and undo tests
 def _remove_file_from_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
-        return file.properties.pages.remove(endpoint)
-    if isinstance(endpoint, Entities.TASK):
-        return endpoint.properties.files.remove(file)
+        if file.properties.task.key or file.properties.page.key != endpoint.key:
+            return False
+        file.page = None
+        return True
+    if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
+        if file.properties.task.key != endpoint.key:
+            return False
+        endpoint.properties.files.remove(file)
+        file.task = None
+        file.page = None
+        return True
     return False
 
 
@@ -163,20 +171,22 @@ def _remove_file_from_endpoint(file, endpoint):
 # @reason attachment mutation is covered through move and undo tests
 def _add_file_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
-        return file.properties.pages.add(endpoint)
+        return file.move_to(endpoint)
     if isinstance(endpoint, Entities.TASK):
+        return file.move_to(endpoint)
+    if isinstance(endpoint, Entities.TASK_HISTORY):
+        # An older completion can reference a File, but its live Task owns it.
+        was_current = file.key in endpoint.task.properties.files.keys
+        file.move_to(endpoint.task)
+        if not was_current:
+            endpoint.task.properties.files.remove(file)
         return endpoint.properties.files.add(file)
     return False
 
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wrong_kind
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_resolves_attachment_page_from_single_prior_task_when_reference_is_file
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_missing
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_category_used_as_attachment_page
-# @matrix ai-report : attachment exact-page-name page-reference prior-task-page repair task-history validation
-# @matrix files : exact-page-name page-reference prior-task-page repair
-# @matrix task-completion tasks : page-reference repair task-history
+# @matrix ai-report task-completion tasks : page-reference repair task-history
 def _resolve_action_page(data, created, user):
     reference = (
         data.get("page")
@@ -243,13 +253,9 @@ def _page_from_non_page_reference(entity, page_name=None):
         if page and _page_name_matches(page, page_name):
             return page
     if isinstance(entity, Entities.FILE):
-        pages = [
-            page
-            for page in getattr(entity, "pages", []) or []
-            if _page_name_matches(page, page_name)
-        ]
-        if len(pages) == 1:
-            return pages[0]
+        page = entity.page or (entity.task.page if entity.task else None)
+        if _page_name_matches(page, page_name):
+            return page
     return None
 
 
@@ -265,13 +271,7 @@ def _page_from_created_context(created, page_name=None):
         elif isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
             page = getattr(entity, "page", None)
         elif isinstance(entity, Entities.FILE):
-            pages = [
-                linked_page
-                for linked_page in getattr(entity, "pages", []) or []
-                if _page_name_matches(linked_page, page_name)
-            ]
-            if len(pages) == 1:
-                page = pages[0]
+            page = entity.page or (entity.task.page if entity.task else None)
 
         if page and _page_name_matches(page, page_name):
             candidates[getattr(page, "key", id(page))] = page
@@ -288,7 +288,7 @@ def _resolve_page_by_exact_name(page_name, user):
 
     restrictions = getattr(getattr(user, "properties", None), "restrictions", None)
     required = getattr(restrictions, "search", [])
-    belongs_to = getattr(restrictions, "belongs_to", [])
+    belongs_to = getattr(restrictions, "belongs_to", Restriction.BELONGS_TO_NONE)
     results, _total = cache.search(
         page_name,
         required,
@@ -429,11 +429,19 @@ def _fetch_report_entity(identifier, *, derived_page=False):
     if entity is None:
         return None
 
+    if isinstance(entity, Entities.TASK_HISTORY):
+        Entities.fetch(
+            entity, entity.properties.task.key, *entity.db.get("files", []),
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+        )
+        return entity
+
     if derived_page and not isinstance(entity, Entities.PAGE):
         request = Fetch.nested(because=FetchReason.DERIVED_PAGE_SAVE_REQUIREMENTS)
-    elif isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
+    elif isinstance(entity, (Entities.FILE, Entities.TASK)):
         request = Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS)
     else:
         request = Fetch.direct()
 
-    return Entities.fetch_one(entity, request=request)
+    entity = Entities.fetch_one(entity, request=request)
+    return entity

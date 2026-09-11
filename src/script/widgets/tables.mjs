@@ -74,7 +74,8 @@ export class IndexTable extends BaseTable {
 				this.target.querySelectorAll("tr[lp-entity]"),
 				(row) => ({
 					key: row.dataset.key,
-					modified: row.dataset.modified || "",
+					hash: row.dataset.hash || "",
+					fingerprint: row.dataset.fingerprint || "",
 				}),
 			),
 		};
@@ -298,16 +299,23 @@ export class FilterResults extends EmbeddedTable {
 		return this.tbody.querySelector("tr[data-role='empty']");
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
+	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
+	 * @matrix filters : run-results results-layout
+	 */
 	postreconcile() {
-		if (this.target.children.length) return;
-		if (!this.table) return;
+		if (!this.table || this.target.contains(this.table)) return;
 
 		this.container = document.createElement("div");
+		this.container.dataset.role = "results-table";
 		this.container.className =
-			"min-w-0 overflow-hidden max-w-full rounded-md outline-2 outline-kind-default bg-white";
+			"min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white";
 		this.tableContainer = document.createElement("div");
 		this.tableContainer.className = "table-container px-4";
 		this.tableContainer.dataset.role = "table";
+		this.tableContainer.dataset.embedded = "true";
 		this.tableContainer.appendChild(this.table);
 		this.container.appendChild(this.tableContainer);
 		this.table.dataset.visible = "true";

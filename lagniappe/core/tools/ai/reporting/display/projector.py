@@ -298,26 +298,20 @@ class ProposalDisplayProjector:
                         consumed_indexes.add(action["action_index"])
                         if action.get("id"):
                             targets[action["id"]] = action
-            elif grouping is ProposalActionGrouping.PAGE_ATTACHMENT:
-                page_ref = self.references.reference_action_id(action, "page")
-                target = targets.get(page_ref)
-                if not target:
-                    target = self._proposal_page_group(
+            elif grouping is ProposalActionGrouping.ATTACHMENT:
+                reference = self.references.reference_action_id(action, "entity")
+                target = targets.get(reference)
+                existing = self.references.existing_entity_reference(action, "entity")
+                details = (self.references.entity_details(existing) if existing else None) or {}
+                if not target and details.get("kind") in {"page", "user"}:
+                    target = self._proposal_page_group_for_reference(
                         action,
+                        "entity",
                         roots,
                         page_groups,
                         action_labels,
                         file_labels,
                     )
-                support = (
-                    self._add_attachment_support(target, action) if target else None
-                )
-                if support:
-                    consumed_indexes.add(action["action_index"])
-                    self._remember_file_support(file_targets, action, support)
-            elif grouping is ProposalActionGrouping.TASK_ATTACHMENT:
-                task_ref = self.references.reference_action_id(action, "task")
-                target = targets.get(task_ref)
                 support = (
                     self._add_attachment_support(target, action) if target else None
                 )

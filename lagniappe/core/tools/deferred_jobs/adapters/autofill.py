@@ -127,7 +127,9 @@ class AutofillAdapter(DeferredJobAdapter):
             and target.allowed(Action.EDIT, user=actor)
         )
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_uploaded_file_is_attached_to_target
+    # @pairs files:attachment deferred-jobs:loaded-input
     def load(self, context):
         super().load(context)
         target = context.input("target")
@@ -136,6 +138,11 @@ class AutofillAdapter(DeferredJobAdapter):
                 target,
                 request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
             )
+        attachment = context.checkpoint.get("attachment")
+        context.inputs["attachment"] = Entities.fetch_one(
+            attachment.get("key"),
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+        ) if attachment else None
         return context
 
     # @testable infrastructure
@@ -249,15 +256,15 @@ class AutofillAdapter(DeferredJobAdapter):
         if not attachment:
             return DeferredJobInspection.APPLIED
 
-        file = Entities.fetch_one(attachment.get("key"), request=Fetch.direct())
+        file = context.input("attachment")
         if not isinstance(file, Entities.FILE):
             return DeferredJobInspection.NOT_APPLIED
         if isinstance(target, Entities.PAGE):
-            attached = target.key in file.properties.pages.keys
+            attached = not file.properties.task.key and target.key == file.properties.page.key
         else:
             attached = (
                 file.key in target.properties.files.keys
-                and target.key in file.properties.tasks.keys
+                and target.key == file.properties.task.key
             )
         return (
             DeferredJobInspection.APPLIED
@@ -279,10 +286,7 @@ class AutofillAdapter(DeferredJobAdapter):
                 raise exceptions.ValidationError(
                     "The autofill attachment metadata is missing."
                 )
-            attached_file = Entities.fetch_one(
-                attachment.get("key"),
-                request=Fetch.direct(),
-            )
+            attached_file = context.input("attachment")
             if attached_file is not None and not isinstance(
                 attached_file,
                 Entities.FILE,
@@ -313,13 +317,14 @@ class AutofillAdapter(DeferredJobAdapter):
                 )
 
             if isinstance(target, Entities.PAGE):
-                attached_file.properties.pages.add(target)
+                attached_file.move_to(target)
             else:
                 target.properties.files.add(attached_file)
 
         target.ai_submission(deepcopy(context.checkpoint["submission"]))
         if attached_file:
             Entities.save(attached_file, target)
+            context.inputs["attachment"] = attached_file
         else:
             target.save()
         result = {

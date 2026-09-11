@@ -64,6 +64,11 @@ REPORT_ACTION_DATA_CONTRACTS = {
         ),
         "required": ("name",),
     },
+    "append_page_document": {
+        "fields": ("page", "page_action", "page_name", "document_markdown"),
+        "required": ("document_markdown",),
+        "required_groups": (("page", "page_action"),),
+    },
     "create_task": {
         "fields": (
             "name",
@@ -107,7 +112,7 @@ REPORT_ACTION_DATA_CONTRACTS = {
             ("form", "form_action"),
         ),
     },
-    "add_category": {
+    "add_page_category": {
         "fields": (
             "page",
             "page_action",
@@ -173,26 +178,29 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "required": ("name",),
         "required_groups": (("entity", "entity_action"),),
     },
-    "update_form_schema": {
+    "extend_form_schema": {
         "fields": ("form", "form_action", "form_name", "operations"),
         "required": ("operations",),
         "required_groups": (("form", "form_action"),),
     },
-    "update_submission_fields": {
+    "update_form_values": {
         "fields": ("page", "page_name", "task", "task_name", "updates"),
         "required": ("updates",),
     },
-    "attach_file_to_page": {
-        "fields": ("page", "page_action", "page_name", "file", "display_name"),
-        "required": ("file",),
-        "required_groups": (("page", "page_action"),),
+    "complete_task": {
+        "fields": ("task", "task_name"),
+        "required": ("task",),
     },
-    "attach_file_to_task": {
-        "fields": ("task", "task_action", "task_name", "file", "display_name"),
-        "required": ("file",),
-        "required_groups": (("task", "task_action"),),
+    "set_task_due_date": {
+        "fields": ("task", "task_name", "due_date"),
+        "required": ("task", "due_date"),
     },
-    "delete_page": {
+    "attach_file": {
+        "fields": ("entity", "entity_action", "entity_name", "file", "display_name"),
+        "required": ("file",),
+        "required_groups": (("entity", "entity_action"),),
+    },
+    "suggest_page_deletion": {
         "fields": ("page", "page_action", "page_name"),
         "required_groups": (("page", "page_action"),),
     },

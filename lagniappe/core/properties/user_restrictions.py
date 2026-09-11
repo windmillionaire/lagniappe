@@ -26,10 +26,11 @@ class Restrictions(Property):
     Get:
         value (list): Sorted list of accessible resource hashes/types.
         search (list | Restriction.UNRESTRICTED): Restrictions for search queries.
+        belongs_to (list | Restriction): Group hashes, BELONGS_TO_ALL, or BELONGS_TO_NONE.
     """
 
     _id = "restrictions"
-    _session_version = 9
+    _session_version = 12
     _session_key = "restrictions"
     _access_fields = (
         "search",
@@ -66,7 +67,7 @@ class Restrictions(Property):
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_only_project_permissions_that_imply_view
-    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_uses_owner_capability
+    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_bypasses_restrictions
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
     # @matrix permissions restrictions : search
     @property
@@ -163,7 +164,9 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_builds_group_membership_from_stored_requires
-    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_uses_owner_capability
+    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_bypasses_restrictions
+    # @tests tests_unit/test_009d_user_restrictions.py::test_session_membership_refreshes_without_permission_map_change
+    # @matrix permissions restrictions : group-membership session-blob
     # @matrix permissions : group-membership stored-requires
     # @pair restrictions:search
     # @pair restrictions:root-fetch
@@ -239,15 +242,29 @@ class Restrictions(Property):
             return None
 
         state = dict(stored)
-        for key in self._access_fields:
+        for key in (*self._access_fields, "belongs_to"):
             state[key] = Restriction.from_session(state[key])
         return state
 
-    @staticmethod
-    def _session_blob_types_valid(stored):
+    # @testable true
+    # @tests tests_unit/test_009d_user_restrictions.py::test_restriction_session_markers_validate_their_own_scope
+    # @matrix permissions restrictions : session-blob validation
+    @classmethod
+    def _session_blob_types_valid(cls, stored):
         return (
             isinstance(stored["value"], list)
-            and isinstance(stored["belongs_to"], list)
+            and (
+                isinstance(stored["belongs_to"], list)
+                or stored["belongs_to"] in (
+                    Restriction.BELONGS_TO_ALL.value,
+                    Restriction.BELONGS_TO_NONE.value,
+                )
+            )
+            and all(
+                isinstance(stored[key], list)
+                or stored[key] == Restriction.UNRESTRICTED.value
+                for key in cls._access_fields
+            )
             and isinstance(stored["pages_by_category"], dict)
             and isinstance(stored["can_initiate_messages"], bool)
         )
@@ -266,12 +283,15 @@ class Restrictions(Property):
 
     def _session_blob(self):
         blob = dict(self._state)
-        for key in self._access_fields:
+        for key in (*self._access_fields, "belongs_to"):
             blob[key] = Restriction.to_session(blob[key])
         return blob
 
+    # @testable true
+    # @tests tests_unit/test_009d_user_restrictions.py::test_session_membership_refreshes_without_permission_map_change
+    # @matrix permissions restrictions : group-membership session-blob
     def _fingerprint(self):
-        return self.entity.permissions_fingerprint
+        return self.entity.authorization_fingerprint
 
     @staticmethod
     def _sorted_hashes(details, *kinds):
@@ -346,6 +366,7 @@ class Restrictions(Property):
             "can_create_categories": can_create_models,
             "can_create_projects": can_create_models,
             "can_create_pages": can_create_pages,
+            "can_append_page_documents": can_edit_pages,
             "can_create_model_tasks": can_create_models or can_edit_projects,
             "can_attach_files_to_pages": can_edit_pages or can_create_pages,
             "can_attach_files_to_tasks": can_edit_tasks or can_edit_pages,
@@ -362,7 +383,7 @@ class Restrictions(Property):
                     can_edit_tasks,
                 )
             ),
-            "can_update_form_schemas": can_edit_forms,
+            "can_extend_form_schemas": can_edit_forms,
             "can_update_submissions": can_edit_pages or can_edit_tasks,
             "can_delete_pages": (
                 can_delete_categories
@@ -395,7 +416,7 @@ class Restrictions(Property):
     def _create(self):
         if self.entity.is_admin:
             restricted_to = ["forms", "models", "users"]
-            belongs_to = ["owner"]
+            belongs_to = []
         else:
             restricted_to = [
                 h
@@ -492,7 +513,10 @@ class Restrictions(Property):
             "version": self._session_version,
             "fingerprint": self._fingerprint(),
             "value": value,
-            "belongs_to": belongs_to,
+            "belongs_to": (
+                Restriction.BELONGS_TO_ALL if self.entity.is_admin
+                else belongs_to or Restriction.BELONGS_TO_NONE
+            ),
             "search": Restriction.UNRESTRICTED if self.entity.is_admin else value,
             "task": task,
             "form": form,

@@ -50,7 +50,7 @@ where winget >nul 2>nul
 if errorlevel 1 goto missing_python
 echo.
 set "LAGNIAPPE_INSTALL_PYTHON="
-set /p "LAGNIAPPE_INSTALL_PYTHON=Install standalone Python 3.14 for this Windows user now? [Y/n]: "
+set /p "LAGNIAPPE_INSTALL_PYTHON=? Install standalone Python 3.14 for this Windows user now [Y/n] "
 if /i "%LAGNIAPPE_INSTALL_PYTHON%"=="n" goto missing_python
 winget install --id Python.Python.3.14 --exact --source winget --scope user --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
 if errorlevel 1 goto python_install_failed
@@ -62,16 +62,16 @@ goto python_install_failed
 
 :missing_python
 echo.
-echo Lagniappe requires standalone Python 3.12 or newer.
+echo [X] Lagniappe requires standalone Python 3.12 or newer
 echo Install Python from https://www.python.org/downloads/windows/ and run
-echo setup.cmd again.
+echo .\setup.cmd again.
 exit /b 1
 
 :python_install_failed
 echo.
-echo WinGet could not install or locate Python 3.14.
+echo [X] WinGet could not install or locate Python 3.14
 echo Install Python from https://www.python.org/downloads/windows/ and run
-echo setup.cmd again.
+echo .\setup.cmd again.
 exit /b 1
 
 :create_with_path
@@ -97,20 +97,20 @@ if errorlevel 1 goto environment_failed
 if not exist "%LAGNIAPPE_VENV_PYTHON%" goto environment_failed
 "%LAGNIAPPE_VENV_PYTHON%" -E -c "import sys; paths=[str(path).lower() for path in sys.path]; raise SystemExit(any('google-cloud-sdk' in path and 'bundledpython' in path for path in paths))" >nul 2>nul
 if errorlevel 1 goto contaminated_environment
-echo Lagniappe's isolated Python environment is ready.
+echo [OK] Lagniappe's isolated Python environment is ready
 echo.
 goto run_setup
 
 :contaminated_environment
 echo.
-echo The new Python environment could not be isolated.
-echo Install or repair standalone Python, then run setup.cmd again.
+echo [X] The new Python environment could not be isolated
+echo Install or repair standalone Python, then run .\setup.cmd again.
 exit /b 1
 
 :environment_failed
 echo.
-echo Python could not create Lagniappe's isolated environment.
-echo Repair or reinstall standalone Python, then run setup.cmd again.
+echo [X] Python could not create Lagniappe's isolated environment
+echo Repair or reinstall standalone Python, then run .\setup.cmd again.
 exit /b 1
 
 :run_setup

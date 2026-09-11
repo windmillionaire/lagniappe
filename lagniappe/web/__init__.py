@@ -9,6 +9,7 @@ cache clearing.
 
 from datetime import timedelta
 import json
+import re
 from urllib.parse import urlsplit
 
 from flask import Flask, g, request, session
@@ -143,9 +144,13 @@ def record_authenticated_site_activity(response):
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_common_security_headers
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
+# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_native_consent_reaches_loopback_and_shows_submit_progress
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_invalidation_is_not_replayed_by_browser_http_cache
 # @matrix web-headers : conditional-request entity-revision etag missing-fingerprint security
+# @matrix cache : invalidation no-store
 # @pair login:logout
+# @matrix mcp-oauth : loopback browser-callback
 @app.after_request
 def add_lagniappe_headers(response):
     """Add security headers, ETag fingerprinting, and cache invalidation flag."""
@@ -157,6 +162,18 @@ def add_lagniappe_headers(response):
         "Cache-Control": "no-store" if g.get("NO_CACHE") else "private, no-cache",
         "Content-Security-Policy": CSP,
     }
+
+    if request.blueprint in {"oauth", "oauth_metadata"}:
+        # Flask-WTF verifies the HTTPS same-origin Referer on consent POSTs.
+        # Cross-origin redirects to ChatGPT must not receive one.
+        headers["Referrer-Policy"] = "same-origin"
+        if CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE:
+            # Browsers enforce form-action on the POST's redirect chain,
+            # including the native client's ephemeral loopback listener.
+            destinations = "https://chatgpt.com http://127.0.0.1:*/callback"
+            headers["Content-Security-Policy"] = CSP.replace(
+                "form-action 'self'", "form-action 'self' " + destinations
+            )
 
     if getattr(g, "fingerprint", False):
         headers["ETag"] = f'"{g.fingerprint}"'
@@ -178,8 +195,13 @@ def add_lagniappe_headers(response):
             separators=(",", ":"),
         )
 
+    cache_revision = session.get(CONFIG.LOGIN_INVALIDATE_CACHE_KEY)
     if _client_cache_invalidation_requested():
+        # Cache Storage deletion cannot clear the browser's separate HTTP cache.
+        # This transient command must never become reusable response metadata.
+        headers["Cache-Control"] = "no-store"
         headers["X-Lagniappe-Invalidate-Cache"] = True
+        headers["X-Lagniappe-Cache-Revision"] = str(cache_revision)
 
     if getattr(CONFIG, "DEBUG_TRACING", False):
         from lagniappe.core.exceptions.entity_load import print_entity_load_trace

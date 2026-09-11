@@ -4,18 +4,10 @@
    but no visible animation/cross-fade
    ========================================================================== */
 
+/* Keep the header and body-mounted overlays in the same snapshot so their
+   normal stacking order also holds while a transition is being painted. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-	animation: none;
-	mix-blend-mode: normal;
-}
-
-.main-nav {
-	view-transition-name: lp-main-navigation;
-}
-
-::view-transition-old(lp-main-navigation),
-::view-transition-new(lp-main-navigation) {
 	animation: none;
 	mix-blend-mode: normal;
 }

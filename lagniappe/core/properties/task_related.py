@@ -2,6 +2,7 @@ from flask_login import current_user
 
 from ..definitions import Action, FieldType, FilterOptions, MutationIntent, Ordering
 from ..entities import Entities
+from ..exceptions import ValidationError
 from ..mixins import (
     AIMixin,
     ColumnMixin,
@@ -123,10 +124,13 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         return file.filename or file.name or file.hash
 
     def _track_file_update(self, file):
+        file.normalize_owner()
         self.entity.add_mutation_intents(
             MutationIntent.patch(
                 file,
-                "tasks",
+                "page",
+                "task",
+                "task_page",
                 "requires",
                 property_updates=("requires", "modified"),
                 reason="task-file-mirror",
@@ -137,15 +141,23 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         if not file or not getattr(self.entity, "key", None):
             return
 
-        file.properties.tasks.add(self.entity)
+        if self.entity.entity_kind == "task_history":
+            if not file.has_references:
+                file.task = self.entity.task
+                self._track_file_update(file)
+            return
+        if file.has_references and file.properties.task.key != self.entity.key:
+            raise ValidationError("Move the File to this Task before attaching it")
+        file.task = self.entity
         self._track_file_update(file)
 
     def _unlink_file(self, file):
         if not file or not getattr(self.entity, "key", None):
             return
 
-        file.properties.tasks.remove(self.entity)
-        self._track_file_update(file)
+        # Removing a current attachment does not erase ownership: a completion
+        # history may still reference the File. Moves and deletion own unlinking.
+        return
 
     @property
     def value(self):
@@ -593,6 +605,9 @@ class TaskPage(RelatedEntityMixin, DetailsMixin, FilterMixin, AIMixin, DBPropert
 
         RelatedEntityMixin.value.fset(self, value)
 
+        if previous_key != next_key:
+            self.entity.properties.restricted_to.unset()
+            self.entity._page_changed = bool(previous_key)
         if previous and previous_key != next_key:
             self.entity.add_mutation_intents(
                 MutationIntent.touch(previous, reason="task-previous-page")

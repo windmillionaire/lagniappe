@@ -22,6 +22,26 @@ from testing.utility import (
 pytestmark = pytest.mark.tooling
 
 
+def test_traceability_discovers_unit_tests_within_testing_root(tmp_path):
+    from testing.utility import traceability
+
+    path = tmp_path / "testing/tests_unit/test_internal.py"
+    path.parent.mkdir(parents=True)
+    path.write_text("def test_internal():\n    pass\n", encoding="utf-8")
+    roots = ["tests_unit"]
+    nodeid = "tests_unit/test_internal.py::test_internal"
+    discovered = traceability.discover_tests(tmp_path, roots)
+    assert set(discovered) == {nodeid}
+    assert traceability.pytest_collect_root_args(roots) == ["testing/tests_unit"]
+    assert traceability.test_path_from_nodeid(nodeid, tmp_path) == path
+    assert [test.nodeid for test in traceability.changed_tests_for_paths(
+        discovered, ["testing/tests_unit/test_internal.py"]
+    )] == [nodeid]
+    for unsafe in ("repo:clients/example/tests", "../outside", "/outside"):
+        with pytest.raises(ValueError, match="must stay within"):
+            traceability.test_files_in_roots(tmp_path, [unsafe])
+
+
 def test_traceability_result_plugin_can_skip_manifest_output(monkeypatch, tmp_path):
     writes = []
     monkeypatch.setattr(
@@ -1012,6 +1032,366 @@ def test_pytest_routing_plugin_normalizes_provider_marker_tokens():
     )
 
 
+# @matrix mcp-package testing : cli-routing environment-isolation no-duplicate-collection
+def test_partition_mcp_adapter_test_selection():
+    repository_root = Path(run.__file__).parent
+    adapter = pytest_routing.MCP_ADAPTER_TEST
+
+    focused = pytest_routing.normalize_pytest_invocation(
+        ["-k", "catalog", f"{adapter}::test_catalog"],
+        repository_root,
+    )
+    assert pytest_routing.partition_mcp_adapter_tests(
+        focused, repository_root
+    ) == pytest_routing.PytestPartitions(
+        root_args=None,
+        mcp_args=("-k", "catalog", f"{adapter}::test_catalog"),
+    )
+
+    unit = pytest_routing.normalize_pytest_invocation(["unit"], repository_root)
+    assert pytest_routing.partition_mcp_adapter_tests(
+        unit, repository_root
+    ) == pytest_routing.PytestPartitions(
+        root_args=(
+            *(f"--ignore={path}" for path in pytest_routing.MCP_TEST_FILES),
+            "testing/tests_unit/",
+        ),
+        mcp_args=pytest_routing.MCP_TEST_FILES,
+    )
+
+    default = pytest_routing.normalize_pytest_invocation([], repository_root)
+    default_partitions = pytest_routing.partition_mcp_adapter_tests(
+        default, repository_root
+    )
+    assert default_partitions.root_args == (
+        *(f"--ignore={path}" for path in pytest_routing.MCP_TEST_FILES),
+    )
+    assert default_partitions.mcp_args == pytest_routing.MCP_TEST_FILES
+
+    package_selector = (
+        "testing/tests_unit/test_033b_mcp_files.py::"
+        "test_upload_honors_chunks_and_returns_authoritative_inventory"
+    )
+    package_focused = pytest_routing.normalize_pytest_invocation(
+        [package_selector], repository_root
+    )
+    assert pytest_routing.partition_mcp_adapter_tests(
+        package_focused, repository_root
+    ) == pytest_routing.PytestPartitions(
+        root_args=None,
+        mcp_args=(package_selector,),
+    )
+
+    tooling = pytest_routing.normalize_pytest_invocation(
+        ["tooling"], repository_root
+    )
+    assert pytest_routing.partition_mcp_adapter_tests(
+        tooling, repository_root
+    ) == pytest_routing.PytestPartitions(
+        root_args=("testing/tests_tooling/",),
+        mcp_args=None,
+    )
+
+
+# @matrix mcp-package testing : cli-routing local-preflight
+def test_targets_include_repository_file():
+    repository_root = Path(run.__file__).parent
+    target = "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py"
+
+    assert pytest_routing.targets_include_repository_file(
+        ("testing/tests_e2e/",), target, repository_root
+    )
+    assert not pytest_routing.targets_include_repository_file(
+        ("testing/tests_tooling/",), target, repository_root
+    )
+
+
+def _transported_adapter_results(path, status=0):
+    path.write_text(
+        json.dumps(
+            {
+                "exit_status": status,
+                "outcomes": {
+                    "tests_unit/test_033_mcp_adapter.py::test_catalog": {
+                        "outcome": "passed",
+                        "duration": 0.01,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+# @matrix mcp-package testing : cli-routing environment-isolation
+@pytest.mark.parametrize(
+    "selector",
+    [
+        f"{pytest_routing.MCP_ADAPTER_TEST}::test_catalog",
+        (
+            "testing/tests_unit/test_033b_mcp_files.py::"
+            "test_upload_honors_chunks_and_returns_authoritative_inventory"
+        ),
+    ],
+    ids=("adapter", "package-files"),
+)
+def test_run_py_focused_adapter_uses_only_locked_package_bridge(
+    monkeypatch, selector
+):
+    from runner import mcp_environment
+
+    calls = []
+    monkeypatch.setattr(
+        mcp_environment,
+        "prepare_environment",
+        lambda: calls.append("prepare"),
+    )
+    monkeypatch.setattr(
+        mcp_environment,
+        "run_pytest",
+        lambda arguments, **kwargs: (
+            calls.append(("adapter", arguments, kwargs["prepared"])),
+            _transported_adapter_results(kwargs["result_path"]),
+            0,
+        )[-1],
+    )
+    monkeypatch.setattr(
+        run,
+        "_merge_mcp_test_evidence",
+        lambda path, command, adapter_status, combined_status: calls.append(
+            ("merge", adapter_status, combined_status, path.is_file())
+        ),
+    )
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: pytest.fail("adapter-only tests must skip gcloud"),
+    )
+    monkeypatch.setattr(
+        run,
+        "_run_pytest_subprocess",
+        lambda command: pytest.fail("adapter-only tests must skip root pytest"),
+    )
+
+    assert run.run_tests([selector]) == 0
+    assert calls == [
+        "prepare",
+        ("adapter", [selector], True),
+        ("merge", 0, 0, True),
+    ]
+
+
+# @matrix mcp-package testing : cli-routing exit-status no-duplicate-collection result-aggregation
+def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
+    from runner import mcp_environment
+
+    calls = []
+    monkeypatch.setattr(
+        mcp_environment,
+        "prepare_environment",
+        lambda: calls.append("prepare"),
+    )
+    monkeypatch.setattr(
+        mcp_environment,
+        "run_pytest",
+        lambda arguments, **kwargs: (
+            calls.append(("adapter", arguments, kwargs["prepared"])),
+            _transported_adapter_results(kwargs["result_path"]),
+            0,
+        )[-1],
+    )
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: calls.append("gcloud"),
+    )
+    monkeypatch.setattr(
+        run,
+        "_run_pytest_subprocess",
+        lambda command: calls.append(("root", command)) or 5,
+    )
+    monkeypatch.setattr(
+        run,
+        "_merge_mcp_test_evidence",
+        lambda path, command, adapter_status, combined_status: calls.append(
+            ("merge", adapter_status, combined_status)
+        ),
+    )
+
+    assert run.run_tests(["unit"]) == 0
+    root_command = next(value for value in calls if value[0] == "root")[1]
+    assert root_command[-(len(pytest_routing.MCP_TEST_FILES) + 1):] == [
+        *(f"--ignore={path}" for path in pytest_routing.MCP_TEST_FILES),
+        "testing/tests_unit/",
+    ]
+    assert calls.count(
+        (
+            "adapter",
+            list(pytest_routing.MCP_TEST_FILES),
+            True,
+        )
+    ) == 1
+    assert ("merge", 0, 0) in calls
+    assert calls[:2] == ["prepare", "gcloud"]
+
+
+# @matrix testing mcp-package : junit result-aggregation environment-isolation
+@pytest.mark.parametrize("root_status,mcp_status", [(1, 0), (0, 1), (0, 0)])
+@pytest.mark.parametrize("option", ["--junitxml", "--junit-xml"])
+def test_run_py_merges_partition_junit(monkeypatch, tmp_path, root_status, mcp_status, option):
+    from xml.etree import ElementTree as ET
+    from runner import mcp_environment
+
+    destination = tmp_path / "report with spaces.xml"
+    written = []
+
+    def write_report(arguments, name, status):
+        report = Path(next(arg.split("=", 1)[1] for arg in arguments
+                           if arg.startswith("--junitxml=")))
+        written.append(report)
+        suite = ET.Element("testsuite", name=name)
+        case = ET.SubElement(suite, "testcase", classname=name, name="test_case")
+        if status:
+            ET.SubElement(case, "failure", message=f"{name} failed")
+        ET.ElementTree(suite).write(report)
+        return status
+
+    monkeypatch.setattr(mcp_environment, "prepare_environment", lambda: None)
+    monkeypatch.setattr(run, "activate_repository_gcloud", lambda **kwargs: None)
+    monkeypatch.setattr(run, "_run_pytest_subprocess",
+                        lambda args: write_report(args, "root", root_status))
+    monkeypatch.setattr(mcp_environment, "run_pytest",
+                        lambda args, **kwargs: write_report(args, "mcp", mcp_status))
+    monkeypatch.setattr(run, "_merge_mcp_test_evidence", lambda *args: None)
+    assert run.run_tests(["unit", option, str(destination)]) == max(root_status, mcp_status)
+    cases = ET.parse(destination).getroot().findall(".//testcase")
+    assert [case.attrib["classname"] for case in cases] == ["root", "mcp"]
+    assert sum(case.find("failure") is not None for case in cases) == root_status + mcp_status
+    assert len(set(written)) == 2
+    assert destination not in written
+
+
+# @matrix testing mcp-package : junit result-aggregation environment-isolation
+def test_partition_junit_reports_preserves_single_run_and_rejects_missing_results(tmp_path):
+    from runner.pytest_reports import partition_junit_reports
+
+    target = tmp_path / "junit.xml"
+    for partitions in (
+        pytest_routing.PytestPartitions((f"--junitxml={target}",), None),
+        pytest_routing.PytestPartitions(None, (f"--junit-xml={target}",)),
+        pytest_routing.PytestPartitions(("unit.py",), ("mcp.py",)),
+    ):
+        with partition_junit_reports(partitions) as actual:
+            assert actual is partitions
+    target.write_text("old report")
+    partitions = pytest_routing.PytestPartitions(
+        (f"--junitxml={target}",), (f"--junitxml={target}",)
+    )
+    with pytest.raises(RuntimeError, match="Missing or invalid partition JUnit"):
+        with partition_junit_reports(partitions):
+            pass
+    assert not target.exists()
+
+
+# @matrix mcp-package testing : fail-closed local-preflight repair-guidance
+def test_run_py_adapter_preflight_stops_before_root_test_work(monkeypatch, capsys):
+    from runner import mcp_environment
+
+    def fail_preflight():
+        raise mcp_environment.McpEnvironmentError(
+            "Managed environment is unavailable. Run ./setup.sh development to repair it."
+        )
+
+    monkeypatch.setattr(mcp_environment, "prepare_environment", fail_preflight)
+    monkeypatch.setattr(
+        run,
+        "configure_test_environment",
+        lambda **kwargs: pytest.fail("failed preflight must stop environment setup"),
+    )
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: pytest.fail("failed preflight must stop gcloud"),
+    )
+    monkeypatch.setattr(
+        run,
+        "_run_pytest_subprocess",
+        lambda command: pytest.fail("failed preflight must stop root pytest"),
+    )
+
+    assert run.run_tests(["unit"]) == 1
+    assert "./setup.sh development" in capsys.readouterr().out
+
+
+# @matrix hosted-e2e mcp-package testing : environment-check isolation
+def test_run_py_hosted_adapter_selection_checks_prebuilt_environment(monkeypatch):
+    from runner import mcp_environment
+
+    calls = []
+    monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E", "true")
+    monkeypatch.setattr(
+        mcp_environment,
+        "check_environment",
+        lambda: calls.append("check"),
+    )
+    monkeypatch.setattr(
+        mcp_environment,
+        "prepare_environment",
+        lambda: pytest.fail("hosted tests must not synchronize dependencies"),
+    )
+    monkeypatch.setattr(
+        mcp_environment,
+        "run_pytest",
+        lambda arguments, **kwargs: (
+            calls.append("adapter"),
+            _transported_adapter_results(kwargs["result_path"]),
+            0,
+        )[-1],
+    )
+    monkeypatch.setattr(run, "_merge_mcp_test_evidence", lambda *args: None)
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: pytest.fail("hosted adapter tests must skip gcloud"),
+    )
+
+    assert run.run_tests([pytest_routing.MCP_ADAPTER_TEST]) == 0
+    assert calls == ["check", "adapter"]
+
+
+# @matrix mcp-package testing traceability : result-aggregation test-evidence
+def test_merge_mcp_test_evidence_validates_and_forwards_outcomes(
+    monkeypatch, tmp_path
+):
+    writes = []
+    result_path = tmp_path / "results.json"
+    _transported_adapter_results(result_path, status=5)
+    payload = json.loads(result_path.read_text(encoding="utf-8"))
+    payload["outcomes"][
+        "../testing/tests_unit/test_033b_mcp_files.py::test_upload_honors_chunks_and_returns_authoritative_inventory"
+    ] = {"outcome": "passed", "duration": 0.02}
+    result_path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(
+        traceability_results,
+        "_write_manifest",
+        lambda *arguments: writes.append(arguments),
+    )
+
+    run._merge_mcp_test_evidence(result_path, ["run.py", "test"], 5, 0)
+
+    assert writes[0][0] == Path(run.__file__).parent
+    assert writes[0][1] == ["run.py", "test"]
+    assert set(writes[0][2]) == {
+        "tests_unit/test_033_mcp_adapter.py::test_catalog",
+        "tests_unit/test_033b_mcp_files.py::test_upload_honors_chunks_and_returns_authoritative_inventory",
+    }
+    assert writes[0][3] == 0
+
+    result_path.write_text('{"exit_status": 0, "outcomes": []}', encoding="utf-8")
+    with pytest.raises(RuntimeError, match="inconsistent test evidence"):
+        run._merge_mcp_test_evidence(result_path, ["run.py", "test"], 0, 0)
+
+
 def test_run_py_test_argument_errors_stop_before_preflight(monkeypatch, capsys):
     monkeypatch.setattr(
         run,
@@ -1177,6 +1557,8 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
 
 # @pair testing:adc
 def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
+    from runner import mcp_environment
+
     calls = []
 
     class FakeAuthority:
@@ -1225,6 +1607,7 @@ def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
         "configure_test_environment",
         lambda **kwargs: calls.append(("environment", kwargs)),
     )
+    monkeypatch.setattr(mcp_environment, "prepare_environment", lambda: None)
     monkeypatch.setattr(
         run,
         "activate_repository_gcloud",
@@ -1255,7 +1638,10 @@ def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
 
 
 def test_run_py_e2e_adc_mismatch_stops_before_pytest(monkeypatch, capsys):
+    from runner import mcp_environment
+
     monkeypatch.setattr(run, "configure_test_environment", lambda **kwargs: None)
+    monkeypatch.setattr(mcp_environment, "prepare_environment", lambda: None)
     monkeypatch.setattr(
         run,
         "activate_repository_gcloud",
@@ -1491,6 +1877,8 @@ def test_run_py_auth_reports_alignment_failure(monkeypatch, capsys):
 
 
 def test_run_py_test_strict_sets_env_and_removes_runner_arg(monkeypatch):
+    from runner import mcp_environment
+
     calls = []
 
     class FakeProcess:
@@ -1506,6 +1894,16 @@ def test_run_py_test_strict_sets_env_and_removes_runner_arg(monkeypatch):
     monkeypatch.delenv("STRICT_RELATION_LOADS", raising=False)
     monkeypatch.setattr(run, "activate_repository_gcloud", lambda **kwargs: None)
     monkeypatch.setattr(run.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(mcp_environment, "prepare_environment", lambda: None)
+    monkeypatch.setattr(
+        mcp_environment,
+        "run_pytest",
+        lambda arguments, **kwargs: (
+            _transported_adapter_results(kwargs["result_path"]),
+            0,
+        )[-1],
+    )
+    monkeypatch.setattr(run, "_merge_mcp_test_evidence", lambda *args: None)
 
     assert run.run_tests(["--strict", "unit"]) == 0
 
@@ -1515,6 +1913,8 @@ def test_run_py_test_strict_sets_env_and_removes_runner_arg(monkeypatch):
 
 
 def test_run_py_test_forwards_signals_to_pytest_process_group(monkeypatch):
+    from runner import mcp_environment
+
     installed_handlers = {}
     restored_handlers = []
     previous_handlers = {
@@ -1543,6 +1943,16 @@ def test_run_py_test_forwards_signals_to_pytest_process_group(monkeypatch):
         lambda command, **kwargs: FakeProcess(),
     )
     monkeypatch.setattr(run, "activate_repository_gcloud", lambda **kwargs: None)
+    monkeypatch.setattr(mcp_environment, "prepare_environment", lambda: None)
+    monkeypatch.setattr(
+        mcp_environment,
+        "run_pytest",
+        lambda arguments, **kwargs: (
+            _transported_adapter_results(kwargs["result_path"]),
+            0,
+        )[-1],
+    )
+    monkeypatch.setattr(run, "_merge_mcp_test_evidence", lambda *args: None)
     monkeypatch.setattr(
         run.signal,
         "getsignal",
@@ -1565,7 +1975,7 @@ def test_run_py_test_forwards_signals_to_pytest_process_group(monkeypatch):
 
 
 # @pair setup:gcloud-token
-def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
+def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch, capsys):
     from runner import adc as runner_adc
     from runner import gcloud as runner_gcloud
 
@@ -1591,7 +2001,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     monkeypatch.setattr(
         runner_gcloud,
         "config_gcloud",
-        lambda: calls.append("activate"),
+        lambda **kwargs: calls.append(("activate", kwargs)),
     )
     monkeypatch.setattr(
         runner_adc,
@@ -1618,8 +2028,8 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
         is True
     )
     assert calls == [
-        "activate",
-        "activate",
+        ("activate", {"announce": False}),
+        ("activate", {"announce": False}),
         (
             "adc",
             "owner@example.test",
@@ -1627,9 +2037,10 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
             {
                 "allowed_principals": (),
                 "select_gcloud_target": False,
+                "announce": False,
             },
         ),
-        "activate",
+        ("activate", {"announce": False}),
         ("cli-token", "owner@example.test", {"allow_login": False}),
         (
             "adc",
@@ -1641,9 +2052,15 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
                     "runtime@lagniappe-local-project.iam.gserviceaccount.com",
                 ),
                 "select_gcloud_target": False,
+                "announce": False,
             },
         ),
     ]
+
+    output = capsys.readouterr().out
+    assert output.count("Google Cloud configuration verified") == 3
+    assert output.count("owner@example.test") == 3
+    assert "Verified:" not in output
 
 
 # @matrix auth : gcloud-token interactive refresh
@@ -2211,8 +2628,28 @@ def _release_check_repository(tmp_path: Path) -> Path:
     files = {
         ".gitignore": "config/files/\nlagniappe.yaml\nindex.yaml\n",
         "runner/__init__.py": "",
+        "runner/console.py": (
+            (Path(run.__file__).parent / "runner" / "console.py").read_text(
+                encoding="utf-8"
+            )
+        ),
+        "runner/presentation.py": (
+            (Path(run.__file__).parent / "runner" / "presentation.py").read_text(
+                encoding="utf-8"
+            )
+        ),
         "runner/context.py": (
             (Path(run.__file__).parent / "runner" / "context.py").read_text(
+                encoding="utf-8"
+            )
+        ),
+        "runner/uv_bootstrap.py": (
+            (Path(run.__file__).parent / "runner" / "uv_bootstrap.py").read_text(
+                encoding="utf-8"
+            )
+        ),
+        "mcp/uv-bootstrap.json": (
+            (Path(run.__file__).parent / "mcp/uv-bootstrap.json").read_text(
                 encoding="utf-8"
             )
         ),
@@ -2232,9 +2669,9 @@ def _release_check_repository(tmp_path: Path) -> Path:
             )
         ),
         "runner/pytest_routing.py": (
-            (
-                Path(run.__file__).parent / "runner" / "pytest_routing.py"
-            ).read_text(encoding="utf-8")
+            (Path(run.__file__).parent / "runner" / "pytest_routing.py").read_text(
+                encoding="utf-8"
+            )
         ),
         "run.py": Path(run.__file__).read_text(encoding="utf-8"),
         "package.json": '{"name": "lagniappe", "version": "0.1.0"}\n',
@@ -2328,14 +2765,19 @@ def test_main_release_workflow_contract():
     assert workflow["on"]["pull_request"]["branches"] == ["main"]
     assert workflow["on"]["pull_request"]["types"] == ["opened", "reopened"]
     assert workflow["on"]["push"]["branches"] == ["next/**", "hotfix/**"]
-    assert list(workflow["jobs"]) == ["request", "execute", "quality", "attest"]
+    assert list(workflow["jobs"]) == [
+        "request",
+        "execute",
+        "quality",
+        "attest",
+    ]
     assert workflow["jobs"]["request"]["permissions"] == {
         "pull-requests": "read"
     }
     assert "Source quality and traceability" in workflow["jobs"]["quality"]["name"]
     assert "Manual dispatch guard" in workflow["jobs"]["quality"]["name"]
     assert workflow["jobs"]["attest"]["permissions"] == {"statuses": "write"}
-    assert workflow["jobs"]["attest"]["needs"] == "quality"
+    assert workflow["jobs"]["attest"]["needs"] == ["quality"]
     assert '"next/**"' in workflow_text
     assert "next/*|hotfix/*" in workflow_text
     assert "npm run check" in workflow_text

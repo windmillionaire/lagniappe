@@ -123,6 +123,7 @@ export class MentionSuggestions {
 		this.onInsert = onInsert;
 		this.options = [];
 		this.focused = 0;
+		this.dismissedFrom = null;
 		this.queries = new QueryLifecycle();
 		this._refresh = this._refresh.bind(this);
 		this._keydown = this._keydown.bind(this);
@@ -165,7 +166,12 @@ export class MentionSuggestions {
 	async search() {
 		if (this._destroyed) return false;
 		const active = currentQuery(this.editor);
-		if (!active) return this.hide();
+		if (!active) {
+			this.dismissedFrom = null;
+			return this.hide();
+		}
+		if (active.from === this.dismissedFrom) return this.hide();
+		this.dismissedFrom = null;
 		const params = new URLSearchParams({
 			q: active.query,
 			permission: "mention",
@@ -284,6 +290,7 @@ export class MentionSuggestions {
 		if (this.popup.classList.contains("hidden")) return;
 		if (event.key === "Escape") {
 			event.preventDefault();
+			this.dismissedFrom = this.active?.from ?? null;
 			this.hide();
 		} else if (
 			this.options.length &&

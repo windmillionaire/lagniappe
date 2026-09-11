@@ -45,6 +45,13 @@ version, runtime identity, and shared-lease validation. Static compiled assets
 remain public like production assets. Internal `/process` routes retain their
 Cloud Tasks/Scheduler OIDC checks.
 
+Non-browser API clients need the same run cookie in addition to their ordinary
+API bearer credential. The managed MCP boundary test forwards only this cookie
+to its direct HTTP calls and isolated driver's test-only transport, bound to
+the exact application origin. It is never forwarded to storage URLs or added
+to the product adapter, whose requests remain bearer-only. Keep the cookie out
+of test artifacts and diagnostics just like the API key.
+
 Reserved E2E hostnames can soft-route after version deletion, so production
 Flask rejects the reserved host pattern with a marker-bearing 404. Setup,
 create, and teardown probe that guard before handling runnable versions.
@@ -58,10 +65,10 @@ Then:
 venv/bin/python run.py hosted-e2e setup --github-repository OWNER/REPOSITORY
 ```
 
-The idempotent command creates the dedicated runtime and invoker accounts,
-Artifact Registry repository, result bucket, settings/CA Secret Manager mounts,
-WIF pool/provider, scoped IAM, and App Engine anchor. Non-secret identifiers are
-written to `reports/hosted-e2e/setup.json`.
+The idempotent command creates the dedicated application runtime and invoker
+accounts, Artifact Registry repository, result bucket, settings/CA Secret Manager
+mounts, WIF pool/provider, scoped IAM, and App Engine anchor. Non-secret
+identifiers are written to `reports/hosted-e2e/setup.json`.
 
 The setup record includes a fingerprint of the stable API, IAM-role, bucket,
 and anchor requirements. `create` refuses a stale record and tells the operator
@@ -123,6 +130,21 @@ session. Direct fixtures execute from Cloud Run; browser requests target the
 exact App Engine version. The runner image includes Git and POSIX process
 inspection tools because repository and test-session contracts run in that
 same container. Local execution follows status and imports results by default.
+
+## MCP coverage
+
+Shared adapter tests run in the pinned internal package environment; remote HTTP,
+OAuth, attachment and terminal-upload tests remain in the normal test selections.
+`test_013b_agent_api_mcp.py` exercises the shared adapter against the live API
+without starting a local stdio server. Remote HTTP protocol behavior is covered
+by `testing/tests_unit/test_033c_mcp_server.py` and OAuth by `test_013d_remote_mcp_oauth.py`.
+
+The public-wheel installation suite, packaging container, `mcp-package` runner
+lifecycle and separate GitHub packaging job have been retired. The release gate
+now depends on the ordinary quality/evidence job. Previously created packaging
+jobs, service accounts and images are not automatically deleted by this source
+change; retire those exact obsolete resources separately. The active remote MCP
+service and ordinary hosted-E2E resources are independent of them.
 
 ## Status and teardown
 

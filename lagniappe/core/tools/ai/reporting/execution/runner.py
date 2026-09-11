@@ -1,6 +1,7 @@
 """Deterministic execution of stored AI report proposals."""
 
 from lagniappe.core import exceptions
+from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 
 from ..proposals.validation import validate_proposal
@@ -43,8 +44,10 @@ from .ledger import (
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_to_task_targets_created_task
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_loads_attached_inputs_only_for_pending_file_work
 # @matrix ai-report : attachments cancellation compensation completed-prefix continue create create-order deterministic-run execute idempotency partial-result permissions persistence post-commit-checkpoint recoverable recovery reuse skip-action stale-proposal validation
+# @matrix ai-report files : execution-inputs initial-load staged-inputs
 def run_report(report, user, ensure_active=None):
     """Execute or resume a stored AI report proposal from durable checkpoints."""
     ensure_active = ensure_active or (lambda: None)
@@ -70,6 +73,19 @@ def run_report(report, user, ensure_active=None):
         _validate_report_ledger(proposal, result)
     else:
         result = _new_report_ledger(report, proposal, fingerprint)
+
+    if any(
+        action["type"] in {"attach_file", "summarize_file"}
+        and not action.get("skip")
+        and record.get("status") not in {"complete", "skipped"}
+        for action, record in zip(proposal.get("actions", []), result["actions"])
+    ):
+        attached_files = [file for file in report.input_files if file.has_references]
+        if attached_files:
+            Entities.fetch(
+                *attached_files,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )
 
     result["status"] = "running"
     result.pop("failed_at", None)
@@ -217,7 +233,7 @@ def run_report(report, user, ensure_active=None):
         (index, record)
         for index, record in enumerate(result["actions"])
         if record.get("status") == "failed"
-        and record.get("type") in {"attach_file_to_page", "attach_file_to_task"}
+        and record.get("type") in {"attach_file"}
     ]
     if failed_placements:
         result["status"] = "failed"

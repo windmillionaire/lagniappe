@@ -43,7 +43,7 @@ GET_FILTER_SCHEMA = types.FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
-            "parent_id": {
+            "id": {
                 "type": "string",
                 "description": (
                     "The project or category hash token from workspace inventory "
@@ -51,7 +51,7 @@ GET_FILTER_SCHEMA = types.FunctionDeclaration(
                 ),
             },
         },
-        "required": ["parent_id"],
+        "required": ["id"],
     },
 )
 
@@ -69,7 +69,7 @@ QUERY_WORKSPACE_FILTER = types.FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
-            "parent_id": {
+            "id": {
                 "type": "string",
                 "description": "The project or category hash token.",
             },
@@ -124,7 +124,7 @@ QUERY_WORKSPACE_FILTER = types.FunctionDeclaration(
                 "description": "Include inactive records. Defaults to false.",
             },
         },
-        "required": ["parent_id", "conditions"],
+        "required": ["id", "conditions"],
     },
 )
 
@@ -170,10 +170,10 @@ def execute_query_workspace_filter(args, user):
 # @reason parent loading and permission checks are asserted through both public handlers
 def _filter_parent(args, user):
     args = args or {}
-    parent_id = args.get("parent_id")
-    if not parent_id:
-        return None, {"error": "parent_id is required"}
-    parent = Entities.fetch_one(parent_id, request=Fetch.direct())
+    identifier = args.get("id")
+    if not identifier:
+        return None, {"error": "id is required"}
+    parent = Entities.fetch_one(identifier, request=Fetch.direct())
     if not parent or parent.kind not in {"project", "category"}:
         return None, {"error": "Project or category not found"}
     if not parent.allowed(Action.VIEW, user=user):

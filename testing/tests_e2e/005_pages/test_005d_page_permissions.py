@@ -110,8 +110,8 @@ def test_owner_can_open_page_permissions_panel(get_user):
 
     permissions = owner.locate(Page.PAGE_PERMISSIONS_FORM)
     expect(permissions).to_be_visible()
-    expect(permissions.locator(Page.PAGE_PERMISSIONS_VISIBLE_TO)).to_be_visible()
     expect(permissions.locator(Page.PAGE_PERMISSIONS_RESTRICT_ACCESS)).to_be_visible()
+    expect(permissions.get_by_role("button", name="Save Restrictions")).to_be_visible()
 
 
 # @pair pages:submitted-reference

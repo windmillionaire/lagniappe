@@ -1,5 +1,7 @@
 """Read-only validation and explicitly named setup activation/repair flows."""
 
+from runner.presentation import output as print
+
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_installation_is_read_only_and_activation_is_explicit
@@ -27,21 +29,19 @@ def verify_installation():
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_installation_is_read_only_and_activation_is_explicit
 # @matrix setup : activation gcloud-config
-def activate_installation():
+def activate_installation(*, announce=True):
     """Explicitly activate the installation's saved local gcloud context."""
     from runner.gcloud import config_gcloud
 
-    config_gcloud()
+    config_gcloud(announce=announce)
     return True
 
 
 # @testable false
-# @covered-by installer/verify.py::activate_installation
 # @covered-by installer/verify.py::validate_installation
-# @reason named composition of the explicit activation and validation contracts
+# @reason focused commands use the target already verified at the CLI boundary
 def prepare_existing_installation():
-    """Activate local gcloud state, then validate an existing installation."""
-    activate_installation()
+    """Validate local setup after the CLI has activated and verified credentials."""
     return validate_installation()
 
 

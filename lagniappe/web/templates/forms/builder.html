@@ -7,17 +7,19 @@
 {% set can_copy_form = Resource.FORMS.allowed(Action.CREATE) %}
 {% set can_delete_form = form.allowed(Action.DELETE) %}
 {% set can_edit_form = Resource.FORMS.allowed(Action.EDIT) %}
+{% set can_generate_form = can_edit_form and current_user.access(AI.CREATE) %}
+{% set can_restrict_form = Resource.SITE.allowed(Action.PERMISSIONS) %}
 
 {% macro save() %}
-  <button class="{{ styles.nav.button }} group/toggle text-xl"
+  <button class="{{ styles.nav.button }} group/toggle"
           data-saved="true"
           data-role="save-form"
           data-kind="saved"
           type="button"
           aria-label="Save form"
           title="Save form">
-    {{ render_icon("builder.saved", "text-kind-default invisible group-data-[saved=true]/toggle:visible", "saved") }}
-    {{ render_icon("builder.unsaved", "text-kind-default invisible group-data-[saved=false]/toggle:visible", "unsaved") }}
+    {{ render_icon("builder.saved", "icon-2xl text-kind-default invisible group-data-[saved=true]/toggle:visible", "saved") }}
+    {{ render_icon("builder.unsaved", "icon-2xl text-kind-default invisible group-data-[saved=false]/toggle:visible", "unsaved") }}
   </button>
 {% endmacro %}
 
@@ -178,7 +180,7 @@
         <h2>Settings</h2>
         <div class="{{ styles.home.card.actions }}">
           {{ help('form_settings') }}
-          {% if can_edit_form %}
+          {% if can_generate_form or can_restrict_form %}
             <button class="{{ styles.toggle.container }}"
                     data-role="form-settings"
                     data-kind="{{ form.form_type }}"
@@ -190,8 +192,8 @@
         </div>
       </div>
       <div id="form-settings-panel" data-visible="true" class="flex flex-col">
-        {% if can_edit_form and current_user.access(AI.CREATE) %}{{ generate() }}{% endif %}
-        {% if Resource.SITE.allowed(Action.PERMISSIONS) %}{{ restrict_access(form) }}{% endif %}
+        {% if can_generate_form %}{{ generate() }}{% endif %}
+        {% if can_restrict_form %}{{ restrict_access(form) }}{% endif %}
       </div>
       <div id="settings-panel" class="flex flex-col gap-3" data-visible="false"></div>
     </section>

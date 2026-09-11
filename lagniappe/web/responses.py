@@ -18,6 +18,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     Action,
     Fetch,
+    FetchReason,
     IngressStage,
     Resource,
     SearchFacets,
@@ -31,6 +32,8 @@ from lagniappe.core.tools import cache
 from lagniappe.core.tools.polling.projections import (
     channel_revision,
     channel_revisions,
+    filter_revision,
+    filter_result_revision,
     render_operation_statuses,
 )
 from lagniappe.core.tools.tasks.ordering import page_task_roots
@@ -189,7 +192,7 @@ def index(name, index, **context):
         render_template(
             f"{name}/index.html",
             index=index,
-            fingerprint=fingerprint,
+            fingerprint=poll_revision if name == "tasks" else fingerprint,
             poll_channel=poll_channel,
             poll_revision=poll_revision,
             **context,
@@ -511,28 +514,6 @@ def page_document_settings(entity):
     )
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
-def page_view_access(page):
-    group_list_template = get_template_attribute(
-        "pages/restrictions.html", "restricted_group_list"
-    )
-    group_list = group_list_template(page)
-
-    viewers = [{"icon": "siteOwner", "text": "Site Owner", "kind": "user"}]
-    for group in page.view_access:
-        if group.name == "public":
-            viewers.append({"icon": "users", "text": "Public", "kind": "group"})
-        else:
-            viewers.append({"icon": "group", "text": group.name, "kind": "group"})
-
-    data = {
-        "viewers": viewers,
-        "group_list": group_list,
-    }
-    return entity_response((jsonify(data), 200), page)
-
-
 def page_image(page):
     template = get_template_attribute("pages/photo.html", "dropzone")
     return template(page), 200
@@ -576,6 +557,9 @@ def new_model_task(model_task):
 # --- File Responses ---
 
 
+# @testable true
+# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_text_tab_renders_uploaded_text_content
+# @matrix file : text-tab
 def file_page(file):
     return render_template("files/file.html", file=file), 200
 
@@ -870,7 +854,17 @@ def home_task_removed():
 # @covered-by lagniappe/web/responses.py::filtered_task_index
 # @covered-by lagniappe/web/responses.py::filtered_page_index
 # @reason filtered index response tests exercise the rendered polling contract
-def _filtered_index_poll_context(channel):
+def _filtered_index_poll_context(entity):
+    if not entity.temporary:
+        context = {"fingerprint": filter_result_revision(entity, current_user)}
+        if entity.parent.kind == "project":
+            context.update(
+                entity_revision=filter_revision(entity, current_user),
+                poll_channel="tasks",
+                poll_revision=channel_revisions(("tasks",), current_user)["tasks"],
+            )
+        return context
+    channel = "tasks" if entity.parent.kind == "project" else "categories"
     return {
         "poll_channel": channel,
         "poll_revision": channel_revisions((channel,), current_user)[channel],
@@ -902,7 +896,7 @@ def filtered_task_index(tasks, filter):
             "tasks/index.html",
             tasks=tasks,
             filtered=filter,
-            **_filtered_index_poll_context("tasks"),
+            **_filtered_index_poll_context(filter),
         ),
         200,
     )
@@ -917,7 +911,7 @@ def filtered_page_index(pages, filter):
             "categories/index.html",
             pages=pages,
             filtered=filter,
-            **_filtered_index_poll_context("categories"),
+            **_filtered_index_poll_context(filter),
         ),
         200,
     )
@@ -1038,12 +1032,10 @@ def delete_entity(entity=None, key=None):
     kind = "user" if entity.kind == "page" and entity.db.get("user") else entity.kind
 
     if kind == "form":
+        loaded = Entities.fetch(*database_get.form_instance_users(entity.key), request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
         instances = [
             instance
-            for instance in Entities.fetch(
-                *database_get.form_instance_users(entity.key),
-                request=Fetch.direct(),
-            )
+            for instance in loaded
             if isinstance(instance, (Entities.PAGE, Entities.TASK))
             and instance.allowed(Action.VIEW, user=current_user)
         ]
@@ -1119,7 +1111,7 @@ def manual_index(section, index):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
-# @matrix manual : ajax-section noindex
+# @matrix manual : ajax-section noindex site-policy address-redaction anonymous-access
 def manual_content(section):
     response = make_response(
         smartypants(render_template(f"manual/content/{section}.html"))

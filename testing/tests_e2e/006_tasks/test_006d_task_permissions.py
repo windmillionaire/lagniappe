@@ -14,7 +14,7 @@ import requests
 from playwright.sync_api import expect
 
 from config import SETTINGS
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from testing.definitions import Categories, Pages, Tasks, Uploads, Users
@@ -268,8 +268,9 @@ def test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page(get_us
     persisted_file = Entities.fetch_one(hidden_file.key, request=Fetch.direct())
     persisted_task = Entities.fetch_one(task.key, request=Fetch.direct())
     before = {
-        "file_tasks": tuple(persisted_file.db.get("tasks", [])),
-        "file_pages": tuple(persisted_file.db.get("pages", [])),
+        "file_task": persisted_file.db.get("task"),
+        "file_page": persisted_file.db.get("page"),
+        "file_task_page": persisted_file.db.get("task_page"),
         "file_requires": tuple(persisted_file.db.get("requires", [])),
         "file_modified": persisted_file.modified,
         "task_files": tuple(persisted_task.db.get("files", [])),
@@ -302,13 +303,14 @@ def test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page(get_us
         timeout=10,
     )
     assert page_response.status_code == 422
-    assert page_response.text == "One or more selected items are unavailable."
+    assert page_response.text == "Upload a new File or move it from File Info."
 
     persisted_file = Entities.fetch_one(hidden_file.key, request=Fetch.direct())
     persisted_task = Entities.fetch_one(task.key, request=Fetch.direct())
     assert {
-        "file_tasks": tuple(persisted_file.db.get("tasks", [])),
-        "file_pages": tuple(persisted_file.db.get("pages", [])),
+        "file_task": persisted_file.db.get("task"),
+        "file_page": persisted_file.db.get("page"),
+        "file_task_page": persisted_file.db.get("task_page"),
         "file_requires": tuple(persisted_file.db.get("requires", [])),
         "file_modified": persisted_file.modified,
         "task_files": tuple(persisted_task.db.get("files", [])),
@@ -344,7 +346,27 @@ def test_new_task_attachment_claim_is_required_and_scope_bound(get_user):
     asset = next(iter(uploaded["assets"].values()))
     assert asset["attachment_claim"]
     uploaded_file = Entities.fetch_one(asset["id"], request=Fetch.direct())
-    assert not uploaded_file.allowed(Action.VIEW, user=actor.entity)
+    assert uploaded_file.allowed(Action.VIEW, user=actor.entity)
+    assert not uploaded_file.allowed(Action.VIEW, user=get_user(Users.user_no_access).entity)
+
+    unclaimed_assets = {
+        key: {field: value for field, value in item.items() if field != "attachment_claim"}
+        for key, item in uploaded["assets"].items()
+    }
+    missing_claim = requests.post(
+        f"{SETTINGS.test_config['BASE_URL']}/tasks/{upload_page.urlsafe_key}/create",
+        data={
+            "name": "Unclaimed attachment task",
+            "description": "Must not be created.",
+            "assets": json.dumps(unclaimed_assets),
+        },
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert missing_claim.status_code == 422
+    assert missing_claim.text == "One or more selected items are unavailable."
 
     wrong_scope = requests.post(
         f"{SETTINGS.test_config['BASE_URL']}/tasks/{other_page.urlsafe_key}/create",
@@ -376,5 +398,9 @@ def test_new_task_attachment_claim_is_required_and_scope_bound(get_user):
     assert accepted.status_code == 200
 
     linked_file = Entities.fetch_one(asset["id"], request=Fetch.direct())
-    assert linked_file.db.get("tasks")
+    Entities.fetch_one(linked_file, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    assert linked_file.task.name == "Claim-authorized attachment task"
+    assert linked_file.task.page.key == upload_page.key
+    assert linked_file.db.get("page") is None
+    assert linked_file.db.get("task_page") == upload_page.key
     assert linked_file.allowed(Action.VIEW, user=actor.entity)

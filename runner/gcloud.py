@@ -1,7 +1,11 @@
+from runner import presentation as ui
+from runner.presentation import output as print
+
 import json
 import os
 
 from runner.context import GCLOUD_CLI, format_command
+from runner.console import wrap_text
 from runner.process import run_command
 
 
@@ -43,7 +47,7 @@ def activate_repository_gcloud(
             "is not installed or is not available on PATH."
         )
 
-    config_gcloud()
+    config_gcloud(announce=False)
     if ensure_cli_token:
         from runner.adc import ensure_gcloud_source_login
 
@@ -51,7 +55,6 @@ def activate_repository_gcloud(
             target["ACCOUNT"],
             allow_login=allow_cli_login,
         )
-        print(f"[OK] gcloud account access is ready ({target['ACCOUNT']})")
     if ensure_adc:
         from runner.adc import ensure_adc_target
 
@@ -64,14 +67,26 @@ def activate_repository_gcloud(
         adc_options = {
             "allowed_principals": allowed_principals,
             "select_gcloud_target": select_adc_target,
+            "announce": False,
         }
         if allow_adc_login is not None:
             adc_options["allow_login"] = allow_adc_login
-        ensure_adc_target(
+        adc_identity = ensure_adc_target(
             target["ACCOUNT"],
             target["PROJECT"],
             **adc_options,
         )
+    print(ui.success("Google Cloud configuration verified"))
+    for label, value in (
+        ("Configuration", target["NAME"]),
+        ("Account", target["ACCOUNT"]),
+        ("Project", target["PROJECT"]),
+    ):
+        print(ui.value(label, value, column=17, verbatim=True))
+    if ensure_adc:
+        principal = (adc_identity or {}).get("principal")
+        if principal and principal.casefold() != target["ACCOUNT"].casefold():
+            print(ui.value("ADC account", principal, column=17, verbatim=True))
     return True
 
 
@@ -130,21 +145,18 @@ def is_account_authenticated(account):
 def check_account_authentication(account):
     """Check if account is authenticated, exit with instructions if not."""
     if not is_account_authenticated(account):
-        print(f"\n{'=' * 70}")
-        print(f"ERROR: Account '{account}' is not authenticated")
-        print(f"{'=' * 70}")
-        print(f"\nThe account '{account}' has not been authenticated with gcloud.")
-        print("\nTo authenticate this account, run:")
-        print(f"\n  {format_command([GCLOUD_CLI, 'auth', 'login', account])}")
-        print("\nThis will open a browser window where you can sign in.")
-        print("\nAuthenticated accounts:")
+        print(ui.error("The saved account is not authenticated with gcloud"))
+        print(ui.value("Account", account, verbatim=True))
+        print(wrap_text("\nTo authenticate this account, run:"))
+        print(f"\n  {ui.literal(format_command([GCLOUD_CLI, 'auth', 'login', account]))}")
+        print(wrap_text("\nThis will open a browser window where you can sign in."))
+        print(wrap_text("\nAuthenticated accounts:"))
         authenticated = get_authenticated_accounts()
         if authenticated:
             for acc in authenticated:
-                print(f"  [OK] {acc}")
+                print(f"  - {acc}")
         else:
             print("  (none)")
-        print(f"\n{'=' * 70}\n")
         raise RuntimeError(f"Account '{account}' is not authenticated.")
 
 
@@ -153,7 +165,7 @@ def check_account_authentication(account):
 # @reason gcloud CLI mutation wrapper exercised through configuration switching
 def create_configuration(name, account, project):
     """Create a new gcloud configuration."""
-    print(f"\nCreating configuration '{name}'...")
+    print(wrap_text(f"\nCreating configuration '{name}'..."))
     run_command(
         [GCLOUD_CLI, "config", "configurations", "create", name, "--no-activate"]
     )
@@ -163,7 +175,7 @@ def create_configuration(name, account, project):
     run_command(
         [GCLOUD_CLI, "config", "set", "project", project, "--configuration", name]
     )
-    print(f"[OK] Configuration '{name}' created successfully")
+    print(ui.success(f"Configuration '{name}' created"))
 
 
 # @testable false
@@ -171,7 +183,7 @@ def create_configuration(name, account, project):
 # @reason gcloud CLI mutation wrapper exercised through configuration switching
 def activate_configuration(name):
     """Activate a specific gcloud configuration."""
-    print(f"\nActivating configuration '{name}'...")
+    print(wrap_text(f"\nActivating configuration '{name}'..."))
     run_command([GCLOUD_CLI, "config", "configurations", "activate", name])
 
 
@@ -196,7 +208,9 @@ def ensure_configuration_properties(name, account, project):
 
     if current_account != account:
         print(
-            f"Updating gcloud configuration '{name}' account: {current_account or '(unset)'} -> {account}"
+            wrap_text(
+                f"Updating gcloud configuration '{name}' account: {current_account or '(unset)'} -> {account}"
+            )
         )
         run_command(
             [GCLOUD_CLI, "config", "set", "account", account, "--configuration", name]
@@ -204,7 +218,9 @@ def ensure_configuration_properties(name, account, project):
 
     if current_project != project:
         print(
-            f"Updating gcloud configuration '{name}' project: {current_project or '(unset)'} -> {project}"
+            wrap_text(
+                f"Updating gcloud configuration '{name}' project: {current_project or '(unset)'} -> {project}"
+            )
         )
         run_command(
             [GCLOUD_CLI, "config", "set", "project", project, "--configuration", name]
@@ -214,20 +230,22 @@ def ensure_configuration_properties(name, account, project):
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_switcher_exports_project_for_child_processes
 # @matrix setup : env-export gcloud-config
-def verify_active_configuration(name, account, project):
+def verify_active_configuration(name, account, project, *, announce=True):
     active = get_active_configuration()
     active_account = get_configuration_value("account")
     active_project = get_configuration_value("project")
 
     if active != name or active_account != account or active_project != project:
-        print(f"\n{'=' * 70}")
-        print("ERROR: Active gcloud configuration does not match expected settings")
-        print(f"{'=' * 70}")
-        print(f"Expected: config={name}, account={account}, project={project}")
         print(
-            f"Actual:   config={active}, account={active_account}, project={active_project}"
+            ui.error("Active gcloud configuration does not match expected settings")
         )
-        print(f"{'=' * 70}\n")
+        for heading, values in (
+            ("Expected", (name, account, project)),
+            ("Actual", (active, active_account, active_project)),
+        ):
+            print(ui.heading(heading))
+            for label, value in zip(("Configuration", "Account", "Project"), values):
+                print(ui.value(label, value, column=17, verbatim=True))
         raise RuntimeError(
             "Active gcloud configuration does not match expected settings."
         )
@@ -237,7 +255,14 @@ def verify_active_configuration(name, account, project):
     os.environ["GCLOUD_PROJECT"] = project
     os.environ["GOOGLE_CLOUD_QUOTA_PROJECT"] = project
     # os.environ["LAGNIAPPE_GCLOUD_CONFIGURED"] = name
-    print(f"[OK] Using gcloud configuration '{name}' ({account}, {project})")
+    if announce:
+        print(ui.success("Google Cloud configuration verified"))
+        for label, value in (
+            ("Configuration", name),
+            ("Account", account),
+            ("Project", project),
+        ):
+            print(ui.value(label, value, column=17, verbatim=True))
 
 
 # @testable false
@@ -248,25 +273,31 @@ def display_configurations():
     configs = list_configurations()
     active = get_active_configuration()
 
-    print("\n" + "=" * 70)
-    print("GCloud Configurations:")
-    print("=" * 70)
+    print(ui.heading("\nGoogle Cloud configurations"))
 
     for config in configs:
         is_active = " (ACTIVE)" if config["name"] == active else ""
-        print(f"\nName: {config['name']}{is_active}")
+        print(ui.value("\nName", f"{config['name']}{is_active}", verbatim=True))
         print(
-            f"  Account: {config.get('properties', {}).get('core', {}).get('account', 'Not set')}"
+            ui.value(
+                "  Account",
+                f"{config.get('properties', {}).get('core', {}).get('account', 'Not set')}",
+                verbatim=True,
+            )
         )
         print(
-            f"  Project: {config.get('properties', {}).get('core', {}).get('project', 'Not set')}"
+            ui.value(
+                "  Project",
+                f"{config.get('properties', {}).get('core', {}).get('project', 'Not set')}",
+                verbatim=True,
+            )
         )
 
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_switcher_exports_project_for_child_processes
 # @matrix setup : env-export gcloud-config
-def config_gcloud():
+def config_gcloud(*, announce=True):
     from config import SETTINGS
 
     config = SETTINGS.GCLOUD_CONFIG
@@ -289,12 +320,12 @@ def config_gcloud():
             )
             if active == expected_name:
                 verify_active_configuration(
-                    expected_name, expected_account, expected_project
+                    expected_name, expected_account, expected_project, announce=announce
                 )
                 return
             activate_configuration(c["name"])
             verify_active_configuration(
-                expected_name, expected_account, expected_project
+                expected_name, expected_account, expected_project, announce=announce
             )
             return
 
@@ -302,4 +333,6 @@ def config_gcloud():
     os.environ["GLOG_minloglevel"] = "2"
     create_configuration(expected_name, expected_account, expected_project)
     activate_configuration(expected_name)
-    verify_active_configuration(expected_name, expected_account, expected_project)
+    verify_active_configuration(
+        expected_name, expected_account, expected_project, announce=announce
+    )

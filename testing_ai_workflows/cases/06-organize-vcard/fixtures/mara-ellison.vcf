@@ -1,0 +1,11 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Ellison;Mara;;;
+FN:Mara Ellison
+ORG:Hawthorn Watershed Cooperative
+TITLE:Volunteer site coordinator
+EMAIL;TYPE=INTERNET:mara.ellison@example.test
+TEL;TYPE=CELL:+1-555-014-2276
+ADR;TYPE=WORK:;;48 Alder Creek Road;Meadow County;OR;97000;USA
+NOTE:Follow up during the week of 2026-10-05 about the Juniper Rain Garden soil delivery.
+END:VCARD

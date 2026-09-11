@@ -7,15 +7,32 @@ They are excluded from App Engine uploads.
 ## Process and path boundary
 
 `runner/context.py` resolves the repository root, project virtualenv, supported
-platform commands, and exact external executables. Paths do not depend on the
-caller's current directory. `runner/process.py` runs argument-list subprocesses
-and provides the shared error/exit boundary.
+platform commands, and exact external executables. Its `UV_CLI` is derived
+only from the version in `mcp/uv-bootstrap.json` and resolves
+to `venv/tools/uv/<version>/uv`; it never consults `PATH`. Paths do not depend
+on the caller's current directory. `runner/process.py` runs argument-list
+subprocesses and provides the shared error/exit boundary.
+
+`runner/uv_bootstrap.py` is a standard-library-only install/check boundary for
+that executable. Developer and CI provisioning explicitly run:
+
+```bash
+venv/bin/python -m runner.uv_bootstrap install --non-interactive
+venv/bin/python -m runner.uv_bootstrap check
+```
+
+Adapter-dependent commands do not download or repair this tool implicitly. A
+missing, byte-mismatched, or wrong-version managed copy stops with the exact
+`./setup.sh development` repair command.
 
 ## Gcloud and ADC
 
 `runner/gcloud.py` activates the complete gcloud configuration saved in
 `lagniappe_dev.yaml`. It verifies configuration name, account, and project as a
 unit and exports the selected project for child pytest/Flask processes.
+Successful activation prints one grouped target summary and lists the credential
+checks completed. Internal callers may suppress repeated success announcements;
+configuration, token, and ADC verification still run normally.
 
 An unconfigured checkout may run offline tooling. A partial saved target fails
 before collection or app startup instead of using ambient gcloud state.
@@ -47,6 +64,58 @@ provider provisioning.
 | `run.py icons` | Material Symbols registry subset refresh. |
 | `run.py upgrade` | Maintainer dependency upgrade. |
 | deployment command | `runner/deploy.py`. |
+
+## MCP service environment
+
+`runner/mcp_environment.py` is the one-way bridge from repository tooling into
+the MCP service environment. It verifies the manifest-selected managed `uv`, runs
+the exact locked synchronization command
+
+```bash
+venv/tools/uv/<version>/uv sync --project mcp --locked --group test \
+  --python <current-project-python> --no-managed-python --no-python-downloads --no-config
+```
+
+and invokes only `mcp/.venv/bin/python -I` for adapter code.
+The bridge removes inherited `UV_*` configuration, pins the current project
+interpreter explicitly, disables managed-Python downloads, and ignores ambient
+uv configuration files. Local preparation checks that the environment shares
+that interpreter's base prefix and that Python 3.14, the MCP SDK, pytest, `uv-build`, and
+the editable adapter source resolve from that isolated environment. The hosted check instead
+requires the adapter itself to be installed inside the prebuilt environment,
+so copied images do not depend on an editable source path. Both container builds
+first install the locked test group without the project, then install the copied
+first-party source offline with build isolation disabled. That second layer can
+therefore use only the exact `uv-build` backend installed from `uv.lock`.
+The production MCP image then synchronizes without the test group, removing
+pytest and the build backend. The hosted E2E image retains them to run tests.
+Adapter pytest runs use
+the shared `testing/pytest.ini` with `--noconftest`, disabled plugin
+autodiscovery, and only the explicit AnyIO plugin, keeping Lagniappe application
+imports and the root virtualenv out of the package suite. The sync also sets
+uv's no-build policy for third-party source distributions while still allowing
+the first-party editable project build. A stale lock, failed sync, unexpected
+interpreter, missing binary dependency, or ambient dependency resolution is a
+hard failure with development-setup repair guidance.
+
+The default and `unit` test selections split MCP coverage into that locked
+environment: the five `testing/tests_unit/test_033*.py` files cover the API
+adapter, file boundary, HTTP server, ChatGPT attachments and terminal uploads.
+They run exactly once there, while the root pytest process explicitly ignores
+them. Focused paths or nodeids take the same bridge. The runner validates and
+merges the isolated outcomes into ordinary traceability evidence and combines
+the two pytest exit statuses without treating an empty companion selection as
+a failure.
+
+When both processes are selected with `--junitxml` (or `--junit-xml`), each
+writes a fresh partition report. The runner atomically publishes their combined
+test suites at the requested path; a missing or malformed partition is an
+error, never a silently incomplete report. Single-process runs retain normal
+pytest report behavior.
+
+The package environment is an internal test/container dependency. The local
+`mcp` and `mcp-artifact` commands, public wheel ledger and release checks have
+been removed. Cloud Run deployment remains separate from this runner.
 
 Testing commands and server concurrency rules are in [TESTING.md](TESTING.md).
 Hosted infrastructure is in [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md).

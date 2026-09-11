@@ -15,7 +15,7 @@
 					}
 				}
 			],
-			["TASK", { "name": "Task" }],
+			["TASK", { "name": "Task", "page": { "name": "Parent", "hash": "parent-page" } }],
 			["CATEGORY", { "name": "Category" }],
 			[
 				"USER",
@@ -171,18 +171,16 @@
 			[
 				"FILE",
 				{
-					"name": "File with Pages",
+					"name": "File with Page",
 					"hash": "file123",
-					"pages": [
-						{ "name": "File Page", "hash": "fpage12", "categories": [] }
-					],
+					"page": { "name": "File Page", "hash": "fpage12", "categories": [] },
 					"should_match": ["file123", "models", "fpage12"]
 				}
 			],
 			[
 				"FILE",
 				{
-					"name": "File No Pages",
+					"name": "Unowned File",
 					"hash": "file456",
 					"should_match": ["file456", "models"]
 				}
@@ -235,7 +233,7 @@
 		"entities": [
 			["PROJECT", { "name": "Project", "hash": "projhsh" }],
 			["PAGE", { "name": "Page", "hash": "pagehsh" }],
-			["TASK", { "name": "Task", "hash": "taskhsh" }],
+			["TASK", { "name": "Task", "hash": "taskhsh", "page": { "name": "Parent", "hash": "parent-page" } }],
 			["CATEGORY", { "name": "Category", "hash": "cathash" }],
 			[
 				"USER",
@@ -283,7 +281,7 @@
 			["PROJECT", { "name": "The Great Project" }],
 			["PROJECT", { "name": "No Features" }],
 			["PAGE", { "name": "Page Name" }],
-			["TASK", { "name": "Task Name" }],
+			["TASK", { "name": "Task Name", "page": { "name": "Parent", "hash": "parent-page" } }],
 			["CATEGORY", { "name": "Category Name" }],
 			[
 				"USER",
@@ -338,7 +336,7 @@
 				"PAGE",
 				{ "name": "User Page", "user": { "name": "Owner", "hash": "owner12" } }
 			],
-			["TASK", { "name": "Task" }],
+			["TASK", { "name": "Task", "page": { "name": "Parent", "hash": "parent-page" } }],
 			["CATEGORY", { "name": "Category" }],
 			[
 				"USER",

@@ -464,8 +464,11 @@ def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user
 
 # @matrix pages : category-fallback default-cascade delete preserve-page
 # @matrix users : category-fallback default-cascade delete options preserve-page
+# @matrix user-index : page-canonical delete
 # @pair user-groups:unrelated-delete
 # @template table.html::row
+# @template controls.html::delete
+# @template cell.html::format_table_cell
 def test_delete_user_can_preserve_page(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -497,6 +500,12 @@ def test_delete_user_can_preserve_page(get_user):
         expect(groups_tool).not_to_be_visible()
         cascade_row = Table(owner).get_row(cascade_user.name)
         expect(cascade_row).to_be_visible()
+        expect(cascade_row).to_have_attribute("data-key", cascade_user.page.urlsafe_key)
+        expect(cascade_row).to_have_attribute("data-hash", cascade_user.page.hash)
+        expect(cascade_row).to_have_attribute("data-fingerprint", cascade_user.page.fingerprint)
+        expect(cascade_row.locator(
+            f"button[lp-delete][data-delete-modal-route='/l/delete/{cascade_user.urlsafe_key}']"
+        )).to_have_count(2)
 
         cascade_row.locator("td[data-column='delete'] button[lp-delete]").click()
         cascade_modal = Modal(owner.page)
@@ -517,6 +526,9 @@ def test_delete_user_can_preserve_page(get_user):
 
         row = Table(owner).get_row(created_user.name)
         expect(row).to_be_visible()
+        expect(row).to_have_attribute("data-key", created_user.page.urlsafe_key)
+        expect(row).to_have_attribute("data-hash", created_user.page.hash)
+        expect(row).to_have_attribute("data-fingerprint", created_user.page.fingerprint)
 
         row.locator("td[data-column='delete'] button[lp-delete]").click()
         modal = Modal(owner.page)

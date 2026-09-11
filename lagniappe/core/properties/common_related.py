@@ -48,7 +48,12 @@ class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProp
         if value is not None and getattr(value, "entity_kind", None) != "form":
             raise ValueError("Value must be a form")
 
+        if self.entity.entity_kind in {"page", "task"} and self.key != getattr(value, "key", None):
+            self.entity._permission_sources_changed = True
         RelatedEntityMixin.value.fset(self, value)
+        restricted_to = self.entity.properties.get("restricted_to")
+        if restricted_to is not None:
+            restricted_to.unset()
 
     # Filter Attributes
     @property
@@ -83,6 +88,22 @@ class AttachedTask(RelatedEntityMixin, FilterMixin, AIMixin, Property):
     _label = "Task"
     _icon = "task"
     _kind = "task"
+
+    @property
+    def key(self):
+        if self.is_set and self._value:
+            return self._value.key
+        return getattr(self.entity.key, "parent", None)
+
+    @property
+    def keys(self):
+        return [self.key] if self.key else []
+
+    def attach(self, key_map):
+        self._value = key_map.get(self.key)
+        self._cache_attached_entities()
+        self._invalidate_projections()
+
 
 
 # @testable true
@@ -334,6 +355,9 @@ class RelatedForms(RelatedEntityListMixin, DBProperty):
         return False
 
 
+# @testable false
+# @covered-by lagniappe/core/properties/common_related.py::Groups.attach
+# @reason inherited relation mechanics are exercised through local restriction attachment
 class Groups(RelatedEntityListMixin, DBProperty):
     """Groups that have access to a form."""
 
@@ -341,3 +365,13 @@ class Groups(RelatedEntityListMixin, DBProperty):
     _label = "Groups"
     _icon = "group"
     _kind = "user"
+
+    # @testable true
+    # @tests tests_unit/test_002_entity_general_properties.py::test_direct_fetch_materializes_local_restrictions_from_attached_groups
+    # @tests tests_unit/test_002_entity_general_properties.py::test_task_file_restrictions_use_stored_hashes_without_group_reads
+    # @matrix permissions relations : attached-groups local-restrictions materialization stored-restrictions no-extra-read
+    def attach(self, key_map):
+        super().attach(key_map)
+        # With no Group references, the stored local hashes remain authoritative.
+        if self.keys:
+            self.entity.properties.restricted_to.materialize()

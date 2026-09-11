@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import sys
 
+from runner.uv_bootstrap import managed_uv_path
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 PROJECT_VIRTUALENV = REPOSITORY_ROOT / "venv"
@@ -26,6 +28,7 @@ GCLOUD_CLI = TOOL_PATHS["gcloud"]
 GIT_CLI = TOOL_PATHS["git"]
 NODE_CLI = TOOL_PATHS["node"]
 NPM_CLI = TOOL_PATHS["npm"]
+UV_CLI = managed_uv_path()
 
 
 # @testable true

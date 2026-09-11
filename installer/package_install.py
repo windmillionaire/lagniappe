@@ -1,4 +1,5 @@
-from contextlib import contextmanager
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
 import importlib
 from importlib import metadata
 import os
@@ -6,10 +7,12 @@ import re
 import subprocess
 import sys
 
-from runner.context import REPOSITORY_ROOT
+from runner.console import format_prompt, wrap_text
+from runner.context import REPOSITORY_ROOT, format_command
 from installer.errors import PIP_TIMEOUT, SetupCancelled, SetupError
 
-_ACTIVE_SPINNERS = []
+from runner.presentation import ACTIVE_PROGRESS as _ACTIVE_SPINNERS  # noqa: F401 - compatibility export used by callers
+from runner.presentation import pause_progress as _pause_active_spinners
 _PROJECT_ROOT = REPOSITORY_ROOT
 _PINNED_REQUIREMENTS = (
     _PROJECT_ROOT / "requirements-installer.txt",
@@ -18,8 +21,7 @@ _PINNED_REQUIREMENTS = (
 )
 _SETUP_DEPENDENCIES = (
     ("yaml", "PyYAML", "YAML configuration"),
-    ("yaspin", "yaspin", "setup progress display"),
-    ("colorama", "colorama", "portable terminal output"),
+    ("rich", "rich", "portable setup presentation"),
     ("certifi", "certifi", "trusted certificate authorities"),
     ("requests", "requests", "provider HTTP requests"),
     ("google.auth", "google-auth", "Google authentication"),
@@ -46,63 +48,6 @@ _SETUP_DEPENDENCIES = (
 )
 
 
-# @testable false
-# @covered-by installer/package_install.py::track_spinner_factory
-# @reason context-manager adapter; behavior is owned by the spinner factory wrapper
-class _TrackedSpinnerContext:
-    def __init__(self, context):
-        self._context = context
-        self._spinner = None
-
-    def __enter__(self):
-        self._spinner = self._context.__enter__()
-        _ACTIVE_SPINNERS.append(self._spinner)
-        return self._spinner
-
-    def __exit__(self, exc_type, exc, tb):
-        try:
-            return self._context.__exit__(exc_type, exc, tb)
-        finally:
-            if self._spinner in _ACTIVE_SPINNERS:
-                _ACTIVE_SPINNERS.remove(self._spinner)
-
-
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_install_if_missing_pauses_active_spinner_for_prompt
-# @matrix setup : package-install spinner
-def track_spinner_factory(yaspin_factory):
-    """Wrap a yaspin factory so package installs can pause active spinners."""
-
-    # @testable false
-    # @covered-by installer/package_install.py::track_spinner_factory
-    # @reason closure returned by spinner factory wrapper
-    def tracked_yaspin(*args, **kwargs):
-        return _TrackedSpinnerContext(yaspin_factory(*args, **kwargs))
-
-    return tracked_yaspin
-
-
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_install_if_missing_pauses_active_spinner_for_prompt
-# @matrix setup : package-install spinner
-@contextmanager
-def _pause_active_spinners():
-    paused = []
-    for spinner in reversed(_ACTIVE_SPINNERS):
-        stop = getattr(spinner, "stop", None)
-        if callable(stop):
-            stop()
-            paused.append(spinner)
-
-    try:
-        yield
-    finally:
-        for spinner in reversed(paused):
-            start = getattr(spinner, "start", None)
-            if callable(start):
-                start()
-
-
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
 # @pair setup:package-install
@@ -125,7 +70,7 @@ def ensure_pip_is_available():
         # pip is not found or python executable itself is not found
         pass  # Proceed to try and install it
 
-    print("Pip not found. Attempting to install it...")
+    print(wrap_text("Pip not found. Attempting to install it..."))
     try:
         # Try to install pip using ensurepip
         subprocess.check_call(
@@ -141,7 +86,7 @@ def ensure_pip_is_available():
             stderr=subprocess.DEVNULL,
             timeout=30,
         )
-        print("Pip installed successfully.")
+        print(ui.success(wrap_text("Pip installed successfully.")))
         return  # pip is now available
     except (
         subprocess.CalledProcessError,
@@ -149,23 +94,56 @@ def ensure_pip_is_available():
         FileNotFoundError,
     ) as e:
         print(
-            f"Error: Automatic installation of 'pip' failed. ({e})\n"
-            f"Please install pip manually for your Python environment ({sys.executable}).\n\n"
-            "Instructions:\n"
-            "-------------\n"
-            "1. Download get-pip.py from https://bootstrap.pypa.io/get-pip.py\n"
-            f"2. Run: '{sys.executable}' get-pip.py\n\n"
-            "For Windows (if the above fails or python is not in PATH):\n"
-            "  - Search for 'Manage app execution aliases' in Windows settings.\n"
-            "  - Ensure 'python.exe' and 'python3.exe' (if present) provided by 'Python Software Foundation' are enabled.\n"
-            "  - Or, use the full path to your python.exe when running get-pip.py, e.g.:\n"
-            f"    '{sys.executable}' get-pip.py\n\n"
-            "For macOS/Linux (if python is not in PATH or you have multiple Pythons):\n"
-            "  - Use 'python3' or the specific Python executable path:\n"
-            f"    '{sys.executable}' get-pip.py\n"
-            "  - You might need to use 'sudo' if installing system-wide (not recommended if using virtual environments):\n"
-            f"    sudo '{sys.executable}' get-pip.py\n\n"
-            "After installing pip, please re-run this setup script.",
+            ui.error("Automatic installation of pip failed", stream=sys.stderr),
+            file=sys.stderr,
+        )
+        print(str(e), file=sys.stderr, raw=True)
+        print(
+            wrap_text(
+                f"Please install pip manually for your Python environment ({sys.executable})."
+            ),
+            file=sys.stderr,
+        )
+        print(
+            ui.value(
+                (f"{ui.literal('1.')} Download get-pip.py"),
+                "https://bootstrap.pypa.io/get-pip.py",
+                verbatim=True,
+                standalone=True,
+                action=True,
+            ),
+            file=sys.stderr,
+        )
+        print(
+            ui.value(
+                (f"{ui.literal('2.')} Run"),
+                format_command([sys.executable, "get-pip.py"]),
+                verbatim=True,
+                standalone=True,
+                action=True,
+            ),
+            file=sys.stderr,
+        )
+        print(
+            wrap_text(
+                (
+                    "\nFor Windows (if the above fails or python is not in PATH):\n  - "
+                    f"Search for '{ui.literal('Manage app execution aliases')}' in "
+                    f"Windows settings.\n  - Ensure '{ui.literal('python.exe')}' and '"
+                    f"{ui.literal('python3.exe')}' (if present) provided by 'Python "
+                    "Software Foundation' are enabled.\n  - Or, use the full path to "
+                    f"your {ui.literal('python.exe')} in the command above.\n\nFor "
+                    "macOS/Linux (if python is not in PATH or you have multiple "
+                    "Pythons):\n  - Use 'python3' or the specific Python executable "
+                    "path.\n  - You might need to use 'sudo' if installing system-wide "
+                    "(not recommended if using virtual environments):"
+                )
+            ),
+            file=sys.stderr,
+        )
+        print(f"    sudo '{sys.executable}' get-pip.py", file=sys.stderr)
+        print(
+            wrap_text("\nAfter installing pip, please re-run this setup script."),
             file=sys.stderr,
         )
         raise SetupError("Automatic pip installation failed.") from e
@@ -291,16 +269,27 @@ def ensure_setup_dependencies():
             "LAGNIAPPE_NONINTERACTIVE", ""
         ).lower() not in ("1", "true", "yes")
         if interactive:
-            print("Setup needs to install or correct these Python dependencies:")
+            print(
+                wrap_text(
+                    "Setup needs to install or correct these Python dependencies:"
+                )
+            )
             for _import_name, package_name, explanation, requirement, detail in pending:
                 print(f"  {requirement} — {explanation} ({detail})")
             if compatibility_error:
                 print(
-                    "  transitive dependencies — compatibility repair "
-                    f"({compatibility_error})"
+                    wrap_text(
+                        "  transitive dependencies — compatibility repair "
+                        f"({compatibility_error})"
+                    )
                 )
-            if input("Continue with this dependency transaction? [Y/n]: ").lower() == "n":
-                print("Aborting installer.")
+            if (
+                input(
+                    format_prompt("Continue with this dependency transaction? [Y/n]: ")
+                ).lower()
+                == "n"
+            ):
+                print(ui.status(wrap_text("Aborting installer.")))
                 raise SetupCancelled(
                     "Setup dependency transaction cancelled by the operator."
                 )
@@ -402,22 +391,28 @@ def install_if_missing(import_name, explanation=None, package_name=None):
             ).lower() not in ("1", "true", "yes")
 
             if interactive:
-                prompt = f"Install {package_name}? ({explanation if explanation else ''}) [Y/n]: "
+                if explanation:
+                    print(ui.info(f"Setup uses {package_name} for {explanation}."), file=sys.stderr)
+                prompt = format_prompt(f"Install {package_name}", hint="Y/n", stream=sys.stderr)
                 sys.stderr.write(prompt)
                 sys.stderr.flush()
                 response = input()
                 if response.lower() == "n":
-                    print("Aborting installer.")
+                    print(ui.status(wrap_text("Aborting installer.")))
                     raise SetupCancelled(
                         f"Installation of {package_name} was cancelled."
                     )
 
-            print(f"Installing {package_name}...", file=sys.stderr)
+            print(ui.activity(f"Installing {package_name}"), file=sys.stderr)
             try:
                 _install(package_name, import_name)
             except Exception as e:
-                print(f"Failed to install {package_name}. Error: {e}", file=sys.stderr)
+                print(
+                    ui.error(f"Failed to install {package_name}", e, stream=sys.stderr),
+                    file=sys.stderr,
+                    raw=True,
+                )
                 raise SetupError(
                     f"Failed to install setup dependency {package_name}."
                 ) from e
-            print(f"Installed {package_name} [OK]", file=sys.stderr)
+            print(ui.success(f"Installed {package_name}", stream=sys.stderr), file=sys.stderr)

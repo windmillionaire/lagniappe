@@ -568,6 +568,26 @@ def test_ai_email_router_normalizes_attachment_create_to_organize():
     }
 
 
+# @source lagniappe/core/tools/ai/email_router.py::ai_email_routing_prompt
+# @source lagniappe/core/tools/ai/email_router.py::validate_ai_email_route
+# @source lagniappe/core/tools/ai/email_router.py::route_ai_email
+# @matrix ai-email : routing utility-model attachment-contract
+def test_ai_email_router_selects_fileless_updates_without_discovery(monkeypatch):
+    captured = []
+    def generate(prompt, *, validator):
+        captured.append(prompt)
+        return validator({"workflow": "organize", "confidence": 0.99, "reason": "Update an existing Task."})
+    monkeypatch.setattr(ai_tools.ai_model, "generate_content", generate)
+    result = ai_tools.route_ai_email("Finish CLI task", "Add implementation notes", [], ("ask", "create", "organize"))
+    assert result["workflow"] == "organize"
+    prompt = captured[0]
+    assert prompt.response_schema["properties"]["workflow"]["enum"] == ["ask", "create", "organize"]
+    assert prompt.tools is None and not prompt.search
+    assert "These requests do not require attachments" in prompt.build()
+    assert "browser review" in prompt.build()
+    assert prompt.model_tier == "utility"
+
+
 # @matrix ai-email : attachment-only deterministic inline routing
 def test_ai_email_router_routes_attachment_only_message_to_organize(monkeypatch):
     monkeypatch.setattr(
@@ -1085,10 +1105,16 @@ def test_submission_contract_keeps_create_and_organize_report_only(monkeypatch):
     )
     with pytest.raises(AIEmailRejection, match="Create email does not accept"):
         ai_email._preflight_submission(message, "create", user, _config())
-    with pytest.raises(AIEmailRejection, match="requires at least one"):
+    update_instructions, update_files = ai_email._preflight_submission(
+        SimpleNamespace(headers={}, subject="Complete the CLI task", text_body="", attachments=()),
+        "organize", user, _config(),
+    )
+    assert update_files == ()
+    assert "Complete the CLI task" in update_instructions
+    with pytest.raises(AIEmailRejection, match="requires a subject or message body"):
         ai_email._preflight_submission(
             SimpleNamespace(
-                headers={}, subject="Organize", text_body="", attachments=()
+                headers={}, subject="", text_body="", attachments=()
             ),
             "organize",
             user,

@@ -102,13 +102,16 @@
 {% macro view() %}
   {% set category = index.entity if index else filtered.parent %}
   <div lp-view
+       data-authorization="{{ current_user.authorization_fingerprint }}"
        lp-entity
        data-kind="category"
        data-index="category"
        data-key="{{ filtered.urlsafe_key if filtered and not filtered.temporary else category.urlsafe_key }}"
-       data-fingerprint="{{ filtered.fingerprint if filtered and not filtered.temporary else category.fingerprint }}"
-       data-poll-channel="{{ poll_channel }}"
-       data-poll-revision="{{ poll_revision }}"
+       data-fingerprint="{{ fingerprint if filtered and not filtered.temporary else category.fingerprint }}"
+       {% if poll_channel %}
+         data-poll-channel="{{ poll_channel }}"
+         data-poll-revision="{{ poll_revision }}"
+       {% endif %}
        data-hash="{{ filtered.hash if filtered else category.hash }}"
        class="group/view">
     <div class="{{ styles.layout.view.header }}">

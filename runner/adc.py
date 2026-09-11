@@ -3,7 +3,10 @@
 import os
 import sys
 
+from runner import presentation as ui
+from runner.presentation import output as print
 from runner.context import GCLOUD_CLI, format_command, python_command, setup_command
+from runner.console import wrap_text
 from runner.process import run_command
 
 
@@ -119,10 +122,12 @@ def ensure_gcloud_source_login(account, *, allow_login=False):
         )
 
     print(
-        f"The saved gcloud login for '{account}' needs to be refreshed; "
-        "opening account authentication:"
+        wrap_text(
+            f"The saved gcloud login for '{account}' needs to be refreshed; "
+            "opening account authentication:"
+        )
     )
-    print(f"  {format_command(login_command)}")
+    print(f"  {ui.literal(format_command(login_command))}")
     result = run_command(
         login_command,
         check=False,
@@ -146,20 +151,18 @@ def ensure_gcloud_source_login(account, *, allow_login=False):
 # @covered-by runner/adc.py::ensure_adc_target
 # @reason ordered gcloud selection is exercised through explicit local ADC alignment
 def _select_gcloud_auth_target(account, project):
-    print(f"Selecting gcloud account '{account}'...")
+    print(wrap_text(f"Selecting gcloud account '{account}'..."))
     run_command(
         [GCLOUD_CLI, "config", "set", "account", account],
         timeout=60,
     )
     ensure_gcloud_source_login(account, allow_login=True)
-    print(f"[OK] Using gcloud account '{account}'")
 
-    print(f"Selecting gcloud project '{project}'...")
+    print(wrap_text(f"Selecting gcloud project '{project}'..."))
     run_command(
         [GCLOUD_CLI, "config", "set", "project", project],
         timeout=60,
     )
-    print(f"[OK] Using gcloud project '{project}'")
 
 
 # @testable true
@@ -175,6 +178,7 @@ def ensure_adc_target(
     allowed_principals=(),
     allow_login=None,
     select_gcloud_target=False,
+    announce=True,
 ):
     """Align local ADC with the requested repository identity and project."""
     account = str(account or "").strip()
@@ -203,10 +207,10 @@ def ensure_adc_target(
         project=project,
     )
     if not mismatches:
-        print(
-            f"[OK] Using Application Default Credentials "
-            f"({identity['principal']}, {project})"
-        )
+        if announce:
+            print(ui.success("Application Default Credentials verified"))
+            print(ui.value("Account", identity["principal"], column=10, verbatim=True))
+            print(ui.value("Project", project, column=10, verbatim=True))
         return identity
 
     if allowed_principals and allow_login is False:
@@ -246,10 +250,12 @@ def ensure_adc_target(
         if select_gcloud_target:
             _select_gcloud_auth_target(account, project)
         print(
-            "Application Default Credentials do not match this checkout; "
-            "opening the saved account login:"
+            wrap_text(
+                "Application Default Credentials do not match this checkout; "
+                "opening the saved account login:"
+            )
         )
-        print(f"  {format_command(login_command)}")
+        print(f"  {ui.literal(format_command(login_command))}")
         result = run_command(
             login_command,
             check=False,
@@ -292,8 +298,8 @@ def ensure_adc_target(
             + "."
         )
 
-    print(
-        f"[OK] Using Application Default Credentials "
-        f"({identity['principal']}, {project})"
-    )
+    if announce:
+        print(ui.success("Application Default Credentials verified"))
+        print(ui.value("Account", identity["principal"], column=10, verbatim=True))
+        print(ui.value("Project", project, column=10, verbatim=True))
     return identity

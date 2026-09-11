@@ -119,13 +119,17 @@ release preparation.
 ```bash
 npm ci
 npm run build
-git commit -am "Release Candidate X.Y.Z"
+git add -A
+git commit -m "Release Candidate X.Y.Z"
 git status --short
 ```
 
 Review the complete authored tree before committing. Add any intentional new
-files explicitly. Skip the commit if the canonical build is already committed
-and the tree is clean.
+files explicitly. Normal deployment also reconciles selected MCP services,
+building changed service inputs and activating them after App Engine; see
+[Deployment](INFRA_DEPLOYMENT.md#remote-mcp-service).
+Skip the commit if the canonical builds are already committed and the tree is
+clean.
 
 ### 4. Run the offline gates
 

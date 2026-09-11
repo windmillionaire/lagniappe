@@ -41,7 +41,7 @@ ending in `.css`, `.js`, `.map`, `.json`, `.txt`, or `.ico`:
 - Sends `If-None-Match` with the ETag on the cached response
 - On 304: return the cached response with `X-Lagniappe-Updated: false`
 - On 200: cache and return the response unless the response is
-  `no-store` or redirected
+  `no-store`, redirected, or carries a cache-invalidation instruction
 - On network error: return a stale cached response if available; otherwise
   return the offline document for navigation or an explicit 503 for non-navigation
   requests
@@ -115,6 +115,20 @@ cache is deleted. The service worker then fetches a fresh CSRF token and
 validates the user session with confirmation that the response cache was
 cleared. This is used for events like permission changes or site-wide updates
 that require a clean slate.
+
+Invalidation-bearing responses use server-owned `Cache-Control: no-store` and
+bypass conditional 304 responses. The browser HTTP cache is separate from Cache
+Storage: deleting `response-cache` cannot remove HTTP-cache metadata, and a 304
+can retain an older invalidation header. The worker also rejects flagged Cache
+Storage entries and replaces them through an unconditional reload fetch. A new
+deployment's existing deployment/build ETag components invalidate older HTTP
+entries created before this policy.
+
+Home ETags still include the user's modification timestamp and authorization
+fingerprint, so permission edits require a fresh representation. A revision-
+checked cache acknowledgement clears only its flag; it does not change the user
+timestamp merely to break header replay. Dynamic invalidation responses wait
+for the acknowledgement attempt before being returned to the application.
 
 The server acknowledgement is complete only when the token response is OK and
 nonempty and `POST /l/validate-user` returns an OK JSON response with

@@ -3,7 +3,7 @@
 import copy
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 
 from ...references import hash_reference
@@ -51,7 +51,7 @@ def _completion_target_context(
             "files": _completion_evidence_files(files, fallback_files),
         }
     )
-    if action.get("type") == "update_submission_fields":
+    if action.get("type") == "update_form_values":
         target["existing_submission"] = _completion_existing_submission(
             action,
             context,
@@ -333,7 +333,7 @@ def _completion_form_info(action, context):
             return task_form
         model_ref = _first_data_reference(data, "model")
         return _model_task_form_info(model_ref, context)
-    if action_type == "update_submission_fields":
+    if action_type == "update_form_values":
         entity, _target_type, _reference = _completion_existing_target(
             action,
             context,
@@ -461,7 +461,11 @@ def _completion_action(context, reference):
 def _load_completion_entity(reference, expected):
     if not reference or not isinstance(reference, str):
         return None
-    entity = Entities.fetch_one(reference, request=Fetch.direct())
+    request = (
+        Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION)
+        if expected in (Entities.TASK, Entities.FILE) else Fetch.direct()
+    )
+    entity = Entities.fetch_one(reference, request=request)
     return entity if isinstance(entity, expected) else None
 
 
@@ -545,7 +549,7 @@ def _completion_request_form(form_info):
 # @reason request shaping is asserted through completion behavior tests
 def _completion_target_name(action, context):
     data = action.get("data") or {}
-    if action.get("type") == "update_submission_fields":
+    if action.get("type") == "update_form_values":
         entity, target_type, _reference = _completion_existing_target(action, context)
         return (
             _completion_data_label(data, target_type)
@@ -630,10 +634,10 @@ def _completion_action_file_refs(action, context):
     refs = []
     action_id = action.get("id")
     source_type = action.get("type")
-    if action_id or source_type == "update_submission_fields":
+    if action_id or source_type == "update_form_values":
         update_target_type = None
         update_target = None
-        if source_type == "update_submission_fields":
+        if source_type == "update_form_values":
             update_target_type = _completion_target_type(action)
             update_target = _first_data_reference(
                 action.get("data") or {},
@@ -644,26 +648,9 @@ def _completion_action_file_refs(action, context):
                 continue
             candidate_type = candidate.get("type")
             candidate_data = candidate.get("data") or {}
-            if source_type == "create_page" and candidate_type == "attach_file_to_page":
-                target = _first_data_reference(candidate_data, "page")
-            elif (
-                source_type == "create_task" and candidate_type == "attach_file_to_task"
-            ):
-                target = _first_data_reference(candidate_data, "task")
-            elif (
-                source_type == "update_submission_fields"
-                and update_target_type == "page"
-                and candidate_type == "attach_file_to_page"
-            ):
-                target = _first_data_reference(candidate_data, "page")
-            elif (
-                source_type == "update_submission_fields"
-                and update_target_type == "task"
-                and candidate_type == "attach_file_to_task"
-            ):
-                target = _first_data_reference(candidate_data, "task")
-            else:
+            if candidate_type != "attach_file":
                 continue
+            target = _first_data_reference(candidate_data, "entity")
             matches_created_action = (
                 isinstance(target, str)
                 and action_id

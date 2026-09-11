@@ -57,6 +57,16 @@ The classifier has no Search or workspace tools. The chosen workflow and short
 diagnostic are stored in the report's `inbound_manifest` before attachment
 download so retries cannot make a different choice.
 
+Organize also accepts instruction-only updates to existing records, through
+either `ai@` classification or the explicit `organize@` alias. Completing a
+task, patching submission details, or renaming/moving a record requires no
+attachment in these remote flows. Empty messages still fail intake. The
+classifier selects intent only; the planner discovers and disambiguates exact
+targets, loads relevant schemas, and returns a plan for browser review.
+Fileless updates skip file preparation and secondary form-completion generation.
+Attachment-bearing requests retain the normal file-processing/placement rules.
+UI Organize's file requirement and instruction-only Ask fallback are unchanged.
+
 ## Durable handoff
 
 The webhook starts `EMAIL_INGEST`. Its adapter downloads ordinary attachments
@@ -68,7 +78,9 @@ deterministically keyed report-owned Files, and then starts the normal
 address, requested/resolved workflow, received time, and safe attachment display
 metadata. Provider IDs and signed URLs remain outside the report. Temporary
 `report_user` relationships let the submitting User read evidence attached only
-to the report without granting edit or placement authority.
+to the report without granting edit or placement authority. Report-only Files
+remain absent from workspace search until approved execution attaches them to a
+Page or Task.
 
 Acceptance and handoff are independently idempotent. Ingestion failure before
 a report job starts creates a linked error Notification. Once the report job

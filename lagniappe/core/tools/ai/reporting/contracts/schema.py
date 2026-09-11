@@ -241,7 +241,10 @@ def _report_action_data_properties():
                 "to create an intentionally empty submission."
             ),
         },
-        "document_markdown": {"type": "string"},
+        "document_markdown": {
+            "type": "string",
+            "description": "Markdown for the new document or requested addition only. append_page_document preserves existing content; the server prefixes trusted source/time attribution.",
+        },
         "due_date": {"type": "string"},
         "schedule": task_schedule_response_schema(),
         "completed": {"type": "boolean"},
@@ -281,6 +284,11 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
     }
     if required:
         schema["required"] = required
+    if action_type == "set_task_due_date":
+        schema["properties"]["due_date"] = {
+            "type": "string", "nullable": True,
+            "description": "Calendar date YYYY-MM-DD in the acting user's timezone, or null to clear.",
+        }
 
     # Cross-field reference alternatives remain an application validation
     # concern. Gemini requires ``anyOf`` to be the only field at its schema
@@ -389,6 +397,108 @@ def _external_required_group_schema(fields):
     }
 
 
+# @testable true
+# @tests tests_unit/test_032d_external_guidance.py::test_external_schedule_schema_matches_repeating_schedule_requirements
+# @matrix agent-api task-scheduling : periodic recurring scheduled structured-output validation
+def external_task_schedule_response_schema():
+    """Add conditional public requirements without changing the Gemini schema."""
+    schema = _standard_json_schema(task_schedule_response_schema())
+    schema["description"] = (
+        "Repeating work only. A one-time reminder uses due_date without schedule. "
+        "The kind selects the required interval or calendar fields below."
+    )
+    schema["allOf"] = [
+        {
+            "if": {"properties": {"kind": {"enum": ["recurring", "periodic"]}}},
+            "then": {
+                "required": ["interval", "unit"],
+                "properties": {"interval": {"minimum": 1}},
+            },
+        },
+        {
+            "if": {"properties": {"kind": {"const": "periodic"}}},
+            "then": {
+                "required": ["description"],
+                "properties": {"description": {"minLength": 1}},
+            },
+        },
+        {
+            "if": {"properties": {"kind": {"const": "scheduled"}}},
+            "then": {"required": ["mode"]},
+        },
+        {
+            "if": {
+                "required": ["mode"],
+                "properties": {
+                    "kind": {"const": "scheduled"},
+                    "mode": {"const": "weekly"},
+                },
+            },
+            "then": {
+                "required": ["days"],
+                "properties": {
+                    "days": {
+                        "minItems": 1,
+                        "items": {"minimum": 0, "maximum": 6},
+                    }
+                },
+            },
+        },
+        {
+            "if": {
+                "required": ["mode"],
+                "properties": {
+                    "kind": {"const": "scheduled"},
+                    "mode": {"enum": ["monthly", "yearly"]},
+                },
+            },
+            "then": {
+                "required": ["pattern_type", "description"],
+                "properties": {"description": {"minLength": 1}},
+                "allOf": [
+                    {
+                        "if": {
+                            "required": ["pattern_type"],
+                            "properties": {"pattern_type": {"const": "specific_day"}},
+                        },
+                        "then": {
+                            "required": ["day"],
+                            "properties": {"day": {"minimum": 1, "maximum": 31}},
+                        },
+                    },
+                    {
+                        "if": {
+                            "required": ["pattern_type"],
+                            "properties": {"pattern_type": {"const": "ordinal_weekday"}},
+                        },
+                        "then": {
+                            "required": ["ordinal", "weekday"],
+                            "properties": {
+                                "ordinal": {"enum": [-1, 1, 2, 3, 4]},
+                                "weekday": {"minimum": 0, "maximum": 6},
+                            },
+                        },
+                    },
+                ],
+            },
+        },
+        {
+            "if": {
+                "required": ["mode"],
+                "properties": {
+                    "kind": {"const": "scheduled"},
+                    "mode": {"const": "yearly"},
+                },
+            },
+            "then": {
+                "required": ["month"],
+                "properties": {"month": {"minimum": 1, "maximum": 12}},
+            },
+        },
+    ]
+    return schema
+
+
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
 # @reason external action variants are asserted through the public transport schema
@@ -417,6 +527,49 @@ def _external_report_action_response_schema(
             for group in required_groups
         ]
 
+    if action_type == "update_form_values" and include_submission_fields:
+        # Top-level targets belong to internal, pending completion requests.
+        # External clients supply executable rows with their own exact targets.
+        for field in ("page", "page_name", "task", "task_name"):
+            data_schema["properties"].pop(field, None)
+        row_schema = data_schema["properties"]["updates"]["items"]
+        targets = ("page", "task", "page_action", "task_action")
+        row_schema["oneOf"] = [{"required": [field]} for field in targets]
+        row_schema["description"] = (
+            "One field patch. Include exactly one target: page/task for an existing "
+            "entity, or page_action/task_action for an earlier creation action. "
+            "Repeat the target in every row, even for fields on the same entity."
+        )
+        for field in targets:
+            row_schema["properties"][field]["minLength"] = 1
+        row_schema["properties"]["schema_id"]["description"] = (
+            "Exact form field id returned by get_schema."
+        )
+
+    if action_type == "create_task":
+        data_schema["properties"]["schedule"] = external_task_schedule_response_schema()
+        descriptions = {
+            "due_date": "One-time deadline or first due date. Omit schedule for a one-time reminder.",
+            "page": "Hash token of the editable destination Page; a Task or model-task reference cannot replace it.",
+            "page_action": "Id of an earlier create_page action for the editable destination Page.",
+            "model": "Hash token of the reusable model task describing this work type.",
+            "model_action": "Id of an earlier create_model_task action; use this for a reusable work type.",
+            "task": "Exact existing Task override for a completed occurrence, not a reusable model task or open-task dependency.",
+            "task_action": "Id of an earlier create_task action used as an exact completed-occurrence target; not model_action or an open-task dependency.",
+        }
+        for field, description in descriptions.items():
+            data_schema["properties"][field] = {
+                **data_schema["properties"][field],
+                "description": description,
+            }
+
+    if action_type == "set_task_due_date":
+        data_schema["properties"]["task"]["description"] = (
+            "Exact hash token of an editable, incomplete Task."
+        )
+        data_schema["properties"]["due_date"].pop("nullable", None)
+        data_schema["properties"]["due_date"].update(type=["string", "null"], format="date")
+
     if action_type == "summarize_file":
         terms_schema = data_schema["properties"]["retrieval_terms"]
         terms_schema["uniqueItems"] = True
@@ -431,6 +584,7 @@ def _external_report_action_response_schema(
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
+# @covered-by lagniappe/core/tools/ai/external_api.py::plan_contract
 # @reason provider-only ordering hints are removed through the public external serializer
 def _standard_json_schema(value):
     """Remove provider-only annotations from an ordinary JSON Schema tree."""

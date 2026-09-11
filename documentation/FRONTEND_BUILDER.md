@@ -143,9 +143,10 @@ server, the Builder only accepts that response as a saved acknowledgement when
 generation began from a saved form and the live schema/name still exactly match
 the acknowledged response; otherwise the Builder stays unsaved.
 
-It also wires group restriction selection through `FacetsBox` and updates
-restriction rows through the route configured in the template. A failed row
-removal restores its button, opacity, and pointer behavior so it can be retried.
+Group restrictions and the owner checkbox are local drafts. Save Restrictions
+submits the complete snapshot in one PUT, using the standard `BaseForm` spinner
+and error state. Adding or removing a group does not autosave. Failed saves keep
+the draft available for retry; duplicate submissions share one pending request.
 
 ### ConditionPanel (`panels/condition.mjs`)
 

@@ -1,14 +1,17 @@
-"""Root-depth collection discovery and permission-safe refresh deltas."""
+"""Root-depth collection discovery and cached-fingerprint refresh deltas."""
 
 from dataclasses import dataclass
 
 from lagniappe.core import exceptions
 
-from ...definitions import Action, Fetch, Resource
+from ...definitions import Action, Fetch, FetchReason, Resource
+from ...definitions.fingerprints import base_fingerprint
 from ...entities import Entities, index
 from lagniappe.core.tools.database import utility as database_utility
+from ..cache.details import _load_cached_details, identify_entity
 from ..filters import FilterCache
 from ..tasks.ordering import page_task_roots, sort_tasks
+from .projections import channel_revisions, filter_result_revision
 
 
 MAX_REFRESH_ROWS = 10_000
@@ -29,15 +32,29 @@ class RefreshView:
 
     entity: object
     fingerprint: str | None
+    reauthorize: bool = False
+    authorization: str | None = None
+    collection_revision: str | None = None
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/polling/refresh.py::load_refresh_collection
+    # @reason the parent revision gate is exercised through collection loading
+    def matches(self, view):
+        return (
+            bool(view.get("fingerprint"))
+            and view.get("fingerprint") == self.fingerprint
+            and not self.reauthorize
+            and view.get("collection_revision") == self.collection_revision
+        )
 
 
 @dataclass(frozen=True)
 class RefreshCollection:
-    """Authoritative root membership plus the renderer context for one widget."""
+    """Renderer context and roots; unchanged membership reuses the client rows."""
 
     kind: str
     parent: object
-    roots: tuple
+    roots: tuple | None
 
 
 @dataclass(frozen=True)
@@ -61,32 +78,52 @@ def _view_entity(view):
 
 # @testable true
 # @tests tests_unit/test_021_refresh.py::test_load_refresh_view_uses_entity_or_site_index_fingerprint
+# @tests tests_unit/test_021_refresh.py::test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change
+# @matrix filters polling : saved-filter permissions revision
 # @matrix reconnect-refresh : entity-view root-fingerprint site-index
-def load_refresh_view(view):
+def load_refresh_view(view, user=None):
     """Resolve a refresh view once, before any collection membership queries."""
     if not isinstance(view, dict):
         raise RefreshFallback("Unsupported refresh view")
 
     key = view.get("key")
+    authorization = getattr(user, "authorization_fingerprint", None)
+    reauthorize = authorization is not None and view.get("authorization") != authorization
     entity = _view_entity(view)
     if isinstance(key, str) and key and entity is None:
         raise RefreshFallback("Refresh view no longer exists")
     if entity is not None:
-        return RefreshView(entity, getattr(entity, "fingerprint", None))
+        if isinstance(entity, Entities.FILTER) and user is not None:
+            return RefreshView(
+                entity, filter_result_revision(entity, user), reauthorize, authorization,
+            )
+        return RefreshView(
+            entity, getattr(entity, "fingerprint", None),
+            reauthorize=reauthorize, authorization=authorization,
+            collection_revision=(
+                channel_revisions(("tasks",), user)["tasks"]
+                if isinstance(entity, Entities.PAGE) and user is not None else None
+            ),
+        )
 
     view_index = view.get("index")
     if view_index not in FINGERPRINTED_INDEXES:
-        return RefreshView(None, None)
+        return RefreshView(None, None, reauthorize, authorization)
+    if view_index == "tasks" and user is not None:
+        return RefreshView(
+            None, channel_revisions(("tasks",), user)["tasks"], reauthorize, authorization,
+        )
     return RefreshView(
         None,
         database_utility.site_fingerprint(f"/{view_index}/index"),
+        reauthorize, authorization,
     )
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/polling/refresh.py::load_refresh_collection
 # @reason saved-filter cache refresh and ordering are owned by collection loading
-def _filtered_roots(filter_entity, user):
+def _filtered_roots(filter_entity, user, *, unchanged=False):
     if not filter_entity.allowed(Action.VIEW, user=user):
         raise RefreshFallback("Filter context is no longer viewable")
     if not filter_entity.related_entities_allowed(user):
@@ -95,6 +132,13 @@ def _filtered_roots(filter_entity, user):
     parent = filter_entity.parent
     if not isinstance(parent, (Entities.PROJECT, Entities.CATEGORY)):
         raise RefreshFallback("Unsupported filter parent")
+
+    if unchanged:
+        kind = (
+            "filtered-task-index"
+            if isinstance(parent, Entities.PROJECT) else "filtered-page-index"
+        )
+        return kind, None
 
     try:
         compiled = filter_entity.compile(user)
@@ -117,6 +161,7 @@ def _filtered_roots(filter_entity, user):
 # @tests tests_unit/test_021_refresh.py::test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query
 # @tests tests_unit/test_021_refresh.py::test_load_refresh_collection_allows_task_index_without_models_permission
 # @matrix reconnect-refresh : authenticated-access cache-refresh component-identity root-depth target-validation
+# @matrix reconnect-refresh : root-fingerprint membership no-extra-read
 # @pairs filters:cache-refresh permissions:own-page-only
 def load_refresh_collection(view, target, user, refresh_view=None):
     """Load one allowlisted collection without expanding its row relationships."""
@@ -126,11 +171,12 @@ def load_refresh_collection(view, target, user, refresh_view=None):
     component_id = target.get("id")
     refresh_view = refresh_view or load_refresh_view(view)
     entity = refresh_view.entity
+    unchanged = refresh_view.matches(view)
 
     if isinstance(entity, Entities.FILTER) and component_id == "table":
         if view.get("hash") != entity.hash:
             raise RefreshFallback("Filter view identity changed")
-        kind, roots = _filtered_roots(entity, user)
+        kind, roots = _filtered_roots(entity, user, unchanged=unchanged)
         return RefreshCollection(kind, entity, roots)
 
     if isinstance(entity, Entities.PAGE) and component_id == "tasks":
@@ -139,14 +185,16 @@ def load_refresh_collection(view, target, user, refresh_view=None):
         return RefreshCollection(
             "page-tasks",
             entity,
-            tuple(page_task_roots(entity)),
+            None if unchanged else tuple(page_task_roots(entity)),
         )
 
     if isinstance(entity, Entities.CATEGORY) and component_id == "table":
         if not entity.allowed(Action.RESTRICTED, user=user):
             raise RefreshFallback("Page index context is no longer viewable")
         parent = index.PageIndex(entity=entity, user=user, limit=None)
-        return RefreshCollection("page-index", parent, tuple(parent.refresh_roots()))
+        return RefreshCollection(
+            "page-index", parent, None if unchanged else tuple(parent.refresh_roots()),
+        )
 
     view_index = view.get("index")
     if entity is not None or view_index not in SUPPORTED_INDEXES:
@@ -154,7 +202,9 @@ def load_refresh_collection(view, target, user, refresh_view=None):
 
     if view_index == "tasks" and component_id == "table":
         parent = index.TaskIndex(user=user, limit=None)
-        return RefreshCollection("task-index", parent, tuple(parent.refresh_roots()))
+        return RefreshCollection(
+            "task-index", parent, None if unchanged else tuple(parent.refresh_roots()),
+        )
 
     if component_id != "table" or not user.has_permission(
         Resource.USERS,
@@ -165,76 +215,122 @@ def load_refresh_collection(view, target, user, refresh_view=None):
     if mode not in {"regular", "public"}:
         raise RefreshFallback("Invalid user index mode")
     parent = index.UserIndex(user=user, mode=mode, limit=None)
-    return RefreshCollection("user-index", parent, tuple(parent.refresh_roots()))
+    return RefreshCollection(
+        "user-index", parent, None if unchanged else tuple(parent.refresh_roots()),
+    )
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 # @reason manifest validation is part of delta resolution
-def _client_modified(rows):
+def _client_fingerprints(rows):
     if not isinstance(rows, list) or len(rows) > MAX_REFRESH_ROWS:
         raise RefreshFallback("Invalid refresh row manifest")
 
-    modified_rows = {}
+    fingerprints = {}
     for row in rows:
         if not isinstance(row, dict):
             raise RefreshFallback("Invalid refresh row")
         key = row.get("key")
-        modified = row.get("modified")
-        if not isinstance(key, str) or not key or not isinstance(modified, str):
+        entity_hash = row.get("hash")
+        fingerprint = row.get("fingerprint")
+        if not all(isinstance(value, str) and value for value in (key, entity_hash, fingerprint)):
             raise RefreshFallback("Invalid refresh row identity")
-        if key in modified_rows:
+        if key in fingerprints:
             raise RefreshFallback("Duplicate refresh row")
-        modified_rows[key] = modified
-    return modified_rows
+        fingerprints[key] = (entity_hash, fingerprint)
+    return fingerprints
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
-# @reason root modified serialization is part of delta comparison
-def _modified_token(entity):
-    modified = getattr(entity, "modified", None)
-    if not modified or not hasattr(modified, "isoformat"):
-        raise RefreshFallback("Refresh root has no modified timestamp")
-    return modified.isoformat()
+# @reason cached row identity and base revisions are checked before skipping a render
+def _cached_fingerprint(key, kind, details, root=None):
+    if (
+        identify_entity(details) != (key, kind)
+        or (root is not None and (
+            not getattr(root, "modified", None)
+            or details.get("modified") != base_fingerprint(root.modified or root.created)
+        ))
+    ):
+        return None
+    return details.get("fingerprint")
 
 
 # @testable true
 # @tests tests_unit/test_021_refresh.py::test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_upsert
+# @tests tests_unit/test_021_refresh.py::test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change
+# @tests tests_unit/test_021_refresh.py::test_warm_refresh_preserves_rows_without_expanding_relations
+# @matrix filters polling : saved-filter permissions revision
+# @matrix reconnect-refresh : target-validation
+# @matrix permissions cache : identity user-page no-extra-read
 # @matrix permissions reconnect-refresh : authorization direct-depth modified ordering removal
-def resolve_refresh_delta(collection, rows, user):
-    """Compare roots, then direct-fetch and authorize only changed/new rows."""
-    client = _client_modified(rows)
-    roots = {}
-    for root in collection.roots:
-        key = root.urlsafe_key
-        roots.setdefault(key, root)
+# @matrix reconnect-refresh permissions : cached-fingerprint authorization no-extra-read
+# @matrix reconnect-refresh : root-fingerprint membership
+# @matrix reconnect-refresh user-index : page-canonical authorization
+# @matrix user-index : page-canonical user-fields no-extra-read
+def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
+    """Compare cached fingerprints and expand only rows needing authorization."""
+    client = _client_fingerprints(rows)
+    if collection.roots is None:
+        roots = dict.fromkeys(client)
+        hashes = {key: row[0] for key, row in client.items()}
+    else:
+        roots = {root.urlsafe_key: root for root in collection.roots}
+        hashes = {key: root.db.get("hash") for key, root in roots.items()}
+    kind = (
+        "page"
+        if collection.kind in {"page-index", "filtered-page-index", "user-index"}
+        else "task"
+    )
+    try:
+        details = _load_cached_details([h for h in hashes.values() if h])
+    except Exception as error:
+        exceptions.capture(error, context={"operation": "refresh-fingerprints"})
+        details = {}
 
-    changed = [
-        root
+    # User account columns can change without changing their Page fingerprint.
+    refresh_users = collection.kind == "user-index" and collection.roots is not None
+    changed_keys = {
+        key
         for key, root in roots.items()
-        if client.get(key) != _modified_token(root)
+        if refresh_users
+        or not hashes[key]
+        or key not in client
+        or client[key] != (
+            hashes[key], _cached_fingerprint(key, kind, details.get(hashes[key], {}), root)
+        )
+    }
+    candidates = [
+        root if root is not None else key
+        for key, root in roots.items()
+        if reauthorize or key in changed_keys
     ]
-    changed_keys = {root.urlsafe_key for root in changed}
     expanded = {
         entity.urlsafe_key: entity
         for entity in Entities.fetch(
-            *(root.urlsafe_key for root in changed),
-            request=Fetch.direct(),
+            *candidates,
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
         )
-    }
+    } if candidates else {}
 
     remove = set(client).difference(roots)
     upsert = []
     order = []
     for key, root in roots.items():
-        if key not in changed_keys:
+        if key not in changed_keys and not reauthorize:
             order.append(key)
             continue
 
         entity = expanded.get(key)
-        if entity and entity.allowed(Action.VIEW, user=user):
-            upsert.append(entity)
+        if entity and entity.entity_kind != kind:
+            entity = None
+        permission_entity = (
+            entity.user if entity and collection.kind == "user-index" else entity
+        )
+        if permission_entity and permission_entity.allowed(Action.VIEW, user=user):
+            if key in changed_keys:
+                upsert.append(entity)
             order.append(key)
         elif key in client:
             remove.add(key)

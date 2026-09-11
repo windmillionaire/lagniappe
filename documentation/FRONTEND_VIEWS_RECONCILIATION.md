@@ -9,7 +9,7 @@ state. Collaborative documents use their own revision protocol in
 
 | Surface | Authority | Browser owner |
 | --- | --- | --- |
-| Entity/form values | Durable `fingerprint` and `modified`. | `EditWatcher` / `EditReconciler`. |
+| Entity/form values | Fingerprint derived from durable state, effective restrictions, and own form version. | `EditWatcher` / `EditReconciler`. |
 | Collection membership | Durable site/channel revision. | Core collection refresh. |
 | Deferred work | `DeferredJob.status_revision` and destination metadata. | `DeferredOperationManager`. |
 | Form operation lock | `DeferredJobLock`. | Form widget plus `form-lock` polling. |
@@ -34,7 +34,8 @@ activation it compares baselines and catches up once when stale.
 For a changed active form, `EditReconciler` renders the focused response in a
 detached preview and compares normalized submissions:
 
-- equal state installs automatically;
+- an unchanged saved baseline and schema leave the live form and draft intact;
+- otherwise, equal state installs automatically;
 - schema-only change projects stable local field IDs into the current schema;
 - renderer-capable value drift offers field-by-field saved/local choices;
 - a dirty non-renderer form offers **Reset form**;
@@ -59,20 +60,51 @@ back to a widget's focused GET route. Data fetch and detached preparation
 finish first; root fingerprint, row changes, deletions, supplemental nav, and
 widget commits apply together.
 
+Each row manifest contains `key`, `hash`, and `fingerprint`. The server loads the
+parent revision. A changed parent or authorization revision triggers a root
+membership/order query; an unchanged parent reuses the manifest's membership.
+Both paths compare a batch of cached detail fingerprints.
+It resolves only new, changed, or uncached rows with `Fetch.nested()` before
+authorization and rendering. The view carries a separate authorization revision;
+a change to that revision rechecks all candidates. Cache loss triggers canonical
+loading rather than treating the row as deleted. Display/sort timestamps remain
+independent of refresh fingerprints.
+
+User rows identify their cached Page. A changed Users collection also refreshes
+User-backed columns such as groups and last login. Form indexes retain full
+fragment replacement when their collection revision changes.
+
 Forms never participate in generic collection replacement. Active, dirty,
 queued, or staged-review rows are protected. Hidden clean rows may refresh
 silently. If a changed row belongs to a loaded DOM collection whose widget has
 not been instantiated, Core loads the collection owner before refreshing it.
 
-Index roots keep raw refresh fingerprints separate from opaque poll-channel
-revisions. Home widgets own independent channels—Notes, Tasks, Starred, Pages,
+Task-index refresh fingerprints include the same viewer-scoped Tasks revision as
+their poll channel. Other index roots retain their established fingerprints.
+Home widgets own independent channels—Notes, Tasks, Starred, Pages,
 Projects, Categories, Ingress, and Tool Reports—so a change refreshes only its
 consumer.
 
-Full-page saved filters subscribe to the collection they project: project
-filters use the Tasks channel and category filters use the Categories channel.
+A loaded Page task list owns a periodic Tasks channel subscription. Its
+`collection_revision` is independent of the Page fingerprint so Task Form
+restriction/schema changes invalidate the list without changing the Page's
+form revision.
+
+`ToolReportList` owns a panel containing filter controls, empty-state messaging,
+and a nested `ul[data-role="report-items"]`. Report rows expose `data-tool` and
+`data-status`; filtering changes row visibility locally without dropping hidden
+rows or their deferred-operation markers. Collection replacements preserve the
+widget's selected categories and reapply counts and visibility. Its panel stays
+visible when empty, so users can change filters after clearing executed reports.
+
+Full-page saved Project filters subscribe to both their Filter/Project entity
+revision and the Tasks channel. Both subscriptions run periodically while active.
+Saved Category filters subscribe to their Filter/Category entity revision.
 Their durable filter key and hash let `/l/refresh` recompute membership through
-the saved filter cache. Temporary project status filters use the same Tasks
+the saved filter cache. Restriction changes alter row fingerprints even when the
+entity's modification timestamp is unchanged.
+Only changed or newly visible rows need replacement HTML; unchanged authorized
+rows keep their DOM. Temporary project status filters use the Tasks
 channel but retain their complete focused route, including query parameters,
 and fall back to replacing that collection from the route.
 
@@ -87,6 +119,19 @@ Server-rendered operation markers seed their current phase and revision; a
 locally started operation requests an immediate check. The coordinator uses
 adaptive backoff and rejects a status revision older than the one already
 seen.
+
+Operation markers may live on the view root (Report detail) or inside a loaded
+widget (Home AI Reports). Startup checks both. All markers for one job share
+one subscription and the newest observed status, including when a later HTML
+fragment carries an older revision. Notifications have their own aggregate
+cursor and focused list fetch; they do not subscribe to individual jobs.
+
+A terminal HTML seed requests an immediate operation poll with a cursor behind
+that revision. HTML presentation attributes do not contain the full destination
+contract, so they cannot acknowledge completion. The authoritative terminal
+payload advances the poll cursor only after reconciliation succeeds; a failed
+replacement remains retryable at the same revision. Pending report spinners
+remain until the report/list replacement installs authoritative content.
 
 Terminal status causes `DeferredOperationManager` to locate the declared source
 and destination and fetch authoritative replacement state. It never applies

@@ -85,6 +85,7 @@
 
 {% macro view() %}
   <div lp-view
+       data-authorization="{{ current_user.authorization_fingerprint }}"
        data-kind="user"
        data-index="users"
        data-fingerprint="{{ fingerprint }}"

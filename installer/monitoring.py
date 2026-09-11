@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from runner import presentation as ui
+
+from runner.presentation import output as print
+
 from copy import deepcopy
 from urllib.parse import quote
 
+from runner.console import wrap_text
 from runner.context import setup_command
 
 
@@ -94,7 +99,7 @@ def _memory_query(settings):
             "  }",
             "| join",
             "| value [memory_per_instance: val(0) / val(1)]",
-            f"| condition val() > {threshold:.1f}",
+            f"| condition val() > {threshold:.1f} 'By'",
         ]
     )
 
@@ -451,11 +456,21 @@ def reconcile_memory_alert_after_deploy():
         f = FORMATTER.initialize()
         print(
             f.warning(
-                "WARNING: deployment succeeded, but App Engine memory "
-                f"monitoring could not be reconciled ({type(error).__name__})."
+                wrap_text(
+                    "Deployment succeeded, but App Engine memory "
+                    f"monitoring could not be reconciled ({type(error).__name__})."
+                )
             )
         )
-        print(f.warning(f"Retry with: {setup_command('monitoring')}"))
+        print(
+            ui.value(
+                "Retry with",
+                setup_command("monitoring"),
+                verbatim=True,
+                standalone=True,
+                action=True,
+            )
+        )
         return False
 
 

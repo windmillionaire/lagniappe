@@ -1,5 +1,6 @@
 """Focused AI-report characterization coverage."""
 
+from copy import deepcopy
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -19,6 +20,7 @@ from lagniappe.core.tools.ai.reporting.execution.actions.registry import (
 )
 from testing.utility.ai_report_fakes import (
     _attach_report_process,
+    _fetch_from,
     _fetch_one_from,
     _patch_fake_keys,
     _recovery_store,
@@ -27,6 +29,265 @@ from testing.utility.ai_report_fakes import (
 )
 from testing.utility.test_entities import TestEntities
 
+
+def _completion_case(monkeypatch, *, completed=False, recurring=False):
+    _patch_fake_keys(monkeypatch)
+    user = _test_user("remote-completion-owner")
+    task = TestEntities.get(
+        "TASK", {"name": "Review CLI", "hash": "remote-completion-task"}
+    )
+    task.page = user.page
+    task.description = "Keep this description"
+    task.submission = {"notes": "Keep these values"}
+    task.files = [_test_file("kept.pdf")]
+    task.assigned_to = user
+    task.due_date = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    if recurring:
+        from lagniappe.core.tools.tasks import scheduling
+        from lagniappe.core.tools.ai.reporting.schedules import apply_task_schedule
+
+        monkeypatch.setattr(scheduling, "CONFIG", SimpleNamespace(production=True))
+        apply_task_schedule(
+            task,
+            {
+                "kind": "recurring",
+                "interval": 1 if recurring == "near" else 30,
+                "unit": "day",
+            },
+        )
+    if completed:
+        task.complete(user=user)
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Review completion",
+            "hash": "remote-completion-report",
+            "parent": user,
+            "user": user,
+            "tool": "organize",
+            "origin": "api",
+            "status": "ready",
+            "proposal": {
+                "summary": "Propose completing the CLI task",
+                "confidence": 1,
+                "actions": [
+                    {
+                        "id": "complete",
+                        "type": "complete_task",
+                        "data": {"task": task.urlsafe_key},
+                    },
+                    {
+                        "id": "finish",
+                        "type": "needs_review",
+                        "data": {
+                            "note": "Review follow-up",
+                            "questions": ["Anything else?"],
+                        },
+                    },
+                ],
+            },
+        },
+    )
+    stored, _ = _recovery_store(monkeypatch, task, user.page, *task.files)
+    save = report_runner.Entities.save
+
+    def save_with_histories(*entities):
+        save(*entities)
+        for entity in entities:
+            if isinstance(entity, report_runner.Entities.TASK):
+                save(*entity.new_history_created)
+
+    monkeypatch.setattr(report_runner.Entities, "save", save_with_histories)
+    monkeypatch.setattr(
+        report_runner.Entities,
+        "delete",
+        lambda *entities: [stored.pop(entity.urlsafe_key, None) for entity in entities],
+    )
+    return user, task, report
+
+
+# @matrix ai-report task-completion : complete preservation recovery undo
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "completed,recurring",
+    [(False, False), (False, "later"), (False, "near"), (True, False)],
+)
+def test_complete_task_action_preserves_details_retries_and_undoes(
+    monkeypatch, completed, recurring
+):
+    from lagniappe.core.tools.ai.reporting.execution.actions.task_completion import (
+        _completion_state,
+    )
+
+    user, task, report = _completion_case(
+        monkeypatch, completed=completed, recurring=recurring
+    )
+    before = _completion_state(task)
+    old_files = list(task.files)
+    original = report_action_lifecycle._execute_action
+    calls = []
+
+    def interrupted(action, *args, **kwargs):
+        calls.append(action["id"])
+        if action["id"] == "finish" and calls.count("finish") == 1:
+            raise RuntimeError("Interrupt after completion")
+        return original(action, *args, **kwargs)
+
+    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
+    assert report_runner.run_report(report, user)["status"] == "failed"
+    assert task.completed is (recurring != "near"), str(report.result)
+    completion = task.completed_on
+    if recurring == "near":
+        histories = task.new_history_created
+        assert len(histories) == 1
+        assert (
+            histories[0].urlsafe_key
+            == report.result["actions"][0]["history_output_key"]
+        )
+        assert histories[0].submission == {"notes": "Keep these values"}
+        assert histories[0].files == old_files
+        assert not task.submission and not task.files
+    else:
+        assert task.completed_by is user.page
+        assert task.submission == {"notes": "Keep these values"}
+        assert task.files == old_files
+    assert task.description == "Keep this description"
+    assert task.assigned_to is user.page
+    if recurring == "later":
+        assert task.scheduled_uncomplete_token
+        assert task.scheduled_uncomplete_at < task.due_date
+    assert report_runner.run_report(report, user)["status"] == "complete"
+    assert calls.count("complete") == 1
+    assert task.completed_on == completion
+    undone = report_undo.undo_report(report, user)
+    assert undone["status"] == "complete", undone
+    assert _completion_state(task) == before
+    assert task.submission == {"notes": "Keep these values"}
+    assert task.files == old_files
+    assert task.description == "Keep this description"
+    if recurring == "near":
+        assert len(task.new_history_created) == 1  # Retry did not create another event.
+
+
+# @matrix ai-report task-completion : complete permissions required-fields
+@pytest.mark.unit
+@pytest.mark.parametrize("denied", [True, False])
+def test_complete_task_action_requires_permission_and_required_fields(
+    monkeypatch, denied
+):
+    user, task, report = _completion_case(monkeypatch)
+    if denied:
+        task.allowed = lambda *_args, **_kwargs: False
+    else:
+        task.form = TestEntities.get(
+            "FORM", {"name": "Required", "hash": "complete-required-form"}
+        )
+        task.form.form_type = "task"
+        task.form.schema = [
+            {
+                "id": "input-required",
+                "type": "input",
+                "input": "text",
+                "title": "Required detail",
+                "required": True,
+            }
+        ]
+        task.submission = {}
+    result = report_runner.run_report(report, user)
+    assert not task.completed
+    assert result["actions"][0]["status"] != "complete"
+    assert (
+        "permission" in result["actions"][0]["error"]
+        if denied
+        else "Required" in result["actions"][0]["error"]
+    )
+
+
+# @matrix ai-report task-completion : preservation recovery undo drift
+@pytest.mark.unit
+def test_complete_task_undo_rejects_changed_completion(monkeypatch):
+    user, task, report = _completion_case(monkeypatch)
+    assert report_runner.run_report(report, user)["status"] == "complete"
+    task.completed_on = datetime(2026, 9, 5, tzinfo=timezone.utc)
+    assert report_undo.undo_report(report, user)["status"] == "failed"
+    assert task.completed
+    assert task.completed_on == datetime(2026, 9, 5, tzinfo=timezone.utc)
+    assert task.submission == {"notes": "Keep these values"}
+
+
+# @matrix ai-report task-completion : recovery undo
+@pytest.mark.unit
+def test_complete_task_undo_resumes_history_cleanup(monkeypatch):
+    user, task, report = _completion_case(monkeypatch, recurring="near")
+    assert report_runner.run_report(report, user)["status"] == "complete"
+    history = task.new_history_created[0]
+    delete = report_runner.Entities.delete
+    calls = []
+
+    def interrupted_delete(*entities):
+        calls.append(entities)
+        if len(calls) == 1:
+            raise RuntimeError("History deletion interrupted")
+        return delete(*entities)
+
+    monkeypatch.setattr(report_runner.Entities, "delete", interrupted_delete)
+    assert report_undo.undo_report(report, user)["status"] == "failed"
+    assert task.submission == {"notes": "Keep these values"}
+    assert report_undo.undo_report(report, user)["status"] == "complete"
+    assert len(calls) == 2
+    assert calls[-1] == (history,)
+
+
+# @source lagniappe/core/tools/ai/reporting/execution/actions/task_completion.py::_complete_task
+# @matrix ai-report task-completion : complete required-fields preservation
+@pytest.mark.unit
+@pytest.mark.parametrize("failure", [None, "invalid_field", "skipped"])
+def test_complete_task_depends_on_successful_submission_patch(monkeypatch, failure):
+    user, task, report = _completion_case(monkeypatch)
+    form = TestEntities.get(
+        "FORM", {"name": "Implementation", "hash": "completion-notes-form"}
+    )
+    form.form_type = "task"
+    form.schema = [
+        {"id": "textarea-notes", "type": "textarea", "title": "Implementation notes"}
+    ]
+    task.form = form
+    task.submission = {"textarea-notes": "Prior notes"}
+    actions = report.proposal["actions"]
+    patch = {
+        "id": "details",
+        "type": "update_form_values",
+        "data": {
+            "updates": [
+                {
+                    "task": task.urlsafe_key,
+                    "schema_id": "textarea-notes",
+                    "new_value": "Verified implementation",
+                }
+            ]
+        },
+    }
+    if failure == "invalid_field":
+        patch["data"]["updates"].append(
+            {"task": task.urlsafe_key, "schema_id": "unknown", "new_value": "Bad"}
+        )
+    if failure == "skipped":
+        patch["skip"] = True
+    actions.insert(0, patch)
+    actions[1]["depends_on"] = ["details"]
+    result = report_runner.run_report(report, user)
+    assert task.completed is (failure is None)
+    if failure:
+        assert "prior updates did not finish" in result["actions"][1]["error"]
+    else:
+        assert result["actions"][1]["status"] == "complete"
+        assert task.submission["textarea-notes"] == "Verified implementation"
+        assert task.files
+        assert report_undo.undo_report(report, user)["status"] == "complete"
+        assert task.submission == {"textarea-notes": "Prior notes"}
+        assert not task.completed
+
+
 # @matrix ai-report : action-registry contract
 @pytest.mark.unit
 def test_report_action_registry_matches_proposal_contracts():
@@ -34,22 +295,24 @@ def test_report_action_registry_matches_proposal_contracts():
 
     assert set(adapters) == set(report_contracts.REPORT_ACTION_DATA_CONTRACTS)
     assert set(adapters) == set(report_contracts.ALLOWED_ACTIONS)
-    assert all(action_type == adapter.action_type for action_type, adapter in adapters.items())
-
-
+    assert all(
+        action_type == adapter.action_type for action_type, adapter in adapters.items()
+    )
 
 
 # @matrix ai-report : cancellation deterministic-run
 @pytest.mark.unit
 def test_run_report_checks_deferred_execution_guard(monkeypatch):
-    report = _attach_report_process(SimpleNamespace(
-        urlsafe_key="guarded-report",
-        proposal={"summary": "No changes", "actions": []},
-        result=None,
-        status="ready",
-        pending=False,
-        error=None,
-    ))
+    report = _attach_report_process(
+        SimpleNamespace(
+            urlsafe_key="guarded-report",
+            proposal={"summary": "No changes", "actions": []},
+            result=None,
+            status="ready",
+            pending=False,
+            error=None,
+        )
+    )
     checks = []
     saved = []
     monkeypatch.setattr(
@@ -374,7 +637,7 @@ def test_run_report_retry_validates_completed_move_and_update_prefix(
         if first_action == "move"
         else {
             "id": "update_page",
-            "type": "update_submission_fields",
+            "type": "update_form_values",
             "data": {
                 "updates": [
                     {
@@ -505,6 +768,75 @@ def test_undo_report_compensates_completed_prefix_of_failed_report(monkeypatch):
         report_undo.undo_report(report, user)
 
 
+# @matrix agent-api ai-report : browser-review cas compensation delete undo
+@pytest.mark.unit
+def test_undo_report_stops_before_compensation_when_initial_save_is_rejected(
+    monkeypatch,
+):
+    report = SimpleNamespace(
+        status="complete",
+        pending=False,
+        error=None,
+        result={
+            "ledger_version": report_ledger.REPORT_LEDGER_VERSION,
+            "status": "complete",
+            "actions": [
+                {
+                    "id": "deleted-report-action",
+                    "type": "skip",
+                    "status": "complete",
+                }
+            ],
+        },
+    )
+
+    class Process:
+        def begin_undo(self, result):
+            report.status = "undoing"
+            report.pending = True
+            report.error = None
+            report.result = result
+
+    report.properties = SimpleNamespace(process=Process())
+    compensation_calls = []
+    monkeypatch.setitem(
+        REPORT_ACTION_ADAPTERS,
+        "skip",
+        SimpleNamespace(
+            compensate=lambda *_args: compensation_calls.append(_args),
+        ),
+    )
+    monkeypatch.setattr(
+        report_undo.Entities,
+        "save",
+        lambda *_args: pytest.fail(
+            "A rejected guarded undo fell back to an ordinary report upsert"
+        ),
+    )
+    save_calls = []
+
+    def reject_deleted_report(current):
+        save_calls.append(current)
+        raise exceptions.ValidationError(
+            "This plan changed while undo was in progress."
+        )
+
+    with pytest.raises(
+        exceptions.ValidationError,
+        match="plan changed while undo was in progress",
+    ):
+        report_undo.undo_report(
+            report,
+            SimpleNamespace(),
+            save=reject_deleted_report,
+        )
+
+    assert save_calls == [report]
+    assert compensation_calls == []
+    assert report.status == "undoing"
+    assert report.result["undo"]["actions"][0]["status"] == "pending"
+
+
 
 
 # @matrix ai-report : compensation completed-task deterministic-run recovery reuse
@@ -604,6 +936,75 @@ def test_completed_task_retry_and_undo_restore_reused_task(monkeypatch):
     assert report.result["status"] == "undone"
 
 
+# @matrix ai-report : grouping result
+# @source lagniappe/core/properties/ai_report_result.py::Result
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "targets,status,expected",
+    [
+        (["task-one"] * 4, "complete", ["task-one"]),
+        (["page-one"], "complete", ["page-one"]),
+        (
+            ["task-one", "page-one", "task-one", "task-two"],
+            "complete",
+            ["task-one", "page-one", "task-two"],
+        ),
+        ([], "complete", []),
+        ([None], "complete", []),
+        (["task-one"], "failed", []),
+        (["task-one"], "skipped", []),
+    ],
+)
+def test_grouped_result_submission_updates_list_only_unique_applied_targets(
+    targets, status, expected
+):
+    applied = []
+    for index, target in enumerate(targets):
+        update = {"index": index, "schema_id": f"input-{index}"}
+        if target:
+            update["entity"] = {
+                "id": target,
+                "kind": target.split("-")[0],
+                "name": target,
+                "url": f"/{target.split('-')[0]}s/{target}",
+            }
+        applied.append(update)
+    original = {
+        "status": status,
+        "actions": [
+            {
+                "id": "details",
+                "type": "update_form_values",
+                "status": status,
+                "updates": {
+                    "applied": applied,
+                    "skipped": [
+                        {
+                            "entity": {
+                                "id": "page-skipped",
+                                "kind": "page",
+                                "name": "Skipped page",
+                            },
+                            "reason": "Missing schema field",
+                        }
+                    ],
+                },
+            }
+        ],
+    }
+    user = _test_user("submission-result-owner")
+    report = TestEntities.get(
+        "REPORT", {"parent": user, "user": user, "result": deepcopy(original)}
+    )
+
+    grouped = report.properties.result.grouped_actions
+
+    assert len(grouped) == 1
+    entities = grouped[0].get("updated_entities", [])
+    assert [entity["id"] for entity in entities] == expected
+    assert all(entity["url"].endswith("/" + entity["id"]) for entity in entities)
+    assert grouped[0]["updates"] == original["actions"][0]["updates"]
+    assert report.result == original
 
 
 # @matrix ai-report : completed-task-history grouping result
@@ -634,7 +1035,7 @@ def test_grouped_result_actions_groups_page_files_tasks_and_summaries():
                 "actions": [
                     {
                         "id": "attach_plan",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "status": "complete",
                         "entity": {
                             "id": "file-plan",
@@ -680,7 +1081,7 @@ def test_grouped_result_actions_groups_page_files_tasks_and_summaries():
                     },
                     {
                         "id": "attach_invoice",
-                        "type": "attach_file_to_task",
+                        "type": "attach_file",
                         "status": "complete",
                         "entity": {
                             "id": "file-invoice",
@@ -816,7 +1217,7 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
         page=page,
     )
     file = _test_file("registration.pdf", "application/pdf")
-    file.db["pages"] = [page.key]
+    file.task = task
     history = task.create_history_entry(
         completed_on=datetime(2023, 6, 24, tzinfo=timezone.utc),
         files=[file],
@@ -849,7 +1250,7 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
                     },
                     {
                         "id": "attachment",
-                        "type": "attach_file_to_page",
+                        "type": "attach_file",
                         "status": "complete",
                         "entity": {
                             "id": file.urlsafe_key,
@@ -916,6 +1317,7 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
         "fetch_one",
         _fetch_one_from(entities),
     )
+    monkeypatch.setattr(report_runner.Entities, "fetch", _fetch_from(entities))
     monkeypatch.setattr(
         report_runner.Entities,
         "save",
@@ -929,7 +1331,7 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
 
     undo = report_undo.undo_report(report, user)
 
-    assert undo["status"] == "complete"
+    assert undo["status"] == "complete", undo
     assert report.status == "ready"
     assert report.pending is False
     assert report.result["status"] == "undone"
@@ -940,7 +1342,6 @@ def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
     assert task in deleted
     assert page in deleted
     assert file not in deleted
-    assert file.db.get("pages") is None
-    assert history.key not in file.db.get("tasks", [])
-    assert task.key not in file.db.get("tasks", [])
+    assert file.db.get("page") is None
+    assert file.db.get("task") is None
     assert all(action["status"] == "complete" for action in undo["actions"])

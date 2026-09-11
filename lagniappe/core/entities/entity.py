@@ -1,17 +1,18 @@
 import json
-import hashlib
 from datetime import datetime, timezone
 
 from google.cloud import datastore
 
 from .. import mixins
-from ..definitions import Action, MutationIntent
+from ..definitions import Action, MutationIntent, Restriction
+from ..definitions.fingerprints import base_fingerprint
 from ..entities import Entities
 from ..exceptions import PropertyError
 from ..properties import common_entity
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
 from ..tools.auth.context import current_context_user
+from ..tools.auth.restrictions import restriction_fields
 
 
 # @testable infrastructure
@@ -151,10 +152,13 @@ class Entity:
     def temporary(self):
         return self._temporary
 
+    # @testable true
+    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_restricted_fingerprints_share_the_entity_and_cache_formula
+    # @matrix cache permissions : fingerprint modified
     @property
     def fingerprint(self):
         modified = self.modified or datetime.now(timezone.utc)
-        return hashlib.md5(modified.isoformat().encode("utf-8")).hexdigest()
+        return base_fingerprint(modified)
 
     @property
     def properties(self):
@@ -278,7 +282,9 @@ class Entity:
     # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_default_entity_fields_are_not_duplicated_in_submission_search_cache
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_cache_stores_detail_parent_pointers
+    # @tests tests_unit/test_002_entity_general_properties.py::test_restriction_fields_keep_source_boundaries
     # @matrix cache : cache-deduplication default-fields details-key parent-key
+    # @matrix permissions cache : source-clauses stable-order
     @property
     def to_cache(self):
         if self.reserved or not self.hash:
@@ -292,6 +298,7 @@ class Entity:
             for p in self.properties.implementing(mixins.CacheMixin)
             if isinstance(p.cache_value, str)
         }
+        cache.update(restriction_fields(getattr(self, "restricted_to", {})))
 
         details = self.details
         cache["id"] = details["id"]
@@ -310,9 +317,11 @@ class Entity:
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_ai_merges_submission_fields_without_nested_duplicate
     # @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
+    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_ai_keeps_browser_urls_separate_from_hash_references
     # @matrix ai entity submission : single-merge submission-fields
     # @matrix ai file : metadata permissions
     # @pair permissions:authenticated-user
+    # @pair ai:browser-url
     def to_ai(self, user=None):
         user = current_context_user(user)
         if not user or not getattr(user, "is_authenticated", False):
@@ -339,18 +348,12 @@ class Entity:
 
         return {k: v for k, v in values.items() if v is not None}
 
+    # @testable false
+    # @covered-by lagniappe/core/entities/entity.py::Entity.to_ai
+    # @reason canonical URL passthrough is exercised through the AI entity projection
     def _ai_url(self):
-        url = self.url
-        entity_hash = getattr(self, "hash", None)
-        if not url or not entity_hash:
-            return url
-
-        try:
-            urlsafe_key = self.urlsafe_key
-        except RuntimeError:
-            return url
-
-        return url.replace(urlsafe_key, f"hash:{entity_hash}", 1)
+        """Return the browser URL; hash references are separate tool arguments."""
+        return self.url
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
@@ -381,6 +384,9 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
+    # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
+    # @matrix task permissions : source-clauses assignee-override parent-page restricted-access
+    # @matrix task permissions : source-clauses admin-only
     # @matrix page permissions user-groups : group-match restricted-access
     def restricted_access(self, user):
         if not user or not user.is_authenticated:
@@ -388,11 +394,17 @@ class Entity:
         elif getattr(user, "is_admin", getattr(user, "is_owner", False)):
             return False
 
-        if getattr(self, "restricted_to", False):
+        restrictions = getattr(self, "restricted_to", {})
+        if restrictions:
             belongs_to = user.properties.restrictions.belongs_to
-            view_access = set(self.restricted_to) & set(belongs_to)
-            if not view_access:
+            if belongs_to is Restriction.BELONGS_TO_ALL:
+                return False
+            if belongs_to is Restriction.BELONGS_TO_NONE:
                 return True
+            return any(
+                "admin" in groups or not set(groups).intersection(belongs_to)
+                for groups in restrictions.values()
+            )
 
         return False
 
@@ -449,6 +461,7 @@ class Entity:
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_add_mutation_intents_requires_typed_intents_and_dedupes
     # @matrix entity : dedupe key-validation typed-intent validation
+    # @matrix editor mutations : document durable-first cleanup named-versions
     def add_mutation_intents(self, *intents):
         if self._mutation_intents is None:
             self._mutation_intents = []
@@ -461,6 +474,8 @@ class Entity:
                 intent.property_updates,
                 intent.cache_key,
                 intent.cache_kind,
+                intent.path,
+                intent.visibility,
                 intent.reason,
             )
             for intent in self._mutation_intents
@@ -480,6 +495,8 @@ class Entity:
                 intent.property_updates,
                 intent.cache_key,
                 intent.cache_kind,
+                intent.path,
+                intent.visibility,
                 intent.reason,
             )
             if signature not in existing:
@@ -511,4 +528,4 @@ class Entity:
         if self._testing:
             return
 
-        Entities.save(self, *args)
+        return Entities.save(self, *args)

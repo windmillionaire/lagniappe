@@ -162,6 +162,11 @@ TASK_FORM_REQUIREMENTS = """
   records that are meaningful to completing the task, beyond the task's own
   page/project/model-task relationships.
 - Add `required`: Boolean for fields needed before task completion
+- A required checkbox must be checked to complete the task; use it only for
+  mandatory affirmative acknowledgements, not questions where No is valid.
+  For a required Yes/No answer (for example, "Needs attention?"), use `radio`
+  or single `select` with distinct non-empty string option values such as
+  `yes` and `no`. An optional checkbox may remain unchecked.
 - Focus on action-specific data that helps complete, review, or filter the task.
 """
 
@@ -298,8 +303,8 @@ SCHEMA_TYPE_GUIDELINES = """
 #### `textarea` Submission Value Guidelines
 
 - Text area element values are strings
-- Fill with concise descriptive text from provided sources when the evidence
-  supports the field
+- Use evidence-supported text suited to the field's purpose. Prefer a concise
+  summary when sufficient; keep longer detail when the field or user needs it.
 - In autofill, a grounded summary sentence or paragraph is a valid textarea
   value; do not omit textarea fields merely because they are narrative
 

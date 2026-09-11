@@ -1,7 +1,40 @@
-{% macro image(page) %}
+{% macro image_controls(page, has_image, editable) %}
+  <div data-role="photo-prompt"
+       data-visible="true"
+       class="flex flex-col gap-2">
+    <div class="inline-flex min-h-10 w-fit overflow-hidden rounded-md border border-base-light/50 bg-white text-base-dark shadow-sm">
+      <span class="grid w-9 place-items-center border-r border-base-light/50 bg-base-bg text-kind-default"
+            aria-hidden="true">{{ render_icon("image") }}</span>
+      <button type="button"
+              data-role="photo-upload"
+              title="{{ 'Hide page image' if has_image else 'Upload page image' }}"
+              aria-label="{{ 'Hide page image' if has_image else 'Upload page image' }}"
+              aria-controls="photo"
+              aria-expanded="{{ has_image|yesno }}"
+              class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
+        {{ render_icon("visibility.visible" if has_image else "upload") }}
+      </button>
+      {% if editable and current_user.access(AI.CREATE) %}
+        <button type="button"
+                data-role="photo-generate"
+                title="Generate page image"
+                aria-label="Generate page image"
+                aria-controls="photo"
+                class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
+          {{ render_icon("generate") }}
+        </button>
+      {% endif %}
+    </div>
+    <p data-role="photo-prompt-error"
+       data-visible="false"
+       class="text-sm italic text-delete-default"></p>
+  </div>
+{% endmacro %}
+
+{% macro image(page, readonly=false) %}
   <form data-widget="PagePhoto"
         data-title="Image"
-        data-ai-create="{{ current_user.access(AI.CREATE)|yesno }}"
+        data-ai-create="{{ (not readonly and current_user.access(AI.CREATE))|yesno }}"
         data-visible="true"
         data-persistent="true"
         data-nav="true"
@@ -21,7 +54,7 @@
        data-readonly="{{ readonly|yesno }}"
        data-kind="page"
        class="{{ styles.card.image }} p-4 sm:p-0">
-    {{ image(page) }}
+    {{ image(page, readonly) }}
   </div>
 {% endmacro %}
 

@@ -34,7 +34,8 @@ Test Isolation Strategy:
 import json
 import os
 from types import SimpleNamespace
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
+from uuid import uuid4
 
 import pytest
 import requests
@@ -48,7 +49,9 @@ from lagniappe.core.tools.database import core as database_core
 from lagniappe.core.tools.database import notifications as notification_database
 
 from testing.definitions import SitePages, Users
-from testing.utility.network import assert_same_etag
+from testing.definitions.user_definitions import UserDefinition
+from testing.resources import User
+from testing.utility.network import assert_same_etag, manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 
@@ -349,6 +352,50 @@ def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):
     second = auth._etag_fingerprint("resource", user)
 
     assert first != second
+
+
+# @matrix cache session timezone : permissions-preserved
+def test_timezone_update_preserves_permissions_and_cache_revision(get_user, setup_test_server):
+    owner = get_user(Users.OWNER)
+    actor = User(user=owner, definition=UserDefinition(
+        name="Timezone HTTP", email=f"timezone-{uuid4().hex}@example.test",
+    )).create()
+    # No browser worker may consume the pending invalidation in this HTTP story.
+    cookies = {cookie["name"]: cookie["value"] for cookie in setup_test_server.browser_cookies}
+    headers = {"Origin": CONFIG.BASE_URL, "X-Lagniappe-Request": "true",
+               "User-Agent": "Lagniappe timezone protocol regression"}
+
+    def send(method, path, **options):
+        response = requests.request(
+            method, f"{CONFIG.BASE_URL}{path}", cookies=cookies,
+            headers={**headers, **options.pop("headers", {})},
+            timeout=30, allow_redirects=False, **options,
+        )
+        cookies.update(response.cookies.get_dict())
+        return response
+
+    login = send("GET", f"/users/login?{urlencode({'test_user': actor.email})}")
+    assert login.status_code == 302
+    token = send("GET", "/l/token")
+    assert token.status_code == 200
+    current = Entities.USER.load(actor.email)
+    current.is_admin = True
+    current.save()
+    revision = current.db["cache_invalidation_revision"]
+    try:
+        response = send("POST", "/l/update-session", json={"timezone": "UTC"},
+                        headers=manual_mutation_headers(CONFIG.BASE_URL, token.text))
+        assert response.status_code == 200
+        assert response.json()["userHash"]
+        persisted = Entities.USER.load(actor.email)
+        assert persisted.db["timezone"] == "UTC"
+        assert persisted.is_admin is True
+        assert persisted.invalidate_cache is True
+        assert persisted.db["cache_invalidation_revision"] == revision
+    finally:
+        persisted = Entities.USER.load(actor.email)
+        persisted.is_admin = False
+        persisted.save()
 
 
 # @matrix location session timezone : atomic-update coordinates validation

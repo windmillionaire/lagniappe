@@ -730,6 +730,22 @@ if (errorLink?.href !== "/forms/unreadable-form" || errorLink?.textContent !== "
 }
 
 settings._renderMigrationStatus({
+  status: "failed",
+  cache_refresh_allowed: false,
+  counts: { failed: 1 },
+  migrations: [{ ...failed, id: "FIL-001", attempts: [{
+    status: "failed",
+    errors: [{ key: "raw-file-key", message: "File has multiple owners", url: "/files/encoded-file", link_label: "Invoice <original>" }],
+  }] }],
+});
+const fileError = errors.children[0];
+const fileLink = fileError.children[0];
+if (fileError.textContent !== "FIL-001: File has multiple owners " ||
+    fileLink?.href !== "/files/encoded-file" || fileLink?.textContent !== "Invoice <original>") {
+  throw new Error("File failure did not replace its raw identifier with a named text link");
+}
+
+settings._renderMigrationStatus({
   status: "running",
   current_version: "0.3",
   cache_refresh_allowed: false,

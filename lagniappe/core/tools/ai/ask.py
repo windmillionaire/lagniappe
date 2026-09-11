@@ -265,6 +265,7 @@ def validate_ask_response(
     response,
     allowed_actions=None,
     allow_pending_submissions=True,
+    preserve_markdown=False,
 ):
     """Validate answer fields and deterministically discard workspace actions."""
     if not isinstance(response, dict):
@@ -303,7 +304,8 @@ def validate_ask_response(
         )
     if answer_markdown is not None:
         response["answer_html"] = render_ai_markdown(answer_markdown)
-        response.pop("answer_markdown", None)
+        if not preserve_markdown:
+            response.pop("answer_markdown", None)
     else:
         answer_html = response.get("answer_html")
         if answer_html is not None and not isinstance(answer_html, str):

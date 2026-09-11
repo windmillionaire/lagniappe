@@ -7,6 +7,7 @@ from redis.commands.search.query import Query
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import Restriction
+from ..auth.restrictions import RESTRICTION_SOURCES
 
 from .core import cache
 from .details import hydrate_search_results
@@ -19,6 +20,10 @@ SUBSTITUTE = re.compile(r"[^a-zA-Z0-9\s]")
 PRIMARY_NAME_KINDS = ("category", "project", "page")
 PRIMARY_NAME_BOOST = 4.0
 SEARCH_QUERY_DIALECT = 2
+EXACT_LOOKUP_CANDIDATE_LIMIT = 100
+CANDIDATE_SEARCH_LIMIT = 100
+CANDIDATE_RELAXATION_MAX_TERMS = 12
+CANDIDATE_MIN_STRICT_RESULTS = 3
 
 STOPWORDS = frozenset(
     {
@@ -165,7 +170,7 @@ def _build_term_list(user_query, expanded=False):
 
 
 # @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_require_lists
+# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_validate_scope_and_membership
 # @matrix search : permissions validation
 def _add_required(required):
     if not isinstance(required, list):
@@ -176,14 +181,28 @@ def _add_required(required):
 
 
 # @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_require_lists
+# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_validate_scope_and_membership
+# @tests tests_unit/test_017_cache_query.py::test_search_restrictions_require_membership_in_each_source
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_redis_search_matches_each_restriction_source_before_pagination
+# @matrix search permissions : source-clauses canonical-policy
 # @matrix search : permissions validation
-def _add_restricted_to(restricted_to):
-    if not isinstance(restricted_to, list):
-        raise TypeError("Restricted to must be a list of hashes")
-    if not restricted_to:
-        return "(ismissing(@restricted_to))"
-    return f"(ismissing(@restricted_to) | @restricted_to:{{ {' | '.join(restricted_to)} }})"
+def _add_restricted_to(belongs_to):
+    """Match any group within every present restriction source before paging."""
+    if belongs_to is Restriction.BELONGS_TO_ALL:
+        return ""
+    if belongs_to is Restriction.BELONGS_TO_NONE:
+        belongs_to = []
+    if not isinstance(belongs_to, list):
+        raise TypeError(
+            "Group membership must be hashes, Restriction.BELONGS_TO_ALL, "
+            "or Restriction.BELONGS_TO_NONE"
+        )
+    groups = " | ".join(sorted(set(belongs_to)))
+    return " ".join(
+        f"(ismissing(@restricted_to_{source}) | @restricted_to_{source}:{{ {groups} }})"
+        if groups else f"(ismissing(@restricted_to_{source}))"
+        for source in RESTRICTION_SOURCES
+    )
 
 
 # @testable false
@@ -288,7 +307,7 @@ def entity_search(query_string, restrictions, belongs_to):
     term_list.append(_add_restricted_to(belongs_to))
 
     if term_list:
-        redis_query = Query(" ".join(term_list))
+        redis_query = Query(" ".join(filter(None, term_list)) or "*").dialect(SEARCH_QUERY_DIALECT)
         results = cache.search(redis_query)
         formatted_results = [
             _format_result(doc, snippets=False) for doc in results.docs
@@ -298,8 +317,10 @@ def entity_search(query_string, restrictions, belongs_to):
         return []
 
 
-# @testable infrastructure
-def _add_models(results, project_hashes):
+# @testable true
+# @tests tests_unit/test_017_cache_query.py::test_model_expansion_keeps_viewer_restrictions
+# @matrix search permissions : model-expansion restricted-access
+def _add_models(results, project_hashes, restriction_clause):
     if not project_hashes:
         return [doc for doc in results.docs]
 
@@ -307,7 +328,9 @@ def _add_models(results, project_hashes):
     result_ids = set([doc.id for doc in results.docs])
     expanded_results = []
 
-    models = cache.search(Query(f"@kind:{{ model }} @requires:{{ {get_models} }}"))
+    models = cache.search(Query(
+        f"@kind:{{ model }} @requires:{{ {get_models} }} {restriction_clause}".strip()
+    ).dialect(SEARCH_QUERY_DIALECT))
     to_append = {h: [m for m in models.docs if h in m.requires] for h in project_hashes}
 
     for result in results.docs:
@@ -331,7 +354,9 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 
     term_list = _build_term_list(query_string) if query_string else []
 
-    if kind == "project" and kwargs.get("models"):
+    if kind == "file-owner":
+        kinds = ["page", "task", "user"]
+    elif kind == "project" and kwargs.get("models"):
         kinds = ["project", "model"]
     elif kind == "page" and kwargs.get("include_users"):
         kinds = ["page", "user"]
@@ -342,7 +367,8 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 
     term_list.append(f"(@kind:{{ {' | '.join(kinds)} }})")
 
-    term_list.append(_add_restricted_to(belongs_to))
+    restriction_clause = _add_restricted_to(belongs_to)
+    term_list.append(restriction_clause)
 
     if kwargs.get("form_type"):
         term_list.append(f"(@type:{{ {kwargs.get('form_type')} }})")
@@ -350,12 +376,12 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
     if not Restriction.is_unrestricted(restrictions):
         term_list.append(_add_required(restrictions))
 
-    redis_query = Query(" ".join(term_list))
+    redis_query = Query(" ".join(filter(None, term_list))).dialect(SEARCH_QUERY_DIALECT)
     results = cache.search(redis_query)
 
     if kind == "project" and kwargs.get("models"):
         project_hashes = [doc.hash for doc in results.docs if doc.kind == "project"]
-        expanded = _add_models(results, project_hashes)
+        expanded = _add_models(results, project_hashes, restriction_clause)
         formatted_results = [_format_result(doc, snippets=False) for doc in expanded]
     else:
         formatted_results = [
@@ -370,7 +396,9 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_primary_name_matches_rank_above_file_name_and_description_matches
 # @tests tests_e2e/009_search/test_009c_search_authorization.py::test_search_matches_explicit_denial_and_administrator_content_access
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_redis_search_matches_each_restriction_source_before_pagination
 # @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
+# @matrix search permissions : source-clauses pagination restricted-access
 # @matrix search : empty-access no-results permissions primary-name-ranking redis-cloud results tag-syntax
 def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
     """Run a full-text search with highlighting, snippets, and pagination."""
@@ -390,7 +418,7 @@ def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
 
     if term_list:
         redis_query = (
-            Query(" ".join(term_list))
+            Query(" ".join(filter(None, term_list)) or "*")
             .dialect(SEARCH_QUERY_DIALECT)
             .highlight(
                 fields=["desc", "doc", "values"],
@@ -407,3 +435,162 @@ def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
         return formatted_results, max(0, results.total - stale_count)
     else:
         return [], 0
+
+
+# @testable true
+# @tests tests_unit/test_017_cache_query.py::test_exact_name_search_is_bounded_permission_and_parent_scoped
+# @matrix search : exact-name parent-scope permissions bounded-query
+def exact_name_search(
+    name,
+    required,
+    belongs_to,
+    *,
+    kinds=None,
+    parent_hash=None,
+    limit=10,
+):
+    """Run a bounded exact-name lookup without changing full-text ``search``."""
+    if Restriction.is_denied(required):
+        return []
+
+    normalized_name = " ".join(str(name or "").split())
+    if not normalized_name:
+        return []
+
+    term_list = _build_term_list(normalized_name)
+    expanded_kinds = _expand_result_kinds(kinds)
+    if expanded_kinds:
+        term_list.append(f"(@kind:{{ {' | '.join(expanded_kinds)} }})")
+    if parent_hash:
+        term_list.append(_add_required([parent_hash]))
+    if not Restriction.is_unrestricted(required):
+        term_list.append(_add_required(required))
+    term_list.append(_add_restricted_to(belongs_to))
+
+    candidate_limit = min(
+        EXACT_LOOKUP_CANDIDATE_LIMIT,
+        max(int(limit or 1) * 4, 25),
+    )
+    redis_query = (
+        Query(" ".join(filter(None, term_list)) or "*")
+        .dialect(SEARCH_QUERY_DIALECT)
+        .paging(offset=0, num=candidate_limit)
+    )
+    results = cache.search(redis_query)
+    formatted = [_format_result(doc, snippets=False) for doc in results.docs]
+    current, _stale_count = _current_search_results(formatted)
+    exact = [
+        result
+        for result in current
+        if " ".join(str(result.get("name") or "").split()).casefold()
+        == normalized_name.casefold()
+    ]
+    return exact[: max(1, int(limit or 1))]
+
+
+# @testable true
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_groups_relaxed_terms_inside_access_scope
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_ranks_exact_strict_and_name_coverage
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_skips_unnecessary_or_queries
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_keeps_default_search_and_stale_repair
+# @tests tests_e2e/009_search/test_009d_ai_candidate_search.py::test_candidate_search_keeps_redis_scope_and_ranks_partial_names
+# @matrix search : candidate-ranking term-relaxation permissions bounded-query cached-details
+def candidate_search(
+    user_query, required, belongs_to, *, kinds=None, parent_hash=None, limit=10
+):
+    """Return bounded AI candidates, relaxing sparse multiword searches once."""
+    if Restriction.is_denied(required):
+        return []
+
+    terms = list(dict.fromkeys(
+        term.casefold()
+        for term in SUBSTITUTE.sub(" ", str(user_query or "")).split()
+        if len(term) > 1 and term.casefold() not in STOPWORDS
+    ))
+    if not terms:
+        return []
+
+    limit = max(1, min(int(limit or 1), CANDIDATE_SEARCH_LIMIT))
+    pool_limit = min(CANDIDATE_SEARCH_LIMIT, max(limit * 4, 25))
+    term_list = _build_term_list(" ".join(terms), expanded=True)
+    scope = []
+    expanded_kinds = _expand_result_kinds(kinds)
+    if expanded_kinds:
+        scope.append(f"(@kind:{{ {' | '.join(expanded_kinds)} }})")
+    if parent_hash:
+        scope.append(_add_required([parent_hash]))
+    if not Restriction.is_unrestricted(required):
+        scope.append(_add_required(required))
+    scope.append(_add_restricted_to(belongs_to))
+
+    strict = _candidate_query(term_list + scope, pool_limit)
+    strict_ids = {result["id"] for result in strict}
+    normalized_name = " ".join(str(user_query or "").split()).casefold()
+    candidates = {result["id"]: result for result in strict}
+    if (
+        1 < len(terms) <= CANDIDATE_RELAXATION_MAX_TERMS
+        and len(strict) < min(limit, CANDIDATE_MIN_STRICT_RESULTS)
+        and not any(
+            " ".join(str(result.get("name") or "").split()).casefold()
+            == normalized_name
+            for result in strict
+        )
+    ):
+        # Keep the optional name boost and all access clauses outside the OR.
+        relaxed = ["(" + " | ".join(term_list[:len(terms)]) + ")"]
+        relaxed.extend(term_list[len(terms):])
+        for result in _candidate_query(relaxed + scope, pool_limit):
+            candidates.setdefault(result["id"], result)
+
+    ordered = sorted(
+        candidates.values(),
+        key=lambda result: _candidate_rank(result, normalized_name, terms, strict_ids),
+    )
+    for result in ordered:
+        result.pop("_candidate_score", None)
+    return ordered[:limit]
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/cache/query.py::candidate_search
+# @reason bounded Redis retrieval and cached hydration belong to candidate search
+def _candidate_query(clauses, limit):
+    redis_query = (
+        Query(" ".join(filter(None, clauses)))
+        .dialect(SEARCH_QUERY_DIALECT)
+        .with_scores()
+        .highlight(
+            fields=["desc", "doc", "values"],
+            tags=[HIGHLIGHT_OPEN, HIGHLIGHT_CLOSE],
+        )
+        .summarize(fields=["desc", "doc"], num_frags=1, context_len=25)
+        .paging(offset=0, num=limit)
+    )
+    results = cache.search(redis_query)
+    formatted = [
+        {
+            **_format_result(doc, snippets=True),
+            "_candidate_score": float(getattr(doc, "score", 0) or 0),
+        }
+        for doc in results.docs
+    ]
+    return _current_search_results(formatted)[0]
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/cache/query.py::candidate_search
+# @reason rank complete names and strict matches without treating snippets as full text
+def _candidate_rank(result, normalized_name, terms, strict_ids):
+    name = " ".join(str(result.get("name") or "").split()).casefold()
+    name_words = SUBSTITUTE.sub(" ", name).split()
+    name_coverage = sum(
+        any(word.startswith(term) for word in name_words) for term in terms
+    )
+    return (
+        name != normalized_name,
+        result["id"] not in strict_ids,
+        -name_coverage,
+        -result["_candidate_score"],
+        name,
+        result["id"],
+    )

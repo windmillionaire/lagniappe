@@ -7,8 +7,6 @@ from lagniappe.core.entities import Entities
 from .references import (
     _add_file_to_endpoint,
     _file_attached_to_endpoint,
-    _remove_file_from_endpoint,
-    _resolve_action_page,
     _resolve_entity,
     _resolve_file_endpoint,
     _resolve_file_entity,
@@ -51,8 +49,7 @@ def _move_file(action, _report, user, created):
     if not _file_attached_to_endpoint(file, source):
         raise exceptions.ValidationError("File is not attached to the source.")
 
-    _remove_file_from_endpoint(file, source)
-    _add_file_to_endpoint(file, target)
+    file.move_to(target)
     metadata = {
         "target": _entity_result(target),
         "moved": {
@@ -70,53 +67,32 @@ def _move_file(action, _report, user, created):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_resolves_attachment_page_from_single_prior_task_when_reference_is_file
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_missing
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_rejects_file_as_attachment_target_without_guessing_prior_page
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_attachment_target_guessing_from_page_name
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_category_used_as_attachment_page
-# @matrix ai-report : attachment attachments deterministic-run exact-page-name page-reference partial-result prior-task-page repair
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
+# @matrix ai-report : attachment attachments deterministic-run exact-page-name page-reference partial-result prior-task-page repair validation created-task persistence submission-completion task-attachment
 # @matrix files : attachment exact-page-name page-reference prior-task-page repair
-def _attach_file_to_page(action, report, user, created):
-    data = _data(action)
-    page = _resolve_action_page(data, created, user)
-    _require_allowed(
-        page.allowed(Action.EDIT, user=user),
-        "You do not have permission to attach files to this page.",
-    )
-    file = _resolve_report_file(
-        data.get("file") or data.get("file_id") or data.get("file_ref"),
-        report,
-    )
-    file.properties.pages.add(page)
-    return file, [file, page], {"file_summary": _file_summary_result(file)}
-
-
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_to_task_targets_created_task
-# @matrix ai-report : created-task task-attachment
 # @matrix files tasks : task-attachment
-def _attach_file_to_task(action, report, user, created):
+def _attach_file(action, report, user, created):
     data = _data(action)
     target = _resolve_entity(
-        data.get("task")
-        or data.get("task_id")
-        or data.get("task_ref")
-        or data.get("task_action"),
+        data.get("entity") or data.get("entity_action"),
         created,
     )
-    if not isinstance(target, (Entities.TASK, Entities.TASK_HISTORY)):
+    if not isinstance(target, (Entities.PAGE, Entities.TASK, Entities.TASK_HISTORY)):
         raise exceptions.ValidationError(
-            "Referenced entity is not a task or task history."
+            "Attachment target must be a Page, Task or task history."
         )
     _require_allowed(
         target.allowed(Action.EDIT, user=user),
-        "You do not have permission to attach files to this task.",
+        "You do not have permission to attach files to this target.",
     )
-    file = _resolve_report_file(
-        data.get("file") or data.get("file_id") or data.get("file_ref"),
-        report,
-    )
-    target.properties.files.add(file)
+    file = _resolve_report_file(data.get("file"), report)
+    if file.has_references:
+        _require_allowed(file.allowed(Action.EDIT, user=user), "You do not have permission to move this file.")
+    _add_file_to_endpoint(file, target)
     return file, [file, target], {"file_summary": _file_summary_result(file)}
 
 

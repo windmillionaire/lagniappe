@@ -17,7 +17,8 @@ from testing.definitions import SitePages, Uploads, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements import Buttons, List, Modal
 from testing.resources import Report
-from testing.utility.network import browser_fetch
+from testing.utility.network import browser_fetch, expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 pytestmark = pytest.mark.e2e
 
@@ -94,7 +95,7 @@ def _ready_report(user):
                     },
                     {
                         "id": "cleanup",
-                        "type": "delete_page",
+                        "type": "suggest_page_deletion",
                         "depends_on": ["page"],
                         "data": {"page_action": "page"},
                     },
@@ -318,7 +319,7 @@ def _schema_section_report(user):
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "update_form_schema",
+                        "type": "extend_form_schema",
                         "display_label": "Add paid invoice option",
                         "data": {
                             "form": form.urlsafe_key,
@@ -336,7 +337,7 @@ def _schema_section_report(user):
                     },
                     {
                         "id": "update_note",
-                        "type": "update_submission_fields",
+                        "type": "update_form_values",
                         "display_label": "Mark invoice note paid",
                         "depends_on": ["schema"],
                         "data": {
@@ -615,7 +616,8 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
             expect(user.locate(home.CREATE_TOOL_REPORT_FORM)).to_have_count(0)
             report_toggle.click()
             report_list = user.locate(home.TOOL_REPORT_LIST)
-            expect(report_list).to_be_hidden()
+            expect(report_list).to_be_visible()
+            expect(report_list.locator("[data-role='report-empty']")).to_be_visible()
             expect(user.locate(home.TOOL_REPORT_LOADING)).to_be_visible()
             expect(user.locate(home.TOOL_REPORT_LOADING)).to_have_text("0")
             expect(user.locate(home.TOOLS_COMPONENT)).to_have_attribute(
@@ -727,11 +729,24 @@ def test_saved_report_controls_do_not_require_provider_access(get_user):
     assert Entities.fetch_one(report.urlsafe_key, request=Fetch.root()) is None
 
 
-# @matrix ai-report : async create persistence title-truncation
+# @matrix ai-report : async create persistence title-truncation filter-create
 # @template home/tools.html::create_report
-def test_create_tool_starts_pending_report(get_user):
+@pytest.mark.parametrize("cold_list", [False, True])
+def test_create_tool_starts_pending_report(get_user, cold_list):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
+    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+    report_panel = user.locate(home.TOOL_REPORT_LIST)
+    expect(report_panel).to_have_attribute("loaded", "")
+    for category in ("active", "ask", "executed"):
+        report_panel.locator(
+            f"[data-role='report-filter'][data-filter='{category}']"
+        ).click()
+    expect(report_panel.locator("[data-filter='active']")).to_have_attribute(
+        "aria-pressed", "false"
+    )
+    if cold_list:
+        home = user.go(SitePages.HOME)
     instructions = (
         f"Create {_suffix()} a household inventory tracker with rooms, warranties, "
         "purchase dates, serial numbers, and replacement values"
@@ -750,6 +765,9 @@ def test_create_tool_starts_pending_report(get_user):
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
     report_name = f"Create: {instructions[:80]}..."
     item = report_list.new_item(report_name, flash=False)
+    expect(report_panel.locator("[data-filter='active']")).to_have_attribute(
+        "aria-pressed", "true"
+    )
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
     expect(item).to_have_attribute("data-operation", re.compile(".+"))
     expect(item.locator("[data-role='deferred-phase']")).to_have_text(
@@ -843,6 +861,113 @@ def test_text_only_organize_uses_ask(get_user):
     assert report.tool == "ask"
     assert report.instructions == question
     assert report.input_files == []
+
+
+# @matrix deferred-jobs : polling progress terminal-ownership
+# @template home/tools.html::report_item
+# @template notifications.html::item
+@pytest.mark.parametrize("surface", ["home", "report"])
+def test_open_pending_report_converges_with_notification(get_user, surface):
+    user = get_user(Users.OWNER)
+    owner = _owner(user)
+    suffix = _suffix()
+    report = Entities.REPORT.create(
+        {
+            "parent": owner,
+            "user": owner,
+            "name": f"Report convergence {suffix}",
+            "tool": "organize",
+            "status": "pending",
+            "pending": True,
+        }
+    )
+    job = Entities.DEFERRED_JOB.create(
+        {
+            "actor": owner,
+            "job_type": DeferredJobType.REPORT_ORGANIZE.value,
+            "idempotency_key": f"report-convergence-{suffix}",
+            "status": "running",
+            "dispatch_state": "dispatched",
+            "status_revision": 4,
+            "inputs": {},
+            "client": {
+                "key": report.urlsafe_key,
+                "source_widget": "CreateToolReport",
+                "destination": "tools:ToolReportList",
+            },
+            "progress": {"phase": "using_tools"},
+        }
+    )
+    report.deferred_job = {"key": job.urlsafe_key, "revision": 4}
+    notification = Entities.NOTIFICATION.create(
+        {
+            "parent": owner,
+            "target": report,
+            "body": "Organize report is running.",
+            "pending": True,
+        }
+    )
+    Entities.save(report, job, notification)
+
+    if surface == "home":
+        home = user.go(SitePages.HOME)
+        user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+        target = user.locate(home.TOOL_REPORT_LIST).locator(
+            f"li[data-key='{report.urlsafe_key}']"
+        )
+    else:
+        user.go(Report.for_entity(user, report))
+        target = user.locate(Report.VIEW)
+
+    expect(target).to_have_attribute("data-pending", "true")
+    expect(target.locator("[data-icon='spinner']")).to_be_visible()
+    expect(target.locator("[data-role='deferred-phase']")).to_have_text(
+        "Checking context"
+    )
+    notification_button = user.locate("[data-role='notifications']")
+    notification_button.click()
+    option = user.page.locator(
+        f"[role='listbox'][data-visible='true'] [role='option'][data-key='{notification.urlsafe_key}']"
+    )
+    expect(option).to_contain_text("Organize report is running.")
+
+    report.properties.process.set_proposal(
+        {"summary": f"Ready proposal {suffix}", "actions": []}
+    )
+    report.deferred_job = None
+    job.status = "succeeded"
+    job.dispatch_state = "complete"
+    job.status_revision = 5
+    job.progress = {"phase": "complete"}
+    notification.body = "Organize report is ready."
+    notification.pending = False
+    completion = (
+        expect_poll_result(
+            user.page,
+            subscription_id=f"operation:{job.urlsafe_key}",
+            timeout=35_000,
+        )
+        if surface == "home"
+        else expect_successful_response(
+            user.page,
+            method="GET",
+            path=f"/tools/reports/{report.urlsafe_key}",
+            timeout=35_000,
+        )
+    )
+    with completion:
+        Entities.save(report, job, notification)
+
+    expect(target).to_have_attribute("data-pending", "false")
+    expect(target).to_contain_text(f"Ready proposal {suffix}")
+    expect(target.locator("[data-icon='spinner']")).not_to_be_attached()
+    expect(target.locator("[data-role='deferred-phase']")).not_to_be_attached()
+    if surface == "report":
+        # Terminal report reconciliation navigates to authoritative full HTML.
+        Report.for_entity(user, report).wait_for_interaction_readiness()
+        notification_button.click()
+    expect(option).to_contain_text("Organize report is ready.")
+    expect(option.locator("[data-icon='spinner']")).not_to_be_attached()
 
 
 # @matrix ai-report : http-boundary upload validation
@@ -978,6 +1103,7 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     }
     Entities.save(report)
     item = reload_item()
+    user.locate("[data-role='report-filter'][data-filter='executed']").click()
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal executed")
 
     report.tool = "ask"
@@ -1408,6 +1534,110 @@ def test_report_detail_skips_action_dependencies(get_user):
     ]
 
 
+# @matrix ai-report submission : batch-field-patch persistence schema-update
+def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_user):
+    user = get_user(Users.OWNER)
+    report, _page_form, page = _schema_section_report(user)
+    form = Entities.FORM.create(
+        {
+            "name": f"test-task-details-{_suffix()}",
+            "form-type": "task",
+            "schema": [
+                {
+                    "id": "textarea-notes",
+                    "type": "textarea",
+                    "title": "Implementation Notes",
+                }
+            ],
+        }
+    )
+    task = Entities.TASK.create(
+        {
+            "name": f"test-optional-ask-{_suffix()}",
+            "page": page,
+            "form": form,
+            "submission": {"textarea-notes": "Previous notes"},
+        }
+    )
+    expected = {
+        "textarea-notes": "Problem: saving was required. Solution: answer first.",
+        "textarea-acceptance": "Save only on request.",
+        "textarea-verification": "Checked live retrieval.",
+        "input-commit": "abc123",
+    }
+    report.proposal = {
+        "summary": "Record details and complete the task",
+        "confidence": 1,
+        "actions": [
+            {
+                "id": "schema",
+                "type": "extend_form_schema",
+                "data": {
+                    "form": form.urlsafe_key,
+                    "operations": [
+                        {
+                            "op": "add_field",
+                            "field": {
+                                "id": field_id,
+                                "type": field_id.split("-", 1)[0],
+                                "title": field_id,
+                                **(
+                                    {"input": "text"}
+                                    if field_id.startswith("input-")
+                                    else {}
+                                ),
+                            },
+                        }
+                        for field_id in list(expected)[1:]
+                    ],
+                },
+            },
+            {
+                "id": "details",
+                "type": "update_form_values",
+                "depends_on": ["schema"],
+                "data": {
+                    "updates": [
+                        {
+                            "task": task.urlsafe_key,
+                            "schema_id": field_id,
+                            "new_value": value,
+                        }
+                        for field_id, value in expected.items()
+                    ],
+                },
+            },
+            {
+                "id": "done",
+                "type": "complete_task",
+                "depends_on": ["details"],
+                "data": {"task": task.urlsafe_key},
+            },
+        ],
+    }
+    Entities.save(form, task, report)
+
+    report_page = user.go(Report.for_entity(user, report))
+    report_page.execute()
+    expect(user.page.get_by_text("Work done.")).to_be_visible()
+
+    saved = Entities.fetch_one(task.urlsafe_key, request=Fetch.direct())
+    receipt = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct()).result
+    assert saved.completed is True
+    assert saved.submission == expected
+    assert len(saved.form.schema) == 4
+    assert [action["status"] for action in receipt["actions"]] == ["complete"] * 3
+    assert len(receipt["actions"][1]["updates"]["applied"]) == 4
+    assert receipt["actions"][1]["updates"]["skipped"] == []
+
+    updated = report_page.result.locator("[data-role='submission-update-target']")
+    expect(updated).to_have_count(1)
+    expect(updated).to_contain_text("Task Updated:")
+    expect(updated.get_by_role("link", name=task.name, exact=True)).to_have_attribute(
+        "href", f"/tasks/{task.urlsafe_key}"
+    )
+
+
 # @matrix ai-report : batch-field-patch detail deterministic-run schema-update skip-action
 def test_report_detail_skips_schema_section_and_runs_submission_updates(get_user):
     user = get_user(Users.OWNER)
@@ -1436,7 +1666,12 @@ def test_report_detail_skips_schema_section_and_runs_submission_updates(get_user
     report_page.execute()
 
     expect(user.page.get_by_text("Work done.")).to_be_visible()
-    expect(user.page.get_by_text("Updated submissions")).to_be_visible()
+    updated = report_page.result.locator("[data-role='submission-update-target']")
+    expect(updated).to_have_count(1)
+    expect(updated).to_contain_text("Page Updated:")
+    expect(updated.get_by_role("link", name=page.name, exact=True)).to_have_attribute(
+        "href", f"/pages/{page.urlsafe_key}"
+    )
     expect(user.page.get_by_text("Updates: 1 applied")).to_be_visible()
 
     saved_report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())

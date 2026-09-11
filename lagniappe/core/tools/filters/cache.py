@@ -71,7 +71,8 @@ class FilterCache:
         return [
             entity
             for entity in Entities.fetch(
-                *self._query_keys(filter), request=Fetch.direct()
+                *self._query_keys(filter),
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
             )
             if entity.allowed(Action.VIEW, user=self.user)
         ]

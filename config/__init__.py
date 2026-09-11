@@ -63,6 +63,28 @@ class Environment(Enum):
     PRODUCTION = "production"
 
 
+# @testable false
+# @covered-by config/__init__.py::File.load
+# @covered-by installer/doctor.py::run_doctor
+# @reason shared saved-settings decoding is exercised by normal loading and read-only diagnostics
+def decode_app_settings(data):
+    """Decode saved scalar/JSON strings while preserving native YAML values."""
+    decoded = dict(data)
+    decoded.pop("BUILD_ID", None)
+    for key, value in decoded.items():
+        if not isinstance(value, str):
+            continue
+        if value.lower() == "true":
+            decoded[key] = True
+        elif value.lower() == "false":
+            decoded[key] = False
+        elif value.isdigit():
+            decoded[key] = int(value)
+        elif value.startswith(("{", "[")):
+            decoded[key] = json.loads(value)
+    return decoded
+
+
 class File(Enum):
     MANIFEST_JSON = Directory.APP.value / "lagniappe/web/static/manifest.json"
     PACKAGE_JSON = Directory.APP.value / "package.json"
@@ -124,21 +146,7 @@ class File(Enum):
         if not self.convert:
             return data
 
-        data.pop("BUILD_ID", None)
-        for k, v in data.items():
-            value = str(v)
-            if value.lower() == "true":
-                data[k] = True
-            elif value.lower() == "false":
-                data[k] = False
-            elif value.isdigit():
-                data[k] = int(value)
-            elif value.startswith("{"):
-                data[k] = json.loads(value)
-            elif value.startswith("["):
-                data[k] = json.loads(value)
-
-        return data
+        return decode_app_settings(data)
 
     # @testable false
     # @covered-by config/__init__.py::File.save

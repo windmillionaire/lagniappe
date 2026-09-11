@@ -1,5 +1,9 @@
 """App Engine custom-domain setup with optional Cloudflare DNS automation."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
+from runner.console import format_prompt
 from installer import wrap_text
 
 from .verify import prepare_existing_installation
@@ -17,25 +21,35 @@ def add_custom_domain():
 
     f = FORMATTER.initialize()
     if not _setup_custom_domain():
-        print(f.error("Custom-domain setup is incomplete."))
+        print(f.error(wrap_text("Custom-domain setup is incomplete.")))
         return 1
 
     SETTINGS.save()
     print(
-        f.success(
-            "The app must be redeployed for custom-domain authentication "
-            "settings to take effect."
+        ui.info(
+            wrap_text(
+                "The app must be redeployed for custom-domain authentication "
+                "settings to take effect."
+            )
         )
     )
-    consent = input(f.info("Would you like to deploy the app now? [y/N]: "))
+    consent = input(
+        format_prompt("Deploy app now", hint="y/N")
+    )
     if consent.casefold() == "y":
-        utils.deploy_to_app_engine()
+        utils.deploy_to_app_engine(print_final_summary=False)
+        print(ui.success("Custom domain settings deployed"))
         print(
-            f"Your app is available at: "
-            f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}"
+            ui.value(
+                "Open this installation",
+                f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}",
+                action=True,
+                verbatim=True,
+                standalone=True,
+            )
         )
     else:
-        print("Custom domain saved. Deploy when ready.")
+        print(wrap_text("Custom domain saved. Deploy when ready."))
     return 0
 
 
@@ -89,24 +103,28 @@ def _setup_custom_domain(*, configure_auth=True):
         )
         return False
 
-    with f.yaspin(
-        text=f.success("Creating or discovering App Engine domain mapping")
+    with f.progress(
+        text="Creating or discovering App Engine domain mapping",
+        success_text='App Engine domain mapping ready',
     ) as spinner:
         mapping = create_gcp_domain_mapping(domain, spinner)
-        spinner.ok(f.ok_glyph)
+        spinner.ok()
 
     resource_records = mapping["resourceRecords"]
     use_cloudflare = input(
-        f.info("Configure these DNS records through Cloudflare? [y/N]: ")
+        format_prompt("Configure these DNS records through Cloudflare? [y/N]: ")
     )
     if use_cloudflare.casefold() == "y":
         api_token = get_cloudflare_api_token()
-        with f.yaspin(text=f.success("Resolving Cloudflare DNS zone")) as spinner:
+        with f.progress(
+            text="Resolving Cloudflare DNS zone",
+            success_text='Cloudflare DNS zone found',
+        ) as spinner:
             zone = get_cloudflare_zone(domain, api_token)
-            spinner.write(f.success(f"Using Cloudflare zone {zone['name']}"))
-            spinner.ok(f.ok_glyph)
-        with f.yaspin(
-            text=f.success("Reconciling DNS-only Cloudflare records")
+            spinner.ok(f"Using Cloudflare zone {zone['name']}")
+        with f.progress(
+            text="Reconciling DNS-only Cloudflare records",
+            success_text='Cloudflare DNS records reconciled',
         ) as spinner:
             record_ids = reconcile_cloudflare_dns_records(
                 domain,
@@ -114,12 +132,7 @@ def _setup_custom_domain(*, configure_auth=True):
                 api_token,
                 resource_records,
             )
-            spinner.write(
-                f.success(
-                    f"Reconciled {len(record_ids)} DNS-only Cloudflare records"
-                )
-            )
-            spinner.ok(f.ok_glyph)
+            spinner.ok(f"Reconciled {len(record_ids)} DNS-only Cloudflare records")
         SETTINGS.APP["CLOUDFLARE_ZONE_ID"] = zone["id"]
         account_id = (zone.get("account") or {}).get("id")
         if account_id:
@@ -127,7 +140,9 @@ def _setup_custom_domain(*, configure_auth=True):
     else:
         print_manual_dns_instructions(domain, resource_records)
         configured = input(
-            f.info("Have you added all of the App Engine DNS records? [y/N]: ")
+            format_prompt(
+                "Have you added all of the App Engine DNS records? [y/N]: "
+            )
         )
         if configured.casefold() != "y":
             print(
@@ -148,7 +163,9 @@ def _setup_custom_domain(*, configure_auth=True):
         if google_signin_enabled:
             update_oauth_redirect_uris(domain)
             confirmed = input(
-                f.info("Have you updated the Google OAuth settings? [y/N]: ")
+                format_prompt(
+                    "Have you updated the Google OAuth settings? [y/N]: "
+                )
             )
             if confirmed.casefold() != "y":
                 print(
@@ -162,7 +179,7 @@ def _setup_custom_domain(*, configure_auth=True):
         from .identity import setup_identity_platform
 
         setup_identity_platform(app_url=f"https://{domain}")
-    print(f.success(f"Custom domain configured: https://{domain}"))
+    print(f.success(wrap_text(f"Custom domain configured: https://{domain}")))
     print(
         wrap_text(
             "App Engine provisions and renews the managed TLS certificate. DNS "

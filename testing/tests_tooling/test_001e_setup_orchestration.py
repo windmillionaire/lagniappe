@@ -37,6 +37,7 @@ CLI_MODES = (
     pytest.param(["oauth"], "oauth", id="oauth"),
     pytest.param(["ai"], "ai", id="ai"),
     pytest.param(["ai-email"], "ai-email", id="ai-email"),
+    pytest.param(["mcp"], "mcp", id="mcp"),
     pytest.param(["security"], "security", id="security"),
     pytest.param(["jobs"], "jobs", id="jobs"),
     pytest.param(["monitoring"], "monitoring", id="monitoring"),
@@ -54,11 +55,9 @@ def _fake_formatter():
         initialize=lambda: types.SimpleNamespace(
             success=lambda message: message,
             info=lambda message: message,
-            warning=lambda message: message,
+            warning=lambda message, diagnostic=None: message + ("\n" + str(diagnostic) if diagnostic else ""),
             error=lambda message, error=None: message,
-            ok_glyph="[OK]",
-            fail_glyph="[X]",
-            yaspin=spinner_factory(SpinnerRecorder()),
+            progress=spinner_factory(SpinnerRecorder()),
         )
     )
 
@@ -110,8 +109,10 @@ def _install_harness(
     deploy=False,
     with_ai_email=False,
 ):
+    import config
     import installer as setup_package
     from installer import install as install_module
+    from installer import mcp as mcp_module
 
     events = []
     settings = types.SimpleNamespace(
@@ -121,13 +122,11 @@ def _install_harness(
         GCLOUD_CONFIG={},
         save=lambda: events.append("settings.save"),
     )
-    config_module = types.ModuleType("config")
-    config_module.SETTINGS = settings
-    config_module.File = types.SimpleNamespace(
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setattr(config, "File", types.SimpleNamespace(
         INDEX_YAML=types.SimpleNamespace(value="index.yaml"),
         APP_YAML=types.SimpleNamespace(value="lagniappe.yaml"),
-    )
-    monkeypatch.setitem(sys.modules, "config", config_module)
+    ))
 
     def step(name, result=None):
         def invoke(*args, **kwargs):
@@ -155,13 +154,18 @@ def _install_harness(
         "create_config",
         set_application_defaults=set_application_defaults,
     )
+    def deploy_to_app_engine(**kwargs):
+        settings._deploy_options = kwargs
+        return step("deploy_to_app_engine")()
+
     _module(
         monkeypatch,
         setup_package,
         "utils",
         check_gcloud_cli=step("check_gcloud_cli"),
-        deploy_to_app_engine=step("deploy_to_app_engine"),
+        deploy_to_app_engine=deploy_to_app_engine,
     )
+    _module(monkeypatch, setup_package, "mcp", requested=mcp_module.requested)
     gcloud_module = _module(
         monkeypatch,
         setup_package,
@@ -218,7 +222,7 @@ def _install_harness(
         setup_package,
         "optional",
         setup_error_monitoring=step("setup_error_monitoring"),
-        change_ai_model=step("change_ai_model"),
+        configure_ai_features=step("configure_ai_features", True),
     )
     ai_email_candidate = {"enabled": True} if with_ai_email else None
 
@@ -262,6 +266,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
 
     assert install_module.install() == 0
     assert settings.APP["APP_NAME"] == "Lagniappe"
+    assert settings._deploy_options == {"print_final_summary": False, "first_install": True}
     assert events == [
         "ensure_pip_is_available",
         "check_gcloud_cli",
@@ -278,19 +283,20 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
         "setup_admin_and_oauth",
         "setup_redis",
         "setup_error_monitoring",
-        "change_ai_model",
+        "configure_ai_features",
         "setup_ai_email",
         "settings.save",
         "deploy_to_app_engine",
         "create_deferred_job_reconciler",
     ]
     output = capsys.readouterr().out
-    assert "Wrapping up installation..." in output
-    assert "Deployment complete!" in output
+    assert "Wrapping up installation..." not in output
+    assert "\n✓ Deployment complete\n" not in output
+    assert output.count("✓ Setup complete") == 1
     assert "every Gunicorn worker adds application memory use" in output
     assert "limits F2 and B2 to three workers" in output
-    assert output.index("Deployment complete!") < output.index("Setup complete!")
-    assert "Manual deployment steps:" not in output
+    assert output.index("Setup complete") < output.index("Installation summary")
+    assert "Manual deployment steps" not in output
 
 
 # @matrix setup : explicit-project manual-deploy
@@ -305,11 +311,11 @@ def test_default_install_only_prints_manual_deployment_steps_when_declined(
 
     assert install_module.install() == 0
     output = capsys.readouterr().out
-    assert "Manual deployment steps:" in output
+    assert "Manual deployment steps" in output
     assert "Review the generated YAML files" in output
     assert "index.yaml --project project-1" in output
     assert "lagniappe.yaml --project project-1" in output
-    assert "Then reconcile memory monitoring: ./setup.sh monitoring" in output
+    assert "Then reconcile memory monitoring:\n  ./setup.sh monitoring" in output
     assert "Wrapping up installation..." not in output
     assert "deploy_to_app_engine" not in events
 
@@ -335,15 +341,16 @@ def test_default_install_activates_ai_email_after_deploy_and_jobs(
 
 
 def test_recovery_install_skips_optional_reconfiguration(monkeypatch):
-    install_module, settings, events = _install_harness(monkeypatch)
+    install_module, settings, events = _install_harness(monkeypatch, deploy=True)
     settings.RECOVERY_MODE = True
 
     assert install_module.install() == 0
     assert "setup_error_monitoring" not in events
-    assert "change_ai_model" not in events
+    assert "configure_ai_features" not in events
     assert "setup_ai_email" not in events
     assert "setup_redis" in events
     assert "settings.save" in events
+    assert settings._deploy_options == {"print_final_summary": False, "first_install": False}
 
 
 # @matrix setup : failure-isolation recovery
@@ -469,6 +476,41 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
 
     monkeypatch.setattr(setup_package, "project_virtualenv_active", lambda: True)
     assert setup_package.verify_setup_runtime() is None
+
+
+# @matrix setup : focused-mode gcloud-token prerequisites deploy-surface gcloud-config transactional-state
+# @source installer/__main__.py::_prepare_setup_dependencies
+# @source installer/verify.py::validate_installation
+def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch):
+    import config
+    from installer import __main__ as setup_cli
+    from installer import optional, package_install, utils
+    from runner import deploy, gcloud
+
+    events = []
+    monkeypatch.setattr(package_install, "ensure_pip_is_available", lambda: None)
+    monkeypatch.setattr(package_install, "ensure_setup_dependencies", lambda: None)
+    monkeypatch.setattr(
+        gcloud, "activate_repository_gcloud",
+        lambda **kwargs: events.append(("credentials", kwargs)) or True,
+    )
+    monkeypatch.setattr(
+        gcloud, "config_gcloud",
+        lambda **kwargs: pytest.fail("the handler repeated gcloud activation"),
+    )
+    monkeypatch.setattr(utils, "check_gcloud_cli", lambda: None)
+    monkeypatch.setattr(config, "verify_generation_manifest", lambda: events.append("generation"))
+    monkeypatch.setattr(deploy, "verify_runtime_deploy_surface", lambda: events.append("deploy-surface"))
+    monkeypatch.setattr(optional, "configure_ai_features", lambda: events.append("AI prompt") or False)
+    monkeypatch.setattr("builtins.input", lambda prompt: "n")
+
+    args = setup_cli._parser().parse_args(["ai"])
+    setup_cli._prepare_setup_dependencies(args)
+    assert setup_cli._dispatch(args) == 0
+    assert events == [
+        ("credentials", {"ensure_adc": True, "ensure_cli_token": True}),
+        "generation", "deploy-surface", "AI prompt",
+    ]
 
 
 # @matrix auth setup : adc explicit-command gcloud-token interactive
@@ -1308,7 +1350,7 @@ def test_cli_subprocess_routes_upgrade_branch():
 
     assert result.returncode == 0
     assert "CALL upgrade" in result.stdout
-    assert "kwargs={'branch': 'release/candidate'}" in result.stdout
+    assert "kwargs={'branch': 'release/candidate', 'announce': False}" in result.stdout
 
 
 def test_cli_subprocess_rejects_branch_without_upgrade():
@@ -1335,7 +1377,7 @@ REMOTE_MUTATION_BOUNDARIES = (
     "setup_admin_and_oauth",
     "setup_redis",
     "setup_error_monitoring",
-    "change_ai_model",
+    "configure_ai_features",
     "setup_ai_email",
     "deploy_to_app_engine",
     "create_deferred_job_reconciler",
@@ -1481,6 +1523,6 @@ def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
     ]
     assert "secret" not in json.dumps(journal).casefold()
     output = capsys.readouterr().out
-    assert "Completed remote mutations:" in output
+    assert "Completed remote mutations" in output
     assert "tasks.googleapis.com" in output
-    assert "Run ./setup.sh jobs again to resume." in output
+    assert "Resume with:\n  ./setup.sh jobs" in output

@@ -1,4 +1,4 @@
-from ..definitions import Action, Fetch
+from ..definitions import Action, Fetch, FetchReason
 from ..entities import Entities
 from ..mixins import (
     AIMixin,
@@ -183,7 +183,7 @@ class PageFiles(RelatedEntityListMixin, Property):
             if getattr(file, "key", file)
         ]
         loaded = (
-            Entities.fetch(*file_keys, self.entity, request=Fetch.direct())
+            Entities.fetch(*file_keys, self.entity, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
             if file_keys
             else []
         )
@@ -194,7 +194,7 @@ class PageFiles(RelatedEntityListMixin, Property):
                 file
                 for file in loaded
                 if isinstance(file, Entities.FILE)
-                and self.entity.key in file.properties.pages.keys
+                and self.entity.key == file.properties.page.key
             ],
         )
         return self._value

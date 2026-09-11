@@ -155,6 +155,8 @@ def test_gcloudignore_uploads_only_canonical_runtime_config():
     assert "!/config/files/redis_ca.pem" in ignore
     assert "/installer/" in ignore
     assert "/runner/" in ignore
+    assert "/mcp/" in ignore
+    assert "/testing_ai_workflows/" in ignore
     assert "/setup/" not in ignore
     assert "**/gha-creds-*.json" in ignore
     for local_only in (
@@ -341,6 +343,10 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
                 "AI_IMAGE_MODEL": "imagen-test",
                 "BUILD_ID": "stale-local-build",
                 "FIREBASE_CONFIG": '{"apiKey": "demo"}',
+                "AI_ENABLED": "True",
+                "EXTERNAL_AI_ENABLED": "False",
+                "REDIS_PORT": "6379",
+                "AUTH_EMAIL_CONFIG": {"senderEmail": "owner@example.com"},
             }
         )
     )
@@ -400,6 +406,13 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
         assert APP_DIR == app_dir
         assert Directory.CONFIG.value == config_files_dir
         assert Environment.TESTING.value == "testing"
+        assert SETTINGS.APP["AI_ENABLED"] is True
+        assert SETTINGS.APP["EXTERNAL_AI_ENABLED"] is False
+        assert SETTINGS.APP["REDIS_PORT"] == 6379
+        assert SETTINGS.APP["FIREBASE_CONFIG"] == {"apiKey": "demo"}
+        assert SETTINGS.APP["AUTH_EMAIL_CONFIG"] == {
+            "senderEmail": "owner@example.com"
+        }
 
         for file_ref in [
             File.APP_YAML,
@@ -1391,9 +1404,13 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
     monkeypatch.chdir(app_dir)
     try:
         from config import SETTINGS
+        from config import constants as deployed_constants
         from runner.deploy import deploy as deploy_app
 
         deploy_module = importlib.import_module("runner.deploy")
+        SETTINGS.DEPLOY["handlers"] = json.loads(
+            json.dumps(deployed_constants.APP_HANDLERS)
+        )
         SETTINGS.APP["GOOGLE_CLOUD_PROJECT"] = "demo-project"
         SETTINGS.save()
 
@@ -1403,6 +1420,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         frontend_inspections = []
         frontend_verifications = []
         frontend_state = {"current": False}
+        frontend_build_id = {"value": "b1234567"}
 
         def fake_preflight(app_dir=None):
             preflight_snapshots.append(
@@ -1417,10 +1435,16 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         monkeypatch.setattr(
             deploy_module, "verify_runtime_deploy_surface", fake_preflight
         )
+        def fake_verify_frontend_build(**kwargs):
+            frontend_verifications.append(kwargs)
+            return types.SimpleNamespace(
+                metadata={"build_id": frontend_build_id["value"]}
+            )
+
         monkeypatch.setattr(
             deploy_module,
             "verify_frontend_build",
-            lambda **kwargs: frontend_verifications.append(kwargs) or True,
+            fake_verify_frontend_build,
         )
         monkeypatch.setattr(
             deploy_module,
@@ -1445,6 +1469,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
                     (app_dir / "package.json").read_text(encoding="utf-8")
                 )
                 build_versions.append(package_json["version"])
+                frontend_build_id["value"] = "b7654321"
             return subprocess.CompletedProcess(command, 0)
 
         monkeypatch.setattr(deploy_module, "run_command", fake_run_command)
@@ -1456,7 +1481,9 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
             capture_output=True,
             announce_progress=False,
         )
-        assert capsys.readouterr().out == "Deployment complete!\n"
+        from runner.presentation import success
+
+        assert capsys.readouterr().out == success("Deployment complete") + "\n"
         assert preflight_snapshots == [
             {"version": "1.23", "chunk_exists": True, "commands": []}
         ]
@@ -1502,6 +1529,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
                 "expected_version": "1.23",
             }
         ]
+
 
         commands.clear()
         preflight_snapshots.clear()
@@ -1554,7 +1582,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
 
         assert deploy_app(announce_completion=False)
         output = capsys.readouterr().out
-        assert "Current production frontend bundle detected; preserving it." in output
+        assert "Current production frontend bundle detected; preserving it" in output
         assert "running npm run build" not in output
         assert preflight_snapshots == [
             {"version": "1.23", "chunk_exists": True, "commands": []}
@@ -1622,3 +1650,24 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         sys.modules.pop("runner.deploy", None)
         if original_runner_deploy is not None:
             sys.modules["runner.deploy"] = original_runner_deploy
+
+
+# @matrix config : recovery-validation site-policy
+# @source config/recovery.py::validate_recovery_document
+def test_recovery_preserves_ai_policy_without_implicitly_selecting_mcp():
+    from config import recovery
+    from installer.mcp import requested
+
+    snapshot = _valid_recovery_document()
+    legacy = recovery.validate_recovery_document(snapshot)
+    assert "EXTERNAL_AI_ENABLED" not in legacy
+    assert not requested(legacy)
+    snapshot.update(AI_ENABLED=False, EXTERNAL_AI_ENABLED=False, MCP_VERSION="a" * 32, MCP_NAME="cwright-mcp")
+    restored = recovery.validate_recovery_document(snapshot)
+    assert restored["AI_ENABLED"] is False
+    assert restored["EXTERNAL_AI_ENABLED"] is False
+    assert restored["MCP_VERSION"] == "a" * 32
+    assert restored["MCP_NAME"] == "cwright-mcp"
+    for field, value in (("AI_ENABLED", "false"), ("EXTERNAL_AI_ENABLED", 1), ("MCP_VERSION", "manual-version"), ("MCP_NAME", "bad;command")):
+        with pytest.raises(recovery.RecoveryConfigurationError, match="AI configuration"):
+            recovery.validate_recovery_document({**snapshot, field: value})

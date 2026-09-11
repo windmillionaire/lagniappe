@@ -1,5 +1,7 @@
 """Shared authenticated HTTP helpers for Google provider setup."""
 
+from runner.presentation import output as print
+
 import time
 
 from installer import FORMATTER

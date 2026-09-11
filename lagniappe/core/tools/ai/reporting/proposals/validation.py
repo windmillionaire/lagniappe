@@ -9,7 +9,7 @@ from lagniappe.core.tools import dates
 from ...debug import ai_debug
 from ...references import normalize_hash_references, render_ai_markdown
 from ..contracts.actions import ALLOWED_ACTIONS
-from ..schedules import validate_task_schedule
+from ..schedules import validate_task_due_date, validate_task_schedule
 from .references import (
     _data_action_reference,
     _data_action_references,
@@ -22,7 +22,7 @@ from .references import (
 
 ENTITY_PAIR_ACTION_REFERENCES = {
     "add_form_to_page": ("page", ("form",)),
-    "add_category": ("page", ("category", "model")),
+    "add_page_category": ("page", ("category", "model")),
     "move_page": ("page", ("category", "model")),
     "move_task": ("task", ("to_page", "page")),
 }
@@ -31,7 +31,7 @@ ENTITY_PAIR_ACTION_REFERENCES = {
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_renders_page_document_markdown
 # @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
-def normalize_report_markdown(proposal):
+def normalize_report_markdown(proposal, *, preserve_markdown=False):
     """Render new model-facing Markdown fields into legacy executable HTML."""
     if not isinstance(proposal, dict):
         return proposal
@@ -39,7 +39,7 @@ def normalize_report_markdown(proposal):
     if not isinstance(actions, list):
         return proposal
     for action in actions:
-        if not isinstance(action, dict) or action.get("type") != "create_page":
+        if not isinstance(action, dict) or action.get("type") not in {"create_page", "append_page_document"}:
             continue
         data = action.get("data")
         if not isinstance(data, dict) or "document_markdown" not in data:
@@ -47,10 +47,11 @@ def normalize_report_markdown(proposal):
         source = data.get("document_markdown")
         if not isinstance(source, str):
             raise exceptions.AIException(
-                "Create page document_markdown must be a string."
+                "Page document_markdown must be a string."
             )
         data["document"] = render_ai_markdown(source)
-        data.pop("document_markdown", None)
+        if not preserve_markdown:
+            data.pop("document_markdown", None)
     return proposal
 
 
@@ -80,12 +81,15 @@ def validate_proposal(
     require_file_summaries=False,
     validate_reference_kinds=False,
     user=None,
+    preserve_document_markdown=False,
+    resolved_reference_details=None,
 ):
     """Validate the JSON action proposal returned by the organize prompt."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
     raw_proposal = proposal
     submitted_required_file_refs = list(required_file_refs or ())
-    resolved_reference_details = {}
+    if resolved_reference_details is None:
+        resolved_reference_details = {}
     normalized = normalize_hash_references(
         {
             "proposal": proposal,
@@ -97,7 +101,10 @@ def validate_proposal(
     required_file_refs = normalized["required_file_refs"]
     if not isinstance(proposal, dict):
         raise exceptions.AIException("Report proposal must be a JSON object.")
-    proposal = normalize_report_markdown(proposal)
+    proposal = normalize_report_markdown(
+        proposal,
+        preserve_markdown=preserve_document_markdown,
+    )
 
     issues = proposal.get("issues")
     if issues is None:
@@ -183,15 +190,11 @@ def validate_proposal(
             action.get("data", {}).get("file")
             for action in actions
             if isinstance(action, dict)
-            and action.get("type") in {"attach_file_to_page", "attach_file_to_task"}
+            and action.get("type") == "attach_file"
             and action.get("skip") is not True
             and isinstance(action.get("data"), dict)
             and _proposal_string(action["data"].get("file"))
-            and (
-                _first_data_reference(action["data"], "page")
-                if action.get("type") == "attach_file_to_page"
-                else _first_data_reference(action["data"], "task")
-            )
+            and _first_data_reference(action["data"], "entity")
         }
         missing_file_refs = [
             submitted_file_ref
@@ -263,6 +266,8 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
     """Reject hash references whose resolved entity kind violates the action."""
     rules = {
         "create_page": (("category", {"category"}),),
+        "complete_task": (("task", {"task"}),),
+        "set_task_due_date": (("task", {"task"}),),
         "create_task": (
             ("page", {"page"}),
             ("task", {"task"}),
@@ -275,7 +280,7 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
             ("category", {"category"}),
             ("form", {"form"}),
         ),
-        "add_category": (
+        "add_page_category": (
             ("page", {"page"}),
             ("category", {"category"}),
         ),
@@ -289,14 +294,14 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
             ("project", {"project"}),
             ("model", {"model"}),
         ),
-        "attach_file_to_page": (("page", {"page"}),),
-        "attach_file_to_task": (("task", {"task", "task_history"}),),
+        "attach_file": (("entity", {"page", "task", "task_history"}),),
+        "append_page_document": (("page", {"page"}),),
         "summarize_file": (("file", {"file"}),),
-        "update_submission_fields": (
+        "update_form_values": (
             ("page", {"page"}),
             ("task", {"task"}),
         ),
-        "delete_page": (("page", {"page"}),),
+        "suggest_page_deletion": (("page", {"page"}),),
     }
     data = action.get("data") if isinstance(action, dict) else None
     if not isinstance(data, dict):
@@ -398,8 +403,14 @@ def _validate_action_data_shape(
 
     if action_type == "create_form":
         _validate_create_form_action_data(data, action_label)
-    if action_type == "update_form_schema":
-        _validate_update_form_schema_action_data(data, action_label)
+    if action_type == "append_page_document":
+        if not _first_data_reference(data, "page") or not _proposal_string(data.get("document")):
+            raise exceptions.AIException(f"Action {action_label} requires a Page reference and non-empty document_markdown.")
+    if action_type == "attach_file":
+        if set(data) - {"entity", "entity_action", "entity_name", "file", "display_name"}:
+            raise exceptions.AIException(f"Action {action_label} uses entity/entity_action for its attachment target.")
+    if action_type == "extend_form_schema":
+        _validate_extend_form_schema_action_data(data, action_label)
     if action_type == "create_page" and not _proposal_string(data.get("name")):
         raise exceptions.AIException(f"Action {action_label} requires data.name.")
     if action_type in {"create_page", "create_task"}:
@@ -410,6 +421,23 @@ def _validate_action_data_shape(
         )
     if action_type == "create_task":
         _validate_create_task_action_data(data, action_label, user=user)
+    if action_type == "complete_task":
+        if not _proposal_string(data.get("task")):
+            raise exceptions.AIException(
+                f"Action {action_label} requires an exact data.task reference."
+            )
+        if set(data) - {"task", "task_name"}:
+            raise exceptions.AIException(
+                f"Action {action_label} only accepts task and task_name; use separate submission patches before completion."
+            )
+    if action_type == "set_task_due_date":
+        if not _proposal_string(data.get("task")):
+            raise exceptions.AIException(f"Action {action_label} requires an exact data.task reference.")
+        if "due_date" not in data:
+            raise exceptions.AIException(f"Action {action_label} requires data.due_date; use null to clear it.")
+        if set(data) - {"task", "task_name", "due_date"}:
+            raise exceptions.AIException(f"Action {action_label} only accepts task, task_name, and due_date.")
+        validate_task_due_date(data["due_date"])
     entity_pair = ENTITY_PAIR_ACTION_REFERENCES.get(action_type)
     if entity_pair:
         source_root, target_roots = entity_pair
@@ -429,7 +457,7 @@ def _validate_action_data_shape(
             action_label,
             require_retrieval_terms=require_file_summary_terms,
         )
-    if action_type == "update_submission_fields":
+    if action_type == "update_form_values":
         _validate_submission_update_action_data(
             data,
             action_label,
@@ -520,7 +548,7 @@ def _validate_create_form_action_data(data, action_label):
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unsafe_schema_update_operations
 # @matrix form-schema : proposal schema-update validation
-def _validate_update_form_schema_action_data(data, action_label):
+def _validate_extend_form_schema_action_data(data, action_label):
     if not _first_data_reference(data, "form"):
         raise exceptions.AIException(f"Action {action_label} requires data.form.")
 
@@ -621,7 +649,7 @@ def _validate_create_task_action_data(data, action_label, user=None):
     if _proposal_file_refs(data):
         raise exceptions.AIException(
             f"Action {action_label} should attach task files with "
-            "attach_file_to_task, not data.file or data.files."
+            "attach_file, not data.file or data.files."
         )
 
     task_references = [
@@ -811,23 +839,18 @@ def _validate_submission_update_action_data(
             raise exceptions.AIException(
                 f"Action {action_label} {row_label} must be an object."
             )
-        page_reference = _first_data_reference(
-            update,
-            "page",
-            "page_id",
-            "page_ref",
-            "page_action",
-        )
-        task_reference = _first_data_reference(
-            update,
-            "task",
-            "task_id",
-            "task_ref",
-            "task_action",
-        )
-        if bool(page_reference) == bool(task_reference):
+        targets = [
+            update[field]
+            for field in (
+                "page", "page_id", "page_ref", "page_action",
+                "task", "task_id", "task_ref", "task_action",
+            )
+            if field in update
+        ]
+        if len(targets) != 1 or not _proposal_string(targets[0]):
             raise exceptions.AIException(
-                f"Action {action_label} {row_label} requires exactly one page or task."
+                f"Action {action_label} {row_label} requires exactly one page or task. "
+                "Put the target in every update row; top-level targets do not apply."
             )
         if not _proposal_string(update.get("schema_id") or update.get("field_id")):
             raise exceptions.AIException(

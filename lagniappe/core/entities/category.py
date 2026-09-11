@@ -10,6 +10,7 @@ UNCATEGORIZED_PAGES_NAME = "Uncategorized Pages"
 # @testable true
 # @tests tests_unit/test_007_category_properties.py::test_category_schema
 # @matrix category form-schema : delegation schema
+# @matrix category permissions : attached-form cache restricted-access
 class Category(Entity):
     entity_kind = "category"
     retired_fields = frozenset({"attributes"})
@@ -33,7 +34,6 @@ class Category(Entity):
                 "form": common_related.AttachedForm,
                 "forms": common_related.RelatedForms,
                 "description": common_entity.Description,
-                "restricted_to": common_entity.RestrictedTo,
                 "filters": category.CategoryFilters,
                 "ai_generated": common_entity.AiGenerated,
             }

@@ -1,0 +1,719 @@
+"""AI policy and MCP lifecycle contracts at the installer/provider boundary."""
+
+from copy import deepcopy
+from dataclasses import replace
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from installer import mcp
+from installer.errors import ProviderTransientError, SetupError
+
+pytestmark = pytest.mark.tooling
+
+
+# @matrix setup : interactive-input settings-save validation
+@pytest.mark.parametrize(
+    "app,answers,expected",
+    [
+        ({"GCLOUD_CONFIG": "cwright"}, [""], "cwright-mcp"),
+        ({"MCP_NAME": "saved-mcp"}, [""], "saved-mcp"),
+        ({"MCP_NAME": "saved-mcp"}, ["cwright-mcp"], "cwright-mcp"),
+        ({}, [""], "lagniappe-mcp"),
+        ({"GCLOUD_CONFIG": "invalid name"}, [""], "lagniappe-mcp"),
+        ({}, ["bad name", "$(pwd)", "cwright-mcp"], "cwright-mcp"),
+    ],
+)
+def test_mcp_connection_name_prompt(monkeypatch, app, answers, expected):
+    import config
+    from installer.optional import configure_mcp_name
+
+    settings = SimpleNamespace(APP=dict(app))
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    responses = iter(answers)
+    prompts = []
+
+    def answer(prompt):
+        prompts.append(prompt)
+        return next(responses)
+
+    monkeypatch.setattr("builtins.input", answer)
+    assert configure_mcp_name() == expected
+    assert settings.APP["MCP_NAME"] == expected
+    assert len(prompts) == len(answers)
+    assert all(prompt.startswith("? MCP connection name (") for prompt in prompts)
+
+
+IMAGE_NOT_FOUND = """ERROR: (gcloud.artifacts.docker.images.describe) Image not found.
+
+A valid container image can be referenced by tag or digest, has the format of
+  LOCATION-docker.DOMAIN/PROJECT-ID/REPOSITORY-ID/IMAGE:tag
+  LOCATION-docker.DOMAIN/PROJECT-ID/REPOSITORY-ID/IMAGE@sha256:digest
+"""
+ACCOUNT_NOT_FOUND = (
+    "ERROR: (gcloud.iam.service-accounts.describe) NOT_FOUND: Service account "
+    "projects/-/serviceAccounts/{email} does not exist. This command is authenticated "
+    "as owner@example.test which is the active account specified by the "
+    "[core/account] property."
+)
+
+
+def settings():
+    return {
+        "AI_ENABLED": True, "EXTERNAL_AI_ENABLED": True,
+        "GOOGLE_CLOUD_PROJECT": "demo-project", "RESOURCE_REGION": "us-central1",
+        "APP_URL": "https://demo-project.uc.r.appspot.com", "DEPLOYER_EMAIL": "owner@example.test",
+    }
+
+
+def service(target, resource="https://lagniappe-demo.run.app/mcp", *, enabled=True):
+    return {
+        "metadata": {"labels": {mcp.VERSION_LABEL: target.version, "managed-by": "lagniappe"}},
+        "spec": {"template": {"spec": {
+            "serviceAccountName": target.runtime,
+            "containers": [{"image": target.image, "env": [
+                {"name": "LAGNIAPPE_MCP_ENABLED", "value": "true" if enabled else "false"},
+                {"name": "LAGNIAPPE_MCP_ISSUER", "value": target.issuer},
+                {"name": "LAGNIAPPE_MCP_RESOURCE", "value": resource},
+            ]}],
+        }}},
+        "status": {"url": resource.removesuffix("/mcp"),
+                   "latestReadyRevisionName": "revision-1", "latestCreatedRevisionName": "revision-1",
+                   "conditions": [{"type": "Ready", "status": "True"}],
+                   "traffic": [{"revisionName": "revision-1", "percent": 100}]},
+    }
+
+
+class Cloud:
+    """Small provider state machine; unknown commands fail instead of succeeding."""
+    def __init__(self, target):
+        self.target = target
+        self.calls = []
+        self.accounts = {}
+        self.repository = None
+        self.bucket = None
+        self.policies = {}
+        self.fields = []
+        self.sink = {"exclusions": [{"name": "unrelated", "filter": "severity=DEBUG"}]}
+        self.image = None
+        self.service = None
+        self.fail_activation = False
+
+    def run(self, target, arguments, **kwargs):
+        assert target.project == "demo-project"
+        self.calls.append(list(arguments))
+        args = [arg for arg in arguments if not arg.startswith("--")]
+        output = {}
+        missing = False
+        if "get-iam-policy" in args:
+            index = args.index("get-iam-policy")
+            key = tuple(args[:index] + [args[index+1]])
+            output = self.policies.setdefault(key, {"etag": "version-1", "bindings": []})
+        elif "set-iam-policy" in args:
+            index = args.index("set-iam-policy")
+            key = tuple(args[:index] + [args[index+1]])
+            self.policies[key] = json.loads(Path(args[index+2]).read_text())
+        elif args[:2] == ["services", "enable"]:
+            pass
+        elif args[:2] == ["iam", "service-accounts"]:
+            if args[2] == "create":
+                email = f"{args[3]}@demo-project.iam.gserviceaccount.com"
+                self.accounts[email] = {"email": email}
+            else:
+                output = self.accounts.get(args[3])
+                missing = output is None
+                if missing:
+                    return SimpleNamespace(
+                        returncode=1, stdout="",
+                        stderr=ACCOUNT_NOT_FOUND.format(email=args[3]),
+                    )
+        elif args[:2] == ["artifacts", "repositories"]:
+            if args[2] == "create":
+                self.repository = {"format": "DOCKER"}
+            else:
+                output = self.repository
+                missing = output is None
+        elif args[:3] == ["storage", "buckets", "create"]:
+            self.bucket = {"projectNumber": "123", "location": "US-CENTRAL1"}
+        elif args[:3] == ["storage", "buckets", "describe"]:
+            output = deepcopy(self.bucket)
+            if output is not None and "--raw" not in arguments:
+                output.pop("projectNumber", None)
+            missing = output is None
+            if missing:
+                return SimpleNamespace(
+                    returncode=1, stdout="",
+                    stderr=f"ERROR: (gcloud.storage.buckets.describe) {args[3]} not found: 404.",
+                )
+        elif args[:2] == ["projects", "describe"]:
+            output = {"projectNumber": "123"}
+        elif args[:3] == ["firestore", "fields", "ttls"]:
+            if args[3] == "list":
+                output = self.fields
+            else:
+                self.fields = [{"name": "projects/demo-project/databases/(default)/collectionGroups/mcp_oauth/fields/expires_at", "ttlConfig": {"state": "CREATING"}}]
+        elif args[:2] == ["logging", "sinks"]:
+            if args[2] == "update":
+                flag = next(arg for arg in arguments if arg.startswith(("--add-exclusion=", "--update-exclusion=")))
+                operation, values = flag.split("=", 1)
+                values = dict(item.split("=", 1) for item in values.split(","))
+                values["disabled"] = bool(values["disabled"])
+                if operation == "--add-exclusion":
+                    assert not any(row["name"] == values["name"] for row in self.sink["exclusions"])
+                    self.sink["exclusions"].append(values)
+                else:
+                    exclusion = next(row for row in self.sink["exclusions"] if row["name"] == values["name"])
+                    exclusion.update(values)
+            output = self.sink
+        elif args[:3] == ["artifacts", "docker", "images"]:
+            output = self.image
+            missing = output is None
+            if missing:
+                return SimpleNamespace(returncode=1, stdout="", stderr=IMAGE_NOT_FOUND)
+        elif args[:2] == ["builds", "submit"]:
+            self.image = {"image_summary": {"digest": "sha256:abc"}}
+        elif args[:3] == ["run", "services", "describe"]:
+            output = self.service
+            missing = output is None
+        elif args[:2] == ["run", "deploy"]:
+            enabled = any("LAGNIAPPE_MCP_ENABLED=true" in arg for arg in arguments)
+            self.service = service(target, enabled=enabled and not self.fail_activation)
+        elif args[:3] == ["run", "services", "update"]:
+            self.service = service(target, enabled=False)
+        elif args[:3] == ["run", "services", "update-traffic"]:
+            assert "--to-latest" in arguments
+            self.service["status"]["traffic"] = [{"revisionName": "revision-1", "percent": 100}]
+        else:
+            raise AssertionError(f"Unexpected provider command: {arguments}")
+        return SimpleNamespace(returncode=1 if missing else 0, stdout=json.dumps(output), stderr="NOT_FOUND" if missing else "")
+
+
+@pytest.fixture
+def cloud(monkeypatch):
+    target = mcp._deployment(settings())
+    cloud = Cloud(target)
+    monkeypatch.setattr(mcp, "_run", cloud.run)
+    monkeypatch.setattr(mcp, "require_permissions", lambda target: None)
+    monkeypatch.setattr(mcp, "record_step", lambda step: None)
+    return cloud
+
+
+# @matrix mcp-install : source-version upload-boundary
+def test_mcp_version_tracks_only_build_inputs_and_rejects_symlinks(tmp_path, monkeypatch):
+    source = tmp_path / "mcp/src/lagniappe_mcp/server.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("initial")
+    for name in ("pyproject.toml", "uv.lock", "README.md", "Dockerfile", "cloudbuild.yaml", "gcloudignore"):
+        (tmp_path / "mcp" / name).write_text(name)
+    first = mcp.source_version(tmp_path)
+    (tmp_path / "app.py").write_text("app-only edit")
+    (tmp_path / "mcp/.venv").mkdir()
+    (tmp_path / "mcp/.venv/local").write_text("environment")
+    assert mcp.source_version(tmp_path) == first
+    with monkeypatch.context() as runtime:
+        runtime.setattr(mcp, "RUNTIME_ARGUMENTS", (*mcp.RUNTIME_ARGUMENTS, "--new-runtime-setting"))
+        assert mcp.source_version(tmp_path) != first
+    source.write_text("new service behavior")
+    assert mcp.source_version(tmp_path) != first
+    (source.parent / "secret.py").symlink_to(tmp_path / "app.py")
+    with pytest.raises(SetupError, match="symlink"):
+        mcp.source_version(tmp_path)
+
+
+# @matrix mcp-install : configuration opt-in legacy-settings
+def test_mcp_policy_preserves_legacy_api_without_implicitly_installing_service():
+    from config.ai_settings import normalize_ai_features
+    assert normalize_ai_features({})["EXTERNAL_AI_ENABLED"]
+    assert not mcp.requested({})
+    assert mcp.requested({"MCP_RESOURCE": "https://mcp.example.test/mcp"})
+    assert mcp.requested({"EXTERNAL_AI_ENABLED": True})
+    assert not mcp.requested({"AI_ENABLED": False, "EXTERNAL_AI_ENABLED": True})
+    assert not mcp.requested({"EXTERNAL_AI_ENABLED": False, "MCP_RESOURCE": "https://mcp.example.test/mcp"})
+
+
+# @matrix mcp-install : fail-closed provider-discovery
+def test_mcp_discovery_distinguishes_absence_from_unavailable_state(monkeypatch):
+    target = mcp._deployment(settings())
+    for error in ("PERMISSION_DENIED", "PERMISSION_DENIED: resource NOT_FOUND or inaccessible", "network timeout", "service API disabled"):
+        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        with pytest.raises(SetupError, match="discovery failed"):
+            mcp.describe(target, ["run", "services", "describe"], optional=True)
+    monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr="NOT_FOUND"))
+    assert mcp.describe(target, ["run", "services", "describe"], optional=True) is None
+    bucket = f"gs://{target.bucket}"
+    arguments = ["storage", "buckets", "describe", bucket]
+    storage_error = f"ERROR: (gcloud.storage.buckets.describe) {bucket} not found: 404."
+    monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=storage_error))
+    assert mcp.describe(target, arguments, optional=True) is None
+    with pytest.raises(SetupError, match="discovery failed"):
+        mcp.describe(target, arguments)
+    for error in (
+        storage_error + " Permission denied.",
+        storage_error.replace("404", "403"),
+        storage_error.replace(bucket, "gs://another-bucket"),
+        "network timeout contacting gs://demo-project-mcp-builds",
+        "HTTP 404: service API disabled",
+    ):
+        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        with pytest.raises(SetupError, match="discovery failed"):
+            mcp.describe(target, arguments, optional=True)
+    arguments = ["artifacts", "docker", "images", "describe", target.image]
+    monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=IMAGE_NOT_FOUND))
+    assert mcp.describe(target, arguments, optional=True) is None
+    with pytest.raises(SetupError, match="discovery failed"):
+        mcp.describe(target, arguments)
+    with pytest.raises(SetupError, match="discovery failed"):
+        mcp.describe(target, ["run", "services", "describe"], optional=True)
+    for error in (
+        IMAGE_NOT_FOUND + "Permission denied.",
+        "ERROR: (gcloud.artifacts.docker.images.describe) Invalid Docker image.",
+        "ERROR: (gcloud.artifacts.docker.images.describe) network timeout",
+    ):
+        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        with pytest.raises(SetupError, match="discovery failed"):
+            mcp.describe(target, arguments, optional=True)
+    monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="[]"))
+    with pytest.raises(SetupError, match="unexpected resource"):
+        mcp.describe(target, ["run", "services", "describe"])
+
+
+# @matrix mcp-install : iam preflight
+def test_mcp_permissions_are_checked_before_resource_mutation(monkeypatch):
+    target = mcp._deployment(settings())
+    client = SimpleNamespace(test_iam_permissions=lambda **kwargs: SimpleNamespace(permissions=[]))
+    with pytest.raises(SetupError, match="provisioning permissions"):
+        mcp.require_permissions(target, client=client)
+    monkeypatch.setattr(mcp, "require_permissions", lambda target: (_ for _ in ()).throw(SetupError("denied")))
+    monkeypatch.setattr(mcp, "_run", lambda *a, **k: pytest.fail("mutated before checking permissions"))
+    with pytest.raises(SetupError, match="denied"):
+        mcp.reconcile_resources(target, "owner@example.test")
+
+
+# @matrix mcp-install : iam idempotence handoff
+def test_mcp_iam_preserves_conditions_etags_and_skips_noop_writes(cloud):
+    key = ("run", "services", mcp.SERVICE)
+    original = {"role": "roles/run.admin", "members": ["user:owner@example.test"], "condition": {"expression": "true", "title": "conditional"}}
+    cloud.policies[key] = {"etag": "etag-to-preserve", "bindings": [deepcopy(original)]}
+    grants = [("user:owner@example.test", ["roles/run.admin"])]
+    mcp.reconcile_access(cloud.target, ["run", "services"], mcp.SERVICE, grants)
+    policy = cloud.policies[key]
+    assert policy["etag"] == "etag-to-preserve"
+    assert original in policy["bindings"]
+    assert any(row.get("condition") is None for row in policy["bindings"])
+    cloud.calls.clear()
+    mcp.reconcile_access(cloud.target, ["run", "services"], mcp.SERVICE, grants)
+    assert not any("set-iam-policy" in call for call in cloud.calls)
+    mcp.reconcile_access(cloud.target, ["run", "services"], mcp.SERVICE, remove_member="user:owner@example.test")
+    assert not cloud.policies[key]["bindings"]
+
+
+# @matrix mcp-install : iam resources keyless
+def test_mcp_resources_use_separate_build_identity_and_scoped_roles(cloud):
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+    assert set(cloud.accounts) == {cloud.target.runtime, cloud.target.build_account}
+    project_roles = cloud.policies[("projects", "demo-project")]["bindings"]
+    assert project_roles == [{"role": "roles/logging.logWriter", "members": [f"serviceAccount:{cloud.target.build_account}"]}]
+    bucket_roles = cloud.policies[("storage", "buckets", f"gs://{cloud.target.bucket}")]["bindings"]
+    assert {"role": "roles/storage.objectViewer", "members": [f"serviceAccount:{cloud.target.build_account}"]} in bucket_roles
+    assert all(cloud.target.runtime not in json.dumps(policy) for policy in cloud.policies.values())
+    assert cloud.sink["exclusions"][0]["name"] == "unrelated"
+    assert cloud.sink["exclusions"][1]["filter"] == mcp.AUTH_LOG_FILTER
+    cloud.calls.clear()
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+    assert not any("create" in call or "set-iam-policy" in call or "update" in call for call in cloud.calls)
+    for project_number, message in (
+        (None, "ownership could not be verified"),
+        ("456", "different project"),
+    ):
+        cloud.bucket["projectNumber"] = project_number
+        cloud.calls.clear()
+        with pytest.raises(SetupError, match=message):
+            mcp.reconcile_resources(cloud.target, "owner@example.test")
+        assert not any("set-iam-policy" in call for call in cloud.calls)
+
+
+# @matrix mcp-install : configuration iam resources recovery
+@pytest.mark.parametrize(
+    "app_name,internal_name,saved_name,runtime_name,build_name",
+    [
+        ("ordinary-app", "ordinary-app", None, "lagniappe-mcp", "lagniappe-mcp-build"),
+        ("lagniappe-mcp", "lagniappe-mcp", None, "lagniappe-mcp-2", "lagniappe-mcp-build"),
+        ("lagniappe-mcp", "lagniappe-mcp", "lagniappe-mcp", "lagniappe-mcp-2", "lagniappe-mcp-build"),
+        ("lagniappe-mcp-build", "lagniappe-mcp-build", None, "lagniappe-mcp", "lagniappe-mcp-build-2"),
+        ("ordinary-app", "ordinary-app", "lagniappe-mcp-build", "lagniappe-mcp-build", "lagniappe-mcp-build-2"),
+        ("lagniappe-mcp", "lagniappe-mcp-2", None, "lagniappe-mcp-3", "lagniappe-mcp-build"),
+        ("ordinary-app", "ordinary-app", "custom-mcp", "custom-mcp", "lagniappe-mcp-build"),
+    ],
+)
+def test_mcp_install_keeps_app_runtime_and_build_accounts_separate(
+    cloud, app_name, internal_name, saved_name, runtime_name, build_name,
+):
+    config = settings()
+    account_suffix = "@demo-project.iam.gserviceaccount.com"
+    app_account = app_name + account_suffix
+    internal_account = internal_name + account_suffix
+    config.update({
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": app_account,
+        "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": internal_account,
+    })
+    app_accounts = {app_account, internal_account}
+    cloud.accounts.update({email: {"email": email} for email in app_accounts})
+    app_binding = {
+        "role": "roles/datastore.user",
+        "members": [f"serviceAccount:{app_account}"],
+    }
+    project_key = ("projects", "demo-project")
+    cloud.policies[project_key] = {"bindings": [deepcopy(app_binding)]}
+    resource = "https://lagniappe-demo.run.app/mcp"
+    if saved_name:
+        saved_account = saved_name + account_suffix
+        config.update(MCP_SERVICE_ACCOUNT=saved_account, MCP_RESOURCE=resource)
+        cloud.accounts[saved_account] = {"email": saved_account}
+        cloud.service = service(replace(cloud.target, runtime=saved_account))
+
+    target = mcp.prepare_deployment(config, announce_progress=False)
+    mcp.finish_deployment(target, config, announce_progress=False)
+
+    assert target.runtime == runtime_name + account_suffix
+    assert target.build_account == build_name + account_suffix
+    assert len({target.runtime, target.build_account}) == 2
+    assert not app_accounts.intersection({target.runtime, target.build_account})
+    assert config["MCP_SERVICE_ACCOUNT"] == target.runtime
+    assert config["MCP_RESOURCE"] == resource
+    assert config["RUNTIME_SERVICE_ACCOUNT_EMAIL"] == app_account
+    assert config["INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL"] == internal_account
+    assert cloud.service["spec"]["template"]["spec"]["serviceAccountName"] == target.runtime
+    deploy_calls = [call for call in cloud.calls if call[:2] == ["run", "deploy"]]
+    if not saved_name or saved_name != runtime_name:
+        assert deploy_calls
+    assert all(f"--service-account={target.runtime}" in call for call in deploy_calls)
+    build_calls = [call for call in cloud.calls if call[:2] == ["builds", "submit"]]
+    assert all(f"--service-account=projects/demo-project/serviceAccounts/{target.build_account}" in call for call in build_calls)
+    assert set(cloud.accounts) >= {target.runtime, target.build_account}
+    project_bindings = cloud.policies[project_key]["bindings"]
+    assert app_binding in project_bindings
+    assert not any(f"serviceAccount:{target.runtime}" in row["members"] for row in project_bindings)
+    assert [row["role"] for row in project_bindings if f"serviceAccount:{target.build_account}" in row["members"]] == ["roles/logging.logWriter"]
+
+    cloud.calls.clear()
+    repeated = mcp.prepare_deployment(config, announce_progress=False)
+    mcp.finish_deployment(repeated, config, announce_progress=False)
+    assert repeated == target
+    assert not any("create" in call or "set-iam-policy" in call for call in cloud.calls)
+    assert not any(call[:2] in (["builds", "submit"], ["run", "deploy"]) for call in cloud.calls)
+
+
+# @matrix mcp-install : iam resources provider-convergence idempotence
+def test_mcp_account_creation_waits_for_visibility(cloud, monkeypatch, capsys):
+    pending_reads = {cloud.target.runtime: 2, cloud.target.build_account: 2}
+    mutations, waits = [], []
+    monkeypatch.setattr(mcp, "record_mutation", lambda step, **values: mutations.append(values))
+    monkeypatch.setattr(mcp.time, "sleep", waits.append)
+
+    def run(target, arguments, **kwargs):
+        result = cloud.run(target, arguments, **kwargs)
+        if arguments[:3] == ["iam", "service-accounts", "describe"] and not result.returncode:
+            email = arguments[3]
+            if pending_reads[email]:
+                assert any(row["action"] == "created" and row["identifier"] == email for row in mutations)
+                pending_reads[email] -= 1
+                return SimpleNamespace(
+                    returncode=1, stdout="", stderr=ACCOUNT_NOT_FOUND.format(email=email),
+                )
+        return result
+
+    monkeypatch.setattr(mcp, "_run", run)
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+
+    assert set(cloud.accounts) == set(pending_reads)
+    assert all(remaining == 0 for remaining in pending_reads.values())
+    assert waits == [2, 4, 2, 4]
+    assert "Waiting for Google IAM" in capsys.readouterr().out
+    assert cloud.repository == {"format": "DOCKER"}
+    assert len([call for call in cloud.calls if call[:3] == ["iam", "service-accounts", "create"]]) == 2
+
+    cloud.calls.clear()
+    waits.clear()
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+    assert waits == []
+    assert not any("create" in call for call in cloud.calls)
+
+
+# @matrix mcp-install : iam resources provider-convergence fail-closed
+@pytest.mark.parametrize("failure", ["missing", "permission"])
+def test_mcp_account_readback_failure_stops_before_more_resources(cloud, monkeypatch, failure):
+    mutations, waits = [], []
+    monkeypatch.setattr(mcp, "record_mutation", lambda step, **values: mutations.append(values))
+    monkeypatch.setattr(mcp.time, "sleep", waits.append)
+
+    def run(target, arguments, **kwargs):
+        result = cloud.run(target, arguments, **kwargs)
+        if arguments[:3] == ["iam", "service-accounts", "describe"] and not result.returncode:
+            error = (
+                ACCOUNT_NOT_FOUND.format(email=arguments[3])
+                if failure == "missing" else "PERMISSION_DENIED: not allowed to read this account"
+            )
+            return SimpleNamespace(returncode=1, stdout="", stderr=error)
+        return result
+
+    monkeypatch.setattr(mcp, "_run", run)
+    error_type = ProviderTransientError if failure == "missing" else SetupError
+    with pytest.raises(error_type):
+        mcp.reconcile_resources(cloud.target, "owner@example.test")
+
+    assert len([call for call in cloud.calls if call[:3] == ["iam", "service-accounts", "create"]]) == 1
+    assert cloud.repository is None
+    assert cloud.bucket is None
+    assert mutations == [{
+        "action": "created", "resource": "service-account", "identifier": cloud.target.runtime,
+    }]
+    if failure == "missing":
+        assert 1 < len(waits) < 10
+        assert sum(waits) <= 120
+    else:
+        assert waits == []
+
+
+# @matrix mcp-install : resources privacy idempotence
+@pytest.mark.parametrize("current_filter,disabled", [(False, False), (False, True), (True, True)])
+def test_mcp_resource_upgrade_covers_oauth_referrers_and_preserves_other_exclusions(cloud, current_filter, disabled):
+    legacy_filter = 'resource.type="gae_app" AND (protoPayload.resource=~"^/oauth/" OR httpRequest.requestUrl=~"/oauth/")'
+    unrelated = deepcopy(cloud.sink["exclusions"])
+    cloud.sink["exclusions"].append({
+        "name": mcp.AUTH_LOG_EXCLUSION,
+        "filter": mcp.AUTH_LOG_FILTER if current_filter else legacy_filter,
+        "disabled": disabled,
+        "description": "Preserve operator description",
+    })
+
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+
+    assert len(cloud.sink["exclusions"]) == len(unrelated) + 1
+    assert cloud.sink["exclusions"][:-1] == unrelated
+    exclusion = cloud.sink["exclusions"][-1]
+    assert not exclusion["disabled"]
+    assert exclusion["description"] == "Preserve operator description"
+    for field in ("protoPayload.resource", "httpRequest.requestUrl", "protoPayload.referrer", "httpRequest.referer"):
+        assert f'{field}=~"' in exclusion["filter"]
+    updates = [call for call in cloud.calls if call[:3] == ["logging", "sinks", "update"]]
+    assert len(updates) == 1
+    assert any(arg.startswith("--update-exclusion=") for arg in updates[0])
+
+    cloud.calls.clear()
+    mcp.reconcile_resources(cloud.target, "owner@example.test")
+    assert not any(call[:3] == ["logging", "sinks", "update"] for call in cloud.calls)
+
+
+# @matrix mcp-install : bootstrap configuration source-version update-order
+def test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app(cloud, capsys):
+    config = settings()
+    prepared = mcp.prepare_deployment(config, announce_progress=False)
+    assert prepared.version == config["MCP_VERSION"]
+    assert config["MCP_RESOURCE"] == "https://lagniappe-demo.run.app/mcp"
+    assert config["MCP_SERVICE_ACCOUNT"] == prepared.runtime
+    assert "REMOTE_MCP" not in config
+    assert not mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
+    assert any("--gcs-source-staging-dir=gs://demo-project-mcp-builds/source" in call for call in cloud.calls)
+    assert all("LAGNIAPPE_MCP_ENABLED=true" not in " ".join(call) for call in cloud.calls)
+    mcp.finish_deployment(prepared, config, announce_progress=False)
+    assert mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
+    assert capsys.readouterr().out == ""
+    mcp.finish_deployment(prepared, config, announce_progress=False)
+    config["AI_ENABLED"] = False
+    mcp.finish_deployment(None, config, announce_progress=False)
+    assert capsys.readouterr().out == ""
+
+
+# @matrix mcp-install : source-version update-order verification
+def test_mcp_unchanged_update_skips_build_and_revision(cloud, capsys, monkeypatch):
+    import installer
+
+    monkeypatch.setattr(installer, "FORMATTER", SimpleNamespace(initialize=lambda: SimpleNamespace(
+        success=str,
+    )))
+    config = settings()
+    prepared = mcp.prepare_deployment(config)
+    capsys.readouterr()
+    mcp.finish_deployment(prepared, config)
+    output = capsys.readouterr().out
+    assert output.endswith("MCP server is ready\n")
+    assert config["MCP_RESOURCE"] not in output
+    cloud.calls.clear()
+    prepared = mcp.prepare_deployment(config)
+    mcp.finish_deployment(prepared, config)
+    assert not any(call[:2] in (["builds", "submit"], ["run", "deploy"]) for call in cloud.calls)
+    cloud.service["status"]["traffic"][0]["percent"] = 50
+    assert not mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
+
+
+# @matrix mcp-install : source-version update-order verification
+# @source installer/mcp.py::prepare_deployment
+# @source installer/mcp.py::finish_deployment
+def test_mcp_changed_source_update_builds_then_activates_new_image(cloud, monkeypatch):
+    config = settings()
+    previous = mcp.prepare_deployment(config, announce_progress=False)
+    mcp.finish_deployment(previous, config, announce_progress=False)
+    old_image = cloud.service["spec"]["template"]["spec"]["containers"][0]["image"]
+    cloud.calls.clear()
+    cloud.image = None  # The new source's image is not present in the registry.
+    monkeypatch.setattr(mcp, "source_version", lambda: "new-source-fingerprint")
+    prepared = mcp.prepare_deployment(config, announce_progress=False)
+    assert prepared.version == config["MCP_VERSION"] == "new-source-fingerprint"
+    assert prepared.image != old_image
+    assert sum(call[:2] == ["builds", "submit"] for call in cloud.calls) == 1
+    assert not any(call[:2] == ["run", "deploy"] for call in cloud.calls)
+    assert cloud.service["spec"]["template"]["spec"]["containers"][0]["image"] == old_image
+    mcp.finish_deployment(prepared, config, announce_progress=False)
+    assert sum(call[:2] == ["run", "deploy"] for call in cloud.calls) == 1
+    assert cloud.service["spec"]["template"]["spec"]["containers"][0]["image"] == prepared.image
+    assert mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
+
+
+# @matrix mcp-install : disable failure-recovery update-order verification
+def test_mcp_disable_and_failed_activation_do_not_claim_success(cloud, capsys):
+    config = settings()
+    prepared = mcp.prepare_deployment(config)
+    cloud.fail_activation = True
+    with pytest.raises(SetupError, match="Retry with ./setup.sh mcp"):
+        mcp.finish_deployment(prepared, config)
+    assert "MCP server is ready" not in capsys.readouterr().out
+    cloud.fail_activation = False
+    mcp.finish_deployment(mcp.prepare_deployment(config), config)
+    config["EXTERNAL_AI_ENABLED"] = False
+    assert mcp.prepare_deployment(config) is None
+    assert config["MCP_RESOURCE"] == "https://lagniappe-demo.run.app/mcp"
+    assert config["MCP_SERVICE_ACCOUNT"] == prepared.runtime
+    mcp.finish_deployment(None, config)
+    assert not mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
+    assert not any("delete" in call for call in cloud.calls)
+    config["EXTERNAL_AI_ENABLED"] = True
+    mcp.finish_deployment(mcp.prepare_deployment(config), config)
+    assert mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
+
+
+# @matrix mcp-install : doctor recovery source-version
+def test_mcp_inspection_is_read_only_and_detects_version_drift(cloud):
+    config = settings()
+    prepared = mcp.prepare_deployment(config)
+    mcp.finish_deployment(prepared, config)
+    cloud.calls.clear()
+    assert mcp.inspect_deployment(config)["state"] == "AVAILABLE"
+    cloud.service["metadata"]["labels"][mcp.VERSION_LABEL] = "old"
+    assert mcp.inspect_deployment(config)["state"] == "UNAVAILABLE"
+    assert all(call[:3] == ["run", "services", "describe"] for call in cloud.calls)
+
+
+# @matrix mcp-install : handoff iam
+@pytest.mark.parametrize("app_name", ["ordinary-app", "lagniappe-mcp", "lagniappe-mcp-build"])
+def test_mcp_handoff_uses_selected_accounts_and_scoped_resources(cloud, app_name):
+    config = settings()
+    config["DEPLOYER_EMAIL"] = "installer@example.test"
+    config["RUNTIME_SERVICE_ACCOUNT_EMAIL"] = f"{app_name}@demo-project.iam.gserviceaccount.com"
+    target = mcp.prepare_deployment(config)
+    mcp.handoff_access(config, owner="owner@example.test")
+    mcp.handoff_access(config, remove_installer="installer@example.test")
+    scoped = [policy for key, policy in cloud.policies.items() if key[0] != "projects"]
+    assert len(scoped) == 5
+    assert all("user:owner@example.test" in json.dumps(policy) for policy in scoped)
+    assert all("user:installer@example.test" not in json.dumps(policy) for policy in scoped)
+    assert "serviceAccount:" + target.build_account in json.dumps(list(cloud.policies.values()))
+    assert ("iam", "service-accounts", target.runtime) in cloud.policies
+    assert ("iam", "service-accounts", target.build_account) in cloud.policies
+    assert ("iam", "service-accounts", config["RUNTIME_SERVICE_ACCOUNT_EMAIL"]) not in cloud.policies
+
+
+# @matrix mcp-install : cli-routing retry confirmation
+def test_focused_mcp_command_uses_normal_deployment_path(monkeypatch):
+    from installer import verify, utils
+    events = []
+    monkeypatch.setattr(mcp.SETTINGS, "APP", settings())
+    monkeypatch.setattr(verify, "prepare_existing_installation", lambda: events.append("prepare"))
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: events.append(("confirm", prompt)) or "y",
+    )
+    monkeypatch.setattr(
+        utils,
+        "deploy_to_app_engine",
+        lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
+    )
+    assert mcp.configure_mcp() == 0
+    assert events[0] == "prepare"
+    assert events[1][0] == "confirm"
+    assert "Deploy app now" in events[1][1]
+    assert "[y/N]" in events[1][1]
+    assert events[2:] == [("deploy", False)]
+
+
+# @matrix mcp-install : confirmation default-no no-mutation
+@pytest.mark.parametrize("answer", ["", "n", "no", "not now"])
+def test_mcp_deployment_decline_preserves_configuration(monkeypatch, capsys, answer):
+    from installer import verify, utils
+
+    app = settings()
+    original = deepcopy(app)
+    monkeypatch.setattr(mcp.SETTINGS, "APP", app)
+    monkeypatch.setattr(verify, "prepare_existing_installation", lambda: None)
+    monkeypatch.setattr("builtins.input", lambda prompt: answer)
+    monkeypatch.setattr(
+        utils, "deploy_to_app_engine",
+        lambda **kwargs: pytest.fail("App deployment started without confirmation"),
+    )
+    monkeypatch.setattr(
+        mcp, "_run",
+        lambda *args, **kwargs: pytest.fail("MCP resources changed after deployment was declined"),
+    )
+
+    assert mcp.configure_mcp() == 0
+    assert app == original
+    output = capsys.readouterr().out
+    assert "Deployment skipped" in output
+    assert "MCP server is ready" not in output
+
+
+# @matrix deploy : app-failure update-order
+# @source runner/deploy.py::deploy
+def test_app_failure_never_activates_mcp(monkeypatch):
+    from runner import deploy
+    announce_progress = False
+    events = []
+    monkeypatch.setattr(deploy, "verify_runtime_deploy_surface", lambda: None)
+    monkeypatch.setattr(deploy, "verify_frontend_build", lambda **k: None)
+    monkeypatch.setattr(deploy, "verify_generation_manifest", lambda: None)
+    monkeypatch.setattr(deploy.SETTINGS, "APP", {"VERSION": "test"})
+    monkeypatch.setattr(deploy.SETTINGS, "save", lambda: events.append("save"))
+    monkeypatch.setattr(mcp, "prepare_deployment", lambda settings, **kwargs: events.append(("prepare", kwargs)) or "target")
+    monkeypatch.setattr(mcp, "finish_deployment", lambda target, settings, **kwargs: events.append(("activate", kwargs)))
+    monkeypatch.setattr(deploy, "_deploy_app_yaml", lambda *a, **k: (_ for _ in ()).throw(SetupError("app failed")))
+    with pytest.raises(SetupError, match="app failed"):
+        deploy.deploy(build_assets=False, announce_progress=announce_progress)
+    assert events == [("prepare", {"announce_progress": announce_progress}), "save"]
+    monkeypatch.setattr(deploy, "_deploy_app_yaml", lambda *a, **k: events.append("app"))
+    events.clear()
+    deploy.deploy(build_assets=False, announce_progress=announce_progress)
+    assert events == [
+        ("prepare", {"announce_progress": announce_progress}), "save", "app",
+        ("activate", {"announce_progress": announce_progress}),
+    ]
+
+
+# @matrix setup : optional site-policy settings-save
+# @source installer/optional.py::configure_ai_features
+def test_disabling_ai_skips_model_and_external_prompts(monkeypatch, capsys):
+    import config
+    from installer import optional
+    saves, prompts = [], []
+    saved = SimpleNamespace(APP={"AI_MODEL": "custom-model"}, save=lambda: saves.append(True))
+    monkeypatch.setattr(config, "SETTINGS", saved)
+    formatter = SimpleNamespace(info=lambda value: value, success=lambda value: value)
+    monkeypatch.setattr(optional, "FORMATTER", SimpleNamespace(initialize=lambda: formatter))
+    monkeypatch.setattr("builtins.input", lambda prompt: prompts.append(prompt) or "n")
+    assert optional.configure_ai_features() is False
+    assert saved.APP["AI_ENABLED"] is False
+    assert saved.APP["EXTERNAL_AI_ENABLED"] is False
+    assert saved.APP["AI_OBSERVABILITY"] is False
+    assert saved.APP["AI_MODEL"] == "custom-model"
+    assert len(prompts) == len(saves) == 1
+    assert "AI models:" not in capsys.readouterr().out

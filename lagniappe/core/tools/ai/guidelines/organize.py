@@ -16,7 +16,7 @@ ORGANIZE_ACTION_GUIDELINES = """
   identifiers. Split them only when they concern different subjects or distinct
   completed occurrences.
 - Each uploaded file needs an auditable outcome. When a file is evidence for a
-  task or completed task event, attach it with attach_file_to_task targeting
+  task or completed task event, attach it with attach_file targeting
   that task action.
 - When summarize_file is listed in allowed_actions, include exactly one
   summarize_file action for every uploaded file. Use the exact report file ref,
@@ -25,13 +25,13 @@ ORGANIZE_ACTION_GUIDELINES = """
   already inspected locally or through get_file; do not fetch it again solely
   for this action. When summarize_file is absent, do not return that action;
   the internal workflow has already prepared file summaries separately.
-- Use add_category when an existing page should also appear in another category
+- Use add_page_category when an existing page should also appear in another category
   without changing its primary category. Do not relocate existing pages, tasks,
   or files in Organize; if a cleanup move would be useful, use needs_review.
 - Use add_form_to_page when an existing page should use an existing or newly
   created page form. Reference only the page and form; this action does not
   require a category.
-- Use delete_page only as the final cleanup suggestion after the actions that
+- Use suggest_page_deletion only as the final cleanup suggestion after the actions that
   preserve useful files/tasks. The runner records it for the result view; it
   does not delete the page automatically.
 - Use action ids for anything created earlier in the proposal.
@@ -45,7 +45,7 @@ ORGANIZE_ACTION_GUIDELINES = """
     primary form
   - add data.submission using exact schema field ids when source evidence
     should fill the page form
-  - attach source report files with attach_file_to_page after the page action;
+  - attach source report files with attach_file after the page action;
     this preserves the original evidence alongside the structured fields
 - To create or use a page/task without structured form data:
   - omit form and submission data when no form is a close conceptual fit
@@ -58,7 +58,7 @@ ORGANIZE_ACTION_GUIDELINES = """
   - create_page with no category/model data so the runner uses Uncategorized
     Pages
   - include a concise description explaining what the file contains
-  - attach the report file with attach_file_to_page after the page action
+  - attach the report file with attach_file after the page action
 - To create a task for existing work:
   - use an existing page hash token whenever possible
   - include project and model task hash tokens when a matching project/model exists
@@ -68,7 +68,7 @@ ORGANIZE_ACTION_GUIDELINES = """
     fields should be filled from the input
   - never put a page form in create_task.data.form; page forms belong on
     create_page actions
-  - attach source report files with attach_file_to_task after the task action;
+  - attach source report files with attach_file after the task action;
     this preserves the original evidence alongside the structured fields
 - To record completed task evidence:
   - use create_task with page and `completed: true`; also include completed_on
@@ -83,7 +83,7 @@ ORGANIZE_ACTION_GUIDELINES = """
     completed work deterministically
   - use get_page_tasks when task-specific details or an explicit target matter;
     it is not required merely to let the runner record task history
-  - attach specific uploaded files with attach_file_to_task actions that target
+  - attach specific uploaded files with attach_file actions that target
     the corresponding create_task action immediately after it
   - use project/model/form and data.submission when they are a close fit
   - use only task forms for create_task.form
@@ -91,7 +91,7 @@ ORGANIZE_ACTION_GUIDELINES = """
     summaries or extracted text to justify the submission
   - use one create_task for each distinct completed occurrence
   - do not put source files in create_task.data.file or create_task.data.files;
-    the runner will attach each attach_file_to_task file to the created task or
+    the runner will attach each attach_file file to the created task or
     generated history entry as appropriate
 - If a new project is needed, create the project before model tasks, and create
   any model-task forms before the model tasks that use them.
@@ -121,7 +121,7 @@ REPORT_PREFLIGHT_CHECKS = """
 - Make sure page names identify the subject, not a filename, document title,
   provider, account/policy number, date, or other supporting detail unless that
   detail is genuinely the independently retrievable subject.
-- Make sure all task attachments use attach_file_to_task with executable refs
+- Make sure all task attachments use attach_file with executable refs
   from Report Input Files, including completed task evidence.
 - If summarize_file is allowed, make sure every Report Input Files ref appears
   in exactly one non-skipped summarize_file action with a grounded summary and
@@ -141,7 +141,7 @@ REPORT_PREFLIGHT_CHECKS = """
   omit the disputed submission field and preserve the conflict for human review.
 - Make sure a completed task date is not later than the supplied current date;
   future-dated work must remain open.
-- Make sure any update_form_schema action needed for submission completion
+- Make sure any extend_form_schema action needed for submission completion
   appears before the page/task action that uses the updated form.
 - Review the whole proposal for coherence before returning: pages, files,
   tasks, projects, model tasks, forms, submissions, summaries, and issues should
@@ -190,10 +190,10 @@ shown):
     },
     {
       "id": "attach_source_file",
-      "type": "attach_file_to_page",
+      "type": "attach_file",
       "depends_on": ["short_unique_id"],
       "data": {
-        "page_action": "short_unique_id",
+        "entity_action": "short_unique_id",
         "file": "exact_report_file_ref_from_Report_Input_Files"
       }
     },
@@ -217,10 +217,10 @@ shown):
     },
     {
       "id": "attach_visit_source",
-      "type": "attach_file_to_task",
+      "type": "attach_file",
       "depends_on": ["record_completed_visit"],
       "data": {
-        "task_action": "record_completed_visit",
+        "entity_action": "record_completed_visit",
         "file": "exact_report_file_ref_from_Report_Input_Files"
       }
     }
@@ -293,11 +293,10 @@ Common data shapes:
 - create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document_markdown": markdown_string}
 - create_task: {"name": string, "description": string, "page": entity_or_action_ref, "task": existing_task_ref_for_completed_occurrence, "task_action": root_new_task_action_for_completed_occurrence, "project": entity_or_action_ref, "model": entity_or_action_ref, "form": task_form_ref_only, "submission": object, "due_date": "YYYY-MM-DD", "completed": true, "completed_on": "YYYY-MM-DD"}
 - add_form_to_page: {"page": entity_ref, "form": entity_or_action_ref}
-- add_category: {"page": entity_ref, "category": entity_ref}
-- update_form_schema: {"form": entity_ref, "operations": [{"op": "add_field", "field": object} or {"op": "add_select_option", "schema_id": string, "option": {"value": string, "label": string}}]}
-- attach_file_to_page: {"page": entity_or_action_ref, "file": report_file_ref}
-- attach_file_to_task: {"task": entity_or_action_ref, "file": report_file_ref}
-- delete_page: {"page": entity_ref}
+- add_page_category: {"page": entity_ref, "category": entity_ref}
+- extend_form_schema: {"form": entity_ref, "operations": [{"op": "add_field", "field": object} or {"op": "add_select_option", "schema_id": string, "option": {"value": string, "label": string}}]}
+- attach_file: {"entity": page_task_or_history_ref, "file": report_file_ref}; use entity_action for an earlier create_page/create_task action
+- suggest_page_deletion: {"page": entity_ref}
 - skip: {"note": string}
 - needs_review: {"note": string, "questions": [string]}
 """
@@ -328,6 +327,10 @@ not skip the existing-page checks before proposing a new page.
    content is not by itself a reason to refuse organization. A `File too large
    to summarize.` result is not evidence about content, so use the remaining
    metadata and relationships and preserve the file as an attachment.
+   Keep user assertions, visible file content, repository/release evidence, and
+   filesystem metadata distinct. A modification timestamp is not evidence of a
+   completion date. When long text is available in bounded chunks, continue
+   through the end before writing a whole-file summary.
 2. Cluster the uploads by stable subject or independently tracked occurrence.
    Group different documents, accounts, policies, providers, dates, identifiers,
    and corroborating files when they concern the same durable subject. Split only
@@ -357,7 +360,7 @@ not skip the existing-page checks before proposing a new page.
 6. Choose the page target. Reuse an editable existing page when it represents the
    same stable subject; a wording difference does not justify a duplicate. A
    merely related topic is not a match. If the matching page belongs outside the
-   initially chosen category, reuse it and propose `add_category` only when that
+   initially chosen category, reuse it and propose `add_page_category` only when that
    additional category relationship is useful and allowed. If the matching page
    cannot be edited, use `needs_review` instead of creating a duplicate to bypass
    permissions. Propose `create_page` only after steps 4 and 5 find no reusable
@@ -384,7 +387,7 @@ not skip the existing-page checks before proposing a new page.
    fit. Give a category a default form only when the user requests it or its pages
    are unambiguously repeated instances of one type with a small stable schema.
    When uploaded evidence should populate the form on an exact existing page or
-   open task, propose `update_submission_fields` with that page/task reference
+   open task, propose `update_form_values` with that page/task reference
    and leave `data.updates` to the completion stage. Leave new-record
    `data.submission` to that stage as well.
 9. Build the ordered proposal. Attach every uploaded file to an intended page or
@@ -408,7 +411,7 @@ ORGANIZE_PLANNING_TOOLS = """
 - Always read the page_form or task_form guideline bundle before returning a
   create_form action of that type.
 - Always read the schema_evolution guideline bundle before returning an
-  update_form_schema action.
+  extend_form_schema action.
 - Read category, project, or page_document guideline bundles when proposing
   that kind of structure.
 - Do not request form_autofill or report_actions guidelines; the base planning
@@ -439,27 +442,27 @@ ORGANIZE_PLANNING_ACTIONS = """
   page, model task, and stable name; task and task_action remain exact overrides.
 - add_form_to_page requires an existing page and a page form. It replaces the
   page's attached form and does not require a category.
-- add_category requires both the existing page and the additional existing
+- add_page_category requires both the existing page and the additional existing
   category. Put their exact tool-returned hash tokens in `data.page` and
   `data.category` (or use `page_action`/`category_action` for earlier proposal
   actions). A page or category name in display text does not execute.
 - Do not include submission, submission_empty_reason, submission_needed,
   submission_request, submission_context, or update rows.
-- Completion owns form values. A planned update_submission_fields action contains exactly one existing
+- Completion owns form values. A planned update_form_values action contains exactly one existing
   page or task reference; omit data.updates.
-- Attach report uploads with attach_file_to_page or attach_file_to_task using the
+- Attach report uploads with attach_file using the explicit entity/entity_action target and
   exact report_file_ref. Filenames and display names are labels, not refs.
-- Use update_form_schema only for additive fields or select/radio options.
+- Use extend_form_schema only for additive fields or select/radio options.
 - Missing schema syntax is not a user decision. Use the relevant guidelines to
   supply stable ids, titles, types, and input subtypes; use needs_review only
   when the intended field meaning or safe additive change is genuinely unclear.
-- Use delete_page only as a manual cleanup suggestion after useful content has
+- Use suggest_page_deletion only as a manual cleanup suggestion after useful content has
   been preserved.
 """
 
 
 ORGANIZE_PLANNING_PREFLIGHT = """
-### Before Returning
+### Before Completing Structure Planning
 
 - Internal hash tokens appear only in executable action data, never in the
   user-facing summary, issues, display labels, or reasons.
@@ -478,14 +481,14 @@ ORGANIZE_PLANNING_PREFLIGHT = """
   they share a model task.
 - Existing hashes came from supplied context or tool results.
 - Every action reference points to an earlier action.
-- Every add_category action has both an executable page/page_action reference
+- Every add_page_category action has both an executable page/page_action reference
   and an executable category/category_action reference; readable names never
   substitute for either reference.
 - Forms describe the record rather than merely containing fillable fields.
 - Category default forms appear only for unambiguous homogeneous collections;
   context-oriented or heterogeneous categories have no default form.
 - Every create_form action was built after reading its page_form or task_form
-  guidelines, and every update_form_schema action was built after reading the
+  guidelines, and every extend_form_schema action was built after reading the
   schema_evolution guidelines.
 - Every new schema field has a unique stable id, supported type, and title;
   input fields also have an input subtype.
@@ -520,10 +523,10 @@ Common data shapes:
   "due_date", optional canonical "schedule", or `"completed": true` with
   optional "completed_on"}
 - add_form_to_page: {"page" or "page_action", "form" or "form_action"}
-- add_category: {"page" or "page_action", "category" or "category_action"}
-- update_form_schema: {"form", "operations"}
-- update_submission_fields: {"page" or "task"}; omit "updates" during planning
-- attach_file_to_page: {"page" or "page_action", "file"}
-- attach_file_to_task: {"task" or "task_action", "file"}
+- add_page_category: {"page" or "page_action", "category" or "category_action"}
+- extend_form_schema: {"form", "operations"}
+- append_page_document: {"page" or "page_action", "document_markdown"}; requested addition only, with server-supplied source/time quote
+- update_form_values: {"page" or "task"}; omit "updates" during planning
+- attach_file: {"entity" or "entity_action", "file"}
 - needs_review: {"note", "questions"}
 """

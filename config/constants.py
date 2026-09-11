@@ -1,6 +1,6 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "b76aa3e8"
+BUILD_ID = "b205ceac"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -577,28 +577,6 @@ RUNTIME_SERVICE_ACCOUNT_ROLES = [
     "roles/iam.serviceAccountTokenCreator",
 ]
 
-REMOVED_RUNTIME_PROJECT_ROLES = [
-    "roles/appengine.deployer",
-    "roles/iam.serviceAccountUser",
-    "roles/cloudbuild.builds.editor",
-    "roles/storage.admin",
-    "roles/storage.objectCreator",
-    "roles/storage.objectViewer",
-    "roles/firebase.admin",
-    "roles/firebaseauth.admin",
-    "roles/firebasecloudmessaging.admin",
-    "roles/firebasemessagingcampaigns.admin",
-    "roles/serviceusage.serviceUsageAdmin",
-    "roles/cloudtasks.admin",
-]
-
-REMOVED_RUNTIME_PROJECT_STORAGE_ROLES = [
-    "roles/storage.admin",
-    "roles/storage.objectCreator",
-    "roles/storage.objectViewer",
-]
-
-
 REQUIRED_GOOGLE_CLOUD_APIS = {
     "cloudbuild.googleapis.com": "Cloud Build",
     "appengine.googleapis.com": "App Engine Admin",
@@ -658,6 +636,7 @@ SCREENSHOTS = [
 # this allowlist fall through to the final static 404 handler without starting
 # the application runtime.
 APP_BLUEPRINT_ROUTE_PREFIXES = (
+    ".well-known",
     "analytics",
     "api",
     "assets",
@@ -668,6 +647,7 @@ APP_BLUEPRINT_ROUTE_PREFIXES = (
     "l",
     "manual",
     "messages",
+    "oauth",
     "pages",
     "process",
     "projects",

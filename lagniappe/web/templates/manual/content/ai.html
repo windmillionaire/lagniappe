@@ -25,6 +25,22 @@
       <li>Suggest workspace-native actions, such as adding pages, tasks, files, forms, or projects in the right place.</li>
     </ul>
   {% endcall %}
+  {{ heading("Plans & Reports", icon="generate", kind="form") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      On the homepage, combine the Active, Executed, and Ask filters to choose
+      which saved reports to show. Active includes proposals that are ready,
+      still processing, or need attention. Executed contains completed
+      Create and Organize proposals. Ask contains questions and answers.
+      Each count includes reports hidden by the current filters.
+    </p>
+    <p class="text-base-medium">
+      Select Executed alone to delete all displayed executed proposals after
+      one confirmation. This removes their reports, undo history, and
+      report-only uploads. Created pages, tasks, and other workspace changes
+      remain. Your browser remembers your filter choices.
+    </p>
+  {% endcall %}
   {{ heading("Per-User AI Access", icon="user", kind="user") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
@@ -47,7 +63,7 @@
       use the signed-in user's normal workspace permissions.
     </p>
   {% endcall %}
-  {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
+  {% if CONFIG.AI_ENABLED and CONFIG.AI_EMAIL_PUBLIC.enabled %}
     {{ heading("AI Reports by Email", icon="email", kind="form") }}
     {% call card() %}
       {% if current_user.is_authenticated %}
@@ -105,6 +121,109 @@
       {% endif %}
     {% endcall %}
   {% endif %}
+  {% call card() %}
+    <details data-role="external-ai-help">
+      <summary class="cursor-pointer text-page-default font-semibold">Use an external AI agent: MCP or skill</summary>
+      <div class="space-y-3 mt-3 text-base-medium">
+        <p>An installation can disable AI entirely, or allow built-in AI while
+          disabling external agents. External access covers both MCP and the API/skill.</p>
+        <p><strong>MCP:</strong> add the installation's MCP server URL to a compatible
+          agent, then sign in to Lagniappe and allow the connection. The server exposes
+          workspace tools directly. No local Lagniappe package is required.</p>
+        <p><strong>Skill:</strong> for an agent that can make HTTP requests, create an API
+          key under <strong>My Page / User Settings / External agent API</strong>.
+          Ask the agent to fetch the skill below
+          using that key and install it for itself. Keep the key in the agent's secret
+          settings; do not paste it into shared prompts or files.</p>
+        {% set show_connection_details = current_user.is_authenticated and not current_user.is_public and CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED %}
+        {% if show_connection_details %}
+          <div data-role="external-ai-account-details" class="space-y-2">
+            {% if CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE %}
+              <p>Connection name: <code>{{ CONFIG.MCP_NAME }}</code></p>
+              <p>MCP server: <code>{{ CONFIG.MCP_RESOURCE }}</code></p>
+            {% else %}
+              <p>Ask the installation Owner for the MCP server address once setup is complete.</p>
+            {% endif %}
+            {% set site_origin = ('https://' ~ CONFIG.CUSTOM_DOMAIN) if CONFIG.CUSTOM_DOMAIN else CONFIG.APP_URL %}
+            <p>Skill URL (requires the API key): <code>{{ site_origin.rstrip('/') }}/api/v1/client-skill.md</code></p>
+          </div>
+        {% else %}
+          <p data-role="external-ai-generic-details">Ask the installation Owner whether
+            external access is enabled and for its MCP server address. The skill URL is
+            <code>https://YOUR-LAGNIAPPE-SITE/api/v1/client-skill.md</code>; replace the
+            example host with the installation's website address.</p>
+        {% endif %}
+        {% if not show_connection_details or (CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE) %}
+          {% set mcp_url = CONFIG.MCP_RESOURCE if show_connection_details else 'https://MCP-ENDPOINT/mcp' %}
+          {% set mcp_name = CONFIG.MCP_NAME if show_connection_details else 'lagniappe-remote' %}
+          <div data-role="external-ai-chatgpt-setup" class="space-y-3">
+            <h3 class="font-semibold text-page-default">Connect ChatGPT: app or web plugin</h3>
+            <p>You can add this installation as a custom plugin in the ChatGPT
+              desktop app or on the web. No Codex CLI or Lagniappe API key is needed.</p>
+            <ol class="list-decimal pl-5 space-y-2">
+              <li>In ChatGPT, open <strong>Settings / Security and login</strong>
+                and enable <strong>Developer mode</strong>. Availability depends
+                on your ChatGPT account and workspace policy.</li>
+              <li>Open <strong>Plugins</strong> and select the <strong>+</strong>
+                button to add a connection. Enter <code>{{ mcp_name }}</code>
+                as the name and a description such as “Connect to my Lagniappe workspace.”</li>
+              <li>Under <strong>Connection</strong>, enter the MCP server URL:
+                <code>{{ mcp_url }}</code>.
+                {% if not show_connection_details %}
+                  Obtain the connection name and full MCP URL from the installation
+                  Owner and replace these examples.
+                {% endif %}
+                Choose <strong>OAuth</strong> if asked for an authentication method,
+                then create the connection.</li>
+              <li>Follow the sign-in prompt, sign in to your invited Lagniappe
+                account, check the account shown, and choose <strong>Allow</strong>.
+                ChatGPT may ask you to connect during setup or the first use.</li>
+              <li>Start a new chat, select the plugin from the tools menu, and
+                ask ChatGPT which Lagniappe account it is using. Then ask it to
+                find a page you know you can access.</li>
+            </ol>
+            <p>If ChatGPT asks you to reconnect later, use its
+              <strong>Reconnect</strong> action and authorize again.
+              Manage or remove the plugin from <strong>Plugins</strong>.
+              To revoke its Lagniappe access, open
+              <strong>Settings / Manage AI connections</strong> in Lagniappe.</p>
+            <p class="text-sm">See OpenAI's
+              {{ link('https://developers.openai.com/plugins/deploy/connect-chatgpt', 'connection instructions') }}
+              and {{ link('https://learn.chatgpt.com/docs/plugins', 'plugin guide') }}
+              for current ChatGPT controls.</p>
+          </div>
+          <div data-role="external-ai-codex-setup" class="space-y-3">
+            <h3 class="font-semibold text-page-default">Connect Codex CLI</h3>
+            <p>With Codex CLI installed, run this command in a terminal.
+              No Lagniappe API key or local Lagniappe package is needed.</p>
+            {% if not show_connection_details %}
+              <p>Ask the installation Owner to confirm Codex access is enabled and
+                replace <code>https://MCP-ENDPOINT/mcp</code> with its MCP
+                server URL. You need an invited, non-public Lagniappe account.</p>
+            {% endif %}
+            {{ code('codex mcp add ' ~ mcp_name ~ ' --url ' ~ mcp_url ~ ' --oauth-client-id lagniappe-codex') }}
+            <p>Follow the sign-in link printed by Codex. Sign in to Lagniappe,
+              check the account shown on the consent page, then choose <strong>Allow</strong>.</p>
+            <p>If sign-in does not start, or you need to reconnect later, run:</p>
+            {{ code('codex mcp login ' ~ mcp_name) }}
+            <p>When the terminal confirms login, you can close the localhost
+              completion tab. Restart any existing Codex sessions to load the
+              connection, then ask Codex to check which Lagniappe account it is using.</p>
+            <p>Codex in the ChatGPT desktop app shares this local MCP configuration.
+              Restart it after setup. ChatGPT web uses the plugin connection above.</p>
+            <p>To switch accounts, sign in to the intended account in Lagniappe
+              first, then run the login command again and restart Codex.
+              To revoke a connection, open <strong>Settings / Manage AI connections</strong>
+              in Lagniappe.</p>
+          </div>
+        {% endif %}
+        <p>Both use the user's normal workspace permissions and the external agent's
+          model provider. Both can answer questions and prepare plans; workspace changes
+          still require review in Lagniappe. Either can be used on its own. If both are
+          installed, tell the agent which one to use to avoid duplicate work.</p>
+      </div>
+    </details>
+  {% endcall %}
   {{ heading("Permission-Scoped Context", icon="permissions", kind="user") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
@@ -128,7 +247,7 @@
   {{ heading("Privacy Model") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
-      AI requests go through your own Google Cloud project's Vertex AI
+      Built-in AI requests go through your own Google Cloud project's Vertex AI
       configuration. That is a meaningfully different posture from pasting
       private data into a consumer chatbot account, though it is still a cloud
       AI service: prompts, files, and generated output are sent to Google for
@@ -171,7 +290,8 @@
       search grounding, file processing, image generation, or run large Create
       or Organize requests, it is worth glancing at usage a little more often.
     </p>
-    <p class="text-base-medium">You can adjust AI settings at any time with:</p>
+    <p class="text-base-medium">Change models in <strong>Admin / Site Settings / AI Models</strong>.
+      The installer can change AI and external-agent access with:</p>
     {{ code("./setup.sh ai") }}
   {% endcall %}
   {{ heading("Good to Know") }}

@@ -74,6 +74,7 @@
   {% set can_combine = t.allowed(Action.DELETE) %}
   <li id="{{ t.hash }}"
       data-key="{{ t.urlsafe_key }}"
+      data-hash="{{ t.hash }}"
       lp-entity
       lp-component
       data-fingerprint="{{ t.fingerprint }}"

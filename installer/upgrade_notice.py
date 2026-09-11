@@ -1,7 +1,11 @@
 """Version-driven owner-maintenance notices for installer deployments."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 import re
 
+from runner.console import format_prompt, wrap_text
 from .errors import SetupCancelled
 
 
@@ -60,15 +64,22 @@ def print_post_upgrade_maintenance_notice(formatter, installed_version, target_v
     transition = f"to version {target_version}"
     if parse_release_version(installed_version):
         transition = f"from {installed_version} to {target_version}"
-    print(f"\n{formatter.warning('Required post-upgrade maintenance')}")
+    print(wrap_text(f"\n{ui.heading('Required post-upgrade maintenance')}"))
     print(
-        f"This deployment upgrades Lagniappe {transition} and requires "
-        "Owner-run application maintenance. setup.sh does not run data migrations."
+        wrap_text(
+            f"This deployment upgrades Lagniappe {transition} and requires "
+            "Owner-run application maintenance. Setup does not run data migrations."
+        )
     )
     print(
-        "After deployment, open Admin \u2192 Site Settings \u2192 Maintenance, "
-        "select Apply Updates, resolve any reported failures, and then select "
-        "Refresh Cache."
+        wrap_text(
+            (
+                "After deployment, open "
+                f"{ui.literal('Admin → Site Settings → Maintenance')}, select "
+                f"{ui.literal('Apply Updates')}, resolve any reported failures, and then "
+                f"select {ui.literal('Refresh Cache')}."
+            )
+        )
     )
 
 
@@ -78,11 +89,27 @@ def print_post_upgrade_maintenance_notice(formatter, installed_version, target_v
 # @reason shared terminal presentation is asserted through both deployment workflows
 def print_post_upgrade_maintenance_steps(formatter):
     """Repeat the required in-app work after a major deployment succeeds."""
-    print(f"\n{formatter.warning('Required next steps')}")
-    print("  1. Sign in as the Owner or an Administrator.")
-    print("  2. Open Admin \u2192 Site Settings \u2192 Maintenance.")
-    print("  3. Select Apply Updates and resolve any reported failures.")
-    print("  4. Select Refresh Cache.")
+    print(wrap_text(f"\n{ui.heading('Required next steps')}"))
+    print(
+        wrap_text((f"  {ui.literal('1.')} Sign in as the Owner or an Administrator."))
+    )
+    print(
+        wrap_text(
+            (
+                f"  {ui.literal('2.')} Open "
+                f"{ui.literal('Admin → Site Settings → Maintenance')}."
+            )
+        )
+    )
+    print(
+        wrap_text(
+            (
+                f"  {ui.literal('3.')} Select {ui.literal('Apply Updates')} and resolve "
+                "any reported failures."
+            )
+        )
+    )
+    print(wrap_text((f"  {ui.literal('4.')} Select {ui.literal('Refresh Cache')}.")))
 
 
 # @testable false
@@ -92,9 +119,9 @@ def confirm_legacy_upgrade_deployment(formatter, target_version):
     """Give old upgrade orchestration one final stop before deploying 1.0+."""
     print_post_upgrade_maintenance_notice(formatter, None, target_version)
     consent = input(
-        formatter.info(
+        format_prompt(
             "Deploy this major version and complete the required maintenance "
-            "afterward? [y/N]: "
+                "afterward? [y/N]: "
         )
     )
     if consent.strip().casefold() not in {"y", "yes"}:

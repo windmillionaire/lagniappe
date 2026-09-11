@@ -82,7 +82,7 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
         "$..filter-expression",
     )
     load.assert_called_once_with(
-        "visible-key", "hidden-key", request=Fetch.direct()
+        "visible-key", "hidden-key", request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION)
     )
     assert results == [visible]
 

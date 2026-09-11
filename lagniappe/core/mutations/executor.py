@@ -45,7 +45,11 @@ def _prepare_write(effect):
         pass
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_022_mutation_contracts.py::test_permission_source_marker_is_consumed_only_after_durable_success
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_cold_source_details_preserve_programmatic_restriction_changes
+# @matrix permissions : invalidation-retry
+# @matrix permissions cache : cache-miss source-intent programmatic-save
 def consume_mutation_intents(plan):
     for owner, captured in plan.consumed_intents:
         current = list(getattr(owner, "mutation_intents", ()))
@@ -53,6 +57,13 @@ def consume_mutation_intents(plan):
         owner._mutation_intents = [
             intent for intent in current if id(intent) not in captured_ids
         ]
+    for effect in plan.effects:
+        if effect.effect is MutationEffectType.UPSERT and effect.property_mask is None:
+            if getattr(effect.entity, "_permission_sources_changed", False):
+                effect.entity._reconcile_restrictions = True
+            effect.entity._permission_sources_changed = False
+            if effect.entity.kind == "task":
+                effect.entity._page_changed = False
 
 
 # @testable infrastructure
@@ -96,7 +107,10 @@ def execute_post_commit(plan):
         if effect.effect is MutationEffectType.CACHE_REFRESH
     ]
     if refresh:
+        from ..tools.cache.restrictions import previous_restrictions, dispatch_changes
+        previous = previous_restrictions(refresh)
         cache.update(*refresh)
+        dispatch_changes(previous)
         cache.update_owner_projection(*refresh)
         complete(MutationEffectType.CACHE_REFRESH)
 
@@ -222,7 +236,7 @@ def execute_post_commit(plan):
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
 # @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save typed-intent-preservation
-def execute_mutation(plan):
+def execute_mutation(plan, *, guards=None):
     """Execute durable effects before rebuildable cache and blob effects."""
     if not isinstance(plan, MutationPlan):
         raise TypeError("execute_mutation requires a MutationPlan")
@@ -237,8 +251,9 @@ def execute_mutation(plan):
     ]
 
     if writes:
+        options = {"guards": guards} if guards else {}
         database_utility.save_mutations(
-            (effect.entity, effect.property_mask) for effect in writes
+            ((effect.entity, effect.property_mask) for effect in writes), **options
         )
         for effect in writes:
             _completed(outcome, effect.effect)

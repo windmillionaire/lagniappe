@@ -16,6 +16,7 @@ from ..tools import cache
 from lagniappe.core.tools.database import get as database_get
 from ..tools.files.html import strip_tags
 from .base_db import DBProperty
+from ..tools.auth.restrictions import normalize_restrictions, permission_relation
 
 
 # @testable true
@@ -763,16 +764,15 @@ class Permissions(DBProperty):
 # @covered-by lagniappe/core/properties/common_entity.py::RestrictedTo.value
 # @covered-by lagniappe/core/properties/common_entity.py::RestrictedTo.add
 # @reason restricted-to behavior is owned by value resolution and explicit mutation
-class RestrictedTo(CacheMixin, DBProperty):
-    """List of user groups restricted to a form.
+class RestrictedTo(DBProperty):
+    """Local group storage and effective restrictions separated by source.
 
     Set:
         value (list): List of group hashes.
 
     Get:
-        value (list): Effective group hashes, including the owner fallback.
+        value (dict): Match one group in each independent source clause.
         stored (list): Independent copy of explicitly stored group hashes.
-        column_value (str | None): Comma-separated group names for table display.
     """
 
     # Property Attributes
@@ -785,30 +785,70 @@ class RestrictedTo(CacheMixin, DBProperty):
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_group_restricted_form_opens_for_group_member_only
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_index_lists_group_restricted_form_only_for_group_member
     # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources
-    # @tests tests_unit/test_007_category_properties.py::test_category_restricted_to_follows_attached_form
-    # @matrix category form forms permissions : access-restrictions attached-form cache group-restricted index-filter inheritance owner-restricted restricted-access side-effect-free stable-order
+    # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
+    # @tests tests_unit/test_002_entity_general_properties.py::test_task_file_restrictions_use_stored_hashes_without_group_reads
+    # @matrix permissions : source-clauses inherited-restrictions
+    # @matrix task permissions : source-clauses admin-only
+    # @matrix permissions relations : stored-restrictions group-free no-extra-read
+    # @matrix forms permissions : access-restrictions group-restricted index-filter inheritance owner-restricted restricted-access side-effect-free stable-order
     @property
     def value(self):
-        if self.is_set:
-            return self._value
-
-        restrictions = self.stored
-        if not restrictions:
-            page = getattr(self.entity, "page", None)
-            restrictions = page.restricted_to if page else None
-        if not restrictions:
-            form = getattr(self.entity, "form", None)
-            restrictions = form.restricted_to if form else None
-        if not restrictions:
-            groups = getattr(self.entity, "groups", None)
-            restrictions = [group.hash for group in groups] if groups else None
-
-        if isinstance(restrictions, list):
-            self._value = list(dict.fromkeys([*restrictions, "owner"]))
+        kind = getattr(self.entity, "entity_kind", None)
+        if kind == "form":
+            source = "task_form" if getattr(self.entity, "form_type", None) == "task" else "page_form"
+            restrictions = {source: self.stored}
+        elif kind == "page":
+            form = permission_relation(self.entity, "form")
+            restrictions = {
+                "page": self.stored,
+                "page_form": form.properties.restricted_to.stored if form else [],
+            }
+        elif kind == "task":
+            page = permission_relation(self.entity, "page", required=True)
+            form = permission_relation(self.entity, "form")
+            restrictions = {
+                **page.restricted_to,
+                "task_form": form.properties.restricted_to.stored if form else [],
+            }
+        elif kind == "file":
+            owner = self.entity.owner
+            restrictions = owner.restricted_to if owner else {}
         else:
-            self._value = restrictions or False
+            restrictions = {}
+        return normalize_restrictions(restrictions)
 
-        return self._value
+    # @testable true
+    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_local_restrictions_materialize_without_persisting_inheritance
+    # @tests tests_unit/test_002_entity_general_properties.py::test_direct_fetch_materializes_local_restrictions_from_attached_groups
+    # @tests tests_unit/test_002_entity_general_properties.py::test_materialize_preserves_hashes_until_groups_are_attached
+    # @matrix permissions : local-restrictions materialization owner-only
+    # @matrix permissions relations : local-restrictions materialization unresolved
+    def materialize(self, *, admin_only=None):
+        """Project attached local groups into storage; inheritance stays computed."""
+        if self.entity.entity_kind not in {"form", "page"}:
+            return
+        # Fetch-time materialization must not rewrite stored relation keys.
+        if admin_only is True:
+            self.entity.groups = []
+        if admin_only is None:
+            admin_only = self.stored == ["admin"]
+        if admin_only:
+            restrictions = ["admin"]
+        else:
+            groups = self.entity.properties.groups
+            if groups.keys and not groups.is_set:
+                return
+            hashes = [group.hash for group in groups.value] if groups.keys else []
+            restrictions = sorted(set(hashes))
+        if restrictions != self.stored:
+            self.entity._permission_sources_changed = True
+        if restrictions:
+            self.entity.db[self.id] = restrictions
+        else:
+            self.entity.db.pop(self.id, None)
+        self.unset()
+        self.entity._details = None
+        self.entity._to_cache = None
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources
@@ -842,8 +882,3 @@ class RestrictedTo(CacheMixin, DBProperty):
                 self.entity.db[self.id] = existing
 
         self.unset()
-
-    # Cache Attributes
-    @property
-    def cache_value(self):
-        return ",".join(self.value) if self.value else None

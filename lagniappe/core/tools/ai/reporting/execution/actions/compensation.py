@@ -110,7 +110,7 @@ def _undo_add_form_to_page_action(action, user):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_entities.py::test_run_report_adds_page_category_without_changing_primary_with_undo
 # @matrix ai-report : add-category undo
-def _undo_add_category_action(action, user):
+def _undo_add_page_category_action(action, user):
     previous = action.get("previous") or {}
     if previous.get("had_category"):
         return {"note": "Category was already present; nothing removed."}
@@ -334,7 +334,7 @@ def _undo_attachment_action(action, user):
             "target": _entity_result(target),
             "note": "Attachment already existed; nothing removed.",
         }
-    if action.get("type") == "attach_file_to_page":
+    if isinstance(target, Entities.PAGE):
         changed = _remove_file_page_reference(file, target)
     else:
         changed = _remove_task_file_reference(target, file)
@@ -380,19 +380,30 @@ def _undo_summarize_file(action, user):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason report file preservation is exercised through public undo tests
+# @testable true
+# @tests tests_unit/test_006_file_properties.py::test_report_undo_distinguishes_primary_page_link_from_task_ancestry
+# @matrix ai-report files : undo parent-key
 def _detach_report_files_before_delete(entity, action, report):
     touched = []
     if isinstance(entity, Entities.PAGE):
         for file in report.input_files:
-            if _remove_file_page_reference(file, entity):
+            if entity.key in {file.properties.page.key, file.properties.task_page.key}:
+                # Page deletion also owns its Tasks. Preserve report inputs
+                # from both cascades before the owned File queries execute.
+                file.task = None
+                file.page = None
                 touched.append(file)
     elif isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
         files = _action_attachment_entities(action)
         if not files:
             files = list(getattr(entity, "files", []) or [])
+        if isinstance(entity, Entities.TASK):
+            # Historical attachments still belong to the live Task even after
+            # they leave its current list. Preserve report inputs before cascade.
+            files = _unique_entities([*files, *(
+                file for file in report.input_files
+                if file.properties.task.key == entity.key
+            )])
         for file in files:
             if _remove_task_file_reference(entity, file):
                 touched.append(file)
@@ -417,39 +428,27 @@ def _action_attachment_entities(action):
     return entities
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason relationship cleanup is exercised through public undo tests
+# @testable true
+# @tests tests_unit/test_006_file_properties.py::test_report_undo_distinguishes_primary_page_link_from_task_ancestry
+# @matrix ai-report files : undo parent-key
 def _remove_file_page_reference(file, page):
-    before = list(file.db.get("pages") or [])
-    after = [key for key in before if key != page.key]
-    changed = before != after
-    if after:
-        file.db["pages"] = after
-    else:
-        file.db.pop("pages", None)
-    return changed
+    if file.properties.task.key or file.properties.page.key != page.key:
+        return False
+    file.page = None
+    return True
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason relationship cleanup is exercised through public undo tests
 def _remove_task_file_reference(task, file, *, remove_task_attachment=True):
-    task_before = list(task.db.get("files") or [])
-    task_after = [key for key in task_before if key != file.key]
-    file_before = list(file.db.get("tasks") or [])
-    file_after = [key for key in file_before if key != task.key]
-    changed = file_before != file_after
+    changed = False
     if remove_task_attachment:
-        changed = changed or task_before != task_after
-        if task_after:
-            task.db["files"] = task_after
-        else:
-            task.db.pop("files", None)
-    if file_after:
-        file.db["tasks"] = file_after
-    else:
-        file.db.pop("tasks", None)
+        changed = task.properties.files.remove(file)
+    if file.properties.task.key == task.key:
+        file.task = None
+        file.page = None
+        changed = True
     return changed
 
 
@@ -457,15 +456,6 @@ def _remove_task_file_reference(task, file, *, remove_task_attachment=True):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason history parent reverse-link cleanup is exercised through public undo tests
 def _remove_history_task_file_reference(task, file, history):
-    if file.key in list(task.db.get("files") or []):
-        return False
-
-    for linked in getattr(file, "tasks", []) or []:
-        if getattr(linked, "key", None) == getattr(history, "key", None):
-            continue
-        if getattr(linked, "entity_kind", None) != "task_history":
-            continue
-        if getattr(getattr(linked, "task", None), "key", None) == task.key:
-            return False
-
-    return _remove_task_file_reference(task, file, remove_task_attachment=False)
+    # History references are non-owning. Undoing a snapshot must not change
+    # ownership or access to the live Task's other attachments.
+    return False

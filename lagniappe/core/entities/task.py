@@ -5,7 +5,7 @@ from uuid import uuid4
 from flask_login import current_user
 from flask import url_for
 
-from ..definitions import Action, Fetch, MutationIntent, MutationIntentType
+from ..definitions import Action, Fetch, FetchReason, MutationIntent, MutationIntentType
 from ..exceptions import TaskCompletionError, ValidationError
 from ..mixins import AssetMixin, SubmitterMixin
 from ..properties import (
@@ -21,6 +21,7 @@ from . import Entities
 from lagniappe.core.tools.database import get as database_get
 from ..tools.tasks import scheduling
 from ..tools.auth.context import current_context_user
+from ..tools.auth.restrictions import permission_relation
 
 
 # @testable true
@@ -128,7 +129,9 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_assigned_user_page_override
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_models_view_requires_models_marker
     # @tests tests_unit/test_013_task_properties.py::test_task_allowed_restricted_form_blocks_page_permission
-    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_skips_unloaded_page_when_stored_permission_suffices
+    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_requires_loaded_page_even_with_stored_permission
+    # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
+    # @matrix task permissions : source-clauses assignee-override parent-page restricted-access
     # @matrix permissions task users : allowed assignee-override lazy-parent-check models-scope parent-page restricted-access shallow-page stored-requires user-page
     # @pair task:stored-requires
     def allowed(self, action, user=None):
@@ -136,18 +139,16 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         if self.restricted_access(user):
             return False
 
-        if super().allowed(action, user=user):
+        page = permission_relation(self, "page", required=True)
+        page_action = Action.VIEW if action is Action.VIEW else Action.EDIT
+        if page.allowed(page_action, user=user):
             return True
-
-        page_allowed = self.page.allowed(action, user=user) if self.page else False
-        if page_allowed:
-            return True
-
         user_page = getattr(user, "page", None)
-        if user_page and self.properties.assigned_to.key == user_page.key:
-            return Action.EDIT.implies(action)
-
-        return False
+        return bool(
+            user_page
+            and self.properties.assigned_to.key == user_page.key
+            and Action.EDIT.implies(action)
+        )
 
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_update_rejects_assignee_without_restricted_task_access
@@ -185,10 +186,26 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     @property
     def history(self):
         return sorted(
-            Entities.fetch(*database_get.task_history(self), request=Fetch.direct()),
+            self.load_history(*database_get.task_history(self)),
             key=lambda h: h.completed_on or datetime.min.replace(tzinfo=timezone.utc),
             reverse=True,
         )
+
+    # @testable true
+    # @tests tests_unit/test_006_file_properties.py::test_history_loading_resolves_moved_task_and_independently_moved_files
+    # @matrix files tasks : task-history parent-key restrictions
+    # @pair tasks:single-batch
+    def load_history(self, *records):
+        """Load snapshots with their live Task and current attachment owners."""
+        records = [record for record in records if record is not None]
+        file_keys = {key for record in records for key in record.get("files", [])}
+        return [
+            entity for entity in Entities.fetch(
+                self, *records, *file_keys,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )
+            if isinstance(entity, Entities.TASK_HISTORY)
+        ]
 
     def save_submission(self):
         super().save_submission()
@@ -211,7 +228,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         return self.db.get("postponed_from")
 
     # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_raises_when_required_submission_missing
     # @matrix submission task-completion : required-fields validation
     def _check_required(self):
         """Return visible required fields that have no value."""
@@ -226,8 +242,11 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
+    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_raises_when_required_submission_missing
+    # @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_retries_and_undoes
     # @matrix task-completion : assignee complete completed-by no-schedule
-    def complete(self):
+    # @matrix submission task-completion : required-fields validation
+    def complete(self, *, user=None, history_key=None):
         incomplete = self._check_required() if self.form else []
         if incomplete:
             titles = [s.label for s in incomplete]
@@ -237,10 +256,13 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
         self.completed = True
         self.completed_on = datetime.now(timezone.utc)
-        self.completed_by = current_user
+        self.completed_by = user if user is not None else current_user
 
         if self.schedule:
-            self._complete_active_schedule()
+            if history_key is None:
+                self._complete_active_schedule()
+            else:
+                self._complete_active_schedule(history_key=history_key)
         else:
             self.due_date = None
 
@@ -249,9 +271,12 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_repeats_when_completed
     # @matrix task-scheduling : complete next-due-date recurring schedule-queue
     # @pair task-completion:next-due-date
-    def _complete_active_schedule(self):
+    def _complete_active_schedule(self, *, history_key=None):
         self.properties.schedule.set_next_due_date()
-        scheduling.add_uncomplete_task_to_queue(self)
+        if history_key is None:
+            scheduling.add_uncomplete_task_to_queue(self)
+        else:
+            scheduling.add_uncomplete_task_to_queue(self, history_key=history_key)
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete

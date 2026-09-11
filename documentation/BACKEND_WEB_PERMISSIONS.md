@@ -30,11 +30,50 @@ status, dynamic forms, and downloads that must not be served from browser or
 service-worker storage. Do not set `g.NO_CACHE` inside such a handler: an
 `If-None-Match` request can otherwise receive `304` before the handler runs.
 
-The fixed authorization fetch uses the session user, user page, and requested
-entity as explicit roots. One batch resolves missing roots and a second attaches
-one relation level. This supplies groups, starred entities, the user page's
-direct relations, and the target's direct relations without expanding the full
-graph.
+`_load_request_context()` keeps the session User and user Page at direct depth.
+Task and File targets use `Fetch.nested()` so their Page/Form dependencies are
+already resolved before fingerprints or permissions are evaluated. An attached
+File stores `page` for a direct attachment, or `task` and `task_page` for a Task
+attachment, keeping both parents' Forms
+within two relation levels. Expanding a Task History table cell loads the
+snapshot by its own key and expands its live Task as a nested root for
+authorization. Permission checks never fetch their own relations. Missing required
+parents or unresolved permission dependencies raise rather than opening access.
+
+Only Forms, Pages, Tasks, and Files have `restricted_to`. Category, task-template,
+and User access use their ordinary resource permissions; a User's Page has its
+own content restrictions. Forms and Pages persist only their local arrays. Effective
+restrictions keep three independent sources: `page`, `page_form`, and
+`task_form`. A Page combines its own groups with its Form's groups; a Task adds
+its own Form's groups. Files inherit their primary Task or Page's complete rule.
+A non-administrator must belong to at least one group in every nonempty source,
+in addition to holding ordinary resource permissions. Groups within a source
+are ORed; the sources are ANDed. Assignment grants Task VIEW/EDIT only after
+this restriction check succeeds.
+
+Administrators bypass group restrictions with `Restriction.BELONGS_TO_ALL` in
+search `belongs_to`; ordinary users without groups use `Restriction.BELONGS_TO_NONE`.
+`Restriction.UNRESTRICTED` independently omits the required-access filter.
+The reserved `["admin"]` local
+restriction permits only administrators. Membership and role changes contribute to the
+viewer's authorization fingerprint and invalidate cached restriction sessions.
+Messaging uses actual group memberships rather than the search sentinel.
+
+Page restrictions display separate rows for the Page's local Groups and its
+Form's Groups. Group names are attached at the initial settings load boundary;
+rendering and permission helpers do not fetch them. Both Page and Form editors
+submit complete local restrictions explicitly, with submitted Groups resolved
+in a batch. `Groups.attach()` materializes local group hashes in the Datastore
+entity; ordinary saves persist them. Permission evaluation reads these stored
+hashes without loading Groups.
+
+Redis stores each source in its own TAG field: `restricted_to_page`,
+`restricted_to_page_form`, and `restricted_to_task_form`. Each search ANDs three
+clauses, each allowing either a missing field or a match with any of the
+viewer's group hashes. This applies before pagination, counts, highlighting,
+and model expansion. Query size is linear in group membership. Cached details
+store `restricted_to` as a canonical mapping of source names to group arrays;
+empty sources are omitted. Fingerprints preserve these source boundaries.
 
 Handlers that require a deeper graph declare it at the point of use:
 
@@ -98,7 +137,7 @@ The current policies are:
 | Category, Page, Project, or ModelTask selection | Target `VIEW`, plus the route-parent relationship where applicable. |
 | Attached Form | Target `VIEW` and the expected Page/Task form type. Schema generation requires target `EDIT`. |
 | Task assignee | A user-backed Page accepted by the collaboration assignment policy. |
-| Existing File attached to a Page or Task | Target `VIEW`. |
+| File ownership move | Current File and destination Page/live Task both require `EDIT`. Page uploads only create new Files. |
 | Newly uploaded Task File | A short-lived signed claim bound to the actor, File, and authorized Task/Page upload scope. |
 | Internal form Link submitted by a browser | Target `VIEW` before any submission field is mutated. |
 
@@ -129,6 +168,11 @@ subsequent request may send `If-None-Match`; the decorator returns `304` only
 after authenticating and authorizing it. The deployment identity invalidates
 server-rendered HTML after backend or template-only deployments even when the
 publish-only installer correctly reuses the existing frontend build.
+
+Filter preview and saved-result routes pass `fingerprint=filter_result_revision`
+to include the task-channel revision for Project results. A Task's changes can
+alter those results without changing the Project or Filter. Reading that channel
+adds one Datastore fingerprint-record read on these requests.
 
 Permission routes declared `no_store=True` do not set `g.fingerprint` and never
 answer a conditional request with `304`. Their `Cache-Control: no-store`

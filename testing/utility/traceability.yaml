@@ -2,6 +2,7 @@ source_roots:
   - build/publication.mjs
   - build/sentry.mjs
   - build/utility.mjs
+  - mcp/src
   - lagniappe/core/definitions
   - lagniappe/core/entities
   - lagniappe/core/mixins
@@ -27,6 +28,8 @@ test_roots:
   - testing/tests_tooling/test_001g_setup_release_readiness.py
   - testing/tests_tooling/test_001h_setup_ai_email.py
   - testing/tests_tooling/test_001i_setup_monitoring.py
+  - testing/tests_tooling/test_001j_setup_ai_mcp.py
+  - testing/tests_tooling/test_001k_setup_console.py
   - testing/tests_tooling/test_003_config.py
   - testing/tests_tooling/test_004_reports.py
   - testing/tests_tooling/test_005_test_server_command.py
@@ -36,6 +39,8 @@ test_roots:
   - testing/tests_tooling/test_008_data_lifecycle.py
   - testing/tests_tooling/test_009_hosted_e2e.py
   - testing/tests_tooling/test_010_runtime_outbound_http.py
+  - testing/tests_tooling/test_012_mcp_environment.py
+  - testing/tests_tooling/test_012c_remote_mcp_config.py
   - testing/tests_tooling/test_icons.py
 
 annotated_source_roots:
@@ -51,21 +56,27 @@ annotated_source_roots:
   - config/ai_settings.py
   - config/form_schema.py
   - config/public_pages.py
+  - config/remote_mcp.py
   - testing/utility/runtime_outbound_http.py
   - testing/utility/hosted_deferred_jobs.py
   - run.py
   - runner/context.py
+  - runner/console.py
+  - runner/presentation.py
   - runner/adc.py
   - runner/deploy.py
   - runner/development.py
   - runner/frontend_build.py
   - runner/gcloud.py
   - runner/icons.py
+  - runner/mcp_environment.py
   - runner/process.py
   - runner/pytest_routing.py
+  - runner/pytest_reports.py
   - runner/testing.py
   - runner/test_session.py
   - runner/upgrade.py
+  - runner/uv_bootstrap.py
   - runner/hosted_e2e.py
   - runner/hosted_e2e_anchor/main.py
   - config/hosted_e2e.py
@@ -78,6 +89,7 @@ annotated_source_roots:
   - lagniappe/web/responses.py
   - testing/utility/browser_review.py
   - testing/utility/test_server_seed.py
+  - testing/utility/mcp_client_driver.py
 
 annotation_scan_roots:
   - installer

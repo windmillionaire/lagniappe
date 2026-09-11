@@ -28,15 +28,23 @@ Test Framework:
 """
 
 from dataclasses import replace
+from contextlib import nullcontext
 from datetime import datetime
 import json
 import re
 from uuid import uuid4
 
 import pytest
+import requests
 from playwright.sync_api import expect
 
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Forms, ModelTasks, Projects, Tasks, Users
+from testing.definitions.form_definitions import FormDefinition
+from testing.definitions.project_definitions import ProjectDefinition
+from testing.definitions.page_definitions import PageDefinition
+from testing.definitions.model_task_definitions import ModelTaskDefinition
 from testing.elements import (
     Badges,
     Buttons,
@@ -44,8 +52,14 @@ from testing.elements import (
     Filters,
     Modal,
     ProjectFilterConditions,
+    FormElements,
+    FormSelect,
+    ProjectSelect,
+    SpinnerButtons,
+    Tabs,
 )
-from testing.resources import Task
+from testing.resources import Form, ModelTask, Page, Project, Task
+from testing.utility.network import expect_successful_response
 from testing.utility.polling import expect_poll_result
 from testing.utility.reconnect import expect_reconnect_refresh
 
@@ -132,7 +146,8 @@ def test_filter_preview_rejects_malformed_and_forged_contracts(
 # --- String conditions (Task Name) ---
 
 
-# @matrix filters : run-results string-condition
+# @matrix filters : results-layout run-results string-condition
+# @template projects/filters.html::task_filters
 def test_filter_by_task_name(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_filter_by_task_name.get(user)
@@ -150,6 +165,14 @@ def test_filter_by_task_name(get_user):
     expect(results).to_be_visible()
     row = results.locator("tr").filter(has_text=task.definition.name)
     expect(row).to_be_visible()
+    table_frame = results.locator("[data-role='results-table']")
+    expect(table_frame).to_have_css("border-top-width", "1px")
+    expect(table_frame).to_have_css("outline-style", "none")
+    expect(table_frame.locator("[data-role='table']")).to_have_css("border-top-width", "0px")
+    form_box = filters.form.bounding_box()
+    table_box = table_frame.bounding_box()
+    assert table_box["x"] == pytest.approx(form_box["x"], abs=1)
+    assert table_box["width"] == pytest.approx(form_box["width"], abs=1)
 
 
 # @matrix filters : exact-match run-results string-condition
@@ -225,27 +248,150 @@ def _attached_form_filter_context(user):
 
 
 # @matrix filters : run-results string-condition view-access
-def test_project_filter_results_respect_task_permissions(get_user):
+# @pair cache:permission-revalidation
+# @matrix filters polling : saved-filter permissions revision
+# @pair permissions:etag
+# @pair permissions:authorization
+# @template tasks/index.html::view
+# @template forms/restrictions.html::restrict_access
+@pytest.mark.parametrize("mode", ["preview", "saved"])
+@pytest.mark.parametrize("permission_source", ["task_form", "model_form", "page", "page_form"])
+def test_project_filter_results_respect_task_permissions(get_user, mode, permission_source):
     owner = get_user(Users.OWNER)
-    visible_task = Tasks.test_filter_permission_visible.get(owner)
-    hidden_task = Tasks.test_filter_permission_hidden.get(owner)
-    if "owner" not in hidden_task.entity.properties.restricted_to.stored:
-        hidden_task.entity.properties.restricted_to.add("owner")
-        hidden_task.entity.save()
-    project = visible_task.project
+    token = f"Permission Filter {uuid4().hex}"
+    project = Project(
+        user=owner, definition=ProjectDefinition(name=f"{token} Project")
+    ).create()
+    form = Form(
+        user=owner,
+        definition=FormDefinition(name=f"{token} Form", form_type="page" if permission_source == "page_form" else "task"),
+    ).create()
+    category = Entities.CATEGORY.create({"name": f"{token} Category"})
+    category.save()
+    page = Entities.PAGE.create({
+        "name": f"{token} Page", "model": category,
+        "form": form.entity if permission_source == "page_form" else None,
+    })
+    page.save()
+    visible_page = Entities.PAGE.create({"name": f"{token} Visible Page"})
+    visible_page.save()
+    visible_task = Entities.TASK.create({
+        "name": f"{token} Visible", "page": visible_page, "project": project.entity,
+    })
+    visible_task.save()
+    model = None
+    if permission_source == "model_form":
+        model = ModelTask(user=owner, definition=ModelTaskDefinition(name=f"{token} Model", project=None))
+        model.entity = Entities.MODEL_TASK.create(project.entity, {"name": model.definition.name, "form": form.entity})
+        model.entity.save()
+    page_resource = Page(user=owner, definition=PageDefinition(name=page.name, category=None))
+    page_resource.entity = page
+    owner.go(page_resource)
+    create_form = page_resource.create_task_form
+    task_name = f"{token} Restricted"
+    create_form.locator(FormElements.NAME).fill(task_name)
+    project_select = ProjectSelect(create_form)
+    if model:
+        project_select.panel(fill=project.definition.name)
+        project_select.select_by_key(model)
+        assert FormSelect(create_form).contains(form)
+    else:
+        project_select.select(project)
+        if permission_source == "task_form":
+            FormSelect(create_form).select(form)
+    with expect_successful_response(owner.page, method="POST", path=f"/tasks/{page_resource.key}/create",
+                                    request_payload_contains=task_name):
+        SpinnerButtons.CREATE.click(create_form)
+    expect(create_form).not_to_be_visible()
+    task_key = page_resource.active_task_list.new_item(task_name).get_attribute("data-key")
+    restricted_task = Entities.fetch_one(task_key, request=Fetch.root())
+    assert restricted_task.properties.project.key == project.entity.key
+    assert restricted_task.properties.model.key == (model.entity.key if model else None)
+    if permission_source in {"task_form", "model_form"}:
+        assert restricted_task.properties.form.key == form.entity.key
+
+    if mode == "saved":
+        owner.go(project)
+        owner_filters = Filters(owner, project)
+        owner_filters.set_condition(ProjectFilterConditions.NAME)
+        owner_filters.name_contains(token).add_filter()
+        saved_filter = owner_filters.save_filter()
+        saved_key = saved_filter.get_attribute("data-key")
 
     viewer = get_user(Users.general_models_view_only)
     project = viewer.go(project)
-
     filters = Filters(viewer, project)
-    filters.set_condition(ProjectFilterConditions.NAME)
+    if mode == "preview":
+        filters.set_condition(ProjectFilterConditions.NAME)
+        expect(filters.name_contains(token).add_filter()).to_be_visible()
+        with expect_successful_response(viewer.page, method="GET", path=f"/filters/{project.key}/test") as response_info:
+            results = filters.run()
+        initial_response = response_info.value
+    else:
+        saved_row = filters.section.locator(f"{Filters.SAVED_FILTERS} li[data-key='{saved_key}']")
+        with viewer.page.expect_navigation(url=f"**/filters/{saved_key}") as response_info:
+            saved_row.get_by_role("link", name="Run saved filter").click()
+        initial_response = response_info.value
+        results = viewer.locate("[lp-view][data-kind='task'] #table")
 
-    badges = filters.name_contains("Permission Filter").add_filter()
-    expect(badges).to_be_visible()
+    etag = initial_response.headers["etag"]
+    assert "no-store" not in initial_response.headers["cache-control"]
 
-    results = filters.run()
-    expect(results).to_be_visible()
-    _expect_only_matching_task(results, visible_task, hidden_task)
+    def conditional_get(revision):
+        # Check the server's conditional response directly; the service worker
+        # turns a 304 into the cached 200 response for browser consumers.
+        response = requests.get(
+            initial_response.url,
+            cookies={cookie["name"]: cookie["value"] for cookie in viewer.page.context.cookies()},
+            headers={"If-None-Match": revision, "User-Agent": viewer.page.evaluate("navigator.userAgent")},
+            allow_redirects=False,
+            timeout=10,
+        )
+        return {"status": response.status_code, "etag": response.headers.get("etag")}
+
+    assert conditional_get(etag)["status"] == 304
+
+    # Both records must match before the form's real save changes access.
+    visible_row = results.locator(f"tr[data-key='{visible_task.urlsafe_key}']")
+    restricted_row = results.locator(f"tr[data-key='{restricted_task.urlsafe_key}']")
+    expect(visible_row).to_be_visible()
+    expect(restricted_row).to_be_visible()
+
+    if permission_source == "page":
+        owner.go(page_resource)
+        Tabs(owner).info
+        owner.locate(Page.PAGE_PERMISSIONS_TOGGLE).click()
+        restriction = owner.locate(Page.PAGE_PERMISSIONS_FORM).locator(Page.PAGE_RESTRICT_OWNER)
+    else:
+        builder = form.builder
+        restriction = builder.restrictions().locator(builder.SPECIFIC_ACCESS_OWNER)
+
+    for restrict in (True, False):
+        boundary = (
+            expect_poll_result(
+                viewer.page, subscription_id="view:channel:tasks", timeout=45_000,
+            )
+            if mode == "saved" else nullcontext()
+        )
+        with boundary:
+            if permission_source == "page":
+                restriction.set_checked(restrict)
+                with expect_successful_response(owner.page, method="PUT", path=f"/pages/{page_resource.key}/view-access"):
+                    owner.locate(Page.PAGE_PERMISSIONS_FORM).locator("button[type='submit']").click()
+            else:
+                restriction.set_checked(restrict)
+                builder.save_restrictions()
+            if mode == "preview":
+                filters.run()
+        fresh = conditional_get(etag)
+        assert fresh["status"] == 200
+        assert fresh["etag"] != etag
+        etag = fresh["etag"]
+        expect(visible_row).to_be_visible()
+        if restrict:
+            expect(restricted_row).to_have_count(0)
+        else:
+            expect(restricted_row).to_be_visible()
 
 
 # @matrix filters : category entity-condition run-results
@@ -704,15 +850,15 @@ def test_saved_in_progress_filter_refreshes_after_reconnect(
     root = user.locate("[lp-view]")
     expect(root).to_have_attribute("data-key", filter_key)
     expect(root).to_have_attribute("data-poll-channel", "tasks")
+    expect(root).to_have_attribute("data-poll-entity-revision", re.compile(r".+"))
     expect(root).to_have_attribute("data-fingerprint", re.compile(r".+"))
-    expect(root).to_have_attribute("data-poll-revision", re.compile(r".+"))
 
     filtered_row = user.locate(f"#table tbody tr[data-key='{task.key}']")
     expect(filtered_row).to_be_visible()
 
     with expect_poll_result(
         user.page,
-        subscription_id="view:channel:tasks",
+        subscription_id=f"view:entity:{filter_key}",
     ):
         with expect_reconnect_refresh(user, browser_failures):
             task.mark_completed()

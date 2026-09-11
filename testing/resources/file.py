@@ -52,7 +52,7 @@ class File(SiteResource):
     INFO_NAME = "input[name='name']"
     INFO_DESCRIPTION_FIELD = "#description"
     INFO_DESCRIPTION = "textarea[name='description']"
-    INFO_PAGES = "[data-role='pages']"
+    INFO_OWNER = "[data-role='owner']"
 
     # Text tab
     TEXT_CONTENT = "[data-widget='TextContent']"

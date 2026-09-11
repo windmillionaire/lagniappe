@@ -19,7 +19,7 @@ import json
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions.asset import AssetVisibility, LARGE_ASSET_BYTES
-from lagniappe.core.definitions.permissions import Action, Resource
+from lagniappe.core.definitions.permissions import Action, Resource, Restriction
 from lagniappe.core.tools.files.html import strip_tags
 from smartypants import smartypants
 
@@ -56,7 +56,10 @@ class TestUser:
 
     @property
     def properties(self):
-        restrictions = SimpleNamespace(belongs_to=self.db.get("belongs_to", []))
+        restrictions = SimpleNamespace(belongs_to=(
+            Restriction.BELONGS_TO_ALL if self.is_owner
+            else self.db.get("belongs_to") or Restriction.BELONGS_TO_NONE
+        ))
         return SimpleNamespace(restrictions=restrictions)
 
     def has_permission(self, resource, action=Action.ALL):
@@ -398,6 +401,11 @@ class TestEntityMixin:
             self.db["assigned_to"] = user_page.key
             self.properties.assigned_to._value = user_page
 
+        if "form" in self.properties and "form" in test_spec:
+            self.properties.form.value = TestEntities.get("FORM", test_spec["form"])
+        if self.entity_kind in {"form", "page"} and "groups" in test_spec:
+            self.properties.groups.value = [TestEntities.get("USER_GROUP", group) for group in test_spec["groups"]]
+            self.properties.restricted_to.materialize(admin_only=False)
         if "restricted_to" in test_spec:
             self.db["restricted_to"] = list(test_spec["restricted_to"])
 
@@ -622,16 +630,6 @@ class TestEntityMixin:
                 self.properties.categories._value = []
             if hasattr(self.properties.categories, "_all_categories"):
                 self.properties.categories._all_categories = None
-
-    @property
-    def pages(self):
-        """For FILE entity - returns list of Page entities this file is attached to."""
-        self.properties.pages._value = (
-            [TestEntities.get("PAGE", page) for page in self.test_spec["pages"]]
-            if "pages" in self.test_spec
-            else []
-        )
-        return super().pages
 
     @property
     def parent(self):

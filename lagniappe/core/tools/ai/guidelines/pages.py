@@ -21,6 +21,12 @@ REPORT_DOCUMENT_GUIDELINES = """
   beyond the name, description, and form fields.
 - Write ordinary Markdown. Trusted application code converts it through the
   shared sanitized, editor-compatible renderer before execution.
+- Use create_page.document_markdown for a new Page, or append_page_document
+  for an existing Page's document (including a missing document). For an append,
+  read the existing content and supply only the requested addition, never a
+  rewritten copy. Arbitrary replacement/deletion is not supported.
+- The server begins each new document/addition with a source and UTC timestamp
+  quote. Do not invent or supply that header yourself. Manual editing is unchanged.
 - Use headings, paragraphs, emphasis, links, block quotes, tables, fenced code,
   and Markdown task lists when they improve the document. Do not hand-author
   HTML.

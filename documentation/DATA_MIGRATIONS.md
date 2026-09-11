@@ -70,6 +70,34 @@ Site Settings summarizes the catalog as:
 Completed release groups are collapsed. Incomplete groups show attempts,
 repairs, errors, and links to the affected application surface.
 
+File-ownership (`FIL-001`, `FIL-002`) failures link to the affected File, using its display
+name or filename when available. Saved failures from builds that recorded only
+keys gain those links when Site Settings loads, without rerunning the migration
+or rewriting audit history. Only old unlinked failures require a bounded batch
+of file-name reads; missing files retain an “Open file” link.
+
+The 2.0 follow-up migrations are append-only. `FIL-002` persists a Task File's
+current Page in the unindexed `task_page` relation and removes its direct `page` link. A directly
+attached File keeps `page` and has neither `task` nor `task_page`. The migration
+normalizes legacy TaskHistory ownership to the live Task, recalculates stale
+`task_page` values, and preserves private staged uploads without inferring an
+attachment from that derived field. An interim singular `task`/`page` pair that
+matches the Task's Page becomes `task`/`task_page`; conflicting direct ownership
+still requires repair. The preceding `FIL-001` resolves legacy plural
+`pages`/`tasks` references and reports multiple attachments, including a Page and
+a Task on that same Page, without discarding either reference.
+
+`RST-002` sorts and deduplicates local Form/Page
+restriction arrays, removes the old owner bypass token, and converts owner-only
+settings to admin-only. Page and Form arrays remain independent local sources;
+their effective restrictions combine at load and cache projection time. The
+migration never stores inherited Form groups on a Page. Refresh Cache after
+both migrations complete so cached permissions and fingerprints use the new
+representations. Stop ordinary traffic and older app processes before deploying
+this change. **Refresh Cache** fully clears the existing cache, recreates its
+indexes, and reloads all entities; complete it after **Apply Updates** and before
+reopening traffic. Startup alone does not replace old permission projections.
+
 ## When a migration is required
 
 Add a migration when a release changes the stored shape or meaning of durable
@@ -121,13 +149,30 @@ kind and `type`, include inactive and history rows when relevant, and keep
 writes within `MIGRATION_CHUNK_SIZE`. Batch relation reads instead of fetching
 one related entity per record.
 
-Entity-specific runners provide a reference callback so every repair and error
-can link to a form, page, file, or settings surface. Internal failures use a
-stable key and an actionable message.
-
 A runner may continue examining unrelated records after one record fails. The
 catalog itself is fail-stop: a failed entry is checkpointed, later entries do
 not run, and a retry resumes at that entry.
+
+### Make diagnostics actionable
+
+Every entity-specific failure or repair must include a link to the affected
+application screen, using `scan_kind(..., reference=...)` or equivalent structured
+detail metadata (`url` and `link_label`). Use the record's display name or filename
+when available, with a readable fallback such as “Open file.” Keep the raw key in
+the audit detail for diagnostics; it must not be the only way an operator can
+identify or reach the record.
+
+Choose a destination that remains usable with the malformed data being reported
+and gives the operator a way to inspect or repair it. If the normal record screen
+cannot handle that state, link to an appropriate repair or settings screen instead.
+Internal failures without a record should explain the corrective action and link
+to relevant settings when applicable.
+
+Saved failures must benefit from diagnostic improvements too. When older attempt
+details contain only keys, add safe links in the status projection without
+requiring another migration run or rewriting audit history. Batch and bound any
+extra reads needed for readable labels. Preserve diagnostic text as text when
+rendering labels and messages.
 
 ### Design for an in-progress deployment
 
@@ -149,8 +194,10 @@ Cover at least:
 - discovery of all intended kinds, types, inactive rows, and history rows;
 - ordered checkpointing, fail-stop behavior, and retry;
 - completion remaining current under a later build;
-- fresh-install baselining; and
-- bounded attempt details with actionable references.
+- fresh-install baselining;
+- bounded attempt details with readable links for failures and repairs, including
+  older saved failures when adding link support; and
+- a usable link destination for the malformed state being reported.
 
 Use focused unit tests and add route or frontend coverage when the response
 envelope or Maintenance UI changes. Follow

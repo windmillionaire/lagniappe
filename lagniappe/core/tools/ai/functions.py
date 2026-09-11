@@ -19,6 +19,7 @@ Provides tools that let the AI query the app's data at generation time:
 - get_guidelines: retrieve detailed prompt guidelines on demand
 """
 
+from copy import deepcopy
 import json
 
 from google.genai import types
@@ -42,6 +43,7 @@ from .function_definitions import (
 )
 from .debug import ai_debug, debug_log
 from .references import normalize_hash_references
+from .function_definitions.output_schemas import OUTPUT_SCHEMAS, RESULT_PATHS
 
 # Default for direct tool-enabled prompts without a workflow-specific limit.
 MAX_TOOL_ITERATIONS = 12
@@ -134,6 +136,8 @@ TOOL_DEFINITIONS = {
         "name": name,
         "description": declaration.description or "",
         "input_schema": _provider_schema_to_json(declaration.parameters),
+        "output_schema": OUTPUT_SCHEMAS[name],
+        "result_paths": RESULT_PATHS[name],
     }
     for name, declaration in DECLARATIONS.items()
 }
@@ -142,11 +146,32 @@ TOOL_DEFINITIONS = {
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_tool_catalog_and_dispatch_share_registered_tools
 # @matrix agent-api ai : provider-neutral-schema tool-catalog
-def tool_catalog(*, transport=None):
+def tool_catalog(*, names=None, names_only=False, transport=None):
     """Return the provider-neutral catalog used by external tool clients."""
+    selected = list(DECLARATIONS) if names is None else list(dict.fromkeys(names))
+    unknown = [name for name in selected if name not in DECLARATIONS]
+    if unknown:
+        raise ValueError(f"Unknown tool names: {', '.join(unknown)}")
+    if names_only:
+        return selected
     catalog = []
-    for name in DECLARATIONS:
+    for name in selected:
         definition = TOOL_DEFINITIONS[name]
+        if transport == "rest" and name == "search_entities":
+            definition = {
+                **definition,
+                "description": search.CANDIDATE_SEARCH_DESCRIPTION,
+                "input_schema": deepcopy(definition["input_schema"]),
+            }
+            definition["input_schema"]["properties"]["parent_id"]["description"] = (
+                'Optional viewable Category hash token when kinds is exactly ["page"]. '
+                "Applies to keyword candidates and exact-name lookup."
+            )
+            definition["input_schema"]["properties"]["match_mode"]["description"] = (
+                "keywords returns bounded ranked candidates and may relax sparse "
+                "multiword queries; exact_name requires normalized full-name "
+                "equality. Defaults to keywords."
+            )
         if transport == "rest" and name == "get_file":
             definition = {
                 **definition,
@@ -164,7 +189,10 @@ def tool_catalog(*, transport=None):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_tool_catalog_and_dispatch_share_registered_tools
 # @matrix agent-api ai : permission-context provider-neutral-dispatch tool-registry
-def execute_registered_tool(name, args, user):
+# @tests tests_unit/test_032d_external_guidance.py::test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow
+# @tests tests_unit/test_032d_external_guidance.py::test_external_search_dispatch_selects_candidates_without_changing_provider_default
+# @matrix ai agent-api : guidelines tool-dispatch
+def execute_registered_tool(name, args, user, *, external=False):
     """Execute one registered read tool without constructing provider parts."""
     if name not in HANDLERS:
         return {"error": f"Unknown function: {name}"}, []
@@ -172,7 +200,12 @@ def execute_registered_tool(name, args, user):
         return {"error": "Tool arguments must be a JSON object."}, []
 
     normalized_args = normalize_hash_references(args)
-    result = HANDLERS[name](normalized_args, user)
+    if external and name == "get_guidelines":
+        result = get_guidelines.execute_external_get_guidelines(normalized_args, user)
+    elif external and name == "search_entities":
+        result = search.execute_search(normalized_args, user, candidate_search=True)
+    else:
+        result = HANDLERS[name](normalized_args, user)
     if isinstance(result, tuple):
         result, file_parts = result
     else:

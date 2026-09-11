@@ -30,6 +30,12 @@ rejected. Every App Engine deploy command also names the saved target project
 explicitly. Interactive setup replaces gcloud's verbose successful-deployment
 transcript with one long-running progress line, retains the provider output on
 failure, and finishes with Lagniappe's exact saved application URL.
+MCP build/deploy messages respect that quiet progress mode; its ready/disabled
+summary is printed only after the deployment spinner has finished. Success is
+a standard green checked “MCP server is ready” line, without the endpoint URL;
+connection details remain available in the app's external-AI instructions. Routine
+service-account reconciliation and individual restored-image filenames are
+silent; provider retries and restore warnings remain visible.
 
 ## Release preparation
 
@@ -38,10 +44,13 @@ Freeze the release tree, then create one canonical build:
 ```bash
 npm ci
 npm run build
+git add -A
+git commit -m "Release Candidate X.Y.Z"
 venv/bin/python run.py release-check --base origin/main
 ```
 
-Commit the complete source and generated release output. `release-check`
+Review and commit the complete source and generated release output.
+`release-check`
 requires a `next/*` or `hotfix/*` candidate, rejects installation-local files,
 and checks that package metadata, lockfile, production build metadata,
 `BUILD_ID`, settings version, and release note agree on one `X.Y.Z` version.
@@ -59,9 +68,17 @@ cannot publish release attestation. See
 ## App Engine upload boundary
 
 `.gcloudignore` root-anchors local directories such as `/testing/`,
-`/installer/`, and `/runner/`. Keep those patterns root-anchored so nested
-runtime packages are not excluded. `config/files/` is excluded, then only
-`lagniappe_settings.yaml` and optional `redis_ca.pem` are included.
+`/installer/`, `/runner/`, `/testing_ai_workflows/`, and the MCP `/mcp/` source tree. Keep
+those patterns root-anchored so nested runtime packages are not excluded.
+`config/files/` is
+excluded, then only `lagniappe_settings.yaml` and optional `redis_ca.pem` are
+included.
+
+Cloud Build images use their own explicit ignore files. The hosted-E2E image
+includes the shared adapter source and installs its locked environment; its final
+stage does not contain uv or pipx. The remote MCP image uses a smaller allowlist
+containing only the adapter libraries, package inputs, and container definition.
+Neither build context includes private workflow artifacts or application secrets.
 
 `config/constants.py` is the template source for App Engine handlers. Keep
 specific static handlers before broad ones:
@@ -76,6 +93,181 @@ without starting Gunicorn. Because App Engine static handlers cannot set 404
 status, Flask routes requiring exact status must remain in the dynamic
 allowlist. Tooling checks keep route prefix constants aligned with blueprint
 registration.
+
+## Remote MCP service
+
+MCP is an optional component of the installation, managed by `installer/mcp.py`
+through the ordinary `runner.deploy.deploy` path. Select it in the AI section
+of setup, during source upgrade when no external-AI choice has been saved, or
+later with `./setup.sh ai`. Selecting external AI enables both
+MCP and the direct API/skill; disabling external AI closes both. Disabling AI
+closes built-in generation and external access together.
+
+### Installation and update order
+
+1. Validate the normal app build and generated configuration. If MCP is selected,
+   check the deployer's provisioning permissions and reconcile the dedicated
+   service/build accounts, Artifact Registry repository, private build-source
+   bucket, OAuth TTL and App Engine authorization-request log exclusion.
+2. Compute the MCP source fingerprint. Reuse a matching image or build it with
+   Cloud Build. On first installation, create a **disabled** Cloud Run service
+   and read its canonical `status.url`; this does not require a running app.
+3. Save that URL plus `/mcp` as `MCP_RESOURCE`, the runtime identity as
+   `MCP_SERVICE_ACCOUNT`, and desired `MCP_VERSION` in application settings.
+   The issuer derives from `CUSTOM_DOMAIN` or `APP_URL`. Publish App Engine normally.
+4. Only after App Engine succeeds, enable/update the Cloud Run revision and
+   verify its readiness, traffic, runtime identity, image version and environment.
+   An unchanged service skips both the build and revision deployment.
+
+This ordering is shared by normal installation, `setup.sh update`, source
+upgrade, recovery/repair, handoff, and `run.py deploy`. The main app is deployed
+once. Cloud Build builds an image; the installer then deploys that image. A
+failed app deployment leaves the prepared MCP service disabled, or the previous
+service revision in place. A failed MCP activation returns an error even though
+the app may already be available. Retry with `./setup.sh mcp`; completed resources
+and images are reused. That focused command asks `Deploy app now [y/N]`, then
+publishes the matching app configuration using the normal prebuilt-app path.
+Declining skips deployment and MCP reconciliation.
+If initial setup defers app deployment, its final instructions include this
+command after manual app setup.
+
+`MCP_VERSION` is a SHA-256 fingerprint (first 32 hexadecimal characters) of the
+service source, container/locked build inputs and managed runtime arguments. It is desired state,
+not a claim that deployment succeeded. Cloud Run's `lagniappe-mcp-version` label
+and current ready revision provide deployed state. App-only changes do not
+change this fingerprint. `setup.sh doctor` checks the selected endpoint and
+version without changing cloud resources. There is no wheel release or manual
+version bump.
+
+### Resources, identity and build boundary
+
+An existing MCP service may predate the managed build-source bucket and build
+identity. A normal upgrade provisions missing build resources without changing
+the canonical MCP endpoint. A confirmed bucket-not-found response is eligible
+for creation; permission failures and ambiguous provider errors stop deployment.
+The running service uses its deployed image, not the build-source bucket.
+Bucket ownership checks request raw Storage API metadata because gcloud's
+default display omits the project number. Missing ownership metadata stops
+deployment separately from a confirmed project mismatch.
+
+The component runs in the owner's existing Google Cloud project and resource
+region. Setup creates the MCP runtime and build accounts there, records each
+successful creation, and waits with bounded backoff for IAM readback before
+applying their roles. A missing readback immediately after creation is retried;
+permission failures stop provisioning. Later runs reuse accounts already found.
+Standard resource names are:
+
+| Resource | Name / purpose |
+| --- | --- |
+| Cloud Run service | `lagniappe-mcp` |
+| Artifact Registry Docker repository | `lagniappe-mcp` |
+| Runtime account | `lagniappe-mcp@PROJECT.iam.gserviceaccount.com`; a saved exact account is preserved |
+| Build account | `lagniappe-mcp-build@PROJECT.iam.gserviceaccount.com` |
+| Private build-source bucket | `PROJECT-mcp-builds` |
+| Firestore TTL | `mcp_oauth.expires_at` |
+| `_Default` log-sink exclusion | `remote-mcp-oauth-query`; excludes App Engine OAuth request URLs and referrers |
+
+Account names above are defaults. The app runtime/internal-caller account, MCP
+runtime account and MCP build account must remain distinct. If a default name
+collides, setup selects a numbered suffix (`-2`, then `-3`, as needed). A saved
+MCP runtime account is retained unless it is also an application account; normal
+MCP deployment repairs that collision by saving and deploying a separate MCP
+identity. It preserves the app's account and permissions and the canonical MCP
+URL. The same account selection is used for provisioning, inspection and handoff.
+
+The OAuth exclusion checks both request-URL fields (`protoPayload.resource`,
+`httpRequest.requestUrl`) and referrer fields (`protoPayload.referrer`,
+`httpRequest.referer`). Navigation to an ordinary page can carry authorization
+parameters in its referrer even though that page's own URL contains none.
+Reconciliation upgrades the named exclusion in place, re-enables it if needed,
+and preserves unrelated exclusions. Keep the consent endpoint's same-origin
+referrer policy for CSRF validation; the logging exclusion provides protection
+before entries are stored by the default sink. Updating this filter affects new
+log entries, not entries already retained. Verify with synthetic OAuth referrers and ordinary control
+requests without copying real authorization parameters into diagnostic output.
+[Sink changes can take a few minutes to apply](https://docs.cloud.google.com/logging/docs/export/configure_export_v2).
+Confirm the saved filter, then send fresh probes after propagation; retained
+ordinary controls distinguish exclusion from missing or delayed request logs.
+
+The installer uses the existing project Owner/delegated-installer convention.
+It checks the additional Cloud Run, Cloud Build, Artifact Registry, service
+account, bucket, logging and TTL provisioning permissions before creating
+resources. Scope `serviceAccountUser` to the two accounts, repository management
+to the image repository, bucket management to the build bucket, and Run
+management to the service. Owner handoff grants those exact resources to the
+permanent Owner and removes the installer's direct bindings before removing
+the installer's project role. No service-account keys are generated.
+
+The build account gets Artifact Registry writer and staging-bucket object viewer
+on those resources, plus project log writer. Cloud Build uses
+`CLOUD_LOGGING_ONLY`, as required for this
+[user-managed build identity](https://docs.cloud.google.com/build/docs/securing-builds/configure-user-specified-service-accounts).
+The runtime account needs no direct Datastore or Storage role: every request
+carries the user's OAuth token and the runtime Google identity to the main API,
+which checks both. Upload sessions authorize individual transfers.
+
+`mcp/gcloudignore` allows only the service source and build inputs into the
+build bucket; application settings, keys, tests, local environments and workflow
+fixtures are excluded. The container uses its locked Python/uv dependencies,
+runs as non-root, and strips test/build dependencies. It does not contain the
+Flask app or its configuration. The Cloud Run service scales to zero, with a
+maximum of two instances, concurrency four, and 1 GiB for temporary upload spools.
+It is publicly invokable at the network layer; application OAuth protects tools.
+Its health path is `/health`. Use the canonical `status.url` for OAuth even if
+another Cloud Run hostname also works.
+
+### Disabling and clients
+
+After the app is deployed with `AI_ENABLED: false` or
+`EXTERNAL_AI_ENABLED: false`, its API, API-key issuance, OAuth metadata and
+OAuth requests reject access, including previously issued credentials. The
+normal deploy then disables an existing Cloud Run endpoint. Resources and
+credentials are retained, so re-enabling can reuse them; use account-level
+revocation when credentials must remain revoked. Saved reports and ordinary
+workspace editing remain available within normal permissions.
+
+Users add the MCP URL shown in the signed-in AI manual, then authorize with an
+eligible Lagniappe account. The account's workspace permissions still apply;
+its email need not match the agent account. Eligible active non-public users
+may connect without an installation-specific actor list. No local
+MCP package or upload helper is installed.
+
+The AI Integration manual includes ChatGPT desktop/web plugin setup: enable
+Developer mode in Settings → Security and login, open Plugins, add a connection
+with the installation's saved `MCP_NAME` and full `MCP_RESOURCE`, and authorize
+with an eligible Lagniappe account. Availability follows the ChatGPT account
+and workspace policy. See OpenAI's
+[connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt).
+
+For Codex, configure the server URL and fixed public client. This example
+assumes setup saved `MCP_NAME: cwright-mcp`:
+
+```bash
+codex mcp add cwright-mcp --url https://MCP-ENDPOINT/mcp --oauth-client-id lagniappe-codex
+codex mcp login cwright-mcp
+```
+
+The AI Integration manual gives signed-in non-public users the setup command
+using `MCP_NAME` and `MCP_RESOURCE` when external AI and MCP are configured, so
+the copied command needs no edits. Public readers see placeholders
+and must obtain the installation's MCP URL and an eligible account. The add
+command can start sign-in automatically; use login if needed or to reconnect,
+then restart existing Codex sessions. OAuth uses current workspace permissions
+without scope negotiation; no `--scopes` option is needed.
+The name is the local Codex registration key; the fixed OAuth client ID remains
+`lagniappe-codex`. `./setup.sh ai` can change the saved name used for future
+connections. Codex in the ChatGPT desktop app shares the CLI's local MCP
+configuration; ChatGPT web uses its separately authorized plugin connection.
+
+A `tool_timeout_sec` of 300 and `startup_timeout_sec` of 60 accommodate uploads
+and startup. `required = true` makes missing initialization visible; it does not
+force the model to choose MCP tools. Restart a client after changing its tool
+catalog. See the [official MCP guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+
+The [implementation overview](EXTERNAL_AI_IMPLEMENTATION.md) records the
+development history and remaining verification boundary; the
+[remote comparison](../testing_ai_workflows/comparisons/remote-mcp-pilot-20260905.md)
+preserves reviewed trial outcomes and measurements.
 
 ## Scaling and runtime settings
 
@@ -137,6 +329,10 @@ missing runtime requirement or excluded local import stops an update before it
 changes remote resources.
 
 Use it for maintained forks and local source changes.
+Declining deployment after update or upgrade prints
+`Deploy when ready: ./setup.sh update`. That managed deployment includes jobs and monitoring;
+separate follow-up commands are only needed for a manual publish or a reported
+reconciliation failure.
 
 ## Source upgrade
 
@@ -150,6 +346,12 @@ The command resolves one exact fetched commit and reads its committed
 rehearsal. It names that exact replacement target and requires confirmation.
 Ignored installation configuration and untracked files remain. Maintained
 forks should merge the desired release themselves and run `update`.
+
+When the installation has no saved `EXTERNAL_AI_ENABLED` choice, source upgrade
+runs the AI feature questions before offering deployment. Choosing external AI
+provisions MCP as part of that deployment; no separate AI command is needed.
+Saved choices are preserved on subsequent upgrades. Ordinary `update` does not
+introduce these questions or implicitly opt a legacy installation into MCP.
 
 When the target crosses a major-version boundary, the deployment prompt states
 that setup does not run application migrations and lists the required

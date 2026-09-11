@@ -224,8 +224,9 @@ export class PageTaskList extends BaseList {
 	}
 
 	/**
-	 * @testable infrastructure
-	 * @covered-by src/script/views/base/core.mjs::Core._collectRefreshTargets
+	 * @testable true
+	 * @tests tests_js/test_022_refresh_frontend.py::test_collection_manifests_include_hash_and_fingerprint
+	 * @matrix reconnect-refresh : manifest
 	 */
 	refreshDescriptor() {
 		if (
@@ -240,7 +241,8 @@ export class PageTaskList extends BaseList {
 				this.target.querySelectorAll("li[lp-entity][data-kind='task']"),
 				(task) => ({
 					key: task.dataset.key,
-					modified: task.dataset.modified || "",
+					hash: task.dataset.hash || "",
+					fingerprint: task.dataset.fingerprint || "",
 				}),
 			),
 		};
@@ -379,8 +381,8 @@ export class PageTaskList extends BaseList {
 
 		newTasks.forEach((elt, id) => {
 			if (existingTasks.has(id)) {
-				const existingModified = existingTasks.get(id).dataset.modified;
-				if (existingModified !== elt.dataset.modified) {
+				const existingFingerprint = existingTasks.get(id).dataset.fingerprint;
+				if (existingFingerprint !== elt.dataset.fingerprint) {
 					this._replaced.push({ from: existingTasks.get(id), to: elt });
 				}
 			} else {

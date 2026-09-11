@@ -1,0 +1,4 @@
+interface:
+  display_name: "Export Chat"
+  short_description: "Export this Codex chat with session stats"
+  default_prompt: "Use $export-chat to save this chat and its session statistics in the current directory."

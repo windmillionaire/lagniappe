@@ -4,6 +4,10 @@ This module provides the entry point for configuring AI settings,
 including zero data retention mode.
 """
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
+from runner.console import format_prompt
 from runner.context import setup_command
 from installer import FORMATTER, wrap_text
 from .package_install import install_if_missing
@@ -33,7 +37,11 @@ def _get_access_token():
     )
     if not credentials:
         print(
-            f.error("Failed to get Application Default Credentials for Vertex AI.")
+            f.error(
+                wrap_text(
+                    "Failed to get Application Default Credentials for Vertex AI."
+                )
+            )
         )
         return None
 
@@ -66,8 +74,8 @@ def _api_request(session, method, url, headers, json_data=None, allow_codes=None
     if resp.status_code == 200 or resp.status_code in allow_codes:
         return resp, resp.json() if resp.text else {}
 
-    print(f.error(f"API request failed: {method} {url}"))
-    print(f.error(f"Status {resp.status_code}: {resp.text[:1000]}"))
+    print(f.error(wrap_text(f"API request failed: {method} {url}")))
+    print(f.error(f"Status {resp.status_code}", resp.text[:1000]), raw=True)
     return None
 
 
@@ -76,12 +84,14 @@ def _api_request(session, method, url, headers, json_data=None, allow_codes=None
 # @reason manual fallback instructions for the AI cache setup flow
 def print_ai_cache_instructions(project_id):
     """Print a portable Python retry command for AI caching."""
-    f = FORMATTER.initialize()
+    FORMATTER.initialize()
     print(
-        f"\n{f.warning('Fix Application Default Credentials for project ')}"
-        f"{project_id}, then retry the Python setup mode:"
+        wrap_text(
+            f"\n{ui.info('Fix Application Default Credentials for project ')}"
+            f"{project_id}, then retry the Python setup mode:"
+        )
     )
-    print(setup_command("ai"))
+    print(ui.literal(setup_command("ai")))
 
 
 # @testable true
@@ -98,21 +108,21 @@ def _configure_ai_cache(sp):
 
     project_id = SETTINGS.GCLOUD_CONFIG.get("PROJECT")
     if not project_id:
-        sp.write(f.error("Google Cloud Project ID not found"))
-        sp.fail(f.fail_glyph)
+        sp.write(f.error(wrap_text("Google Cloud Project ID not found")))
+        sp.fail()
         return False
 
     try:
         access_token = _get_access_token()
     except Exception as e:
-        print(f.error(f"Failed to obtain access token:\n{str(e)}"))
+        print(f.error("Failed to obtain access token", e), raw=True)
         print_ai_cache_instructions(project_id)
-        sp.fail(f.fail_glyph)
+        sp.fail()
         return False
 
     if not access_token:
         print_ai_cache_instructions(project_id)
-        sp.fail(f.fail_glyph)
+        sp.fail()
         return False
 
     headers = {
@@ -131,18 +141,16 @@ def _configure_ai_cache(sp):
 
     if _api_request(session, "PATCH", cache_url, headers, payload) is None:
         print_ai_cache_instructions(project_id)
-        sp.fail(f.fail_glyph)
+        sp.fail()
         return False
 
-    print(f.success("AI data caching disabled successfully."))
+    sp.ok("AI data caching disabled")
     print(
         wrap_text(
-            "Vertex AI prompt caching is now disabled for this project. Review "
-            "Google Cloud's zero data retention guidance for the remaining "
+            "Review Google Cloud's zero data retention guidance for the remaining "
             "provider settings."
         )
     )
-    sp.ok(f.ok_glyph)
     return True
 
 
@@ -157,13 +165,32 @@ def configure_ai():
     prepare_existing_installation()
 
     from config import SETTINGS
-    from installer.optional import configure_ai_observability
+    from installer.optional import configure_ai_features
+    from installer.utils import deploy_to_app_engine
+    from runner.context import setup_command
 
     f = FORMATTER.initialize()
 
-    print(f"\n{f.info('AI Configuration for Lagniappe')}")
-    print("=" * 40)
-    print("\nThis will configure Vertex AI data retention settings.")
+    print(wrap_text(f"\n{ui.heading('AI configuration')}"))
+    enabled = configure_ai_features()
+    if not enabled:
+        if (
+            input(
+                format_prompt("Deploy the AI access policy now? [Y/n]: ")
+            ).casefold()
+            != "n"
+        ):
+            deploy_to_app_engine(print_final_summary=False)
+            print(ui.success("AI access policy deployed"))
+        else:
+            print(
+                (
+                    "Saved locally. Apply the policy with "
+                    f"{ui.literal(setup_command('update'))}."
+                )
+            )
+        return 0
+    print(wrap_text("\nThis will configure Vertex AI data retention settings."))
     print(
         wrap_text(
             "Disabling data caching is one step toward zero data retention for "
@@ -172,20 +199,35 @@ def configure_ai():
     )
 
     print(
-        f"\n{f.warning('Note: Disabling caching may result in slightly slower responses.')}"
+        wrap_text(
+            f"\n{f.warning('Disabling caching may result in slightly slower responses.')}"
+        )
     )
 
     consent = input(
-        f"\n{f.info('Disable AI data caching as a zero-retention control? [y/N]: ')}"
+        format_prompt(
+            f"\n{'Disable AI data caching as a zero-retention control? [y/N]: '}"
+        )
     )
     if consent.lower() == "y":
-        feedback_text = f.success("Disabling AI data caching")
-        with f.yaspin(text=feedback_text) as sp:
+        feedback_text = ui.info("Disabling AI data caching")
+        with f.progress(text=feedback_text) as sp:
             if not _configure_ai_cache(sp):
                 return 1
     else:
-        print(f.success("Vertex AI cache configuration unchanged."))
+        print(ui.status(wrap_text("Vertex AI cache configuration unchanged.")))
 
-    configure_ai_observability()
     SETTINGS.save()
+    if (
+        input(
+            format_prompt("Deploy the AI access policy now? [Y/n]: ")
+        ).casefold()
+        != "n"
+    ):
+        deploy_to_app_engine(print_final_summary=False)
+        print(ui.success("AI access policy deployed"))
+    else:
+        print(
+            f"Saved locally. Apply the policy with {ui.literal(setup_command('update'))}."
+        )
     return 0

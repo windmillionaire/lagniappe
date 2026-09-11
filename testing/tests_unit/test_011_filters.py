@@ -287,7 +287,7 @@ def test_filter_related_entities_allowed_checks_referenced_entities():
 
 # @matrix filter permissions : model-task related-entities restricted-access saved-filters
 @pytest.mark.unit
-def test_filter_related_entities_allowed_checks_model_task_form_restrictions():
+def test_filter_related_entities_allowed_keeps_model_and_form_access_separate():
     viewer = UtilityTestUser(
         owner=False, permissions={"models": "VIEW", "forms": "VIEW"}
     )
@@ -311,7 +311,11 @@ def test_filter_related_entities_allowed_checks_model_task_form_restrictions():
     filter_entity = FilterEntity(testing=True)
     filter_entity.related = [model]
 
-    assert not model.allowed(Action.VIEW, user=viewer)
+    assert not model.form.allowed(Action.VIEW, user=viewer)
+    assert model.allowed(Action.VIEW, user=viewer)
+    assert filter_entity.related_entities_allowed(viewer)
+
+    filter_entity.related = [model, model.form]
     assert not filter_entity.related_entities_allowed(viewer)
 
 

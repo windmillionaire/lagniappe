@@ -82,7 +82,7 @@ class Filter(Entity):
 
     # @testable true
     # @tests tests_unit/test_011_filters.py::test_filter_related_entities_allowed_checks_referenced_entities
-    # @tests tests_unit/test_011_filters.py::test_filter_related_entities_allowed_checks_model_task_form_restrictions
+    # @tests tests_unit/test_011_filters.py::test_filter_related_entities_allowed_keeps_model_and_form_access_separate
     # @matrix filter permissions : model-task related-entities restricted-access saved-filters
     def related_entities_allowed(self, user=None):
         user = current_context_user(user)

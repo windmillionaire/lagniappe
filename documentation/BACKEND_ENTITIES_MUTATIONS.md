@@ -19,6 +19,13 @@ entity-kind planner under `lagniappe/core/mutations/` and produces a
 Every entity passed directly to `Entities.save(*entities)` is a complete root
 write. Lifecycle properties, requirements, process serialization, and the full
 `exclude_from_indexes` set are prepared by the executor.
+If a dependency touch carries a different instance of the same entity, the
+complete root save supplies the authoritative instance for both the durable
+write and cache refresh, regardless of planning order. A shallow dependency
+copy must never replace the complete root's fields or permission requirements.
+Dependency ordering tracks completed entity keys and removes each ready write
+by object identity. Mutation-effect equality excludes its entity and dependencies,
+so equal-looking effects for different roots must remain distinct.
 
 An entity may declare `retired_fields` for obsolete stored keys. The executor
 discards those keys while preparing any otherwise-requested complete save,
@@ -73,6 +80,12 @@ its ModelTasks and orphaned Forms. Non-owning references are not rewritten by
 an unrelated delete unless the mutation contract declares that survivor
 effect.
 
+Category deletion preserves Pages that still belong to another Category and
+deletes those with no remaining Category. Decide this before removing the
+Category: ordinary Page category removal can assign the Uncategorized Pages
+fallback. Surviving Page repairs persist both `categories` and `model` so a
+deleted model Category cannot remain as a stale durable reference.
+
 ## Mutation contracts
 
 `core/definitions/mutation_contracts.py` is the machine-readable inventory for
@@ -108,11 +121,16 @@ Reads are explicit about the total graph promised to a consumer:
 | `Fetch.direct()` | Roots and their direct relations. | At most 1. |
 | `Fetch.nested(because=...)` | Roots, direct relations, and their relations. | At most 2. |
 
+Starting from keys adds one root-loading batch. Nested fetching stops after two
+relationship levels: at most three batches from keys, or two from loaded roots.
+
 Nested reads require a registered `FetchReason`. Request authentication loads
-the session User, user Page, and requested entity as roots with
-`Fetch.direct()`. A handler that genuinely needs another level re-fetches the
-typed entity at the point of use. Attached relations are reused, so only
-missing second-level keys need another batch.
+the session User and user Page with `Fetch.direct()`. Task and File permission
+boundaries use `Fetch.nested()` so effective restrictions have their Page and
+Form dependencies loaded. History authorization resolves the live Task as a
+nested root, because its current Page can differ from the historical Page.
+Other handlers declare the graph needed at the point of use. Attached relations
+are reused, so only missing second-level keys need another batch.
 
 `DEBUG_TRACING` records the declared depth, reason, stage, key counts, and
 database read counts. Strict relation checks make an unplanned relation access
@@ -124,6 +142,18 @@ visible rather than allowing an implicit N+1 read.
 Changing a Page can touch its Category owners because their rendered Page lists
 changed. Those owners receive new fingerprints and ETags even though their own
 form fields did not change.
+
+Page/Form restriction changes and Page/Task attached-Form changes mark a pending
+permission-source invalidation. The source's full save advances the Tasks
+collection fingerprint in its Datastore batch and queues permission
+reconciliation after durable success. The pending marker survives commit
+failure for retry; incidental masked touches do not consume it.
+Page/Form save planners pass their already-resolved Category/Project owner keys
+to reconciliation so completion can refresh those lists without another owner
+query. Reconciliation supplements those hints with raw Category/Project keys
+from its root Page/Task batches, preserving their deduplicated union across
+continuations before the final touch. Finding these owners requires no relation
+expansion and does not depend solely on the Category's Form registry.
 
 Redis search/detail refresh, filter-index updates, cache invalidation, and blob
 deletion happen after durable success. The browser receives entity revisions
@@ -141,3 +171,34 @@ Trace the whole effect, not just the root method:
 5. Add focused unit coverage for commit failure, retry, and delete behavior.
 6. Run `mutation-contracts --check` and
    `venv/bin/python run.py traceability --changed --check`.
+
+## File ownership
+
+Direct Page attachments store `page`. Task attachments store `task` and the
+unindexed `task_page` ancestry key, with no direct `page`. File saves recalculate
+`task_page` from the Task and clear incompatible links; the primary link supplies
+File permissions and restrictions. Unattached upload/report Files stay private
+and unsearchable; `report_user` identifies the uploader allowed to view staged
+content. Task form uploads retain their signed, actor-and-scope-bound attachment
+claims until final attachment. A TaskHistory's `files` are non-owning references; the
+live Task remains the permission owner after a completion is archived. Removing
+a current attachment does not erase that ownership. `File.move_to()` updates
+current Task attachment lists and both owners' refresh intents.
+
+Report saves update the Report and its parent/user lists without touching input
+Files. Upload, summary, and execution operations save the Files they change.
+
+Deleting a Page or Task deletes its owned Files, including history-only Task
+attachments, and removes surviving history references. Combining Tasks transfers
+all owned Files before deleting the old Task. Moving a Task updates its owned
+Files' `task_page` and `requires` through masked writes. A pending Task move survives a
+failed durable commit for retry. Page Files tabs and the Page-only File delete
+cascade query `page` to select only direct Page attachments.
+
+Upgrade and repair steps are documented in
+[Durable Data Migrations](DATA_MIGRATIONS.md).
+
+File ownership updates use explicit empty `MutationIntent.depends_on` tuples
+for reverse links and owner touches. Those key-list writes do not depend on the
+File's computed fields; the File's `requires` calculation depends on its owner.
+Other patch/touch intents retain their default dependency on the emitting entity.

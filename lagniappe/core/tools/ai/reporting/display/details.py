@@ -4,6 +4,7 @@ REFERENCE_DETAIL_LABELS = frozenset(
     {
         "Category",
         "Entity",
+        "Target",
         "File",
         "Form",
         "From Page",

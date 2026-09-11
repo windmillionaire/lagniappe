@@ -3,9 +3,9 @@
 Permission decorators normally follow this pattern:
 1. Check authentication (401 if not logged in)
 2. Load the entity from the URL key (404 if missing)
-3. Set g.fingerprint for ETag caching on GET requests (304 if unchanged)
+3. Set g.fingerprint for ETag caching on GET requests
 4. Check permission (403 if denied)
-5. Pass the loaded entity to the route via ``entity=`` kwarg
+5. Return 304 if unchanged, otherwise pass the loaded entity via ``entity=`` kwarg
 
 Routes declared ``no_store=True`` set the response cache policy before loading
 authorization context and skip ETag handling entirely.
@@ -19,7 +19,8 @@ from flask import abort, current_app, g, redirect, request, session, url_for
 from flask_login import current_user
 
 from lagniappe import CONFIG
-from lagniappe.core.definitions import AI, Fetch
+from uuid import uuid4
+from lagniappe.core.definitions import AI, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
@@ -76,9 +77,14 @@ def _etag_fingerprint(base_fingerprint, user):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_invalidation_is_not_replayed_by_browser_http_cache
 # @matrix cache : etag missing-fingerprint standard-header
+# @matrix cache : invalidation conditional-response
 def _fingerprint_matches_etag():
     """Check if the client's If-None-Match header matches the current fingerprint."""
+    if session.get(LOGIN_INVALIDATE_CACHE_KEY):
+        # A 304 would merge a transient invalidation command into an older body.
+        return False
     if not getattr(g, "fingerprint", None):
         return False
     if request.headers.get("Range"):
@@ -113,10 +119,14 @@ def clear_login_session():
 # @pair login:invalidation
 def request_client_cache_invalidation(user=None, persist_user=False):
     """Mark this session response as requiring a client response-cache clear."""
-    session[LOGIN_INVALIDATE_CACHE_KEY] = True
     if user is not None and persist_user:
         user.invalidate_cache = True
         user.save()
+    session[LOGIN_INVALIDATE_CACHE_KEY] = (
+        f"user:{user.urlsafe_key}:{user.db.get('cache_invalidation_revision', 'legacy')}"
+        if user is not None and user.invalidate_cache
+        else f"session:{uuid4().hex}"
+    )
 
 
 # @testable false
@@ -157,7 +167,7 @@ def seed_login_session(user, invalidate_cache=False):
     session[LOGIN_USER_KEY] = user.urlsafe_key
     session[LOGIN_USER_PAGE_KEY] = user.page.urlsafe_key
     if invalidate_cache or getattr(user, "invalidate_cache", False):
-        request_client_cache_invalidation()
+        request_client_cache_invalidation(user)
 
 
 
@@ -278,37 +288,55 @@ def _load_session_user_context(entity_identifier=None):
 
     g._login_user = user
     if user.invalidate_cache:
-        request_client_cache_invalidation()
+        request_client_cache_invalidation(user)
     return current_user, entity
 
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_stale_preloaded_session_keys_fall_back_to_flask_login_user
+# @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_route_is_forbidden_without_model_or_page_permission
+# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell
 # @matrix auth : fallback session-preload
+# @matrix permissions : resource-gates
+# @pair embedded-table:table-cell-expand
 def _load_request_context(entity_identifier=None):
     user, entity = _load_session_user_context(entity_identifier)
-    if user:
-        return user, entity
+    if not user:
+        user = current_user
+        if user.is_authenticated:
+            seed_login_session(user)
 
-    if getattr(current_user, "is_authenticated", False):
-        seed_login_session(current_user)
+        entity = (
+            Entities.fetch_one(entity_identifier, request=Fetch.direct())
+            if entity_identifier else None
+        )
 
-    loaded = (
-        Entities.fetch(entity_identifier, request=Fetch.direct())
-        if entity_identifier
-        else []
-    )
-    entity = loaded[0] if loaded else None
-    return current_user, entity
+    if user.is_authenticated:
+        if isinstance(entity, (Entities.TASK, Entities.FILE)):
+            Entities.fetch(
+                entity,
+                request=Fetch.nested(
+                    because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION,
+                ),
+            )
+        elif isinstance(entity, Entities.TASK_HISTORY):
+            Entities.fetch(
+                entity.task,
+                request=Fetch.nested(
+                    because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION,
+                ),
+            )
+    return user, entity
 
 
 # @testable true
 # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
 # @tests tests_e2e/008_users/test_008d_admin_data_protection.py::test_backups_tab_reveals_static_status_panel
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_route_is_forbidden_without_model_or_page_permission
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
 # @matrix permissions : authorization-before-cache etag no-store resource-gates
-def permission(resource=None, requested=None, *, no_store=False):
-    """Check route access using the fixed direct request-auth graph."""
+def permission(resource=None, requested=None, *, no_store=False, fingerprint=None):
+    """Check route access and optionally use a route-specific revision resolver."""
 
     # @testable false
     # @covered-by lagniappe/web/auth.py::permission
@@ -334,9 +362,10 @@ def permission(resource=None, requested=None, *, no_store=False):
 
             if request.method == "GET" and not no_store:
                 base_fingerprint = (
-                    entity.fingerprint
-                    if entity
-                    else database_utility.site_fingerprint(request.path)
+                    fingerprint(entity, user) if fingerprint else (
+                        entity.fingerprint if entity
+                        else database_utility.site_fingerprint(request.path)
+                    )
                 )
                 g.fingerprint = _etag_fingerprint(base_fingerprint, user)
 

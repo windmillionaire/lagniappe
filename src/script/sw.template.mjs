@@ -111,6 +111,7 @@ const _validateUser = async (cacheConfirmation = {}) => {
 				cacheCleared: cacheConfirmation.cacheCleared === true,
 				responseCacheCleared: cacheConfirmation.responseCacheCleared === true,
 				cacheGeneration: cacheConfirmation.cacheGeneration,
+				cacheRevision: cacheConfirmation.cacheRevision,
 			}),
 		});
 	} catch {
@@ -127,14 +128,16 @@ const _validateUser = async (cacheConfirmation = {}) => {
 		return failed("validation-body", validationResponse.status);
 	}
 	if (acknowledgement?.cacheCleared !== true) {
+		// A newer permission mutation can legitimately supersede this clear.
+		if (acknowledgement?.retry === true) return false;
 		return failed("validation-acknowledgement", validationResponse.status);
 	}
 	return true;
 };
 
 let _cacheGeneration = 0;
-let _cacheInvalidation = null;
-let _validateUserRequest = null;
+const _cacheInvalidations = new Map();
+const _validateUserRequests = new Map();
 
 /**
  * @testable false
@@ -151,11 +154,11 @@ function responseInvalidatesCache(response) {
  * @covered-by src/script/sw.template.mjs::checkForCacheInvalidation
  * @reason local cache clearing is exercised through the cache invalidation owner
  */
-async function clearClientCache() {
-	if (!_cacheInvalidation) {
+async function clearClientCache(cacheRevision = null) {
+	if (!_cacheInvalidations.has(cacheRevision)) {
 		const cacheGeneration = _cacheGeneration + 1;
 		_cacheGeneration = cacheGeneration;
-		_cacheInvalidation = (async () => {
+		const pending = (async () => {
 			await caches.delete(RESPONSE_CACHE);
 			const responseCacheCleared =
 				typeof caches.has === "function"
@@ -167,11 +170,12 @@ async function clearClientCache() {
 				cacheGeneration,
 			};
 		})().finally(() => {
-			_cacheInvalidation = null;
+			_cacheInvalidations.delete(cacheRevision);
 		});
+		_cacheInvalidations.set(cacheRevision, pending);
 	}
 
-	return _cacheInvalidation;
+	return _cacheInvalidations.get(cacheRevision);
 }
 
 /**
@@ -181,23 +185,32 @@ async function clearClientCache() {
  */
 function validateUserOnce(cacheConfirmation) {
 	if (!cacheConfirmation.cacheCleared) return null;
-	if (!_validateUserRequest) {
-		_validateUserRequest = _validateUser(cacheConfirmation).finally(() => {
-			_validateUserRequest = null;
-		});
+	const revision = cacheConfirmation.cacheRevision;
+	if (!_validateUserRequests.has(revision)) {
+		_validateUserRequests.set(
+			revision,
+			_validateUser(cacheConfirmation).finally(() => {
+				_validateUserRequests.delete(revision);
+			}),
+		);
 	}
-	return _validateUserRequest;
+	return _validateUserRequests.get(revision);
 }
 
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_confirmation_posts_after_local_clear
  * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_requires_explicit_server_acknowledgement
- * @matrix cache : acknowledgement failure invalidation retry service-worker
+ * @tests tests_js/test_008_service_worker.py::test_cache_acknowledgements_do_not_coalesce_different_revisions
+ * @matrix cache : acknowledgement concurrency failure invalidation retry service-worker
  */
 async function checkForCacheInvalidation(response, options = {}) {
 	if (!responseInvalidatesCache(response)) return { invalidated: false };
-	const confirmation = await clearClientCache();
+	const cacheRevision = response.headers.get("X-Lagniappe-Cache-Revision");
+	const confirmation = {
+		...(await clearClientCache(cacheRevision)),
+		cacheRevision,
+	};
 	const acknowledged =
 		options.validate !== false ? await validateUserOnce(confirmation) : null;
 	return {
@@ -240,6 +253,7 @@ async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
  * @reason response storage filtering is exercised through no-store, static, redirect, and precache owners
  */
 function responsePreventsStorage(response) {
+	if (responseInvalidatesCache(response)) return true;
 	if (response.redirected || response.type === "opaqueredirect") return true;
 
 	return (
@@ -264,7 +278,8 @@ async function discardCachedResponse(cache, request) {
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.py::test_no_store_304_discards_cached_response
- * @matrix cache : no-store service-worker
+ * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @matrix cache : acknowledgement invalidation no-store service-worker
  */
 async function handleUncacheableResponse(
 	event,
@@ -280,7 +295,9 @@ async function handleUncacheableResponse(
 	} else {
 		event.waitUntil(discard);
 	}
-	event.waitUntil(checkForCacheInvalidation(response));
+	// Preserve the acknowledgement boundary for invalidating dynamic responses,
+	// including those now explicitly marked no-store by the server.
+	await checkForCacheInvalidation(response);
 	return true;
 }
 
@@ -756,7 +773,9 @@ async function handleNetworkOnlyGet(event) {
  * @tests tests_js/test_008_service_worker.py::test_redirect_response_with_invalidation_header_clears_cache
  * @tests tests_js/test_008_service_worker.py::test_redirected_responses_are_discarded_and_not_cached
  * @tests tests_js/test_008_service_worker.py::test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response
- * @matrix cache : cached-response invalidation network-validation no-store redirected-response service-worker
+ * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @tests tests_js/test_008_service_worker.py::test_previously_stored_invalidation_is_discarded_before_reuse
+ * @matrix cache : browser-validators cached-response invalidation network-validation no-store redirected-response service-worker
  */
 async function handleCacheable(event, pathname) {
 	const { request } = event;
@@ -765,6 +784,8 @@ async function handleCacheable(event, pathname) {
 	const cache = await caches.open(RESPONSE_CACHE);
 
 	let cachedResponse = await cache.match(request, { ignoreVary: true });
+	const storedInvalidation =
+		cachedResponse && responseInvalidatesCache(cachedResponse);
 	if (cachedResponse && responsePreventsStorage(cachedResponse)) {
 		await discardCachedResponse(cache, request);
 		cachedResponse = null;
@@ -776,7 +797,10 @@ async function handleCacheable(event, pathname) {
 
 	const storedETag = cachedResponse?.headers.get("ETag");
 
-	const fetchRequest = networkRequest(request, { etag: storedETag });
+	const fetchRequest = networkRequest(request, {
+		etag: storedETag,
+		...(storedInvalidation ? { cache: "reload" } : {}),
+	});
 
 	const networkPromise = (async () => {
 		try {

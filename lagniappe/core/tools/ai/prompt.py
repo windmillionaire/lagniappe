@@ -5,7 +5,7 @@ import re
 
 from lagniappe.core.definitions import FileConsumer, enforce_file_consumer
 
-from .constants import GEMINI_MIMETYPES
+from .constants import gemini_mimetype
 from .guidelines import (
     JSON_OUTPUT_RULES,
     MARKDOWN_GENERATION_RULES,
@@ -340,9 +340,11 @@ class Prompt:
 
         Args:
             file: File-like object to read bytes from.
-            mime_type: MIME type; ignored if unsupported by Gemini.
+            mime_type: MIME type; normalized to a provider-supported equivalent
+                or ignored when unsupported by Gemini.
         """
-        if mime_type not in GEMINI_MIMETYPES:
+        mime_type = gemini_mimetype(mime_type)
+        if not mime_type:
             return
 
         enforce_file_consumer(

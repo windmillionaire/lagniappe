@@ -8,6 +8,7 @@ import types
 
 import pytest
 
+
 pytestmark = pytest.mark.unit
 
 
@@ -47,6 +48,45 @@ def _disabled_ai_email_config():
             "dailyPerUser": 200,
         },
     }
+
+
+# @matrix config : site-policy configuration validation
+# @source lagniappe/__init__.py::Config
+@pytest.mark.parametrize("ai_enabled, external_enabled", [(True, True), (True, False), (False, True)])
+def test_config_loads_flat_mcp_settings_and_ai_switches(monkeypatch, ai_enabled, external_enabled):
+    app_settings = {
+        "CONFIG_KIND": "lagniappe-settings", "CONFIG_SCHEMA_VERSION": 3,
+        "GOOGLE_CLOUD_PROJECT": "project-1", "VERSION": "1.0",
+        "GIBBERISH": "bucket-seed",
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": "runtime@project-1.iam.gserviceaccount.com",
+        "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": "runtime@project-1.iam.gserviceaccount.com",
+        "APP_ENGINE_LOCATION": "us-central", "RESOURCE_REGION": "us-central1",
+        "APP_URL": "https://project-1.uc.r.appspot.com",
+        "CUSTOM_DOMAIN": "workspace.example.test",
+        "AI_ENABLED": ai_enabled, "EXTERNAL_AI_ENABLED": external_enabled,
+        "MCP_RESOURCE": "https://mcp.example.test/mcp",
+        "MCP_SERVICE_ACCOUNT": "lagniappe-mcp@project-1.iam.gserviceaccount.com",
+    }
+    monkeypatch.setitem(sys.modules, "config", types.SimpleNamespace(
+        Environment=FakeEnvironment,
+        SETTINGS=types.SimpleNamespace(app_config=app_settings),
+        constants=types.SimpleNamespace(
+            BUILD_ID="tracked-build", DEFAULT_SOURCE_URL="https://example.test/source",
+            UNSUPPORTED_SETTING_KEYS=frozenset(),
+        ),
+    ))
+    monkeypatch.setenv("FLASK_ENV", "production")
+    spec = importlib.util.spec_from_file_location(
+        "_lagniappe_mcp_config_test",
+        Path(__file__).resolve().parents[2] / "lagniappe" / "__init__.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.CONFIG.AI_ENABLED is ai_enabled
+    assert module.CONFIG.EXTERNAL_AI_ENABLED is (ai_enabled and external_enabled)
+    assert module.CONFIG.MCP_RESOURCE == app_settings["MCP_RESOURCE"]
+    assert module.CONFIG.MCP_SERVICE_ACCOUNT == app_settings["MCP_SERVICE_ACCOUNT"]
+    assert not hasattr(module.CONFIG, "REMOTE_MCP")
 
 
 # @matrix config : ai-email build-id constants optional-providers public-projection secrets stale-settings

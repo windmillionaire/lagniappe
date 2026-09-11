@@ -9,10 +9,14 @@ class Restriction(Enum):
 
     ``UNRESTRICTED`` means no required-access filter should be applied. It is
     intentionally distinct from an empty list, which means the caller has no
-    allowed hashes for that filtered view.
+    allowed hashes for that filtered view. ``BELONGS_TO_ALL`` bypasses the
+    independent required-group membership filter for administrators.
+    ``BELONGS_TO_NONE`` means that only entities without required groups match.
     """
 
     UNRESTRICTED = "UNRESTRICTED"
+    BELONGS_TO_ALL = "BELONGS_TO_ALL"
+    BELONGS_TO_NONE = "BELONGS_TO_NONE"
 
     @classmethod
     def is_unrestricted(cls, value):
@@ -24,8 +28,11 @@ class Restriction(Enum):
 
     @classmethod
     def from_session(cls, value):
-        return cls.UNRESTRICTED if value == cls.UNRESTRICTED.value else value
+        for marker in cls:
+            if value == marker.value:
+                return marker
+        return value
 
     @classmethod
     def to_session(cls, value):
-        return cls.UNRESTRICTED.value if value is cls.UNRESTRICTED else value
+        return value.value if isinstance(value, cls) else value

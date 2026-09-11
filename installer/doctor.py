@@ -1,5 +1,8 @@
 """Read-only local and provider diagnostics for an existing installation."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 import hashlib
 import json
 import os
@@ -8,6 +11,7 @@ import re
 
 import yaml
 
+from config import decode_app_settings
 from runner.context import REPOSITORY_ROOT, setup_command
 from installer.summary import expected_resource_lines
 
@@ -36,7 +40,10 @@ def _load_document(path):
     with path.open("r", encoding="utf-8", newline="") as document:
         if path.suffix == ".json":
             return json.load(document)
-        return yaml.safe_load(document) or {}
+        data = yaml.safe_load(document) or {}
+        if path.name == "lagniappe_settings.yaml":
+            return decode_app_settings(data)
+        return data
 
 
 # @testable false
@@ -253,6 +260,11 @@ def _default_provider_checker(settings, project):
     from installer.monitoring import inspect_memory_alert
 
     report["app-engine-memory-alert"] = inspect_memory_alert(settings, project)
+    from installer.mcp import inspect_deployment
+    try:
+        report["mcp-service"] = inspect_deployment(settings)
+    except Exception:
+        report["mcp-service"] = {"state": "UNAVAILABLE", "details": {}, "error": "MCP provider inspection failed."}
     return report
 
 
@@ -318,7 +330,8 @@ def _keyless_identity_issues(settings, deploy):
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reports_drift_without_writing
-# @matrix setup : doctor drift independent-provider-check provider-identity read-only
+# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_decodes_saved_settings_and_guides_adc_alignment
+# @matrix setup : adc doctor drift independent-provider-check parsing provider-identity read-only
 def run_doctor(
     *,
     root=REPOSITORY_ROOT,
@@ -336,13 +349,13 @@ def run_doctor(
     local_issues.extend(_keyless_identity_issues(settings, deploy))
     issues = list(local_issues)
 
-    print("=== Lagniappe setup doctor (read-only) ===")
+    print(ui.heading("Lagniappe setup doctor") + " " + ui.secondary("(read-only)"))
     if local_issues:
-        print("Local generated state: DRIFT")
+        print(ui.warning("Local generated state: drift detected"))
         for issue in local_issues:
-            print(f"- {issue}")
+            print(ui.info(f"  - {issue}"))
     else:
-        print("Local generated state: OK")
+        print(ui.success("Local generated state: verified"))
 
     active = {}
     identity_issues = []
@@ -378,42 +391,101 @@ def run_doctor(
                 )
         issues.extend(identity_issues)
         print(
-            "Active gcloud configuration: "
-            f"{active.get('configuration') or '(unavailable)'}"
+            ui.value(
+                "Active gcloud configuration",
+                f"{active.get('configuration') or '(unavailable)'}",
+                verbatim=True,
+            )
         )
-        print(f"Active gcloud account: {active.get('account') or '(unavailable)'}")
-        print(f"Active gcloud project: {active.get('project') or '(unavailable)'}")
-        print(f"ADC principal: {adc.get('principal') or '(unavailable)'}")
-        print(f"ADC project: {adc.get('project') or '(unavailable)'}")
-        print(f"ADC quota project: {adc.get('quota_project') or '(unavailable)'}")
         print(
-            f"Saved installer: {settings.get('INSTALLER_EMAIL') or '(not configured)'}"
+            ui.value(
+                "Active gcloud account",
+                f"{active.get('account') or '(unavailable)'}",
+                verbatim=True,
+            )
         )
-        print(f"Saved deployer: {settings.get('DEPLOYER_EMAIL') or '(not configured)'}")
-        print(f"Saved owner: {settings.get('ADMIN_EMAIL') or '(not configured)'}")
+        print(
+            ui.value(
+                "Active gcloud project",
+                f"{active.get('project') or '(unavailable)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "ADC principal",
+                f"{adc.get('principal') or '(unavailable)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "ADC project", f"{adc.get('project') or '(unavailable)'}", verbatim=True
+            )
+        )
+        print(
+            ui.value(
+                "ADC quota project",
+                f"{adc.get('quota_project') or '(unavailable)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "Saved installer",
+                f"{settings.get('INSTALLER_EMAIL') or '(not configured)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "Saved deployer",
+                f"{settings.get('DEPLOYER_EMAIL') or '(not configured)'}",
+                verbatim=True,
+            )
+        )
+        print(
+            ui.value(
+                "Saved owner",
+                f"{settings.get('ADMIN_EMAIL') or '(not configured)'}",
+                verbatim=True,
+            )
+        )
         if identity_issues:
-            print("Identity state: DRIFT")
+            print(ui.error("Identity state: drift detected"))
             for issue in identity_issues:
-                print(f"- {issue}")
+                print(ui.info(f"  - {issue}"))
         else:
-            print("Identity state: OK")
+            print(ui.success("Identity state: verified"))
     else:
         identity_issues.append("saved setup identity is unavailable")
         issues.extend(identity_issues)
-        print("Identity state: UNAVAILABLE")
+        print(ui.error("Identity state: unavailable"))
 
-    print("Expected target and provider resources:")
+    if identity_issues:
+        command = "auth" if settings and saved_gcloud else "repair"
+        print(ui.value(
+            "Authentication command" if command == "auth" else "Repair command",
+            setup_command(command),
+            action=True,
+            verbatim=True,
+            standalone=True,
+        ))
+        return 1
+
+    print(ui.heading("Expected target and provider resources:"))
     for line in expected_resource_lines(
         settings,
         deploy=deploy,
         gcloud_config=saved_gcloud,
     ):
-        print(f"- {line}")
+        label, _, value = line.partition(": ")
+        print(ui.value(label, value, verbatim=True))
 
     project = settings.get("GOOGLE_CLOUD_PROJECT") or saved_gcloud.get("PROJECT")
     provider_report = {}
     provider_issues = []
-    if settings and project and not identity_issues:
+    if settings and project:
         try:
             checker = provider_checker or _default_provider_checker
             provider_report = checker(settings, project)
@@ -436,20 +508,33 @@ def run_doctor(
     issues.extend(provider_issues)
     if provider_report:
         print(
-            "Provider state: DRIFT OR UNAVAILABLE"
+            ui.warning("Provider state: drift detected or unavailable")
             if provider_issues
-            else "Provider state: OK"
+            else ui.success("Provider state: verified")
         )
         for name in sorted(provider_report):
-            print(f"- {name}: {provider_report[name].get('state')}")
+            state = provider_report[name].get("state")
+            outcome = ui.styled(
+                str(state).lower().replace("_", " "),
+                "green" if state == "AVAILABLE" else "yellow",
+            )
+            print(ui.info(f"  {name}: {outcome}"))
     elif project:
-        print("Provider state: DRIFT OR UNAVAILABLE")
+        print(ui.warning("Provider state: drift detected or unavailable"))
     else:
         issues.append("target project is unavailable")
-        print("Provider state: UNAVAILABLE")
+        print(ui.warning("Provider state: unavailable"))
 
     if issues:
-        print(f"Repair command: {setup_command('repair')}")
+        print(
+            ui.value(
+                "Repair command",
+                setup_command("repair"),
+                action=True,
+                verbatim=True,
+                standalone=True,
+            )
+        )
         return 1
-    print("Doctor result: OK")
+    print(ui.success("Doctor result: verified"))
     return 0

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -46,13 +49,13 @@ DEFAULT_DATABASE = "(default)"
 # @reason terminal animation wraps tested restore phases without changing their contracts
 @contextmanager
 def _progress(formatter, message):
-    with formatter.yaspin(text=formatter.success(message)) as spinner:
+    with formatter.progress(text=message) as spinner:
         try:
             yield spinner
         except BaseException:
-            spinner.fail(formatter.fail_glyph)
+            spinner.fail()
             raise
-        spinner.ok(formatter.ok_glyph)
+        spinner.ok()
 
 
 # @testable false
@@ -236,33 +239,29 @@ def _print_plan(plan):
 
     formatter = FORMATTER.initialize()
     merge = plan["merge"]
-    print(f"\n{formatter.info('Restore Plan')}")
-    print(f"  {formatter.info('Restore ID:')} {plan['restore_id']}")
+    print(f"\n{ui.heading('Restore plan')}")
+    print(ui.value("  Restore ID", plan["restore_id"], verbatim=True))
     print(
-        f"  {formatter.info('Manual backup:')} "
-        f"{plan['backup_id']} ({plan['consistency']})"
+        f"  {ui.emphasis('Manual backup:')} {plan['backup_id']} ({plan['consistency']})"
     )
+    print(f"  {ui.emphasis('Database:')} {ui.info('merge directly into (default)')}")
     print(
-        f"  {formatter.info('Database:')} "
-        f"{formatter.warning('merge directly into (default)')}"
-    )
-    print(
-        f"  {formatter.info('Snapshot keys:')} "
+        f"  {ui.emphasis('Snapshot keys:')} "
         f"{merge['snapshot_entities']} ({merge['overwritten']} overwritten, "
         f"{merge['restored_missing']} restored); live-only keys are preserved"
     )
     print(
-        f"  {formatter.info('Safety clone:')} {plan['safety_database']} "
+        f"  {ui.emphasis('Safety clone:')} {plan['safety_database']} "
         "(removed after validation)"
     )
     print(
-        f"  {formatter.info('Queue:')} {plan['queue']} "
-        f"{formatter.warning('(paused, audited, purged, then reconciled)')}"
+        f"  {ui.emphasis('Queue:')} {plan['queue']} "
+        f"{ui.info('(paused, audited, purged, then reconciled)')}"
     )
     print(formatter.warning(wrap_text(CONSISTENCY_NOTICE)))
-    print(f"\n{formatter.info('Proposed Recovery Sequence')}")
+    print(f"\n{ui.heading('Proposed recovery sequence')}")
     for number, step in enumerate(plan["sequence"], 1):
-        print(wrap_text(f"  {formatter.info(f'{number}.')} {step}"))
+        print(wrap_text(f"  {ui.literal(f'{number}.')} {step}"))
 
 
 # @testable false
@@ -483,7 +482,7 @@ def restore_backup(
     if dry_run:
         plan = restore_plan(backup_id, context=context)
         _print_plan(plan)
-        print("Dry run complete. No provider or application resources were changed.")
+        print(ui.success("Dry run complete. No provider or application resources were changed."))
         return plan
 
     local = checkpoint or LifecycleCheckpoint(context.project_id, ["restore", backup_id])
@@ -500,7 +499,7 @@ def restore_backup(
         plan = None
     if state and state.get("status") == "complete":
         completed_plan = _validate_in_place_restore_plan(state.get("plan"))
-        print(f"Restore {completed_plan['restore_id']} is already complete.")
+        print(ui.status(f"Restore {completed_plan['restore_id']} is already complete."))
         return completed_plan
     plan = _validate_in_place_restore_plan(
         (state or {}).get("plan")
@@ -691,13 +690,16 @@ def restore_backup(
         checkpoint.update("restore-record-published", restore_record=record)
     checkpoint.finish()
     print(
-        f"Restore {plan['restore_id']} merged into (default): "
+        ui.success(f"Restore {plan['restore_id']} merged into (default): "
         f"{plan['merge']['overwritten']} keys reset and "
-        f"{plan['merge']['restored_missing']} missing keys restored."
+        f"{plan['merge']['restored_missing']} missing keys restored.")
     )
     print(
-        "Cache data was cleared. Sign in as the Owner, then open "
-        "Admin → Site Settings → Maintenance and select Refresh Cache."
+        (
+            "Cache data was cleared. Sign in as the Owner, then open "
+            f"{ui.literal('Admin → Site Settings → Maintenance')} and select "
+            f"{ui.literal('Refresh Cache')}."
+        )
     )
     return plan
 

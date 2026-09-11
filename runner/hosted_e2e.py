@@ -80,11 +80,74 @@ CLOUD_BUILD_ID_RE = re.compile(
     re.IGNORECASE,
 )
 CLOUD_BUILD_PENDING_STATUSES = {"STATUS_UNKNOWN", "QUEUED", "WORKING", "PENDING"}
+HOSTED_E2E_ENVIRONMENTS = ("standard",)
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 # @testable infrastructure
 class HostedE2EError(RuntimeError):
     """Raised when a hosted-E2E lifecycle invariant is not satisfied."""
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_environment_rejects_retired_lifecycle
+# @matrix hosted-e2e : environment-selection deletion-safety image-boundary fail-closed
+@dataclass(frozen=True)
+class HostedE2EEnvironment:
+    """Closed lifecycle identity for one hosted test environment."""
+
+    name: str
+    job: str
+    image_repository: str
+    state_filename: str
+    result_directory: str
+    container_relative_root: Path
+
+    # @testable true
+    # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_environment_rejects_retired_lifecycle
+    # @matrix hosted-e2e : environment-selection image-boundary
+    def image_base(self, infrastructure) -> str:
+        registry = infrastructure.image_base.rsplit("/", 1)[0]
+        return f"{registry}/{self.image_repository}"
+
+    # @testable true
+    # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_environment_rejects_retired_lifecycle
+    # @matrix hosted-e2e : environment-selection deletion-safety
+    @property
+    def state_path(self) -> Path:
+        return STATE_PATH
+        return STATE_ROOT / self.state_filename
+
+    # @testable true
+    # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_environment_rejects_retired_lifecycle
+    # @matrix hosted-e2e : environment-selection deletion-safety
+    @property
+    def result_root(self) -> Path:
+        return STATE_ROOT / self.result_directory
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_environment_rejects_retired_lifecycle
+# @matrix hosted-e2e : environment-selection deletion-safety image-boundary fail-closed
+def _environment(environment="standard") -> HostedE2EEnvironment:
+    """Resolve the public environment enum without accepting aliases."""
+    definitions = {
+        "standard": HostedE2EEnvironment(
+            name="standard",
+            job=JOB,
+            image_repository="runner",
+            state_filename=STATE_PATH.name,
+            result_directory="results",
+            container_relative_root=CONTAINER_RELATIVE_ROOT,
+        ),
+    }
+    try:
+        return definitions[environment]
+    except (KeyError, TypeError) as error:
+        allowed = "|".join(HOSTED_E2E_ENVIRONMENTS)
+        raise HostedE2EError(
+            f"Hosted E2E environment must be one of {allowed}."
+        ) from error
 
 
 # @testable infrastructure
@@ -106,6 +169,8 @@ class HostedE2EInfrastructure:
 
     # @testable infrastructure
     @property
+    # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_environment_rejects_retired_lifecycle
+    # @matrix hosted-e2e : environment-selection image-boundary
     def image_base(self) -> str:
         return (
             f"{self.region}-docker.pkg.dev/{self.project}/"
@@ -803,7 +868,9 @@ def _grant_runtime_identity_roles(infrastructure, runtime_member, deployer_membe
     )
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_setup_provisions_only_supported_runtime_identities
+# @matrix hosted-e2e : identity setup-contract
 def setup(github_repository=None):
     """Provision stable least-privilege resources and the inert service anchor."""
     _activate(adc=False)
@@ -1093,18 +1160,34 @@ def _change_test_bucket_cors(infrastructure, origin, *, present):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_uses_the_exported_commit
-# @matrix hosted-e2e : deployment-source image-boundary
-def _build_runner_image(infrastructure, source, source_root):
+# @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_refuses_an_unsafe_staged_root_ignore
+# @matrix hosted-e2e : deployment-source image-boundary symlink-safety
+def _build_runner_image(
+    infrastructure,
+    source,
+    source_root,
+    *,
+    environment="standard",
+):
     """Start a resumable image build from the exported committed tree."""
-    container_root = Path(source_root) / CONTAINER_RELATIVE_ROOT
+    selected = _environment(environment)
+    container_root = Path(source_root) / selected.container_relative_root
     canonical_ignore = Path(source_root) / ".gcloudignore"
     if not canonical_ignore.is_file():
         raise HostedE2EError("The committed source has no canonical .gcloudignore.")
-    shutil.copyfile(
-        canonical_ignore,
-        container_root / RUNNER_GCLOUDIGNORE_COPY,
-    )
-    image = f"{infrastructure.image_base}:{source}"
+    staged_ignore = container_root / RUNNER_GCLOUDIGNORE_COPY
+    if staged_ignore.exists() or staged_ignore.is_symlink():
+        raise HostedE2EError(
+            "The runner image's staged root .gcloudignore path is not clean."
+        )
+    shutil.copyfile(canonical_ignore, staged_ignore)
+    if (
+        staged_ignore.is_symlink()
+        or not staged_ignore.is_file()
+        or staged_ignore.read_bytes() != canonical_ignore.read_bytes()
+    ):
+        raise HostedE2EError("The runner image's staged root .gcloudignore is invalid.")
+    image = f"{selected.image_base(infrastructure)}:{source}"
     result = _gcloud(
         "builds",
         "submit",
@@ -1276,25 +1359,38 @@ def _sync_settings_secret(infrastructure):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_job_grants_only_job_scoped_ci_permissions
 # @matrix hosted-e2e : identity invocation-overrides least-privilege
-def _update_job(infrastructure, state):
-    environment = {
-        "FLASK_ENV": "testing",
+def _update_job(infrastructure, state, *, environment="standard"):
+    selected = _environment(environment)
+    job_service_account = infrastructure.runtime_email
+    configured_job = state.get("job", selected.job)
+    if configured_job != selected.job:
+        raise HostedE2EError(
+            "Hosted E2E lifecycle state names the wrong environment job."
+        )
+    job_environment = {
         "GOOGLE_CLOUD_PROJECT": infrastructure.project,
         "LAGNIAPPE_HOSTED_E2E": "true",
         "LAGNIAPPE_HOSTED_E2E_ROLE": "runner",
+        "LAGNIAPPE_HOSTED_E2E_ENVIRONMENT": selected.name,
         "LAGNIAPPE_HOSTED_E2E_BASE_URL": state["base_url"],
-        "LAGNIAPPE_HOSTED_E2E_PREFIX": DEFAULT_TEST_PREFIX,
-        "LAGNIAPPE_HOSTED_E2E_RUNTIME_SERVICE_ACCOUNT_EMAIL": infrastructure.runtime_email,
         "LAGNIAPPE_HOSTED_E2E_VERSION": state["version"],
         "LAGNIAPPE_HOSTED_E2E_SOURCE": state["source"],
         "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT": state["source_snapshot"],
         "LAGNIAPPE_HOSTED_E2E_BUILD_ID": state["build_id"],
         "LAGNIAPPE_HOSTED_E2E_SERVICE": SERVICE,
-        "LAGNIAPPE_HOSTED_E2E_CALLER_EMAIL": infrastructure.runtime_email,
-        "LAGNIAPPE_HOSTED_E2E_JOB": infrastructure.job,
+        "LAGNIAPPE_HOSTED_E2E_JOB": selected.job,
         "LAGNIAPPE_HOSTED_E2E_ARTIFACT_BUCKET": infrastructure.artifact_bucket,
     }
-    env_argument = ",".join(f"{key}={value}" for key, value in environment.items())
+    secret_argument = "--clear-secrets"
+    job_image = state["image"]
+    job_environment.update(
+        {
+            "FLASK_ENV": "testing",
+            "LAGNIAPPE_HOSTED_E2E_PREFIX": DEFAULT_TEST_PREFIX,
+            "LAGNIAPPE_HOSTED_E2E_RUNTIME_SERVICE_ACCOUNT_EMAIL": infrastructure.runtime_email,
+            "LAGNIAPPE_HOSTED_E2E_CALLER_EMAIL": infrastructure.runtime_email,
+        }
+    )
     secret_mounts = [
         "/workspace/config/files/lagniappe_settings.yaml="
         f"{infrastructure.settings_secret}:latest"
@@ -1304,12 +1400,14 @@ def _update_job(infrastructure, state):
             "/workspace/config/files/redis_ca.pem="
             f"{infrastructure.redis_ca_secret}:latest"
         )
+    secret_argument = f"--set-secrets={','.join(secret_mounts)}"
+    env_argument = ",".join(f"{key}={value}" for key, value in job_environment.items())
     exists = _describe(
         [
             "run",
             "jobs",
             "describe",
-            infrastructure.job,
+            selected.job,
             f"--region={infrastructure.region}",
             f"--project={infrastructure.project}",
         ]
@@ -1319,13 +1417,13 @@ def _update_job(infrastructure, state):
         "run",
         "jobs",
         action,
-        infrastructure.job,
-        f"--image={state['image']}",
+        selected.job,
+        f"--image={job_image}",
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
-        f"--service-account={infrastructure.runtime_email}",
+        f"--service-account={job_service_account}",
         f"--set-env-vars={env_argument}",
-        f"--set-secrets={','.join(secret_mounts)}",
+        secret_argument,
         "--tasks=1",
         "--parallelism=1",
         "--max-retries=0",
@@ -1339,7 +1437,7 @@ def _update_job(infrastructure, state):
         "run",
         "jobs",
         "add-iam-policy-binding",
-        infrastructure.job,
+        selected.job,
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
         f"--member=serviceAccount:{infrastructure.invoker_email}",
@@ -1350,7 +1448,7 @@ def _update_job(infrastructure, state):
         "run",
         "jobs",
         "add-iam-policy-binding",
-        infrastructure.job,
+        selected.job,
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
         f"--member=serviceAccount:{infrastructure.invoker_email}",
@@ -1363,7 +1461,7 @@ def _update_job(infrastructure, state):
             "run",
             "jobs",
             "add-iam-policy-binding",
-            infrastructure.job,
+            selected.job,
             f"--region={infrastructure.region}",
             f"--project={infrastructure.project}",
             f"--member={deployer_member}",
@@ -1382,8 +1480,10 @@ def _resumable_create_state(
     source,
     source_snapshot,
     build_id,
+    environment="standard",
 ):
     """Return interrupted exact-source state, or reject an unsafe replacement."""
+    selected = _environment(environment)
     if not previous or previous.get("status") == "torn-down":
         return None
     if previous.get("schema_version") != STATE_SCHEMA_VERSION:
@@ -1393,7 +1493,11 @@ def _resumable_create_state(
             "The previous hosted E2E lifecycle has not been torn down; "
             "inspect its status and tear it down first."
         )
-    _validate_state_infrastructure(previous, infrastructure)
+    _validate_state_infrastructure(
+        previous,
+        infrastructure,
+        environment=selected.name,
+    )
     expected = {
         "source": source,
         "source_snapshot": source_snapshot,
@@ -1408,11 +1512,12 @@ def _resumable_create_state(
             f"committed build ({', '.join(mismatches)}); tear it down first."
         )
     version = str(previous.get("version") or "")
-    if not VERSION_RE.fullmatch(version):
+    version_pattern = VERSION_RE
+    if not version_pattern.fullmatch(version):
         raise HostedE2EError("The interrupted lifecycle has an invalid version.")
     if previous.get("base_url") != _version_url(infrastructure, version):
         raise HostedE2EError("The interrupted lifecycle has an invalid version URL.")
-    expected_image = f"{infrastructure.image_base}:{source}"
+    expected_image = f"{selected.image_base(infrastructure)}:{source}"
     if previous.get("image") not in {None, expected_image}:
         raise HostedE2EError("The interrupted lifecycle has an unexpected image.")
     cloud_build_id = previous.get("cloud_build_id")
@@ -1481,8 +1586,9 @@ def _require_current_setup(infrastructure):
 
 
 # @testable infrastructure
-def create(*, base_ref=None):
+def create(*, base_ref=None, environment="standard"):
     """Deploy one committed production build as a test app and runner."""
+    selected = _environment(environment)
     source = require_clean_source()
     build_id = _require_committed_production_build(source)
     _run_create_preflight(source, base_ref=base_ref)
@@ -1493,16 +1599,19 @@ def create(*, base_ref=None):
     infrastructure = _infrastructure()
     _require_current_setup(infrastructure)
     _verify_soft_routing_guard(infrastructure)
-    previous = _load_json(STATE_PATH)
+    state_path = selected.state_path
+    previous = _load_json(state_path)
     state = _resumable_create_state(
         previous,
         infrastructure,
         source=source,
         source_snapshot=source_snapshot,
         build_id=build_id,
+        environment=selected.name,
     )
     if state is None:
-        version = "e2e-" + secrets.token_hex(8)
+        version_prefix = "e2e-"
+        version = version_prefix + secrets.token_hex(8)
         base_url = _version_url(infrastructure, version)
         state = {
             "schema_version": STATE_SCHEMA_VERSION,
@@ -1511,21 +1620,22 @@ def create(*, base_ref=None):
             "project": infrastructure.project,
             "region": infrastructure.region,
             "service": SERVICE,
-            "job": infrastructure.job,
+            "job": selected.job,
+            "environment": selected.name,
             "version": version,
             "source": source,
             "source_snapshot": source_snapshot,
             "build_id": build_id,
             "base_url": base_url,
             "artifact_bucket": infrastructure.artifact_bucket,
-            "image": f"{infrastructure.image_base}:{source}",
+            "image": f"{selected.image_base(infrastructure)}:{source}",
         }
     else:
         state["status"] = "creating"
         state["resumed_at"] = datetime.now(timezone.utc).isoformat()
-        state.setdefault("image", f"{infrastructure.image_base}:{source}")
+        state.setdefault("image", f"{selected.image_base(infrastructure)}:{source}")
     STATE_ROOT.mkdir(parents=True, exist_ok=True)
-    _write_json(STATE_PATH, state, owner_only=True)
+    _write_json(state_path, state, owner_only=True)
 
     try:
         with _committed_source_tree(source) as source_root:
@@ -1539,15 +1649,18 @@ def create(*, base_ref=None):
                     )
                     state["image"] = image
                     state["cloud_build_id"] = cloud_build_id
-                    _write_json(STATE_PATH, state, owner_only=True)
-                _wait_runner_image_build(infrastructure, cloud_build_id)
+                    _write_json(state_path, state, owner_only=True)
+                _wait_runner_image_build(
+                    infrastructure,
+                    cloud_build_id,
+                )
                 state["image_ready"] = True
-                _write_json(STATE_PATH, state, owner_only=True)
+                _write_json(state_path, state, owner_only=True)
 
             if not state.get("settings_synced"):
                 _sync_settings_secret(infrastructure)
                 state["settings_synced"] = True
-                _write_json(STATE_PATH, state, owner_only=True)
+                _write_json(state_path, state, owner_only=True)
 
             _change_test_bucket_cors(
                 infrastructure,
@@ -1555,11 +1668,11 @@ def create(*, base_ref=None):
                 present=True,
             )
             state["cors_added"] = True
-            _write_json(STATE_PATH, state, owner_only=True)
+            _write_json(state_path, state, owner_only=True)
 
             if _hosted_app_version_present(infrastructure, state):
                 state["app_deployed"] = True
-                _write_json(STATE_PATH, state, owner_only=True)
+                _write_json(state_path, state, owner_only=True)
             else:
                 _stage_app_runtime_files(source_root)
                 descriptor = _hosted_app_descriptor(
@@ -1590,7 +1703,7 @@ def create(*, base_ref=None):
                         capture_output=False,
                     )
                     state["app_deployed"] = True
-                    _write_json(STATE_PATH, state, owner_only=True)
+                    _write_json(state_path, state, owner_only=True)
                 finally:
                     descriptor_path.unlink(missing_ok=True)
 
@@ -1598,23 +1711,26 @@ def create(*, base_ref=None):
         _update_job(infrastructure, state)
         state["job_updated"] = True
         state["status"] = "ready"
-        _write_json(STATE_PATH, state, owner_only=True)
+        _write_json(state_path, state, owner_only=True)
         return state
     except Exception:
         state["status"] = "failed"
-        _write_json(STATE_PATH, state, owner_only=True)
+        _write_json(state_path, state, owner_only=True)
         raise
 
 
 # @testable infrastructure
-def _validate_state_infrastructure(state, infrastructure):
+def _validate_state_infrastructure(state, infrastructure, *, environment=None):
+    selected = _environment(environment) if environment is not None else None
     expected = {
         "project": infrastructure.project,
         "region": infrastructure.region,
         "service": SERVICE,
-        "job": infrastructure.job,
+        "job": selected.job if selected is not None else infrastructure.job,
         "artifact_bucket": infrastructure.artifact_bucket,
     }
+    if selected is not None and (not 'environment' not in state):
+        expected["environment"] = selected.name
     mismatches = [name for name, value in expected.items() if state.get(name) != value]
     if mismatches:
         raise HostedE2EError(
@@ -1625,8 +1741,9 @@ def _validate_state_infrastructure(state, infrastructure):
 
 
 # @testable infrastructure
-def _state_ready(infrastructure):
-    state = _load_json(STATE_PATH)
+def _state_ready(infrastructure, *, environment="standard"):
+    selected = _environment(environment)
+    state = _load_json(selected.state_path)
     if not state or state.get("schema_version") != STATE_SCHEMA_VERSION:
         raise HostedE2EError("No hosted E2E lifecycle state exists.")
     if state.get("status") != "ready":
@@ -1635,26 +1752,38 @@ def _state_ready(infrastructure):
         )
     if not re.fullmatch(r"b[0-9a-f]{7}", str(state.get("build_id") or "")):
         raise HostedE2EError("Hosted E2E lifecycle state contains an invalid build ID.")
-    if not VERSION_RE.fullmatch(str(state.get("version") or "")):
+    version_pattern = VERSION_RE
+    if not version_pattern.fullmatch(str(state.get("version") or "")):
         raise HostedE2EError("Hosted E2E lifecycle state contains an invalid version.")
-    _validate_state_infrastructure(state, infrastructure)
+    _validate_state_infrastructure(
+        state,
+        infrastructure,
+        environment=selected.name,
+    )
     return state
 
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr
 # @matrix hosted-e2e : execution-name failure-recovery
-def _execution_name(payload, *output):
+def _execution_name(payload, *output, environment="standard"):
+    selected = _environment(environment)
+    prefix = f"{selected.job}-"
     metadata = payload.get("metadata") if isinstance(payload, dict) else None
     name = metadata.get("name") if isinstance(metadata, dict) else None
     if isinstance(name, str) and "/" in name:
         name = name.rsplit("/", 1)[-1]
-    if isinstance(name, str) and EXECUTION_RE.fullmatch(name):
+    if (
+        isinstance(name, str)
+        and name.startswith(prefix)
+        and EXECUTION_RE.fullmatch(name)
+    ):
         return name
+    escaped_prefix = re.escape(prefix)
     patterns = (
-        r"\bexecutions/(?P<name>lagniappe-e2e-[a-z0-9-]*[a-z0-9])\b",
-        r"\bExecution\s+\[?(?P<name>lagniappe-e2e-[a-z0-9-]*[a-z0-9])\]?",
-        r"\bexecutions\s+describe\s+(?P<name>lagniappe-e2e-[a-z0-9-]*[a-z0-9])\b",
+        rf"\bexecutions/(?P<name>{escaped_prefix}[a-z0-9-]*[a-z0-9])\b",
+        rf"\bExecution\s+\[?(?P<name>{escaped_prefix}[a-z0-9-]*[a-z0-9])\]?",
+        rf"\bexecutions\s+describe\s+(?P<name>{escaped_prefix}[a-z0-9-]*[a-z0-9])\b",
     )
     for value in output:
         for pattern in patterns:
@@ -1798,7 +1927,14 @@ def _wait_for_execution(
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_and_imports
 # @matrix hosted-e2e : artifact-location duration junit result-summary
 # @pair hosted-e2e:suite-scope
-def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
+def format_execute_summary(
+    payload,
+    *,
+    imported=True,
+    state_root=STATE_ROOT,
+    result_root=None,
+    environment="standard",
+):
     """Format an operator-facing summary for one hosted execution result."""
     execution = str(payload.get("execution") or "unknown")
     exit_status = int(payload.get("exit_status") or 0)
@@ -1839,7 +1975,13 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
         except ValueError:
             pass
 
-    destination = Path(state_root) / "results" / execution
+    selected = _environment(environment)
+    result_root = (
+        Path(result_root)
+        if result_root is not None
+        else Path(state_root) / selected.result_directory
+    )
+    destination = result_root / execution
     junit_path = destination / "junit.xml"
     if imported and junit_path.is_file():
         try:
@@ -1926,9 +2068,12 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
             lines.append(f"JUnit XML: {junit_path.resolve()}")
     else:
         lines.append("Results were left in Cloud Storage and were not imported.")
+        environment_argument = (
+            ""
+        )
         lines.append(
             "Import later: venv/bin/python run.py hosted-e2e results "
-            f"--execution {execution}"
+            f"{environment_argument}--execution {execution}"
         )
     return "\n".join(lines)
 
@@ -1936,11 +2081,20 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_dispatches_validated_focused_targets
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
-# @matrix hosted-e2e : argument-injection cloud-run focused-execution local-dispatch override target-validation
-def execute(*, suite="all", targets=(), import_results=True, progress=True):
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr
+# @matrix hosted-e2e : argument-injection cloud-run execution-name failure-recovery focused-execution local-dispatch override target-validation
+def execute(
+    *,
+    suite="all",
+    targets=(),
+    import_results=True,
+    progress=True,
+    environment="standard",
+):
     """Execute the shared Cloud Run job and normally import its evidence."""
     from testing.utility.hosted_e2e_job import validate_focused_targets
 
+    selected = _environment(environment)
     targets = tuple(targets or ())
     if suite == "focused":
         try:
@@ -1965,7 +2119,7 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
         "run",
         "jobs",
         "execute",
-        infrastructure.job,
+        selected.job,
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
         f"--args={','.join(job_arguments)}",
@@ -1981,7 +2135,12 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
         except HostedE2EError:
             if result.returncode == 0:
                 raise
-    execution = _execution_name(payload, result.stdout, result.stderr)
+    execution = _execution_name(
+        payload,
+        result.stdout,
+        result.stderr,
+        environment=selected.name,
+    )
     if execution is None:
         raise HostedE2EError(
             result.stderr.strip() or "Cloud Run did not identify the job execution."
@@ -1989,7 +2148,7 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
     state["last_execution"] = execution
     state["last_suite"] = suite
     state["last_targets"] = list(targets)
-    _write_json(STATE_PATH, state, owner_only=True)
+    _write_json(selected.state_path, state, owner_only=True)
     if progress:
         print(f"Hosted E2E execution: {execution}", flush=True)
         print(
@@ -2003,12 +2162,18 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
     )
     if not import_results:
         return {"execution": execution, "exit_status": exit_status, "suite": suite}
-    manifest = results(execution=execution, latest=False, merge=True)
+    manifest = results(
+        execution=execution,
+        latest=False,
+        merge=True,
+        environment=selected.name,
+    )
     return manifest
 
 
 # @testable infrastructure
-def _latest_execution(infrastructure):
+def _latest_execution(infrastructure, *, environment="standard"):
+    selected = _environment(environment)
     from google.cloud import storage
 
     client = storage.Client(project=infrastructure.project)
@@ -2017,6 +2182,7 @@ def _latest_execution(infrastructure):
         blob
         for blob in client.list_blobs(bucket, prefix="executions/")
         if blob.name.endswith("/manifest.json")
+        and blob.name.split("/", 2)[1].startswith(f"{selected.job}-")
     ]
     if not manifests:
         raise HostedE2EError("No hosted E2E result artifacts exist.")
@@ -2253,20 +2419,26 @@ def results(
     latest=False,
     merge=True,
     include_report_archive=True,
+    environment="standard",
 ):
     """Download one result bundle and merge its outcomes into evidence.json."""
+    selected = _environment(environment)
     _activate(adc=True)
     infrastructure = _infrastructure()
-    state = _load_json(STATE_PATH) or {}
+    state = _load_json(selected.state_path) or {}
     if latest:
-        execution = _latest_execution(infrastructure)
+        execution = _latest_execution(infrastructure, environment=selected.name)
     execution = execution or state.get("last_execution")
-    if not isinstance(execution, str) or not EXECUTION_RE.fullmatch(execution):
+    if (
+        not isinstance(execution, str)
+        or not execution.startswith(f"{selected.job}-")
+        or not EXECUTION_RE.fullmatch(execution)
+    ):
         raise HostedE2EError("A valid Cloud Run execution name is required.")
 
     from google.cloud import storage
 
-    destination = STATE_ROOT / "results" / execution
+    destination = selected.result_root / execution
     destination.mkdir(parents=True, exist_ok=True)
     print(f"Downloading hosted test artifacts to {destination}", flush=True)
     client = storage.Client(project=infrastructure.project)
@@ -2290,6 +2462,11 @@ def results(
     manifest = _load_json(downloaded["manifest.json"])
     if not manifest or manifest.get("execution") != execution:
         raise HostedE2EError("Hosted result manifest does not match its execution.")
+    manifest_job = manifest.get("job")
+    if (
+        manifest_job not in {None, selected.job}
+    ):
+        raise HostedE2EError("Hosted result manifest belongs to another environment.")
     if merge:
         return import_result_directory(
             destination,
@@ -2318,13 +2495,14 @@ def _acquire_cleanup_lease():
 
 
 # @testable infrastructure
-def _active_job_executions(infrastructure):
+def _active_job_executions(infrastructure, *, job=None):
+    job = job or infrastructure.job
     result = _gcloud(
         "run",
         "jobs",
         "executions",
         "list",
-        f"--job={infrastructure.job}",
+        f"--job={job}",
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
         "--limit=20",
@@ -2361,9 +2539,9 @@ def _active_job_executions(infrastructure):
 # @testable false
 # @covered-by runner/hosted_e2e.py::teardown
 # @reason teardown owns the lifecycle boundary for downloaded result cleanup
-def _clear_local_result_artifacts():
+def _clear_local_result_artifacts(*, environment="standard"):
     """Remove downloaded result bundles after a successful lifecycle teardown."""
-    result_root = STATE_ROOT / "results"
+    result_root = _environment(environment).result_root
     if not result_root.exists() and not result_root.is_symlink():
         return False
     if result_root.is_symlink() or result_root.is_file():
@@ -2377,18 +2555,24 @@ def _clear_local_result_artifacts():
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_removes_downloaded_results_after_success
 # @matrix hosted-e2e : deletion-safety evidence-retention local-artifacts teardown
-def teardown(*, force=False):
+def teardown(*, force=False, environment="standard"):
     """Delete ephemeral resources and downloaded artifacts for the lifecycle."""
+    selected = _environment(environment)
     (APP_DIR / ".hosted-e2e-app.yaml").unlink(missing_ok=True)
     _activate(adc=True)
     infrastructure = _infrastructure()
-    state = _load_json(STATE_PATH)
+    state = _load_json(selected.state_path)
     if not state:
         raise HostedE2EError("No hosted E2E lifecycle state exists.")
-    _validate_state_infrastructure(state, infrastructure)
+    _validate_state_infrastructure(
+        state,
+        infrastructure,
+        environment=selected.name,
+    )
     version = str(state.get("version") or "")
     base_url = str(state.get("base_url") or "")
-    if not VERSION_RE.fullmatch(version) or version == ANCHOR_VERSION:
+    version_pattern = VERSION_RE
+    if not version_pattern.fullmatch(version) or version == ANCHOR_VERSION:
         raise HostedE2EError("Refusing to tear down an invalid App Engine version.")
     if base_url != _version_url(infrastructure, version):
         raise HostedE2EError(
@@ -2401,12 +2585,14 @@ def teardown(*, force=False):
             "run",
             "jobs",
             "describe",
-            infrastructure.job,
+            selected.job,
             f"--region={infrastructure.region}",
             f"--project={infrastructure.project}",
         ]
     )
-    active_executions = _active_job_executions(infrastructure) if job else ()
+    active_executions = (
+        _active_job_executions(infrastructure, job=selected.job) if job else ()
+    )
     if active_executions and not force:
         raise HostedE2EError(
             "Cloud Run still has active hosted E2E executions: "
@@ -2443,7 +2629,7 @@ def teardown(*, force=False):
                 "run",
                 "jobs",
                 "delete",
-                infrastructure.job,
+                selected.job,
                 f"--region={infrastructure.region}",
                 f"--project={infrastructure.project}",
                 "--quiet",
@@ -2473,23 +2659,33 @@ def teardown(*, force=False):
             _change_test_bucket_cors(infrastructure, base_url, present=False)
         state["status"] = "torn-down"
         state["torn_down_at"] = datetime.now(timezone.utc).isoformat()
-        _write_json(STATE_PATH, state, owner_only=True)
-        _clear_local_result_artifacts()
+        _write_json(selected.state_path, state, owner_only=True)
+        _clear_local_result_artifacts(environment=selected.name)
         return state
     finally:
         if cleanup_lease is not None:
             cleanup_lease.__exit__(None, None, None)
 
 
-# @testable infrastructure
-def status():
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_status_reads_only_the_supported_job
+# @matrix hosted-e2e : provider-status
+def status(*, environment="standard"):
     """Return local lifecycle state plus live App Engine/job presence."""
+    selected = _environment(environment)
     _activate(adc=False)
     infrastructure = _infrastructure()
-    state = _load_json(STATE_PATH) or {"status": "absent"}
+    state = _load_json(selected.state_path) or {"status": "absent"}
+    if state.get("status") != "absent":
+        _validate_state_infrastructure(
+            state,
+            infrastructure,
+            environment=selected.name,
+        )
     version = state.get("version")
     app_version = None
-    if isinstance(version, str) and VERSION_RE.fullmatch(version):
+    version_pattern = VERSION_RE
+    if isinstance(version, str) and version_pattern.fullmatch(version):
         app_version = _describe(
             [
                 "app",
@@ -2505,16 +2701,17 @@ def status():
             "run",
             "jobs",
             "describe",
-            infrastructure.job,
+            selected.job,
             f"--region={infrastructure.region}",
             f"--project={infrastructure.project}",
         ]
     )
-    return {
+    result = {
         **state,
         "app_version_present": app_version is not None,
         "job_present": job is not None,
     }
+    return result
 
 
 # @testable true
@@ -2528,6 +2725,18 @@ def run_hosted_e2e_command(arguments):
         description="Run repository tests in an isolated Google-hosted environment.",
     )
     commands = parser.add_subparsers(dest="action", required=True)
+
+    # @testable true
+    # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cli_routes_closed_environment
+    # @matrix hosted-e2e : cli-routing environment-selection target-validation
+    def add_environment_argument(command_parser):
+        command_parser.add_argument(
+            "--environment",
+            choices=HOSTED_E2E_ENVIRONMENTS,
+            default="standard",
+            help="Select the hosted E2E lifecycle.",
+        )
+
     setup_parser = commands.add_parser(
         "setup", help="Provision stable hosted-E2E resources."
     )
@@ -2545,7 +2754,9 @@ def run_hosted_e2e_command(arguments):
             "Defaults to origin/main, then main."
         ),
     )
+    add_environment_argument(create_parser)
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
+    add_environment_argument(execute_parser)
     execute_scope = execute_parser.add_mutually_exclusive_group()
     execute_scope.add_argument("--suite", choices=("all", "full"))
     execute_scope.add_argument(
@@ -2562,6 +2773,7 @@ def run_hosted_e2e_command(arguments):
     results_parser = commands.add_parser(
         "results", help="Download and import job artifacts."
     )
+    add_environment_argument(results_parser)
     result_selector = results_parser.add_mutually_exclusive_group()
     result_selector.add_argument("--execution")
     result_selector.add_argument("--latest", action="store_true")
@@ -2584,10 +2796,14 @@ def run_hosted_e2e_command(arguments):
     validate_parser.add_argument("--candidate", required=True)
     validate_parser.add_argument("--evidence", required=True)
     validate_parser.add_argument("--base", required=True)
-    commands.add_parser("status", help="Show local and provider lifecycle state.")
+    status_parser = commands.add_parser(
+        "status", help="Show local and provider lifecycle state."
+    )
+    add_environment_argument(status_parser)
     teardown_parser = commands.add_parser(
         "teardown", help="Delete the ephemeral version and job."
     )
+    add_environment_argument(teardown_parser)
     teardown_parser.add_argument("--force", action="store_true")
     args = parser.parse_args(arguments)
 
@@ -2600,19 +2816,35 @@ def run_hosted_e2e_command(arguments):
                 "documentation/TESTING_HOSTED_E2E.md before dispatching CI."
             )
         elif args.action == "create":
-            payload = create(base_ref=args.base_ref)
+            create_options = {"base_ref": args.base_ref}
+            if args.environment != "standard":
+                create_options["environment"] = args.environment
+            payload = create(**create_options)
             print(f"Hosted E2E version ready: {payload['base_url']}")
         elif args.action == "execute":
             suite = args.suite or ("focused" if args.targets else "all")
+            execute_options = {
+                "suite": suite,
+                "targets": args.targets or (),
+                "import_results": not args.no_import_results,
+            }
+            if args.environment != "standard":
+                execute_options["environment"] = args.environment
             payload = execute(
-                suite=suite,
-                targets=args.targets or (),
-                import_results=not args.no_import_results,
+                **execute_options,
             )
+            summary_options = {"imported": not args.no_import_results}
+            if args.environment != "standard":
+                summary_options.update(
+                    {
+                        "environment": args.environment,
+                        "result_root": _environment(args.environment).result_root,
+                    }
+                )
             print(
                 format_execute_summary(
                     payload,
-                    imported=not args.no_import_results,
+                    **summary_options,
                 )
             )
             return int(payload.get("exit_status") or 0)
@@ -2624,11 +2856,16 @@ def run_hosted_e2e_command(arguments):
             print(json.dumps(payload, indent=2, sort_keys=True))
             return 0
         elif args.action == "results":
+            result_options = {
+                "execution": args.execution,
+                "latest": args.latest,
+                "merge": not args.download_only,
+                "include_report_archive": not args.skip_report_archive,
+            }
+            if args.environment != "standard":
+                result_options["environment"] = args.environment
             payload = results(
-                execution=args.execution,
-                latest=args.latest,
-                merge=not args.download_only,
-                include_report_archive=not args.skip_report_archive,
+                **result_options,
             )
             print(json.dumps(payload, indent=2, sort_keys=True))
             return int(payload.get("exit_status") or 0)
@@ -2641,9 +2878,15 @@ def run_hosted_e2e_command(arguments):
             print(json.dumps(payload, indent=2, sort_keys=True))
             return 0
         elif args.action == "status":
-            print(json.dumps(status(), indent=2, sort_keys=True))
+            status_options = {}
+            if args.environment != "standard":
+                status_options["environment"] = args.environment
+            print(json.dumps(status(**status_options), indent=2, sort_keys=True))
         elif args.action == "teardown":
-            payload = teardown(force=args.force)
+            teardown_options = {"force": args.force}
+            if args.environment != "standard":
+                teardown_options["environment"] = args.environment
+            payload = teardown(**teardown_options)
             print(f"Hosted E2E version {payload['version']} was torn down.")
     except HostedE2EError as error:
         print(f"Hosted E2E command stopped: {error}")

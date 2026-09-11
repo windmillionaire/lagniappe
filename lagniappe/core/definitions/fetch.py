@@ -22,6 +22,7 @@ class FetchReason(Enum):
     TASK_SAVE_REQUIREMENTS = "task-save-requirements"
     TASK_COMBINE_REQUIREMENTS = "task-combine-requirements"
     TASK_FILTER_INDEX_MATERIALIZATION = "task-filter-index-materialization"
+    AI_FILTER_RESULT_SERIALIZATION = "ai-filter-result-serialization"
     CASCADE_SAVE_REQUIREMENTS = "cascade-save-requirements"
     PERMISSION_REQUIREMENTS_MATERIALIZATION = (
         "permission-requirements-materialization"

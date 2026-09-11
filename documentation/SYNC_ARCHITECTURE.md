@@ -16,7 +16,7 @@ Use the focused guides for stateful consumers:
 
 | Surface | Durable or working authority | Poll type |
 | --- | --- | --- |
-| Entity and focused form | Datastore `fingerprint` and `modified`. | `entity`, `form-lock` |
+| Entity and focused form | Fingerprint derived from durable state, effective restrictions, and the entity's own form version. | `entity`, `form-lock` |
 | Collection membership | Datastore site/channel fingerprints. | `channel` |
 | Deferred work | `DeferredJob.status_revision`; Redis is a verified read hint. | `operation` |
 | Notification invalidation | Durable aggregate; Redis generation/revision/membership projection. | Request-level `notification_state` |
@@ -24,10 +24,14 @@ Use the focused guides for stateful consumers:
 | Collaborative document | Durable asset plus revisioned Redis working state. | `document` |
 | Offline form mutation | IndexedDB command until accepted by the server. | Replayed on reconnect |
 
-Entity and collection revisions survive Redis loss. Redis is appropriate for
-document working state and reconstructable notification/operation projections.
-Do not add Redis copies of durable fingerprints merely to avoid a bounded
-Datastore read.
+Entity and collection revisions can be reconstructed after Redis loss. Cached
+details retain the base modification digest, effective restrictions, own form
+version, and final fingerprint. Collection refresh loads the parent revision
+first and queries membership only when that revision or viewer authorization
+changes. Otherwise it compares cached projections for the existing rows.
+An absent or stale cache row
+falls back to loading and authorizing that entity. Root entity polling still
+loads the canonical permission graph.
 
 ## Browser scheduler
 
@@ -81,6 +85,7 @@ Recurring work belongs to the narrowest visible consumer:
 | --- | --- |
 | Root entity | Mounted, focused, visible detail view. |
 | Index channel | Mounted view; checked on foreground catch-up. |
+| Page Tasks channel | After the Page task list loads; checked periodically for task-form changes. |
 | Home channel | After its owning Notes, Tasks, Starred, Pages, Projects, Categories, Ingress, or Tool Reports widget loads. |
 | Watched entity/form lock | Active visible form only; root forms reuse the root entity result. |
 | Document | Active visible collaborative editor. |
@@ -173,6 +178,20 @@ Permission fingerprints participate in collection revisions, so access changes
 invalidate a viewer's list even when membership is unchanged. Home widgets use
 independent channels. Personal Starred and Tool Reports channels combine their
 narrow User/report authorities.
+
+Saved filtered Task indexes subscribe to both their Filter entity and the Tasks
+channel, periodically while active. Filter entity revisions include their parent
+Project and the viewer's authorization; result-page revisions also include Tasks.
+The independent entity cursor is rendered as `data-poll-entity-revision`.
+Saved filtered Page indexes watch their Filter/Category entity revision.
+Collection manifests carry each row's key, hash, and fingerprint. Task indexes,
+Category indexes, and filtered tables compare cached fingerprints, then load and
+authorize changed or newly visible rows with `Fetch.nested()`. Viewer membership
+or permission changes reauthorize every candidate. Unchanged authorized rows
+retain their DOM; newly forbidden rows are removed. Page task lists also watch
+the Tasks channel because Task Form changes need not change the Page fingerprint.
+User rows use their Page projections. When the Users collection revision changes,
+their User-backed columns also refresh even if the Page fingerprint is unchanged.
 
 Operation and notification bookkeeping do not modify User or site collection
 fingerprints.

@@ -1,5 +1,8 @@
 """Best-effort restoration of site images with transactional local updates."""
 
+from runner import presentation as ui
+from runner.presentation import output as print
+
 import os
 from pathlib import Path, PurePosixPath
 import shutil
@@ -51,7 +54,7 @@ def get_images():
         return ds.get(image_key, timeout=DATASTORE_TIMEOUT)
     except Exception as error:
         print(f.warning(f"Could not check Datastore for site images: {error}"))
-        print(f.warning("Continuing update with existing site images."))
+        print(ui.info("Continuing update with existing site images."))
         return None
 
 
@@ -145,7 +148,7 @@ def save_images(sp, images_dict=None):
     if images_dict is None:
         images_dict = get_images()
     if not images_dict:
-        sp.write(f.warning("Site images not found; keeping existing images."))
+        sp.write(ui.status("Site images not found; keeping existing images."))
         return False
 
     keys = _site_image_entries(images_dict, sp, f)
@@ -208,7 +211,6 @@ def save_images(sp, images_dict=None):
                 )
                 continue
             staged_targets.append(target)
-            sp.write(f.info(f"Staged {provider_key}"))
 
         if not staged_targets:
             sp.write(

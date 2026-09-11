@@ -205,6 +205,81 @@ External-agent API authentication is independent of browser sessions. An
 authenticated non-public user can generate one 30-day bearer key from their own
 Settings panel, regardless of the site-funded AI-access level. Only a digest is
 persisted, rotation invalidates the previous key, and `/api/v1` never falls back
-to a login cookie. The API has no separate deployment-wide feature gate;
+to a login cookie. Both site AI policy flags must permit external access;
 normal entity permissions remain authoritative. See [External Agent
 API](AI_EXTERNAL_API.md).
+
+## Remote MCP
+
+The optional Cloud Run service uses existing browser login to authorize one
+supported ChatGPT CIMD client and one pre-registered public Codex client.
+Both site AI policy flags gate authorization and existing grants. Eligible
+active non-public Lagniappe users may connect. There is no actor allowlist in
+installation configuration. The login email need not
+match the agent account's email. See
+[Infrastructure Configuration](INFRA_CONFIG.md#ai-policy-and-remote-mcp).
+
+The main app serves authorization-server metadata at
+`/.well-known/oauth-authorization-server` and the `/oauth/authorize`,
+`/oauth/token`, and `/oauth/revoke` endpoints. Only authorization code with PKCE
+S256 and rotating refresh tokens are supported. Client ID, redirect URI,
+issuer, and resource are checked exactly. OAuth does not advertise or request
+scopes: each request uses the connected user's current workspace permissions.
+New OAuth records and token responses omit scope. Previously issued credentials
+and clients still sending the former `mcp:use` scope remain compatible; other
+explicit scopes are rejected. There is no dynamic client registration or client
+secret. Login continuation stores the validated request in a short-lived
+server-side record, then uses the clean
+`/oauth/authorize` URL through login and consent. Only its opaque reference is
+held in a dedicated Secure, HttpOnly, SameSite=Lax cookie scoped to `/oauth`.
+Keeping this separate from the main session lets the pending authorization
+survive Google's cross-site sign-in POST creating a new session. Consent also
+binds its submitted pending reference and actor to the current request, so a
+stale form cannot authorize a different attempt or account. Consent and connection
+revocation use ordinary session authentication and CSRF protection; only token
+exchange and token-possession revocation are exempt views.
+CSRF failures on the consent endpoint show the AI connections error page with
+sign-in-session mismatch and client-restart guidance. They still return HTTP 400
+with `X-Lagniappe-CSRF: invalid`, without issuing a code or redirecting to a client.
+
+Opaque codes and tokens have digest-addressed records in the `mcp_oauth`
+Datastore kind. Pending requests last ten minutes, codes five minutes, access
+tokens thirty minutes, and grants at most thirty days. Refresh rotates the
+token; reuse of an already-used refresh token revokes its grant family.
+There is one active grant per Lagniappe user **and client**. Reconnecting
+ChatGPT replaces that user's ChatGPT grant; reconnecting Codex replaces only
+Codex. **Manage AI connections**
+in Settings opens `/oauth/connection`, with separate revoke controls. Browser
+logout or switching the browser user does not revoke either connection.
+
+The pre-registered public Codex client is `lagniappe-codex`. Its redirect is `http://127.0.0.1/callback`, allowing only
+an optional valid numeric port for Codex's local listener (RFC 8252). Host,
+path, query absence, and the actual callback reused at token exchange remain
+exact. No DNS callback, dynamic registration, client secret, or additional
+metadata fetch is introduced. Authorization responses include `iss`, as
+required by Codex's pre-registered-client flow. OAuth responses also allow the
+loopback callback in their CSP `form-action` directive:
+browsers apply that directive to the native consent POST's redirect chain.
+Other pages retain the ordinary same-origin policy. Consent and revocation use
+the shared login button spinner while preserving native POST values and CSRF.
+Client identities and callback rules are application constants, not installation
+settings. Both clients are available when MCP and external AI are configured.
+
+Cloud Run authenticates every MCP request through `/api/v1`, including requests
+such as ping that need no domain data. The API requires both the dedicated
+service account's Google ID token in `Authorization` and the opaque access token
+in `X-Lagniappe-MCP-Token`. It verifies the Google signature, exact service
+identity, and audience the canonical app origin plus `/api/v1` before resolving the user
+token and current grant. Google's public verification certificates use a
+bounded five-minute cache; token signatures, claims, and current user grants
+are still verified on every request. Ordinary user permissions still apply.
+An OAuth token sent directly as a public API bearer key is rejected; API-key
+and OAuth grant revocation are independent.
+
+Disabling `EXTERNAL_AI_ENABLED` or `AI_ENABLED` stops the OAuth routes and
+envelope authentication. The saved `MCP_RESOURCE` and `MCP_SERVICE_ACCOUNT`
+remain available for re-enabling; the issuer derives from the canonical app URL. Expiry and revocation are enforced during reads, independently
+of eventual expired-record cleanup. Application error reporting redacts opaque
+secrets and OAuth context. Platform request logs require separate deployment
+handling because the initial authorization URL contains query parameters; see
+the [deployment lifecycle](INFRA_DEPLOYMENT.md#remote-mcp-service).

@@ -363,8 +363,11 @@ vm.runInContext(source, context);
   const catchupProbes = events.filter(
     (event) => event.type === "form-request" && event.url === "/form-a",
   );
-  if (catchupProbes.length !== 1 || markerA.dataset.visible !== "true") {
+  if (catchupProbes.length !== 1 || markerA.dataset.visible !== "false") {
     throw new Error("Newly active form did not catch up from its retained revision");
+  }
+  if (events.some((event) => event.type === "apply-a")) {
+    throw new Error("Unchanged saved form replaced the retained draft during catch-up");
   }
 
   const timersBeforeAcknowledgement = events.filter(
@@ -572,5 +575,69 @@ vm.runInContext(source, context);
   console.error(error);
   process.exit(1);
 });
+'''
+    )
+
+
+# @pair edited-entity-notice:unchanged-form
+# @source src/script/shared/editReconciler.mjs::EditReconciler
+def test_metadata_only_revision_preserves_clean_and_dirty_forms(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+const assert = require("node:assert/strict");
+const context = {
+  console,
+  areEqual: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  loadRevisionPreview: async (_widget, response) => ({
+    revisionSnapshot: () => response.snapshot,
+    destroy() {},
+  }),
+  withTransition: async (callback) => callback(),
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8")
+  .replace(/^import .*$/gm, "")
+  .replace("export class EditReconciler", "class EditReconciler");
+vm.runInContext(source + "\nglobalThis.EditReconciler = EditReconciler;", context);
+(async () => {
+  for (const dirty of [false, true]) {
+    for (const schema of [[], [{ id: "title" }]]) {
+      let replacements = 0;
+      const marker = {
+        dataset: { visible: "true" },
+        querySelector() { return null; },
+        closest() { return { dataset: { fingerprint: "old", modified: "before" } }; },
+      };
+      const widget = {
+        schema, submission: { title: "saved" },
+        revisionBaseline: "saved",
+        revisionCanReset: () => true,
+        revisionSnapshot: () => dirty ? "draft" : "saved",
+        buildLocalRevision: (response) => ({ response: { ...response, snapshot: "draft" } }),
+        async applyRevision() { replacements++; },
+        unsavedState: dirty, visible: true,
+        form: schema.length ? { renderer: {} } : {},
+        target: { contains: () => true },
+      };
+      widget.component = { active: widget };
+      const reconciler = new context.EditReconciler({ addFlash() {} });
+      await reconciler._stageRevision(marker, widget,
+        { schema, submission: { title: "saved" }, snapshot: "saved" },
+        { fingerprint: "image-updated", modified: "after" });
+      assert.equal(replacements, 0, "Metadata-only update replaced the form");
+      assert.equal(marker.dataset.visible, "false", "Metadata-only update raised a conflict");
+      assert.equal(widget.unsavedState, dirty, "Metadata-only update cleared dirty state");
+      assert.equal(widget.revisionSnapshot(), dirty ? "draft" : "saved");
+
+      await reconciler._stageRevision(marker, widget,
+        { schema, submission: { title: "remote" }, snapshot: "remote" },
+        { fingerprint: "concurrent-edit", modified: "later" });
+      assert.equal(replacements, 0, "Concurrent edit replaced an active form");
+      assert.equal(marker.dataset.visible, "true", "Concurrent edit was silently acknowledged");
+    }
+  }
+})().catch((error) => { console.error(error); process.exit(1); });
 '''
     )

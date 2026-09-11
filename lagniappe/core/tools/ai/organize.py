@@ -32,6 +32,11 @@ from .reporting.contracts.permissions import (
     report_action_permission_instructions,
 )
 from .reporting.contracts.schema import report_proposal_response_schema
+from .reporting.contracts.workflows import (
+    ORGANIZE_UPDATE_GUIDELINES,
+    REMOTE_UPDATE_ACTIONS,
+    is_remote_organize_update,
+)
 from .reporting.completion.files import (
     OVERSIZED_REPORT_SUMMARY,
     _report_file_summary_warning,
@@ -109,12 +114,12 @@ ORGANIZE_ACTION_TYPES = frozenset(
         "create_page",
         "create_task",
         "add_form_to_page",
-        "add_category",
-        "update_form_schema",
-        "update_submission_fields",
-        "attach_file_to_page",
-        "attach_file_to_task",
-        "delete_page",
+        "add_page_category",
+        "extend_form_schema",
+        "update_form_values",
+        "attach_file",
+        "append_page_document",
+        "suggest_page_deletion",
         "skip",
         "needs_review",
     }
@@ -151,16 +156,18 @@ def _organize_action_permission_context(user, allowed_actions):
             "can_rename_entities",
         }
     }
-    if "add_category" in set(allowed_actions or ()):
+    if "add_page_category" in set(allowed_actions or ()):
         context["capabilities"]["can_add_page_categories"] = True
     return context
 
 
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_organize_prompt_includes_files_tools_instructions_and_high_limit
-# @matrix ai-report : files iteration-limit prompt tools
+# @matrix ai-report : files iteration-limit prompt tools remote-update
 def organize_prompt(report, user, retrieval_context=None):
     """Build the AI prompt used to create an organize report proposal."""
+    if is_remote_organize_update(report):
+        return _organize_update_prompt(report, user)
     prompt = _organize_prompt_base(
         report,
         user,
@@ -187,6 +194,8 @@ to run it.
 # @matrix ai-report : context feedback proposal revision
 def revise_organize_prompt(report, user, feedback, retrieval_context=None):
     """Build the AI prompt used to revise an organize report proposal."""
+    if is_remote_organize_update(report):
+        return _organize_update_prompt(report, user, feedback=feedback)
     prompt = _organize_prompt_base(
         report,
         user,
@@ -233,6 +242,53 @@ do not add a hash: prefix to an existing long id.
 # @testable false
 # @covered-by lagniappe/core/tools/ai/organize.py::organize_prompt
 # @covered-by lagniappe/core/tools/ai/organize.py::revise_organize_prompt
+# @reason remote update prompt behavior is exercised through both public builders
+def _organize_update_prompt(report, user, feedback=None):
+    allowed = tuple(
+        action
+        for action in allowed_report_actions(user)
+        if action in REMOTE_UPDATE_ACTIONS
+    )
+    prompt = Prompt(
+        "You are the Lagniappe Organize tool, planning updates to existing records.",
+        user=user,
+        type="organize report",
+    )
+    prompt._organize_update_only = True
+    prompt.set_instructions_before_context()
+    prompt.enable_tools(*READ_ONLY_CONTEXT_TOOLS)
+    prompt.set_max_tool_iterations(ORGANIZE_MAX_TOOL_ITERATIONS)
+    prompt.set_allowed_actions(allowed)
+    prompt.set_response_schema(
+        report_proposal_response_schema(allowed, require_issues=True)
+    )
+    prompt.add_output_contract(
+        "JSON",
+        "Return summary, confidence, issues and actions using the response schema.",
+    )
+    prompt.add_workspace_concepts(LAGNIAPPE_WORKSPACE_CONCEPTS)
+    prompt.add_context("current_date", dates.user_today(user).date().isoformat())
+    prompt.add_context("user_instructions", report.instructions or "None provided.")
+    prompt.add_context(
+        "report_action_permissions", report_action_permission_context(user, allowed)
+    )
+    prompt.add_instructions(
+        ORGANIZE_UPDATE_GUIDELINES, section_title="Remote Organize updates"
+    )
+    if feedback is not None:
+        prompt.add_context("user_feedback", feedback, quote=True)
+        prompt.add_context("current_proposal_json", report.proposal or {}, quote=True)
+        prompt.add_instructions(
+            "Revise and return the complete replacement proposal, retaining correct "
+            "parts and final submission patches. Existing stored ids in the current "
+            "proposal must be preserved exactly, without adding hash: prefixes."
+        )
+    return prompt
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/organize.py::organize_prompt
+# @covered-by lagniappe/core/tools/ai/organize.py::revise_organize_prompt
 # @reason prompt section composition is verified by the public prompt builders
 def _organize_prompt_base(
     report,
@@ -242,6 +298,8 @@ def _organize_prompt_base(
     retrieval_context=None,
 ):
     allowed_actions = _organize_allowed_actions(user)
+    if getattr(report, "origin", None) in {"api", "email"}:
+        allowed_actions = (*allowed_actions, "complete_task", "set_task_due_date")
     prompt = Prompt(intro, user=user, type="organize report")
     prompt.set_instructions_before_context()
     # Leave thinking unset so each primary model uses its native default; a raw
@@ -384,9 +442,9 @@ def generate_organize_plan(prompt):
             prompt,
             proposal,
             report_label="Organize",
-            allow_empty_submission_updates=True,
-            require_pending_submission_target=True,
-            allow_pending_submissions=True,
+            allow_empty_submission_updates=not getattr(prompt, "_organize_update_only", False),
+            require_pending_submission_target=not getattr(prompt, "_organize_update_only", False),
+            allow_pending_submissions=not getattr(prompt, "_organize_update_only", False),
         )
 
     proposal = ai_model.generate_content(prompt, validator=validate_plan)
@@ -402,6 +460,8 @@ def generate_organize_plan(prompt):
 def generate_organize_report(prompt, report, user):
     """Generate, complete, and validate an Organize report proposal."""
     proposal = generate_organize_plan(prompt)
+    if is_remote_organize_update(report):
+        return proposal
     proposal = complete_organize_submissions(
         proposal,
         report,

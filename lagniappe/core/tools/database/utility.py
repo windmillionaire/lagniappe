@@ -10,6 +10,7 @@ from lagniappe import CONFIG
 from .core import DATA, KINDS
 from .defaults import DEFAULT_USER_FORM, DEFAULT_USER_PAGE
 from .filter import Filter, Query
+from .transactions import retry_aborted
 from lagniappe.core.definitions.default import DefaultEnum
 
 PREFIX = CONFIG.PREFIX
@@ -148,12 +149,34 @@ def _put_mutation(writer, entity, property_mask=None):
 
 
 # @testable true
+# @tests tests_unit/test_018_database_utility.py::test_cache_acknowledgement_is_revision_checked_and_masked
+# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_cache_acknowledgement_preserves_newer_permissions
+# @matrix cache user : invalidation acknowledgement concurrency property-mask
+@retry_aborted
+def acknowledge_user_cache(key, revision):
+    """Clear only the invalidation that the browser actually observed."""
+    with DATA.datastore.transaction() as transaction:
+        current = DATA.datastore.get(key, transaction=transaction)
+        if current is None:
+            return False
+        if not current.get("invalidate_cache"):
+            return True
+        if revision != current.get("cache_invalidation_revision", "legacy"):
+            return False
+        current["invalidate_cache"] = False
+        _put_mutation(transaction, current, ("invalidate_cache",))
+    return True
+
+
+# @testable true
 # @tests tests_unit/test_018_database_utility.py::test_save_mutations_applies_property_masks_and_fingerprints
+# @tests tests_unit/test_018_database_utility.py::test_permission_source_save_invalidates_tasks_without_descendant_writes
+# @matrix permissions mutations : channel-invalidation no-descendant-writes
 # @tests tests_unit/test_018_database_utility.py::test_notification_save_and_delete_skip_site_fingerprints
 # @matrix database mutations : document-checkpoint full-upsert property-mask site-fingerprint update
 # @matrix notifications : mutation site-fingerprint-isolation
-def save_mutations(writes):
-    """Persist full and property-masked entity writes in one Datastore batch.
+def save_mutations(writes, *, guards=None):
+    """Persist full and property-masked writes with their collection revisions.
 
     ``writes`` contains ``(typed_entity, property_mask)`` pairs. A ``None`` mask
     is a normal full upsert. A non-empty mask is converted to an ``update``
@@ -177,15 +200,42 @@ def save_mutations(writes):
     fingerprint_entities = [
         entity.db for entity, mask in writes if _advances_site_fingerprint(entity, mask)
     ]
+    if any(
+        mask is None and entity.db.get("type") in {"page", "form"}
+        and getattr(entity, "_permission_sources_changed", False)
+        for entity, mask in writes
+    ):
+        # One collection invalidation replaces a write to every affected Task.
+        fingerprint_entities.append({"type": "task"})
     fingerprints = (
         update_site_fingerprints(*fingerprint_entities) if fingerprint_entities else []
     )
+    if guards:
+        return _save_guarded_mutations(writes, fingerprints, guards)
     with DATA.datastore.batch() as batch:
         for entity, mask in writes:
             _put_mutation(batch, entity.db, mask)
 
         for fingerprint in fingerprints:
             batch.put(fingerprint)
+
+
+# @testable true
+# @tests tests_unit/test_010b_document_append.py::test_guarded_checkpoint_rejects_a_concurrent_asset_change
+# @matrix mutations sync : document checkpoint cas conflict
+@retry_aborted
+def _save_guarded_mutations(writes, fingerprints, guards):
+    with DATA.datastore.transaction() as transaction:
+        for key, expected in guards:
+            current = DATA.datastore.get(key, transaction=transaction)
+            if current is None or any(current.get(name) != value for name, value in expected.items()):
+                from lagniappe.core.exceptions import ValidationError
+
+                raise ValidationError("Document changed while saving; sync and retry.")
+        for entity, mask in writes:
+            _put_mutation(transaction, entity.db, mask)
+        for fingerprint in fingerprints:
+            transaction.put(fingerprint)
 
 
 # @testable true
@@ -269,6 +319,16 @@ def update_site_fingerprints(*entities):
         record["fingerprint"] = str(uuid.uuid4())
 
     return records
+
+
+# @testable true
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_completion_publishes_existing_collection_revisions
+# @matrix permissions cache : channel-invalidation reconciliation
+def advance_site_fingerprints(*kinds):
+    """Publish completed projection changes through the existing channels."""
+    records = update_site_fingerprints(*({"type": kind} for kind in kinds))
+    if records:
+        DATA.datastore.put_multi(records)
 
 
 # @testable false

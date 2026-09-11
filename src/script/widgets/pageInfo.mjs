@@ -118,10 +118,6 @@ export class PageForm extends FormElement {
 		return section;
 	}
 
-	get photoPromptElement() {
-		return sections.photoPrompt(this);
-	}
-
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
@@ -136,8 +132,22 @@ export class PageForm extends FormElement {
 		return sections.autofill(this);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_controls_toggle_and_remember_desktop_visibility
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_readonly_viewer_can_toggle_image_without_editing
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_image_changes_preserve_page_info_dom_and_draft
+	 * @matrix pages : photo-prompt photo-visibility readonly desktop-tabs unsaved-preservation
+	 */
 	get prepend() {
-		return [this.photoPromptElement, this.nameElement, this.descriptionElement];
+		let imageControls = this.target.querySelector("[data-role='photo-prompt']");
+		if (this.revisionPreview) {
+			imageControls?.remove();
+			imageControls = null;
+		} else if (imageControls) {
+			this.view._syncPhotoControls(undefined, imageControls);
+		}
+		return [imageControls, this.nameElement, this.descriptionElement];
 	}
 
 	get append() {
@@ -790,9 +800,11 @@ export class UserSettings extends PagePermissions {
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
 	 * @pair public-users:email-consent
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
+	 * @pair user-settings:restrictions
 	 */
 	get formData() {
-		const data = new FormData();
+		const data = super.formData;
 		const card = this.userCardElement;
 		const name = card?.querySelector("[name='name']");
 		const email = card?.querySelector("[name='email']");

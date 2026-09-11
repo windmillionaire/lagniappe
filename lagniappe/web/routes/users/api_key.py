@@ -3,6 +3,7 @@
 from flask import abort, g, request
 from flask_login import current_user
 
+from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.tools.auth import agent_api
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
@@ -16,7 +17,11 @@ from . import users
 # @covered-by lagniappe/web/routes/users/api_key.py::api_key
 # @reason user eligibility is owned by the public key-management route
 def _enabled_actor():
-    if getattr(current_user, "is_public", False):
+    if (
+        not CONFIG.AI_ENABLED
+        or not CONFIG.EXTERNAL_AI_ENABLED
+        or getattr(current_user, "is_public", False)
+    ):
         abort(403)
     g.NO_CACHE = True
     return current_user._get_current_object()

@@ -177,7 +177,7 @@ def _remember_created(created, action, entity):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason attachment target serialization is verified through report run outputs
 def _attachment_target_result(action, to_save):
-    if action.get("type") not in {"attach_file_to_page", "attach_file_to_task"}:
+    if action.get("type") != "attach_file":
         return None
     if len(to_save) < 2:
         return None

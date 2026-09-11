@@ -48,6 +48,12 @@ Writes use UTF-8/LF, a same-directory temporary file, flush/fsync,
 rejected. Secret-bearing files receive owner-only POSIX mode and a restricted
 Windows ACL where available.
 
+The application settings file stores booleans/numbers as text and structured
+values as JSON strings. `decode_app_settings` provides the shared conversion
+used by `File.load()` and doctor; native YAML values also remain supported.
+Diagnostics must decode this persisted format before applying runtime
+validation, rather than passing raw YAML strings to feature-policy checks.
+
 After all generated files exist, `lagniappe_generation.json` records the
 SHA-256 generation of `config/constants.py`, excluding the random `BUILD_ID`
 line. Deploy verifies the marker and every generated document. Frontend builds
@@ -186,11 +192,84 @@ Optional agent access uses `AGENT_ACCESS_ENABLED`, `AGENT_ACCESS_EMAIL`,
 `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. Successful login resolves to a
 normal User and normal group permissions.
 
-The bearer-authenticated external planning API has no deployment-wide feature
-setting. Setup removes the retired `EXTERNAL_AGENT_API_ENABLED` key from older
-generated settings. Access is controlled by user AI eligibility, per-user
-credential revocation, and ordinary workspace permissions; it does not enable
-or invoke an AI provider.
+The bearer-authenticated external planning API follows the AI policy below.
+Setup removes the retired `EXTERNAL_AGENT_API_ENABLED` key from generated
+settings. User AI eligibility, credential revocation, and ordinary workspace
+permissions also apply; external access does not invoke the site’s AI provider.
+
+## AI policy and remote MCP
+
+`AI_ENABLED` and `EXTERNAL_AI_ENABLED` are strict booleans in application
+settings. Disabling AI makes external access effectively false as well. The
+first controls built-in provider calls and AI controls throughout the UI,
+including Admin model selection and per-user AI settings. The second controls
+both MCP OAuth and direct API/skill access, including existing credentials.
+These are installer policy, separate from per-user AI entitlement and the
+live model selections in Admin → Site Settings → AI Models.
+
+Normal installation asks for AI first, then offers external AI/MCP (default
+no), and prints one informational line with the three default models. Existing
+choices are preserved by update/recovery. Source upgrade asks for AI choices
+when `EXTERNAL_AI_ENABLED` has not yet been recorded; selecting external AI
+provisions MCP during that upgrade's deployment. Later upgrades preserve the
+saved choice. `./setup.sh ai` changes these choices and offers to deploy them.
+When external AI is selected, setup also asks for an MCP connection name and
+saves it as `MCP_NAME`. The default is the installation's saved `GCLOUD_CONFIG`
+name plus `-mcp`; an existing choice is offered unchanged. Source upgrade asks
+only for this name when external AI is already selected but the name is absent.
+Updates and recovery retain it, including while AI is disabled.
+Legacy configurations lacking the flags retain their existing built-in and REST
+API behavior on ordinary update; missing external policy does **not** implicitly
+install a Cloud Run service. A previously enabled remote service
+continues to be selected through its saved `MCP_RESOURCE`. New installations
+always save explicit choices. Normal config generation also writes the
+`AI_ENABLED` default explicitly when it was absent.
+
+MCP connection and deployment details are flat application settings, validated
+by `config/remote_mcp.py`. Setup collects the connection name and discovers the
+endpoint and runtime identity from the selected project and verified Cloud Run service:
+
+| Field | Contract |
+| --- | --- |
+| `MCP_NAME` | Installation's connection name for manual commands and ChatGPT plugin setup. 1–64 ASCII letters, digits, hyphens or underscores, starting with a letter or digit. |
+| `MCP_RESOURCE` | Exact canonical Cloud Run `status.url` plus `/mcp`, on a different origin from the application. |
+| `MCP_SERVICE_ACCOUNT` | Exact MCP runtime identity in this project. |
+| `MCP_VERSION` | Desired 32-character hexadecimal source fingerprint. |
+
+The endpoint and service account must be present together. Without them, MCP
+OAuth is unavailable. Disabling external AI retains both values for re-enabling.
+There is no separate MCP or per-client switch, and no actor list in CONFIG.
+Eligible active non-public users may connect within their workspace permissions.
+The name is a client-facing alias, independent of the Cloud Run service,
+service accounts and OAuth client IDs. Changing it updates the manual for new
+connections; existing client registrations keep their local names. Runtime
+configuration without a saved name uses `lagniappe-remote` until setup collects
+the installation's choice.
+
+The issuer is derived from `CUSTOM_DOMAIN` when configured, otherwise `APP_URL`.
+It is a canonical HTTPS origin without a path or trailing slash. The upstream
+API and Google ID-token audience use that origin plus `/api/v1`. URLs reject
+credentials, query strings, fragments, ports and noncanonical host spelling.
+Changing the canonical app origin or MCP resource requires reconnection.
+
+Supported client identities and callback rules live in application code:
+ChatGPT uses its fixed metadata URL and callback; Codex uses `lagniappe-codex`
+and an exact loopback callback with an optional valid port. Incoming OAuth
+requests must match those rules; they do not choose the server’s trust policy.
+
+The installer compares the actual ready Cloud Run revision and its matching
+label, image and environment before deciding whether a redeploy is necessary.
+It does not equate a locally saved version with deployment success. Recovery
+validates and retains these settings; doctor reports component drift.
+
+Cloud Run reads only `LAGNIAPPE_MCP_ENABLED`, `LAGNIAPPE_MCP_ISSUER` and
+`LAGNIAPPE_MCP_RESOURCE`; Google identity comes from runtime metadata. No app
+settings file, user API key, client secret or service-account key is copied
+there. Disabled bootstrap permits reading the canonical URL before publishing
+the app configuration and activating the service.
+
+See [Authentication](AUTHENTICATION.md#remote-mcp) and
+[Deployment](INFRA_DEPLOYMENT.md#remote-mcp-service) for authorization and lifecycle.
 
 ## Runtime-safe exports
 

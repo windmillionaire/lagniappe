@@ -119,7 +119,7 @@ def _fetch(user, path, method="GET", data=None):
     )
 
 
-# @matrix mentions : document-view empty-results floating-menu link-popover mouse node-attributes profile-link recipient-search unlink
+# @matrix mentions : document-view empty-results floating-menu keyboard link-popover mouse node-attributes profile-link recipient-search unlink
 def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     owner = get_user(Users.OWNER)
     recipient = get_user(
@@ -160,6 +160,12 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     expect(popup).to_have_attribute("data-visible", "true")
     expect(popup).to_have_attribute("data-kind", "user")
     expect(popup.get_by_role("option", name="No Results")).to_be_visible()
+
+    editor.text_entry.press("Escape")
+    expect(popup).to_be_hidden()
+    editor.type_text(" still typing")
+    editor.blur()
+    expect(popup).to_be_hidden()
 
     editor.clear_text()
     expect(popup).to_be_hidden()

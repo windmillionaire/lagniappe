@@ -1,9 +1,14 @@
 """Resumable delegated-installation handoff to the permanent business Owner."""
 
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
+
 from config.storage import recovery_bucket_name, storage_bucket_names
 from installer import iam
 from installer.package_install import install_if_missing
 from installer.state import record_step
+from runner.console import format_prompt, wrap_text
+from runner.context import setup_command
 
 
 OWNER_ROLE = "roles/owner"
@@ -51,15 +56,8 @@ def prepare_handoff_operator():
             SETTINGS.GCLOUD_CONFIG["ACCOUNT"] = saved_account
 
     role = "permanent Owner" if active_email == owner_email else "installer"
-    print(f"[OK] Handoff operator: {active_email} ({role})")
+    print(ui.success(f"Handoff operator: {active_email} ({role})"))
     return active_email
-
-
-# @testable false
-# @covered-by installer/handoff.py::handoff
-# @reason terminal-only role formatting is exercised through the handoff preview
-def _role_list(roles):
-    return ", ".join(sorted(roles)) if roles else "(no current direct binding)"
 
 
 # @testable false
@@ -278,56 +276,34 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
     for bucket in context["buckets"].values():
         iam.require_installer_bucket_permissions(bucket)
 
-    installer_member = iam.principal_member(installer_email)
-    bucket_installer_roles = {
-        name: iam.policy_member_roles(
-            bucket.get_iam_policy(requested_policy_version=3), installer_member
-        )
-        for name, bucket in context["buckets"].items()
-    }
-    _runtime_resource, runtime_policy = _service_account_policy(
+    # Read managed policies before confirmation so discovery failures still
+    # stop before any handoff changes.
+    for bucket in context["buckets"].values():
+        bucket.get_iam_policy(requested_policy_version=3)
+    _service_account_policy(
         context["service_accounts"], project_id, runtime_email
     )
-    runtime_installer_roles = iam.policy_member_roles(
-        runtime_policy, installer_member
-    )
-    project_installer_roles = iam.policy_member_roles(
-        project_policy, installer_member
-    )
 
-    print("\n=== Delegated installation handoff ===")
-    print(f"Installer/source: {installer_email}")
-    print(f"Permanent Owner/deployer: {owner_email}")
-    print(f"Target project: {project_id}")
-    print(f"Runtime service account: {runtime_email}")
-    print("Planned binding changes:")
-    for name in managed_bucket_names:
-        print(f"  Bucket {name}:")
-        print(f"    add Owner: {_role_list(iam.constants.OPERATOR_BUCKET_ROLES)}")
-        print(
-            "    remove installer: "
-            f"{_role_list(bucket_installer_roles.get(name, set()))}"
-        )
-    print(f"  Runtime service account {runtime_email}:")
-    print(
-        "    add Owner: "
-        f"{_role_list(iam.constants.RUNTIME_SERVICE_ACCOUNT_ROLES)}"
-    )
-    print(f"    remove installer: {_role_list(runtime_installer_roles)}")
-    print("  Application configuration:")
-    print(f"    set DEPLOYER_EMAIL: {owner_email}")
-    print(f"    set saved gcloud account: {owner_email}")
-    print("    clear BOOTSTRAP_ADMIN_EMAIL and deploy")
-    print(f"  Project {project_id} (final cloud mutation):")
-    print(f"    retain Owner: {OWNER_ROLE}")
-    print(f"    remove installer: {_role_list(project_installer_roles)}")
-    answer = (confirm or input)("Continue with handoff? [y/N]: ")
+    print(ui.heading("\nDelegated installation handoff"))
+    print(ui.value("Installer", installer_email, column=17, verbatim=True))
+    print(ui.value("Permanent Owner", owner_email, column=17, verbatim=True))
+    print(ui.value("Project", project_id, column=17, verbatim=True))
+    print(wrap_text(
+        "\nInstallation access will transfer to the Owner. After the app is "
+        "deployed with the Owner as deployer, the installer's installation "
+        "roles will be removed."
+    ))
+    answer = (confirm or input)(format_prompt(
+        "Deploy app and complete handoff", hint="y/N"
+    ))
     if str(answer or "").strip().casefold() not in {"y", "yes"}:
-        print("Handoff cancelled. No changes were made.")
+        print(ui.status("Handoff cancelled. No changes were made."))
         return 1
 
     record_step("grant permanent Owner managed-resource access")
     _grant_owner_resource_access(context, project_id, runtime_email, owner_email)
+    from installer.mcp import handoff_access
+    handoff_access(settings, owner=owner_email)
 
     record_step("deploy permanent Owner configuration")
     settings["DEPLOYER_EMAIL"] = owner_email
@@ -341,18 +317,30 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
         context, project_id, runtime_email, installer_email
     )
 
+    handoff_access(settings, remove_installer=installer_email)
+
     record_step("remove installer project IAM access")
     _remove_installer_project_access(
         context, project_id, installer_email, owner_email
     )
 
-    print("\nHandoff complete. INSTALLER_EMAIL was retained as historical metadata.")
-    print("Remaining business cleanup:")
-    print("  Verify the installer is absent from Google Cloud project IAM.")
-    print("  Revoke provider invitations and temporary access tokens.")
-    print("  Remove local credentials and settings from the installer's machine.")
-    print("  Suspend, then delete the temporary Workspace user when no longer needed.")
-    print("  Rotate any secret that could not remain business-controlled.")
+    print(ui.success("\nHandoff complete"))
+    print("Installation roles removed from installer.")
+    print(ui.heading("\nRemaining business cleanup"))
+    auth_email = settings.get("AUTH_EMAIL_CONFIG") or {}
+    if installer_email in {
+        str(auth_email.get(field) or "").strip().casefold()
+        for field in ("senderEmail", "username")
+    }:
+        print(wrap_text(
+            f"  - Run {ui.literal(setup_command('email'))} to replace "
+            f"authentication email for {installer_email} with a permanent "
+            "account, and deploy the change before deleting the mailbox."
+        ))
+    print(wrap_text(
+        f"  - Delete the installer's Workspace account ({installer_email}) "
+        "if no longer needed."
+    ))
     return 0
 
 

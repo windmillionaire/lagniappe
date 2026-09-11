@@ -115,6 +115,8 @@ It is intentionally not part of `User.go()`. Most direct setup navigations need
 only view initialization, later same-page transitions should use their own
 visible/workflow boundary, and public pages do not load the authenticated
 bundle or its readiness markers. Never call this helper on a public page.
+Its complete readiness/transition boundary is one navigation-aware Playwright
+wait, so cache-driven document replacements do not exhaust a one-reload retry.
 
 Some cold-loaded controls expose their portal before asynchronous activation
 has finished replacing its options. If the component publishes `aria-busy`,
@@ -136,6 +138,19 @@ wait for the service worker's exact `POST /l/validate-user` acknowledgement
 before the navigation that consumes it. Assert `cacheCleared` before checking
 that the persisted flag is false. A page-scoped wait can be lost across the new
 document that performs this acknowledgement.
+
+Use `acknowledge_user_cache_invalidation()` for permission setup. It accepts an
+already-completed worker acknowledgement and waits for successful application
+destinations to become interaction-ready before returning. Intentional error
+destinations still require acknowledgement but have no application readiness
+markers. Do not require the transient invalidation flag to
+still be true after a mutation: the active worker may already have consumed it.
+The server matches the acknowledged invalidation revision and clears only that
+field transactionally, preserving newer permission changes.
+
+Header-search assertions wait for the exact query response and the input's
+`aria-busy="false"` publication boundary. An absent result or hidden empty panel
+alone can pass before a debounced query has even started.
 
 ### Time and browser conditions
 
@@ -193,7 +208,9 @@ response expectation and assert its exact status.
 
 Use direct HTTP requests only when the protocol itself is under test, such as
 forgery protection or malformed payload handling. Carry the browser's cookies
-and CSRF token, set a finite timeout, and keep a final user-visible assertion
+and CSRF token, use `manual_mutation_headers()` for same-origin `Origin` and
+`Referer` headers required by HTTPS CSRF checks, set a finite timeout, and keep a
+final user-visible assertion
 when the test claims a browser story.
 
 The E2E browser failure guard fails tests on unaccounted console errors,

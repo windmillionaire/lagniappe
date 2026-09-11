@@ -1,6 +1,6 @@
 """Error handlers for HTTP, Datastore, and uncaught exceptions."""
 
-from flask import make_response, redirect, render_template, request, session, url_for
+from flask import g, make_response, redirect, render_template, request, session, url_for
 from flask_wtf.csrf import CSRFError
 from lagniappe import CONFIG
 from google.api_core.exceptions import GoogleAPIError
@@ -38,8 +38,14 @@ def handle_http_error(error):
         return handle_api_http_error(error)
 
     if isinstance(error, CSRFError):
-        response = make_response(str(error.description))
-        response.headers["Content-Type"] = "text/plain"
+        if request.endpoint == "oauth.authorize":
+            g.NO_CACHE = True
+            response = make_response(render_template(
+                "oauth/connection.html", error=True, session_mismatch=True
+            ))
+        else:
+            response = make_response(str(error.description))
+            response.headers["Content-Type"] = "text/plain"
         response.headers["X-Lagniappe-CSRF"] = "invalid"
         return response, 400
     elif code == 401:

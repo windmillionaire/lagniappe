@@ -17,24 +17,25 @@ GET_CATEGORY_DETAILS = types.FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
-            "category_id": {
+            "id": {
                 "type": "string",
                 "description": "The category hash token from prompt context or search results.",
             },
         },
-        "required": ["category_id"],
+        "required": ["id"],
     },
 )
 
 
-# @testable false
-# @reason category loading, permissions, and to_ai projection are data/E2E-owned for AI tool stories
+# @testable true
+# @tests tests_unit/test_015_ai_tools.py::test_get_category_details_uses_canonical_id_and_checks_permission
+# @matrix ai categories : category-details permissions tool-context
 def execute_get_category_details(args, user):
-    category_id = args.get("category_id")
-    if not category_id:
-        return {"error": "category_id is required"}
+    identifier = args.get("id")
+    if not identifier:
+        return {"error": "id is required"}
 
-    category = Entities.fetch_one(category_id, request=Fetch.direct())
+    category = Entities.fetch_one(identifier, request=Fetch.direct())
     if not category or not isinstance(category, Entities.CATEGORY):
         return {"error": "Category not found"}
 

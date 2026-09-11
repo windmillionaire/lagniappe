@@ -1,5 +1,8 @@
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
 from pathlib import Path
 
+from runner.console import format_prompt
 from runner.context import (
     GCLOUD_CLI,
     REPOSITORY_ROOT,
@@ -30,7 +33,7 @@ def _recovery_file_present(app_dir=None):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
 # @matrix setup : explicit-project main-install manual-deploy prerequisites virtualenv
 def install():
-    print("Welcome to Lagniappe Setup!")
+    print(ui.heading(wrap_text("Welcome to Lagniappe setup")))
     if _recovery_file_present():
         print(
             wrap_text(
@@ -47,15 +50,10 @@ def install():
     record_step("validate gcloud CLI")
     check_gcloud_cli()
 
-    value = input(
-        wrap_text(
-            "This script will need to install certain Python packages if they "
-            "are not already installed. The script will ask for confirmation "
-            "before installing. Continue? [Y/n]: "
-        )
-    )
+    print(wrap_text("Setup will ask before installing any missing Python packages."))
+    value = input(format_prompt("Continue? [Y/n]: "))
     if value.lower() == "n":
-        print("Exiting installer.")
+        print(ui.status(wrap_text("Exiting installer.")))
         raise SetupCancelled("Setup cancelled before dependency installation.")
 
     record_step("install setup dependencies")
@@ -64,6 +62,7 @@ def install():
     from installer import FORMATTER
 
     f = FORMATTER.initialize()
+    first_install = not SETTINGS.APP.get("GOOGLE_CLOUD_PROJECT") and not SETTINGS.APP.get("APP_URL")
 
     from installer.create_config import set_application_defaults
 
@@ -105,8 +104,10 @@ def install():
 
     print(
         f.warning(
-            "Deployment memory note: every Gunicorn worker adds application "
-            "memory use; Lagniappe limits F2 and B2 to three workers."
+            wrap_text(
+                "Deployment memory note: every Gunicorn worker adds application "
+                "memory use; Lagniappe limits F2 and B2 to three workers."
+            )
         )
     )
 
@@ -114,43 +115,55 @@ def install():
     if getattr(SETTINGS, "RECOVERY_MODE", False):
         print(
             f.info(
-                "Recovery preserved monitoring, Sentry, AI, Redis, domain, and "
-                "other saved choices. Use the focused setup modes to reconfigure "
-                "them explicitly."
+                wrap_text(
+                    "Recovery preserved monitoring, Sentry, AI, Redis, domain, and "
+                    "other saved choices. Use the focused setup modes to reconfigure "
+                    "them explicitly."
+                )
             )
         )
     else:
         optional.setup_error_monitoring()
-        optional.change_ai_model()
-        record_step("configure AI email submissions")
-        ai_email_config = ai_email.setup_ai_email()
+        if optional.configure_ai_features():
+            record_step("configure AI email submissions")
+            ai_email_config = ai_email.setup_ai_email()
 
     record_step("persist generated configuration")
     SETTINGS.save()
 
     deployed = False
-    consent = input(f.info("Would you like to deploy the app now? [y/N]: "))
+    consent = input(
+        format_prompt("Deploy app now", hint="y/N")
+    )
     if consent.lower() == "y":
         record_step("deploy application")
-        utils.deploy_to_app_engine(print_final_summary=False)
+        utils.deploy_to_app_engine(
+            print_final_summary=False,
+            first_install=first_install and not getattr(SETTINGS, "RECOVERY_MODE", False),
+        )
         from installer.upgrade import _configure_deferred_job_recovery
 
-        print(f"\n{f.info('Wrapping up installation...')}")
         if not _configure_deferred_job_recovery(f, gcloud):
             return 1
         if ai_email_config:
             record_step("activate AI email submissions")
             ai_email.activate_ai_email(ai_email_config)
-        print(f"\n{f.success('Deployment complete!')}")
         deployed = True
     else:
         project = SETTINGS.GCLOUD_CONFIG["PROJECT"]
-        print(f.success("You can deploy the application manually when ready."))
-        print("Manual deployment steps:")
-        print("1. Review the generated YAML files")
         print(
-            "2. Run: "
-            f"{format_command([GCLOUD_CLI, 'config', 'set', 'project', project])}"
+            ui.info(wrap_text("You can deploy the application manually when ready."))
+        )
+        print(wrap_text(ui.heading("Manual deployment steps:")))
+        print(wrap_text((f"{ui.literal('1.')} Review the generated YAML files")))
+        print(
+            ui.value(
+                (f"{ui.literal('2.')} Select the project"),
+                format_command([GCLOUD_CLI, "config", "set", "project", project]),
+                verbatim=True,
+                standalone=True,
+                action=True,
+            )
         )
         index_command = [
             GCLOUD_CLI,
@@ -168,17 +181,65 @@ def install():
             "--project",
             project,
         ]
-        print(f"3. Run: {format_command(index_command)}")
-        print(f"4. Run: {format_command(app_command)}")
-        print(f"After deployment, run: {setup_command('jobs')}")
-        print(f"Then reconcile memory monitoring: {setup_command('monitoring')}")
+        print(
+            ui.value(
+                (f"{ui.literal('3.')} Deploy indexes"),
+                format_command(index_command),
+                verbatim=True,
+                standalone=True,
+                action=True,
+            )
+        )
+        print(
+            ui.value(
+                (f"{ui.literal('4.')} Deploy the application"),
+                format_command(app_command),
+                verbatim=True,
+                standalone=True,
+                action=True,
+            )
+        )
+        print(
+            ui.value(
+                "After deployment, run",
+                setup_command("jobs"),
+                verbatim=True,
+                standalone=True,
+                action=True,
+            )
+        )
+        print(
+            ui.value(
+                "Then reconcile memory monitoring",
+                setup_command("monitoring"),
+                verbatim=True,
+                standalone=True,
+                action=True,
+            )
+        )
+        from installer.mcp import requested
+        if requested(SETTINGS.APP):
+            print(
+                ui.value(
+                    "Then publish MCP and its app configuration",
+                    setup_command("mcp"),
+                    verbatim=True,
+                    standalone=True,
+                    action=True,
+                )
+            )
         if ai_email_config:
             print(
-                "Then activate the saved AI email configuration with: "
-                f"{setup_command('ai-email')}"
+                ui.value(
+                    "Then activate the saved AI email configuration",
+                    setup_command("ai-email"),
+                    verbatim=True,
+                    standalone=True,
+                    action=True,
+                )
             )
 
-    print(f"\n{f.success('Setup complete!')}")
+    print(wrap_text(f"\n{f.success('Setup complete')}"))
 
     from installer.summary import print_install_summary
 

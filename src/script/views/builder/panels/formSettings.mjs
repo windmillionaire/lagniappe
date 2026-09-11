@@ -33,7 +33,18 @@ export class FormSettings {
 		}
 
 		this._generateSchema = this._generateSchema.bind(this);
-		this._addRestriction = this._addRestriction.bind(this);
+		this._saveRestrictions = this._saveRestrictions.bind(this);
+		this._restrictionPromise = null;
+		this.restrictionForm = this.restrictions
+			? new BaseForm({
+					target: this.restrictions,
+					messages: {
+						submit: "Save Restrictions",
+						submitting: "Saving",
+						submitted: "Saved",
+					},
+				})
+			: null;
 		this._input = this._input.bind(this);
 		this._click = this._click.bind(this);
 		this._restrictionUpdated = this._restrictionUpdated.bind(this);
@@ -56,6 +67,8 @@ export class FormSettings {
 		this.column?.addEventListener("click", this._click);
 
 		if (this.restrictions) {
+			this.restrictionForm.init();
+			this.restrictions.addEventListener("submit", this._saveRestrictions);
 			const input = this.column.querySelector(
 				"[data-role='restrict-group-input']",
 			);
@@ -65,33 +78,52 @@ export class FormSettings {
 		}
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
+	 * @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
+	 */
 	_restrictionUpdated(event) {
 		if (this._destroyed) return;
-		const data = new FormData();
-		data.set("action", "add");
-
-		Object.keys(event.detail.options).forEach((key) => {
-			data.append("group-key", key);
-		});
-		void this._addRestriction(data);
+		if (Object.keys(event.detail.options).length) {
+			this.restrictions.querySelector("[name='admin']").checked = false;
+		}
+		const list = this.restrictions.querySelector("ul");
+		const template = this.restrictions.querySelector("template");
+		for (const [key, option] of Object.entries(event.detail.options)) {
+			if (
+				[...list.querySelectorAll("input[name='group-key']")].some(
+					(input) => input.value === key,
+				)
+			)
+				continue;
+			const item = template.content.firstElementChild.cloneNode(true);
+			item.querySelector("input").value = key;
+			item.querySelector("span").textContent = option.name;
+			item.querySelector("button").dataset.key = key;
+			list.append(item);
+		}
+		this.selectGroup.clear({ notify: false });
+		this.restrictionForm.markUnsavedState();
 	}
 
 	/**
 	 * @testable true
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
-	 * @matrix forms : access-restrictions owner-restricted
+	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
+	 * @matrix forms : access-restrictions explicit-submit owner-restricted
 	 */
 	_input(event) {
+		if (event.target.name === "admin" && event.target.checked) {
+			this.restrictions.querySelector("ul").replaceChildren();
+			this.selectGroup.clear({ notify: false });
+			this.restrictionForm.markUnsavedState();
+		}
 		if (event.target.name === "description" && this.generateForm?.target) {
 			const explain = this.generateForm.target.querySelector(
 				"[data-role='explain']",
 			);
 			if (explain) explain.dataset.visible = "true";
-		} else if (event.target.dataset.role === "specific-access") {
-			const data = new FormData();
-			data.set("action", event.target.checked ? "add" : "remove");
-			data.set("specific", event.target.name);
-			this._addRestriction(data);
 		}
 	}
 
@@ -107,7 +139,8 @@ export class FormSettings {
 			const ta = this.generateForm.target.querySelector("textarea");
 			if (ta) ta.value = "";
 		} else if (button?.dataset.role === "remove-restriction") {
-			this._removeRestriction(button);
+			button.closest("li")?.remove();
+			this.restrictionForm.markUnsavedState();
 		}
 	}
 
@@ -124,83 +157,50 @@ export class FormSettings {
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
 	 * @matrix forms : access-restrictions group-restricted owner-restricted
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_restriction_save_submits_snapshot_and_releases_failed_submitter
+	 * @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants
+	 * @matrix forms : access-restrictions explicit-submit retryable-action single-flight
 	 */
-	async _addRestriction(data) {
-		if (this._destroyed || !this.restrictions) return;
-
-		const route = this.restrictions.dataset.route;
-
-		const response = await request.put(route, data);
+	_saveRestrictions(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._restrictionPromise) return this._restrictionPromise;
 		if (this._destroyed) return;
-		if (response.html) {
-			const list = this.restrictions.querySelector("ul");
-			const nodes =
-				typeof response.html === "string"
-					? null
-					: Array.from(response.html.body.children);
-
-			if (nodes?.length) {
-				list?.append(...nodes.map((node) => document.importNode(node, true)));
-			} else if (typeof response.html === "string") {
-				list?.insertAdjacentHTML("beforeend", response.html);
-			}
-		}
-		this.selectGroup?.clear({ notify: false });
-	}
-
-	async _removeRestriction(button) {
-		if (this._destroyed || !this.restrictions || button.disabled) return;
-
-		const route = this.restrictions.dataset.route;
-		const key = button.dataset.key;
-		const item = button.closest("li");
-		if (!item) return;
-		const hadFocus = document.activeElement === button;
-		let removed = false;
-		button.disabled = true;
-		button.setAttribute("aria-disabled", "true");
-		button.setAttribute("aria-busy", "true");
-		item.classList.add("opacity-50", "pointer-events-none");
-		this.builder.header.clearMessage();
-
-		const data = new FormData();
-		data.set("action", "remove");
-		data.set("group-key", key);
-
-		try {
-			const response = await request.put(route, data);
-			if (this._destroyed) return;
-			if (response?.ok === true) {
-				removed = true;
-				item.remove();
-			} else {
-				this.builder.header.message(
-					response?.error || "Could not remove this restriction. Try again.",
-					{ persistent: true },
+		const form = this.restrictionForm;
+		const data = new FormData(this.restrictions);
+		const snapshot = JSON.stringify([...data]);
+		form.submitting();
+		form.submitButton.disabled = true;
+		this._restrictionPromise = (async () => {
+			try {
+				const response = await request.put(
+					this.restrictions.dataset.route,
+					data,
 				);
+				if (this._destroyed) return;
+				if (response?.ok === true) {
+					if (JSON.stringify([...new FormData(this.restrictions)]) === snapshot)
+						form.success();
+					else {
+						form.resetSubmitButton();
+						form.markUnsavedState();
+					}
+				} else
+					form.showError(
+						response?.error || "Could not save restrictions. Try again.",
+					);
+			} catch (error) {
+				captureError(error, this.restrictions, {
+					context: "builder-save-restrictions",
+				});
+				if (!this._destroyed)
+					form.showError("Could not save restrictions. Try again.");
+			} finally {
+				if (!this._destroyed) form.submitButton.disabled = false;
+				this._restrictionPromise = null;
 			}
-		} catch (error) {
-			captureError(error, button, { context: "builder-remove-restriction" });
-			this.builder.header.message(
-				"Could not remove this restriction. Try again.",
-				{ persistent: true },
-			);
-		} finally {
-			if (!removed && !this._destroyed && button.isConnected !== false) {
-				button.disabled = false;
-				button.setAttribute("aria-disabled", "false");
-				button.removeAttribute("aria-busy");
-				item.classList.remove("opacity-50", "pointer-events-none");
-				if (
-					hadFocus &&
-					(!document.activeElement ||
-						document.activeElement === document.body ||
-						document.activeElement === button)
-				) {
-					button.focus({ preventScroll: true });
-				}
-			}
-		}
+		})();
+		return this._restrictionPromise;
 	}
 
 	/**
@@ -320,6 +320,8 @@ export class FormSettings {
 		this.column?.removeEventListener("input", this._input);
 		this.column?.removeEventListener("click", this._click);
 		this.restrictions?.removeEventListener("updated", this._restrictionUpdated);
+		this.restrictions?.removeEventListener("submit", this._saveRestrictions);
+		this.restrictionForm?.destroy();
 		this.generateForm?.destroy();
 		this.selectGroup?.destroy();
 		this.modal?.destroy();

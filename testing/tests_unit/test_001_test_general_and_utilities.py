@@ -390,7 +390,7 @@ def test_entities_delete_accepts_batch_and_dedupes(monkeypatch):
     def entity(key):
         return SimpleNamespace(
             key=key,
-            entity_kind="file",
+            kind="file",
             assets={},
             db=DB(),
             properties={"modified": Modified()},
@@ -638,6 +638,7 @@ def test_collect_task_delete_updates_task_list_owners(monkeypatch):
     task.properties.linked_pages._value = [linked_page]
 
     monkeypatch.setattr(delete_module.DeleteCollector, "task_files", lambda *_: None)
+    monkeypatch.setattr(delete_module.database_get, "task_history", lambda *_: [])
     collector = delete_module.DeleteCollector(Entities)
     collector.collect(task)
 

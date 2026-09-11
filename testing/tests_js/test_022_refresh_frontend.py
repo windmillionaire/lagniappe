@@ -1,6 +1,86 @@
 """Node-backed checks for batched Core refresh orchestration."""
 
 
+# @matrix polling tasks : channel refresh
+def test_page_task_collection_watches_task_form_changes(run_node):
+    run_node(r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+const context = { console };
+vm.createContext(context);
+let source = fs.readFileSync("src/script/views/page.mjs", "utf8");
+source = source.replace(/^import [\s\S]*?(?=\/\*\*)/, "class Entity { async reconcilePollingSubscriptions() {} }\n");
+source = source.replace("export default class Page", "class Page");
+source += "\nglobalThis.Page = Page;";
+vm.runInContext(source, context);
+(async () => {
+  const page = new context.Page();
+  const list = { name: "PageTaskList", loaded: false };
+  const component = { widgets: { list } };
+  let subscription, subscriptions = 0, refreshes = 0, unsubscriptions = 0;
+  Object.assign(page, {
+    key: "page-key", elt: { dataset: { collectionRevision: "known-tasks" } },
+    components: { tasks: component },
+    PollingCoordinator: { subscribe(descriptor, options) {
+      subscriptions += 1;
+      subscription = { descriptor, options };
+      return () => { unsubscriptions += 1; };
+    } },
+    async _refreshCollectionComponents(components) {
+      if (components.length !== 1 || components[0] !== component) throw new Error("Refreshed unrelated collections");
+      refreshes += 1;
+    },
+  });
+  await page.reconcilePollingSubscriptions();
+  if (subscriptions) throw new Error("Unloaded task list subscribed");
+  list.loaded = true;
+  await page.reconcilePollingSubscriptions();
+  await page.reconcilePollingSubscriptions();
+  if (subscriptions !== 1 || subscription.descriptor.channel !== "tasks" ||
+      subscription.descriptor.revision !== "known-tasks" || subscription.options.mode !== "periodic") {
+    throw new Error("Loaded task list did not own one periodic Tasks subscription");
+  }
+  await subscription.options.onResult({status: "unchanged"});
+  await subscription.options.onResult({status: "changed"});
+  if (refreshes !== 1) throw new Error("Task form invalidation did not refresh exactly once");
+  list.loaded = false;
+  await page.reconcilePollingSubscriptions();
+  if (unsubscriptions !== 1) throw new Error("Removed task list retained its subscription");
+})().catch(error => { console.error(error); process.exit(1); });
+''')
+
+
+# @matrix reconnect-refresh : manifest
+# @source src/script/widgets/tables.mjs::IndexTable.refreshDescriptor
+def test_collection_manifests_include_hash_and_fingerprint(run_node):
+    run_node(r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+const context = { console, document: {} };
+vm.createContext(context);
+for (const [path, base, exported] of [
+  ["src/script/widgets/tables.mjs", "class BaseTable {} class EmbeddedTable {}", "IndexTable"],
+  ["src/script/widgets/pageTaskList.mjs", "class BaseList {}", "PageTaskList"],
+]) {
+  let source = fs.readFileSync(path, "utf8").replace(/^import [\s\S]*?(?=\/\*\*)/, base + "\n");
+  source = source.replaceAll("export class ", "class ");
+  source += `\nglobalThis.${exported} = ${exported};`;
+  vm.runInContext(source, context);
+  const widget = Object.create(context[exported].prototype);
+  Object.assign(widget, {
+    component: {name: exported === "IndexTable" ? "table" : "tasks"}, view: {key: "page", elt: {dataset: {}}},
+    target: {hasAttribute: () => true, querySelectorAll: () => [{dataset: {
+      key: "entity", hash: "hash", fingerprint: "revision", modified: "timestamp"
+    }}]},
+  });
+  const rows = widget.refreshDescriptor().rows;
+  if (JSON.stringify(rows) !== '[{"key":"entity","hash":"hash","fingerprint":"revision"}]') {
+    throw new Error(`${exported} sent an invalid manifest: ${JSON.stringify(rows)}`);
+  }
+}
+''')
+
+
 # @matrix form-index : created-row delete-target destination-refresh sorting
 def test_index_table_row_updates_rebuild_active_sort(run_node):
     run_node(
@@ -180,6 +260,8 @@ const request = {
     return {
       ok: true,
       fingerprint: "fresh-root",
+      authorization: "new-auth",
+      collection_revision: "tasks-after",
       targets: payload.targets.map((target, index) => ({
         id: target.id,
         fallback: index === 1,
@@ -204,6 +286,8 @@ const root = {
     kind: "task",
     index: "tasks",
     fingerprint: "initial-root",
+    authorization: "old-auth",
+    collectionRevision: "tasks-before",
   },
   addEventListener() {},
   dispatchEvent() {},
@@ -238,7 +322,7 @@ const view = {
 const deltaWidget = {
   refreshScope: "collection",
   refreshDescriptor() {
-    return { rows: [{ key: "a", modified: "old" }] };
+    return { rows: [{ key: "a", hash: "a", fingerprint: "old" }] };
   },
   async refreshDelta() { events.push({ type: "delta" }); },
   async refresh() { events.push({ type: "legacy-delta" }); },
@@ -298,6 +382,13 @@ view.Notifications = { async refresh() { events.push({ type: "notifications" });
   }
   if (requests[0].payload.targets.map((target) => target.id).join(",") !== "table,tasks") {
     throw new Error("Component IDs did not identify refresh targets");
+  }
+  if (requests[0].payload.view.authorization !== "old-auth" ||
+      requests[0].payload.view.collection_revision !== "tasks-before") {
+    throw new Error("Independent authorization/collection revisions were not sent");
+  }
+  if (root.dataset.authorization !== "new-auth" || root.dataset.collectionRevision !== "tasks-after") {
+    throw new Error("Independent refresh revisions were not committed");
   }
   const types = events.map((event) => event.type);
   for (const expected of ["delta", "legacy-fallback"]) {

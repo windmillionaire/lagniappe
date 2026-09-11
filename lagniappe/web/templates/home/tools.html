@@ -98,11 +98,42 @@
 {% endmacro %}
 
 {% macro report_list(reports) %}
-  <ul data-widget="ToolReportList"
+  <div data-widget="ToolReportList"
       data-visible="false"
-      class="{{ styles.home.ingress.list }}">
-    {% for report in reports.list %}{{ report_item(report) }}{% endfor %}
-  </ul>
+      class="flex flex-col gap-3">
+    <div role="group" aria-label="Report types" class="flex flex-wrap gap-2">
+      {% for value, label in [("active", "Active"), ("executed", "Executed"), ("ask", "Ask")] %}
+        <button type="button"
+                data-role="report-filter"
+                data-filter="{{ value }}"
+                data-active="{{ (value != 'executed')|yesno }}"
+                aria-pressed="{{ (value != 'executed')|yesno }}"
+                class="{{ styles.home.reportFilter }}">
+          <span>{{ label }}</span>
+          <span data-role="report-count" class="tabular-nums">0</span>
+        </button>
+      {% endfor %}
+    </div>
+    <p data-role="report-delete-result" role="status" class="text-sm text-base-dark" hidden></p>
+    <div class="{{ styles.home.reportList }}">
+      <button type="button"
+              data-role="delete-executed-reports"
+              data-kind="delete"
+              data-route="{{ url_for('tools.delete_executed_reports') }}"
+              class="{{ styles.home.reportClear }}"
+              hidden>
+        {{ render_icon("trash.inactive", styles.icon.default) }}
+        <span>Delete all executed proposals</span>
+      </button>
+      <p data-role="report-empty" class="p-3 text-sm text-base-medium" hidden></p>
+      <ul data-role="report-items" class="divide-y divide-base-light/50">
+        {% for report in reports.list %}{{ report_item(report) }}{% endfor %}
+      </ul>
+    </div>
+    <template data-role="report-delete-template">
+      {% include "delete/executed_reports.html" %}
+    </template>
+  </div>
 {% endmacro %}
 
 {% macro report_stage_label(report) -%}
@@ -156,6 +187,7 @@
       data-fingerprint="{{ report.fingerprint }}"
       data-name="{{ report.name }}"
       data-kind="report"
+      data-tool="{{ report.tool }}"
       data-status="{{ report.status }}"
       data-pending="{{ report.pending|yesno }}"
       {% if operation_key %}

@@ -1,5 +1,7 @@
 """REST resources for provider-free external Ask, Create, and Organize plans."""
 
+from contextlib import suppress
+from copy import deepcopy
 from functools import wraps
 import json
 import logging
@@ -8,18 +10,32 @@ import time
 import uuid
 
 from flask import g, jsonify, make_response, request, url_for
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
+from config.remote_mcp import mcp_issuer
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason, MutationOperation
 from lagniappe.core.entities import Entities
+from lagniappe.core.mutations import (
+    consume_mutation_intents,
+    execute_post_commit,
+    plan_mutation,
+    prepare_durable_writes,
+)
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import functions as ai_functions
+from lagniappe.core.tools.ai.reporting.uploads import (
+    CHECKPOINT_AMBIGUOUS,
+    CHECKPOINT_NOT_COMMITTED,
+)
 from lagniappe.core.tools.ai.references import hash_reference, normalize_hash_references
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
+from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.database import assets as storage_assets
+from lagniappe.core.tools.email.notifications.links import absolute_url
+from lagniappe.core.tools.notifications import service as notification_service
 
 from . import api, api_family
 
@@ -28,9 +44,30 @@ LOGGER = logging.getLogger(__name__)
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
 MAX_JSON_BODY_BYTES = external_api.MAX_PROPOSAL_BYTES + 64 * 1024
 GENERAL_RATE_LIMIT = (60, 60)
-PLAN_START_RATE_LIMIT = (10, 60 * 60)
+PLAN_START_RATE_LIMIT = (100, 60 * 60)
 PLAN_TOOL_RATE_WINDOW = 31 * 24 * 60 * 60
 UPLOAD_INPUT_NAME = "agent-api-files"
+UPLOAD_BATCH_ID_PATTERN = re.compile(external_api.UPLOAD_BATCH_ID_PATTERN)
+
+
+# @testable true
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_uses_only_a_configured_request_origin
+# @matrix agent-api : discovery origin-validation proposal-contract
+def _api_origin():
+    """Use the configured site origin, or the authenticated remote OAuth issuer."""
+    if getattr(g, "remote_mcp_authenticated", False):
+        return mcp_issuer(vars(CONFIG))
+    if CONFIG.hosted_e2e:
+        return CONFIG.BASE_URL.rstrip("/")
+    return absolute_url("/").rstrip("/")
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/api/main.py::_api_origin
+# @reason URL joining is exercised across discovery, OpenAPI, plan, and contract links
+def _api_absolute_url(path):
+    """Build an API-advertised URL from the selected configured origin."""
+    return f"{_api_origin()}/{str(path or '/').lstrip('/')}"
 
 
 # @testable infrastructure
@@ -112,14 +149,23 @@ def _rate_limit(scope, identifier, limit, window_seconds):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_authentication_and_header_contract
+# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_bounds_json_without_a_declared_content_length
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
-# @matrix agent-api : bearer-only entitlement-independent error-envelope public-user request-correlation request-recheck session-independent
+# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
+# @matrix agent-api : site-policy bearer-only body-limit entitlement-independent error-envelope public-user request-correlation request-recheck session-independent streaming
+# @pairs agent-api:rate-limit
 @api.before_request
 def authenticate_request():
     """Authenticate only a bearer token; browser sessions are never a fallback."""
     g.NO_CACHE = True
     g.agent_api_request_id = _request_id()
+    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
+        return _error("external_ai_disabled", "External AI access is disabled.", 403)
+    # ``Content-Length`` is not guaranteed (for example with chunked transfer).
+    # Werkzeug's limited request stream enforces this cap while JSON is read as
+    # well as rejecting an oversized declared length up front.
+    request.max_content_length = MAX_JSON_BODY_BYTES
     if request.content_length and request.content_length > MAX_JSON_BODY_BYTES:
         return _error("request_too_large", "Request body is too large.", 413)
 
@@ -128,7 +174,33 @@ def authenticate_request():
     if not separator or scheme.casefold() != "bearer" or not token.strip():
         return _error("unauthorized", "A bearer API key is required.", 401)
     try:
-        actor, credential = agent_auth.authenticate_credential(token.strip())
+        from config.remote_mcp import USER_TOKEN_HEADER
+        from lagniappe.core.tools.auth import remote_mcp as remote_auth
+
+        if USER_TOKEN_HEADER in request.headers:
+            try:
+                _rate_limit(
+                    "remote-mcp-envelope", client_ip(request), *GENERAL_RATE_LIMIT
+                )
+                actor, credential = remote_auth.authenticate_envelope(
+                    token.strip(), request.headers.get(USER_TOKEN_HEADER)
+                )
+                g.remote_mcp_authenticated = True
+            except remote_auth.OAuthError:
+                return _error(
+                    "unauthorized",
+                    "The remote MCP connection is invalid or expired.",
+                    401,
+                )
+            except APIProblem as problem:
+                return _error(
+                    problem.code,
+                    problem.message,
+                    problem.status,
+                    retry_after=problem.retry_after,
+                )
+        else:
+            actor, credential = agent_auth.authenticate_credential(token.strip())
     except agent_auth.AgentAPICredentialError:
         return _error("unauthorized", "The API key is invalid or expired.", 401)
 
@@ -161,7 +233,7 @@ api_family.before_request(authenticate_request)
 
 # @testable true
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_authentication_and_header_contract
-# @matrix agent-api : error-envelope no-store request-correlation
+# @matrix agent-api : build-marker error-envelope no-store request-correlation
 @api.after_request
 def annotate_response(response):
     response.headers["X-Request-ID"] = getattr(
@@ -170,6 +242,7 @@ def annotate_response(response):
         "",
     )
     response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Lagniappe-Build-ID"] = CONFIG.BUILD_ID
     return response
 
 
@@ -185,6 +258,8 @@ def handle_api_http_error(error):
     g.NO_CACHE = True
     if not getattr(g, "agent_api_request_id", None):
         g.agent_api_request_id = _request_id()
+    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
+        return _error("external_ai_disabled", "External AI access is disabled.", 403)
 
     status = error.code if isinstance(error, HTTPException) else 500
     code, message = {
@@ -265,7 +340,12 @@ def _route(handler):
 # @covered-by lagniappe/web/routes/api/main.py::create_plan
 # @reason request normalization is exercised through plan creation
 def _json_body():
-    data = request.get_json(silent=True)
+    try:
+        data = request.get_json(silent=True)
+    except RequestEntityTooLarge as error:
+        raise APIProblem(
+            "request_too_large", "Request body is too large.", 413
+        ) from error
     if not isinstance(data, dict):
         raise APIProblem(
             "invalid_json",
@@ -296,6 +376,169 @@ def _file_payload(file):
 
 
 # @testable false
+# @covered-by lagniappe/web/routes/api/main.py::finalize_uploads
+# @reason persisted batch-record consistency is asserted through the bound finalize route
+def _upload_batch_id(report):
+    """Return the persisted batch identity, rejecting inconsistent state."""
+    manifest = (
+        report.agent_manifest
+        if isinstance(getattr(report, "agent_manifest", None), dict)
+        else {}
+    )
+    batch_id = manifest.get("upload_batch_id")
+    pending = getattr(report, "upload_manifest", None)
+    if batch_id is None and not pending:
+        return None
+    if (
+        not isinstance(batch_id, str)
+        or not UPLOAD_BATCH_ID_PATTERN.fullmatch(batch_id)
+        or (
+            pending
+            and (
+                not isinstance(pending, list)
+                or any(
+                    not isinstance(record, dict)
+                    or record.get("upload_batch_id") != batch_id
+                    for record in pending
+                )
+            )
+        )
+    ):
+        raise APIProblem(
+            "invalid_upload_state",
+            "The current upload batch state is invalid.",
+            409,
+        )
+    return batch_id
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/api/main.py::create_uploads
+# @covered-by lagniappe/web/routes/api/main.py::finalize_uploads
+# @reason claim outcomes are exercised through both public upload routes
+def _raise_plan_operation_problem(outcome):
+    """Map a transactional Plan-operation outcome to a bounded API conflict."""
+    if outcome == agent_api_store.PLAN_OPERATION_PENDING:
+        raise APIProblem(
+            "uploads_pending",
+            "Finalize the current upload batch before starting another.",
+            409,
+        )
+    if outcome == agent_api_store.PLAN_OPERATION_BUSY:
+        raise APIProblem(
+            "plan_operation_in_progress",
+            "Another request is already changing this Plan.",
+            409,
+        )
+    if outcome == agent_api_store.PLAN_OPERATION_MISMATCH:
+        raise APIProblem(
+            "upload_batch_mismatch",
+            "This upload batch is no longer current for the Plan.",
+            409,
+        )
+    if outcome == agent_api_store.PLAN_OPERATION_MISSING:
+        raise APIProblem("plan_not_found", "Plan not found.", 404)
+    raise APIProblem(
+        "invalid_upload_state",
+        "The current upload batch state is invalid.",
+        409,
+    )
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/api/main.py::create_uploads
+# @covered-by lagniappe/web/routes/api/main.py::finalize_uploads
+# @reason expiry provides recovery when best-effort cleanup itself is unavailable
+def _release_plan_operation_claim(
+    report,
+    *,
+    phase,
+    operation_id,
+    claim_token,
+):
+    """Best-effort release; a crashed cleanup remains bounded by the lease."""
+    with suppress(Exception):
+        agent_api_store.release_plan_operation(
+            report.key,
+            phase=phase,
+            operation_id=operation_id,
+            claim_token=claim_token,
+        )
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/api/main.py::create_uploads
+# @covered-by lagniappe/web/routes/api/main.py::finalize_uploads
+# @covered-by lagniappe/web/routes/api/main.py::submit_plan
+# @reason route interleaving tests exercise exact-token transactional checkpoints
+def _claimed_plan_save(report, *, phase, operation_id, claim_token):
+    """Return a mutation writer fenced by one exact Plan-operation claim."""
+    expected_report = deepcopy(dict(report.db))
+
+    # @testable false
+    # @covered-by lagniappe/web/routes/api/main.py::_claimed_plan_save
+    # @reason the closure delegates each checkpoint to the route-owned claim writer
+    def save(*entities):
+        nonlocal expected_report
+        try:
+            plan = plan_mutation(MutationOperation.SAVE, *entities)
+            writes = prepare_durable_writes(plan)
+        except BaseException as error:
+            error.checkpoint_disposition = CHECKPOINT_NOT_COMMITTED
+            raise
+        try:
+            outcome = agent_api_store.commit_plan_operation(
+                report.key,
+                phase=phase,
+                operation_id=operation_id,
+                claim_token=claim_token,
+                expected_report=expected_report,
+                writes=[(effect.entity, effect.property_mask) for effect in writes],
+                notification_user=g.agent_api_user if phase == "submit" else None,
+            )
+        except BaseException as error:
+            error.checkpoint_disposition = CHECKPOINT_AMBIGUOUS
+            raise
+        if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+            if outcome == agent_api_store.PLAN_OPERATION_LOST:
+                problem = APIProblem(
+                    "plan_operation_lost",
+                    "This request no longer owns the Plan operation.",
+                    409,
+                )
+            elif outcome == agent_api_store.PLAN_OPERATION_STALE:
+                problem = APIProblem(
+                    "plan_state_conflict",
+                    "The Plan changed while this operation was in progress.",
+                    409,
+                )
+            else:
+                try:
+                    _raise_plan_operation_problem(outcome)
+                except APIProblem as error:
+                    problem = error
+            problem.checkpoint_disposition = CHECKPOINT_NOT_COMMITTED
+            raise problem
+
+        expected_report = deepcopy(dict(report.db))
+        consume_mutation_intents(plan)
+        try:
+            execute_post_commit(plan)
+        except Exception as error:
+            exceptions.capture(
+                error,
+                context={
+                    "agent_api": {
+                        "request_id": g.agent_api_request_id,
+                        "phase": f"{phase}_post_commit",
+                    }
+                },
+            )
+
+    return save
+
+
+# @testable false
 # @covered-by lagniappe/web/routes/api/main.py::get_plan
 # @reason plan projection is asserted through the public plan resource
 def _plan_payload(report, *, include_proposal=True):
@@ -307,30 +550,46 @@ def _plan_payload(report, *, include_proposal=True):
         "instructions": report.instructions,
         "files": [_file_payload(file) for file in report.input_files],
         "uploads_pending": bool(report.upload_manifest),
+        "upload_batch_id": _upload_batch_id(report),
         "contract_version": external_api.CONTRACT_VERSION,
-        "contract_url": url_for(
-            "agent_api.get_plan_contract",
-            plan_id=report.urlsafe_key,
-            _external=True,
+        "contract_url": _api_absolute_url(
+            url_for(
+                "agent_api.get_plan_contract",
+                plan_id=report.urlsafe_key,
+            )
         ),
-        "status_url": url_for(
-            "agent_api.get_plan",
-            plan_id=report.urlsafe_key,
-            _external=True,
+        "submit_url": _api_absolute_url(
+            url_for(
+                "agent_api.submit_plan",
+                plan_id=report.urlsafe_key,
+            )
         ),
-        "preview_url": url_for(
-            "tools.api_plan_preview",
-            plan_hash=report.hash,
-            _external=True,
+        "status_url": _api_absolute_url(
+            url_for(
+                "agent_api.get_plan",
+                plan_id=report.urlsafe_key,
+            )
         ),
-        "review_url": url_for(
-            "tools.report",
-            key=report.urlsafe_key,
-            _external=True,
+        "preview_url": _api_absolute_url(
+            url_for(
+                "tools.api_plan_preview",
+                plan_hash=report.hash,
+            )
+        ),
+        "review_url": _api_absolute_url(
+            url_for(
+                "tools.report",
+                key=report.urlsafe_key,
+            )
         ),
     }
     if include_proposal:
-        payload["proposal"] = report.proposal
+        payload["proposal"] = external_api.public_plan_proposal(report)
+        if report.tool != "ask":
+            payload["execution"] = external_api.public_execution_receipt(
+                report, g.agent_api_user
+            )
+        payload["original_brief"] = (report.agent_manifest or {}).get("original_brief")
     return _json_safe(payload)
 
 
@@ -410,18 +669,13 @@ def _discovery_payload():
     return {
         "name": "Lagniappe External Agent API",
         "version": "v1",
-        "base_url": url_for("agent_api.api_index", _external=True).rstrip("/"),
-        "openapi_url": url_for(
-            "agent_api.openapi_document",
-            _external=True,
-        ),
-        "actor_url": url_for("agent_api.me", _external=True),
-        "tools_url": url_for("agent_api.tools", _external=True),
-        "plans_url": url_for("agent_api.create_plan", _external=True),
-        "client_skill_url": url_for(
-            "agent_api.client_skill",
-            _external=True,
-        ),
+        "base_url": _api_absolute_url(url_for("agent_api.api_index")).rstrip("/"),
+        "openapi_url": _api_absolute_url(url_for("agent_api.openapi_document")),
+        "actor_url": _api_absolute_url(url_for("agent_api.me")),
+        "tools_url": _api_absolute_url(url_for("agent_api.tools")),
+        "plans_url": _api_absolute_url(url_for("agent_api.create_plan")),
+        "answer_context_url": _api_absolute_url(url_for("agent_api.answer_context")),
+        "client_skill_url": _api_absolute_url(url_for("agent_api.client_skill")),
         "authentication": "Authorization: Bearer <user API key>",
         "instructions": (
             "Read openapi_url before using or guessing resource paths, then call "
@@ -464,7 +718,7 @@ def client_skill():
     """Return a copyable, discovery-first client skill without API schemas."""
     response = make_response(
         external_api.client_skill_markdown(
-            url_for("agent_api.api_index", _external=True).rstrip("/")
+            _api_absolute_url(url_for("agent_api.api_index")).rstrip("/")
         )
     )
     response.headers["Content-Type"] = "text/markdown; charset=utf-8"
@@ -485,6 +739,14 @@ def openapi_document():
         "required": True,
         "description": "The opaque plan ID returned by createPlan.",
         "schema": {"type": "string", "minLength": 1},
+    }
+    upload_batch_id_schema = {
+        "type": "string",
+        "pattern": external_api.UPLOAD_BATCH_ID_PATTERN,
+        "description": (
+            "Opaque server-issued identity for exactly one upload batch. "
+            "Return it unchanged when finalizing that batch."
+        ),
     }
     tool_parameter = {
         "name": "tool_name",
@@ -540,9 +802,7 @@ def openapi_document():
                 "responses": {
                     "200": {
                         "description": "Canonical minimal client skill.",
-                        "content": {
-                            "text/markdown": {"schema": {"type": "string"}}
-                        },
+                        "content": {"text/markdown": {"schema": {"type": "string"}}},
                     },
                     "default": error_response,
                 },
@@ -583,10 +843,69 @@ def openapi_document():
                     "hash: references only as allowed by the selected plan contract."
                 ),
                 "tags": ["Discovery"],
+                "parameters": [
+                    {
+                        "name": "names",
+                        "in": "query",
+                        "required": False,
+                        "description": (
+                            "Optional comma-separated or repeated exact tool names. "
+                            "Use this to retrieve only selected definitions."
+                        ),
+                        "schema": {"type": "array", "items": {"type": "string"}},
+                        "style": "form",
+                        "explode": True,
+                    },
+                    {
+                        "name": "view",
+                        "in": "query",
+                        "required": False,
+                        "description": (
+                            "Use names for a compact array of exact registered names; "
+                            "the default full view includes input and output schemas."
+                        ),
+                        "schema": {
+                            "type": "string",
+                            "enum": ["full", "names"],
+                            "default": "full",
+                        },
+                    },
+                ],
                 "responses": {
                     "200": {
                         "description": "Read-tool catalog and reference format.",
-                        **json_content({"type": "object"}),
+                        **json_content(
+                            {
+                                "type": "object",
+                                "required": [
+                                    "tools",
+                                    "view",
+                                    "selected_count",
+                                    "reference_format",
+                                    "execution_envelope",
+                                ],
+                                "properties": {
+                                    "tools": {
+                                        "type": "array",
+                                        "items": {
+                                            "oneOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/ToolDefinition"
+                                                },
+                                                {"type": "string"},
+                                            ]
+                                        },
+                                    },
+                                    "view": {
+                                        "type": "string",
+                                        "enum": ["full", "names"],
+                                    },
+                                    "selected_count": {"type": "integer"},
+                                    "reference_format": {"type": "string"},
+                                    "execution_envelope": {"type": "object"},
+                                },
+                            }
+                        ),
                     },
                     "default": error_response,
                 },
@@ -600,8 +919,10 @@ def openapi_document():
                     "Starts a durable provider-free workspace. Creation does not run "
                     "a model or change workspace data. The client chooses one fixed "
                     "tool for this plan and may create another plan if the conversation "
-                    "later changes modes. Keep the returned opaque ID for every tool, "
-                    "contract, upload when supported, and submission call."
+                    "later changes modes. Keep the returned opaque ID for Plan-scoped "
+                    "read tools and uploads when supported. Follow the returned "
+                    "contract_url, submit_url, and status_url exactly instead of "
+                    "reconstructing those lifecycle paths."
                 ),
                 "tags": ["Plans"],
                 "requestBody": {
@@ -625,6 +946,7 @@ def openapi_document():
                                 "instructions": {
                                     "type": "string",
                                     "minLength": 1,
+                                    "pattern": "\\S",
                                     "description": (
                                         "The question or requested work, limited to 65,536 "
                                         "UTF-8 bytes."
@@ -650,10 +972,10 @@ def openapi_document():
                 "description": (
                     "Checks draft/ready state, finalized files, pending uploads, "
                     "contract and browser-review URLs, and any submitted execution-"
-                    "normalized proposal. The stored proposal is inspection state, "
-                    "not a round-trippable submission source; retain the public hash: "
-                    "proposal sent by the client for revisions. The plan ID is the "
-                    "top-level id field in every plan response."
+                    "normalized proposal. The proposal is projected back into the "
+                    "public hash-reference and Markdown submission contract so a "
+                    "reusable Plan can be edited and submitted again. The plan ID is "
+                    "the top-level id field in every plan response."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -682,7 +1004,7 @@ def openapi_document():
                 "responses": {
                     "200": {
                         "description": "Current proposal and permission contract.",
-                        **json_content({"type": "object"}),
+                        **json_content({"$ref": "#/components/schemas/PlanContract"}),
                     },
                     "default": error_response,
                 },
@@ -725,7 +1047,49 @@ def openapi_document():
                 "responses": {
                     "201": {
                         "description": "Upload sessions in request-array order.",
-                        **json_content({"type": "object"}),
+                        **json_content(
+                            {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "required": [
+                                    "plan_id",
+                                    "upload_batch_id",
+                                    "uploads",
+                                ],
+                                "properties": {
+                                    "plan_id": {"type": "string"},
+                                    "upload_batch_id": upload_batch_id_schema,
+                                    "uploads": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "additionalProperties": False,
+                                            "required": [
+                                                "index",
+                                                "filename",
+                                                "session_url",
+                                                "chunk_size",
+                                            ],
+                                            "properties": {
+                                                "index": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                },
+                                                "filename": {"type": "string"},
+                                                "session_url": {
+                                                    "type": "string",
+                                                    "format": "uri",
+                                                },
+                                                "chunk_size": {
+                                                    "type": "integer",
+                                                    "minimum": 1,
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            }
+                        ),
                     },
                     "default": error_response,
                 },
@@ -736,19 +1100,23 @@ def openapi_document():
                 "operationId": "finalizeUploads",
                 "summary": "Finalize staged uploads",
                 "description": (
-                    "After every session upload completes, send an empty JSON object. "
-                    "The server verifies the staged objects and attaches files to the "
-                    "draft. Calling again with no pending batch simply returns state."
+                    "After every session upload completes, return the exact "
+                    "upload_batch_id issued with those sessions. The server verifies "
+                    "that batch is still authoritative before attaching files to the "
+                    "draft. Repeating the same finalized identity simply returns state."
                 ),
                 "tags": ["Uploads"],
                 "parameters": [plan_parameter],
                 "requestBody": {
-                    "required": False,
+                    "required": True,
                     **json_content(
                         {
                             "type": "object",
-                            "maxProperties": 0,
                             "additionalProperties": False,
+                            "required": ["upload_batch_id"],
+                            "properties": {
+                                "upload_batch_id": upload_batch_id_schema,
+                            },
                         }
                     ),
                 },
@@ -815,9 +1183,10 @@ def openapi_document():
                 "summary": "Validate and publish the final proposal",
                 "description": (
                     "Requires the current tool-specific contract and no pending "
-                    "uploads; Organize also requires at least one finalized file. A "
+                    "uploads. Remote Organize can update existing records without "
+                    "files; uploaded files still require summaries and placement. A "
                     "valid Ask response becomes a completed read-only report and "
-                    "should be submitted without separate save confirmation. A valid "
+                    "is saved only after the user requests saving the answer. A valid "
                     "Create or Organize proposal becomes ready for review and returns "
                     "preview_url. Submission itself never executes actions. Repeating "
                     "the identical normalized result is accepted. While the report "
@@ -866,12 +1235,73 @@ def openapi_document():
                             {"$ref": "#/components/schemas/SubmissionReceipt"}
                         ),
                     },
+                    "422": {
+                        "description": (
+                            "Invalid submission. Independent wrapper and schema "
+                            "failures are returned together in "
+                            "error.details.errors; later semantic failures retain "
+                            "the concise Error envelope."
+                        ),
+                        **json_content({"$ref": "#/components/schemas/Error"}),
+                    },
                     "default": error_response,
                 },
             }
         },
     }
-    return {
+    # The plan-free endpoint has exactly the same argument and result boundary,
+    # but no report lifecycle, owner lookup, or per-Plan budget.
+    plan_free = deepcopy(paths["/api/v1/plans/{plan_id}/tools/{tool_name}"]["post"])
+    plan_free.update(
+        operationId="readWorkspaceTool",
+        parameters=[tool_parameter],
+        description="Run a permission-bounded read without creating a Plan or saving an answer. Use the same arguments/result envelope as Plan-scoped reads. Normal authentication, revocation, and general rate limits apply on every call.",
+    )
+    paths["/api/v1/tools/{tool_name}"] = {"post": plan_free}
+    paths["/api/v1/answer-context"] = {
+        "get": {
+            "operationId": "answerQuestion",
+            "summary": "Get plan-free answering guidance",
+            "description": "The client model answers using authorized read tools, then offers to save. This endpoint creates no report/session and invokes no model. Start an Ask Plan only after save consent.",
+            "tags": ["Tools"],
+            "responses": {
+                "200": {
+                    "description": "Current date, timezone, personal Page, report_created=false and workflow_rules.",
+                    **json_content({"type": "object"}),
+                },
+                "default": error_response,
+            },
+        }
+    }
+    paths["/api/v1/plans/{plan_id}/contract"]["get"]["parameters"].extend(
+        [
+            {
+                "name": "view",
+                "in": "query",
+                "schema": {"enum": ["full", "summary", "schema"], "default": "full"},
+                "description": "summary omits the proposal schema; schema returns only exact schemas and submission metadata for follow-ups using previously obtained plan context.",
+            },
+            {
+                "name": "actions",
+                "in": "query",
+                "schema": {"type": "string"},
+                "description": "Comma-separated allowed action names for selected schemas. Omit for all schemas. This is context selection, not a permission change.",
+            },
+        ]
+    )
+    paths["/api/v1/plans/{plan_id}/submit"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]["properties"].update(
+        {
+            "name": {"type": "string", "minLength": 1, "maxLength": 120},
+            "instructions": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Updated current brief, at most 65536 UTF-8 bytes. Original brief is retained; updates are atomic with proposal submission.",
+            },
+        }
+    )
+    document = {
         "openapi": "3.1.0",
         "info": {
             "title": f"{CONFIG.APP_NAME} External Agent API",
@@ -882,22 +1312,25 @@ def openapi_document():
                 "plan and may create a different plan as the conversation changes. "
                 "Verify the actor, create a draft, use permitted read tools, fetch the "
                 "tool-specific plan contract, and submit a conforming final result. "
-                "Organize additionally uploads files and follows the get_guidelines "
-                "task=organize two-phase workflow, including one summary and two "
-                "retrieval terms per file. Ask publishes a read-only answer. Create "
+                "Use Create for new content and Organize for existing-record updates "
+                "or file organization. Remote updates do not require uploads. Fetch "
+                "selected action contracts for details. With uploads, follow the "
+                "get_guidelines task=organize two-phase workflow, including one summary "
+                "and two retrieval terms per file. Ask publishes a read-only answer. Create "
                 "and Organize publish proposals for authenticated browser review. "
                 "The external API never applies those proposals; direct the user to "
                 "preview_url, where the existing website Execute control is the only "
                 "approval and application path. The server does not call a model to "
                 "choose the tool, complete, repair, or summarize the result. When an "
-                "Ask answer is ready, submit it without separate save confirmation, "
-                "then answer the user with the returned preview_url; Ask submission "
+                "question is asked, use answer-context and plan-free tools and answer "
+                "in the conversation; offer to save afterward. Only if the user wants "
+                "to save, create an Ask Plan and submit the agreed answer; Ask submission "
                 "is read-only and later valid answers may replace it. Ready Create and "
                 "Organize proposals may likewise be revised and submitted again until "
                 "browser execution starts."
             ),
         },
-        "servers": [{"url": request.url_root.rstrip("/")}],
+        "servers": [{"url": _api_absolute_url("/").rstrip("/")}],
         "security": [{"bearerAuth": []}],
         "tags": [
             {"name": "Discovery", "description": "Actor and tool discovery."},
@@ -924,10 +1357,33 @@ def openapi_document():
                             "properties": {
                                 "code": {"type": "string"},
                                 "message": {"type": "string"},
-                                "details": {},
+                                "details": {
+                                    "type": "object",
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "maxItems": external_api.MAX_VALIDATION_ERRORS,
+                                            "items": {
+                                                "$ref": "#/components/schemas/ValidationErrorDetail"
+                                            },
+                                        }
+                                    },
+                                    "additionalProperties": True,
+                                },
                             },
                         },
                         "request_id": {"type": "string"},
+                    },
+                },
+                "ValidationErrorDetail": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["code", "path", "message"],
+                    "properties": {
+                        "code": {"type": "string"},
+                        "path": {"type": "string"},
+                        "message": {"type": "string"},
+                        "expected": {},
                     },
                 },
                 "PlanFile": {
@@ -954,8 +1410,10 @@ def openapi_document():
                         "instructions",
                         "files",
                         "uploads_pending",
+                        "upload_batch_id",
                         "contract_version",
                         "contract_url",
+                        "submit_url",
                         "status_url",
                         "preview_url",
                         "review_url",
@@ -985,11 +1443,23 @@ def openapi_document():
                             "items": {"$ref": "#/components/schemas/PlanFile"},
                         },
                         "uploads_pending": {"type": "boolean"},
+                        "upload_batch_id": {
+                            "oneOf": [
+                                upload_batch_id_schema,
+                                {"type": "null"},
+                            ],
+                            "description": (
+                                "The current or most recently finalized upload batch "
+                                "identity, retained so an uncertain finalize response "
+                                "can be resolved without replaying the write."
+                            ),
+                        },
                         "contract_version": {
                             "type": "integer",
                             "const": external_api.CONTRACT_VERSION,
                         },
                         "contract_url": {"type": "string", "format": "uri"},
+                        "submit_url": {"type": "string", "format": "uri"},
                         "status_url": {"type": "string", "format": "uri"},
                         "preview_url": {
                             "type": "string",
@@ -1004,7 +1474,128 @@ def openapi_document():
                             "format": "uri",
                             "description": "Canonical full browser report URL.",
                         },
-                        "proposal": {"oneOf": [{"type": "object"}, {"type": "null"}]},
+                        "proposal": {
+                            "oneOf": [{"type": "object"}, {"type": "null"}],
+                            "description": (
+                                "The public submission representation: existing "
+                                "entities use hash: references and generated rich "
+                                "text uses Markdown. A reusable plan's proposal may "
+                                "be edited and submitted again."
+                            ),
+                        },
+                        "execution": {
+                            "type": ["object", "null"],
+                            "description": "Create/Organize action outcomes and permission-rechecked result entity references; no private ledger data. Absent for Ask.",
+                        },
+                        "original_brief": {
+                            "type": ["object", "null"],
+                            "description": "Initial name/instructions, retained when the current brief is revised.",
+                        },
+                    },
+                },
+                "PlanSubmissionFormat": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "method",
+                        "url",
+                        "contract_version",
+                        "body",
+                        "rule",
+                    ],
+                    "properties": {
+                        "method": {"type": "string", "const": "POST"},
+                        "url": {"type": "string", "format": "uri"},
+                        "contract_version": {
+                            "type": "integer",
+                            "const": external_api.CONTRACT_VERSION,
+                        },
+                        "body": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["contract_version", "proposal"],
+                            "properties": {
+                                "contract_version": {
+                                    "type": "integer",
+                                    "const": external_api.CONTRACT_VERSION,
+                                },
+                                "proposal": {"type": "object"},
+                            },
+                        },
+                        "rule": {"type": "string"},
+                    },
+                },
+                "PlanContract": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "contract_version",
+                        "tool",
+                        "current_date",
+                        "timezone",
+                        "personal_page",
+                        "submission_format",
+                        "proposal_schema",
+                        "schema_scope",
+                        "schema_actions",
+                        "schema_instructions",
+                        "permissions",
+                        "required_file_refs",
+                        "upload_inventory",
+                        "file_checklist",
+                        "guidance_requirements",
+                        "uploads_supported",
+                        "workflow_rules",
+                        "reference_rules",
+                        "limits",
+                        "payload_sizes",
+                    ],
+                    "properties": {
+                        "contract_version": {
+                            "type": "integer",
+                            "const": external_api.CONTRACT_VERSION,
+                        },
+                        "tool": {
+                            "type": "string",
+                            "enum": list(external_api.SUPPORTED_PLAN_TOOLS),
+                        },
+                        "current_date": {"type": "string", "format": "date"},
+                        "timezone": {"type": "string"},
+                        "personal_page": {"type": "object"},
+                        "submission_format": {
+                            "$ref": "#/components/schemas/PlanSubmissionFormat"
+                        },
+                        "proposal_schema": {"type": ["object", "null"]},
+                        "schema_scope": {"enum": ["full", "selected", "summary"]},
+                        "schema_actions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "schema_instructions": {"type": "string"},
+                        "permissions": {"type": "object"},
+                        "required_file_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "upload_inventory": {
+                            "oneOf": [{"type": "object"}, {"type": "null"}]
+                        },
+                        "file_checklist": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                        },
+                        "guidance_requirements": {"type": "object"},
+                        "uploads_supported": {"type": "boolean"},
+                        "workflow_rules": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "reference_rules": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "limits": {"type": "object"},
+                        "payload_sizes": {"type": "object"},
                     },
                 },
                 "SubmissionReceipt": {
@@ -1049,9 +1640,15 @@ def openapi_document():
                     "additionalProperties": False,
                     "required": ["filename", "size"],
                     "properties": {
-                        "filename": {"type": "string", "minLength": 1},
+                        "filename": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S",
+                        },
                         "content_type": {
                             "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S",
                             "default": "application/octet-stream",
                         },
                         "size": {
@@ -1062,10 +1659,60 @@ def openapi_document():
                         },
                     },
                 },
+                "ToolDefinition": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "name",
+                        "description",
+                        "input_schema",
+                        "output_schema",
+                        "result_paths",
+                    ],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "description": {"type": "string"},
+                        "input_schema": {"type": "object"},
+                        "output_schema": {
+                            "type": "object",
+                            "description": (
+                                "Schema for a successful direct shared-tool value. "
+                                "REST places it beneath the success result field."
+                            ),
+                        },
+                        "result_paths": {
+                            "type": "object",
+                            "description": (
+                                "JSON paths for the primary entity or collection "
+                                "and any pagination metadata within result."
+                            ),
+                        },
+                    },
+                },
             },
         },
         "paths": paths,
     }
+    schemas = document["components"]["schemas"]
+    schema_keys = (
+        "contract_version", "tool", "submission_format", "proposal_schema",
+        "schema_scope", "schema_actions", "schema_instructions",
+    )
+    schemas["PlanSchemaContract"] = {
+        "type": "object", "additionalProperties": False,
+        "required": list(schema_keys),
+        "properties": {
+            key: ({"type": "object"} if key == "proposal_schema" else schemas["PlanContract"]["properties"][key])
+            for key in schema_keys
+        },
+    }
+    paths["/api/v1/plans/{plan_id}/contract"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] = {
+        "oneOf": [
+            {"$ref": "#/components/schemas/PlanContract"},
+            {"$ref": "#/components/schemas/PlanSchemaContract"},
+        ],
+    }
+    return document
 
 
 # @testable true
@@ -1098,16 +1745,59 @@ def me():
 @api.get("/tools")
 @_route
 def tools():
+    selected = []
+    for value in request.args.getlist("names"):
+        selected.extend(name.strip() for name in value.split(",") if name.strip())
+    selected = selected or None
+    view = str(request.args.get("view") or "full").strip().casefold()
+    if view not in {"full", "names"}:
+        raise APIProblem(
+            "invalid_tool_catalog_view",
+            "Tool catalog view must be full or names.",
+            422,
+        )
+    try:
+        catalog = ai_functions.tool_catalog(
+            names=selected,
+            names_only=view == "names",
+            transport="rest",
+        )
+    except ValueError as error:
+        raise APIProblem(
+            "unknown_tool_selection",
+            str(error),
+            422,
+            details={"available": list(ai_functions.DECLARATIONS)},
+        ) from error
     return {
-        "tools": ai_functions.tool_catalog(transport="rest"),
+        "tools": catalog,
+        "view": view,
+        "selected_count": len(catalog),
         "reference_format": "hash:<12-character-hash>",
+        "execution_envelope": {
+            "success": {"result": "<value matching the selected output_schema>"},
+            "failure": {
+                "error": {"code": "tool_error", "message": "<message>"},
+                "request_id": "<request id>",
+            },
+        },
     }
+
+
+# @testable true
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_plan_free_reads_and_answer_context_do_not_create_reports
+# @pair agent-api:answer-context
+@api.get("/answer-context")
+@_route
+def answer_context():
+    return external_api.answer_context(g.agent_api_user)
 
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
 # @matrix agent-api : entitlement-independent plan-session tool-selection
+# @pairs agent-api:rate-limit
 @api.post("/plans")
 @_route
 def create_plan():
@@ -1118,18 +1808,54 @@ def create_plan():
         *PLAN_START_RATE_LIMIT,
     )
     data = _json_body()
-    tool = str(data.get("tool") or "organize").strip().casefold()
-    if tool not in external_api.SUPPORTED_PLAN_TOOLS:
+    unsupported_fields = sorted(set(data) - {"instructions", "name", "tool"})
+    if unsupported_fields:
+        raise APIProblem(
+            "unsupported_field",
+            "Plan request contains unsupported fields.",
+            422,
+            details={
+                "path": "$",
+                "fields": unsupported_fields,
+                "allowed_fields": ["instructions", "name", "tool"],
+            },
+        )
+    tool = data.get("tool", "organize")
+    if not isinstance(tool, str) or tool not in external_api.SUPPORTED_PLAN_TOOLS:
         raise APIProblem(
             "unsupported_tool",
             "Plan tool must be ask, create, or organize.",
             422,
+            details={"path": "$.tool"},
+        )
+    instructions = data.get("instructions")
+    if not isinstance(instructions, str) or not instructions.strip():
+        raise APIProblem(
+            "invalid_instructions",
+            '"instructions" must be a non-empty string.',
+            422,
+            details={
+                "path": "$.instructions",
+                "expected": "non-empty string",
+            },
+        )
+    name = data.get("name")
+    if "name" in data and (not isinstance(name, str) or len(name) > 120):
+        raise APIProblem(
+            "invalid_name",
+            '"name" must be a string of at most 120 characters.',
+            422,
+            details={
+                "path": "$.name",
+                "expected": "string with at most 120 characters",
+            },
         )
     report = external_api.create_plan(
         actor,
-        instructions=data.get("instructions"),
+        instructions=instructions,
         tool=tool,
-        name=data.get("name"),
+        name=name,
+        remote_mcp=bool(getattr(g, "remote_mcp_authenticated", False)),
     )
     return _plan_payload(report), 201
 
@@ -1150,7 +1876,34 @@ def get_plan(plan_id):
 @_route
 def get_plan_contract(plan_id):
     report = _load_plan(plan_id)
-    return external_api.plan_contract(report, g.agent_api_user)
+    actions = [
+        name.strip()
+        for value in request.args.getlist("actions")
+        for name in value.split(",")
+        if name.strip()
+    ] or None
+    contract = external_api.plan_contract(
+        report,
+        g.agent_api_user,
+        submit_url=_api_absolute_url(
+            url_for(
+                "agent_api.submit_plan",
+                plan_id=report.urlsafe_key,
+            )
+        ),
+        **({"actions": actions} if actions is not None else {}),
+        **({"view": request.args["view"]} if "view" in request.args else {}),
+    )
+    LOGGER.info(
+        "agent_api_contract request_id=%s user_hash=%s plan=%s "
+        "contract_bytes=%d proposal_schema_bytes=%d",
+        g.agent_api_request_id,
+        g.agent_api_user.hash,
+        report.hash,
+        len(json.dumps(contract, ensure_ascii=False, default=str).encode("utf-8")),
+        (contract.get("payload_sizes") or {}).get("proposal_schema_bytes", 0),
+    )
+    return contract
 
 
 # @testable false
@@ -1175,7 +1928,11 @@ def _upload_sizes(report, requested):
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : uploads
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_upload_batch_identity_rejects_a_same_metadata_last_writer
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_claimed_upload_routes_reload_before_storage_side_effects
+# @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
+# @pairs agent-api:authoritative-reload agent-api:concurrency agent-api:stale-snapshot
+# @pairs mcp-upload:authoritative-reload mcp-upload:concurrency mcp-upload:stale-snapshot
 @api.post("/plans/<plan_id>/uploads")
 @_route
 def create_uploads(plan_id):
@@ -1194,31 +1951,83 @@ def create_uploads(plan_id):
             409,
         )
     data = _json_body()
+    unsupported_fields = sorted(set(data) - {"files"})
+    if unsupported_fields:
+        raise APIProblem(
+            "unsupported_field",
+            "Upload-session request contains unsupported fields.",
+            422,
+            details={
+                "path": "$",
+                "fields": unsupported_fields,
+                "allowed_fields": ["files"],
+            },
+        )
     requested = data.get("files")
     if not isinstance(requested, list) or not requested:
         raise APIProblem("invalid_files", "files must be a non-empty list.", 422)
 
     normalized = []
-    for item in requested:
+    for index, item in enumerate(requested):
         if not isinstance(item, dict):
             raise APIProblem("invalid_files", "Each file must be an object.", 422)
-        filename = str(item.get("filename") or "").strip()
-        content_type = str(
-            item.get("content_type") or "application/octet-stream"
-        ).strip()
-        try:
-            size = int(item.get("size"))
-        except (TypeError, ValueError) as error:
+        unsupported_fields = sorted(set(item) - {"filename", "content_type", "size"})
+        if unsupported_fields:
+            details = {
+                "path": f"$.files[{index}]",
+                "fields": unsupported_fields,
+                "allowed_fields": ["content_type", "filename", "size"],
+            }
+            if "size_bytes" in unsupported_fields:
+                details["use_field"] = "size"
             raise APIProblem(
-                "invalid_file_size",
-                "Each file must declare its byte size.",
+                "unsupported_field",
+                "Upload file entry contains unsupported fields.",
                 422,
-            ) from error
-        if not filename or size <= 0:
+                details=details,
+            )
+        filename = item.get("filename")
+        if not isinstance(filename, str) or not filename.strip():
             raise APIProblem(
                 "invalid_file",
-                "Each file needs a filename and a positive byte size.",
+                'Each file\'s "filename" must be a non-empty string.',
                 422,
+                details={
+                    "path": f"$.files[{index}].filename",
+                    "expected": "non-empty string",
+                },
+            )
+        filename = filename.strip()
+        content_type = item.get("content_type", "application/octet-stream")
+        if not isinstance(content_type, str) or not content_type.strip():
+            raise APIProblem(
+                "invalid_content_type",
+                'Each file\'s "content_type" must be a non-empty string.',
+                422,
+                details={
+                    "path": f"$.files[{index}].content_type",
+                    "expected": "non-empty string",
+                },
+            )
+        content_type = content_type.strip()
+        size_details = {
+            "path": f"$.files[{index}].size",
+            "expected": "positive integer byte size",
+        }
+        size = item.get("size")
+        if isinstance(size, bool) or not isinstance(size, int):
+            raise APIProblem(
+                "invalid_file_size",
+                'Each file\'s "size" must be a positive integer byte size.',
+                422,
+                details=size_details,
+            )
+        if size <= 0:
+            raise APIProblem(
+                "invalid_file_size",
+                'Each file\'s "size" must be a positive integer byte size.',
+                422,
+                details=size_details,
             )
         if size > external_api.MAX_FILE_BYTES:
             raise APIProblem(
@@ -1235,39 +2044,114 @@ def create_uploads(plan_id):
         )
     _upload_sizes(report, normalized)
 
-    sessions = []
-    records = []
-    for index, item in enumerate(normalized):
-        session = storage_assets.create_direct_upload_session(
-            item["filename"],
-            content_type=item["content_type"],
-            size=item["size"],
-            input_name=UPLOAD_INPUT_NAME,
-            origin=None,
+    upload_batch_id = uuid.uuid4().hex
+    claim_token = uuid.uuid4().hex
+    claim_outcome = agent_api_store.claim_plan_operation(
+        report.key,
+        phase="create",
+        operation_id=upload_batch_id,
+        claim_token=claim_token,
+    )
+    if claim_outcome != agent_api_store.PLAN_OPERATION_CLAIMED:
+        _raise_plan_operation_problem(claim_outcome)
+
+    try:
+        # The pre-claim entity may predate a completed upload operation. Always
+        # resume from the authoritative state protected by this claim.
+        report = _load_plan(plan_id)
+        _require_draft(report)
+        if report.tool != "organize":
+            raise APIProblem(
+                "uploads_not_supported",
+                "File uploads are supported only for Organize plans.",
+                409,
+            )
+        if report.upload_manifest:
+            raise APIProblem(
+                "uploads_pending",
+                "Finalize the current upload batch before starting another.",
+                409,
+            )
+        _upload_sizes(report, normalized)
+        save = _claimed_plan_save(
+            report,
+            phase="create",
+            operation_id=upload_batch_id,
+            claim_token=claim_token,
         )
-        records.append(
-            {
-                "token": session["token"],
-                "input_name": UPLOAD_INPUT_NAME,
-                **item,
-            }
+        sessions = []
+        records = []
+        for index, item in enumerate(normalized):
+            if not agent_api_store.renew_plan_operation(
+                report.key,
+                phase="create",
+                operation_id=upload_batch_id,
+                claim_token=claim_token,
+            ):
+                raise APIProblem(
+                    "plan_operation_lost",
+                    "This request no longer owns the Plan's upload batch.",
+                    409,
+                )
+            session = storage_assets.create_direct_upload_session(
+                item["filename"],
+                content_type=item["content_type"],
+                size=item["size"],
+                input_name=UPLOAD_INPUT_NAME,
+                origin=None,
+            )
+            records.append(
+                {
+                    "token": session["token"],
+                    "input_name": UPLOAD_INPUT_NAME,
+                    **item,
+                }
+            )
+            sessions.append(
+                {
+                    "index": index,
+                    "filename": item["filename"],
+                    "session_url": session["session_url"],
+                    "chunk_size": session["chunk_size"],
+                }
+            )
+        prepared = external_api.prepare_upload_manifest(
+            records,
+            upload_batch_id=upload_batch_id,
         )
-        sessions.append(
-            {
-                "index": index,
-                "filename": item["filename"],
-                "session_url": session["session_url"],
-                "chunk_size": session["chunk_size"],
-            }
+        report.upload_manifest = external_api.bind_upload_file_identities(
+            report,
+            prepared,
+            upload_batch_id=upload_batch_id,
         )
-    report.upload_manifest = external_api.prepare_upload_manifest(records)
-    Entities.save(report)
-    return {"plan_id": report.urlsafe_key, "uploads": sessions}, 201
+        agent_manifest = (
+            dict(report.agent_manifest)
+            if isinstance(getattr(report, "agent_manifest", None), dict)
+            else {}
+        )
+        agent_manifest["upload_batch_id"] = upload_batch_id
+        report.agent_manifest = agent_manifest
+        save(report)
+        return {
+            "plan_id": report.urlsafe_key,
+            "upload_batch_id": upload_batch_id,
+            "uploads": sessions,
+        }, 201
+    finally:
+        _release_plan_operation_claim(
+            report,
+            phase="create",
+            operation_id=upload_batch_id,
+            claim_token=claim_token,
+        )
 
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : uploads
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_upload_batch_identity_rejects_a_same_metadata_last_writer
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_claimed_upload_routes_reload_before_storage_side_effects
+# @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
+# @matrix agent-api mcp-upload : authoritative-reload concurrency checkpoint resume stale-snapshot
 @api.post("/plans/<plan_id>/uploads/finalize")
 @_route
 def finalize_uploads(plan_id):
@@ -1279,8 +2163,113 @@ def finalize_uploads(plan_id):
             "File uploads are supported only for Organize plans.",
             409,
         )
-    if report.upload_manifest:
-        external_api.finalize_uploads(report, g.agent_api_user)
+    data = _json_body()
+    unsupported_fields = sorted(set(data) - {"upload_batch_id"})
+    if unsupported_fields:
+        raise APIProblem(
+            "unsupported_field",
+            "Upload finalization request contains unsupported fields.",
+            422,
+            details={
+                "path": "$",
+                "fields": unsupported_fields,
+                "allowed_fields": ["upload_batch_id"],
+            },
+        )
+    upload_batch_id = data.get("upload_batch_id")
+    if not isinstance(upload_batch_id, str) or not UPLOAD_BATCH_ID_PATTERN.fullmatch(
+        upload_batch_id
+    ):
+        raise APIProblem(
+            "invalid_upload_batch_id",
+            "upload_batch_id must be the opaque identity returned at creation.",
+            422,
+            details={
+                "path": "$.upload_batch_id",
+                "expected": "server-issued upload batch identity",
+            },
+        )
+    current_batch_id = _upload_batch_id(report)
+    if current_batch_id != upload_batch_id:
+        raise APIProblem(
+            "upload_batch_mismatch",
+            "This upload batch is no longer current for the Plan.",
+            409,
+        )
+    if not report.upload_manifest:
+        return _plan_payload(report)
+
+    claim_token = uuid.uuid4().hex
+    claim_outcome = agent_api_store.claim_plan_operation(
+        report.key,
+        phase="finalize",
+        operation_id=upload_batch_id,
+        claim_token=claim_token,
+    )
+    if claim_outcome == agent_api_store.PLAN_OPERATION_COMPLETE:
+        current = _load_plan(plan_id)
+        return _plan_payload(current)
+    if claim_outcome != agent_api_store.PLAN_OPERATION_CLAIMED:
+        _raise_plan_operation_problem(claim_outcome)
+
+    try:
+        # A prior worker may have checkpointed one or more records between this
+        # request's first fetch and claim acquisition. Never finalize its stale
+        # in-memory manifest.
+        report = _load_plan(plan_id)
+        _require_draft(report)
+        if report.tool != "organize":
+            raise APIProblem(
+                "uploads_not_supported",
+                "File uploads are supported only for Organize plans.",
+                409,
+            )
+        if _upload_batch_id(report) != upload_batch_id:
+            raise APIProblem(
+                "upload_batch_mismatch",
+                "This upload batch is no longer current for the Plan.",
+                409,
+            )
+        if not report.upload_manifest:
+            return _plan_payload(report)
+
+        # @testable false
+        # @covered-by lagniappe/web/routes/api/main.py::finalize_uploads
+        # @reason the route-owned callback only maps lease renewal loss to its API conflict
+        def ensure_active():
+            if not agent_api_store.renew_plan_operation(
+                report.key,
+                phase="finalize",
+                operation_id=upload_batch_id,
+                claim_token=claim_token,
+            ):
+                raise APIProblem(
+                    "plan_operation_lost",
+                    "This request no longer owns the Plan's upload batch.",
+                    409,
+                )
+
+        save = _claimed_plan_save(
+            report,
+            phase="finalize",
+            operation_id=upload_batch_id,
+            claim_token=claim_token,
+        )
+        external_api.finalize_uploads(
+            report,
+            g.agent_api_user,
+            asset_nonce=claim_token,
+            ensure_active=ensure_active,
+            save=save,
+        )
+        report = _load_plan(plan_id)
+    finally:
+        _release_plan_operation_claim(
+            report,
+            phase="finalize",
+            operation_id=upload_batch_id,
+            claim_token=claim_token,
+        )
     return _plan_payload(report)
 
 
@@ -1291,10 +2280,9 @@ def _original_file_download(tool_name, arguments, result):
     if tool_name != "get_file" or not isinstance(arguments, dict):
         return result
     include_original = arguments.get("include_original")
-    include_original = (
-        include_original is True
-        or str(include_original).strip().casefold() in {"1", "true", "yes", "on"}
-    )
+    include_original = include_original is True or str(
+        include_original
+    ).strip().casefold() in {"1", "true", "yes", "on"}
     original_file = result.get("original_file") if isinstance(result, dict) else None
     if (
         not include_original
@@ -1304,10 +2292,9 @@ def _original_file_download(tool_name, arguments, result):
         return result
 
     normalized = normalize_hash_references(arguments)
-    entity = Entities.fetch_one(normalized.get("id"), request=Fetch.direct())
-    if (
-        not isinstance(entity, Entities.FILE)
-        or not entity.allowed(Action.VIEW, user=g.agent_api_user)
+    entity = Entities.fetch_one(normalized.get("id"), request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    if not isinstance(entity, Entities.FILE) or not entity.allowed(
+        Action.VIEW, user=g.agent_api_user
     ):
         return result
     asset = entity.properties.file.value
@@ -1343,19 +2330,27 @@ def _original_file_download(tool_name, arguments, result):
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
 # @matrix agent-api : tool-dispatch
+# @pair agent-api:answer-context
 # @pairs agent-api:ask-refinement agent-api:create-revision agent-api:organize-revision agent-api:envelope-validation
+# @pairs agent-api:rate-limit
+@api.post("/tools/<tool_name>", defaults={"plan_id": None})
 @api.post("/plans/<plan_id>/tools/<tool_name>")
 @_route
 def execute_tool(plan_id, tool_name):
-    report = _load_plan(plan_id)
-    _require_tools_available(report)
+    report = _load_plan(plan_id) if plan_id is not None else None
+    if report is not None:
+        _require_tools_available(report)
     if tool_name not in ai_functions.TOOL_DEFINITIONS:
         raise APIProblem("tool_not_found", "Tool not found.", 404)
-    _rate_limit(
-        "agent-api-plan-tools",
-        report.urlsafe_key,
-        external_api.MAX_PLAN_TOOL_CALLS,
-        PLAN_TOOL_RATE_WINDOW,
+    rate_state = (
+        _rate_limit(
+            "agent-api-plan-tools",
+            report.urlsafe_key,
+            external_api.MAX_PLAN_TOOL_CALLS,
+            PLAN_TOOL_RATE_WINDOW,
+        )
+        if report is not None
+        else {"count": 0}
     )
     data = _json_body()
     unsupported = sorted(set(data) - {"arguments"})
@@ -1376,13 +2371,19 @@ def execute_tool(plan_id, tool_name):
 
     started = time.monotonic()
     outcome = "success"
+    result_bytes = 0
     try:
         result, _file_parts = ai_functions.execute_registered_tool(
             tool_name,
             arguments,
             g.agent_api_user,
+            external=True,
         )
         result = _original_file_download(tool_name, arguments, result)
+        safe_result = _json_safe(result)
+        result_bytes = len(
+            json.dumps(safe_result, ensure_ascii=False, default=str).encode("utf-8")
+        )
         if isinstance(result, dict) and result.get("error"):
             outcome = "tool_error"
             details = {
@@ -1399,7 +2400,7 @@ def execute_tool(plan_id, tool_name):
                 422,
                 details=details,
             )
-        return {"result": _json_safe(result)}
+        return {"result": safe_result}
     except APIProblem:
         if outcome != "tool_error":
             outcome = "api_error"
@@ -1410,19 +2411,24 @@ def execute_tool(plan_id, tool_name):
     finally:
         LOGGER.info(
             "agent_api_tool request_id=%s user_hash=%s plan=%s tool=%s "
-            "outcome=%s elapsed_ms=%d",
+            "outcome=%s call_number=%d result_bytes=%d elapsed_ms=%d",
             g.agent_api_request_id,
             g.agent_api_user.hash,
-            report.hash,
+            report.hash if report is not None else "none",
             tool_name,
             outcome,
+            rate_state["count"],
+            result_bytes,
             round((time.monotonic() - started) * 1000),
         )
 
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_submission_is_serialized_with_upload_operations
 # @matrix agent-api : submission
+# @pairs agent-api:concurrency agent-api:plan-operation
+# @pairs mcp-upload:concurrency mcp-upload:plan-operation
 @api.post("/plans/<plan_id>/submit")
 @_route
 def submit_plan(plan_id):
@@ -1435,15 +2441,76 @@ def submit_plan(plan_id):
             409,
         )
     data = _json_body()
+    operation_id = uuid.uuid4().hex
+    claim_token = uuid.uuid4().hex
+    claim_outcome = agent_api_store.claim_plan_operation(
+        report.key,
+        phase="submit",
+        operation_id=operation_id,
+        claim_token=claim_token,
+    )
+    if claim_outcome != agent_api_store.PLAN_OPERATION_CLAIMED:
+        if claim_outcome == agent_api_store.PLAN_OPERATION_INVALID:
+            raise APIProblem(
+                "plan_state_conflict",
+                "This plan cannot accept a proposal in its current state.",
+                409,
+            )
+        _raise_plan_operation_problem(claim_outcome)
+
     try:
-        submitted = external_api.submit_plan(
+        # Submission shares the per-report operation claim so it cannot
+        # overwrite a newly staged manifest or be overwritten by a stale
+        # upload creator.
+        report = _load_plan(plan_id)
+        reusable_status = "complete" if report.tool == "ask" else "ready"
+        if report.status not in {"draft", reusable_status}:
+            raise APIProblem(
+                "plan_state_conflict",
+                "This plan cannot accept a proposal in its current state.",
+                409,
+            )
+        validation_errors = external_api.submission_validation_errors(
+            data,
             report,
             g.agent_api_user,
-            data.get("proposal"),
-            contract_version=data.get("contract_version"),
         )
-    except exceptions.ValidationError as error:
-        if report.status == reusable_status:
-            raise APIProblem("plan_state_conflict", str(error), 409) from error
-        raise
+        if validation_errors:
+            raise APIProblem(
+                "validation_failed",
+                "Submission failed validation.",
+                422,
+                details={"errors": validation_errors},
+            )
+        save = _claimed_plan_save(
+            report,
+            phase="submit",
+            operation_id=operation_id,
+            claim_token=claim_token,
+        )
+        try:
+            submitted = external_api.submit_plan(
+                report,
+                g.agent_api_user,
+                data.get("proposal"),
+                contract_version=data.get("contract_version"),
+                save=save,
+                **{
+                    field: data[field]
+                    for field in ("name", "instructions")
+                    if field in data
+                },
+            )
+            notification_service.publish_plan_notification(submitted, g.agent_api_user)
+        except exceptions.ValidationError as error:
+            if report.status == reusable_status:
+                raise APIProblem("plan_state_conflict", str(error), 409) from error
+            raise
+    finally:
+        _release_plan_operation_claim(
+            report,
+            phase="submit",
+            operation_id=operation_id,
+            claim_token=claim_token,
+        )
     return _submission_receipt(submitted)

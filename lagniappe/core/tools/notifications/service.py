@@ -95,6 +95,48 @@ def create_ordinary_notification(user, *, identifier, body, target=None):
 
 
 # @testable true
+# @tests tests_unit/test_032b_agent_plan_notifications.py::test_publication_delivery_retries_cache_and_email_without_recreating_dismissed_alerts
+# @matrix agent-api notifications : idempotency cache-failure-isolation target
+def publish_plan_notification(report, user):
+    """Replay supplementary delivery of an already committed publication alert."""
+    identity = (report.agent_manifest or {}).get("publication_notification")
+    if not identity:
+        return
+    from ...definitions import Fetch
+    from ...entities import Entities
+    from ...exceptions import capture
+    from .. import cache
+    from ..email.notifications import capture as email_capture
+    from ..database import get as database_get
+
+    try:
+        row = database_notifications.DATA.datastore.get(
+            database_get.datastore_key(identity)
+        )
+        # Dismissal is durable: replay must never recreate or project a deleted alert.
+        if row is None or row.get("parent") != user.key or row.get("target") != report.key:
+            return
+        notification = Entities.fetch_one(row, request=Fetch.direct())
+        notification.parent = user
+        notification.target = report
+    except Exception as error:
+        capture(error, context={"operation": "plan-notification-load"})
+        return
+    try:
+        aggregate = database_notifications.get_notification_aggregate(user)
+        cache.update_notification_projection(
+            upserts=[notification], aggregates={user.urlsafe_key: aggregate}
+        )
+    except Exception as error:
+        capture(error, context={"operation": "plan-notification-projection"})
+    try:
+        # The stable source key also deduplicates email capture after a retry.
+        email_capture.record_notification(notification, now=row.get("created"))
+    except Exception as error:
+        capture(error, context={"operation": "plan-notification-email"})
+
+
+# @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
 # @matrix notifications : aggregate-count ordinary-delete
 def delete_ordinary_notification(user, notification_key):

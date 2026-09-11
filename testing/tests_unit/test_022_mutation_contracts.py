@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 
+from google.cloud import datastore
 import pytest
 
 from lagniappe.core.definitions import (
@@ -43,6 +44,145 @@ def _writes(plan):
         for effect in plan.effects
         if effect.effect in {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
     ]
+
+
+# @matrix mutations : write-identity dependency-order
+@pytest.mark.parametrize("report_first", [False, True])
+def test_mutation_write_order_preserves_distinct_roots_and_dependencies(report_first):
+    user = TestEntities.get("USER", {"hash": "ordered-report-user"})
+    page = TestEntities.get("PAGE", {"hash": "ordered-file-page"})
+    detached = TestEntities.get("FILE", {"hash": "ordered-detached-file"})
+    attached = TestEntities.get("FILE", {"hash": "ordered-attached-file"})
+    attached.page = page
+    report = TestEntities.get("REPORT", {
+        "hash": "ordered-report", "parent": user, "user": user,
+    })
+    roots = (report, detached, attached) if report_first else (detached, attached, report)
+
+    plan = plan_mutation(MutationOperation.SAVE, *roots, registry=Entities)
+
+    keys = [effect.entity.key for effect in _writes(plan)]
+    assert len(keys) == len(set(keys))
+    assert set(keys) == {detached.key, attached.key, page.key, report.key, user.key}
+    assert keys.index(page.key) < keys.index(attached.key)
+
+
+# @matrix ai-report mutations : input-files no-database-read owner-touch
+def test_report_save_does_not_touch_input_files(monkeypatch):
+    user = TestEntities.get("USER", {"hash": "report-planner-user"})
+    file = TestEntities.get("FILE", {"hash": "report-planner-file"})
+    report = TestEntities.get("REPORT", {"hash": "report-planner", "parent": user, "user": user})
+    report.input_files = [file]
+    monkeypatch.setattr(Entities, "fetch", lambda *_args, **_kwargs: pytest.fail("Report save needs no file graph"))
+
+    plan = plan_mutation(MutationOperation.SAVE, report, registry=Entities)
+
+    writes = {effect.entity.key: effect for effect in _writes(plan)}
+    assert set(writes) == {report.key, user.key}
+    assert writes[report.key].property_mask is None
+    assert writes[user.key].property_updates == ("modified",)
+    assert all(effect.entity is not file for effect in plan.effects)
+
+
+# @matrix permissions : invalidation-retry
+@pytest.mark.parametrize("kind", ["PAGE", "FORM"])
+def test_permission_source_marker_is_consumed_only_after_durable_success(monkeypatch, kind):
+    from lagniappe.core.tools.database import get as database_get
+
+    source = TestEntities.get(kind, {"hash": "permission-source"})
+    source.properties.restricted_to.materialize(admin_only=True)
+    assert source._permission_sources_changed is True
+    monkeypatch.setattr(database_get, "form_users", lambda *_forms: [])
+    monkeypatch.setattr(Entities, "fetch", lambda *items, request: list(items))
+    monkeypatch.setattr(mutation_executor, "execute_post_commit", lambda _plan: ([], []))
+    plan = plan_mutation(MutationOperation.SAVE, source, registry=Entities)
+    assert [effect.entity for effect in _writes(plan)] == [source]
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations",
+                        lambda _writes: (_ for _ in ()).throw(RuntimeError("save failed")))
+    with pytest.raises(RuntimeError, match="save failed"):
+        execute_mutation(plan)
+    assert source._permission_sources_changed is True
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", lambda _writes: None)
+    execute_mutation(plan)
+    assert source._permission_sources_changed is False
+    source.properties.restricted_to.materialize()
+    assert source._permission_sources_changed is False
+
+
+# @matrix permissions mutations : owner-reuse no-extra-read repeated-save
+@pytest.mark.parametrize("kind", ["PAGE", "FORM"])
+def test_permission_save_reuses_resolved_collection_owner_keys(monkeypatch, kind):
+    source = TestEntities.get(kind, {"name": "Permission source", "hash": "owner-source"})
+    category = TestEntities.get("CATEGORY", {"name": "Category", "hash": "owner-category"})
+    other = TestEntities.get("PROJECT" if kind == "FORM" else "CATEGORY", {
+        "name": "Other collection", "hash": "other-owner",
+    })
+    user = TestEntities.get("USER", {"name": "Viewer", "hash": "owner-user"})
+    group = TestEntities.get("USER_GROUP", {"name": "Group", "hash": "owner-group"})
+    if kind == "FORM":
+        source.groups = [group]
+    owners = [category, other, user, category]
+    reads = []
+
+    def resolved_owners(_source):
+        reads.append(True)
+        return list(owners)
+
+    monkeypatch.setattr(
+        type(source), "used_by" if kind == "FORM" else "page_list_owners",
+        property(resolved_owners),
+    )
+    monkeypatch.setattr(
+        Entities, "fetch",
+        lambda *_args, **_kwargs: pytest.fail("already-resolved owners must be reused"),
+    )
+    source._restriction_owner_keys = ("stale-owner",)
+
+    for current in ([category, other, user, category], [other], []):
+        owners[:] = current
+        plan = plan_mutation(MutationOperation.SAVE, source, registry=Entities)
+
+        assert source._restriction_owner_keys == tuple(sorted({
+            owner.urlsafe_key for owner in current
+            if owner.entity_kind in {"category", "project"}
+        }))
+        assert "_restriction_owner_keys" not in source.db
+        expected = {source.key, *(owner.key for owner in current)}
+        if kind == "FORM":
+            expected.add(group.key)
+        assert {write.entity.key for write in _writes(plan)} == expected
+    assert len(reads) == 3
+
+
+# @matrix mutations : full-root masked-touch instance-precedence cache
+@pytest.mark.parametrize("file_first", [True, False])
+def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first, monkeypatch):
+    monkeypatch.setattr(Entities, "fetch", lambda *entities, request: list(entities))
+    page = TestEntities.get("PAGE", {
+        "name": "Current contact", "hash": "root-contact",
+        "model": {"name": "Contacts", "hash": "root-contacts"},
+    })
+    category = page.model
+    old_page = TestEntities.get("PAGE", {"name": "Stale contact", "hash": page.hash})
+    record = datastore.Entity(key=datastore.Key("files", "contact-file", project="test-project"))
+    record.update(type="file", name="Contact card", hash="root-contact-file")
+    file = Entities.FILE(record)
+    file.page = old_page
+    roots = (file, page) if file_first else (page, file)
+
+    plan = plan_mutation(MutationOperation.SAVE, *roots, registry=Entities)
+    write = next(effect for effect in _writes(plan) if effect.entity.key == page.key)
+    refresh = next(
+        effect for effect in plan.effects
+        if effect.effect is MutationEffectType.CACHE_REFRESH and effect.entity.key == page.key
+    )
+    assert write.property_mask is None
+    assert "file-owner" in write.reasons
+    assert write.entity is page
+    assert refresh.entity is page
+    mutation_executor.prepare_durable_writes(plan)
+    assert category.hash in write.entity.requires
+    assert write.entity.name == "Current contact"
 
 
 # @matrix mutations task-scheduling : durable-first post-commit
@@ -151,8 +291,8 @@ def test_mutation_contract_registry_covers_persisted_entities_and_relations(caps
     )
     assert mutation_contracts.main(["--kind", "file", "--check"]) == 0
     output = capsys.readouterr().out
-    assert "pages -> page" in output
-    assert "tasks -> task, task_history" in output
+    assert "page -> page" in output
+    assert "task -> task" in output
 
 
 # @matrix mutations : durable-first plan save serialization typed-intent-preservation
@@ -592,20 +732,83 @@ def test_existing_user_save_does_not_implicitly_mutate_canonical_page():
 def test_delete_survivor_merge_combines_relation_removals():
     page_a = TestEntities.get("PAGE", {"name": "A", "hash": "merge-page-a"})
     page_b = TestEntities.get("PAGE", {"name": "B", "hash": "merge-page-b"})
-    file_a = TestEntities.get("FILE", {"name": "Shared", "hash": "shared-file"})
-    file_b = TestEntities.get("FILE", {"name": "Shared", "hash": "shared-file"})
-    file_b._key = file_a.key
-    file_a.db["pages"] = [page_b.key]
-    file_b.db["pages"] = [page_a.key]
+    task_a = TestEntities.get("TASK", {"name": "Shared", "hash": "shared-task"})
+    task_b = TestEntities.get("TASK", {"name": "Shared", "hash": "shared-task"})
+    task_b._key = task_a.key
+    task_a.db["linked_pages"] = [page_b.key]
+    task_b.db["linked_pages"] = [page_a.key]
 
     merged = _merge_survivors(
         [
-            Survivor(file_a, {"pages"}, {"modified"}, {"unlink-a"}),
-            Survivor(file_b, {"pages"}, {"modified"}, {"unlink-b"}),
+            Survivor(task_a, {"linked_pages"}, {"modified"}, {"unlink-a"}),
+            Survivor(task_b, {"linked_pages"}, {"modified"}, {"unlink-b"}),
         ]
     )
 
     assert len(merged) == 1
-    assert merged[0].entity is file_a
-    assert merged[0].properties == {"pages"}
-    assert file_a.db.get("pages") is None
+    assert merged[0].entity is task_a
+    assert merged[0].properties == {"linked_pages"}
+    assert task_a.db.get("linked_pages") is None
+
+
+# @pairs file:delete file:reverse-link mutations:delete mutations:unlink
+# @pairs tasks:delete tasks:list-owner-fingerprint tasks:reverse-link
+# @pairs tasks:task-history tasks:unlink
+def test_file_delete_unlinks_task_references_and_list_owners(monkeypatch):
+    page = TestEntities.get(
+        "PAGE",
+        {"name": "Attachment page", "hash": "attachment-page"},
+    )
+    task = TestEntities.get(
+        "TASK",
+        {
+            "name": "Attachment task",
+            "hash": "attachment-task",
+            "page": {"name": page.name, "hash": page.hash},
+        },
+    )
+    task.properties.page._value = page
+    retained = TestEntities.get(
+        "FILE",
+        {"name": "Retained attachment", "hash": "retained-attachment"},
+    )
+    deleted = TestEntities.get(
+        "FILE",
+        {"name": "Deleted attachment", "hash": "deleted-attachment"},
+    )
+    task.files = [retained, deleted]
+
+    history = Entities.TASK_HISTORY(testing=True)
+    history._key = "attachment-history"
+    history.kind = "task_history"
+    history.created = datetime.now(timezone.utc)
+    history.task = task
+    history.page = page
+    history.linked_pages = []
+    history.files = [deleted]
+
+    linked = {task.key: task, history.key: history}
+
+    def fetch_linked_tasks(*identifiers, request):
+        assert request.depth.name == "NESTED"
+        return [linked[key] for key in identifiers]
+
+    monkeypatch.setattr("lagniappe.core.tools.database.get.file_references", lambda key: list(linked))
+    monkeypatch.setattr(Entities, "fetch", fetch_linked_tasks)
+
+    plan = plan_mutation(MutationOperation.DELETE, deleted, registry=Entities)
+    writes = {effect.entity.key: effect for effect in _writes(plan)}
+    deleted_entities = [
+        effect.entity
+        for effect in plan.effects
+        if effect.effect is MutationEffectType.DELETE
+    ]
+
+    assert deleted_entities == [deleted]
+    assert task.files == [retained]
+    assert history.files == []
+    assert deleted.task is task
+    assert retained.task is task
+    assert writes[task.key].property_mask == ("files", "modified")
+    assert writes[history.key].property_mask == ("files",)
+    assert writes[page.key].property_mask == ("modified",)

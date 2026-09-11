@@ -4,7 +4,7 @@ Covers: ``FormType``, ``Schema`` → ``fields``, ``table_fields``, ``html_fields
 ``FormFilters.conditions``, schema-change cache behavior, ``Form.update``, and
 ``Form.save`` schema history, and ``SchemaVersion.update``.
 
-Out of scope here: ``get_html_field`` / ``set_html_field`` (e2e), ``used_by``.
+Out of scope here: ``get_html_field`` / ``set_html_field`` (e2e).
 """
 
 import json
@@ -174,6 +174,57 @@ def test_form_save_records_schema_history_on_version_change(get_schema):
     ]
     assert [effect.entity for effect in writes[:2]] == [history, form]
     assert all(effect.property_mask is None for effect in writes[:2])
+
+
+# @matrix forms cache : owner-reuse no-extra-read
+# @pair form-schema:cache
+@pytest.mark.unit
+@pytest.mark.parametrize("kind", ["category", "model"])
+def test_form_save_refreshes_users_with_edited_form_schema(monkeypatch, kind):
+    from datetime import datetime, timezone
+    from google.cloud import datastore
+    from lagniappe.core.tools.database.core import KINDS
+
+    modified = datetime(2026, 9, 10, tzinfo=timezone.utc)
+    form_key = datastore.Key(KINDS.models.value, "edited-form", project="form-reuse")
+    project_key = datastore.Key(KINDS.models.value, "owner-project", project="form-reuse")
+    owner_key = datastore.Key(KINDS.models.value, f"form-{kind}", project="form-reuse")
+    persisted_form = datastore.Entity(key=form_key)
+    persisted_form.update(type="form", hash="editedform", name="Edited Form", modified=modified,
+                          form_type="task" if kind == "model" else "page", version="old-version")
+    edited_row = datastore.Entity(key=form_key)
+    edited_row.update(persisted_form)
+    form = Entities.FORM(edited_row)
+    owner_row = datastore.Entity(key=owner_key)
+    owner_row.update(type=kind, hash=f"owner{kind}", name="Form user", modified=modified,
+                     form=form_key, requires=["models"])
+    project_row = datastore.Entity(key=project_key)
+    project_row.update(type="project", hash="ownerproject", name="Project", modified=modified)
+    if kind == "model":
+        owner_row["project"] = project_key
+    records = {row.key: row for row in (persisted_form, owner_row, project_row)}
+    reads = []
+
+    def fetch_rows(keys):
+        reads.extend(keys)
+        return [records[key] for key in keys if key in records]
+
+    monkeypatch.setattr(form_module.database_get, "form_users", lambda _form: [owner_row])
+    monkeypatch.setattr(form_module.database_get, "entities", fetch_rows)
+
+    form.set_schema([{"id": "subject", "type": "input", "title": "Updated subject"}])
+    plan = plan_mutation(MutationOperation.SAVE, form, registry=Entities)
+    owner = next(
+        effect.entity for effect in plan.effects
+        if effect.effect is MutationEffectType.CACHE_REFRESH and effect.entity.key == owner_key
+    )
+
+    assert owner.form is form
+    assert owner.form.schema == form.schema
+    assert owner.form.schema[-1]["title"] == "Updated subject"
+    assert owner.form.version == form.version != "old-version"
+    assert form_key not in reads
+    assert persisted_form["version"] == "old-version"
 
 
 # @matrix form-type : cache column details property

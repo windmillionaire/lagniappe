@@ -1,9 +1,13 @@
 """App Engine custom-domain mapping discovery and reconciliation."""
 
+from runner.presentation import output as print
+from runner import presentation as ui
+
 import json
 import subprocess
 import time
 
+from runner.console import wrap_text
 from installer import FORMATTER, GCLOUD_CLI
 from installer.errors import (
     GCLOUD_TIMEOUT,
@@ -212,6 +216,7 @@ def _listed_domain_mapping(mappings, project_id, domain):
 def wait_for_managed_certificate(
     domain,
     *,
+    announce_ready=False,
     sleep=time.sleep,
     poll_delays=MANAGED_CERTIFICATE_POLL_DELAYS,
 ):
@@ -302,12 +307,15 @@ def wait_for_managed_certificate(
 
         if active_id:
             last_status = "ACTIVE"
-            print(
-                f.success(
-                    f"Managed TLS certificate active for https://{domain}. "
-                    "It may take up to an hour before the domain opens over HTTPS."
+            if announce_ready:
+                print(
+                    f.success(
+                        wrap_text(
+                            f"Managed TLS certificate active for https://{domain}. "
+                            "It may take up to an hour before the domain opens over HTTPS."
+                        )
+                    )
                 )
-            )
             return True
         elif pending_id:
             certificate = retry_provider_call(
@@ -331,12 +339,13 @@ def wait_for_managed_certificate(
 
         if attempt < len(delays) - 1:
             next_delay = delays[attempt + 1]
-            certificate_id = pending_id or "not assigned yet"
-            detail = (
-                f"Managed TLS certificate {certificate_id} for "
-                f"https://{domain} in {target}: {last_status}"
+            print(
+                ui.status(
+                    f"Managed TLS certificate for {domain}: {last_status}; "
+                    f"retrying in {next_delay} seconds",
+                    "pending",
+                )
             )
-            print(f"{detail}. Retrying in {next_delay} seconds...")
 
     raise ProviderTimeout(
         "Deployment succeeded, but the App Engine managed TLS certificate for "
@@ -379,7 +388,7 @@ def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
     """Discover or create a mapping and return Google's exact DNS records."""
     from config import SETTINGS
 
-    f = FORMATTER.initialize()
+    FORMATTER.initialize()
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
     account = str(SETTINGS.GCLOUD_CONFIG.get("ACCOUNT") or "").strip()
     target_flags = [f"--project={project_id}"]
@@ -459,29 +468,11 @@ def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
         validated = _validated_mapping(mapping, project_id, domain)
         if validated is not None and _uses_automatic_ssl(validated):
             action = "created" if created else "updated" if updated else "existing"
-            ssl_settings = _ssl_settings(validated) or {}
-            management_type = str(
-                ssl_settings.get("sslManagementType")
-                or ssl_settings.get("ssl_management_type")
-                or "SSL_MANAGEMENT_TYPE_UNSPECIFIED"
-            ).strip().upper()
-            certificate_id = str(
-                ssl_settings.get("certificateId")
-                or ssl_settings.get("pendingManagedCertificateId")
-                or "not assigned yet"
-            ).strip()
             record_mutation(
                 "custom-domain-mapping",
                 action=action,
                 resource="App Engine domain mapping",
                 identifier=validated.get("name") or domain,
-            )
-            sp.write(
-                f.success(
-                    f"App Engine domain mapping {action}: {validated['name']} "
-                    f"using {account or '<configured-account>'}; managed TLS "
-                    f"{management_type}, certificate {certificate_id}"
-                )
             )
             return validated
 

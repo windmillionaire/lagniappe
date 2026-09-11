@@ -9,6 +9,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 
 from runner.context import (
     GCLOUD_CLI,
@@ -24,6 +25,9 @@ from runner.pytest_routing import (
     TRACEABILITY_RESULTS_PLUGIN,
     PytestRoutingError,
     normalize_pytest_invocation,
+    MCP_TEST_FILES,
+    partition_mcp_adapter_tests,
+    targets_include_repository_file,
 )
 
 if len(sys.argv) > 1 and sys.argv[1] in {"browser-review", "test", "test-server"}:
@@ -119,10 +123,81 @@ def _run_pytest_subprocess(command: list[str]) -> int:
             signal.signal(signum, handler)
 
 
+MCP_E2E_TEST = "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py"
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_unit_partitions_adapter_once_and_merges_results
+# @matrix mcp-package testing : result-aggregation exit-status
+def _combine_pytest_exit_statuses(*statuses: int) -> int:
+    """Combine partitions while treating an empty companion selection as neutral."""
+    for status in statuses:
+        if status not in {0, 5}:
+            return status
+    return 0 if 0 in statuses else 5
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_merge_mcp_test_evidence_validates_and_forwards_outcomes
+# @matrix mcp-package testing traceability : result-aggregation test-evidence
+def _merge_mcp_test_evidence(
+    result_path: Path,
+    full_command: list[str],
+    adapter_status: int,
+    combined_status: int,
+) -> None:
+    """Validate and merge results transported from package-isolated pytest."""
+    try:
+        if result_path.stat().st_size > 10_000_000:
+            raise ValueError("result payload is too large")
+        payload = json.loads(result_path.read_text(encoding="utf-8"))
+        payload_status = payload["exit_status"]
+        outcomes = payload["outcomes"]
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            "The MCP adapter test process returned invalid test evidence."
+        ) from error
+    if payload_status != adapter_status or not isinstance(outcomes, dict):
+        raise RuntimeError(
+            "The MCP adapter test process returned inconsistent test evidence."
+        )
+    normalized_outcomes = {}
+    for nodeid, row in outcomes.items():
+        if not isinstance(nodeid, str) or not isinstance(row, dict):
+            raise RuntimeError(
+                "The MCP adapter test process returned inconsistent test evidence."
+            )
+        canonical_nodeid = nodeid.removeprefix("../").removeprefix("testing/")
+        test_path = canonical_nodeid.partition("::")[0]
+        if test_path not in {
+            path.removeprefix("testing/") for path in MCP_TEST_FILES
+        } or canonical_nodeid in normalized_outcomes:
+            raise RuntimeError(
+                "The MCP adapter test process returned unexpected test evidence."
+            )
+        normalized_outcomes[canonical_nodeid] = row
+
+    from testing.utility.traceability_results import _write_manifest
+
+    _write_manifest(
+        REPOSITORY_ROOT,
+        full_command,
+        normalized_outcomes,
+        combined_status,
+    )
+
+
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_e2e_aligns_adc_before_pytest
 # @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_focused_adapter_uses_only_locked_package_bridge
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_unit_partitions_adapter_once_and_merges_results
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_adapter_preflight_stops_before_root_test_work
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_hosted_adapter_selection_checks_prebuilt_environment
 # @matrix hosted-e2e testing : cli-routing
+# @matrix hosted-e2e mcp-package testing : environment-check isolation
+# @matrix mcp-package testing : cli-routing environment-isolation no-duplicate-collection
+# @matrix mcp-package testing : fail-closed local-preflight repair-guidance
 # @pairs hosted-e2e:frontend-build testing:adc
 def run_tests(test_args: list[str]) -> int:
     """Run pytest through the repo wrapper.
@@ -144,11 +219,37 @@ def run_tests(test_args: list[str]) -> int:
         print(f"Test argument error: {error}", file=sys.stderr)
         return 4
 
+    partitions = partition_mcp_adapter_tests(invocation, REPOSITORY_ROOT)
+    hosted = hosted_e2e_enabled()
+    adapter_e2e = (
+        not hosted
+        and (REPOSITORY_ROOT / MCP_E2E_TEST).is_file()
+        and targets_include_repository_file(
+            invocation.collection_targets,
+            MCP_E2E_TEST,
+            REPOSITORY_ROOT,
+        )
+    )
+    if partitions.mcp_args is not None or adapter_e2e:
+        try:
+            from runner.mcp_environment import (
+                check_environment,
+                prepare_environment,
+            )
+
+            if hosted:
+                check_environment()
+            else:
+                prepare_environment()
+        except RuntimeError as error:
+            print(f"Test startup stopped: {error}")
+            return 1
+
     if invocation.strict_relations or invocation.includes_e2e:
         os.environ["STRICT_RELATION_LOADS"] = "1"
 
     configure_test_environment(includes_e2e=invocation.includes_e2e)
-    if not hosted_e2e_enabled():
+    if partitions.root_args is not None and not hosted:
         try:
             activate_repository_gcloud(
                 ensure_adc=invocation.includes_e2e,
@@ -172,7 +273,7 @@ def run_tests(test_args: list[str]) -> int:
     crossed_data_boundary = False
     session_environment = {}
     try:
-        if invocation.includes_e2e and not hosted_e2e_enabled():
+        if invocation.includes_e2e and not hosted:
             from runner.test_session import (
                 SESSION_MODE_ENV,
                 SESSION_NONCE_ENV,
@@ -208,7 +309,34 @@ def run_tests(test_args: list[str]) -> int:
             server_process = run_test_server(authority)
             authority.update(phase="ready")
 
-        return _run_pytest_subprocess(pytest_command(list(invocation.pytest_args)))
+        from runner.pytest_reports import partition_junit_reports
+
+        statuses = []
+        with partition_junit_reports(partitions) as reports:
+            if reports.root_args is not None:
+                statuses.append(
+                    _run_pytest_subprocess(pytest_command(list(reports.root_args)))
+                )
+            if reports.mcp_args is not None:
+                from runner.mcp_environment import run_pytest as run_mcp_pytest
+
+                with tempfile.TemporaryDirectory(prefix="lagniappe-mcp-pytest-") as temp:
+                    result_path = Path(temp) / "results.json"
+                    adapter_status = run_mcp_pytest(
+                        list(reports.mcp_args),
+                        prepared=True,
+                        result_path=result_path,
+                    )
+                    statuses.append(adapter_status)
+                    combined_status = _combine_pytest_exit_statuses(*statuses)
+                    if "--no-test-evidence" not in invocation.pytest_args:
+                        _merge_mcp_test_evidence(
+                            result_path,
+                            full_command,
+                            adapter_status,
+                            combined_status,
+                        )
+        return _combine_pytest_exit_statuses(*statuses)
     except RuntimeError as error:
         print(f"Test startup stopped: {error}")
         return 1

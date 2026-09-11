@@ -11,6 +11,7 @@ from lagniappe.core.definitions import (
     DeferredJobStatus,
     DeferredJobType,
     Fetch,
+    FetchReason,
     FileConsumer,
 )
 from lagniappe.core.entities import Entities
@@ -106,7 +107,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
             file_key = database_utility.create_named_key("file", f"email-{identity}")
             file = attached.get(file_key) or Entities.fetch_one(
                 file_key,
-                request=Fetch.direct(),
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
             )
             if not isinstance(file, Entities.FILE):
                 parameters["_diagnostic_code"] = "attachment_download_failed"

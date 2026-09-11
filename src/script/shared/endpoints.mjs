@@ -151,14 +151,5 @@ export const ENDPOINTS = {
 	},
 	createSchema: "/forms/create-schema",
 	restrictions: (key) => `/forms/${key}/restrictions`,
-	PagePermissions: (settings) => {
-		return {
-			viewAccess: `/pages/${settings.key}/view-access`,
-			restrictAccess: `/pages/${settings.key}/restrictions`,
-		};
-	},
-	UserSettings: (settings) => {
-		return ENDPOINTS.PagePermissions(settings);
-	},
 	sync: "/l/sync",
 };

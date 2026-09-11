@@ -61,6 +61,22 @@ The external-agent REST API publishes ordinary JSON Schema definitions for
 this same registry and invokes the same handlers as the bearer key's user. It
 does not maintain a separate privileged data-access path.
 
+Every catalog definition includes a provider-neutral input schema, output
+schema, and result-path descriptor. Provider-native calls receive the successful
+direct handler value; REST preserves its `{result: ...}` success envelope. External
+catalog selection can return exact definitions or names only, but it never
+creates a second handler registry.
+
+Internal `search_entities` defaults to the unchanged full-text search. The
+external API selects bounded candidate discovery through trusted dispatch:
+sparse multiword queries may receive ranked OR matches in the same tool result,
+with cached parent/snippet and Task completion context. This does not load every
+candidate again to attach edit/create permissions. The automatic Organize
+retrieval prepass retains native full-text matching. Both paths preserve the
+explicit `exact_name` mode; external Page candidates can also use the existing
+Category `parent_id` scope. The model cannot select the internal/external
+dispatch context through tool arguments.
+
 ## Structured output
 
 When JSON, tools, and a provider response schema are enabled together, the
@@ -94,7 +110,33 @@ tool, declare:
 `get_guidelines` defers specialized form, schema, page, project, scheduling,
 image, and output policy until relevant. Treat its result as model guidance,
 not proof that a required rule was followed; the application validator remains
-the contract.
+the contract. External plan contracts publish required/conditional bundle
+arguments. The guideline tool can restrict Form value rules to actual schema
+field types and action rules to selected action types; filtered and full calls
+remain different arguments in the normal exact-call cache.
+
+For an existing-submission patch, the same tool accepts `task="form_autofill"`
+with `actions=["update_form_values"]` and actual `field_types`; this returns
+patch-specific guidance in both native and external flows, without the blank-only
+Autofill/file-reading workflow. `get_schema(include_values=true)` joins current
+AI-readable values to exact schema ids in one read. Neither option adds a tool
+name or a required model round. Prefer projections and reuse over splitting one
+natural read into several dependent calls: each extra Gemini round sends another
+provider request and replays prior tool output. Tool count alone is not the useful
+measure; observe rounds, cumulative tokens, latency and provider errors.
+
+The API route selects external dispatch through server-owned context, never a
+model-supplied argument. In particular, `get_guidelines(task="organize")`
+has separate compositions. Built-in Gemini receives structural-planning rules:
+the server already prepared summaries/retrieval terms and will complete form
+values afterward. External clients receive full inspection, summary-authoring
+and final-submission responsibilities. Shared domain guidance remains reusable;
+MCP lifecycle names and REST submission instructions do not belong in built-in
+provider prompts. The external schedule schema adds conditional requirements
+without changing Gemini's provider-compatible schema.
+The external `form_autofill` bundle permits grounded corrections and emits only
+selected field updates; built-in Autofill retains its blank-only completion
+policy and preserves non-empty partial values.
 
 `get_category_pages` returns at most ten Pages per call. Its response separates
 the caller's `requested_limit`, the enforced `effective_limit`, and

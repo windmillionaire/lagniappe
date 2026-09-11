@@ -27,14 +27,8 @@ def move_file_details(details, data, action=None):
 
 
 # @testable infrastructure
-def page_attachment_details(details, data, action=None):
-    details.reference("Page", data, "page")
-    details.reference("File", data, "file")
-
-
-# @testable infrastructure
-def task_attachment_details(details, data, action=None):
-    details.reference("Task", data, "task")
+def attachment_details(details, data, action=None):
+    details.reference("Target", data, "entity")
     details.reference("File", data, "file")
 
 
@@ -59,16 +53,10 @@ def file_action_displays():
             prefer_file_label=True,
         ),
         ProposalActionDisplay(
-            "attach_file_to_page",
+            "attach_file",
             "Attached File",
-            page_attachment_details,
-            grouping=ProposalActionGrouping.PAGE_ATTACHMENT,
-        ),
-        ProposalActionDisplay(
-            "attach_file_to_task",
-            "Attached File",
-            task_attachment_details,
-            grouping=ProposalActionGrouping.TASK_ATTACHMENT,
+            attachment_details,
+            grouping=ProposalActionGrouping.ATTACHMENT,
         ),
         ProposalActionDisplay(
             "summarize_file",

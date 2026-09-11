@@ -339,7 +339,8 @@ def test_search_snippet_skips_highlighted_value_without_matching_key():
 # @matrix cache : details parent-key redis-storage
 @pytest.mark.unit
 def test_redis_details_store_parent_key_not_parent_blob():
-    entity = SimpleNamespace(
+    entity = SimpleNamespace(entity_kind="page", restricted_to={},
+        urlsafe_key="page-id", fingerprint="page-fingerprint", form=None,
         details={
             "id": "page-id",
             "kind": "page",
@@ -362,7 +363,26 @@ def test_redis_details_store_parent_key_not_parent_blob():
         "hash": "page-hash",
         "name": "Page",
         "parent_key": "category-hash",
+        "fingerprint": "page-fingerprint",
+        "form_version": "",
     }
+
+
+# @matrix cache : details redis-storage source-clauses
+@pytest.mark.unit
+def test_redis_details_preserve_restriction_sources():
+    entity = SimpleNamespace(
+        entity_kind="file", fingerprint="file-fingerprint", owner=None,
+        restricted_to={"page": ["b", "a", "b"], "page_form": [], "task_form": ["c"]},
+        details={"id": "file-id", "kind": "file", "restricted_to": {"page_form": ["old"]}},
+    )
+
+    details = cache_add._redis_details(entity)
+
+    assert details["restricted_to"] == {"page": ["a", "b"], "task_form": ["c"]}
+    assert entity.restricted_to["page"] == ["b", "a", "b"]
+    entity.restricted_to = {}
+    assert "restricted_to" not in cache_add._redis_details(entity)
 
 
 # @matrix cache : kind-score search-ranking
@@ -402,7 +422,8 @@ def test_cache_update_writes_pointer_search_rows_and_parent_free_details(monkeyp
         def pipeline(self):
             return FakePipe()
 
-    entity = SimpleNamespace(
+    entity = SimpleNamespace(entity_kind="page", key="page-id", properties={}, db={}, restricted_to={},
+        fingerprint="page-fingerprint", form=None,
         hash="page-hash",
         kind="page",
         urlsafe_key="page-id",
@@ -451,6 +472,69 @@ def test_cache_update_writes_pointer_search_rows_and_parent_free_details(monkeyp
     details = json.loads(details_call[1][1])
     assert details["parent_key"] == "category-hash"
     assert "parent" not in details
+
+
+# @pair cache:search-visibility
+@pytest.mark.unit
+def test_cache_update_keeps_non_searchable_entity_hash_addressable(monkeypatch):
+    deleted = []
+    hset_calls = []
+
+    class FakePipe:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def delete(self, key):
+            deleted.append(key)
+
+        def hset(self, key, *args, mapping=None):
+            hset_calls.append((key, mapping, args))
+
+        def execute(self):
+            return None
+
+    monkeypatch.setattr(
+        cache_add,
+        "cache",
+        SimpleNamespace(pipeline=lambda: FakePipe()),
+    )
+    entity = SimpleNamespace(entity_kind="file", key="staged-file-id", properties={}, owner=None,
+        fingerprint="file-fingerprint",
+        hash="staged-file-hash",
+        kind="file",
+        searchable=False,
+        urlsafe_key="staged-file-id",
+        to_cache={
+            "id": "staged-file-id",
+            "kind": "file",
+            "name": "Staged evidence",
+            "hash": "staged-file-hash",
+            "details_key": "staged-file-hash",
+        },
+        details={
+            "id": "staged-file-id",
+            "kind": "file",
+            "hash": "staged-file-hash",
+            "name": "Staged evidence",
+        },
+    )
+
+    cache_add.update(entity, update=False)
+
+    assert deleted == [Search.file.key(entity)]
+    assert not any(
+        key == Search.file.key(entity) for key, _mapping, _args in hset_calls
+    )
+    details_call = next(
+        (key, args)
+        for key, mapping, args in hset_calls
+        if key == Keys.ENTITY_HASHES.value
+    )
+    assert details_call[1][0] == "staged-file-hash"
+    assert json.loads(details_call[1][1])["id"] == "staged-file-id"
 
 
 # @pairs cache:delete search:user-projection
@@ -555,7 +639,7 @@ def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch
 @pytest.mark.unit
 def test_search_results_are_hydrated_from_details_hashes(monkeypatch):
     doc = SimpleNamespace(
-        id=f"{query.CONFIG.PREFIX}page:page-id",
+        id=Search.page.value.format("page-id"),
         kind="page",
         name="Page",
         details_key="page-hash",
@@ -587,11 +671,11 @@ def test_search_results_are_hydrated_from_details_hashes(monkeypatch):
     monkeypatch.setattr(query, "cache", fake_cache)
     monkeypatch.setattr(cache_details, "cache", fake_cache)
 
-    entity_results = query.entity_search("Page", Restriction.UNRESTRICTED, [])
+    entity_results = query.entity_search("Page", Restriction.UNRESTRICTED, Restriction.BELONGS_TO_ALL)
     kind_results = query.kind_search(
-        "Page", "page", Restriction.UNRESTRICTED, [], include_users=False
+        "Page", "page", Restriction.UNRESTRICTED, Restriction.BELONGS_TO_ALL, include_users=False
     )
-    full_results, total = query.search("Page", Restriction.UNRESTRICTED, [])
+    full_results, total = query.search("Page", Restriction.UNRESTRICTED, Restriction.BELONGS_TO_ALL)
 
     for result in [entity_results[0], kind_results[0], full_results[0]]:
         assert result["details"]["parent"]["name"] == "Category"
@@ -646,13 +730,14 @@ def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
     monkeypatch.setattr(query, "cache", FakeCache())
 
     assert (
-        query.kind_search("Alpha", "project", ["models", "abc123"], [], models=True)
+        query.kind_search("Alpha", "project", ["models", "abc123"], Restriction.BELONGS_TO_NONE, models=True)
         == []
     )
 
     assert calls[0] == (
         "(@name:Alpha*) (@kind:{ project | model }) "
-        "(ismissing(@restricted_to)) (@requires:{ models | abc123 })"
+        "(ismissing(@restricted_to_page)) (ismissing(@restricted_to_page_form)) "
+        "(ismissing(@restricted_to_task_form)) (@requires:{ models | abc123 })"
     )
 
     calls.clear()
@@ -661,15 +746,88 @@ def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
             "Alpha",
             "project",
             Restriction.UNRESTRICTED,
-            [],
+            Restriction.BELONGS_TO_ALL,
             models=True,
         )
         == []
     )
 
     assert calls[0] == (
-        "(@name:Alpha*) (@kind:{ project | model }) (ismissing(@restricted_to))"
+        "(@name:Alpha*) (@kind:{ project | model })"
     )
+
+    calls.clear()
+    assert query.kind_search("Alpha", "project", Restriction.UNRESTRICTED, Restriction.BELONGS_TO_NONE) == []
+    assert calls[0] == (
+        "(@name:Alpha*) (@kind:{ project }) (ismissing(@restricted_to_page)) "
+        "(ismissing(@restricted_to_page_form)) (ismissing(@restricted_to_task_form))"
+    )
+
+
+# @matrix search : exact-name parent-scope permissions bounded-query
+@pytest.mark.unit
+def test_exact_name_search_is_bounded_permission_and_parent_scoped(monkeypatch):
+    captured = {}
+    docs = [
+        SimpleNamespace(
+            id=Search.page.value.format("recovery-key"),
+            kind="page",
+            name="Recovery",
+            details_key="recovery-hash",
+        ),
+        SimpleNamespace(
+            id=Search.page.value.format("recovery-notes-key"),
+            kind="page",
+            name="Recovery Notes",
+            details_key="notes-hash",
+        ),
+    ]
+
+    class FakeCache:
+        def search(self, redis_query):
+            captured["query"] = redis_query
+            return SimpleNamespace(docs=docs, total=len(docs))
+
+        def delete(self, *_keys):
+            return None
+
+    monkeypatch.setattr(query, "cache", FakeCache())
+    monkeypatch.setattr(
+        query,
+        "hydrate_search_results",
+        lambda results: [
+            {
+                **result,
+                "details": {
+                    "id": result["id"],
+                    "hash": result["details_key"],
+                    "kind": result["kind"],
+                    "name": result["name"],
+                },
+            }
+            for result in results
+        ],
+    )
+
+    results = query.exact_name_search(
+        " recovery ",
+        ["models", "actor-hash"],
+        ["grouphash"],
+        kinds=["page"],
+        parent_hash="category-hash",
+        limit=3,
+    )
+
+    assert [result["name"] for result in results] == ["Recovery"]
+    assert captured["query"]._query_string == (
+        "(@name:recovery*) (@kind:{ page }) (@requires:{ category-hash }) "
+        "(@requires:{ models | actor-hash }) "
+        "(ismissing(@restricted_to_page) | @restricted_to_page:{ grouphash }) "
+        "(ismissing(@restricted_to_page_form) | @restricted_to_page_form:{ grouphash }) "
+        "(ismissing(@restricted_to_task_form) | @restricted_to_task_form:{ grouphash })"
+    )
+    assert captured["query"]._offset == 0
+    assert captured["query"]._num == 25
 
 
 # @matrix search : empty-access permissions
@@ -688,18 +846,53 @@ def test_search_empty_access_returns_without_querying_redis(monkeypatch):
 
 # @matrix search : permissions validation
 @pytest.mark.unit
-def test_search_permission_fragments_require_lists():
+def test_search_permission_fragments_validate_scope_and_membership():
     with pytest.raises(TypeError, match="Required must be a list"):
         query._add_required("models")
 
     with pytest.raises(ValueError, match="at least one hash"):
         query._add_required([])
 
-    with pytest.raises(TypeError, match="Restricted to must be a list"):
+    with pytest.raises(TypeError, match="Group membership must be hashes"):
         query._add_restricted_to("group")
+
+    with pytest.raises(TypeError, match="Group membership must be hashes"):
+        query._add_restricted_to(Restriction.UNRESTRICTED)
 
     with pytest.raises(TypeError, match="Required must be a list"):
         query.search("Alpha", False, [])
+
+
+# @matrix search permissions : source-clauses canonical-policy
+@pytest.mark.parametrize("groups", [["a", "b", "c"], ["c", "a", "b", "a"]])
+@pytest.mark.unit
+def test_search_restrictions_require_membership_in_each_source(monkeypatch, groups):
+    # Constructing the permission clause requires only viewer memberships.
+    monkeypatch.setattr(query, "cache", object())
+    assert query._add_restricted_to(groups) == (
+        "(ismissing(@restricted_to_page) | @restricted_to_page:{ a | b | c }) "
+        "(ismissing(@restricted_to_page_form) | @restricted_to_page_form:{ a | b | c }) "
+        "(ismissing(@restricted_to_task_form) | @restricted_to_task_form:{ a | b | c })"
+    )
+    assert query._add_restricted_to(Restriction.BELONGS_TO_ALL) == ""
+    for ungrouped in ([], Restriction.BELONGS_TO_NONE):
+        assert query._add_restricted_to(ungrouped) == (
+            "(ismissing(@restricted_to_page)) (ismissing(@restricted_to_page_form)) "
+            "(ismissing(@restricted_to_task_form))"
+        )
+
+
+# @matrix search permissions : model-expansion restricted-access
+@pytest.mark.unit
+def test_model_expansion_keeps_viewer_restrictions(monkeypatch):
+    calls = []
+    project = SimpleNamespace(id="project", hash="projecthash")
+    monkeypatch.setattr(query, "cache", SimpleNamespace(
+        search=lambda request: calls.append(request._query_string) or SimpleNamespace(docs=[]),
+    ))
+    clause = query._add_restricted_to(["a", "b"])
+    assert query._add_models(SimpleNamespace(docs=[project]), [project.hash], clause) == [project]
+    assert calls == [f"@kind:{{ model }} @requires:{{ projecthash }} {clause}"]
 
 
 # @matrix cache : empty-requires index-schema redis-cloud search-ranking tag-syntax
@@ -737,6 +930,16 @@ def test_search_index_indexes_empty_requires_tags():
         "values": 0.25,
     }
     assert "INDEXEMPTY" in requires.redis_args()
+    restriction_fields = {
+        field.name: field for field in captured["schema"]
+        if field.name.startswith("restricted_to")
+    }
+    assert set(restriction_fields) == {
+        "restricted_to_page", "restricted_to_page_form", "restricted_to_task_form",
+    }
+    assert all("INDEXMISSING" in field.redis_args() for field in restriction_fields.values())
+    pointer = next(field for field in captured["schema"] if field.name == "details_key")
+    assert "SORTABLE" in pointer.redis_args() and "NOINDEX" in pointer.redis_args()
     assert "SCORE_FIELD" in captured["definition"].args
     assert SEARCH_SCORE_FIELD in captured["definition"].args
 

@@ -2,7 +2,13 @@
 
 from dataclasses import dataclass, field
 
-from ..definitions import Fetch, MutationEffectType, MutationOperation, Restriction
+from ..definitions import (
+    Fetch,
+    FetchReason,
+    MutationEffectType,
+    MutationOperation,
+    Restriction,
+)
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import messaging as database_messaging
 from .base import MutationPlanBuilder
@@ -95,7 +101,9 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_entities_deletes_user_and_page_together
+    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
     # @matrix entities : cascade delete user-page
+    # @pair categories:shared-page
     def page(self, page, *, force=False):
         if force or not page.categories:
             self.page_notes(page)
@@ -109,6 +117,7 @@ class DeleteCollector:
             self.repair(
                 page,
                 "categories",
+                "model",
                 "requires",
                 property_updates=("requires", "modified"),
                 reason="category-delete-page-unlink",
@@ -125,17 +134,8 @@ class DeleteCollector:
             if isinstance(entity, self.entities.FILE)
         ]
         for file in files:
-            file.properties.pages.remove(page)
-            if not file.pages:
-                self.delete(file)
-            else:
-                self.repair(
-                    file,
-                    "pages",
-                    "requires",
-                    property_updates=("requires", "modified"),
-                    reason="page-delete-file-unlink",
-                )
+            self.delete(file)
+            self.file_tasks(file)
 
     # @testable infrastructure
     def page_tasks(self, page):
@@ -153,18 +153,46 @@ class DeleteCollector:
 
     # @testable infrastructure
     def task_files(self, task):
-        for file in task.files:
-            file.properties.tasks.remove(task)
-            if file.has_references:
-                self.repair(
-                    file,
-                    "tasks",
-                    "requires",
-                    property_updates=("requires", "modified"),
-                    reason="task-delete-file-unlink",
-                )
-            else:
-                self.delete(file)
+        if task.entity_kind == "task_history":
+            return
+        for file in self.entities.fetch(*database_get.task_files(task.key), request=Fetch.direct()):
+            self.delete(file)
+            self.file_tasks(file)
+
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_file_delete_unlinks_task_references_and_list_owners
+    # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_delete_file_removes_attached_task_badge
+    # @pairs file:badge file:delete file:reverse-link
+    # @pairs mutations:delete mutations:unlink
+    # @pairs tasks:badge tasks:delete tasks:list-owner-fingerprint
+    # @pairs tasks:reverse-link tasks:task-history tasks:unlink
+    def file_tasks(self, file):
+        tasks = [
+            entity
+            for entity in self.entities.fetch(
+                *database_get.file_references(file.key),
+                request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+            )
+            if isinstance(entity, (self.entities.TASK, self.entities.TASK_HISTORY))
+        ]
+        for task in tasks:
+            if not task.properties.files.remove(file):
+                continue
+
+            is_history = isinstance(task, self.entities.TASK_HISTORY)
+            self.repair(
+                task,
+                "files",
+                property_updates=() if is_history else ("modified",),
+                reason="file-delete-task-unlink",
+            )
+            owners = (
+                [task.task, task.page, *task.linked_pages]
+                if is_history
+                else task.task_list_owners
+            )
+            for owner in owners:
+                self.repair(owner, reason="file-delete-task-list-owner")
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_task_delete_updates_task_list_owners
@@ -298,7 +326,10 @@ class DeleteCollector:
         for filter_key in database_get.filters(entity):
             self.delete(self.entities.FILTER(filter_key))
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_e2e/002_home/test_002c_home_categories.py::test_delete_category
+    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
+    # @matrix categories : cascade model-category shared-page
     def category_pages(self, category):
         entities = database_get.pages(
             category.key,
@@ -312,8 +343,11 @@ class DeleteCollector:
             if isinstance(page, self.entities.PAGE)
         ]
         for page in pages:
-            page.properties.categories.remove(category)
-            self.page(page)
+            if any(owner.key != category.key for owner in page.categories):
+                page.properties.categories.remove(category)
+                self.page(page)
+            else:
+                self.page(page, force=True)
 
     # @testable infrastructure
     def collect(self, entity):
@@ -356,6 +390,20 @@ class TaskDeleteMutation(StandardDeleteMutation):
         collector.delete(entity)
         collector.task_owners(entity)
         collector.task_files(entity)
+        if entity.entity_kind == "task":
+            for history in collector.entities.fetch(*database_get.task_history(entity), request=Fetch.direct()):
+                collector.delete(history)
+
+
+# @testable infrastructure
+class FileDeleteMutation(StandardDeleteMutation):
+    # @testable infrastructure
+    # @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.file_tasks
+    def collect(self, entity, collector):
+        collector.delete(entity)
+        collector.file_tasks(entity)
+        if entity.owner:
+            collector.repair(entity.owner, reason="file-delete-owner")
 
 
 # @testable false
@@ -409,7 +457,7 @@ DELETE_PLANNERS = {
     "user": UserDeleteMutation(),
     "project": ProjectDeleteMutation(),
     "model": ModelDeleteMutation(),
-    "file": STANDARD_DELETE,
+    "file": FileDeleteMutation(),
     "ingress": STANDARD_DELETE,
     "form": FormDeleteMutation(),
     "category": CategoryDeleteMutation(),

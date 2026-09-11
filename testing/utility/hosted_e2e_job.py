@@ -20,12 +20,23 @@ REPORT_ROOT = REPOSITORY_ROOT / "reports"
 HOSTED_REPORT_ROOT = REPORT_ROOT / "hosted-e2e"
 EVIDENCE_PATH = REPOSITORY_ROOT / "testing/evidence/latest.json"
 MAX_FOCUSED_TARGETS = 50
+HOSTED_E2E_ENVIRONMENTS = ("standard",)
+STANDARD_JOB = "lagniappe-e2e"
 
 
 def _required_environment(name: str) -> str:
     value = str(os.environ.get(name) or "").strip()
     if not value:
         raise RuntimeError(f"Hosted E2E job requires {name}.")
+    return value
+
+
+def _hosted_environment() -> str:
+    value = str(
+        os.environ.get("LAGNIAPPE_HOSTED_E2E_ENVIRONMENT") or "standard"
+    ).strip()
+    if value not in HOSTED_E2E_ENVIRONMENTS:
+        raise RuntimeError("Hosted E2E job received an invalid environment.")
     return value
 
 
@@ -59,7 +70,9 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
             )
         relative_path = Path(path_text)
         if relative_path.is_absolute() or ".." in relative_path.parts:
-            raise RuntimeError("Focused hosted E2E targets cannot traverse directories.")
+            raise RuntimeError(
+                "Focused hosted E2E targets cannot traverse directories."
+            )
         target_path = (REPOSITORY_ROOT / relative_path).resolve()
         if (
             not target_path.is_relative_to(e2e_root)
@@ -70,10 +83,11 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
                 "Focused hosted E2E targets must name existing E2E Python files."
             )
         if separator and (
-            not selector
-            or any(not component for component in selector.split("::"))
+            not selector or any(not component for component in selector.split("::"))
         ):
-            raise RuntimeError("Focused hosted E2E received an invalid nodeid selector.")
+            raise RuntimeError(
+                "Focused hosted E2E received an invalid nodeid selector."
+            )
     return normalized
 
 
@@ -81,7 +95,15 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract
 # @matrix hosted-e2e : argument-injection focused-execution target-validation
-def _pytest_command(suite: str, targets=()) -> list[str]:
+def _pytest_command(
+    suite: str,
+    targets=(),
+    *,
+    environment="standard",
+) -> list[str]:
+    if environment not in HOSTED_E2E_ENVIRONMENTS:
+        raise RuntimeError("Hosted E2E job received an invalid environment.")
+    targets = tuple(targets or ())
     if suite == "all":
         if targets:
             raise RuntimeError("All hosted tests do not accept focused targets.")
@@ -124,6 +146,12 @@ def _artifact_manifest(
     finished_at: datetime,
     targets=(),
 ) -> dict:
+    environment = _hosted_environment()
+    job = _required_environment("CLOUD_RUN_JOB")
+    declared_job = _required_environment("LAGNIAPPE_HOSTED_E2E_JOB")
+    expected_job = STANDARD_JOB
+    if declared_job != job or job != expected_job:
+        raise RuntimeError("Hosted E2E job identity does not match its environment.")
     manifest = {
         "schema_version": 1,
         "kind": "hosted-e2e-result",
@@ -131,7 +159,7 @@ def _artifact_manifest(
         "suite_started_at": started_at.astimezone(timezone.utc).isoformat(),
         "suite_finished_at": finished_at.astimezone(timezone.utc).isoformat(),
         "execution": execution,
-        "job": _required_environment("CLOUD_RUN_JOB"),
+        "job": job,
         "project": _required_environment("GOOGLE_CLOUD_PROJECT"),
         "service": _required_environment("LAGNIAPPE_HOSTED_E2E_SERVICE"),
         "version": _required_environment("LAGNIAPPE_HOSTED_E2E_VERSION"),
@@ -140,6 +168,7 @@ def _artifact_manifest(
             "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT"
         ),
         "build_id": _required_environment("LAGNIAPPE_HOSTED_E2E_BUILD_ID"),
+        "environment": environment,
         "suite": suite,
         "exit_status": int(exit_status),
     }
@@ -178,6 +207,8 @@ def _stamp_evidence(manifest: dict) -> None:
             "suite_finished_at",
         )
     }
+    if manifest.get("environment"):
+        provenance["hosted_e2e"]["environment"] = manifest["environment"]
     if manifest.get("targets"):
         provenance["hosted_e2e"]["targets"] = list(manifest["targets"])
     evidence["provenance"] = provenance
@@ -224,6 +255,7 @@ def main(arguments=None) -> int:
     parser.add_argument("--target", action="append", default=[])
     args = parser.parse_args(arguments)
 
+    environment = _hosted_environment()
     targets = (
         validate_focused_targets(args.target)
         if args.suite == "focused"
@@ -234,7 +266,7 @@ def main(arguments=None) -> int:
     HOSTED_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
     started_at = datetime.now(timezone.utc)
     result = subprocess.run(
-        _pytest_command(args.suite, targets),
+        _pytest_command(args.suite, targets, environment=environment),
         cwd=REPOSITORY_ROOT,
     )
     finished_at = datetime.now(timezone.utc)

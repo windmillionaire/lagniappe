@@ -23,6 +23,12 @@ Dates are stored in UTC and projected in the user's timezone. `Completed`,
 `CompletedOn`, and `DueDate` remain separate values so a recurring task can
 stay active while temporarily completed.
 
+The reviewed Organize action `set_task_due_date` sets or clears only the due
+date of an editable, incomplete Task. Calendar dates use the Task editor's
+current-local-time behavior and retain recurrence and postponement metadata.
+Its execution ledger records date/scheduling state for retry and guarded undo;
+it never reopens a task or replaces the schedule.
+
 Calendar schedules select valid calendar positions rather than clamping dates.
 A monthly schedule for day 31 skips months without a 31st, and a yearly
 February 29 schedule advances to the next leap year. Recurring and periodic

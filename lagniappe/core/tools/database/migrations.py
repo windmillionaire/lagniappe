@@ -23,6 +23,9 @@ from config.datastore import encode_urlsafe_key
 from lagniappe import CONFIG
 
 from . import utility
+from .migration_steps.v2_0_permissions import migrate_file_ownership, migrate_local_restrictions
+from .migration_steps.v2_0_file_pages import migrate_file_pages, migrate_canonical_restrictions
+from .get import datastore_key
 from .core import DATA, KINDS
 from .filter import Query
 from .migration_steps import (
@@ -89,6 +92,18 @@ def _form_record_reference(entity):
     return {
         "url": f"/forms/{identifier}",
         "link_label": "Open form",
+    }
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/database/migration_steps/v2_0_permissions.py::migrate_file_ownership
+# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
+# @reason file scan failures and saved failure projection exercise the same raw-row link
+def _file_record_reference(entity):
+    name = entity.get("name") or entity.get("filename")
+    return {
+        "url": f"/files/{encode_urlsafe_key(entity.key)}",
+        "link_label": name.strip() if isinstance(name, str) and name.strip() else "Open file",
     }
 
 
@@ -269,6 +284,7 @@ def _run_asset_generation_migration(context):
     return result
 
 
+
 MIGRATION_CATALOG = (
     MigrationDefinition(
         sequence=1,
@@ -291,6 +307,22 @@ MIGRATION_CATALOG = (
         introduced_in="1.0",
         label="Asset generation metadata",
         runner=_run_asset_generation_migration,
+    ),
+    MigrationDefinition(
+        sequence=4, id="FIL-001", introduced_in="2.0",
+        label="Single-owner Files", runner=migrate_file_ownership,
+    ),
+    MigrationDefinition(
+        sequence=5, id="RST-001", introduced_in="2.0",
+        label="Materialized local restrictions", runner=migrate_local_restrictions,
+    ),
+    MigrationDefinition(
+        sequence=6, id="FIL-002", introduced_in="2.0",
+        label="File Page ancestry", runner=migrate_file_pages,
+    ),
+    MigrationDefinition(
+        sequence=7, id="RST-002", introduced_in="2.0",
+        label="Canonical restriction groups", runner=migrate_canonical_restrictions,
     ),
 )
 
@@ -802,6 +834,31 @@ def _load_views(datastore, catalog):
 
 # @testable false
 # @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
+# @reason status regression verifies old failures gain links without changing stored audit history
+def _link_saved_file_failures(datastore, views):
+    """Make pre-link FIL-001 failures actionable without rerunning the migration."""
+    failures = []
+    for view in views:
+        if view["id"] != "FIL-001":
+            continue
+        for detail in (view.get("latest_attempt") or {}).get("errors", []):
+            if detail.get("url"):
+                continue
+            key = datastore_key(detail.get("key"))
+            if key is not None and key.kind == KINDS.files.value:
+                failures.append((detail, key))
+    if not failures:
+        return
+    records = _get_multi(datastore, list(dict.fromkeys(key for _detail, key in failures)))
+    for detail, key in failures:
+        row = records.get(key)
+        detail.update(_file_record_reference(
+            row if row is not None and row.get("type") == "file" else DatastoreEntity(key=key)
+        ))
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
 # @reason lease state projection is exercised through running and stale lease tests
 def _active_lease(control, now):
     if not control or not control.get("run_id"):
@@ -826,7 +883,9 @@ def _status_counts(views):
 # @tests tests_unit/test_018b_database_migrations.py::test_status_reads_completed_migrations_across_builds_and_blocks_after_failure
 # @tests tests_unit/test_018b_database_migrations.py::test_legacy_audit_projects_as_completed
 # @tests tests_unit/test_018b_database_migrations.py::test_migration_status_rejects_malformed_ledger
+# @tests tests_unit/test_018b_database_migrations.py::test_saved_file_migration_failures_gain_links_without_rewriting_history
 # @matrix admin database-migrations : audit build-history catalog failure-order identity invalid-storage legacy-audit persistence read-through release-metadata sticky-completion
+# @pair database-migrations:actionable-links
 def get_migration_status(
     *,
     datastore=None,
@@ -839,6 +898,7 @@ def get_migration_status(
     datastore = datastore or DATA.datastore
     now_value = _utc((now or (lambda: datetime.now(timezone.utc)))())
     views, control = _load_views(datastore, catalog)
+    _link_saved_file_failures(datastore, views)
     lease_active = _active_lease(control, now_value)
     active_id = control.get("active_migration_id") if lease_active else None
 

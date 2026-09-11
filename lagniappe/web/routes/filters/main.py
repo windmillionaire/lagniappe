@@ -14,6 +14,7 @@ from lagniappe.core.tools.filters import (
     resolve_filter_field,
 )
 from lagniappe.core.tools.tasks.ordering import sort_tasks
+from lagniappe.core.tools.polling.projections import filter_result_revision
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
 
@@ -150,15 +151,12 @@ def _filter_results_owner(definitions):
     return _filter_results_response
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/filters/main.py::_string_filter_results_response
-# @covered-by lagniappe/web/routes/filters/main.py::_status_filter_results_response
-# @covered-by lagniappe/web/routes/filters/main.py::_date_filter_results_response
-# @covered-by lagniappe/web/routes/filters/main.py::_entity_filter_results_response
-# @covered-by lagniappe/web/routes/filters/main.py::_compound_filter_results_response
-# @reason endpoint coordinates request parsing while focused helpers own filter result behaviors
+# @testable true
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
+# @pair filters:view-access
+# @pair cache:permission-revalidation
 @filters.route("<key>/test", methods=["GET"])
-@permission(requested=Action.VIEW)
+@permission(requested=Action.VIEW, fingerprint=filter_result_revision)
 def test(key, **kwargs):
     entity = kwargs["entity"]
     try:
@@ -216,11 +214,12 @@ def get(key, **kwargs):
 
 
 # @testable true
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
 # @pair filters:run-results
+# @pair filters:view-access
+# @pair cache:permission-revalidation
 @filters.route("/<key>", methods=["GET"])
-@permission(requested=Action.VIEW)
+@permission(requested=Action.VIEW, fingerprint=filter_result_revision)
 def run(key, **kwargs):
     filter = kwargs["entity"]
     Entities.fetch(

@@ -18,7 +18,7 @@ def test_toggle_proposal_action_indexes_can_skip_exact_indexes_without_dependenc
         "actions": [
             {
                 "id": "schema",
-                "type": "update_form_schema",
+                "type": "extend_form_schema",
                 "data": {
                     "form": "invoice-form",
                     "operations": [
@@ -32,7 +32,7 @@ def test_toggle_proposal_action_indexes_can_skip_exact_indexes_without_dependenc
             },
             {
                 "id": "updates",
-                "type": "update_submission_fields",
+                "type": "update_form_values",
                 "depends_on": ["schema"],
                 "data": {
                     "updates": [
@@ -91,7 +91,7 @@ def test_run_report_adds_page_category_without_changing_primary_with_undo(
                 "actions": [
                     {
                         "id": "add_family_records",
-                        "type": "add_category",
+                        "type": "add_page_category",
                         "data": {
                             "page": page.urlsafe_key,
                             "category": extra.urlsafe_key,
@@ -99,7 +99,7 @@ def test_run_report_adds_page_category_without_changing_primary_with_undo(
                     },
                     {
                         "id": "add_family_records_again",
-                        "type": "add_category",
+                        "type": "add_page_category",
                         "data": {
                             "page": page.urlsafe_key,
                             "category": extra.urlsafe_key,
@@ -130,8 +130,8 @@ def test_run_report_adds_page_category_without_changing_primary_with_undo(
 
     assert result["status"] == "complete"
     assert [action["type"] for action in result["actions"]] == [
-        "add_category",
-        "add_category",
+        "add_page_category",
+        "add_page_category",
     ]
     assert page.model is primary
     assert page.categories == [primary, extra]

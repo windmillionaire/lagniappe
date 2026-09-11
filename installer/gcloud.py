@@ -1,9 +1,12 @@
+from runner import presentation as ui
+from runner.presentation import output as print, read_input as input
 import re
 import time
 import webbrowser
 from types import SimpleNamespace
 
 from config import constants
+from runner.console import format_prompt
 from installer import FORMATTER, wrap_text
 from installer import iam as iam_access
 from .package_install import install_if_missing
@@ -40,7 +43,7 @@ def _guide_google_service_terms_acceptance(
     spinner,
 ):
     """Pause API activation for account-scoped Google terms acceptance."""
-    f = FORMATTER.initialize()
+    FORMATTER.initialize()
     selected_account = str(account or "").strip()
     permanent_owner = str(owner_email or "").strip()
     delegated_maps = (
@@ -62,39 +65,49 @@ def _guide_google_service_terms_acceptance(
         print()
         print(
             wrap_text(
-                f"Google requires the active setup account "
-                f"'{selected_account}' to complete "
-                f"the {agreement_name}."
+                (
+                    "Google requires the active setup account '"
+                    f"{ui.literal(selected_account)}' to complete the "
+                    f"{ui.literal(agreement_name)}."
+                )
             )
         )
         if delegated_maps:
             print(
                 wrap_text(
-                    f"Permanent Owner '{permanent_owner}' must first review "
-                    "the Google Maps Platform agreement and authorize the "
-                    "temporary installer to acknowledge it with the "
-                    "business-controlled installer account. The Owner does "
-                    "not need to enable Places API manually; setup will retry "
-                    "and enable it."
+                    (
+                        f"Permanent Owner '{ui.literal(permanent_owner)}' must first review "
+                        "the Google Maps Platform agreement and authorize the temporary "
+                        "installer to acknowledge it with the business-controlled installer "
+                        "account. The Owner does not need to enable Places API manually; "
+                        "setup will retry and enable it."
+                    )
                 )
             )
         print(
             wrap_text(
-                "The terms page may first show Google Cloud's welcome "
-                "agreement. Complete every agreement it presents, and confirm "
-                f"the browser profile is '{selected_account}'."
+                (
+                    "The terms page may first show Google Cloud's welcome agreement. "
+                    "Complete every agreement it presents, and confirm the browser profile "
+                    f"is '{ui.literal(selected_account)}'."
+                )
             )
         )
-        print(f"Terms page: {terms_error.terms_url}")
+        print(
+            ui.value(
+                "Terms page",
+                terms_error.terms_url,
+                action=True,
+                verbatim=True,
+                standalone=True,
+            )
+        )
         try:
             webbrowser.open_new_tab(terms_error.terms_url)
         except webbrowser.Error:
             pass
         answer = input(
-            f.info(
-                "Press Enter after completing the agreement to retry API "
-                "activation, or X to cancel: "
-            )
+            format_prompt("Complete the agreement", hint="Enter to retry API activation; x to cancel")
         )
         if answer.strip().casefold() == "x":
             raise SetupCancelled(
@@ -136,14 +149,16 @@ def enable_gcloud_apis():
     f = FORMATTER.initialize()
     required_apis = constants.REQUIRED_GOOGLE_CLOUD_APIS
 
-    feedback_text = f.success("Enabling required Google Cloud APIs")
+    feedback_text = ui.info("Enabling required Google Cloud APIs")
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
     enabled_apis = getattr(
         SETTINGS,
         "_SETUP_ENABLED_GOOGLE_CLOUD_APIS",
         None,
     )
-    with f.yaspin(text=feedback_text) as sp:
+    with f.progress(
+        text=feedback_text, success_text="Required Google Cloud APIs verified"
+    ) as sp:
         if enabled_apis is None:
             result = retry_provider_call(
                 lambda: _enabled_google_cloud_apis(project_id),
@@ -155,7 +170,7 @@ def enable_gcloud_apis():
         if missing_apis:
             sp.write(
                 f.info(
-                    "Enabling Google Cloud APIs may take up to 5 minutes..."
+                    wrap_text("Enabling Google Cloud APIs may take up to 5 minutes...")
                 )
             )
             # @testable false
@@ -206,14 +221,13 @@ def enable_gcloud_apis():
                 description="Enable required Google Cloud APIs",
             )
             for service_name in missing_apis:
-                display_name = required_apis[service_name]
                 record_mutation(
                     "enable Google Cloud APIs",
                     action="enabled",
                     resource="provider-api",
                     identifier=service_name,
                 )
-                sp.write(f.success(f"Enabled {display_name}"))
+
             def verify_enabled_services():
                 discovered = _enabled_google_cloud_apis(project_id)
                 pending = sorted(set(required_apis) - discovered)
@@ -242,7 +256,7 @@ def enable_gcloud_apis():
             )
 
         SETTINGS._SETUP_ENABLED_GOOGLE_CLOUD_APIS = set(enabled_apis)
-        sp.ok(f.ok_glyph)
+        sp.ok()
     return True
 
 
@@ -256,164 +270,165 @@ def configure_service_account():
 
     f = FORMATTER.initialize()
 
-    with f.yaspin(text=f.success("Configuring service account")) as sp:
-        install_if_missing(
-            "google.cloud.iam_admin_v1",
-            "Google IAM Admin API",
-            package_name="google-cloud-iam",
+    install_if_missing(
+        "google.cloud.iam_admin_v1",
+        "Google IAM Admin API",
+        package_name="google-cloud-iam",
+    )
+    from google.cloud import iam_admin_v1
+
+    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    project_name = SETTINGS.GCLOUD_CONFIG.get("NAME") or re.sub(
+        r"[^a-z0-9]", "-", project_id.lower()
+    )
+    runtime_email = str(
+        SETTINGS.APP.get("RUNTIME_SERVICE_ACCOUNT_EMAIL")
+        or f"{project_name}@{project_id}.iam.gserviceaccount.com"
+    ).strip().casefold()
+    if not runtime_email.endswith(
+        f"@{project_id}.iam.gserviceaccount.com"
+    ):
+        raise RuntimeError(
+            "RUNTIME_SERVICE_ACCOUNT_EMAIL must identify a service "
+            "account in the configured Google Cloud project."
         )
-        from google.cloud import iam_admin_v1
+    deployer_email = SETTINGS.APP.get(
+        "DEPLOYER_EMAIL"
+    ) or SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
+    if not deployer_email:
+        raise RuntimeError("A deployer Google account is required.")
 
-        project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
-        project_name = SETTINGS.GCLOUD_CONFIG.get("NAME") or re.sub(
-            r"[^a-z0-9]", "-", project_id.lower()
-        )
-        runtime_email = str(
-            SETTINGS.APP.get("RUNTIME_SERVICE_ACCOUNT_EMAIL")
-            or f"{project_name}@{project_id}.iam.gserviceaccount.com"
-        ).strip().casefold()
-        if not runtime_email.endswith(
-            f"@{project_id}.iam.gserviceaccount.com"
-        ):
-            raise RuntimeError(
-                "RUNTIME_SERVICE_ACCOUNT_EMAIL must identify a service "
-                "account in the configured Google Cloud project."
-            )
-        deployer_email = SETTINGS.APP.get(
-            "DEPLOYER_EMAIL"
-        ) or SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
-        if not deployer_email:
-            raise RuntimeError("A deployer Google account is required.")
+    iam_admin_client = iam_admin_v1.IAMClient()
+    resource = f"projects/{project_id}"
 
-        iam_admin_client = iam_admin_v1.IAMClient()
-        resource = f"projects/{project_id}"
-
-        def retry_iam(operation, description):
-            def wait_for_retry(delay):
-                sp.write(
-                    f.info(
-                        "Google IAM is still becoming available; "
-                        f"retrying in {delay} seconds..."
-                    )
+    # @testable false
+    # @covered-by installer/gcloud.py::configure_service_account
+    # @reason bounded IAM retry is exercised through account provisioning
+    def retry_iam(operation, description):
+        # @testable false
+        # @covered-by installer/gcloud.py::configure_service_account
+        # @reason retry feedback and delays are exercised through IAM propagation
+        def wait_for_retry(delay):
+            print(
+                f.info(
+                    "Google IAM is still becoming available; "
+                    f"retrying in {delay} seconds..."
                 )
-                time.sleep(delay)
-
-            return retry_provider_call(
-                operation,
-                description=description,
-                attempts=GCLOUD_API_PROPAGATION_ATTEMPTS,
-                delays=GCLOUD_API_PROPAGATION_DELAYS,
-                sleep=wait_for_retry,
             )
+            time.sleep(delay)
 
-        def apply_iam_policy(email):
-            iam_access.reconcile_runtime_project_policy(
-                project_id,
-                email,
-                removed_roles=(
-                    set(constants.REMOVED_RUNTIME_PROJECT_ROLES)
-                    - set(constants.REMOVED_RUNTIME_PROJECT_STORAGE_ROLES)
-                ),
-            )
-            iam_access.reconcile_runtime_service_account_policy(
-                project_id,
-                email,
-                deployer_email,
-            )
+        return retry_provider_call(
+            operation,
+            description=description,
+            attempts=GCLOUD_API_PROPAGATION_ATTEMPTS,
+            delays=GCLOUD_API_PROPAGATION_DELAYS,
+            sleep=wait_for_retry,
+        )
 
-        name = f"projects/{project_id}/serviceAccounts/{runtime_email}"
-        request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
+    # @testable false
+    # @covered-by installer/gcloud.py::configure_service_account
+    # @reason exact runtime and service-account grants belong to provisioning
+    def apply_iam_policy(email):
+        iam_access.reconcile_runtime_project_policy(
+            project_id,
+            email,
+        )
+        iam_access.reconcile_runtime_service_account_policy(
+            project_id,
+            email,
+            deployer_email,
+        )
+
+    name = f"projects/{project_id}/serviceAccounts/{runtime_email}"
+    request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
+    try:
+        account = retry_iam(
+            lambda: iam_admin_client.get_service_account(request=request),
+            f"Discover service account {name}",
+        )
+        record_mutation(
+            "reconcile service account",
+            action="existing",
+            resource="service-account",
+            identifier=account.email,
+        )
+    except ProviderTransientError as e:
+        message = (
+            "Google IAM is enabled but did not become ready in time. "
+            "Run setup again to resume."
+        )
+        print(f.error(message))
+        raise ProviderTransientError(message) from e
+    except ProviderNotFound:
         try:
+            request = iam_admin_v1.types.CreateServiceAccountRequest()
+            request.account_id = runtime_email.split("@", 1)[0]
+            request.name = resource
+
+            new_service_account = iam_admin_v1.types.ServiceAccount()
+            new_service_account.display_name = SETTINGS.APP["APP_NAME"]
+            request.service_account = new_service_account
+
             account = retry_iam(
-                lambda: iam_admin_client.get_service_account(request=request),
-                f"Discover service account {name}",
+                lambda: iam_admin_client.create_service_account(request=request),
+                f"Create service account {name}",
             )
-            sp.write(f.info("Using existing service account..."))
             record_mutation(
                 "reconcile service account",
-                action="existing",
+                action="created",
                 resource="service-account",
                 identifier=account.email,
             )
-        except ProviderTransientError as e:
+        except Exception as e:
+            classified = classify_provider_error(e)
+            if isinstance(classified, ProviderTransientError):
+                message = (
+                    "Google IAM is enabled but did not become ready in "
+                    "time. Run setup again to resume."
+                )
+                print(f.error(message))
+                raise ProviderTransientError(message) from e
+            print(f.error(wrap_text("Failed to create service account.")))
+            raise classify_provider_error(
+                e,
+                message="Failed to create service account.",
+            ) from e
+
+    # @testable false
+    # @covered-by installer/gcloud.py::configure_service_account
+    # @reason provider readback is exercised through account provisioning
+    def wait_for_service_account(name):
+        active, count = False, 0
+        while not active:
+            try:
+                request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
+                iam_admin_client.get_service_account(request=request)
+                break
+            except Exception as e:
+                count += 1
+                if count > 9:
+                    raise e
+                time.sleep(1)
+
+    try:
+        wait_for_service_account(account.name)
+        apply_iam_policy(account.email)
+    except Exception as e:
+        classified = classify_provider_error(e)
+        if isinstance(classified, ProviderTransientError):
             message = (
                 "Google IAM is enabled but did not become ready in time. "
                 "Run setup again to resume."
             )
-            sp.write(f.error(message))
-            sp.fail(f.fail_glyph)
+            print(f.error(message))
             raise ProviderTransientError(message) from e
-        except ProviderNotFound:
-            sp.write(f.info("Creating new service account..."))
-            try:
-                request = iam_admin_v1.types.CreateServiceAccountRequest()
-                request.account_id = runtime_email.split("@", 1)[0]
-                request.name = resource
+        print(f.error(wrap_text("Failed to reconcile the service account.")))
+        raise classify_provider_error(
+            e,
+            message="Failed to reconcile the keyless runtime service account.",
+        ) from e
 
-                new_service_account = iam_admin_v1.types.ServiceAccount()
-                new_service_account.display_name = SETTINGS.APP["APP_NAME"]
-                request.service_account = new_service_account
-
-                account = retry_iam(
-                    lambda: iam_admin_client.create_service_account(request=request),
-                    f"Create service account {name}",
-                )
-                record_mutation(
-                    "reconcile service account",
-                    action="created",
-                    resource="service-account",
-                    identifier=account.email,
-                )
-            except Exception as e:
-                sp.fail(f.fail_glyph)
-                classified = classify_provider_error(e)
-                if isinstance(classified, ProviderTransientError):
-                    message = (
-                        "Google IAM is enabled but did not become ready in "
-                        "time. Run setup again to resume."
-                    )
-                    sp.write(f.error(message))
-                    raise ProviderTransientError(message) from e
-                sp.write(f.error("Failed to create service account."))
-                raise classify_provider_error(
-                    e,
-                    message="Failed to create service account.",
-                ) from e
-
-        def wait_for_service_account(name):
-            active, count = False, 0
-            while not active:
-                try:
-                    request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
-                    iam_admin_client.get_service_account(request=request)
-                    break
-                except Exception as e:
-                    count += 1
-                    if count > 9:
-                        raise e
-                    time.sleep(1)
-
-        try:
-            wait_for_service_account(account.name)
-            apply_iam_policy(account.email)
-        except Exception as e:
-            sp.fail(f.fail_glyph)
-            classified = classify_provider_error(e)
-            if isinstance(classified, ProviderTransientError):
-                message = (
-                    "Google IAM is enabled but did not become ready in time. "
-                    "Run setup again to resume."
-                )
-                sp.write(f.error(message))
-                raise ProviderTransientError(message) from e
-            sp.write(f.error("Failed to reconcile the service account."))
-            raise classify_provider_error(
-                e,
-                message="Failed to reconcile the keyless runtime service account.",
-            ) from e
-
-        sp.ok(f.ok_glyph)
-        return {"client_email": account.email}
+    return {"client_email": account.email}
 
 
 # @testable true
@@ -492,7 +507,10 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
     if include_production:
         managed_buckets[recovery_bucket_name(SETTINGS.APP)] = "recovery"
 
-    with f.yaspin(text=f.success("Configure Cloud Storage buckets")) as sp:
+    with f.progress(
+        text="Configure Cloud Storage buckets",
+        success_text='Cloud Storage buckets configured',
+    ) as sp:
         for bucket_name, bucket_kind in managed_buckets.items():
             created = False
             try:
@@ -506,7 +524,6 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
                         location=BUCKET_CREATE_LOCATION,
                     )
                     created = True
-                    sp.write(f.success(f"Created bucket {bucket_name}"))
                 except api_exceptions.Conflict:
                     bucket = client.get_bucket(bucket_name)
 
@@ -597,7 +614,7 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
             if changed:
                 bucket.set_iam_policy(policy)
         iam_access.reconcile_runtime_project_policy(project_id, runtime_email)
-        sp.ok(f.ok_glyph)
+        sp.ok()
     return True
 
 
@@ -629,7 +646,10 @@ def create_app_engine_app():
     )
 
     client = appengine_admin_v1.ApplicationsClient()
-    with f.yaspin(text=f.success("Discover App Engine application")) as sp:
+    with f.progress(
+        text="Discover App Engine application",
+        success_text='App Engine application found',
+    ) as sp:
         try:
             application = retry_provider_call(
                 lambda: client.get_application(
@@ -644,26 +664,27 @@ def create_app_engine_app():
                 resource="app-engine-application",
                 identifier=project_id,
             )
-            sp.ok(f.ok_glyph)
+            sp.ok()
             return application
         except ProviderNotFound:
-            sp.write(f.info("No App Engine application exists yet."))
+            pass
 
     print(
         f.warning(
-            "App Engine location is permanent and cannot be changed after "
-            f"creation. Selected location: {location}"
+            wrap_text(
+                "App Engine location is permanent and cannot be changed after "
+                f"creation. Selected location: {location}"
+            )
         )
     )
     print(
         f.info(
-            "Creating the App Engine application may take up to 5 minutes. "
-            "The next prompt is waiting for your response."
+            wrap_text("Creating the App Engine application may take up to 5 minutes.")
         )
     )
     try:
         confirmation = input(
-            f.warning(
+            format_prompt(
                 f"Create the App Engine application in '{location}'? [y/N]: "
             )
         )
@@ -675,13 +696,12 @@ def create_app_engine_app():
         print(f.error(message))
         raise SetupCancelled(message) from error
     if confirmation.strip().lower() not in ("y", "yes"):
-        print(f.error("App Engine application creation cancelled."))
+        print(ui.status(wrap_text("App Engine application creation cancelled.")))
         raise SetupCancelled("App Engine application creation was cancelled.")
 
-    with f.yaspin(
-        text=f.success(
-            "Create App Engine application (may take up to 5 minutes)"
-        )
+    with f.progress(
+        text="Create App Engine application (may take up to 5 minutes)",
+        success_text='App Engine application created',
     ) as sp:
         application_to_create = appengine_admin_v1.Application()
         application_to_create.id = project_id
@@ -692,11 +712,6 @@ def create_app_engine_app():
                 request={"application": application_to_create},
                 timeout=APP_ENGINE_RPC_TIMEOUT,
             )
-            sp.write(
-                f.info(
-                    "Waiting for Google to finish App Engine provisioning..."
-                )
-            )
             created_app = operation.result(timeout=APP_ENGINE_CREATE_TIMEOUT)
             record_mutation(
                 "reconcile App Engine",
@@ -705,13 +720,7 @@ def create_app_engine_app():
                 identifier=project_id,
             )
 
-            sp.write(
-                f.success(
-                    "Successfully created App Engine app in "
-                    f"{created_app.location_id}."
-                )
-            )
-            sp.ok(f.ok_glyph)
+            sp.ok(f"App Engine application created in {created_app.location_id}")
             return created_app
         except Exception as e:
             classified = classify_provider_error(
@@ -726,7 +735,7 @@ def create_app_engine_app():
                     "if creation finished."
                 )
                 sp.write(f.error(message))
-                sp.fail(f.fail_glyph)
+                sp.fail()
                 raise type(classified)(message) from e
             if isinstance(classified, ProviderTransientError):
                 message = (
@@ -736,7 +745,7 @@ def create_app_engine_app():
                     "creation finished."
                 )
                 sp.write(f.error(message))
-                sp.fail(f.fail_glyph)
+                sp.fail()
                 raise type(classified)(message) from e
             if isinstance(classified, ProviderConflict):
                 message = (
@@ -745,10 +754,10 @@ def create_app_engine_app():
                     "discover and reuse the provider application."
                 )
                 sp.write(f.error(message))
-                sp.fail(f.fail_glyph)
+                sp.fail()
                 raise ProviderConflict(message) from e
             sp.write(f.error(str(classified)))
-            sp.fail(f.fail_glyph)
+            sp.fail()
             raise classified from e
 
 
@@ -761,7 +770,10 @@ def create_task_queue():
 
     f = FORMATTER.initialize()
 
-    with f.yaspin(text=f.success("Configure Cloud Tasks queue")) as sp:
+    with f.progress(
+        text="Configure Cloud Tasks queue",
+        success_text='Cloud Tasks queue configured',
+    ) as sp:
         install_if_missing(
             "google.cloud.tasks_v2",
             "Google Cloud Tasks",
@@ -795,10 +807,9 @@ def create_task_queue():
                 identifier=queue_path,
             )
             SETTINGS.save()
-            sp.ok(f.ok_glyph)
+            sp.ok()
             return True
         except ProviderNotFound:
-            sp.write(f.info("Creating new Cloud Tasks queue..."))
             queue = tasks_v2.types.Queue(name=queue_path)
             try:
                 retry_provider_call(
@@ -816,19 +827,24 @@ def create_task_queue():
                     identifier=queue_path,
                 )
                 SETTINGS.save()
-                sp.write(f.success("Successfully created Cloud Tasks queue."))
-                sp.ok(f.ok_glyph)
+                sp.ok()
                 return True
             except Exception as e:
-                sp.write(f.error(f"Failed to create Cloud Tasks queue.\n{str(e)}"))
-                sp.fail(f.fail_glyph)
+                sp.write(
+                    f.error("Failed to create Cloud Tasks queue.", e),
+                    raw=True,
+                )
+                sp.fail()
                 raise classify_provider_error(
                     e,
                     message="Failed to create the Cloud Tasks queue.",
                 ) from e
         except Exception as e:
-            sp.write(f.error(f"Error checking for Cloud Tasks queue.\n{str(e)}"))
-            sp.fail(f.fail_glyph)
+            sp.write(
+                f.error("Error checking for Cloud Tasks queue.", e),
+                raw=True,
+            )
+            sp.fail()
             raise classify_provider_error(
                 e,
                 message="Failed to discover the Cloud Tasks queue.",
@@ -881,7 +897,10 @@ def create_deferred_job_reconciler():
         f"--oidc-token-audience={endpoint}",
     ]
 
-    with f.yaspin(text=f.success("Configure background-job recovery")) as sp:
+    with f.progress(
+        text="Configure background-job recovery",
+        success_text='Background-job recovery configured',
+    ) as sp:
         run_gcloud_command(
             [
                 "services",
@@ -954,7 +973,7 @@ def create_deferred_job_reconciler():
             resource="cloud-scheduler-job",
             identifier=f"{region}/{name}",
         )
-        sp.ok(f.ok_glyph)
+        sp.ok()
     return True
 
 
@@ -1065,7 +1084,10 @@ def create_ocr_processor():
 
     f = FORMATTER.initialize()
 
-    with f.yaspin(text=f.success("Configure OCR processor")) as sp:
+    with f.progress(
+        text="Configure OCR processor",
+        success_text='OCR processor configured',
+    ) as sp:
         install_if_missing(
             "google.cloud.documentai",
             "Google Document AI",
@@ -1097,7 +1119,7 @@ def create_ocr_processor():
                             "Saved OCR processor display name does not match "
                             "the provider resource."
                         )
-                    sp.ok(f.ok_glyph)
+                    sp.ok()
                     record_mutation(
                         "reconcile OCR processor",
                         action="existing",
@@ -1121,7 +1143,7 @@ def create_ocr_processor():
                             resource="document-ai-processor",
                             identifier=processor.name,
                         )
-                        sp.ok(f.ok_glyph)
+                        sp.ok()
                         return True
 
             processor = retry_provider_call(
@@ -1147,12 +1169,11 @@ def create_ocr_processor():
                 resource="document-ai-processor",
                 identifier=processor.name,
             )
-            sp.write(f.info(f"Document AI processor '{display_name}' created."))
             SETTINGS.save()
-            sp.ok(f.ok_glyph)
+            sp.ok()
         except Exception as e:
-            sp.write(f.error(f"Failed to create OCR processor.\n{str(e)}"))
-            sp.fail(f.fail_glyph)
+            sp.write(f.error("Failed to create OCR processor.", e), raw=True)
+            sp.fail()
             raise classify_provider_error(
                 e,
                 message="Failed to reconcile the OCR processor.",

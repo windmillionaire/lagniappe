@@ -14,7 +14,7 @@ begin in the [README](../README.md).
 | Frontend application | [FRONTEND_OVERVIEW.md](FRONTEND_OVERVIEW.md) |
 | Views and widgets | [FRONTEND_VIEWS.md](FRONTEND_VIEWS.md) |
 | Synchronization | [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md) |
-| Configuration and setup | [INFRA_CONFIG.md](INFRA_CONFIG.md), [INFRA_SETUP.md](INFRA_SETUP.md) |
+| Configuration and setup | [INFRA_CONFIG.md](INFRA_CONFIG.md), [INFRA_SETUP.md](INFRA_SETUP.md), [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) |
 | Tests | [TESTING.md](TESTING.md), [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) |
 
 ## AI
@@ -25,7 +25,9 @@ begin in the [README](../README.md).
 | [AI_CONTEXT.md](AI_CONTEXT.md) | Context assembly, prompt inputs, tool schemas, and privacy boundaries. |
 | [AI_WORKFLOWS.md](AI_WORKFLOWS.md) | Autofill, summarize, create, organize, and form-generation workflows. |
 | [AI_EMAIL.md](AI_EMAIL.md) | Inbound email webhooks, attachment retrieval, reports, review, and feedback. |
-| [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | REST API keys and permission-bounded external Ask, Create, and Organize plans. |
+| [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | REST API keys, the remote MCP service, and permission-bounded external plans. |
+| [EXTERNAL_AI_IMPLEMENTATION.md](EXTERNAL_AI_IMPLEMENTATION.md) | API-to-skill-to-MCP development history, trial findings and the retained design. |
+| [Reusable workflow cases](../testing_ai_workflows/README.md) | Natural prompts, fixtures, rubrics, latest live results and targeted comparisons. |
 
 ## Backend
 
@@ -45,7 +47,7 @@ begin in the [README](../README.md).
 | [BACKEND_INGRESS.md](BACKEND_INGRESS.md) | CSV staging, mapping, matching, processing, and progress. |
 | [BACKEND_WEB.md](BACKEND_WEB.md) | Flask startup, blueprints, Jinja, route responses, errors, and templates. |
 | [BACKEND_WEB_PERMISSIONS.md](BACKEND_WEB_PERMISSIONS.md) | Route authorization, fetch scope, ETags, collection state, and polling. |
-| [AUTHENTICATION.md](AUTHENTICATION.md) | Identity Platform, sessions, account rules, verification, and safe failures. |
+| [AUTHENTICATION.md](AUTHENTICATION.md) | Identity Platform, sessions, API keys, remote MCP OAuth, and safe failures. |
 | [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md) | Migration catalog, authoring, execution ledger, tests, and recovery. |
 
 ## Frontend
@@ -95,6 +97,7 @@ begin in the [README](../README.md).
 | --- | --- |
 | [TESTING.md](TESTING.md) | Suites, commands, markers, strict checks, layout, and evidence. |
 | [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) | Test design and placement; read before adding or reshaping tests. |
+| [TESTING_AI_PROCESS.md](TESTING_AI_PROCESS.md) | Recorded live-model cases, paired before/after evaluation, scoring, and entry-point parity. |
 | [TESTING_SERVER.md](TESTING_SERVER.md) | Managed local server, seed packs, agent login, browser review, and teardown. |
 | [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) | Cloud Run test job, exact-source candidate, artifacts, evidence, and teardown. |
 | [TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) | Reviewing a test and the source claims it makes. |

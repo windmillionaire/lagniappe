@@ -21,7 +21,7 @@ from . import webhooks
 def resend_ai_email():
     """Verify and hand one Resend event to the durable report workflow."""
     config = getattr(CONFIG, "AI_EMAIL_CONFIG", None)
-    if not config or not config.get("enabled"):
+    if not CONFIG.AI_ENABLED or not config or not config.get("enabled"):
         return Response(status=404)
 
     raw_body = request.get_data(cache=True)

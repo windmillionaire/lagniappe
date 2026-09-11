@@ -81,8 +81,11 @@ browser cannot run the transition, the same commits run directly.
 
 Use transitions for noticeable geometry changes. Update progress text, editor
 content/caret state, pointer-driven tables, and stable counters immediately.
-Collection rows do not receive independent snapshots, and nav transitions do
-not crossfade.
+Collection rows do not receive independent snapshots, and transitions do not
+crossfade. Keep the main header in the root snapshot with body-mounted modals
+and dropdowns. Giving the header its own `view-transition-name` makes its
+snapshot paint above those overlays during a transition, overriding their
+normal stacking order and causing a visible flicker.
 
 ## Component navigation
 

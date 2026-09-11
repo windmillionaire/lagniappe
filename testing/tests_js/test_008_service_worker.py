@@ -236,6 +236,81 @@ if (responseCache.puts !== 0) {
     )
 
 
+# @matrix cache : invalidation no-store service-worker acknowledgement
+def test_invalidation_response_waits_for_acknowledgement_and_is_not_stored(run_node):
+    run_service_worker_check(run_node, """
+let completed = 0;
+process.on("beforeExit", () => {
+  if (completed !== 2) throw new Error("Acknowledgement test did not complete");
+});
+for (const cacheControl of ["private, no-cache", "no-store"]) {
+  let finishAcknowledgement;
+  let acknowledgementStarted;
+  const started = new Promise(resolve => { acknowledgementStarted = resolve; });
+  context.checkForCacheInvalidation = async response => {
+    if (response.headers.has("X-Lagniappe-Invalidate-Cache")) {
+      acknowledgementStarted();
+      await new Promise(resolve => { finishAcknowledgement = resolve; });
+      return {invalidated: true, acknowledged: true};
+    }
+    return {invalidated: false};
+  };
+  context.fetch = async () => new Response("current page", {headers: {
+    "X-Lagniappe-Invalidate-Cache": "true", "Cache-Control": cacheControl,
+  }});
+  const request = new Request("https://example.test/");
+  responseCache.entries.set(request.url, new Response("old page"));
+  const pending = [];
+  let returned = false;
+  const result = context.handleCacheable({request,
+    waitUntil: promise => pending.push(promise)}, "/").then(response => {
+      returned = true;
+      return response;
+    });
+  await started;
+  await new Promise(resolve => setImmediate(resolve));
+  if (returned) throw new Error("Invalidating response overtook its acknowledgement");
+  finishAcknowledgement();
+  const response = await result;
+  await Promise.all(pending);
+  if (await response.text() !== "current page") throw new Error("Lost live response");
+  if (responseCache.puts || responseCache.entries.has(request.url)) {
+    throw new Error("Invalidation response was retained in Cache Storage");
+  }
+  completed += 1;
+}
+""")
+
+
+# @matrix cache : invalidation no-store service-worker browser-validators
+def test_previously_stored_invalidation_is_discarded_before_reuse(run_node):
+    run_service_worker_check(run_node, """
+const request = new Request("https://example.test/", {
+  headers: {"If-None-Match": '"old"'},
+});
+responseCache.entries.set(request.url, new Response("old page", {headers: {
+  ETag: '"old"', "X-Lagniappe-Invalidate-Cache": "true",
+}}));
+context.fetch = async fresh => {
+  if (fresh.cache !== "reload" || fresh.headers.has("If-None-Match")) {
+    throw new Error("Stored invalidation reused a browser or worker validator");
+  }
+  return new Response("clean page", {headers: {ETag: '"current"'}});
+};
+const pending = [];
+const response = await context.handleCacheable({request,
+  waitUntil: promise => pending.push(promise)}, "/");
+await Promise.all(pending);
+if (await response.text() !== "clean page" ||
+    response.headers.has("X-Lagniappe-Invalidate-Cache")) {
+  throw new Error("Previously cached invalidation was replayed");
+}
+if (!responseCache.deletes.includes(request.url) || responseCache.puts !== 1) {
+  throw new Error("Invalidation entry was not replaced with the clean response");
+}
+""")
+
+
 # @matrix cache request : conditional-response dom-refresh service-worker
 def test_cached_304_marks_response_not_updated(run_node):
     run_service_worker_check(
@@ -584,7 +659,7 @@ checkForCacheInvalidation = realCheckForCacheInvalidation;
 
 const result = await context.checkForCacheInvalidation(
   new Response("", {
-    headers: { "X-Lagniappe-Invalidate-Cache": "true" },
+    headers: { "X-Lagniappe-Invalidate-Cache": "true", "X-Lagniappe-Cache-Revision": "user:actor:revision" },
   }),
 );
 
@@ -595,6 +670,9 @@ if (validateCalls.length !== 1) {
   throw new Error(`Expected one validate-user call, got ${validateCalls.length}`);
 }
 const body = JSON.parse(validateCalls[0].body);
+if (body.cacheRevision !== "user:actor:revision") {
+  throw new Error("Acknowledgement lost the observed server revision");
+}
 if (!body.cacheCleared || !body.responseCacheCleared || "etagStoreCleared" in body) {
   throw new Error(`validate-user payload did not confirm cache clearing: ${validateCalls[0].body}`);
 }
@@ -603,6 +681,43 @@ if (validateCalls[0].headers["X-CSRFToken"] !== "csrf-token") {
 }
 """,
     )
+
+
+# @matrix cache : acknowledgement concurrency invalidation retry service-worker
+def test_cache_acknowledgements_do_not_coalesce_different_revisions(run_node):
+    run_service_worker_check(run_node, """
+const started = [];
+const confirmations = [];
+const waiting = [];
+context.fetch = async (url, options = {}) => {
+  if (url === "/l/token") return new Response("csrf-token");
+  const body = JSON.parse(options.body);
+  confirmations.push(body);
+  return new Promise(resolve => {
+    waiting.push(resolve);
+    started[confirmations.length - 1]();
+  });
+};
+vm.runInContext(`checkForCacheInvalidation = realCheckForCacheInvalidation;`, context);
+const response = revision => new Response("", {headers: {
+  "X-Lagniappe-Invalidate-Cache": "true",
+  "X-Lagniappe-Cache-Revision": revision,
+}});
+const firstStarted = new Promise(resolve => started.push(resolve));
+const secondStarted = new Promise(resolve => started.push(resolve));
+const first = context.checkForCacheInvalidation(response("first"));
+await firstStarted;
+const second = context.checkForCacheInvalidation(response("second"));
+await secondStarted;
+waiting[0](new Response(JSON.stringify({cacheCleared: false, retry: true})));
+waiting[1](new Response(JSON.stringify({cacheCleared: true})));
+const [a, b] = await Promise.all([first, second]);
+if (a.acknowledged !== false || b.acknowledged !== true ||
+    confirmations[0].cacheRevision !== "first" || confirmations[1].cacheRevision !== "second" ||
+    b.cacheGeneration <= a.cacheGeneration) {
+  throw new Error("New invalidation reused the older clear or acknowledgement");
+}
+""")
 
 
 # @matrix cache : acknowledgement failure invalidation retry service-worker

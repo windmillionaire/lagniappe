@@ -17,6 +17,15 @@ def page_details(details, data, action=None):
     details.reference("Category", data, "category", "model")
     details.reference("Form", data, "form")
     details.submission(data, form_present=bool(details.first_value(data, "form")))
+    if data.get("document_markdown") or data.get("document"):
+        details.add("Document", data.get("document_markdown") or data.get("document"))
+
+
+# @testable infrastructure
+def document_details(details, data, action=None):
+    details.reference("Page", data, "page")
+    details.add("Append", data.get("document_markdown") or data.get("document"))
+    details.add("Attribution", "Server-recorded time and source; existing text is preserved.")
 
 
 # @testable true
@@ -28,7 +37,7 @@ def page_details(details, data, action=None):
 # @matrix categories : add-category attachment-grouping details existing-page-category proposal
 def entity_reference_details(details, data, action=None):
     action_type = action.get("type")
-    if action_type == "add_category":
+    if action_type == "add_page_category":
         details.reference("Page", data, "page")
         details.reference("Category", data, "category", "model")
     elif action_type == "rename_entity":
@@ -40,6 +49,7 @@ def entity_reference_details(details, data, action=None):
 
 
 ENTITY_ACTION_DISPLAYS = (
+    ProposalActionDisplay("append_page_document", "Append Page Document", document_details),
     ProposalActionDisplay("create_category", "Category", category_details),
     ProposalActionDisplay("create_project", "Project"),
     ProposalActionDisplay(
@@ -52,13 +62,13 @@ ENTITY_ACTION_DISPLAYS = (
         ),
     ),
     ProposalActionDisplay(
-        "add_category",
-        "Add Category",
+        "add_page_category",
+        "Add Page Category",
         entity_reference_details,
         grouping=ProposalActionGrouping.PAGE_CATEGORY,
         label_detail="Category",
     ),
     ProposalActionDisplay("move_page", "Move Page", entity_reference_details),
     ProposalActionDisplay("rename_entity", "Rename", entity_reference_details),
-    ProposalActionDisplay("delete_page", "Delete Page", hidden=True),
+    ProposalActionDisplay("suggest_page_deletion", "Suggest Page Deletion", hidden=True),
 )

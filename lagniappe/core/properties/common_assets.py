@@ -1,3 +1,5 @@
+import json
+
 from ..definitions import FieldType, FilterOptions, MutationIntent
 from ..definitions.identifiers import short_uuid
 from ..mixins import AIMixin, CacheMixin, FilterMixin
@@ -93,37 +95,44 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property):
     # @testable true
     # @tests tests_e2e/004_projects/test_004d_document.py::test_editor_loads_and_saves_text
     # @tests tests_e2e/004_projects/test_004d_document.py::test_task_list_persists
-    # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
+    # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_saves_do_not_create_automatic_history
     # @matrix editor : history-list reload task-list text-save
+    # @matrix editor : document isolated-checkpoint tombstones
+    # @matrix editor mutations : document durable-first cleanup named-versions
     def save(self, **kwargs):
+        previous = {
+            name: self.entity.assets.get(name)
+            for name in (self.id, self._ydoc_id)
+        }
         self._html = kwargs.get("html")
         self._ydoc = kwargs.get("ydoc")
 
         if self._html == "":
-            self.entity.delete_asset(self.id)
-            self.entity.delete_asset(self._ydoc_id)
+            # Keep tombstones so an offline editor cannot resurrect erased text.
+            self.entity.assets.pop(self.id, None)
+            if self._ydoc:
+                self.entity.save_asset(self._ydoc, self._ydoc_id, "ydoc", isolated=True)
+            else:
+                self.entity.assets.pop(self._ydoc_id, None)
+            self.entity.db["assets"] = json.dumps(self.entity.assets)
         elif self._ydoc and self._html is None:
-            self.entity.delete_asset(self.id)
-            self.entity.save_asset(self._ydoc, self._ydoc_id, "ydoc")
+            self.entity.assets.pop(self.id, None)
+            self.entity.save_asset(self._ydoc, self._ydoc_id, "ydoc", isolated=True)
         elif self._html:
-            html_asset = self.entity.save_asset(self._html, self.id, "html")
-            if html_asset.updated:
-                self._create_history()
-                self.entity.save_asset(self._ydoc, self._ydoc_id, "ydoc")
+            self.entity.save_asset(self._html, self.id, "html", isolated=True)
+            if self._ydoc:
+                self.entity.save_asset(self._ydoc, self._ydoc_id, "ydoc", isolated=True)
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/common_assets.py::Document.save
-    # @reason document history creation is a private side effect of saving changed HTML
-    def _create_history(self):
-        from ..entities import Entities
-
-        history = Entities.DOCUMENT_HISTORY.create(self.entity)
-        if not history:
-            return
-        self.entity.add_mutation_intents(
-            MutationIntent.standard(history, reason="document-history")
-        )
-        self.entity.db["document_history"] = True
+        for name, asset in previous.items():
+            if asset and asset.get("path") != (self.entity.assets.get(name) or {}).get("path"):
+                # Retire only after the new pair commits. This deletes the live
+                # object, not its backup generations or any embedded images.
+                self.entity.add_mutation_intents(
+                    MutationIntent.delete_blob(
+                        asset["path"], asset.get("visibility", "private"),
+                        reason="superseded-document",
+                    )
+                )
 
     # Cache Attributes
     _cache_key = "doc"

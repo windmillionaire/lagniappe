@@ -2,7 +2,8 @@
 
 Lagniappe is a private web app for individuals and small organizations that supports collaborative documents, files, structured records, contextual tasks, permissions, and search. It runs in a Google Cloud project and connects to a Redis Cloud database, both controlled by the owner. Optional, user-invoked AI is limited to the invoking user's existing permissions.
 
-[Tour](https://lagniappe.site/pages/public/74faecaf) · [Manual](https://lagniappe.site/manual/) · [Install](https://lagniappe.site/manual/installation) · [Latest release](https://github.com/windmillionaire/lagniappe/releases/latest)
+[Tour](https://lagniappe.site/pages/public/74faecaf) · [Manual](https://lagniappe.site/manual/) · [Install](https://lagniappe.site/manual/installation) · [Approach to AI](https://lagniappe.site/pages/public/9a10ae4c) ·
+  [Manual](https://lagniappe.site/manual/) · [Latest release](https://github.com/windmillionaire/lagniappe/releases/latest)
 
 The tour and manual are public, although the demo examples linked to in the tour require you to log in.
 
@@ -10,7 +11,7 @@ The tour and manual are public, although the demo examples linked to in the tour
 
 The main unit of organization in Lagniappe is a page: a car, a job you're trying to get, an apartment you manage — anything, really. A page can have as much structure as you choose to give it, and its related tasks, files, images, and notes are attached directly to that page. Structure is defined by reusable forms that you build yourself or generate with AI and attach to pages or tasks. Because those forms provide structure without determining where something belongs, a page can cohesively organize many different kinds of information.
 
-Rather than a folder containing a collection of files, a page represents a thing or a concept itself. Pieces of it can appear elsewhere — in search, filters, or project-tracked task lists — but they remain attached to that page. This fits the way I organize things in my own head, and it also happens to be convenient for always-optional AI features, because the relevant context is already bundled together.
+Rather than a folder containing a collection of files, a page represents a thing or a concept itself. Pieces of it can appear elsewhere — in search, filters, or project-tracked task lists — but they remain attached to that page. This fits the way I organize things in my own head, and it also happens to be convenient for AI features, because the relevant context is already bundled together.
 
 | Structured information | Collaborative document |
 |:---:|:---:|
@@ -41,6 +42,14 @@ If you don't like the idea of hosting your data in GCP, don't want to be technic
 | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/07-form-builder-permissions.png" alt="The form builder with reusable components and access restrictions"> | <img src="https://storage.googleapis.com/public-6d87544dcf8564696514a9ca9/06-project-task-filter.png" alt="A project filter with nested structured task results"> |
 
 See the [release history](documentation/releases/) for version notes.
+
+## AI Integration
+
+AI integration can be fully disabled at installation time. If enabled you'll see the option anywhere it has been integrated, if not those options won't appear. If enabled it can be used inside the app itself, accessed via email when configured, and can optionally also be used in ChatGPT as a plugin and via an MCP or as a skill using a user-linked API key in harnesses like Pi or Codex. 
+
+Both on-site and email invocations use a flavor of Gemini that you can specify, while external clients use their own model. Since these uses are billed directly to the site owner, invited users must be explicitly given access to those modes. 
+
+AI is only able to retrieve site data that the invoking user can view, and cannot modify the site without explicit user action. Models invoked remotely (such as via MCP or email) submit plans which the user must execute on the application itself. Permitted context is still sent to the model provider, which is worth keeping in mind especially if you enable the MCP. More on how that all works [here](https://lagniappe.site/pages/public/9a10ae4c).
 
 ## Installation
 

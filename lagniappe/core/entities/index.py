@@ -1,6 +1,6 @@
 from flask import url_for
 
-from ..definitions import Action, Restriction, Fetch
+from ..definitions import Action, Restriction, Fetch, FetchReason
 from ..entities import Entities
 from ..properties import category, index
 from ..tools import cache
@@ -119,7 +119,10 @@ class TaskIndex(Index):
 
         return [
             task
-            for task in Entities.fetch(*db.results, request=Fetch.direct())
+            for task in Entities.fetch(
+                *db.results,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )
             if task.allowed(Action.VIEW)
         ]
 
@@ -145,7 +148,10 @@ class TaskIndex(Index):
             self.append = url_for("tasks.rows", undated=1)
         return [
             task
-            for task in Entities.fetch(*db.results, request=Fetch.direct())
+            for task in Entities.fetch(
+                *db.results,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )
             if task.allowed(Action.VIEW)
         ]
 
@@ -409,7 +415,10 @@ class UserIndex(Index):
         )
         self._users = [
             u
-            for u in Entities.fetch(*db.results, request=Fetch.direct())
+            for u in Entities.fetch(
+                *db.results,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )
             if not u.is_public and u.allowed(Action.VIEW, self.user)
         ]
         self.cursor = db.next_cursor
@@ -433,7 +442,10 @@ class UserIndex(Index):
         )
         self._users = [
             u
-            for u in Entities.fetch(*db.results, request=Fetch.direct())
+            for u in Entities.fetch(
+                *db.results,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )
             if u.is_public and u.allowed(Action.VIEW, self.user)
         ]
         self.cursor = db.next_cursor
@@ -448,9 +460,9 @@ class UserIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_user_index_refresh_roots_preserves_regular_and_public_modes
-    # @matrix reconnect-refresh user-index : mode root-depth
+    # @matrix reconnect-refresh user-index : mode root-depth page-canonical
     def refresh_roots(self):
-        """Return the selected user-index mode without relationship expansion."""
+        """Return the Pages represented by authorized User rows at root depth."""
         if self.mode == self._public_mode:
             if not self.public_users_enabled:
                 return []
@@ -466,13 +478,20 @@ class UserIndex(Index):
             )
             expected_public = False
 
-        return [
+        users = [
             user
             for user in Entities.fetch(*db.results, request=Fetch.root())
             if isinstance(user, Entities.USER)
             and bool(user.is_public) is expected_public
             and user.allowed(Action.VIEW, self.user)
         ]
+        page_keys = [user.properties.page.key for user in users]
+        pages = {
+            page.key: page
+            for page in Entities.fetch(*page_keys, request=Fetch.root())
+            if isinstance(page, Entities.PAGE)
+        }
+        return [pages[key] for key in page_keys if key in pages]
 
     @property
     def mode(self):

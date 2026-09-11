@@ -372,7 +372,7 @@
           {% endif %}
 
           {% if report.proposal and (not is_ask or has_actions) %}
-            <div data-role="report-result" class="flex flex-col gap-2">
+            <div data-role="report-proposal" class="flex flex-col gap-2">
               <h2 class="text-base font-semibold text-base-dark">{{ "Suggested Actions" if is_ask else "Proposal" }}</h2>
               {% if report.proposal.summary and not is_ask %}
                 <p class="text-base-dark">{{ report.proposal.summary }}</p>
@@ -424,7 +424,7 @@
           {% endif %}
 
           {% if report.result and not report.pending %}
-            <div class="flex flex-col gap-2">
+            <div data-role="report-result" class="flex flex-col gap-2">
               <h2 class="text-base font-semibold text-base-dark">Result</h2>
               {% if report.result.status == "complete" %}
                 <p class="text-base-dark">Work done.</p>
@@ -437,7 +437,7 @@
                 <ul class="flex flex-col gap-1 text-sm">
                   {% for action in report.properties.result.grouped_actions %}
                     {% set action_label = action.display_label or action.note or "action" %}
-                    <li {% if action.type == "delete_page" and action.entity %}
+                    <li {% if action.type == "suggest_page_deletion" and action.entity %}
                           lp-entity
                           data-key="{{ action.entity.id }}"
                           data-kind="{{ action.entity.kind }}"
@@ -448,9 +448,9 @@
                         Summarized {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.type == "page_group" %}
                         Existing Page: {{ format_name(action.entity, parent=False) }}
-                      {% elif action.status == "complete" and action.entity and action.type in ["attach_file_to_page", "attach_file_to_task"] %}
+                      {% elif action.status == "complete" and action.entity and action.type == "attach_file" %}
                         Attached {{ format_name(action.entity, parent=False) }}{% if action.target %} to {{ format_name(action.target, parent=False) }}{% endif %}
-                      {% elif action.status == "complete" and action.entity and action.type == "add_category" %}
+                      {% elif action.status == "complete" and action.entity and action.type == "add_page_category" %}
                         {% if action.previous and action.previous.had_category %}
                           Category already present:
                         {% else %}
@@ -462,16 +462,26 @@
                         Moved {{ format_name(action.entity, parent=False) }}{% if action.target %} to {{ format_name(action.target, parent=False) }}{% endif %}
                       {% elif action.status == "complete" and action.entity and action.type == "rename_entity" %}
                         Renamed to {{ format_name(action.entity, parent=False) }}
-                      {% elif action.status == "complete" and action.entity and action.type == "delete_page" %}
+                      {% elif action.status == "complete" and action.entity and action.type == "suggest_page_deletion" %}
                         Cleanup suggested:
                         {{ format_name(action.entity, parent=False) }}
                         <span class="ml-2 inline-flex align-middle">
                           {{ controls.delete(label='Delete ' ~ action.entity.name) }}
                         </span>
-                      {% elif action.status == "complete" and action.type == "update_submission_fields" %}
-                        Updated submissions
-                      {% elif action.status == "complete" and action.entity and action.type == "update_form_schema" %}
-                        Updated schema for {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.type == "update_form_values" %}
+                        {% for entity in action.updated_entities %}
+                          <span data-role="submission-update-target"{% if not loop.first %} class="block pl-5"{% endif %}>
+                            {{ entity.kind|title }} Updated: {{ format_name(entity, parent=False) }}
+                          </span>
+                        {% else %}
+                          {{ "Updated submissions" if action.updates.applied else "No submission changes applied" }}
+                        {% endfor %}
+                      {% elif action.status == "complete" and action.entity and action.type == "extend_form_schema" %}
+                        Extended schema for {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.type == "append_page_document" %}
+                        Page Document Updated: {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.type == "complete_task" %}
+                        Completed Task: {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.created is sameas false %}
                         Reused {{ action.entity.kind|title }}: {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity %}

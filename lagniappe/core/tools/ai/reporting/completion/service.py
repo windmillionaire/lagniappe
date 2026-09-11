@@ -59,13 +59,13 @@ def complete_organize_submissions(
         if not isinstance(action, dict):
             continue
         action_type = action.get("type")
-        if action_type == "update_form_schema":
+        if action_type == "extend_form_schema":
             prior_schema_updates.append(action)
             continue
         if action_type not in {
             "create_page",
             "create_task",
-            "update_submission_fields",
+            "update_form_values",
         }:
             continue
 
@@ -148,7 +148,7 @@ def complete_organize_submissions(
             index, action = request_actions[request_id]
             result = results.get(request_id, {})
             submission = result.get("submission")
-            if action.get("type") == "update_submission_fields":
+            if action.get("type") == "update_form_values":
                 _apply_completed_submission_update(
                     proposal,
                     action,

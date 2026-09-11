@@ -11,6 +11,15 @@ DETAIL_HASH_DISALLOWED = frozenset(
 
 
 # @testable true
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_user_page_cache_identity_preserves_permission_projection
+# @matrix permissions cache : identity user-page form-version no-extra-read
+def identify_entity(details):
+    """Identify the stored entity represented by a cached display projection."""
+    kind = details.get("kind")
+    return details.get("id"), "page" if kind == "user" else kind
+
+
+# @testable true
 # @tests tests_unit/test_017_cache_query.py::test_get_details_by_hash_hydrates_parent_and_hides_internal_keys
 # @matrix cache : details-hydration missing-parent parent-key string-input
 def get_details_by_hash(hashes):

@@ -12,7 +12,6 @@ from lagniappe.core.definitions import (
     DeferredJobPhase,
     DeferredJobStatus,
     DeferredJobType,
-    Fetch,
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import ai
@@ -108,15 +107,13 @@ class FileExtractAdapter(FileAdapter):
             "text_asset": text_asset,
         }
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_job_inspection_uses_loaded_input_without_fetch
+    # @matrix deferred-jobs files : inspection loaded-input no-database-read
     def inspect(self, context):
-        file = Entities.fetch_one(
-            context.input("file").urlsafe_key,
-            request=Fetch.direct(),
-        )
+        file = context.input("file")
         if file is None:
             raise exceptions.ValidationError("Deferred file is missing.")
-        context.inputs["file"] = file
         return (
             DeferredJobInspection.APPLIED
             if file.properties.extract.complete and file.get_asset("text")
@@ -179,15 +176,13 @@ class FileSummarizeAdapter(FileAdapter):
             "process": deepcopy(summarize.section),
         }
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_job_inspection_uses_loaded_input_without_fetch
+    # @matrix deferred-jobs files : inspection loaded-input no-database-read
     def inspect(self, context):
-        file = Entities.fetch_one(
-            context.input("file").urlsafe_key,
-            request=Fetch.direct(),
-        )
+        file = context.input("file")
         if file is None:
             raise exceptions.ValidationError("Deferred file is missing.")
-        context.inputs["file"] = file
         if (
             file.summary == context.checkpoint.get("summary")
             and file.properties.summarize.complete

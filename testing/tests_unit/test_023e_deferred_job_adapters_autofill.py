@@ -338,6 +338,7 @@ def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
 
 
 # @matrix ai deferred-jobs files pages tasks : attachment autofill idempotency inspection naming upload
+# @pair deferred-jobs:loaded-input
 @pytest.mark.parametrize("target_kind", ["page", "task"])
 def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     class Relation:
@@ -359,6 +360,7 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
 
     class Target:
         def __init__(self):
+            self.db = {}
             self.key = f"{target_kind}-key"
             self.urlsafe_key = self.key
             self.entity_kind = target_kind
@@ -366,7 +368,7 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
                 submission=SimpleNamespace(value={}),
             )
             self.properties.files = Relation(
-                on_add=lambda file: file.properties.tasks.add(self)
+                on_add=lambda file: setattr(file.properties.task, "key", self.key)
             )
 
         def ai_submission(self, submission):
@@ -384,6 +386,12 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     created = []
 
     class File:
+        def move_to(self, owner):
+            self.properties.page.key = owner.key if owner.entity_kind == "page" else None
+            self.properties.task.key = owner.key if owner.entity_kind == "task" else None
+            if owner.entity_kind == "task":
+                owner.properties.files.add(self)
+
         @classmethod
         def create(cls, page=None, upload=None, data=None, key=None):
             file = cls()
@@ -392,11 +400,11 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
             file.upload = upload
             file.data = dict(data or {})
             file.properties = SimpleNamespace(
-                pages=Relation(),
-                tasks=Relation(),
+                page=SimpleNamespace(key=None),
+                task=SimpleNamespace(key=None),
             )
             if page:
-                file.properties.pages.add(page)
+                file.properties.page.key = page.key
             created.append(file)
             return file
 
@@ -412,9 +420,13 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     stored = {}
     saved = []
     upload_loads = []
+    attachment_loads = []
 
     def fetch_one(key, request):
         del request
+        if key is target:
+            return target
+        attachment_loads.append(key)
         return stored.get(key)
 
     def save(*entities):
@@ -447,11 +459,13 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
                 "mimetype": "application/pdf",
             },
         },
-        input=lambda name: target if name == "target" else None,
+        inputs={"target": target},
         ensure_active=lambda: None,
     )
+    context.input = lambda name: context.inputs.get(name)
 
     adapter = autofill_adapters.AutofillAdapter()
+    adapter.load(context)
     result = adapter.apply(context)
 
     assert len(created) == 1
@@ -465,10 +479,10 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     assert saved == [(created[0], target)]
     assert target.properties.submission.value == {"field-one": "Autofilled answer"}
     if target_kind == "page":
-        assert created[0].properties.pages.keys == [target.key]
+        assert created[0].properties.page.key == target.key
     else:
         assert target.properties.files.keys == [created[0].key]
-        assert created[0].properties.tasks.keys == [target.key]
+        assert created[0].properties.task.key == target.key
     assert result == {
         "target_key": target.key,
         "target_kind": target_kind,
@@ -479,3 +493,10 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     adapter.apply(context)
     assert len(created) == 1
     assert upload_loads == [{"token": "signed-upload"}]
+    assert attachment_loads == ["encoded-file-key"]
+
+    # A retry refreshes attachment state at the load boundary, then reuses it.
+    context.inputs = {"target": target}
+    adapter.load(context)
+    assert adapter.inspect(context) is DeferredJobInspection.APPLIED
+    assert attachment_loads == ["encoded-file-key", "encoded-file-key"]

@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "version": "0.12.9",
+  "allowed_redirect_hosts": [
+    "github.com",
+    "release-assets.githubusercontent.com"
+  ],
+  "platforms": {
+    "darwin-aarch64-none": {
+      "system": "darwin",
+      "architecture": "aarch64",
+      "libc": "none",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-aarch64-apple-darwin.tar.gz",
+      "sha256": "301f72afaf54060f92da7016cb0115bd077f43a9c8e39c1d8170a0bac80fd398",
+      "archive_size": 16636737,
+      "member": "uv-aarch64-apple-darwin/uv",
+      "member_sha256": "5e2e4133be3e61a25f819b95f6d6bb38c61fb3062eddf3e0857bb72fa3c69205"
+    },
+    "darwin-x86_64-none": {
+      "system": "darwin",
+      "architecture": "x86_64",
+      "libc": "none",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-x86_64-apple-darwin.tar.gz",
+      "sha256": "e1ca175824f1056589ce9908f7631879ebc3c36535b5e63dc06510beb370b4c1",
+      "archive_size": 19952135,
+      "member": "uv-x86_64-apple-darwin/uv",
+      "member_sha256": "935ac2592d1f6975571fc332b02527049fc4c4fc3604917a9936b2cf329aa821"
+    },
+    "linux-x86_64-gnu": {
+      "system": "linux",
+      "architecture": "x86_64",
+      "libc": "gnu",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "ec7a99cd05e0cd7f80243f135ce1361c76835cb0ee60055d14d20eba8eba1460",
+      "archive_size": 19423276,
+      "member": "uv-x86_64-unknown-linux-gnu/uv",
+      "member_sha256": "671793498fe0a545432e2524b6691ffb9eea4540d9fda43ca2f978df2dbf8426"
+    }
+  }
+}

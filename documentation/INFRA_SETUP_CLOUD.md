@@ -129,7 +129,9 @@ impersonation grant.
 
 All managed IAM reconciliation preserves unrelated members and conditional
 bindings, uses policy version 3 and provider etags, and skips no-op writes.
-Unexpected conditional broad grants are reported for manual review.
+Runtime project reconciliation manages only the current role list. Historical
+role-removal migrations are retired; existing unrelated grants, including
+conditional grants, remain operator-owned and are not automatically removed.
 
 ## Storage buckets
 
@@ -176,6 +178,9 @@ additional instances do not inflate the per-instance signal, then warns after
 two one-minute samples above 80% of the configured instance-class memory
 envelope. The policy documentation records the class, worker count, threshold,
 remediation, and a Monitoring chart link.
+The MQL threshold literal is explicitly measured in bytes (`'By'`); Monitoring
+rejects an alert-policy comparison between byte-valued usage and a unitless
+threshold even when the time-series query endpoint accepts it with a warning.
 
 The envelopes come from Google's [App Engine instance-class limits](https://docs.cloud.google.com/appengine/docs/standard/overview#instance_classes).
 Both [App Engine system metrics](https://docs.cloud.google.com/monitoring/api/metrics_gcp_a_b#appengine)
@@ -239,6 +244,9 @@ action callback and Google OAuth origin/callback instructions.
 Deployment waits for App Engine to report an active managed certificate before
 claiming custom-domain completion. A certificate timeout leaves the App Engine
 deployment available at its default URL and exits with DNS/CAA/rerun guidance.
+Only a fresh installation prints the successful TLS/propagation guidance.
+Updates, recovery and focused deployments still verify TLS and report pending
+or failed certificates, but an already-active certificate is silent.
 
 ## Validation
 
@@ -247,3 +255,15 @@ project, region, resource name, and relevant state. `doctor` uses the same
 expectations read-only. The opt-in setup provider tests exercise the runtime
 credential against its intended APIs and verify the absence of provisioning
 authority; see [TESTING.md](TESTING.md#provider-contracts).
+
+## Optional MCP provisioning
+
+Selecting external AI in setup enables Cloud Run, Cloud Build and Artifact
+Registry in the existing project. The normal project Owner/delegated-installer
+preflight is followed by an MCP-specific permission check; no extra human
+account or service-account key is required. The build account is separate from
+the runtime account. Exact scoped grants and owner handoff are documented in
+[the MCP deployment lifecycle](INFRA_DEPLOYMENT.md#remote-mcp-service).
+The component uses the saved resource region; setup does not ask for a second
+project or regional choice. Builds run in Cloud Build, so installers do not
+need Docker or a local MCP environment.

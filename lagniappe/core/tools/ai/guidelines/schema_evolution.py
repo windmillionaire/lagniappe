@@ -17,7 +17,7 @@ make a new or existing field required. Do not change visibility rules. Do not
 rewrite an entire schema when a small additive operation is enough.
 
 When proposing submission updates that would benefit from a schema update, keep
-the schema update in a separate update_form_schema action. The user can skip
+the schema update in a separate extend_form_schema action. The user can skip
 schema updates independently; submission updates should still be exact,
 reviewable patches against page/task ids and schema ids.
 

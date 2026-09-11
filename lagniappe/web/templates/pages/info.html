@@ -1,10 +1,12 @@
 {% from 'common.html' import autofill %}
+{% from 'pages/photo.html' import image_controls %}
 {% import 'controls.html' as controls %}
 {% import 'pages/restrictions.html' as restrictions %}
 
 {% macro permissions_form(page, close_target='PageInfo') %}
   <form data-widget="PagePermissions"
         lp-update
+        data-route="{{ url_for('pages.view_access', key=page.urlsafe_key) }}"
         data-title="Page Restrictions"
         data-help="restrictions"
         data-close="info:{{ close_target }}"
@@ -16,6 +18,9 @@
     {{ restrictions.visible_to(page) }}
     {{ restrictions.restrict_access(page) }}
     {{ controls.edited_marker(url_for('pages.permissions', key=page.urlsafe_key)) }}
+    <div class="{{ styles.button.group }}" data-role="submit-group">
+      <button type="submit" class="{{ styles.button.submit }}">Save Restrictions</button>
+    </div>
   </form>
 {% endmacro %}
 
@@ -47,7 +52,7 @@
         data-can-edit-name="{{ can_edit_name|yesno }}"
         data-can-edit-email="{{ (can_manage_user and not is_own_page and not page.user.is_owner)|yesno }}"
         data-can-edit-groups="{{ can_manage_user|yesno }}"
-        data-can-edit-ai="{{ can_manage_user|yesno }}"
+        data-can-edit-ai="{{ (CONFIG.AI_ENABLED and can_manage_user)|yesno }}"
         data-ai-access="{{ page.user.ai_access }}"
         data-notification-email-mode="{{ page.user.notification_email_mode }}"
         {% if is_own_page and not page.user.is_public %}
@@ -89,12 +94,18 @@
             </div>
           </div>
           {% if is_own_page and not page.user.is_public %}<div data-role="notification-email"></div>{% endif %}
-          {% if is_own_page and not page.user.is_public %}
+          {% if CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED and is_own_page and not page.user.is_public %}
             <fieldset data-role="api-key-settings"
                       data-kind="user"
                       class="rounded-md border border-user-default p-3">
               <legend class="{{ styles.label.default }} px-1">External agent API</legend>
               <div class="space-y-3">
+                {% if CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE %}
+                  <p>
+                    <a href="{{ url_for('oauth.connection') }}"
+                       class="font-semibold text-page-default underline hover:text-page-dark">Manage AI connections</a>
+                  </p>
+                {% endif %}
                 <p class="text-sm text-base-medium">
                   Use another AI client to Ask questions or prepare Create and Organize plans within your workspace permissions. API plans never run automatically.
                 </p>
@@ -258,10 +269,12 @@
             </fieldset>
           {% endif %}
         </div>
-        {{ controls.edited_marker(url_for('pages.user_settings', key=page.urlsafe_key)) }}
-        <button type="submit" data-kind="user" class="{{ styles.button.submit }}"></button>
       </div>
     </section>
+    {{ controls.edited_marker(url_for('pages.user_settings', key=page.urlsafe_key)) }}
+    <div class="{{ styles.button.group }}" data-role="submit-group">
+      <button type="submit" data-kind="user" class="{{ styles.button.submit }}"></button>
+    </div>
   </form>
 {% endmacro %}
 
@@ -283,42 +296,9 @@
         {% if page.form %}data-schema='{{ page.form.schema|tojson }}'{% endif %}
         {% if page.form %}data-submission='{{ page.properties.submission.form_value|tojson }}'{% endif %}
         class="{{ styles.form.default }} mt-4 sm:mt-0">
-    {% if page.allowed(Action.EDIT) %}
-      {% if not current_user.is_public %}
-        <div data-role="photo-prompt"
-             data-visible="{{ (not page.image)|yesno }}"
-             class="flex flex-col gap-2">
-          <div class="inline-flex min-h-10 w-fit overflow-hidden rounded-md border border-base-light/50 bg-white text-base-dark shadow-sm">
-            <span class="grid w-9 place-items-center border-r border-base-light/50 bg-base-bg text-kind-default"
-                  aria-hidden="true">{{ render_icon("image") }}</span>
-            <button type="button"
-                    data-role="photo-upload"
-                    title="Upload page image"
-                    aria-label="Upload page image"
-                    class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
-              {{ render_icon("upload") }}
-            </button>
-            {% if current_user.access(AI.CREATE) %}
-              <button type="button"
-                      data-role="photo-generate"
-                      title="Generate page image"
-                      aria-label="Generate page image"
-                      class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
-                {{ render_icon("generate") }}
-              </button>
-            {% endif %}
-          </div>
-          <p data-role="photo-prompt-error"
-             data-visible="false"
-             class="text-sm italic text-delete-default"></p>
-          <template data-role="photo-mobile-toggle-template">
-            <button lp-show="photo:active"
-                    data-kind="page"
-                    class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("image") }}</button>
-          </template>
-        </div>
-      {% endif %}
-    {% endif %}
+    {% set can_edit_image = page.allowed(Action.EDIT) and not current_user.is_public %}
+    {% set has_image = page.image and not (current_user.is_public and current_user.page.key == page.key) %}
+    {% if has_image or can_edit_image %}{{ image_controls(page, has_image, can_edit_image) }}{% endif %}
     {% if page.allowed(Action.VIEW) %}
       {% set category_preload = page.properties.categories.column_value %}
       {% if page.allowed(Action.EDIT) or category_preload %}

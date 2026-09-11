@@ -13,12 +13,19 @@ def test_mention_node_collection_insertion_and_keyboard_contract(run_node):
             import vm from "node:vm";
             import { Node, mergeAttributes } from "@tiptap/core";
 
+            const searches = [];
             const context = {
               Node,
               mergeAttributes,
-              request: {},
+              request: {
+                async get(endpoint, params) {
+                  searches.push([endpoint, params.get("q")]);
+                  return { ok: false };
+                },
+              },
               console,
               crypto: globalThis.crypto,
+              URLSearchParams,
               debounce(callback) {
                 const debounced = (...args) => callback(...args);
                 debounced.cancel = () => {};
@@ -27,6 +34,11 @@ def test_mention_node_collection_insertion_and_keyboard_contract(run_node):
               QueryLifecycle: class {
                 invalidate() {}
                 destroy() {}
+                async run(key, loader, publisher) {
+                  const response = await loader({ key });
+                  await publisher(response);
+                  return true;
+                }
               },
             };
             context.globalThis = context;
@@ -172,6 +184,59 @@ def test_mention_node_collection_insertion_and_keyboard_contract(run_node):
               target: { closest: () => ({ dataset: { index: "0" } }) },
             });
             assert.deepEqual(keys, ["prevent", "render", "prevent", 2, 1]);
+
+            let editorText = "Hello @Absent";
+            const dismissedEditor = {
+              state: { selection: null },
+              view: {
+                dom: {
+                  setAttribute() {},
+                  removeAttribute() {},
+                },
+              },
+            };
+            const setEditorText = (text) => {
+              editorText = text;
+              dismissedEditor.state.selection = {
+                empty: true,
+                from: editorText.length + 1,
+                $from: {
+                  parentOffset: editorText.length,
+                  parent: { textBetween: () => editorText },
+                },
+              };
+            };
+            setEditorText(editorText);
+
+            const popupClasses = new Set();
+            const dismissed = new MentionSuggestions(dismissedEditor, {
+              documentKey: "document-key",
+            });
+            dismissed.popup = {
+              classList: {
+                add: (name) => popupClasses.add(name),
+                contains: (name) => popupClasses.has(name),
+              },
+              dataset: {},
+            };
+            dismissed.active = context.currentQuery(dismissedEditor);
+            let escapePrevented = false;
+            dismissed._keydown({
+              key: "Escape",
+              preventDefault: () => { escapePrevented = true; },
+            });
+            assert.equal(escapePrevented, true);
+            assert.equal(popupClasses.has("hidden"), true);
+
+            setEditorText("Hello @Absent still typing");
+            await dismissed.search();
+            assert.deepEqual(searches, []);
+
+            setEditorText("Hello ");
+            await dismissed.search();
+            setEditorText("Hello @New");
+            await dismissed.search();
+            assert.deepEqual(searches, [["/l/search-index/user", "New"]]);
             """
         ),
         module=True,

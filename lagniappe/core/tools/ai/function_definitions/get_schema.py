@@ -3,8 +3,9 @@
 from google.genai import types
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
+from lagniappe.core.mixins import AIMixin
 from ..debug import ai_debug
 from ..references import hash_reference
 
@@ -15,7 +16,9 @@ GET_SCHEMA = types.FunctionDeclaration(
         "Load the form schema for one form-bearing entity. Accepts a form, "
         "page, task, or model task hash token and returns the attached form schema with "
         "exact field ids and value shapes. Use this after the compact workspace "
-        "inventory or a search result identifies the likely structure."
+        "inventory or a search result identifies the likely structure. Set "
+        "include_values=true on a Page or Task to read its current values keyed "
+        "by those same field ids, without unrelated entity details."
     ),
     parameters={
         "type": "object",
@@ -23,6 +26,10 @@ GET_SCHEMA = types.FunctionDeclaration(
             "id": {
                 "type": "string",
                 "description": "The form, page, task, or model task hash token.",
+            },
+            "include_values": {
+                "type": "boolean",
+                "description": "Include current AI-readable submission values by exact schema id (default false). Forms have no submission: values is null.",
             },
         },
         "required": ["id"],
@@ -32,7 +39,9 @@ GET_SCHEMA = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_schema_returns_schema_for_form_bearing_entities
+# @tests tests_unit/test_015_ai_tools.py::test_get_schema_includes_values_by_id_without_label_collisions
 # @matrix ai form-schema : form model-task page task tool-context
+# @matrix ai form-schema : permissions schema
 def execute_get_schema(args, user):
     """Return the schema for a form, page, task, or model task."""
     identifier = args.get("id")
@@ -41,10 +50,19 @@ def execute_get_schema(args, user):
         ai_debug("tool.get_schema.result", error="id is required")
         return {"error": "id is required"}
 
-    entity = Entities.fetch_one(identifier, request=Fetch.direct())
+    entity = Entities.fetch_one(identifier, request=Fetch.root())
     if not entity:
         ai_debug("tool.get_schema.result", identifier=identifier, error="not found")
         return {"error": "Entity not found"}
+    if isinstance(entity, (Entities.TASK, Entities.FILE)):
+        Entities.fetch_one(entity, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    elif isinstance(entity, Entities.TASK_HISTORY):
+        Entities.fetch(
+            entity, entity.properties.task.key, *entity.db.get("files", []),
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+        )
+    else:
+        Entities.fetch_one(entity, request=Fetch.direct())
     if not entity.allowed(Action.VIEW, user=user):
         ai_debug(
             "tool.get_schema.result",
@@ -66,6 +84,7 @@ def execute_get_schema(args, user):
             "form": None,
             "schema": [],
             "field_count": 0,
+            **({"values": None} if args.get("include_values") else {}),
         }
     if not form.allowed(Action.VIEW, user=user) or getattr(form, "reserved", False):
         ai_debug(
@@ -85,13 +104,29 @@ def execute_get_schema(args, user):
         field_count=len(schema),
         fields=_schema_debug_fields(schema),
     )
-    return {
+    result = {
         "entity": _entity_result(entity),
         "form": _entity_result(form),
         "form_type": form.form_type,
         "schema": schema,
         "field_count": len(schema),
     }
+    if args.get("include_values"):
+        submission = entity.properties.get("submission")
+        result["values"] = None
+        if submission is not None:
+            # Match the normal AI field projection, but key by schema id rather
+            # than display label (labels can be duplicated or renamed).
+            entity.form = form
+            values = {}
+            for field_id, field in submission.fields.items():
+                if isinstance(field, AIMixin) and field.is_set:
+                    field.user = user
+                    value = field.ai_value
+                    if value is not None:
+                        values[field_id] = value
+            result["values"] = values
+    return result
 
 
 # @testable false

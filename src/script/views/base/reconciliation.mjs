@@ -168,6 +168,8 @@ export const refreshCollectionComponents = async (
 	const reconciled = new Set();
 	const commits = [];
 	let refreshedFingerprint = null;
+	let refreshedAuthorization = null;
+	let collectionRevision = null;
 	if (targets.size) {
 		const response = await request.post("/l/refresh", {
 			view: {
@@ -176,6 +178,8 @@ export const refreshCollectionComponents = async (
 				index: view.elt.dataset.index || null,
 				mode: view.elt.dataset.userMode || null,
 				fingerprint,
+				authorization: view.elt.dataset.authorization || null,
+				collection_revision: view.elt.dataset.collectionRevision || null,
 			},
 			targets: Array.from(targets.values(), ({ descriptor }) => descriptor),
 		});
@@ -185,6 +189,8 @@ export const refreshCollectionComponents = async (
 		}
 		if (response?.ok && Array.isArray(response.targets)) {
 			refreshedFingerprint = response.fingerprint || null;
+			refreshedAuthorization = response.authorization || null;
+			collectionRevision = response.collection_revision || null;
 			if (!response.targets.length && refreshedFingerprint) {
 				for (const { widget } of targets.values()) reconciled.add(widget);
 			}
@@ -227,6 +233,10 @@ export const refreshCollectionComponents = async (
 			if (refreshedFingerprint) {
 				view.elt.dataset.fingerprint = refreshedFingerprint;
 			}
+			if (refreshedAuthorization)
+				view.elt.dataset.authorization = refreshedAuthorization;
+			if (collectionRevision)
+				view.elt.dataset.collectionRevision = collectionRevision;
 		};
 	}
 
@@ -237,5 +247,9 @@ export const refreshCollectionComponents = async (
 		}),
 	);
 	if (refreshedFingerprint) view.elt.dataset.fingerprint = refreshedFingerprint;
+	if (refreshedAuthorization)
+		view.elt.dataset.authorization = refreshedAuthorization;
+	if (collectionRevision)
+		view.elt.dataset.collectionRevision = collectionRevision;
 	return null;
 };

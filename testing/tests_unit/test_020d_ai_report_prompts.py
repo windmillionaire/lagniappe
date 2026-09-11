@@ -21,6 +21,38 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
+
+# @source lagniappe/core/tools/ai/organize.py::organize_prompt
+# @source lagniappe/core/tools/ai/organize.py::revise_organize_prompt
+# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_proposal_repair_prompt
+# @matrix ai-report : remote-update prompt tools revision repair
+@pytest.mark.unit
+def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance():
+    from lagniappe.core.tools.ai.reporting.proposals.repair import _proposal_repair_prompt
+    user = _test_user("remote-prompt-owner")
+    report = TestEntities.get("REPORT", {
+        "name": "Update task", "hash": "remote-update-prompt", "parent": user, "user": user,
+        "origin": "email", "tool": "organize", "instructions": "Complete CLI and add notes",
+        "proposal": {"summary": "Update CLI", "confidence": 1, "actions": []},
+    })
+    report.origin = "email"
+    report.tool = "organize"
+    initial = organize.organize_prompt(report, user)
+    revised = organize.revise_organize_prompt(report, user, "Use the newer notes")
+    repaired = _proposal_repair_prompt(initial, report.proposal, ValueError("bad reference"), "Organize")
+    for prompt in (initial, revised, repaired):
+        schemas = _response_action_schemas(prompt)
+        assert {"complete_task", "update_form_values"} <= set(schemas)
+        assert "create_task" not in schemas
+        assert "attach_file" not in schemas
+        assert "updates" in schemas["update_form_values"]["properties"]["data"]["properties"]
+        assert "search_entities" in prompt.tools
+        text = str(prompt.preview())
+        assert "normal completion rules" in text
+        assert "Do not preserve or generate data.submission" not in text
+        assert "A separate completion stage fills" not in text
+    assert "Use the newer notes" in _prompt_context(revised, "User Feedback")
+
 # @matrix ai-report : files iteration-limit prompt tools
 @pytest.mark.unit
 def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkeypatch):
@@ -143,15 +175,15 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
     assert "Review/skip may supplement but never replace" in semantic_preview
     assert "Category default forms appear only" in semantic_preview
     assert (
-        "add_category requires both the existing page and the additional existing "
+        "add_page_category requires both the existing page and the additional existing "
         "category"
     ) in semantic_preview
     assert (
-        'add_category: {"page" or "page_action", "category" or '
+        'add_page_category: {"page" or "page_action", "category" or '
         '"category_action"}'
     ) in semantic_preview
     assert (
-        "Every add_category action has both an executable page/page_action "
+        "Every add_page_category action has both an executable page/page_action "
         "reference and an executable category/category_action reference"
     ) in semantic_preview
     assert set(prompt.allowed_actions) == {
@@ -162,17 +194,17 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
         "create_page",
         "create_task",
         "add_form_to_page",
-        "add_category",
-        "update_form_schema",
-        "update_submission_fields",
-        "attach_file_to_page",
-        "attach_file_to_task",
-        "delete_page",
+        "add_page_category",
+        "extend_form_schema",
+        "update_form_values",
+        "attach_file",
+        "append_page_document",
+        "suggest_page_deletion",
         "skip",
         "needs_review",
     }
     assert "summarize_file" not in prompt.allowed_actions
-    assert "update_submission_fields" in prompt.allowed_actions
+    assert "update_form_values" in prompt.allowed_actions
     assert "move_page" not in prompt.allowed_actions
     assert "move_task" not in prompt.allowed_actions
     assert "move_file" not in prompt.allowed_actions
@@ -215,7 +247,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
     assert prompt.audit()["duplicate_headings"] == []
     assert "get_form_instances" in prompt.tools
     assert prompt.files == []
-    assert len(organize.organize_prompt(report, user).preview()) < 20_000
+    assert len(organize.organize_prompt(report, user).preview()) < 21_000
     assert "Completion owns form values" in prompt.preview()
 
 
@@ -292,6 +324,7 @@ def test_prepare_organize_retrieval_context_searches_bounded_structure_candidate
 
 
 # @matrix ai-report : active-request quota search-opt-in summary-prepass
+# @pair files:normalization
 @pytest.mark.unit
 def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     user = _test_user("summary-prepass-owner")
@@ -300,6 +333,8 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
         "agenda.docx",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
+    markdown = _test_file("service-confirmation.md", "text/markdown")
+    vcard = _test_file("marisol-vega.vcf", "text/vcard")
     second = _test_file("second.pdf", "application/pdf")
     existing = _test_file("existing.pdf", "application/pdf")
     unsupported = _test_file("archive.zip", "application/zip")
@@ -311,7 +346,15 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
             "hash": "summary-prepass-report",
             "parent": user,
             "user": user,
-            "input_files": [first, office, existing, unsupported, second],
+            "input_files": [
+                first,
+                office,
+                markdown,
+                vcard,
+                existing,
+                unsupported,
+                second,
+            ],
         },
     )
     generated = []
@@ -332,21 +375,33 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
         ensure_active=lambda: active_checks.append(True),
     )
 
-    assert summarized == [first, office, second]
-    assert saved == [first, office, second]
-    assert generated == ["first.pdf", "agenda.docx", "second.pdf"]
+    assert summarized == [first, office, markdown, vcard, second]
+    assert saved == [first, office, markdown, vcard, second]
+    assert generated == [
+        "first.pdf",
+        "agenda.docx",
+        "service-confirmation.md",
+        "marisol-vega.vcf",
+        "second.pdf",
+    ]
     assert first.properties.summarize.enabled is True
     assert first.properties.summarize.search is True
     assert first.properties.summarize.complete is True
     assert office.properties.summarize.enabled is True
     assert office.properties.summarize.search is True
     assert office.properties.summarize.complete is True
+    assert markdown.properties.summarize.enabled is True
+    assert markdown.properties.summarize.search is True
+    assert markdown.properties.summarize.complete is True
+    assert vcard.properties.summarize.enabled is True
+    assert vcard.properties.summarize.search is True
+    assert vcard.properties.summarize.complete is True
     assert second.properties.summarize.enabled is True
     assert second.properties.summarize.search is True
     assert second.properties.summarize.complete is True
     assert existing.summary == "Already summarized."
     assert unsupported.summary is None
-    assert len(active_checks) == 8
+    assert len(active_checks) == 12
 
     unindexed = _test_file("unindexed.pdf", "application/pdf")
     unindexed_report = TestEntities.get(
@@ -643,7 +698,7 @@ def test_create_prompt_builds_creation_proposal_without_file_actions():
         "actions",
     ]
     assert tuple(_response_action_schemas(prompt)) == prompt.allowed_actions
-    assert "attach_file_to_page" not in prompt.allowed_actions
+    assert "attach_file" not in prompt.allowed_actions
     assert "summarize_file" not in prompt.allowed_actions
     assert prompt.audit()["duplicate_headings"] == []
     assert "Category default forms are exceptional" in prompt.preview()
@@ -791,7 +846,7 @@ def test_report_prompts_attach_provider_json_schema():
         "type",
         "title",
     ]
-    update_form_data = all_actions["update_form_schema"]["properties"]["data"]
+    update_form_data = all_actions["extend_form_schema"]["properties"]["data"]
     operation_schemas = {
         variant["properties"]["op"]["enum"][0]: variant
         for variant in update_form_data["properties"]["operations"]["items"][
@@ -815,7 +870,7 @@ def test_report_prompts_attach_provider_json_schema():
         "value",
         "label",
     ]
-    update_data = full_actions["update_submission_fields"]["properties"]["data"]
+    update_data = full_actions["update_form_values"]["properties"]["data"]
     update_schema = update_data["properties"]["updates"]["items"]
     assert update_schema["required"] == ["schema_id", "new_value"]
     assert update_schema["properties"]["page"] == {"type": "string"}
@@ -829,7 +884,7 @@ def test_report_prompts_attach_provider_json_schema():
     assert update_schema["properties"]["schema_id"] == {"type": "string"}
     assert update_schema["properties"]["new_value"] == {}
     assert "anyOf" not in update_schema
-    organize_update_data = all_actions["update_submission_fields"]["properties"][
+    organize_update_data = all_actions["update_form_values"]["properties"][
         "data"
     ]
     assert set(organize_update_data["properties"]) == {
@@ -839,7 +894,7 @@ def test_report_prompts_attach_provider_json_schema():
         "task_name",
     }
     assert "updates" not in organize_update_data["properties"]
-    add_category_data = organize_actions["add_category"]["properties"]["data"]
+    add_category_data = organize_actions["add_page_category"]["properties"]["data"]
     assert set(add_category_data["properties"]) == {
         "page",
         "page_action",
@@ -985,12 +1040,12 @@ def test_report_prompts_filter_actions_by_user_permissions():
 
     assert organize_prompt.allowed_actions == (
         "create_page",
+        "append_page_document",
         "create_task",
         "add_form_to_page",
-        "add_category",
-        "update_submission_fields",
-        "attach_file_to_page",
-        "attach_file_to_task",
+        "add_page_category",
+        "update_form_values",
+        "attach_file",
         "skip",
         "needs_review",
     )
@@ -1010,6 +1065,7 @@ def test_report_prompts_filter_actions_by_user_permissions():
     )
     capabilities = permissions["capabilities"]
     assert capabilities == {
+        "can_append_page_documents": True,
         "can_create_forms": False,
         "can_create_categories": False,
         "can_create_projects": False,
@@ -1019,7 +1075,7 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "can_add_forms_to_pages": True,
         "can_attach_files_to_tasks": True,
         "can_add_page_categories": True,
-        "can_update_form_schemas": False,
+        "can_extend_form_schemas": False,
         "can_update_submissions": True,
         "can_delete_pages": False,
     }

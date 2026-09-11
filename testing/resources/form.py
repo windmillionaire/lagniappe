@@ -36,7 +36,7 @@ class Builder:
     ADD_BUTTON = "button[data-role='add']"
     PREVIEW_TOGGLE = "#preview-toggle"
     RESTRICT_ACCESS = "[data-role='restrict-access']"
-    SPECIFIC_ACCESS_OWNER = "input[data-role='specific-access'][name='owner']"
+    SPECIFIC_ACCESS_OWNER = "input[data-role='specific-access'][name='admin']"
     RESTRICT_GROUP_INPUT = "[data-role='restrict-group-input']"
     RESTRICTED_GROUP_LIST = "li"
     SCHEMA_INPUT = "input[name='schema']"
@@ -125,11 +125,8 @@ class Builder:
         group_input = restrictions.locator(self.RESTRICT_GROUP_INPUT)
         expect(group_input).to_be_visible()
         expect(group_input).to_have_attribute("data-combobox-id", re.compile(".+"))
-        with self.page.expect_response("**/restrictions"):
-            Select(group_input).select_by_key(
-                group.key,
-                query=group.definition.name,
-            )
+        Select(group_input).select_by_key(group.key, query=group.definition.name)
+        self.save_restrictions()
 
         expect(group_list.filter(has_text=group.definition.name)).to_be_visible()
         return restrictions
@@ -140,11 +137,17 @@ class Builder:
         if owner_checkbox.is_checked():
             return
 
-        with self.page.expect_response("**/restrictions"):
-            owner_checkbox.check()
+        owner_checkbox.check()
+        self.save_restrictions()
 
         expect(owner_checkbox).to_be_checked()
         return restrictions
+
+    def save_restrictions(self):
+        with self.page.expect_response(lambda response: response.request.method == "PUT" and response.url.endswith("/restrictions")) as response:
+            self.restrictions().get_by_role("button", name="Save Restrictions", exact=True).click()
+        assert response.value.ok
+        assert response.value.text() == ""
 
     def save(self):
         with self.page.expect_response("**/update"):

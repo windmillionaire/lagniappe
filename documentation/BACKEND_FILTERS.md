@@ -186,6 +186,14 @@ entity IDs with `Entities.fetch(..., request=Fetch.direct())`, and keeps only
 entities the current user may view. `query_roots(compiled_filter)` uses `Fetch.root()`
 for refresh membership checks that do not need relationships.
 
+The AI `query_workspace_filter` compiles and queries this same contract and
+cache. It differs only after matching: full `to_ai` Task projection requires a
+nested fetch for completion and parent-Page-derived relations that the browser
+table does not render. Projection errors are isolated per row and reported in a
+bounded `serialization_errors` list, so a legacy record cannot turn otherwise
+valid filter results into an opaque API 500. The comparator expression and
+shared cache query are unchanged.
+
 ### Background Updates
 
 In production, cache updates are deferred to Cloud Tasks (`process.update_cache` endpoint) to avoid blocking the request. In development, they run synchronously.

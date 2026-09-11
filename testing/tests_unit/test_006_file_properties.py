@@ -1,6 +1,6 @@
 """Unit tests for File entity properties.
 
-Heavy persistence (save/delete), ``AttachedToPages`` with real DB keys, and full
+Heavy persistence (save/delete), single File ownership with real DB keys, and full
 Document-AI / cloud upload paths are tracked as planned integration-shaped
 stories here and covered in e2e where possible.
 """
@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from lagniappe.core.definitions import asset as asset_defs
-from lagniappe.core.definitions import LARGE_ASSET_BYTES
+from lagniappe.core.definitions import Action, LARGE_ASSET_BYTES
 from lagniappe.core.definitions.asset import ImageAsset
 from lagniappe.core.entities.history import TaskHistory
 from lagniappe.core.properties.file_assets import FileAsset
@@ -86,6 +86,24 @@ def test_file_description_form_field_populates_search_cache():
     assert file.to_cache["desc"] == "Generated permit packet description."
 
 
+# @pairs ai-report:pre-execution files:search-visibility
+@pytest.mark.unit
+def test_report_file_is_searchable_only_after_workspace_attachment():
+    user = TestEntities.get("USER", {"name": "Report owner", "hash": "reportowner"})
+    file = TestEntities.get(
+        "FILE",
+        {"filename": "staged-evidence.pdf", "hash": "stagedevidence"},
+    )
+    file.report_user = user
+
+    assert file.searchable is False
+
+    page = TestEntities.get("PAGE", {"name": "Evidence Page", "hash": "evidencepage"})
+    file.page = page
+
+    assert file.searchable is True
+
+
 # @matrix file : option-preservation update
 @pytest.mark.unit
 def test_file_update_preserves_processing_options_when_controls_absent():
@@ -110,6 +128,7 @@ def test_file_to_ai_exports_metadata_and_uri_to_ai():
     user = SimpleNamespace(
         is_authenticated=True,
         is_owner=True,
+        is_admin=True,
         has_permission=lambda *_args, **_kwargs: True,
     )
     asset = SimpleNamespace(
@@ -151,6 +170,13 @@ def test_file_to_ai_exports_metadata_and_uri_to_ai():
         "uri": "gs://private-bucket/permit-packet.pdf",
         "mime_type": "application/pdf",
     }
+
+    for mimetype in ("text/markdown", "text/md", "text/vcard"):
+        file.mimetype = mimetype
+        assert file.properties.file.uri_to_ai == {
+            "uri": "gs://private-bucket/permit-packet.pdf",
+            "mime_type": "text/plain",
+        }
 
     file.mimetype = "application/octet-stream"
 
@@ -890,17 +916,13 @@ def test_image_asset_content_type_falls_back_without_recursing():
 @pytest.mark.unit
 def test_uploaded_file_story_lists_pages_that_reference_it():
     file = TestEntities.get("FILE", {"filename": "linked.pdf", "hash": "linkedfile"})
-    visible = TestEntities.get("PAGE", {"name": "Visible Page", "hash": "vispage"})
-    hidden = TestEntities.get("PAGE", {"name": "Hidden Page", "hash": "hiddenpage"})
-    hidden.allowed = lambda *_args, **_kwargs: False
-    file.db["pages"] = [visible.key, hidden.key]
-    file.properties.pages.attach({visible.key: visible, hidden.key: hidden})
-
-    pages = file.properties.pages.value
-    again = file.properties.pages.value
-    assert pages == [visible, hidden]
-    assert again is pages
-    assert file.properties.pages.column_value == [visible.reference_details]
+    page = TestEntities.get("PAGE", {"name": "Owner Page", "hash": "ownerpage"})
+    file.page = page
+    assert file.owner is page
+    assert file.db["page"] == page.key
+    assert "pages" not in file.db
+    page.allowed = lambda *_args, **_kwargs: False
+    assert file.allowed(Action.VIEW) is False
 
 
 # @matrix file : attached-tasks badges permissions references reverse-links task-history
@@ -918,16 +940,165 @@ def test_file_reverse_task_links_drive_permissions_and_references():
     history.task = task
 
     file = TestEntities.get("FILE", {"filename": "linked.pdf", "hash": "filetask"})
-    file.tasks = [task, history]
-
+    task.files = [file]
+    history.files = [file]
     assert file.has_references is True
-    assert set(file.required) == {"filetask", "models", "pgfile1"}
-    assert file.linked_tasks == [task]
+    assert set(file.required) == {"filetask", "models", "pgfile1", "tskfile1"}
+    assert file.owner is task
+    task.properties.files.remove(file)
+    assert file.owner is task and history.files == [file]
+    history.properties.files.remove(file)
+    assert file.owner is task
 
-    file.properties.tasks.remove(task)
-    assert file.has_references is True
-    assert file.linked_tasks == [task]
 
-    file.properties.tasks.remove(history)
-    assert file.has_references is False
-    assert file.linked_tasks == []
+# @matrix files : ownership parent-key fingerprint restrictions
+@pytest.mark.unit
+def test_file_save_normalizes_task_page_and_restriction_fingerprint(monkeypatch):
+    from datetime import datetime, timezone
+    from lagniappe.core.definitions import MutationEffectType, MutationOperation
+    from lagniappe.core.entities import Entities
+    from lagniappe.core.mutations import plan_mutation
+
+    unsaved = Entities.FILE(testing=True)
+    assert unsaved.modified is None
+    assert len(unsaved.fingerprint) == 32
+    first = TestEntities.get("PAGE", {"hash": "first-file-page", "restricted_to": ["a"]})
+    destination = TestEntities.get("PAGE", {"hash": "next-file-page", "restricted_to": ["b"]})
+    task = TestEntities.get("TASK", {"hash": "file-owner-task"}, page=first)
+    file = TestEntities.get("FILE", {"hash": "normalized-file", "modified": datetime(2026, 9, 9, tzinfo=timezone.utc)})
+    file.task = task
+    before = file.fingerprint
+    assert file.page is None and file.task_page is first and file.restricted_to == {"page": ["a"]}
+    task.page = destination
+    monkeypatch.setattr(Entities, "fetch", lambda *_items, **_kwargs: pytest.fail("File save planning must use its loaded graph"))
+
+    plan = plan_mutation(MutationOperation.SAVE, file, registry=Entities)
+
+    assert file.owner is task and file.page is None and file.task_page is destination
+    assert file.db["task"] == task.key and file.db["task_page"] == destination.key
+    assert not file.db.get("page")
+    assert file.restricted_to == {"page": ["b"]} and file.fingerprint != before
+    assert file.modified == datetime(2026, 9, 9, tzinfo=timezone.utc)
+    assert any(effect.effect is MutationEffectType.CACHE_REFRESH and effect.entity is file for effect in plan.effects)
+
+
+# @matrix files : uploads temporary-view-ownership search-visibility
+@pytest.mark.unit
+def test_unattached_upload_is_private_to_its_uploader_and_admin():
+    uploader = TestEntities.get("USER", {"hash": "private-uploader", "owner": False, "admin": False})
+    other = TestEntities.get("USER", {"hash": "other-uploader", "owner": False, "admin": False})
+    admin = TestEntities.get("USER", {"hash": "upload-admin", "owner": False, "admin": True})
+    admin.is_admin = True
+    file = TestEntities.get("FILE", {"hash": "private-upload"})
+    file.report_user = uploader
+
+    assert not file.searchable
+    assert file.allowed(Action.VIEW, user=uploader)
+    assert not file.allowed(Action.EDIT, user=uploader)
+    assert not file.allowed(Action.VIEW, user=other)
+    assert file.allowed(Action.EDIT, user=admin)
+
+
+# @matrix ai-report files : undo parent-key
+@pytest.mark.unit
+def test_report_undo_distinguishes_primary_page_link_from_task_ancestry():
+    from lagniappe.core.tools.ai.reporting.execution.actions import compensation
+
+    page = TestEntities.get("PAGE", {"hash": "report-undo-page"})
+    task = TestEntities.get("TASK", {"hash": "report-undo-task"}, page=page)
+    file = TestEntities.get("FILE", {"hash": "report-undo-file"})
+    file.task = task
+    report = SimpleNamespace(input_files=[file])
+
+    # Undo of an earlier direct Page attachment must preserve a later Task move.
+    assert not compensation._remove_file_page_reference(file, page)
+    assert file.owner is task and file.page is None and file.task_page is page
+
+    # Undo of Page creation preserves its report input across both delete cascades.
+    assert compensation._detach_report_files_before_delete(page, {}, report) == [file]
+    file.normalize_owner()
+    assert file.page is None and file.task is None and file.task_page is None and not file.searchable
+
+
+# @matrix files tasks : task-history parent-key restrictions
+# @pair tasks:single-batch
+@pytest.mark.unit
+def test_history_loading_resolves_moved_task_and_independently_moved_files(monkeypatch):
+    from datetime import datetime, timezone
+    from google.cloud import datastore
+    from lagniappe.core.entities import Entities
+    from lagniappe.core.tools.database import get as database_get
+    from lagniappe.core.tools.database.core import KINDS
+
+    records = {}
+
+    def record(kind, name, *, parent=None, **values):
+        row = datastore.Entity(key=datastore.Key(kind.value, name, project="history-loading", parent=parent))
+        row.update(hash=name, modified=datetime(2026, 9, 9, tzinfo=timezone.utc), **values)
+        records[row.key] = row
+        return row
+
+    old_page = record(KINDS.instances, "snapshot-page", type="page")
+    current_form = record(KINDS.models, "current-page-form", type="form", restricted_to=["current"])
+    current_page = record(KINDS.instances, "current-page", type="page", form=current_form.key)
+    file_form = record(KINDS.models, "file-page-form", type="form", restricted_to=["elsewhere"])
+    file_page = record(KINDS.instances, "file-page", type="page", form=file_form.key)
+    task_row = record(KINDS.instances, "live-task", type="task", page=current_page.key)
+    file_task = record(KINDS.instances, "file-task", type="task", page=file_page.key)
+    file_row = record(KINDS.files, "moved-file", type="file", task=file_task.key, task_page=file_page.key)
+    history = record(KINDS.history, "snapshot", parent=task_row.key, type="task_history",
+                     page=old_page.key, files=[file_row.key], created=datetime(2025, 1, 1, tzinfo=timezone.utc))
+    monkeypatch.setattr(database_get, "entities", lambda keys: [records[key] for key in keys if key in records])
+    monkeypatch.setattr(database_get, "task_history", lambda _task: [history])
+    task = Entities.TASK(task_row)
+    fetch = Entities.fetch
+    batches = []
+
+    def tracked_fetch(*identifiers, request):
+        batches.append(identifiers)
+        return fetch(*identifiers, request=request)
+
+    monkeypatch.setattr(Entities, "fetch", tracked_fetch)
+
+    loaded = task.history
+
+    assert len(batches) == 1
+    assert len(loaded) == 1
+    snapshot = loaded[0]
+    assert snapshot.task is task
+    assert snapshot.page.key == old_page.key
+    assert snapshot.task.page.key == current_page.key
+    assert snapshot.task.restricted_to == {"page_form": ["current"]}
+    attached = snapshot.files[0]
+    assert attached.owner.key == file_task.key
+    assert attached.page is None and attached.task_page.key == file_page.key
+    assert attached.restricted_to == {"page_form": ["elsewhere"]}
+
+
+# @matrix files : ownership task-move history parent-key retry
+@pytest.mark.unit
+def test_task_move_updates_history_only_file_page_without_consuming_pending_move(monkeypatch):
+    from lagniappe.core.definitions import MutationEffectType, MutationOperation
+    from lagniappe.core.entities import Entities
+    from lagniappe.core.mutations import plan_mutation
+    from lagniappe.core.tools.database import get as database_get
+
+    previous = TestEntities.get("PAGE", {"hash": "move-old-page"})
+    destination = TestEntities.get("PAGE", {"hash": "move-new-page", "restricted_to": ["b"]})
+    task = TestEntities.get("TASK", {"hash": "move-owner-task"}, page=previous)
+    file = TestEntities.get("FILE", {"hash": "history-only-file"})
+    file.task = task
+    task.files = []
+    task.page = destination
+    task._testing = False
+    monkeypatch.setattr(database_get, "task_files", lambda key: [file] if key == task.key else [])
+    monkeypatch.setattr(Entities, "fetch", lambda *items, request: list(items))
+
+    plan = plan_mutation(MutationOperation.SAVE, task, registry=Entities)
+
+    write = next(effect for effect in plan.effects if effect.entity is file and effect.effect is MutationEffectType.UPSERT)
+    assert set(write.property_mask) == {"task_page", "requires", "modified"}
+    assert write.depends_on == (task,)
+    assert file.page is None and file.task_page is destination and file.owner is task
+    assert file.restricted_to == {"page": ["b"]} and task.files == []
+    assert task._page_changed is True

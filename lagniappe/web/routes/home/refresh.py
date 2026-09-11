@@ -1,4 +1,4 @@
-"""Batched collection refresh with root-depth modified-time comparison."""
+"""Batched collection refresh with cached-fingerprint comparisons."""
 
 from flask import get_template_attribute, request
 from flask_login import current_user
@@ -46,7 +46,10 @@ def _render_upserts(collection, entities):
     return [
         {
             "key": entity.urlsafe_key,
-            "html": render(entity, collection.parent).strip(),
+            "html": render(
+                entity.user if collection.kind == "user-index" else entity,
+                collection.parent,
+            ).strip(),
         }
         for entity in entities
     ]
@@ -75,7 +78,10 @@ def _render_empty(collection, order):
 # @reason target orchestration is owned by the public batched route
 def _refresh_target(view, target, refresh_view):
     collection = load_refresh_collection(view, target, current_user, refresh_view)
-    delta = resolve_refresh_delta(collection, target.get("rows"), current_user)
+    delta = resolve_refresh_delta(
+        collection, target.get("rows"), current_user,
+        reauthorize=refresh_view.reauthorize,
+    )
     return {
         "id": target["id"],
         "fallback": False,
@@ -91,6 +97,7 @@ def _refresh_target(view, target, refresh_view):
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_reconnect_refreshes_external_page
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
 # @matrix reconnect-refresh : batched-request category-index component-identity fallback page-tasks root-fingerprint
 # @pairs category-index:refresh permissions:authorization
 @internal.route("/refresh", methods=["POST"])
@@ -108,7 +115,7 @@ def refresh():
         return responses.error("Invalid refresh targets.")
 
     try:
-        refresh_view = load_refresh_view(view)
+        refresh_view = load_refresh_view(view, current_user)
     except RefreshFallback:
         return responses.json_response(
             {"targets": [_fallback(target) for target in targets]}
@@ -119,14 +126,13 @@ def refresh():
             {"targets": [_fallback(target) for target in targets]}
         )
 
-    client_fingerprint = view.get("fingerprint")
-    if (
-        isinstance(client_fingerprint, str)
-        and client_fingerprint
-        and client_fingerprint == refresh_view.fingerprint
-    ):
+    # Form tables use full fragments; their rows cannot change independently
+    # of the Forms collection revision.
+    if view.get("index") == "forms" and refresh_view.matches(view):
         return responses.json_response(
-            {"fingerprint": refresh_view.fingerprint, "targets": []}
+            {"fingerprint": refresh_view.fingerprint,
+             "authorization": refresh_view.authorization,
+             "collection_revision": refresh_view.collection_revision, "targets": []}
         )
 
     refreshed = []
@@ -153,5 +159,7 @@ def refresh():
             refreshed.append(_fallback(target))
 
     return responses.json_response(
-        {"fingerprint": refresh_view.fingerprint, "targets": refreshed}
+        {"fingerprint": refresh_view.fingerprint,
+         "authorization": refresh_view.authorization,
+         "collection_revision": refresh_view.collection_revision, "targets": refreshed}
     )

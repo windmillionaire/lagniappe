@@ -3,8 +3,7 @@
 {% macro restrict_access(page) %}
   <div data-role="restrict-access"
        class="outline-2 outline-user-default rounded-md shadow-sm bg-white"
-       data-kind="user"
-       type="button">
+       data-kind="user">
     <div class="{{ styles.iconLabel.wrapper }} rounded-t-md px-3 py-1.5 text-lg font-semibold border-b-2 border-user-default">
       {{ render_icon("group", (styles.iconLabel.icon) ~ " text-user-default") }}
       <span class="text-user-default">Restrict Access</span>
@@ -12,45 +11,75 @@
     <div class="flex flex-col gap-3 p-3">
       <p class="text-sm text-base-dark italic"
          data-role="restricted-description">
-        If a page is restricted to application Administrators or a specific group, only Administrators and users in that
-        group can view it. This will override any category access other groups may have.
+        Administrators can always view restricted content. When groups are listed, other users must belong
+        to at least one to view this page. The page form's restrictions also apply.
       </p>
-      {{ specific_access(page, 'owner') }}
-      <input data-index="group"
-             data-role="restrict-group-input"
-             data-kind="user"
-             data-placeholder="add group restriction..."
-             name="group"
-             class="{{ styles.input }}">
+      {{ specific_access(page, 'admin') }}
+      <label class="flex flex-col gap-1">
+        <span class="{{ styles.label.sectionHeading }}">Page groups</span>
+        <input data-index="group"
+               data-role="restrict-group-input"
+               data-kind="user"
+               data-placeholder="Add group restriction..."
+               name="restriction-group"
+               class="{{ styles.input }}">
+      </label>
+      {{ restricted_group_list(page) }}
     </div>
-    {{ restricted_group_list(page) }}
+    <template data-role="restriction-template">{{ restricted_group() }}</template>
   </div>
 {% endmacro %}
 
-{% macro restricted_group_list(page) %}
-  <ul class="empty:hidden" data-role="restricted-group-list">
-    {%- for group in page.groups -%}
+{% macro restricted_group(group=None) %}
       <li class="{{ styles.form.restriction }}">
-        <span class="text-base font-semibold text-user-default truncate">{{ group.name }}</span>
+        <input type="hidden" name="group-key" value="{{ group.urlsafe_key if group else '' }}">
+        <span data-role="group-name" class="text-base font-semibold text-user-default truncate">{{ group.name if group else '' }}</span>
         <button class="{{ styles.toggle.plain }}"
                 data-role="remove-restriction"
-                data-key="{{ group.urlsafe_key }}"
+                data-key="{{ group.urlsafe_key if group else '' }}"
                 data-kind="delete"
+                aria-label="Remove group restriction"
                 type="button">
           {{ render_icon("x") }}
         </button>
       </li>
+{% endmacro %}
+
+{% macro restricted_group_list(page) %}
+  <ul class="flex flex-col gap-2 empty:hidden" data-role="restricted-group-list">
+    {%- for group in page.groups -%}
+      {{ restricted_group(group) }}
     {%- endfor -%}
   </ul>
 {% endmacro %}
 
-{% macro visible_to(page) %}
-  <div data-role="visible-to" class="flex flex-col gap-2">
-    <h2 class="text-lg font-semibold text-user-default">This page is visible to</h2>
+{% macro restriction_summary(entity, title, source) %}
+  {% set restricted = entity.properties.restricted_to.stored if entity else [] %}
+  {% if restricted %}
+  <section data-role="restriction-summary" data-source="{{ source }}" class="flex flex-col gap-2">
+    <h2 class="text-lg font-semibold text-user-default">{{ title }}</h2>
     <div class="flex flex-row flex-wrap items-center gap-2" data-role="badges">
-      {{ badge.site_owner() }}
-      {% for group in page.groups %}{{ badge.entity_badge(group.details) }}{% endfor %}
+      {% if 'admin' in restricted %}
+        {{ badge.administrators() }}
+      {% else %}
+        {% for group in entity.groups if group.hash in restricted %}{{ badge.entity_badge(group.details) }}{% endfor %}
+      {% endif %}
     </div>
+  </section>
+  {% endif %}
+{% endmacro %}
+
+{% macro visible_to(page) %}
+  {% set page_restricted = page.properties.restricted_to.stored %}
+  {% set form_restricted = page.form.properties.restricted_to.stored if page.form else [] %}
+  <div data-role="visible-to" class="{{ 'flex' if page_restricted or form_restricted else 'hidden' }} flex-col gap-4">
+    {{ restriction_summary(page, 'Page restrictions', 'page') }}
+    {{ restriction_summary(page.form, 'Form restrictions', 'page_form') }}
+    {% if page_restricted and form_restricted and 'admin' not in page_restricted and 'admin' not in form_restricted %}
+      <p data-role="combined-restrictions-note" class="text-sm text-base-dark">
+        Only users who belong to at least one group in each set can view this page. Administrators can always view restricted content.
+      </p>
+    {% endif %}
   </div>
 {% endmacro %}
 
@@ -61,10 +90,10 @@
              data-role="specific-access"
              data-kind="user"
              name="{{ type }}"
-             {{ 'checked' if page.restricted_to and type in page.restricted_to else '' }}
+             {{ 'checked' if page.properties.restricted_to.stored == ['admin'] else '' }}
              class="{{ styles.checkbox.default }}">
       {{ render_icon("check", (styles.checkbox.icon)) }}
     </div>
-    <span>Restrict to site {{ type }}</span>
+    <span>Administrators only</span>
   </label>
 {% endmacro %}
