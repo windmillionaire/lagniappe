@@ -7,7 +7,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.files.html import sanitize_form_content_html
-from lagniappe.core.tools.form_definitions import rendered_html_fields
+from lagniappe.core.tools.form_definitions import original_completion, rendered_html_fields
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,
@@ -43,17 +43,19 @@ def html_field(key, field_id, **kwargs):
 # @testable true
 # @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_historical_images_are_bound_to_the_authorized_completion
 # @matrix task-completion html-field permissions : schema-version owned-image record-scope
-@assets.route("<key>/form-version/<version>/<asset_name>", methods=["GET", "HEAD"])
-@permission(requested=Action.VIEW)
-def historical_form_image(key, version, asset_name, **kwargs):
+@assets.route("<key>/form-generation/<int:generation>/<asset_name>", methods=["GET", "HEAD"])
+@permission(requested=Action.VIEW, no_store=True)
+def historical_form_image(key, generation, asset_name, **kwargs):
     """Serve retained images through the authorized completion, never a free snapshot key."""
     entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
     if not isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
         abort(404)
-    definition = entity.submission_definition
+    if isinstance(entity, Entities.TASK) and not entity.completed:
+        abort(404)
+    definition = original_completion(entity)["definition"] if isinstance(entity, Entities.TASK) else entity.submission_definition
     if (
         not definition.immutable or definition.error or not definition.content_available
-        or version != definition.version
+        or generation != definition.generation
     ):
         abort(404)
     name = asset_name if asset_name in definition.source.assets else asset_name.rsplit(".", 1)[0]

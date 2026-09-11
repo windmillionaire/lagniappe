@@ -14,7 +14,7 @@ from werkzeug.datastructures import FileStorage
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.form_definitions import rendered_html_fields
-from lagniappe.core.tools.form_drafts import resolve_form_version
+from lagniappe.core.tools.form_drafts import archive_form_generation, resolve_form_generation
 from testing.definitions import Pages, SitePages, Uploads, Users
 from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields
@@ -200,20 +200,27 @@ def test_historical_images_are_bound_to_the_authorized_completion(get_user):
     task.save()
     task.complete(user=user.entity)
     task.save()
-    html = rendered_html_fields(task)[field.id]
+    archive_form_generation(form.entity).save()
+    form.entity.set_html_field(field.id, "<p>New active instructions</p>")
+    form.entity.save()
+    # Supply a later-generation fixture; conversion itself is outside step 1.
+    form.entity.generation = 1
+    Entities.save_root(form.entity, property_mask=("generation",))
+    html = rendered_html_fields(task, original=True)[field.id]
     image_url = BeautifulSoup(html, "html.parser").find("img")["src"]
     user.go(page)
     response = _http(user, "GET", image_url)
     assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["Content-Type"].startswith("image/")
     metadata = _http(user, "HEAD", image_url)
     assert metadata.status_code == 200
     assert int(metadata.headers["Content-Length"]) == len(response.content)
     assert metadata.content == b""
-    snapshot = resolve_form_version(task.properties.form.key, task.submission_definition.version)
+    snapshot = resolve_form_generation(task.properties.form.key, 0)
     image_name = next(name for name in snapshot.assets if name.startswith(f"image_{field.id}_"))
     assert _http(user, "GET", snapshot.get_asset(image_name).url).status_code == 403
-    wrong_version = image_url.replace(task.schema_version, "unrelated-version")
+    wrong_version = image_url.replace("/form-generation/0/", "/form-generation/99/")
     assert _http(user, "GET", wrong_version).status_code == 404
     outsider = get_user(UserDefinition(
         name="BSU unrelated viewer", email=f"bsu-viewer-{uuid4().hex}@example.test",
@@ -221,13 +228,11 @@ def test_historical_images_are_bound_to_the_authorized_completion(get_user):
     outsider.go(SitePages.HOME)
     assert _http(outsider, "GET", image_url).status_code == 403
 
-    form.entity.set_html_field(field.id, "<p>New active instructions</p>")
-    form.entity.save()
-    assert _http(user, "GET", image_url).status_code == 200
-    assert "Original instructions" in rendered_html_fields(task)[field.id]
+    assert "New active instructions" in rendered_html_fields(task)[field.id]
+    assert "Original instructions" in rendered_html_fields(task, original=True)[field.id]
     Entities.delete(form.entity)
     restored = Entities.fetch_one(task.key, request=Fetch.root())
-    assert "Original instructions" in rendered_html_fields(restored)[field.id]
+    assert "Original instructions" in rendered_html_fields(restored, original=True)[field.id]
     assert _http(user, "GET", image_url).status_code == 200
     assert _http(outsider, "GET", image_url).status_code == 403
 

@@ -4,7 +4,7 @@ from .form_links import Link
 from .base_submission import SubmissionProperty
 from .base_db import DBProperty
 from .schema import SchemaFields
-from ..tools.form_definitions import completed_envelope, require_mutable_submission
+from ..tools.form_definitions import require_mutable_submission
 
 
 # @testable false
@@ -46,11 +46,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
 
     def __init__(self, *args, entity=None, **kwargs):
         super().__init__(*args, entity=entity, **kwargs)
-        # Reading a completion must not reserialize its immutable raw answers.
-        envelope = completed_envelope(self.entity)
-        SubmissionProperty.value.fset(
-            self, envelope["submission"] if envelope is not None else self.entity.db.get("submission")
-        )
+        SubmissionProperty.value.fset(self, self.entity.db.get("submission"))
 
     # @testable true
     # @tests tests_unit/test_003_submission.py::test_submission_value
@@ -59,8 +55,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
     # @pair submission:schema-version
     @property
     def value(self):
-        envelope = completed_envelope(self.entity)
-        return envelope["submission"] if envelope is not None else super().value
+        return super().value
 
     @value.setter
     def value(self, value):

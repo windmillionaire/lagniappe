@@ -37,20 +37,23 @@ name narrow dependent changes; cache-state and search-delete intents are
 post-commit effects. Intents are consumed only after all durable writes and
 deletes succeed, so a failed commit can be retried from the same domain state.
 
-Form publication stages new HTML and immutable definition snapshots at isolated
-Storage paths, then atomically commits their references and Form changes with
-exact source-row guards. Form construction retains serialized JSON and scalar
-values, freezing small mutable collections without copying or parsing content.
-Keyed Forms capture that state on their first explicit row read. Publication
-reconstructs the saved row only when preparing its guard. `ExactEntityState` includes the absence of additional
+Form publication stages new HTML at isolated Storage paths, then atomically
+commits its references and Form changes with exact source-row guards. Publication
+reads the saved Form at the explicit save boundary; Form construction and ordinary
+row access do not retain a second row or intercept database reads. The saved
+source supplies the compatibility check, prior generation, and concurrency guard.
+A conversion preserves the previous Form generation and its independent HTML/image
+assets in FormHistory; compatible saves only refresh the content fingerprint.
+`ExactEntityState` includes the absence of additional
 properties, so concurrently adding a restriction is detected even if the
 modified timestamp is unchanged. Document checkpoints retain their narrower
-property-subset guards. The shared executor also collects snapshot-creation
+property-subset guards. The shared executor also collects history-creation
 and completion guards. A rejected compare-and-set raises `MutationConflict`
 before any durable Datastore mutation. Builder Save rechecks its baseline on retry and
 preserves concurrent restrictions. Known rejected attempt blobs are removed
 with generation-qualified deletion; ambiguous commit failures retain objects
-until their references can be reconciled. Saved version assets are not purged.
+until their references can be reconciled. Replaced live HTML is deleted only after
+an accepted commit; independently archived generation assets remain intact.
 
 ## Property masks
 
@@ -84,6 +87,11 @@ lifecycle. See [SYNC_DOCUMENTS.md](SYNC_DOCUMENTS.md).
 4. runs cache, search, and blob cleanup; and
 5. returns a `MutationOutcome` that separates durable commit from post-commit
    completion.
+
+Deleting a Form archives its current generation and deletes the Form in the same
+guarded Datastore transaction. A concurrent Form edit rejects both operations.
+The mutation writer accepts explicit `deletes` alongside writes for this atomic
+boundary; remaining cascade deletes retain their existing flow.
 
 A post-commit Redis or Storage failure never rolls back or obscures the durable
 result. Callers must inspect and report post-commit errors when their workflow

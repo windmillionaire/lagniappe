@@ -218,10 +218,11 @@ the restored active state without deleting or duplicating the completion.
 
 Undoing an imported event on a reused Task would rewrite a recorded completion;
 that correction remains unavailable and fails before changing answer assets.
-New imported completion events save their answers before pinning the exact form
-definition. Unknown generated field IDs are rejected before existing values
-are reset. Historical AI reads use recorded definitions; missing originals are
-marked unavailable and recoverable answers are shown with their saved IDs.
+New imported completion events save their answers before capturing the original
+answers and Form generation. Unknown generated field IDs are rejected before
+existing values are reset. Normal Task AI reads use flat current values and the
+current Form. Historical AI reads resolve the recorded generation; missing
+originals are marked unavailable and recoverable answers use their saved IDs.
 
 ## Workspace semantics
 

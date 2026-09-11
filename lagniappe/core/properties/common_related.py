@@ -76,7 +76,7 @@ class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProp
                 definition = self.entity.submission_definition
                 if definition.error:
                     return {"unavailable": definition.error}
-                return {"schema": definition.schema, "version": definition.version}
+                return {"schema": definition.schema, "generation": definition.generation}
         if (
             not self.value
             or not self.value.allowed(Action.VIEW, self.user)

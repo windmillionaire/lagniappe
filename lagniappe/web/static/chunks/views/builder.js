@@ -1,24 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.1.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="efe756b9-c9f3-42e5-a543-ae4e12d5e0f0",e._sentryDebugIdIdentifier="sentry-dbid-efe756b9-c9f3-42e5-a543-ae4e12d5e0f0");}catch(e){}}();import"../search.js?v=bcff8c4a";import"../entityMenu.js?v=bcff8c4a";import"../upload.js?v=bcff8c4a";import"../foundation.js?v=bcff8c4a";import"../connectivity.js?v=bcff8c4a";import"../modal.js?v=bcff8c4a";import{F as w}from"../builder.js?v=bcff8c4a";import"../styles.js?v=bcff8c4a";import"../remote.js?v=bcff8c4a";import"../queryLifecycle.js?v=bcff8c4a";import"../combobox.js?v=bcff8c4a";import"../primitives.js?v=bcff8c4a";import"../icons.js?v=bcff8c4a";import"../results.js?v=bcff8c4a";import"../storage.js?v=bcff8c4a";import"../formatting.js?v=bcff8c4a";import"../upstreamUnavailable.js?v=bcff8c4a";import"../dropdown.js?v=bcff8c4a";import"../buttons.js?v=bcff8c4a";import"../baseForm.js?v=bcff8c4a";import"../loader.js?v=bcff8c4a";import"../facets.js?v=bcff8c4a";import"../submitter.js?v=bcff8c4a";export{w as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=b110e8d6';
-import '../entityMenu.js?v=b110e8d6';
-import '../upload.js?v=b110e8d6';
-import '../foundation.js?v=b110e8d6';
-import '../connectivity.js?v=b110e8d6';
-import '../modal.js?v=b110e8d6';
-export { F as default } from '../builder.js?v=b110e8d6';
-import '../styles.js?v=b110e8d6';
-import '../remote.js?v=b110e8d6';
-import '../queryLifecycle.js?v=b110e8d6';
-import '../combobox.js?v=b110e8d6';
-import '../primitives.js?v=b110e8d6';
-import '../icons.js?v=b110e8d6';
-import '../results.js?v=b110e8d6';
-import '../storage.js?v=b110e8d6';
-import '../formatting.js?v=b110e8d6';
-import '../upstreamUnavailable.js?v=b110e8d6';
-import '../dropdown.js?v=b110e8d6';
-import '../buttons.js?v=b110e8d6';
-import '../baseForm.js?v=b110e8d6';
-import '../loader.js?v=b110e8d6';
-import '../facets.js?v=b110e8d6';
-import '../submitter.js?v=b110e8d6';

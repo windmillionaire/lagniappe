@@ -2,12 +2,12 @@
 
 from copy import deepcopy
 from contextlib import nullcontext
-import copy
 from datetime import datetime, timezone
 import hashlib
 from io import BytesIO
 import json
 from types import SimpleNamespace
+from uuid import uuid4
 
 from google.cloud import datastore
 import pytest
@@ -18,6 +18,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.entities.form import Form
 from lagniappe.core.mutations import executor, plan_mutation
 from lagniappe.core.tools import form_drafts as drafts
+from lagniappe.core.tools.cache import restrictions as restriction_cache
 from lagniappe.core.tools.database import assets, get as database_get, utility as database_utility
 
 pytestmark = pytest.mark.unit
@@ -26,6 +27,7 @@ pytestmark = pytest.mark.unit
 @pytest.fixture
 def memory_forms(monkeypatch):
     """Replace only storage, database, authorization, and rebuildable effects."""
+    execute_post_commit = executor.execute_post_commit
     rows, blobs, commits = {}, {}, []
     key = datastore.Key("models", "draft-form", project="test-project")
     row = datastore.Entity(key=key)
@@ -92,8 +94,13 @@ def memory_forms(monkeypatch):
 
     monkeypatch.setattr(Entities, "fetch_one", fetch_one)
     monkeypatch.setattr(Entities, "fetch", fetch)
+    monkeypatch.setattr(database_utility, "create_key", lambda kind, parent=None: datastore.Key(
+        "history" if kind == "form_history" else "models", uuid4().hex,
+        parent=parent.key if parent else None, project="test-project",
+    ))
     monkeypatch.setattr(Form, "allowed", lambda self, action, user=None: True)
     monkeypatch.setattr(database_get, "form_users", lambda form: [])
+    monkeypatch.setattr(database_get, "entity", lambda identifier: deepcopy(rows.get(identifier)))
     monkeypatch.setattr(executor.database_utility, "save_mutations", commit)
     monkeypatch.setattr(executor, "execute_post_commit", lambda plan: ([], []))
     monkeypatch.setattr(assets, "get_text", lambda path, *args, **kwargs: blobs.get(path))
@@ -106,34 +113,22 @@ def memory_forms(monkeypatch):
         ancestor=lambda key: SimpleNamespace(filter=lambda query: SimpleNamespace(fetch_all=lambda: []))
     ))
     return SimpleNamespace(rows=rows, blobs=blobs, commits=commits, key=key,
-                           form=lambda: fetch_one(key, request=Fetch.direct()), commit=commit)
+                           form=lambda: fetch_one(key, request=Fetch.direct()), commit=commit,
+                           execute_post_commit=execute_post_commit)
 
 
-# @matrix forms mutations : lazy-construction immutable-baseline guarded-save
-def test_form_construction_retains_serialized_state_without_hydration_or_deepcopy(memory_forms, monkeypatch):
-    row = deepcopy(memory_forms.rows[memory_forms.key])
-    row["groups"] = ["original-group"]
-    original_schema, original_assets = row["schema"], row["assets"]
-    reads = []
-    monkeypatch.setattr(database_get, "entity", lambda key: reads.append(key) or row)
-    with monkeypatch.context() as construction:
-        construction.setattr(copy, "deepcopy", lambda *args, **kwargs: pytest.fail("constructor copied the row graph"))
-        loaded = Form(row)
-        keyed = Form(row.key)
-    assert reads == []
-    assert loaded.properties._instances == {} and keyed.properties._instances == {}
-    assert loaded._form_source_state["schema"] is original_schema
-    assert loaded._form_source_state["assets"] is original_assets
-    assert keyed._db == {}
-    row["groups"].append("later-group")
-    row["schema"] = "[]"
-    saved = loaded.saved_form_state()
-    assert saved["groups"] == ["original-group"]
-    assert saved["schema"] == original_schema
-    assert keyed.name == "Instructions"
-    assert reads == [row.key]
-    keyed.name = "Edited after load"
-    assert keyed.saved_form_state()["name"] == "Instructions"
+# @source lagniappe/core/entities/form.py::Form.get_html_field
+# @matrix forms html-field : draft no-write
+def test_form_reads_do_not_fetch_or_archive_definitions(memory_forms, monkeypatch):
+    form = memory_forms.form()
+    before = deepcopy(memory_forms.rows), deepcopy(memory_forms.blobs)
+    monkeypatch.setattr(Entities, "fetch_one", lambda *args, **kwargs: pytest.fail("Form read fetched history"))
+    monkeypatch.setattr(assets, "copy_file", lambda *args, **kwargs: pytest.fail("Form read copied assets"))
+    assert form.name == "Instructions"
+    assert form.schema[0]["title"] == "Notes"
+    assert form.get_html_field("notes") == "<p>Original</p>"
+    assert form.generation == 0
+    assert (memory_forms.rows, memory_forms.blobs) == before
 
 
 # @matrix form-schema : validation identity conditions
@@ -187,52 +182,135 @@ def test_builder_draft_and_staged_html_are_read_only(memory_forms):
 
 
 # @source lagniappe/core/properties/form.py::SchemaVersion
-# @matrix form-schema html-field : content-version fingerprint
 # @matrix form : schema-version update
 def test_content_version_changes_only_with_definition_content(memory_forms):
     form = memory_forms.form()
-    version = drafts.definition_version(form)
-    form.name = "Another name"
-    assert drafts.definition_version(form) == version
-    form.assets["notes"]["fingerprint"] = "different"
-    assert drafts.definition_version(form) != version
     form.properties.version.update()
-    assert form.version == drafts.definition_version(form)
-    del form.assets["notes"]["fingerprint"]
-    with pytest.raises(exceptions.ValidationError, match="fingerprint"):
-        drafts.definition_version(form)
+    version = form.version
+    form.name = "Another name"
+    assert form.properties.version.update() is False
+    assert form.version == version
+    form.assets["notes"]["fingerprint"] = "different"
+    form.properties.version.update()
+    assert form.version != version
+    assert form.generation == 0
 
 
-# @matrix form-schema html-field : history immutable-assets content-version
-# @pair html-field:missing-content
-def test_history_snapshot_owns_original_assets_and_marks_legacy_content_unknown(memory_forms):
-    form = memory_forms.form()
-    history = Entities.FORM_HISTORY.snapshot(form, "known", content_available=True)
+# @matrix form-schema html-field : history generation immutable-assets
+def test_archived_generation_preserves_schema_html_and_images(memory_forms):
+    source = memory_forms.form()
+    source.assets["image_notes_photo"] = {
+        "type": "image", "path": "photo.png", "generation": "1", "fingerprint": "photo",
+    }
+    source.db["assets"] = json.dumps(source.assets)
+    memory_forms.blobs["photo.png"] = b"original picture"
+    history = drafts.archive_form_generation(source)
+    assert history.generation == 0
+    assert history.schema == source.schema
     assert history.get_html_field("notes") == "<p>Original</p>"
     assert history.assets["notes"]["path"] != "original.html"
+    image_path = history.assets["image_notes_photo"]["path"]
+    assert image_path != "photo.png"
     memory_forms.blobs["original.html"] = "<p>Later</p>"
+    memory_forms.blobs["photo.png"] = b"later picture"
     assert history.get_html_field("notes") == "<p>Original</p>"
-    legacy = Entities.FORM_HISTORY.snapshot(form, "legacy", content_available=False)
-    assert not legacy.content_available and not legacy.assets
-    assert legacy.get_html_field("notes") is None
+    assert memory_forms.blobs[image_path] == b"original picture"
+    assert not history.allowed(Action.VIEW)
 
 
 # @source lagniappe/core/mutations/save.py::FormMutation.plan_save
 # @source lagniappe/core/mutations/executor.py::execute_mutation
-# @matrix forms html-field mutations : content-version history guarded-save
-# @matrix form : save schema-history
+# @matrix forms mutations : guarded-save publication
 # @matrix mutations : save durable-first
-def test_publication_stages_immutable_history_and_guards_original_row(memory_forms):
+def test_publication_reads_saved_form_only_at_save(memory_forms):
     form = memory_forms.form()
     form.set_html_field("notes", "<p>Accepted</p>")
     plan = plan_mutation(MutationOperation.SAVE, form, registry=Entities)
-    assert memory_forms.rows[memory_forms.key]["version"] == "legacy-version"
     memory_forms.rows[memory_forms.key]["restricted_to"] = ["newer-restriction"]
-    with pytest.raises(exceptions.ValidationError, match="changed"):
+    with pytest.raises(exceptions.MutationConflict, match="changed"):
         executor.execute_mutation(plan)
     assert memory_forms.rows[memory_forms.key]["version"] == "legacy-version"
     assert memory_forms.blobs["original.html"] == "<p>Original</p>"
     assert memory_forms.rows[memory_forms.key]["restricted_to"] == ["newer-restriction"]
+
+
+# @matrix forms mutations : generation publication
+def test_compatible_saves_update_version_without_archiving_generation(memory_forms):
+    for content in ("<p>First edit</p>", "<p>Second edit</p>"):
+        form = memory_forms.form()
+        previous_version = form.version
+        form.set_html_field("notes", content)
+        form.save()
+        saved = memory_forms.form()
+        assert saved.version != previous_version
+        assert saved.generation == 0
+        assert saved.get_html_field("notes") == content
+    assert len(memory_forms.rows) == 1
+
+
+# @source lagniappe/core/tools/form_drafts.py::prepare_form_publication
+# @source lagniappe/core/mutations/executor.py::execute_post_commit
+# @matrix html-field : isolated-assets cleanup
+# @matrix mutations : durable-first rejected-save
+# @pair forms:publication
+@pytest.mark.parametrize("content", ["<p>Replacement</p>", ""], ids=["replace", "clear"])
+@pytest.mark.parametrize("accepted", [True, False], ids=["accepted", "rejected"])
+def test_replaced_live_html_is_deleted_only_after_commit_and_preserves_archive(
+    memory_forms, monkeypatch, content, accepted,
+):
+    form = memory_forms.form()
+    history = drafts.archive_form_generation(form)
+    history.save()
+    archived_path = history.assets["notes"]["path"]
+    before_blobs = deepcopy(memory_forms.blobs)
+    before_row = deepcopy(memory_forms.rows[form.key])
+    events = []
+
+    def commit(writes, *, guards=None):
+        assert memory_forms.blobs["original.html"] == "<p>Original</p>"
+        assert memory_forms.blobs[archived_path] == "<p>Original</p>"
+        events.append("commit")
+        if not accepted:
+            raise exceptions.MutationConflict("Rejected the edited Form")
+        memory_forms.commit(writes, guards=guards)
+
+    def delete_blobs(paths, *, on_error):
+        # The accepted row must already point to the replacement or clear.
+        assert events == ["commit"]
+        assert memory_forms.form().get_html_field("notes") == (content or None)
+        events.append("delete")
+        for path in paths:
+            memory_forms.blobs.pop(path)
+
+    monkeypatch.setattr(executor.database_utility, "save_mutations", commit)
+    monkeypatch.setattr(executor, "execute_post_commit", memory_forms.execute_post_commit)
+    monkeypatch.setattr(executor.cache, "update", lambda *args: None)
+    monkeypatch.setattr(executor.cache, "update_owner_projection", lambda *args: None)
+    monkeypatch.setattr(restriction_cache, "previous_restrictions", lambda entities: {})
+    monkeypatch.setattr(restriction_cache, "dispatch_changes", lambda previous: None)
+    bucket = SimpleNamespace(delete_blobs=delete_blobs)
+    monkeypatch.setattr(database_utility, "DATA", SimpleNamespace(
+        private_bucket=bucket, public_bucket=bucket,
+    ))
+
+    form.set_html_field("notes", content)
+    plan = plan_mutation(MutationOperation.SAVE, form, registry=Entities)
+    assert memory_forms.blobs["original.html"] == "<p>Original</p>"
+    if accepted:
+        outcome = executor.execute_mutation(plan)
+        assert outcome.post_commit_complete
+        assert events == ["commit", "delete"]
+        assert "original.html" not in memory_forms.blobs
+        assert memory_forms.form().get_html_field("notes") == (content or None)
+    else:
+        with pytest.raises(exceptions.MutationConflict, match="Rejected"):
+            executor.execute_mutation(plan)
+        assert events == ["commit"]
+        assert memory_forms.rows[form.key] == before_row
+        assert memory_forms.blobs == before_blobs
+    saved_history = Entities.fetch_one(history.key, request=Fetch.root())
+    assert saved_history.get_html_field("notes") == "<p>Original</p>"
+    assert memory_forms.blobs[archived_path] == "<p>Original</p>"
 
 
 # @matrix forms mutations permissions : guarded-save concurrent-restrictions
@@ -255,57 +333,34 @@ def test_exact_publication_guard_rejects_new_properties_but_document_guard_is_su
     assert written == [{"assets": "draft"}]
 
 
-# @matrix form-schema html-field : history legacy missing-version
-def test_resolver_prefers_snapshot_and_does_not_invent_legacy_content(memory_forms):
+# @matrix form-schema : history generation
+def test_generation_resolution_ignores_legacy_versions(memory_forms, monkeypatch):
     form = memory_forms.form()
-    legacy = drafts.resolve_form_version(form, form.version)
-    assert legacy.schema == form.schema and not legacy.content_available
-    snapshot = drafts.ensure_form_snapshot(form)
-    memory_forms.blobs["original.html"] = "<p>Later</p>"
-    resolved = drafts.resolve_form_version(form.key, snapshot.version)
-    assert resolved.get_html_field("notes") == "<p>Original</p>"
-    assert drafts.resolve_form_version(form, "missing") is None
-    memory_forms.rows[snapshot.key]["form"] = datastore.Key("models", "another", project="test-project")
-    with pytest.raises(exceptions.ValidationError, match="inconsistent"):
-        drafts.resolve_form_version(form.key, snapshot.version)
+    monkeypatch.setattr(drafts, "Query", lambda *args, **kwargs: pytest.fail("Matching generation queried history"))
+    assert drafts.resolve_form_generation(form, 0) is form
+    assert drafts.resolve_form_generation(form.key, 0).schema == form.schema
+    assert form.version == "legacy-version"
 
 
-# @matrix task-completion form-schema : immutable-snapshot content-version
-def test_completion_snapshot_is_exact_and_does_not_relabel_legacy_version(memory_forms):
-    form = memory_forms.form()
-    snapshot = drafts.ensure_form_snapshot(form)
-    repeated = drafts.ensure_form_snapshot(form)
-    assert snapshot.version.startswith("fc1-") and repeated.key == snapshot.key
-    assert snapshot.version != "legacy-version"
-    assert memory_forms.rows[memory_forms.key]["version"] == "legacy-version"
-    assert len(memory_forms.commits) == 1
-    form.set_html_field("notes", "<p>Unsaved</p>")
-    with pytest.raises(exceptions.ValidationError, match="Save the Form draft"):
-        drafts.ensure_form_snapshot(form)
-    assert len(memory_forms.commits) == 1
-
-
-# @matrix task-completion form-schema : content-version current-definition no-extra-read
-def test_completion_reuses_clean_current_content_without_snapshot_reads(memory_forms, monkeypatch):
-    original = memory_forms.form()
-    draft = drafts.builder_draft(original)
-    baseline = draft.pop("baseline")
-    drafts.save_form_draft(original, draft, baseline, "publish-current", object())
+# @matrix form-schema : history generation
+def test_generation_resolution_loads_only_the_requested_archive(memory_forms, monkeypatch):
+    source = memory_forms.form()
+    archived = drafts.archive_form_generation(source)
     current = memory_forms.form()
-    with monkeypatch.context() as current_read:
-        current_read.setattr(Entities, "fetch_one", lambda *args, **kwargs: pytest.fail("completion looked up a history snapshot"))
-        current_read.setattr(assets, "copy_file", lambda *args, **kwargs: pytest.fail("completion copied current content"))
-        assert current.snapshot_for_completion() is current
-        assert current.content_available
-        schema = current.schema
-        schema[0]["title"] = "Unsaved label"
-        current.schema = schema
-        assert not current.content_available
-    current = memory_forms.form()
-    current.set_html_field("notes", "<p>Unsaved</p>")
-    assert not current.content_available
-    with pytest.raises(exceptions.ValidationError, match="Save the Form draft"):
-        current.snapshot_for_completion()
+    current.generation = 1
+    current.schema = [{"id": "different", "type": "input", "title": "Current"}]
+    calls = []
+    def stored(key, generation):
+        calls.append((key, generation))
+        return archived if generation == 0 else None
+    monkeypatch.setattr(drafts, "_stored_generation", stored)
+    assert drafts.resolve_form_generation(current, 0) is archived
+    assert drafts.resolve_form_generation(current, 1) is current
+    assert drafts.resolve_form_generation(current, 99) is None
+    assert calls == [(source.key, 0), (source.key, 99)]
+
+
+
 
 
 # @matrix forms : draft save-receipt conflict publication
@@ -352,22 +407,19 @@ def test_save_draft_publishes_images_once_and_retains_failed_attempt_originals(m
     assert len(memory_forms.blobs) == count
 
 
-# @matrix form-schema : history batch-read
-def test_definition_versions_batch_shared_history_reads(memory_forms, monkeypatch):
+# @matrix form-schema : history generation batch-read
+def test_generation_resolution_batches_current_forms(memory_forms, monkeypatch):
     form = memory_forms.form()
-    snapshot = drafts.ensure_form_snapshot(form)
     actual_fetch = Entities.fetch
     calls = []
-
     def fetch(*keys, request):
         calls.append(keys)
         return actual_fetch(*keys, request=request)
-
     monkeypatch.setattr(Entities, "fetch", fetch)
-    result = drafts.resolve_form_versions([(form, snapshot.version), (form.key, snapshot.version)])
-    assert list(result) == [(form.key, snapshot.version)]
-    assert result[(form.key, snapshot.version)].schema == form.schema
-    assert calls == [(snapshot.key,)]
+    result = drafts.resolve_form_generations([(form.key, 0), (form.key, 0)])
+    assert list(result) == [(form.key, 0)]
+    assert result[(form.key, 0)].schema == form.schema
+    assert calls == [(form.key,)]
 
 
 # @matrix forms html-field : copy draft immutable-assets save-receipt
@@ -407,14 +459,14 @@ def test_copy_draft_owns_content_and_is_idempotent_without_saving_source(memory_
     assert len(memory_forms.commits) == commits
 
 
+# @source lagniappe/core/entities/history.py::FormHistory.allowed
 # @matrix form-schema html-field : history permission-boundary
 def test_definition_snapshot_requires_submitter_scoped_authorization(memory_forms):
-    snapshot = drafts.ensure_form_snapshot(memory_forms.form())
-    # Entity permission decorators read the fingerprint before calling allowed.
+    snapshot = drafts.archive_form_generation(memory_forms.form())
+    snapshot.save()
     assert snapshot.created is not None
     assert snapshot.modified == snapshot.created
     assert snapshot.fingerprint
-    assert snapshot.name == snapshot.db.get("name")
     for action in (Action.VIEW, Action.EDIT, Action.DELETE):
         assert snapshot.allowed(action, user=SimpleNamespace(is_admin=True)) is False
 
@@ -445,29 +497,43 @@ def test_rejected_save_cleans_only_attempt_blobs_and_ambiguous_commit_retains_th
 
 
 # @source lagniappe/core/tools/form_drafts.py::save_form_draft
-# @source lagniappe/core/tools/form_drafts.py::ensure_form_snapshot
 # @matrix forms : draft conflict publication
 # @pair mutations:conflict
-# @matrix task-completion form-schema : immutable-snapshot content-version
-def test_save_reuses_snapshot_won_by_concurrent_completion(memory_forms, monkeypatch):
+@pytest.mark.parametrize("race_timing", ["after-initial-fetch", "before-commit"])
+def test_save_retry_preserves_concurrent_restrictions(memory_forms, monkeypatch, race_timing):
     form = memory_forms.form()
     draft = drafts.builder_draft(form)
     baseline = draft.pop("baseline")
-    draft["name"] = "Accepted after completion"
+    draft["name"] = "Accepted after restriction edit"
     raced = False
-    winner = None
+    allowed_restrictions = []
+    fetch_one = Entities.fetch_one
+
+    def check_permission(self, action, user=None):
+        allowed_restrictions.append(self.db.get("restricted_to"))
+        return True
+
+    def fetch(identifier, *, request):
+        nonlocal raced
+        current = fetch_one(identifier, request=request)
+        if race_timing == "after-initial-fetch" and not raced:
+            raced = True
+            memory_forms.rows[form.key]["restricted_to"] = ["admin"]
+        return current
 
     def race(writes, *, guards=None):
-        nonlocal raced, winner
-        if not raced:
+        nonlocal raced
+        if race_timing == "before-commit" and not raced:
             raced = True
-            winner = drafts.ensure_form_snapshot(memory_forms.form())
+            memory_forms.rows[form.key]["restricted_to"] = ["admin"]
         return memory_forms.commit(writes, guards=guards)
 
+    monkeypatch.setattr(Form, "allowed", check_permission)
+    monkeypatch.setattr(Entities, "fetch_one", fetch)
     monkeypatch.setattr(executor.database_utility, "save_mutations", race)
     result = drafts.save_form_draft(form, draft, baseline, "save-race", object())
-    assert result["draft"]["name"] == "Accepted after completion"
-    assert memory_forms.form().version == winner.version
-    assert len([row for row in memory_forms.rows.values() if row.get("schema_version") == winner.version]) == 1
-    assert memory_forms.blobs[winner.get_asset("notes").path] == "<p>Original</p>"
-    assert len(memory_forms.blobs) == 2  # original plus the winning independent snapshot
+    assert result["draft"]["name"] == "Accepted after restriction edit"
+    assert memory_forms.rows[form.key]["restricted_to"] == ["admin"]
+    assert allowed_restrictions == [None, ["admin"]]
+    assert memory_forms.form().generation == 0
+    assert len(memory_forms.rows) == 1

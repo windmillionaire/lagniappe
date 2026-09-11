@@ -69,7 +69,7 @@
   {% set completed = t.completed %}
   {% set form_readonly = t.readonly or completed %}
   {% set show_settings = not form_readonly %}
-  {% set show_form = (t.properties.submission.value or t.submission_schema) if completed else t.form %}
+  {% set show_form = completed or t.form %}
   {% set can_move = t.allowed(Action.EDIT) %}
   {% set can_combine = t.allowed(Action.DELETE) %}
   <li id="{{ t.hash }}"
@@ -204,6 +204,14 @@
         class="{{ styles.form.default }}">
     {% if t.allowed(Action.EDIT) and not t.completed %}
       {{ autofill(enabled=current_user.access(AI.CREATE)) }}
+    {% endif %}
+    {% if t.completed %}
+      <section data-role="original-completion-controls" class="flex flex-col gap-3">
+        <button type="button" data-role="view-original-completion" aria-expanded="false"
+                data-route="{{ url_for('tasks.completion_details', key=t.urlsafe_key) }}"
+                class="{{ styles.button.submit }}">View original completion</button>
+        <div data-role="original-completion-detail" hidden></div>
+      </section>
     {% endif %}
     {{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}
   </form>

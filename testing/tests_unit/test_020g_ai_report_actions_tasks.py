@@ -1,6 +1,7 @@
 """Focused AI-report characterization coverage."""
 
 from datetime import datetime, timezone
+import json
 
 import pytest
 
@@ -621,8 +622,6 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
     get_schema,
 ):
     _patch_fake_keys(monkeypatch)
-    snapshot_type = type(TestEntities.get("FORM", {"name": "Snapshot boundary", "hash": "snapshot-boundary"}))
-    monkeypatch.setattr(report_runner.Entities.FORM, "snapshot_for_completion", snapshot_type.snapshot_for_completion)
     user = _test_user("history-cache-owner")
     file_one = _test_file("2023-06-24 jeep registration.pdf", "application/pdf")
     file_two = _test_file("2018_06_07 jeep registration.pdf", "application/pdf")
@@ -755,6 +754,8 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
     assert tracker_task.description == "Vehicle registration renewal payment."
     assert tracker_task.form is forms[0]
     assert histories[0].form is forms[0]
+    assert forms[0].generation == tracker_task.generation == histories[0].generation == 0
+    assert json.loads(tracker_task.db["completed_submission"])["generation"] == 0
     assert tracker_task.completed is True
     assert tracker_task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
     assert tracker_task.due_date is None

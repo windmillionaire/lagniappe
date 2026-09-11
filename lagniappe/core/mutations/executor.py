@@ -9,7 +9,7 @@ from ..definitions import (
     MutationPlan,
 )
 from ..exceptions import MutationConflict, capture
-from ..tools import cache, form_definitions
+from ..tools import cache
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.database.assets import cleanup_rejected_attempt
 from ..tools.notifications import service as notification_service
@@ -66,12 +66,9 @@ def consume_mutation_intents(plan):
             if effect.entity.kind == "task":
                 effect.entity._page_changed = False
             if effect.entity.kind in {"task", "task_history"}:
-                form_definitions.capture_completion_identity(effect.entity, effect.entity.db)
-                effect.entity._completion_sealing = None
-                effect.entity._completion_reopening = False
+                effect.entity._completion_transition = None
                 effect.entity._completion_write_guards = []
             if effect.entity.kind == "form":
-                effect.entity.capture_saved_form_state()
                 effect.entity._pending_html = {}
                 effect.entity._form_save_guard = None
                 effect.entity._form_additional_guards = []
@@ -267,13 +264,16 @@ def execute_mutation(plan, *, guards=None):
     if writes:
         mutation_guards = list(guards or [])
         for effect in writes:
-            for attribute in ("_form_save_guard", "_definition_create_guard"):
-                guard = getattr(effect.entity, attribute, None)
-                if guard is not None:
-                    mutation_guards.append(guard)
+            guard = getattr(effect.entity, "_form_save_guard", None)
+            if guard is not None:
+                mutation_guards.append(guard)
             for attribute in ("_completion_write_guards", "_form_additional_guards"):
                 mutation_guards.extend(getattr(effect.entity, attribute, None) or [])
         options = {"guards": mutation_guards} if mutation_guards else {}
+        form_deletes = [effect for effect in deletes if effect.entity.entity_kind == "form"]
+        if form_deletes:
+            # A Form's last generation and its deletion must commit together.
+            options["deletes"] = [effect.entity for effect in form_deletes]
         try:
             database_utility.save_mutations(
                 ((effect.entity, effect.property_mask) for effect in writes), **options
@@ -284,6 +284,9 @@ def execute_mutation(plan, *, guards=None):
             raise
         for effect in writes:
             _completed(outcome, effect.effect)
+        if form_deletes:
+            _completed(outcome, MutationEffectType.DELETE)
+            deletes = [effect for effect in deletes if effect.entity.entity_kind != "form"]
 
     if deletes:
         database_utility.delete_entities(effect.entity for effect in deletes)

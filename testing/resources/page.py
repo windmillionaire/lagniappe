@@ -228,6 +228,8 @@ class Page(SiteResource):
         ):
             task_item.locator(self.COMPLETE_TASK_CHECKBOX).click()
 
+        # The response can arrive before the browser replaces a large task list.
+        expect(task_item).to_have_count(0)
         completed_task = self.completed_task_list.get_item(task)
         expect(completed_task).to_be_visible()
         task.element = completed_task

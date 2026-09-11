@@ -59,7 +59,8 @@ class TaskMutation(StandardMutation):
     # @matrix files : ownership history parent-key retry
     def plan_save(self, entity, builder, *, reason, depends_on=()):
 
-        validate_completion_write(entity)
+        persisted = builder.entities.fetch_one(entity.key, request=Fetch.root())
+        validate_completion_write(entity, persisted.db if persisted is not None else None)
         super().plan_save(
             entity,
             builder,
@@ -82,7 +83,8 @@ class TaskHistoryMutation(StandardMutation):
     # @testable infrastructure
     def plan_save(self, entity, builder, *, reason, depends_on=()):
 
-        validate_completion_write(entity)
+        persisted = builder.entities.fetch_one(entity.key, request=Fetch.root())
+        validate_completion_write(entity, persisted.db if persisted is not None else None)
         super().plan_save(
             entity,
             builder,
@@ -114,10 +116,11 @@ class UserMutation(StandardMutation):
 # @testable infrastructure
 class FormMutation(StandardMutation):
     # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_save_records_schema_history_on_version_change
+    # @tests tests_unit/test_004_form_properties.py::test_form_save_refreshes_content_version_without_archiving_compatible_edits
     # @tests tests_unit/test_022_mutation_contracts.py::test_permission_save_reuses_resolved_collection_owner_keys
     # @matrix permissions mutations : owner-reuse no-extra-read repeated-save
-    # @matrix form : relations save schema-history
+    # @matrix form : relations save content-fingerprint generation
+    # @matrix forms mutations : guarded-save publication
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         entity.properties.restricted_to.materialize()
         from ..tools.form_drafts import prepare_form_publication

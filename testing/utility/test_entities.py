@@ -11,7 +11,6 @@ Usage:
 
 import random
 import string
-from copy import deepcopy
 from datetime import datetime, timezone
 from enum import Enum
 from types import SimpleNamespace
@@ -678,17 +677,7 @@ class TestEntityRegistry:
             pass
 
         class TestForm(TestEntityMixin, entities.FORM):
-            def snapshot_for_completion(self):
-                """Keep unit completion snapshots in memory at the storage boundary."""
-                snapshot = entities.FORM(temporary=True)
-                snapshot._key = self.key
-                snapshot.schema = deepcopy(self.schema)
-                snapshot.version = self.version or "test-completion"
-                snapshot.form_type = self.form_type
-                snapshot.source_form_key = self.key
-                snapshot.db["form_content_version"] = 1
-                snapshot.capture_saved_form_state()
-                return snapshot
+            pass
 
         class TestFile(TestEntityMixin, entities.FILE):
             pass

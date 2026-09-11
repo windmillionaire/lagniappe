@@ -1,6 +1,4 @@
 import json
-from collections.abc import Mapping
-from types import MappingProxyType
 from flask import url_for
 from ..definitions import Fetch
 from ..mixins import AssetMixin
@@ -14,29 +12,6 @@ from ..properties import (
 from .entity import Entity
 from . import Entities
 from lagniappe.core.tools.database import get as database_get
-from lagniappe.core.tools.form_definitions import definition_version
-
-
-# @testable false
-# @covered-by lagniappe/core/entities/form.py::Form.__init__
-# @reason retain serialized fields without copying their contents or hydrating relations
-def _retained_form_value(value):
-    if isinstance(value, Mapping):
-        return MappingProxyType({key: _retained_form_value(item) for key, item in value.items()})
-    if isinstance(value, (list, tuple)):
-        return tuple(_retained_form_value(item) for item in value)
-    return value
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::prepare_form_publication
-# @reason reconstruct exact Datastore values only when preparing a guarded write
-def _materialized_form_value(value):
-    if isinstance(value, Mapping):
-        return {key: _materialized_form_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_materialized_form_value(item) for item in value]
-    return value
 
 
 # @testable false
@@ -46,42 +21,6 @@ def _materialized_form_value(value):
 # @reason focused methods/properties own the durable Form behavior
 class Form(Entity, AssetMixin):
     entity_kind = "form"
-
-    # @testable true
-    # @tests tests_unit/test_004f_form_drafts.py::test_form_construction_retains_serialized_state_without_hydration_or_deepcopy
-    # @matrix forms mutations : lazy-construction immutable-baseline guarded-save
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        existing = bool(args and args[0] is not None)
-        self._retain_source_on_load = existing and not self._db
-        self._form_source_state = _retained_form_value(self._db) if existing and self._db else None
-        self._pending_html = {}
-
-    # @testable false
-    # @covered-by lagniappe/core/entities/form.py::Form.__init__
-    # @reason first explicit row access captures keyed Forms before callers mutate them
-    @property
-    def db(self):
-        value = super().db
-        if getattr(self, "_retain_source_on_load", False):
-            self._form_source_state = _retained_form_value(value) if value else None
-            self._retain_source_on_load = False
-        return value
-
-    # @testable false
-    # @covered-by lagniappe/core/tools/form_drafts.py::prepare_form_publication
-    # @reason publication materializes the retained raw source for exact CAS
-    def saved_form_state(self):
-        if self._retain_source_on_load:
-            _ = self.db
-        return _materialized_form_value(self._form_source_state) if self._form_source_state is not None else None
-
-    # @testable false
-    # @covered-by lagniappe/core/tools/form_drafts.py::save_form_draft
-    # @reason accepted writes establish the next lightweight publication baseline
-    def capture_saved_form_state(self):
-        self._form_source_state = _retained_form_value(self._db)
-        self._retain_source_on_load = False
 
     @property
     def exclude_from_index(self):
@@ -108,6 +47,7 @@ class Form(Entity, AssetMixin):
                 "restricted_to": common_entity.RestrictedTo,
                 "groups": common_related.Groups,
                 "version": form.SchemaVersion,
+                "generation": form.FormGeneration,
             }
         )
         return properties
@@ -120,34 +60,16 @@ class Form(Entity, AssetMixin):
     def table_fields(self):
         return self.properties.schema.table_fields
 
+    # @testable true
+    # @matrix forms html-field : draft no-write
     def get_html_field(self, field_id):
-        if field_id in self._pending_html:
-            return self._pending_html[field_id] or None
+        pending = getattr(self, "_pending_html", {})
+        if field_id in pending:
+            return pending[field_id] or None
         html_asset = self.get_asset(field_id)
         if not html_asset:
             return None
         return html_asset.html()
-
-    @property
-    def content_available(self):
-        raw = self.db
-        saved = self._form_source_state
-        return bool(saved is not None and raw.get("form_content_version") == 1
-                    and not self._pending_html
-                    and all(saved.get(name) == raw.get(name)
-                            for name in ("schema", "assets", "form_type", "version")))
-
-    # @testable true
-    # @tests tests_unit/test_004f_form_drafts.py::test_completion_reuses_clean_current_content_without_snapshot_reads
-    # @matrix task-completion form-schema : content-version current-definition no-extra-read
-    def snapshot_for_completion(self):
-        if self.content_available and self.version == definition_version(self):
-            return self
-        # Legacy completion needs persistence; keep that entry point out of
-        # entity-registry initialization.
-        from ..tools.form_drafts import ensure_form_snapshot
-
-        return ensure_form_snapshot(self)
 
     # @testable true
     # @tests tests_unit/test_004f_form_drafts.py::test_builder_draft_and_staged_html_are_read_only
@@ -155,6 +77,8 @@ class Form(Entity, AssetMixin):
     def set_html_field(self, field_id, html):
         if not isinstance(field_id, str) or not isinstance(html, (str, type(None))):
             raise ValueError("HTML fields require a field ID and text content.")
+        if not hasattr(self, "_pending_html"):
+            self._pending_html = {}
         self._pending_html[field_id] = html or ""
 
     # @testable true

@@ -21,14 +21,11 @@ from . import Entities
 from lagniappe.core.tools.database import get as database_get
 from ..tools.tasks import scheduling
 from ..tools.form_definitions import (
-    capture_completion_identity,
-    compatible_values,
+    capture_completed_submission,
     immutable_submission,
     preload_definitions,
-    stage_completion_definition,
     stage_completion_guards,
     validate_completion_values,
-    validate_completion_write,
 )
 from ..tools.auth.context import current_context_user
 from ..tools.auth.restrictions import permission_relation
@@ -37,18 +34,9 @@ from ..tools.auth.restrictions import permission_relation
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_entity_lifecycle_readonly_and_save_relations
 # @matrix task : entity-lifecycle readonly save
+# @matrix task-completion mutations : hydration no-extra-read
 class Task(AssetMixin, SubmitterMixin, Entity):
     entity_kind = "task"
-
-    # @testable false
-    # @covered-by lagniappe/core/tools/form_definitions.py::validate_completion_write
-    # @reason capture serialized identity only when raw data is actually accessed
-    @property
-    def db(self):
-        raw = Entity.db.fget(self)
-        if "_completion_identity" not in self.__dict__:
-            capture_completion_identity(self, raw)
-        return raw
 
     @property
     def exclude_from_index(self):
@@ -283,7 +271,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
                 "Required fields are incomplete: " + ", ".join(titles)
             )
 
-        stage_completion_definition(self)
+        capture_completed_submission(self)
         self.completed = True
         self.completed_on = datetime.now(timezone.utc)
         self.completed_by = user if user is not None else current_user
@@ -378,25 +366,20 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     def uncomplete(self, history_key=None):
         """Archive the current completion as TaskHistory and reset the task."""
 
-        validate_completion_write(self)
         completed_cycle = immutable_submission(self)
-        defaults = deepcopy(self.default_submission)
-        if defaults and completed_cycle:
-            definition = self.submission_definition
-            if definition.error:
-                raise ValidationError(definition.error)
-            compatible_values(definition.schema, self.form.schema if self.form else [], defaults)
         if completed_cycle:
-            stage_completion_guards(self)
+            stage_completion_guards(self, transition="reopen")
         self._clear_scheduled_uncomplete()
         if completed_cycle:
             if history_key is None:
                 self.create_history_entry()
             else:
                 self.create_history_entry(history_key=history_key)
-            self._completion_reopening = True
+            self._completion_transition = {
+                "action": "reopen",
+                "envelope": self.db.get("completed_submission"),
+            }
         self.db.pop("completed_submission", None)
-        self._completion_sealing = None
         self.completed = False
         self._submission_definition = None
         self.completed_on = None
@@ -417,8 +400,10 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         submission.value = deepcopy(defaults)
         if self.form:
             self.db["schema_version"] = self.form.version
+            self.db["generation"] = self.form.generation
         else:
             self.db.pop("schema_version", None)
+            self.db["generation"] = 0
         self.files = []
 
     @property

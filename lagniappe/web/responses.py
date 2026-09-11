@@ -25,6 +25,8 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.definitions.manual import VALID_MANUAL_SECTIONS
 from lagniappe.core.entities import Entities
+from lagniappe.core.properties.schema import SchemaFields
+from lagniappe.core.tools.form_definitions import original_completion, rendered_html_fields
 from lagniappe.core.tools.database import assets as database_assets
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
@@ -347,24 +349,36 @@ def task_combine_delta(main, removed, page):
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
 # @matrix html-field : html-fields
 # @matrix security : html-sanitization inner-html
-def form_submission(entity):
-    from lagniappe.core.tools.files.html import sanitize_form_content_html
-
-    from lagniappe.core.tools.form_definitions import rendered_html_fields
-
-    definition = entity.submission_definition
+def form_submission(entity, *, original=False):
+    if original:
+        completion = original_completion(entity)
+        definition = completion["definition"]
+        values = completion["submission"]
+        submission = {}
+        for schema_field in definition.schema:
+            if schema_field["id"] not in values:
+                continue
+            field = SchemaFields.create_field(schema_field, entity)
+            if field is not None:
+                field.db_value = values[schema_field["id"]]
+                if field.form_value is not None:
+                    submission[field.id] = field.form_value
+    else:
+        definition = entity.submission_definition
+        values = entity.properties.submission.value
+        submission = entity.properties.submission.form_value
     schema = definition.schema
-    submission = entity.properties.submission.form_value
-    html = rendered_html_fields(entity)
-
-    return jsonify(
-        {"schema": schema, "submission": submission, "html_fields": html,
-         "schema_error": definition.error,
-         "raw_submission": entity.properties.submission.value if definition.error else None,
-         "content_error": ("Original static content is unavailable." if
-             definition.immutable and not definition.content_available and
-             any(field.get("type") == "html" for field in schema) else None)}
-    ), 200
+    return jsonify({
+        "schema": schema,
+        "submission": submission,
+        "html_fields": rendered_html_fields(entity, original=original),
+        "schema_error": definition.error,
+        "raw_submission": values if definition.error else None,
+        "can_uncomplete": bool(original and entity.allowed(Action.EDIT, user=current_user)),
+        "content_error": ("Original static content is unavailable." if
+            definition.immutable and not definition.content_available and
+            any(field.get("type") == "html" for field in schema) else None),
+    }), 200
 
 
 def expanded_table_cell(field):

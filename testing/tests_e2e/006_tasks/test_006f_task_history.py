@@ -10,6 +10,7 @@ Verified against:
 
 from dataclasses import replace
 import re
+import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -19,6 +20,7 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.tasks.ordering import page_task_roots
+from lagniappe.core.tools.form_drafts import archive_form_generation
 from testing.definitions import ModelTasks, Pages, Tasks, Users
 from testing.resources import Task
 from testing.utility.network import expect_successful_response
@@ -67,8 +69,9 @@ def _open_history(task):
         task.user.page,
         method="GET",
         path=f"/tasks/{task.key}/history",
-    ):
+    ) as history_response:
         history_toggle.click()
+    assert history_response.value.headers["cache-control"] == "no-store"
 
     history = task.element.locator(Task.TASK_HISTORY)
     expect(history).to_be_visible()
@@ -86,11 +89,12 @@ def _open_history_visibility(history):
     return controller
 
 
-# @matrix tasks task-completion : history schema-version readonly
+# @matrix tasks task-completion : history generation readonly
+# @matrix task-completion : original-view archive uncomplete
 # @template tasks/history.html::completion_history
 # @template pages/tasks.html::task_form
-def test_completion_definitions_remain_original_after_builder_save(get_user):
-    """Both live and archived completions retain labels and HTML after Save."""
+def test_completion_views_follow_generation_and_archive_original_answers(get_user):
+    """Compatible edits stay current; explicitly requested originals follow their generation."""
     from testing.resources.form import Form
 
     user = get_user(Users.OWNER)
@@ -137,21 +141,57 @@ def test_completion_definitions_remain_original_after_builder_save(get_user):
         builder.save()
 
         user.go(live)
-        expect(live.task_form).to_contain_text("Original question")
-        expect(live.task_form).to_contain_text("Original instructions")
-        expect(live.task_form).not_to_contain_text("Updated question")
-
+        expect(live.task_form).to_contain_text("Updated question")
+        expect(live.task_form).to_contain_text("Updated instructions")
         user.go(archived)
-        expect(archived.task_form).to_contain_text("Updated question")
-        expect(archived.task_form).to_contain_text("Updated instructions")
         history = _open_history(archived)
         history.get_by_role("button", name=re.compile("View completion")).click()
         detail = history.locator("[data-role='completion-detail']")
-        expect(detail).to_be_visible()
-        expect(detail).to_contain_text("Original question")
+        expect(detail).to_contain_text("Updated question")
         expect(detail).to_contain_text("Original answer")
-        expect(detail).to_contain_text("Original instructions")
-        expect(detail.locator("input:not([type='hidden']), textarea, [contenteditable='true']")).to_have_count(0)
+        expect(detail).to_contain_text("Updated instructions")
+
+        # Fixture for a future converted generation. This does not exercise or
+        # claim an implemented conversion engine: it supplies an archived Form
+        # and distinct current values so the two read surfaces can be verified.
+        form = Entities.fetch_one(form.key, request=Fetch.root())
+        archive_form_generation(form).save()
+        form.schema = [
+            {"id": "note", "type": "input", "title": "Next generation question"},
+            {"id": "intro", "type": "html", "title": "Instructions"},
+        ]
+        form.set_html_field("intro", "<p>Next generation instructions</p>")
+        form.save()
+        form.generation = 1
+        Entities.save_root(form, property_mask=("generation",))
+        live.entity = Entities.fetch_one(live.key, request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS))
+        live.entity.db["submission"] = json.dumps({"note": "Current converted answer"})
+        live.entity.db["generation"] = 1
+        live.entity.save()
+
+        user.go(live)
+        expect(live.task_form).to_contain_text("Next generation question")
+        expect(live.task_form).to_contain_text("Current converted answer")
+        with expect_successful_response(user.page, method="GET", path=f"/tasks/{live.key}/completion-details") as original_response:
+            live.task_form.get_by_role("button", name="View original completion", exact=True).click()
+        assert original_response.value.headers["cache-control"] == "no-store"
+        original = live.task_form.locator("[data-role='original-completion-detail']")
+        expect(original).to_be_visible()
+        expect(original).to_contain_text("Updated question")
+        expect(original).to_contain_text("Original answer")
+        expect(original).to_contain_text("Updated instructions")
+        expect(original).not_to_contain_text("Current converted answer")
+        expect(original.locator("input:not([type='hidden']), textarea, [contenteditable='true']")).to_have_count(0)
+        with expect_successful_response(user.page, method="PUT", path=f"/tasks/{live.key}/update"):
+            original.get_by_role("button", name="Archive completion and uncomplete", exact=True).click()
+        expect(live.element).to_have_attribute("data-completed", "false")
+        expect(live.element.get_by_role("button", name="View original completion", exact=True)).to_have_count(0)
+        history = _open_history(live)
+        history.get_by_role("button", name=re.compile("View completion")).click()
+        detail = history.locator("[data-role='completion-detail']")
+        expect(detail).to_contain_text("Updated question")
+        expect(detail).to_contain_text("Original answer")
+        expect(detail).not_to_contain_text("Current converted answer")
     finally:
         for resource in resources:
             Entities.delete(resource.entity)

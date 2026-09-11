@@ -7,9 +7,12 @@ from google.cloud import datastore
 import pytest
 
 from lagniappe.core.definitions import (
+    MutationEffect,
     MutationEffectType,
     MutationIntent,
     MutationOperation,
+    MutationPhase,
+    MutationPlan,
 )
 from lagniappe.core.definitions.mutation_contracts import (
     ENTITY_MUTATION_CONTRACTS,
@@ -49,16 +52,15 @@ def _writes(plan):
 
 def _saved_permission_form(monkeypatch, *, name, identity):
     """Use a valid saved empty definition while isolating its storage lookup."""
-    from lagniappe.core.tools.form_drafts import definition_version
-
     row = datastore.Entity(key=datastore.Key("models", identity, project="test-project"))
     row.update(type="form", form_type="task", hash=identity, name=name,
-               schema="[]", schema_format=1, form_content_version=1)
+               schema="[]", schema_format=1)
     form = Entities.FORM(row)
-    form.version = definition_version(form)
-    form._form_source_state = deepcopy(dict(form.db))
-    snapshot = Entities.FORM_HISTORY.snapshot(form, form.version, content_available=True)
-    monkeypatch.setattr(Entities, "fetch_one", lambda key, *, request: snapshot if key == snapshot.key else None)
+    form.properties.version.update()
+    saved = deepcopy(form.db)
+    monkeypatch.setattr(Entities, "fetch_one", lambda key, *, request: (
+        Entities.FORM(deepcopy(saved)) if key == form.key else None
+    ))
     return form
 
 
@@ -678,6 +680,49 @@ def test_job_delete_removes_operation_projection_after_commit(monkeypatch):
     assert deleted == [job]
     assert projected == [job]
     assert outcome.complete is True
+
+
+# @source lagniappe/core/mutations/executor.py::execute_mutation
+# @pair mutations:durable-first
+def test_mixed_delete_keeps_form_archive_atomic_and_deletes_other_root_once(monkeypatch):
+    form_key = datastore.Key("models", "mixed-form", project="unit-project")
+    form_row = datastore.Entity(key=form_key)
+    form_row.update(type="form", form_type="task", name="Form", generation=0)
+    form = Entities.FORM(form_row)
+    other_row = datastore.Entity(key=datastore.Key("models", "mixed-category", project="unit-project"))
+    other_row.update(type="category", name="Other root")
+    other = Entities.CATEGORY(other_row)
+    archive_row = datastore.Entity(key=datastore.Key("history", "archive", parent=form_key))
+    archive_row.update(type="form_history", name="Archived Form", generation=0)
+    archive = Entities.FORM_HISTORY(archive_row)
+    guard = (form_key, mutation_executor.database_utility.ExactEntityState(dict(form_row)))
+    archive._form_save_guard = guard
+    plan = MutationPlan(MutationOperation.DELETE, [
+        MutationEffect(MutationEffectType.UPSERT, MutationPhase.DURABLE, entity=archive),
+        MutationEffect(MutationEffectType.DELETE, MutationPhase.DURABLE,
+                       entity=form, reasons=("delete-cascade",)),
+        MutationEffect(MutationEffectType.DELETE, MutationPhase.DURABLE,
+                       entity=other, reasons=("delete-cascade",)),
+    ])
+    calls = []
+
+    def save_mutations(writes, **options):
+        calls.append(("save", list(writes), options))
+
+    def delete_entities(entities):
+        calls.append(("delete", list(entities)))
+
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", save_mutations)
+    monkeypatch.setattr(mutation_executor.database_utility, "delete_entities", delete_entities)
+
+    outcome = execute_mutation(plan)
+
+    assert calls == [
+        ("save", [(archive, None)], {"guards": [guard], "deletes": [form]}),
+        ("delete", [other]),
+    ]
+    assert outcome.complete is True
+    assert outcome.completed_effects.count(MutationEffectType.DELETE) == 1
 
 
 # @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save

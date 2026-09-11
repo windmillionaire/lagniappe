@@ -3103,12 +3103,9 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     )
     assert "completed_at" not in result["history"][0]
     assert result["history"][0]["description"] == "Completed at the service shop."
-    assert "unavailable" in result["history"][0]["Form"]["unavailable"]
-    assert "schema" not in result["history"][0]["Form"]
-    assert "Service Notes" not in result["history"][0]
-    assert result["history"][0]["Saved answers (original labels unavailable)"] == {
-        "input-service-notes": "Synthetic oil",
-    }
+    assert result["history"][0]["Form"] == {"schema": form.schema, "generation": 0}
+    assert result["history"][0]["Service Notes"] == "Synthetic oil"
+    assert "Saved answers (original labels unavailable)" not in result["history"][0]
     assert "input-service-notes" not in result["history"][0]
     assert "submission" not in result["history"][0]
     assert result["history"][0]["Attachments"] == [

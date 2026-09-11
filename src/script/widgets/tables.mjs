@@ -2,6 +2,39 @@ import { BaseTable, EmbeddedTable } from "../elements/base/baseTable";
 import { request, captureError } from "../shared";
 
 /**
+ * @testable false
+ * @covered-by src/script/widgets/tables.mjs::TaskHistory._click
+ * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
+ * @reason both explicit completion views use the existing readonly form renderer
+ */
+export async function renderCompletionForm(response, key) {
+	const { BaseForm } = await import("../elements/base/baseForm");
+	const host = document.createElement("div");
+	host.dataset.kind = "task";
+	const form = new BaseForm({
+		target: host, key, readonly: true,
+		schema: response.schema || [], submission: response.submission || {},
+		htmlFields: response.html_fields || {}, showEmptyFields: false,
+	});
+	await form.init();
+	const error = response.schema_error || response.content_error;
+	if (error) {
+		const message = document.createElement("p");
+		message.setAttribute("role", "status");
+		message.textContent = error;
+		host.prepend(message);
+	}
+	if (response.raw_submission) {
+		const raw = document.createElement("pre");
+		raw.dataset.role = "original-raw-answers";
+		raw.className = "whitespace-pre-wrap break-words";
+		raw.textContent = JSON.stringify(response.raw_submission, null, 2);
+		host.append(raw);
+	}
+	return { form, host };
+}
+
+/**
  * @testable infrastructure
  */
 export class IndexTable extends BaseTable {
@@ -253,7 +286,7 @@ export class TaskHistory extends EmbeddedTable {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_definitions_remain_original_after_builder_save
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
 	 * @matrix tasks task-completion : history readonly schema-version
 	 */
 	_click(event) {
@@ -281,32 +314,10 @@ export class TaskHistory extends EmbeddedTable {
 		button.disabled = true;
 		try {
 			const response = await request.get(button.dataset.route);
-			const { BaseForm } = await import("../elements/base/baseForm");
-			const host = document.createElement("div");
-			host.dataset.kind = "task";
-			const form = new BaseForm({
-				target: host, key: button.dataset.key, readonly: true,
-				schema: response.schema || [], submission: response.submission || {},
-				htmlFields: response.html_fields || {}, showEmptyFields: false,
-			});
-			await form.init();
+			const { form, host } = await renderCompletionForm(response, button.dataset.key);
 			if (generation !== this._detailGeneration || !this.target.contains(button)) {
 				form.destroy();
 				return;
-			}
-			const error = response.schema_error || response.content_error;
-			if (error) {
-				const message = document.createElement("p");
-				message.setAttribute("role", "status");
-				message.textContent = error;
-				host.prepend(message);
-			}
-			if (response.raw_submission) {
-				const raw = document.createElement("pre");
-				raw.dataset.role = "original-raw-answers";
-				raw.className = "whitespace-pre-wrap break-words";
-				raw.textContent = JSON.stringify(response.raw_submission, null, 2);
-				host.append(raw);
 			}
 			target.replaceChildren(host);
 			target.hidden = false;

@@ -14,7 +14,7 @@ from lagniappe.core.tools.database import get as database_get
 
 from .....form_definitions import (
     require_mutable_submission,
-    stage_completion_definition,
+    capture_completed_submission,
     validate_completion_values,
 )
 from ....debug import ai_debug
@@ -68,6 +68,8 @@ def _task_checkpoint_state(task):
         "due_date": _checkpoint_datetime(task.due_date),
         "submission": copy.deepcopy(task.submission),
         "default_submission": copy.deepcopy(task.default_submission),
+        "generation": task.generation,
+        "completed_submission": task.db.get("completed_submission"),
         "schema_version": task.schema_version,
         "history": bool(task.db.get("history", False)),
         "page": _snapshot_entity(task.page),
@@ -649,7 +651,7 @@ def _apply_completed_task_event(
         task.submission = None
         task.linked_pages = []
     validate_completion_values(task)
-    stage_completion_definition(task)
+    capture_completed_submission(task)
     task.completed = True
     task.completed_on = completed_on
     task.completed_by = None
@@ -837,6 +839,7 @@ def _undo_reused_completed_task(action, user):
     task.linked_pages = _checkpoint_entities(state.get("linked_pages"))
     task.files = _checkpoint_entities(state.get("files"))
     task.db["history"] = bool(state.get("history", False))
+    task.db["generation"] = state.get("generation", 0) or 0
 
     restored_relations = [
         getattr(task, name, None)

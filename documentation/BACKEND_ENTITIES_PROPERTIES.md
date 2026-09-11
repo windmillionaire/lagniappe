@@ -133,20 +133,37 @@ an opaque saved baseline, and a request identity; a receipt recognizes a retry
 before its image uploads are consumed. Copy publishes an independent Form and
 never saves the source draft.
 
-New `fc1-` definition versions identify form type, schema and static-content
-fingerprints independently from the Form's display name.
-`tools/form_definitions.py` owns that content identity. Completion can reuse a
-clean persisted Form with the matching content version without a history read
-or asset copy; legacy or mismatched content goes through snapshot preparation.
-Each published version has a deterministic FormHistory record with independent
-HTML/image objects; historical readers must authorize the Task or TaskHistory
-that references it. FormHistory is not directly viewable through entity or
-asset endpoints. Older schema-only versions remain schema-only: current HTML
-must not be presented as their original content. Missing or inconsistent
-versions and unverifiable content fingerprints require repair.
+Forms have two independent change indicators in `properties/form.py`:
 
-`schema_format` records the storage format independently from the form's
-user-facing version. During a data update, readable rows remain projectable so
+- `version` is a content fingerprint for cache invalidation. Schema metadata,
+  field order, form type, and published HTML/image fingerprints affect it;
+  the display name and Storage paths do not.
+- `generation` is the integer representation generation for saved answers.
+  Missing values default to zero, including legacy Forms. Publication advances
+  it only when `requires_submission_conversion()` finds that existing answers
+  need conversion: removed answer fields/options/columns or changed value
+  representations. Labels, additions, ordering, static HTML, and computed status
+  do not advance it. Older `version` and `schema_version` values are not
+  interpreted as generations.
+
+Before replacing a generation, publication preserves its FormHistory schema
+and independent private HTML/image objects. Deleting a Form preserves its last
+generation at the deletion boundary. Compatible saves do not create history.
+Original-completion and TaskHistory readers use the current Form while its
+generation matches, and resolve FormHistory only for an older or missing Form.
+Presentation changes within one generation therefore remain visible in those
+readers. Historical asset requests authorize the referencing Task or TaskHistory;
+FormHistory is not directly viewable through generic entity or asset endpoints.
+An unavailable generation is reported explicitly without guessing from old
+content-version records or changing saved answers.
+
+The later transfer workflow will advance affected flat current submissions,
+including completed Tasks, to the new generation while preserving their original
+completion envelopes and TaskHistory records. Step 1 keeps incompatible saves
+blocked; it does not implement that transfer engine.
+
+`schema_format` records the storage format independently from the content
+fingerprint and submission generation. During a data update, readable rows remain projectable so
 the Administrator workflow can report malformed values instead of silently
 discarding them. See [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md).
 

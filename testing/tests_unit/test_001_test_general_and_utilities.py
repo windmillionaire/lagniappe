@@ -391,6 +391,7 @@ def test_entities_delete_accepts_batch_and_dedupes(monkeypatch):
         return SimpleNamespace(
             key=key,
             kind="file",
+            entity_kind="file",
             assets={},
             db=DB(),
             properties={"modified": Modified()},

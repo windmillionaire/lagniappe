@@ -8,7 +8,11 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 
 from .....database.assets import cleanup_rejected_attempt, record_attempt_asset
-from .....form_definitions import compatible_values, stage_completion_guards
+from .....form_definitions import (
+    compatible_values,
+    original_completion,
+    stage_completion_guards,
+)
 from .common import _data, _require_allowed
 from .completed_tasks import (
     _checkpoint_datetime,
@@ -143,7 +147,11 @@ def _undo_complete_task(record, report, user):
     source = task if task.completed else next(iter(histories), None)
     if source is None or (source is not task and source.properties.task.key != task.key):
         raise exceptions.ValidationError("The original completion is unavailable; undo needs review.")
-    definition = source.submission_definition
+    definition = (
+        original_completion(source)["definition"]
+        if source is task and task.completed
+        else source.submission_definition
+    )
     values = deepcopy(state.get("submission") or {})
     defaults = deepcopy(state.get("default_submission") or {})
     prior_form = (state.get("form") or {}).get("id")

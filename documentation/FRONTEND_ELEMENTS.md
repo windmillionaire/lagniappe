@@ -99,12 +99,16 @@ Empty submission-bearing fields on a reopened Task can restore their most
 recent history value. Static HTML, computed status, and signature assets do not
 offer that control.
 
-Completed Task forms use their recorded definition. The history view keeps its
-newest-first order and uses separate tables for consecutive definition versions,
-so column headings retain their original labels. **View completion** expands a
-read-only form with the original labels, answers and static HTML. Missing legacy
-definitions/content are shown as unavailable; they never fall back to the current
-Form. History-fill responses omit incompatible candidates and report the reason.
+Completed Task forms show their flat current answers with the current Form.
+**View original completion** explicitly opens the saved completion answers;
+**Archive completion and uncomplete** archives those originals before reopening.
+The history view keeps its newest-first order and uses separate tables for
+consecutive Form generations. **View completion** expands a read-only history
+record. Original/history views use the current Form while its generation matches,
+so same-generation label and HTML edits remain visible; older generations use
+their archived definitions and content. Missing definitions are shown as
+unavailable with raw original answers retained for review. History-fill responses
+omit incompatible candidates and report the reason.
 
 ## Primitives
 

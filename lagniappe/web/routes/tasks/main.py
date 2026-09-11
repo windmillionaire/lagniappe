@@ -16,6 +16,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.tools import ai
+from lagniappe.core.tools.form_definitions import history_groups, history_values_for
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools import collaboration
 from lagniappe.core.tools.auth.references import (
@@ -654,6 +655,15 @@ def update(key, **kwargs):
     role = request.form.get("role")
     explain = request.form.get("explain")
 
+    if role == "archive-completion":
+        try:
+            if task.completed:
+                task.uncomplete()
+                task.save()
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
+        return responses.page_task(task)
+
     if (
         _should_submit_task_form(active, role, task)
         or role == "autofill-submit"
@@ -829,11 +839,9 @@ def personal_direct(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_history_routes_are_forbidden_without_permission
 # @matrix tasks : completion-cycle history reload
 @tasks.route("<key>/history", methods=["GET"])
-@permission(Resource.TASK, Action.VIEW)
+@permission(Resource.TASK, Action.VIEW, no_store=True)
 def history(key, **kwargs):
     task = kwargs["entity"]
-    from lagniappe.core.tools.form_definitions import history_groups
-
     groups = history_groups(task.history)
     for group in groups:
         group["index"] = index.TaskHistoryIndex(entity=group["records"][0])
@@ -842,17 +850,17 @@ def history(key, **kwargs):
 
 
 # @testable true
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_definitions_remain_original_after_builder_save
-# @matrix tasks task-completion : history schema-version readonly
+# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
+# @matrix tasks task-completion : history generation readonly
 @tasks.route("<key>/completion-details", methods=["GET"])
-@permission(requested=Action.VIEW)
+@permission(requested=Action.VIEW, no_store=True)
 def completion_details(key, **kwargs):
     entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
     if not isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)) or (
         isinstance(entity, Entities.TASK) and not entity.completed
     ):
         abort(404)
-    return responses.form_submission(entity)
+    return responses.form_submission(entity, original=isinstance(entity, Entities.TASK))
 
 
 # @testable false
@@ -879,8 +887,6 @@ def latest_history_submission(key, **kwargs):
     task = kwargs["entity"]
     histories = task.load_history(database_get.latest_task_history(task))
     history = histories[0] if histories else None
-    from lagniappe.core.tools.form_definitions import history_values_for
-
     try:
         values = history_values_for(task, history) if history else {}
     except exceptions.ValidationError as error:

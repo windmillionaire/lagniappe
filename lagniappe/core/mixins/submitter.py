@@ -8,8 +8,8 @@ from ..definitions.fingerprints import restricted_fingerprint
 from ..exceptions import ValidationError
 from ..entities import Entities
 from ..tools.form_definitions import (
-    completed_envelope, definition_for, history_values_for,
-    immutable_submission, require_mutable_submission,
+    definition_for, history_values_for,
+    require_mutable_submission,
 )
 from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.references import (
@@ -316,10 +316,19 @@ class SubmitterMixin:
 
         self.save_submission()
 
+    # @testable false
+    # @covered-by lagniappe/core/tools/form_definitions.py::original_completion
+    # @reason cache revision metadata remains independent from original-completion generation
     @property
     def schema_version(self):
-        envelope = completed_envelope(self)
-        return envelope.get("schema_version") if envelope is not None else self.db.get("schema_version")
+        return self.db.get("schema_version")
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/form_definitions.py::definition_for
+    # @reason missing generation is the shared legacy baseline for flat submissions
+    @property
+    def generation(self):
+        return self.db.get("generation", 0) or 0
 
     # @testable false
     # @covered-by lagniappe/core/tools/form_definitions.py::definition_for
@@ -407,6 +416,7 @@ class SubmitterMixin:
         self._set_default_submission(defaults)
         if self.form and self.entity_kind != "task_history":
             self.db["schema_version"] = self.form.version
+            self.db["generation"] = self.form.generation
         if "name" in submission_value:
             self.name = submission_value["name"]
         if "description" in submission_value:
@@ -434,7 +444,11 @@ class SubmitterMixin:
     @property
     def fingerprint(self):
         form = self.form
-        version = self.schema_version if immutable_submission(self) else (form.version if form else "")
+        version = (
+            str(self.generation)
+            if self.entity_kind == "task_history"
+            else (form.version if form else "")
+        )
         return restricted_fingerprint(
             super().fingerprint,
             self.restricted_to,

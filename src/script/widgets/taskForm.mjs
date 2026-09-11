@@ -25,6 +25,9 @@ export class TaskForm extends FormElement {
 		this._historyFillError = null;
 		this._historyFillGeneration = 0;
 		this._defaultFieldSave = Promise.resolve();
+		this._originalCompletionForm = null;
+		this._originalCompletionGeneration = 0;
+		this._showOriginalCompletion = this._showOriginalCompletion.bind(this);
 	}
 
 	get autofillElement() {
@@ -71,7 +74,82 @@ export class TaskForm extends FormElement {
 			raw.className = "whitespace-pre-wrap break-words";
 			raw.textContent = JSON.stringify(JSON.parse(this.target.dataset.rawSubmission), null, 2);
 		}
-		return [this.autofillElement, notice, raw];
+		const original = this.target.querySelector("[data-role='original-completion-controls']");
+		original?.querySelector("[data-role='view-original-completion']")
+			?.addEventListener("click", this._showOriginalCompletion);
+		return [this.autofillElement, notice, raw, original];
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
+	 * @matrix task-completion : original-view readonly archive uncomplete
+	 */
+	async _showOriginalCompletion(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const button = event.currentTarget;
+		const target = button.parentElement.querySelector("[data-role='original-completion-detail']");
+		if (button.disabled) return;
+		if (this._originalCompletionForm) {
+			target.hidden = !target.hidden;
+			button.setAttribute("aria-expanded", String(!target.hidden));
+			return;
+		}
+		const generation = this._originalCompletionGeneration;
+		button.disabled = true;
+		try {
+			const response = await request.get(button.dataset.route);
+			const { renderCompletionForm } = await import("./tables");
+			const { form, host } = await renderCompletionForm(response, this.key);
+			if (generation !== this._originalCompletionGeneration || !this.target.contains(button)) {
+				form.destroy();
+				return;
+			}
+			if (response.can_uncomplete) {
+				const archive = document.createElement("button");
+				archive.type = "button";
+				archive.dataset.role = "archive-completion";
+				archive.className = button.className;
+				archive.textContent = "Archive completion and uncomplete";
+				archive.addEventListener("click", (click) => {
+					click.preventDefault();
+					click.stopPropagation();
+					const data = new FormData();
+					data.append("role", "archive-completion");
+					this.component.disable();
+					void this.view.update(this.component, data, this.component.elt.dataset.route);
+				});
+				host.append(archive);
+			}
+			target.replaceChildren(host);
+			target.hidden = false;
+			button.setAttribute("aria-expanded", "true");
+			this._originalCompletionForm = form;
+		} catch (error) {
+			if (generation !== this._originalCompletionGeneration) return;
+			target.textContent = "Could not load the original completion. Please try again.";
+			target.hidden = false;
+			captureError(error, this.target, { route: button.dataset.route });
+		} finally {
+			button.disabled = false;
+		}
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
+	 * @reason the requested readonly form shares the Task form lifetime
+	 */
+	_clearOriginalCompletion() {
+		this._originalCompletionGeneration += 1;
+		this._originalCompletionForm?.destroy();
+		this._originalCompletionForm = null;
+	}
+
+	destroy() {
+		this._clearOriginalCompletion();
+		super.destroy();
 	}
 
 	offline({ data, method, route }) {
@@ -117,6 +195,7 @@ export class TaskForm extends FormElement {
 	 * @reason detached task-form resets preserve history-fill initialization
 	 */
 	async prepareReset(options = {}) {
+		this._clearOriginalCompletion();
 		this._resetHistoryFillCache();
 		const afterInit = options.afterInit;
 		await super.prepareReset({

@@ -4,7 +4,6 @@ from copy import deepcopy
 import hashlib
 import json
 import re
-from types import SimpleNamespace
 from uuid import uuid4
 
 from google.cloud import datastore
@@ -22,7 +21,7 @@ from lagniappe.core.tools.database.core import KINDS
 from lagniappe.core.tools.database.filter import Filter, Query
 from lagniappe.core.tools.database.utility import ExactEntityState
 from lagniappe.core.tools.files.html import sanitize_form_content_html
-from lagniappe.core.tools.form_definitions import definition_version, _snapshot_key
+from lagniappe.core.properties.form import requires_submission_conversion
 
 CONTENT_VERSION = 1
 IMAGE_ID = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
@@ -88,18 +87,6 @@ def validate_draft_schema(schema, form_type):
     return canonical
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::validate_compatible_schema
-# @reason field representation comparison is owned by the compatibility guard
-def _representation(field):
-    return (
-        field["type"],
-        field.get("input", "text") if field["type"] == "input" else None,
-        bool(field.get("multiple")) if field["type"] == "select" else None,
-        field.get("location", "out") if field["type"] == "link" else None,
-    )
-
-
 # @testable true
 # @tests tests_unit/test_004f_form_drafts.py::test_compatible_schema_preserves_representation_and_identity
 # @matrix form-schema : identity migration-required save-guard
@@ -108,23 +95,12 @@ def validate_compatible_schema(previous, proposed, form_type=None):
     kind = form_type or "task"
     old = canonicalize_schema(previous or [], form_type=kind)
     new = validate_draft_schema(proposed, kind)
-    destinations = {field["id"]: field for field in new}
-    for source in old:
-        target = destinations.get(source["id"])
-        if target is None or _representation(source) != _representation(target):
-            raise exceptions.ValidationError(
-                "Removing or replacing a saved field requires a form migration, which is not available yet."
-            )
-        if source["type"] in {"radio", "select"}:
-            values = {option["value"] for option in target["options"]}
-            if any(option["value"] not in values for option in source["options"]):
-                raise exceptions.ValidationError("Removing or replacing saved options requires a form migration.")
-        if source["type"] == "table":
-            columns = {column["id"]: column for column in target["columns"]}
-            for column in source["columns"]:
-                destination = columns.get(column["id"])
-                if destination is None or _representation(column) != _representation(destination):
-                    raise exceptions.ValidationError("Removing or replacing saved columns requires a form migration.")
+    removed_fields = {field["id"] for field in old} - {field["id"] for field in new}
+    if removed_fields or requires_submission_conversion(old, new):
+        raise exceptions.ValidationError(
+            "Removing or changing a saved field, option or column requires a form migration, "
+            "which is not available yet."
+        )
     return new
 
 
@@ -155,99 +131,126 @@ def builder_draft(form):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::resolve_form_version
-# @covered-by lagniappe/core/tools/form_drafts.py::ensure_form_snapshot
-# @reason persisted snapshot identity validation belongs to exact-version resolution
-def _checked_snapshot(snapshot, form_key, version):
-    if snapshot is None:
+# @covered-by lagniappe/core/tools/form_drafts.py::resolve_form_generation
+# @reason historical definitions are queried only for an explicitly requested generation
+def _stored_generation(form_key, generation):
+    rows = Query(KINDS.history).ancestor(form_key).filter(
+        Filter().eq("type", "form_history").eq("generation", generation)
+    ).fetch_all()
+    if not rows:
         return None
-    if (getattr(snapshot, "entity_kind", None) != "form_history"
-            or snapshot.source_form_key != form_key or snapshot.version != version
-            or (str(version).startswith("fc1-") and (
-                not snapshot.content_available or definition_version(snapshot) != version
-            ))):
-        raise exceptions.ValidationError("The saved Form definition is inconsistent and requires repair.")
-    return snapshot
+    return Entities.fetch_one(rows[0], request=Fetch.root())
 
 
 # @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_resolver_prefers_snapshot_and_does_not_invent_legacy_content
-# @matrix form-schema html-field : history legacy missing-version
-def resolve_form_version(form_or_key, version):
-    """Resolve an exact immutable definition; never substitute newer content."""
+# @tests tests_unit/test_004f_form_drafts.py::test_generation_resolution_ignores_legacy_versions
+# @tests tests_unit/test_004f_form_drafts.py::test_generation_resolution_loads_only_the_requested_archive
+# @matrix form-schema : history generation
+def resolve_form_generation(form_or_key, generation):
+    """Use the current Form when possible; otherwise load its archived generation."""
     form = form_or_key if hasattr(form_or_key, "schema") else None
     key = form.key if form is not None else form_or_key
-    if not key or not version:
+    if not key:
         return None
-    stored = _checked_snapshot(Entities.fetch_one(_snapshot_key(key, version), request=Fetch.root()), key, version)
-    if stored is not None:
-        return stored
-    rows = Query(KINDS.history).ancestor(key).filter(
-        Filter().eq("type", "form_history").eq("schema_version", version)
-    ).fetch_all()
-    if rows:
-        histories = [_checked_snapshot(Entities.fetch_one(row, request=Fetch.root()), key, version) for row in rows]
-        if any(item is None for item in histories) or len({_digest({"schema": item.schema, "type": item.form_type}) for item in histories}) != 1:
-            raise exceptions.ValidationError("The saved Form version has conflicting definitions and requires repair.")
-        return histories[0]
     if form is None:
         form = Entities.fetch_one(key, request=Fetch.root())
-    if form is not None and form.version == version:
-        # Old versions did not identify HTML. Their current bytes are not proof
-        # of what a historical completion saw.
-        return Entities.FORM_HISTORY.snapshot(
-            form, version, content_available=False, copy_content=False,
+    if form is not None and form.generation == generation:
+        return form
+    return _stored_generation(key, generation)
+
+
+# @testable true
+# @tests tests_unit/test_004f_form_drafts.py::test_generation_resolution_batches_current_forms
+# @matrix form-schema : history generation batch-read
+def resolve_form_generations(pairs):
+    """Load each current Form once, then resolve the distinct older generations."""
+    requested = set(pairs)
+    keys = {key for key, _generation in requested if key}
+    current = {
+        form.key: form
+        for form in Entities.fetch(*keys, request=Fetch.root())
+    }
+    return {
+        (key, generation): (
+            current[key] if key in current and current[key].generation == generation
+            else _stored_generation(key, generation)
         )
-    return None
+        for key, generation in requested if key
+    }
 
 
 # @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_definition_versions_batch_shared_history_reads
-# @matrix form-schema : history batch-read
-def resolve_form_versions(pairs):
-    """Batch immutable snapshot reads for a collection of completed records."""
-    requested = {}
-    for form, version in pairs:
-        key = form.key if hasattr(form, "schema") else form
-        if key and version:
-            requested[(key, version)] = form
-    snapshot_keys = {_snapshot_key(key, version): (key, version) for key, version in requested}
-    snapshots = Entities.fetch(*snapshot_keys, request=Fetch.root()) if snapshot_keys else []
-    resolved = {snapshot_keys[item.key]: _checked_snapshot(item, *snapshot_keys[item.key])
-                for item in snapshots if item.key in snapshot_keys}
-    for pair, form in requested.items():
-        if pair not in resolved:
-            resolved[pair] = resolve_form_version(form, pair[1])
-    return resolved
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::prepare_form_publication
-# @reason raw saved baseline reconstruction is owned by guarded publication
-def _source_form(form):
-    source = form.saved_form_state()
-    if not source:
-        return None
-    row = datastore.Entity(key=form.key)
-    row.update(source)
-    return Entities.FORM(row)
+# @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
+# @matrix form-schema html-field : history generation immutable-assets
+def archive_form_generation(source, *, attempt_owner=None):
+    """Preserve a superseded Form and its private content before replacing it."""
+    history = Entities.FORM_HISTORY.create(source, source.generation)
+    owner = attempt_owner if attempt_owner is not None else history
+    html_ids = _html_ids(source)
+    source_urls = {}
+    try:
+        for name, definition in source.assets.items():
+            is_image = any(name.startswith(f"image_{field_id}_") for field_id in html_ids)
+            if name not in html_ids and not is_image:
+                continue
+            asset = source.get_asset(name)
+            destination = f"{history.hash}_{name}_{uuid4().hex}.{asset.extension}"
+            blob = storage_assets.copy_file(
+                asset.path, asset.visibility.value, destination, "private",
+                **({"source_generation": asset.generation} if asset.generation else {}),
+            )
+            if not blob:
+                raise exceptions.ValidationError("Could not preserve the Form's previous content.")
+            copied = dict(definition)
+            copied["path"] = destination
+            copied.pop("visibility", None)
+            if getattr(blob, "generation", None) is not None:
+                copied["generation"] = str(blob.generation)
+            history.assets[name] = copied
+            record_attempt_asset(owner, copied)
+            if definition.get("type") == "image":
+                source_urls[name] = asset.url
+    except Exception:
+        cleanup_rejected_attempt(owner)
+        raise
+    history.db["assets"] = json.dumps(history.assets)
+    history.db["source_asset_urls"] = source_urls
+    history.db["form_content_version"] = CONTENT_VERSION
+    return history
 
 
 # @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_publication_stages_immutable_history_and_guards_original_row
-# @matrix forms html-field mutations : content-version history guarded-save
+# @tests tests_unit/test_004f_form_drafts.py::test_publication_reads_saved_form_only_at_save
+# @tests tests_unit/test_004f_form_drafts.py::test_compatible_saves_update_version_without_archiving_generation
+# @matrix forms mutations : guarded-save generation publication
+# @matrix html-field : isolated-assets cleanup
+# @pair mutations:rejected-save
 def prepare_form_publication(form, builder):
-    """Prepare every Form writer through the same compatibility/history contract."""
-    source = _source_form(form)
+    """Compare with the saved Form and publish staged content at the save boundary."""
+    source = builder.entities.fetch_one(form.key, request=Fetch.root())
+    prior_guard = getattr(form, "_form_save_guard", None)
+    if prior_guard is not None:
+        expected = prior_guard[1]
+        actual = dict(source.db) if source is not None else None
+        if actual != expected:
+            raise exceptions.MutationConflict("This Form changed while preparing the Save; retry.")
     if source is not None:
+        if source.modified != form.modified:
+            raise exceptions.MutationConflict("This Form changed before saving; reload and retry.")
         if source.form_type != form.form_type:
             raise exceptions.ValidationError("A saved Form's type cannot be changed.")
         validate_compatible_schema(source.schema, form.schema, form.form_type)
         form._form_save_guard = (form.key, ExactEntityState(dict(source.db)))
     else:
+        if form.created:
+            raise exceptions.MutationConflict("This Form was deleted before saving.")
         validate_draft_schema(form.schema, form.form_type)
+        form._form_save_guard = (form.key, None)
 
-    pending = dict(getattr(form, "_pending_html", {}) or {})
+    previous_generation = source.generation if source else 0
+    changed_generation = bool(source) and requires_submission_conversion(source.schema, form.schema)
+    form.generation = previous_generation + 1 if changed_generation else previous_generation
+    pending = getattr(form, "_pending_html", {})
     for field_id, content in pending.items():
         if field_id not in _html_ids(form):
             raise exceptions.ValidationError("Static content must belong to a draft HTML field.")
@@ -258,72 +261,23 @@ def prepare_form_publication(form, builder):
             if asset and asset.path != previous_path:
                 record_attempt_asset(form, asset.definition)
         else:
-            # Clearing a draft removes its live reference only. Never invoke
-            # HTMLAsset.delete(), which also deletes embedded images.
             form.assets.pop(field_id, None)
             form.db["assets"] = json.dumps(form.assets)
 
-    version = definition_version(form)
-    old_version = source.version if source is not None else form.version
-    prepared_versions = set()
-    if source is not None and old_version:
-        snapshot = _checked_snapshot(Entities.fetch_one(_snapshot_key(form.key, old_version), request=Fetch.root()), form.key, old_version)
-        if snapshot is None:
-            snapshot = Entities.FORM_HISTORY.snapshot(
-                source, old_version,
-                content_available=source.db.get("form_content_version") == CONTENT_VERSION,
-                on_asset=lambda definition: record_attempt_asset(form, definition),
-            )
-            builder.plan_standard(snapshot, reason="form-definition-history")
-            prepared_versions.add(old_version)
-    if source is None or version != old_version or pending:
-        snapshot = _checked_snapshot(Entities.fetch_one(_snapshot_key(form.key, version), request=Fetch.root()), form.key, version)
-        if snapshot is None and version not in prepared_versions:
-            snapshot = Entities.FORM_HISTORY.snapshot(form, version, content_available=True,
-                on_asset=lambda definition: record_attempt_asset(form, definition))
-            builder.plan_standard(snapshot, reason="form-definition-snapshot")
-    form.version = version
-    form.db["form_content_version"] = CONTENT_VERSION
-    if old_version != version:
+    # Ordinary Step 1 saves are compatible. The existing migration guard stays
+    # in place until the later transfer workflow can convert affected values.
+    if changed_generation:
+        history = archive_form_generation(source, attempt_owner=form)
+        builder.plan_standard(history, reason="form-generation-history")
+    if source is not None:
+        for name, definition in source.assets.items():
+            if definition.get("path") != (form.assets.get(name) or {}).get("path"):
+                asset = source.get_asset(name)
+                builder.delete_blob(asset.path, asset.visibility.value, reason="replaced-form-content")
+    previous_version = form.version
+    form.properties.version.update()
+    if form.version != previous_version:
         form._permission_sources_changed = True
-
-
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_completion_snapshot_is_exact_and_does_not_relabel_legacy_version
-# @matrix task-completion form-schema : immutable-snapshot content-version
-def ensure_form_snapshot(form):
-    """Capture the definition seen by a new completion without changing its Form."""
-    # The mutation registry itself imports Form publication preparation.
-    from lagniappe.core.mutations import execute_mutation, plan_root
-
-    source = _source_form(form)
-    if source is None or getattr(form, "_pending_html", None) or source.schema != form.schema or source.assets != form.assets:
-        raise exceptions.ValidationError("Save the Form draft before completing a task with it.")
-    version = definition_version(form)
-    existing = _checked_snapshot(Entities.fetch_one(_snapshot_key(form.key, version), request=Fetch.root()), form.key, version)
-    if existing is not None:
-        return existing
-    expected = ExactEntityState(deepcopy(dict(form.db)))
-    attempt = SimpleNamespace()
-    commit_started = False
-    try:
-        snapshot = Entities.FORM_HISTORY.snapshot(form, version, content_available=True,
-            on_asset=lambda definition: record_attempt_asset(attempt, definition))
-        plan = plan_root(snapshot)
-        commit_started = True
-        execute_mutation(plan, guards=[(form.key, expected)])
-    except exceptions.MutationConflict:
-        cleanup_rejected_attempt(attempt)
-        # Another completion can capture the same immutable definition first.
-        existing = _checked_snapshot(Entities.fetch_one(_snapshot_key(form.key, version), request=Fetch.root()), form.key, version)
-        if existing is not None:
-            return existing
-        raise
-    except Exception:
-        if not commit_started:
-            cleanup_rejected_attempt(attempt)
-        raise
-    return snapshot
 
 
 # @testable false
@@ -459,6 +413,7 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
     images = images or {}
     _validate_content(schema, html, images)
 
+    current._form_save_guard = (current.key, ExactEntityState(dict(current.db)))
     current.name = name.strip()
     current.set_schema(schema)
     commit_started = False
@@ -475,9 +430,8 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
     except exceptions.MutationConflict:
         cleanup_rejected_attempt(current)
         if _retry:
-            # Re-read permissions and unrelated metadata, or reuse an immutable
-            # snapshot won by a concurrent completion. The baseline check in
-            # the retried request still prevents overwriting newer draft work.
+            # Re-read permissions and metadata; the browser baseline still
+            # prevents overwriting another editor's accepted draft.
             return save_form_draft(form, draft, baseline, save_id, actor, images=images, _retry=False)
         raise FormDraftConflict("The Form changed while saving. Your draft is preserved; reload to reconcile it.")
     except Exception:
@@ -526,7 +480,6 @@ def copy_form_draft(source, draft, baseline, save_id, actor, *, images=None):
     row.update({"type": "form", "form_type": source.form_type,
                 "hash": short_hash(key.to_legacy_urlsafe().decode()), "name": "Copy of " + name.strip()})
     copied = Entities.FORM(row)
-    copied._form_source_state = None
     copied._form_save_guard = (key, None)
     copied._form_additional_guards = [(source.key, ExactEntityState(deepcopy(dict(source.db))))]
     copied.set_schema(schema)

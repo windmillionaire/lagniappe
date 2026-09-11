@@ -63,7 +63,7 @@ for (const [path, base, exported] of [
   ["src/script/widgets/pageTaskList.mjs", "class BaseList {}", "PageTaskList"],
 ]) {
   let source = fs.readFileSync(path, "utf8").replace(/^import [\s\S]*?(?=\/\*\*)/, base + "\n");
-  source = source.replaceAll("export class ", "class ");
+  source = source.replaceAll("export class ", "class ").replaceAll("export async function ", "async function ");
   source += `\nglobalThis.${exported} = ${exported};`;
   vm.runInContext(source, context);
   const widget = Object.create(context[exported].prototype);
@@ -97,7 +97,7 @@ source = source.replace(
   "class BaseTable {} class EmbeddedTable {}",
 );
 source = source.replace(/^import .*;\n/gm, "");
-source = source.replaceAll("export class ", "class ");
+source = source.replaceAll("export class ", "class ").replaceAll("export async function ", "async function ");
 source += "\nglobalThis.IndexTable = IndexTable;";
 vm.runInContext(source, context);
 
