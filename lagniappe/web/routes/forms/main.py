@@ -289,7 +289,6 @@ def restrictions(key, **kwargs):
                   for key in keys]
         form.groups = groups
         form.properties.restricted_to.materialize(admin_only=admin_only)
-        form._reconcile_restrictions = True
         form.save()
     except (exceptions.ValidationError, ValueError) as error:
         return responses.error(str(error))

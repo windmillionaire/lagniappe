@@ -1,9 +1,13 @@
 from types import SimpleNamespace
 
+from google.cloud.datastore import Key
 import pytest
 
+from lagniappe.core.entities import Entities
 from lagniappe.core.tools.http import OutboundResult, OutboundStatus
 from lagniappe.core.tools.links import preview as link_preview
+from lagniappe.core.tools.database import get as database_get
+from testing.utility.test_entities import TestUser as UtilityTestUser
 
 
 class PreviewEntity(SimpleNamespace):
@@ -49,6 +53,42 @@ def test_internal_preview_returns_allowed_entity_metadata(monkeypatch):
         "kind": "project",
         "internal": True,
     }
+
+
+# @pair link-preview:nested-relations
+@pytest.mark.parametrize("kind", ["task", "file"])
+def test_task_preview_loads_page_form_before_permission_check(monkeypatch, kind):
+    def stored(entity_type, name):
+        entity = entity_type(Key(entity_type.entity_kind, name, project="preview-unit-test"))
+        entity._db = {"name": name, "hash": name, "kind": entity.entity_kind,
+                     "type": entity.entity_kind, "requires": ["pages"]}
+        return entity
+
+    form = stored(Entities.FORM, "Members form")
+    form.db["restricted_to"] = ["members"]
+    page = stored(Entities.PAGE, "Preview page")
+    page.form = form
+    task = stored(Entities.TASK, "Preview Target")
+    task.page = page
+    entity = task
+    if kind == "file":
+        entity = stored(Entities.FILE, "Preview Target")
+        entity.task = task
+    viewer = UtilityTestUser(owner=False, permissions={"pages": "EDIT"})
+    viewer.db["belongs_to"] = ["members"]
+    page.properties.form.unset()
+    page.properties.form._attached = {}
+    original_fetch = link_preview.Entities.fetch_one
+    def fetch(key, *, request):
+        return original_fetch(entity, request=request)
+    monkeypatch.setattr(link_preview.Entities, "fetch_one", fetch)
+    monkeypatch.setattr(database_get, "entities", lambda keys: [form for key in keys if key == form.key])
+    preview = link_preview.preview_for_url(f"/{kind}s/item", user=viewer, base_url="https://app.test/")
+    assert preview["title"] == "Preview Target"
+    assert page.form is form
+    viewer.db["belongs_to"] = []
+    denied = link_preview.preview_for_url(f"/{kind}s/item", user=viewer, base_url="https://app.test/")
+    assert denied["title"] == "Access Restricted"
 
 
 # @matrix editor link-preview : internal metadata permissions

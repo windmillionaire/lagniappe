@@ -427,12 +427,19 @@
             <div data-role="report-result" class="flex flex-col gap-2">
               <h2 class="text-base font-semibold text-base-dark">Result</h2>
               {% if report.result.status == "complete" %}
-                <p class="text-base-dark">Work done.</p>
+                {% if report.properties.result.submission_issues %}
+                  <p class="text-delete-default">Some submission updates were not applied.</p>
+                {% else %}
+                  <p class="text-base-dark">Work done.</p>
+                {% endif %}
               {% elif report.result.status == "undone" %}
                 <p class="text-base-dark">Work undone.</p>
               {% elif report.result.status == "failed" %}
                 <p class="text-delete-default">This report stopped before all actions were completed.</p>
               {% endif %}
+              {% for issue in report.properties.result.submission_issues %}
+                <p class="text-sm text-delete-default">{{ issue.action_label }}{% if issue.schema_id %} ({{ issue.schema_id }}){% endif %}: {{ issue.reason }}</p>
+              {% endfor %}
               {% if report.result.actions %}
                 <ul class="flex flex-col gap-1 text-sm">
                   {% for action in report.properties.result.grouped_actions %}

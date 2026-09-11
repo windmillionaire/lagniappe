@@ -49,6 +49,12 @@ not a rewritten copy of the document. The server prefixes source/time attributio
 Replacement/deletion of existing document text is not supported.
 
 Return a complete proposal, not a conversational answer or an intermediate plan.
+Check every requested outcome against the actions, target by target. Updating
+two tasks requires patches for both; completing them requires complete_task
+actions depending on those updates; adding a link requires append_page_document.
+Submission completion cannot add missing targets or actions later. Write the
+summary from the final actions. Explain unplanned work in issues and needs_review
+instead of promising it in the summary or silently omitting it.
 Every mutation still requires the user's browser approval and live permissions.
 If files are uploaded, use the file Organize profile instead: inspect, summarize
 and place every supplied file; update requests do not waive those obligations.

@@ -39,6 +39,9 @@ class _HashPipeline:
     def exists(self, key):
         self.commands.append(lambda: key in self.values)
 
+    def hget(self, key, field):
+        self.commands.append(lambda: self.values.get(key, {}).get(field))
+
     def hset(self, key, field, value):
         self.commands.append(lambda: self.values.setdefault(key, {}).__setitem__(field, value))
 
@@ -132,31 +135,139 @@ def test_cached_restrictions_resolve_file_task_page_and_form(kind, form_type, so
     assert current["restricted_to"] == {"page": ["admin"], "page_form": ["old"], "task_form": ["task"]}
 
 
-# @matrix permissions cache : change-detection retry form-version
-def test_reconciliation_change_detection_and_forced_retry(monkeypatch):
-    form = TestEntities.get("FORM", {"hash": "changed-form", "restricted_to": ["new"], "version": "v2"})
-    form.version = "v2"
-    form._testing = False
-    pipe = Mock()
-    pipe.__enter__ = Mock(return_value=pipe)
-    pipe.__exit__ = Mock(return_value=False)
-    pipe.execute.return_value = [json.dumps({"restricted_to": {"page_form": ["new"]}, "form_version": "v1"}), None]
-    monkeypatch.setattr(reconcile.cache, "pipeline", lambda: pipe)
+# @matrix permissions cache : change-detection retry
+@pytest.mark.parametrize("cached", [True, False])
+@pytest.mark.parametrize("restricted", [True, False])
+def test_reconciliation_change_detection_and_forced_retry(monkeypatch, cached, restricted):
+    from copy import deepcopy
+    from google.cloud import datastore
+    from lagniappe.core.definitions import MutationEffectType
+    from lagniappe.core.mutations.executor import consume_mutation_intents
+    from lagniappe.core.tools.form_drafts import prepare_form_publication
+
+    row = datastore.Entity(key=datastore.Key("models", "changed-form", project="unit-project"))
+    row.update(type="form", form_type="task", name="Restricted Form", hash="changed-form",
+               restricted_to=["old-group"], schema="[]", version="v2")
+    source = Entities.FORM(row)
+    form = Entities.FORM(deepcopy(row))
+    form.properties.restricted_to.materialize(admin_only=restricted)
+    prepare_form_publication(form, SimpleNamespace(entities=SimpleNamespace(
+        fetch_one=lambda key, *, request: source,
+    )))
+    consume_mutation_intents(SimpleNamespace(
+        consumed_intents=[], effects=[SimpleNamespace(
+            effect=MutationEffectType.UPSERT, property_mask=None, entity=form,
+        )],
+    ))
+    values = {Keys.ENTITY_HASHES.value: {}}
+    if cached:
+        values[Keys.ENTITY_HASHES.value][form.hash] = json.dumps({
+            "restricted_to": source.restricted_to, "form_version": source.version,
+        })
+    monkeypatch.setattr(reconcile.cache, "pipeline", lambda: _HashPipeline(values))
+    changes = reconcile.prepare_changes([form])
+    assert values[Keys.RESTRICTION_PENDING.value][form.urlsafe_key] == "1"
+    # Cache publication precedes enqueue. A failure must survive even when the
+    # next save already sees the current restriction projection.
+    values[Keys.ENTITY_HASHES.value][form.hash] = json.dumps({
+        "restricted_to": form.restricted_to, "form_version": "v2",
+    })
+    monkeypatch.setattr(reconcile, "enqueue", Mock(side_effect=RuntimeError("queue offline")))
+    with pytest.raises(RuntimeError, match="queue offline"):
+        reconcile.dispatch_changes(changes)
+    assert values[Keys.RESTRICTION_PENDING.value][form.urlsafe_key] == "1"
+
     queued = []
     monkeypatch.setattr(reconcile, "enqueue", queued.append)
-    previous = reconcile.previous_restrictions([form])
-    reconcile.dispatch_changes(previous)
+    form._reconcile_restrictions = False
+    reconcile.dispatch_changes(reconcile.prepare_changes([form]))
     assert queued == [{"source_key": form.urlsafe_key, "owner_keys": []}]
-    reconcile.dispatch_changes([(form, ({"page_form": ["new"]}, "v2"))])
+    assert form.urlsafe_key not in values[Keys.RESTRICTION_PENDING.value]
+    reconcile.dispatch_changes(reconcile.prepare_changes([form]))
     assert len(queued) == 1
-    form._reconcile_restrictions = True
-    reconcile.dispatch_changes([(form, ({"page_form": ["new"]}, "v2"))])
-    assert len(queued) == 2
-    monkeypatch.setattr(reconcile, "enqueue", Mock(side_effect=RuntimeError("queue offline")))
-    form._reconcile_restrictions = True
-    with pytest.raises(RuntimeError, match="queue offline"):
-        reconcile.dispatch_changes([(form, ({"page_form": ["new"]}, "v2"))])
-    assert form._reconcile_restrictions is True
+
+    # If the first Redis operation failed before it could write a pending
+    # marker, a fresh save still sees the already-persisted restrictions.
+    persisted = Entities.FORM(deepcopy(form.db))
+    form = Entities.FORM(deepcopy(form.db))
+    prepare_form_publication(form, SimpleNamespace(entities=SimpleNamespace(
+        fetch_one=lambda key, *, request: persisted,
+    )))
+    consume_mutation_intents(SimpleNamespace(
+        consumed_intents=[], effects=[SimpleNamespace(
+            effect=MutationEffectType.UPSERT, property_mask=None, entity=form,
+        )],
+    ))
+    assert form._reconcile_restrictions is False
+    values[Keys.ENTITY_HASHES.value][form.hash] = json.dumps({
+        "restricted_to": source.restricted_to, "form_version": form.version,
+    })
+    reconcile.dispatch_changes(reconcile.prepare_changes([form]))
+    assert queued == [{"source_key": form.urlsafe_key, "owner_keys": []}] * 2
+    assert form.urlsafe_key not in values[Keys.RESTRICTION_PENDING.value]
+
+
+# @matrix permissions cache : new-form content-only no-queue
+@pytest.mark.parametrize("restricted", [False, True])
+@pytest.mark.parametrize("change,cached", [
+    ("create", False),
+    ("label", True), ("label", False),
+    ("html", True), ("html", False),
+    ("version", True), ("version", False),
+])
+def test_form_creation_and_content_edits_do_not_queue_reconciliation(monkeypatch, restricted, change, cached):
+    from copy import deepcopy
+    from google.cloud import datastore
+    from lagniappe.core.definitions import MutationEffectType
+    from lagniappe.core.mutations.executor import consume_mutation_intents
+    from lagniappe.core.tools.form_drafts import prepare_form_publication
+
+    row = datastore.Entity(key=datastore.Key("models", "content-form", project="unit-project"))
+    row.update(type="form", form_type="task", name="Content Form", hash="content-form",
+               schema=json.dumps([
+                   {"id": "answer", "type": "input", "title": "Answer"},
+                   {"id": "notes", "type": "html", "title": "Notes"},
+               ]), version="saved-version", assets=json.dumps({
+                   "notes": {"type": "html", "path": "notes.html", "fingerprint": "old-content"},
+               }))
+    if restricted:
+        row["restricted_to"] = ["admin"]
+    source = Entities.FORM(deepcopy(row)) if change != "create" else None
+    form = Entities.FORM(deepcopy(row))
+    if change == "create":
+        form.db.pop("version")
+        form.db.pop("restricted_to", None)
+        form.properties.restricted_to.materialize(admin_only=restricted)
+    elif change == "label":
+        edited = deepcopy(form.schema)
+        edited[0]["title"] = "Renamed answer"
+        form.schema = edited
+    elif change == "html":
+        form.assets["notes"]["fingerprint"] = "new-content"
+
+    prepare_form_publication(form, SimpleNamespace(entities=SimpleNamespace(
+        fetch_one=lambda key, *, request: source,
+    )))
+    consume_mutation_intents(SimpleNamespace(
+        consumed_intents=[], effects=[SimpleNamespace(
+            effect=MutationEffectType.UPSERT, property_mask=None, entity=form,
+        )],
+    ))
+    values = {}
+    if cached:
+        values[Keys.ENTITY_HASHES.value] = {form.hash: json.dumps({
+            "restricted_to": source.restricted_to, "form_version": source.version,
+        })}
+    monkeypatch.setattr(reconcile.cache, "pipeline", lambda: _HashPipeline(values))
+    queued = []
+    monkeypatch.setattr(reconcile, "enqueue", queued.append)
+
+    reconcile.dispatch_changes(reconcile.prepare_changes([form]))
+
+    assert form.version and form.version != "saved-version"
+    assert form.restricted_to == ({"task_form": ["admin"]} if restricted else {})
+    assert queued == []
+    assert form.urlsafe_key not in values.get(Keys.RESTRICTION_PENDING.value, {})
 
 
 # @matrix permissions cache : fingerprint modified form-version stable-order
@@ -816,5 +927,5 @@ def test_cold_source_details_preserve_programmatic_restriction_changes(monkeypat
     queued = []
     monkeypatch.setattr(reconcile.cache, "pipeline", lambda: pipe)
     monkeypatch.setattr(reconcile, "enqueue", queued.append)
-    reconcile.dispatch_changes(reconcile.previous_restrictions([source]))
+    reconcile.dispatch_changes(reconcile.prepare_changes([source]))
     assert queued == [{"source_key": source.urlsafe_key, "owner_keys": []}]

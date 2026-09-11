@@ -14,6 +14,53 @@ from testing.utility.ai_report_fakes import (
 )
 from testing.utility.test_entities import TestEntities
 
+
+# @matrix form-table : ai-value validation
+@pytest.mark.unit
+@pytest.mark.parametrize("value", [{"rows": ["Airline & Flight #"]}, {"rows": {"flight": "UA1434"}}, {"rows": [{"Flight": "UA1434"}]}])
+def test_submission_completion_rejects_malformed_table_rows(value):
+    targets = [{"action_id": "flights", "form": {"schema": [{
+        "id": "table-flights", "type": "table", "columns": [{"id": "input-flight"}],
+    }]}}]
+    result = {"submissions": [{"action_id": "flights", "submission": {"table-flights": value}}]}
+    with pytest.raises(organize.exceptions.AIException, match="flights, field table-flights"):
+        organize.validate_organize_submission_results(result, targets)
+
+
+# @matrix form-table : ai-value validation
+@pytest.mark.unit
+@pytest.mark.parametrize("repair_succeeds", [True, False])
+def test_submission_completion_repairs_invalid_table_once(monkeypatch, repair_succeeds):
+    user = _test_user("table-completion-owner")
+    page = TestEntities.get("PAGE", {"name": "Miami & DC", "hash": "table-trip"})
+    form = TestEntities.get("FORM", {"name": "Flight details", "hash": "table-form"})
+    form.form_type = "task"
+    form.schema = [{"id": "table-flights", "type": "table", "title": "Flights", "columns": [
+        {"id": "input-flight", "type": "input", "input": "text", "title": "Flight"},
+    ]}]
+    task = TestEntities.get("TASK", {"name": "Book Plane Tickets", "hash": "table-task"}, page=page)
+    task.form = form
+    report = TestEntities.get("REPORT", {"name": "Travel details", "hash": "table-report", "parent": user, "user": user,
+        "instructions": "Add reservations UA1458, B61680 and UA1434 to my trip."})
+    proposal = {"summary": "Update flights", "confidence": 1, "issues": [], "actions": [
+        {"id": "flights", "type": "update_form_values", "data": {"task": task.urlsafe_key}},
+    ]}
+    monkeypatch.setattr(organize.Entities, "fetch_one", _fetch_one_from({task.urlsafe_key: task, form.key: form, form.urlsafe_key: form}))
+    calls = []
+    actual = {"rows": [{"input-flight": flight} for flight in ["UA1458", "B61680", "UA1434"]]}
+    def generate(prompt):
+        calls.append(prompt)
+        value = actual if len(calls) == 2 and repair_succeeds else {"rows": ["Flight"]}
+        return {"submissions": [{"action_id": "flights", "submission": {"table-flights": value}}]}
+    if repair_succeeds:
+        result = organize.complete_organize_submissions(proposal, report, user, generate=generate)
+        assert result["actions"][0]["data"]["updates"][0]["new_value"] == actual
+    else:
+        with pytest.raises(organize.exceptions.AIException, match="Table row 1"):
+            organize.complete_organize_submissions(proposal, report, user, generate=generate)
+    assert len(calls) == 2
+    assert task.submission == {}
+
 # @matrix ai-report : no-category page-form validation
 @pytest.mark.unit
 def test_validate_proposal_accepts_add_form_to_page_without_category():

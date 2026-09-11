@@ -415,6 +415,8 @@ def _inspect_action_compensated(record, report, user):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason recoverable action errors are asserted through full report execution
 def _is_recoverable_action_error(_action, error):
+    if _action.get("type") == "update_form_values" and str(error) != SUBMISSION_UPDATE_ROWS_ERROR:
+        return False  # Invalid patches must block dependent completions and remain retryable.
     if _action.get("type") == "append_page_document":
         return False  # A document conflict must remain retryable, not be skipped.
     return isinstance(error, exceptions.ValidationError) and not str(error).startswith(

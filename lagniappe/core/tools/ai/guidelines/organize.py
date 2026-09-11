@@ -464,6 +464,9 @@ ORGANIZE_PLANNING_ACTIONS = """
 ORGANIZE_PLANNING_PREFLIGHT = """
 ### Before Completing Structure Planning
 
+- Match every requested outcome to an executable action and target. Submission
+  completion cannot add missing targets or document actions later. Write the
+  summary from the final actions; explain missing work in issues and needs_review.
 - Internal hash tokens appear only in executable action data, never in the
   user-facing summary, issues, display labels, or reasons.
 - The complete upload set was clustered by stable subject before page actions

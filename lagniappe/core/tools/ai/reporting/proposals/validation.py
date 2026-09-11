@@ -4,6 +4,7 @@ import re
 
 from lagniappe.core import exceptions
 from lagniappe.core.properties.schema import SchemaFields
+from lagniappe.core.properties.form_table import validate_ai_table
 from lagniappe.core.tools import dates
 
 from ...debug import ai_debug
@@ -69,6 +70,7 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_invalid_static_form_content
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_create_task_page_reference
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_remote_organize_repairs_malformed_table_patch
 # @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission task-page validation
 # @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
@@ -860,3 +862,11 @@ def _validate_submission_update_action_data(
             raise exceptions.AIException(
                 f"Action {action_label} {row_label} requires new_value."
             )
+        value = update["new_value"]
+        if isinstance(value, dict) and "rows" in value:
+            try:
+                validate_ai_table(value)
+            except ValueError as error:
+                raise exceptions.AIException(
+                    f"Action {action_label} {row_label}: {error}"
+                ) from error

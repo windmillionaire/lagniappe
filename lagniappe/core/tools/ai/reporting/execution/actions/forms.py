@@ -5,7 +5,7 @@ import copy
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
 from lagniappe.core.entities import Entities
-from lagniappe.core.properties.schema import SchemaValidationError, canonicalize_schema
+from lagniappe.core.properties.schema import SchemaFields, SchemaValidationError, canonicalize_schema
 
 from .common import (
     SUBMISSION_UPDATE_ROWS_ERROR,
@@ -31,6 +31,8 @@ from .references import (
 # @matrix ai-report submission : batch-field-patch persistence
 # @matrix ai-report : batch-field-patch deterministic-run empty-update
 # @matrix submission : continue deterministic-run empty-update recoverable
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_validation_preserves_values_and_blocks_completion
+# @matrix ai-report submission : validation failure-isolation
 def _update_form_values(action, _report, user, created):
     data = _data(action)
     updates = data.get("updates") or []
@@ -44,6 +46,7 @@ def _update_form_values(action, _report, user, created):
     previous = []
     to_save = []
     working_entities = {}
+    prepared = []
     for index, update in enumerate(updates, 1):
         if not isinstance(update, dict):
             skipped.append({"index": index, "reason": "Update row must be an object."})
@@ -63,23 +66,34 @@ def _update_form_values(action, _report, user, created):
             continue
         schema_id = schema_id.strip()
 
-        before = _submission_previous_value(entity, schema_id)
-        try:
-            changed, note = _apply_submission_field_update(
-                entity,
-                schema_id,
-                update.get("new_value"),
-            )
-        except Exception as error:
-            skipped.append(
-                {
-                    "index": index,
-                    "entity": _entity_result(entity),
-                    "schema_id": schema_id,
-                    "reason": str(error),
-                }
-            )
+        if not getattr(entity, "form", None):
+            skipped.append({"index": index, "reason": "Target has no form."})
             continue
+        field = entity.properties.submission.fields.get(schema_id)
+        if field is None:
+            skipped.append({"index": index, "schema_id": schema_id,
+                            "reason": "Field is not in the target's current form schema."})
+            continue
+        # Validate every patch on a detached field before changing any target.
+        # A later malformed value must not save or erase earlier values.
+        candidate = SchemaFields.create_field(dict(field), entity)
+        candidate.user = user
+        try:
+            candidate.validate_ai(update.get("new_value"))
+            if candidate.errors:
+                raise exceptions.ValidationError("; ".join(map(str, candidate.errors)))
+        except Exception as error:
+            raise exceptions.ValidationError(
+                f"Could not update {entity.name}, field {schema_id}: {error}"
+            ) from error
+        prepared.append((index, entity, schema_id, candidate))
+
+    if not prepared:
+        raise exceptions.ValidationError("No submission fields could be updated. Review the targets and form fields.")
+
+    for index, entity, schema_id, validated_field in prepared:
+        before = _submission_previous_value(entity, schema_id)
+        changed, note = _apply_submission_field_update(entity, schema_id, validated_field)
 
         if not changed:
             skipped.append(
@@ -224,7 +238,7 @@ def _submission_previous_value(entity, schema_id):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_values
 # @reason validation behavior is covered through batch submission report-run tests
-def _apply_submission_field_update(entity, schema_id, value):
+def _apply_submission_field_update(entity, schema_id, validated_field):
     if not getattr(entity, "form", None):
         return False, "Target has no form."
 
@@ -234,8 +248,7 @@ def _apply_submission_field_update(entity, schema_id, value):
         return False, "Field is not in the target's current form schema."
 
     before = _submission_previous_value(entity, schema_id)
-    field.reset()
-    field.validate_ai(value)
+    submission.fields[schema_id] = validated_field
     entity.save_submission()
     after = _submission_previous_value(entity, schema_id)
     changed = (

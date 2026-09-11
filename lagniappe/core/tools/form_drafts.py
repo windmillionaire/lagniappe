@@ -222,8 +222,11 @@ def archive_form_generation(source, *, attempt_owner=None):
 # @testable true
 # @tests tests_unit/test_004f_form_drafts.py::test_publication_reads_saved_form_only_at_save
 # @tests tests_unit/test_004f_form_drafts.py::test_compatible_saves_update_version_without_archiving_generation
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_form_creation_and_content_edits_do_not_queue_reconciliation
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_change_detection_and_forced_retry
 # @matrix forms mutations : guarded-save generation publication
 # @matrix html-field : isolated-assets cleanup
+# @matrix permissions cache : change-detection retry new-form content-only no-queue
 # @pair mutations:rejected-save
 def prepare_form_publication(form, builder):
     """Compare with the saved Form and publish staged content at the save boundary."""
@@ -246,6 +249,15 @@ def prepare_form_publication(form, builder):
             raise exceptions.MutationConflict("This Form was deleted before saving.")
         validate_draft_schema(form.schema, form.form_type)
         form._form_save_guard = (form.key, None)
+
+    # Only existing submissions need their inherited permissions reconciled.
+    # Compare the saved source, not a cache row that may be missing or stale.
+    form._reconcile_restrictions = source is not None and (
+        source.restricted_to != form.restricted_to
+        or getattr(form, "_reconcile_restrictions", False)
+    )
+    if form._reconcile_restrictions:
+        form._permission_sources_changed = True
 
     previous_generation = source.generation if source else 0
     changed_generation = bool(source) and requires_submission_conversion(source.schema, form.schema)

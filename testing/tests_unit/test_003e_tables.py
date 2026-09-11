@@ -11,6 +11,7 @@ from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.mixins.submitter import normalize_submission_values
 from lagniappe.core.properties.form_links import Link
 from lagniappe.core.properties.row_submission import RowSubmission
+from lagniappe.core.properties.form_table import Table
 from testing.utility.mock_submission import WebFormSubmission
 from testing.utility.test_entities import TestEntities
 
@@ -61,6 +62,20 @@ def test_table_ai_multiple_rows(get_test_entities, get_schema, test_submission_v
     for entity in get_test_entities():
         entity.form.schema = get_schema(entity.test_spec["form"]["schema"])
         test_submission_values(entity)
+
+
+# @matrix form-table : ai-value validation
+@pytest.mark.unit
+@pytest.mark.parametrize("invalid", ["Flight", [], {}, {"rows": {}}, {"rows": ["Airline & Flight #"]}, {"rows": [["UA1434"]]}, {"rows": [{"Flight": "UA1434"}]}])
+def test_table_ai_rejects_malformed_rows_without_losing_values(invalid):
+    table = Table({"id": "table-flights", "type": "table", "columns": [
+        {"id": "input-flight", "type": "input", "input": "text", "title": "Flight"},
+    ]}, entity=TestEntities.get("PAGE", {"name": "Trip", "hash": "table-validation-page"}))
+    original = {"rows": [{"input-flight": "UA1458"}]}
+    table.validate_ai(original)
+    with pytest.raises(ValueError, match="Table"):
+        table.validate_ai(invalid)
+    assert table.db_value == original
 
 
 # @matrix form-table : column empty form-submission

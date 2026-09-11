@@ -74,7 +74,7 @@ def test_document_save_retires_only_superseded_blobs_after_commit(monkeypatch, f
     monkeypatch.setattr(executor.database_utility, "save_mutations", commit)
     monkeypatch.setattr(executor.database_utility, "delete_blobs", cleanup)
     monkeypatch.setattr(executor.cache, "update", refresh)
-    monkeypatch.setattr(restrictions, "previous_restrictions", lambda entities: [])
+    monkeypatch.setattr(restrictions, "prepare_changes", lambda entities: [])
     monkeypatch.setattr(executor.cache, "update_owner_projection", lambda *args: None)
     monkeypatch.setattr(executor, "capture", lambda *args, **kwargs: None)
     for text in ("first", "second", "third"):

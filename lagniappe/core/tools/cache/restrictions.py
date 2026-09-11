@@ -26,8 +26,10 @@ VERIFICATION_ATTEMPTS = 3
 
 # @testable true
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_change_detection_and_forced_retry
-# @matrix permissions cache : change-detection retry form-version
-def previous_restrictions(entities):
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_form_creation_and_content_edits_do_not_queue_reconciliation
+# @matrix permissions cache : change-detection retry new-form content-only no-queue
+def prepare_changes(entities):
+    """Preserve required permission work before replacing source cache rows."""
     sources = [entity for entity in entities
                if entity.kind in SOURCES and not getattr(entity, "_testing", False)]
     if not sources:
@@ -40,32 +42,34 @@ def previous_restrictions(entities):
     changes = []
     with cache.pipeline() as pipe:
         for entity, old, pending in zip(sources, previous[::2], previous[1::2]):
-            before = _source_signature(entity, json.loads(old) if old else {})
-            if pending or before != _source_signature(entity) or getattr(entity, "_reconcile_restrictions", False):
+            before = normalize_restrictions(json.loads(old).get("restricted_to")) if old else {}
+            # Forms also compare their durable source during Save. A missing
+            # cache row is not a restriction change for a newly created Form.
+            # An existing stale row can recover a retry before a pending write.
+            changed = (entity.kind != "form" or old is not None) and before != entity.restricted_to
+            if pending or changed or getattr(entity, "_reconcile_restrictions", False):
                 # Keep this intent outside the replaceable search row so a
                 # failed source projection/queue write remains retryable.
                 pipe.hset(Keys.RESTRICTION_PENDING.value, entity.urlsafe_key, "1")
                 entity._reconcile_restrictions = True
-            changes.append((entity, before))
+                changes.append(entity)
         pipe.execute()
     return changes
 
 
 # @testable true
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_change_detection_and_forced_retry
-# @matrix permissions cache : change-detection retry form-version
-def dispatch_changes(previous):
-    for entity, old in previous:
-        after = _source_signature(entity)
-        if old != after or getattr(entity, "_reconcile_restrictions", False):
-            enqueue({
-                "source_key": entity.urlsafe_key,
-                "owner_keys": list(getattr(entity, "_restriction_owner_keys", ())),
-            })
-            with cache.pipeline() as pipe:
-                pipe.hdel(Keys.RESTRICTION_PENDING.value, entity.urlsafe_key)
-                pipe.execute()
-            entity._reconcile_restrictions = False
+# @matrix permissions cache : change-detection retry
+def dispatch_changes(changes):
+    for entity in changes:
+        enqueue({
+            "source_key": entity.urlsafe_key,
+            "owner_keys": list(getattr(entity, "_restriction_owner_keys", ())),
+        })
+        with cache.pipeline() as pipe:
+            pipe.hdel(Keys.RESTRICTION_PENDING.value, entity.urlsafe_key)
+            pipe.execute()
+        entity._reconcile_restrictions = False
 
 
 # @testable true
@@ -82,17 +86,6 @@ def enqueue(payload):
     )
     if not identity:
         raise RuntimeError("Restriction reconciliation could not be queued; retry saving.")
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/cache/restrictions.py::previous_restrictions
-# @reason source signature comparison owns restriction and schema invalidation
-def _source_signature(entity, details=None):
-    restrictions = entity.restricted_to if details is None else details.get("restricted_to")
-    version = None
-    if entity.kind == "form":
-        version = (entity.version or "") if details is None else details.get("form_version")
-    return normalize_restrictions(restrictions), version
 
 
 # @testable true

@@ -1259,6 +1259,33 @@ def test_email_report_detail_collapses_message_behind_subject_and_sender(get_use
     )
 
 
+# @matrix ai-report : validation result
+# @source lagniappe/core/properties/ai_report_result.py::Result.submission_issues
+def test_report_detail_surfaces_legacy_skipped_submission_error(get_user):
+    user = get_user(Users.OWNER)
+    report, _, _ = _ready_report(user)
+    report.properties.process.complete_execution({
+        "status": "complete",
+        "actions": [{
+            "id": "flights",
+            "type": "update_form_values",
+            "display_label": "Update Flight Details",
+            "status": "complete",
+            "updates": {"applied": [], "skipped": [{
+                "schema_id": "table-flights",
+                "reason": "'str' object has no attribute 'get'",
+            }]},
+        }],
+    })
+    Entities.save(report)
+
+    report_page = user.go(Report.for_entity(user, report))
+
+    expect(report_page.result).to_contain_text("Some submission updates were not applied.")
+    expect(report_page.result).to_contain_text("Update Flight Details (table-flights): 'str' object has no attribute 'get'")
+    expect(report_page.result.get_by_text("Work done.", exact=True)).to_have_count(0)
+
+
 # @matrix ai-report : detail deterministic-undo failed-prefix failure recovery reload retry undo
 def test_failed_report_detail_offers_retry_and_partial_undo(get_user):
     user = get_user(Users.OWNER)

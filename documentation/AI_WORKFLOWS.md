@@ -71,6 +71,16 @@ Organize evaluates an upload batch as a whole:
 6. repair locally or through one model pass when needed; and
 7. run a focused form-completion generation only for form-backed targets.
 
+Planning preflight compares each requested outcome with its executable target
+actions; summaries must describe only those actions and omissions belong in
+review issues. Form completion cannot add missing tasks or document actions.
+Table submissions validate their rows and exact column ids before the proposal
+is accepted, with one corrective generation on malformed output. Execution
+validates all patches on detached fields before changing a submission. Invalid
+values fail the action and block dependent completions; they are not successful
+skips. Older reports with skipped submission errors display those errors instead
+of an unconditional “Work done.”
+
 Finalized uploads remain report-only evidence before browser execution. They
 are addressable through the owning report and its exact file references, but
 are omitted from ordinary workspace search while they have no Page or Task
@@ -106,6 +116,9 @@ form completion. Its planner authors final field patches directly, including
 on revision or validation repair. Once uploads are supplied, normal file
 coverage and completion obligations apply. External starters return a compact
 action contract; clients request selected schemas and guidance on demand.
+Table-shaped patches are checked during proposal validation, so malformed row
+arrays enter the existing proposal repair flow before browser review. Execution
+also checks the current Form's exact column ids before saving any field patches.
 
 ## Autofill
 

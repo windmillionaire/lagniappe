@@ -5,9 +5,10 @@ from dataclasses import dataclass
 from lagniappe.core import exceptions
 
 from ...definitions import Action, Fetch, FetchReason, Resource
-from ...definitions.fingerprints import base_fingerprint
+from ...definitions.fingerprints import base_fingerprint, restricted_fingerprint
 from ...entities import Entities, index
 from lagniappe.core.tools.database import utility as database_utility
+from .. import cache
 from ..cache.details import _load_cached_details, identify_entity
 from ..filters import FilterCache
 from ..tasks.ordering import page_task_roots, sort_tasks
@@ -244,16 +245,60 @@ def _client_fingerprints(rows):
 
 # @testable false
 # @covered-by lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
+# @reason own Form versions are batched without expanding unchanged rows
+def _form_versions(roots, hashes, details):
+    if any(root is not None for root in roots.values()):
+        # A changed collection may be observed before its Form cache write.
+        # Root relation keys let one durable batch close that publication window.
+        keys = {root.db.get("form") for root in roots.values() if root.db.get("form")}
+        versions = {
+            form.key: form.version or ""
+            for form in Entities.fetch(*keys, request=Fetch.root())
+            if form.entity_kind == "form"
+        } if keys else {}
+        return {
+            key: versions.get(root.db["form"]) if root.db.get("form") else ""
+            for key, root in roots.items()
+        }
+
+    form_hashes = {
+        pointer for entity_hash in hashes.values()
+        if (pointer := details.get(entity_hash, {}).get("form_hash"))
+    }
+    forms = _load_cached_details(sorted(form_hashes)) if form_hashes else {}
+    versions = {}
+    for key, entity_hash in hashes.items():
+        row = details.get(entity_hash, {})
+        form_hash = row.get("form_hash")
+        if form_hash:
+            source = forms.get(form_hash, {})
+            versions[key] = source.get("form_version") if source.get("kind") == "form" else None
+        elif "form_hash" in row and form_hash is None:
+            # Explicit null also covers reserved Forms, which have no cache row.
+            versions[key] = row.get("form_version", "")
+        else:
+            versions[key] = None
+    return versions
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 # @reason cached row identity and base revisions are checked before skipping a render
-def _cached_fingerprint(key, kind, details, root=None):
+def _cached_fingerprint(key, kind, details, root=None, *, form_version=None):
     if (
-        identify_entity(details) != (key, kind)
+        form_version is None or identify_entity(details) != (key, kind)
         or (root is not None and (
             not getattr(root, "modified", None)
             or details.get("modified") != base_fingerprint(root.modified or root.created)
         ))
     ):
         return None
+    if details.get("form_version") != form_version:
+        if not details.get("modified"):
+            return None
+        return restricted_fingerprint(
+            details["modified"], details.get("restricted_to"), form_version=form_version,
+        )
     return details.get("fingerprint")
 
 
@@ -285,9 +330,11 @@ def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
     )
     try:
         details = _load_cached_details([h for h in hashes.values() if h])
+        form_versions = _form_versions(roots, hashes, details)
     except Exception as error:
         exceptions.capture(error, context={"operation": "refresh-fingerprints"})
         details = {}
+        form_versions = {}
 
     # User account columns can change without changing their Page fingerprint.
     refresh_users = collection.kind == "user-index" and collection.roots is not None
@@ -298,7 +345,10 @@ def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
         or not hashes[key]
         or key not in client
         or client[key] != (
-            hashes[key], _cached_fingerprint(key, kind, details.get(hashes[key], {}), root)
+            hashes[key], _cached_fingerprint(
+                key, kind, details.get(hashes[key], {}), root,
+                form_version=form_versions.get(key),
+            )
         )
     }
     candidates = [
@@ -334,6 +384,19 @@ def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
             order.append(key)
         elif key in client:
             remove.add(key)
+
+    if upsert:
+        # Refresh only projections we already loaded and authorized. This also
+        # teaches legacy rows their Form pointer after their first safe refresh.
+        refreshed = {entity.key: entity for entity in upsert}
+        for entity in upsert:
+            form = entity.form
+            if form and not form.reserved:
+                refreshed[form.key] = form
+        try:
+            cache.update(*refreshed.values(), update=False)
+        except Exception as error:
+            exceptions.capture(error, context={"operation": "refresh-projections"})
 
     return RefreshDelta(
         upsert=tuple(upsert),

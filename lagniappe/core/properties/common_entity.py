@@ -786,10 +786,11 @@ class RestrictedTo(DBProperty):
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_index_lists_group_restricted_form_only_for_group_member
     # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources
     # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
+    # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_recalculates_restrictions_after_form_deletion
     # @tests tests_unit/test_002_entity_general_properties.py::test_task_file_restrictions_use_stored_hashes_without_group_reads
     # @matrix permissions : source-clauses inherited-restrictions
     # @matrix task permissions : source-clauses admin-only
-    # @matrix permissions relations : deleted-form fail-closed admin-only
+    # @matrix permissions relations : deleted-form recalculation
     # @matrix permissions relations : stored-restrictions group-free no-extra-read
     # @matrix forms permissions : access-restrictions group-restricted index-filter inheritance owner-restricted restricted-access side-effect-free stable-order
     @property
@@ -806,17 +807,10 @@ class RestrictedTo(DBProperty):
             }
         elif kind == "task":
             page = permission_relation(self.entity, "page", required=True)
-            form_property = self.entity.properties.form
-            if form_property.key and form_property.is_set and form_property.value is None:
-                # A deleted Form has no current access policy to evaluate. Keep
-                # its Task readable by admins without relaxing unloaded checks.
-                form_restrictions = ["admin"]
-            else:
-                form = permission_relation(self.entity, "form")
-                form_restrictions = form.properties.restricted_to.stored if form else []
+            form = permission_relation(self.entity, "form")
             restrictions = {
                 **page.restricted_to,
-                "task_form": form_restrictions,
+                "task_form": form.properties.restricted_to.stored if form else [],
             }
         elif kind == "file":
             owner = self.entity.owner

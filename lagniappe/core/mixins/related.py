@@ -302,6 +302,9 @@ class RelatedEntityMixin:
         return self.value.name if self.value else None
 
     # Property Attributes
+    # @testable true
+    # @tests tests_unit/test_026_site_admin.py::test_unloaded_optional_form_is_not_mistaken_for_a_deleted_form
+    # @matrix permissions relations : unloaded-relation
     @property
     def value(self):
         if self.is_set:
@@ -311,6 +314,9 @@ class RelatedEntityMixin:
             key = self.entity.db.get(self.id)
             if key:
                 capture_unloaded_relation(self, relation_type="single", keys=[key])
+                # A diagnostic fallback is not a completed lookup. Only attach()
+                # can establish that a stored reference was checked and is missing.
+                return None
             self._value = None
         else:
             self._value = None

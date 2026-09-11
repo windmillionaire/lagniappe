@@ -64,6 +64,14 @@
             </button>
           {% endif %}
         </div>
+        <div data-role="cache-status"
+             data-visible="false"
+             class="rounded-md border border-base-light/70 bg-white/80 p-3 text-sm text-base-dark">
+          <strong data-role="cache-status-title" class="block"></strong>
+          <p data-role="cache-status-summary" class="mt-1 text-base-medium"></p>
+          <ul data-role="cache-status-errors"
+              class="mt-2 space-y-1 text-delete-dark empty:hidden"></ul>
+        </div>
         <div data-role="migration-status"
              data-visible="false"
              class="rounded-md border border-base-light/70 bg-white/80 p-3 text-sm text-base-dark">

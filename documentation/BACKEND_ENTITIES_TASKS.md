@@ -83,9 +83,11 @@ completion fields to reject stale or direct changes to original answers.
 Missing archived definitions or historical static content produce an explicit unavailable
 state, retaining raw original answers for review. Historical images are authorized
 through the Task/TaskHistory that references them. After
-a live Form is deleted, its current access policy is unavailable: only admins
-can read retained completion/history content, subject to the existing page access
-check. Ordinary users fail closed; no ACL tombstone or permission version is stored.
+a live Form is deleted, its restriction clause no longer applies. Tasks, Pages,
+and retained completion/history content use the remaining live permission
+sources. Loading a stale Form key resolves it to `None` without requiring a
+record re-save; a relation that was never loaded still raises an unloaded-relation
+error. Reads do not silently rewrite stored relationship keys.
 
 ## Defaults and reopening
 

@@ -1487,6 +1487,7 @@ def test_related_single_value_reports_unloaded_relation_without_loading(monkeypa
     with app.test_request_context("/tasks/demo", method="GET"):
         assert prop.value is None
         assert prop.value is None
+        assert not prop.is_set
 
     assert len(captured) == 1
     error, context, level = captured[0]

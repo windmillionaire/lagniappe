@@ -41,7 +41,12 @@ Form publication stages new HTML at isolated Storage paths, then atomically
 commits its references and Form changes with exact source-row guards. Publication
 reads the saved Form at the explicit save boundary; Form construction and ordinary
 row access do not retain a second row or intercept database reads. The saved
-source supplies the compatibility check, prior generation, and concurrency guard.
+source supplies the compatibility check, prior generation, restriction comparison,
+and concurrency guard. Creating a Form never queues permission reconciliation:
+there are no existing submissions to update. Content edits invalidate submission
+revisions without queuing permission work. An existing Form's restriction change
+queues reconciliation after the durable save, with failed dispatches remaining
+retryable.
 A conversion preserves the previous Form generation and its independent HTML/image
 assets in FormHistory; compatible saves only refresh the content fingerprint.
 `ExactEntityState` includes the absence of additional

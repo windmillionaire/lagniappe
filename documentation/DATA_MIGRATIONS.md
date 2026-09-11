@@ -24,6 +24,13 @@ After deploying a release that includes migrations:
 Datastore records, and the route rejects the request until migrations are
 current.
 
+Refresh loads nested permission dependencies in bounded batches. Individual
+malformed records are skipped while the remaining cache is rebuilt; Maintenance
+shows processed/skipped counts and up to 100 linked errors for review. Retry
+after repairing those records. Infrastructure failures still stop the refresh.
+Deleted optional Forms are treated as absent and restrictions are recalculated
+from surviving sources, without rewriting or individually re-saving records.
+
 ## Catalog and ledger
 
 `MIGRATION_CATALOG` is an ordered tuple of immutable `MigrationDefinition`

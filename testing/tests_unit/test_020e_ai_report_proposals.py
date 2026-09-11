@@ -13,7 +13,9 @@ from testing.utility.ai_report_fakes import (
     _assert_repair_prompt_contract,
     _prompt_context,
     _with_validator,
+    _test_user,
 )
+from testing.utility.test_entities import TestEntities
 
 # @matrix ai-report : generate validate
 @pytest.mark.unit
@@ -552,6 +554,56 @@ def test_generate_organize_report_repairs_category_used_as_page_reference(monkey
     )
 
 
+
+
+# @matrix ai-report : repair validation
+# @source lagniappe/core/tools/ai/organize.py::generate_organize_plan
+# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::validate_or_repair_proposal
+@pytest.mark.unit
+def test_generate_remote_organize_repairs_malformed_table_patch(monkeypatch):
+    user = _test_user("email-travel-owner")
+    report = TestEntities.get("REPORT", {
+        "name": "Travel details", "parent": user, "user": user,
+        "origin": "email", "tool": "organize",
+        "instructions": "Add the three flight reservations and complete the booking task.",
+    })
+    report.origin = "email"
+    report.tool = "organize"
+    invalid = {
+        "summary": "Update flight reservations and complete booking.",
+        "confidence": 1,
+        "actions": [{
+            "id": "flights", "type": "update_form_values",
+            "data": {"updates": [{
+                "task": "flight-task-id", "schema_id": "table-flights",
+                "new_value": {"rows": ["Airline & Flight #", "Confirmation #"]},
+            }]},
+        }, {
+            "id": "done", "type": "complete_task", "depends_on": ["flights"],
+            "data": {"task": "flight-task-id"},
+        }],
+    }
+    repaired = copy.deepcopy(invalid)
+    flights = {"rows": [
+        {"input-flight": "UA1458", "input-confirmation": "PR2FYB"},
+        {"input-flight": "B61680", "input-confirmation": "PSDSX9"},
+        {"input-flight": "UA1434", "input-confirmation": "PSJLBB"},
+    ]}
+    repaired["actions"][0]["data"]["updates"][0]["new_value"] = flights
+    calls = []
+    def generate(prompt):
+        calls.append(prompt)
+        return copy.deepcopy(invalid if len(calls) == 1 else repaired)
+    monkeypatch.setattr(organize.ai_model, "generate_content", _with_validator(generate))
+
+    prompt = organize.organize_prompt(report, user)
+    assert prompt._organize_update_only
+    result = organize.generate_organize_report(prompt, report, user)
+
+    assert len(calls) == 2
+    assert "must be an object keyed by column ids" in _prompt_context(calls[1], "Validation Error")
+    assert result["actions"][0]["data"]["updates"][0]["new_value"] == flights
+    assert result["actions"][1]["depends_on"] == ["flights"]
 
 
 # @matrix ai-report : repair required-data

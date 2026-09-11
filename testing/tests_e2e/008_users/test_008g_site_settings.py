@@ -407,7 +407,10 @@ def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     with owner.page.expect_response("**/l/rebuild-cache") as response_info:
         cache_button.click()
     assert response_info.value.status == 200
+    assert response_info.value.json()["cache_status"]["processed"] > 0
     expect(cache_button).to_contain_text("Cache Refreshed")
+    expect(maintenance.locator("[data-role='cache-status']")).to_be_visible()
+    expect(maintenance.locator("[data-role='cache-status-summary']")).to_contain_text("records processed")
 
 
 # @matrix admin : generated-images lazy-initialization metadata public-preview site-image-upload

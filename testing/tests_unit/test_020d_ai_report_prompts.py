@@ -49,6 +49,8 @@ def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance():
         assert "search_entities" in prompt.tools
         text = str(prompt.preview())
         assert "normal completion rules" in text
+        assert "Check every requested outcome against the actions" in text
+        assert "Write the\nsummary from the final actions" in text
         assert "Do not preserve or generate data.submission" not in text
         assert "A separate completion stage fills" not in text
     assert "Use the newer notes" in _prompt_context(revised, "User Feedback")

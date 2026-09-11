@@ -768,3 +768,62 @@ if (title.textContent !== "Site update history needs repair" || !updateButton.di
 }
 """
     )
+
+
+# @matrix cache : failure-isolation actionable-links
+# @template home/site_settings.html::site_settings
+def test_site_settings_cache_refresh_displays_linked_failures(run_node):
+    run_node(r"""
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+class Node {
+  constructor() { this.children = []; this.nodes = {}; this.events = {}; this.dataset = {}; this.textContent = ""; }
+  querySelector(key) { return this.nodes[key] || null; }
+  appendChild(child) { this.children.push(child); }
+  replaceChildren() { this.children = []; }
+  addEventListener(name, callback) { this.events[name] = callback; }
+}
+const title = new Node(), summary = new Node(), errors = new Node(), panel = new Node();
+panel.nodes = { "[data-role='cache-status-title']": title,
+  "[data-role='cache-status-summary']": summary, "[data-role='cache-status-errors']": errors };
+const cacheButton = new Node(), updateButton = new Node(), target = new Node();
+target.nodes = { "[data-role='cache-status']": panel,
+  "[data-role='rebuild-cache']": cacheButton, "[data-role='site-update']": updateButton };
+let response = { ok: true, cache_status: { status: "partial", processed: 7, failed: 2, errors: [
+  { message: "Missing task parent", url: "/tasks/broken", link_label: "Broken task" } ] } };
+let cleared = 0;
+const context = { console, SiteSetting: class {}, STYLES: { link: { emphasized: "link" } },
+  document: { createElement: () => new Node() }, Modal: class {},
+  withTransition: async (callback) => callback(),
+  clearRecentSearchResults() { cleared++; }, request: { post: async () => response },
+  buttons: { active: ({existingButton, completedText}) => ({ element: existingButton,
+    activate() {}, deactivate(text) { existingButton.textContent = text || completedText; } }) } };
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/siteSettings/maintenance.mjs", "utf8")
+  .replace(/import[\s\S]*?from ".*?";\n/g, "")
+  .replace("export class SiteMaintenance", "class SiteMaintenance");
+vm.runInContext(source + "\nglobalThis.SiteMaintenance = SiteMaintenance;", context);
+const settings = new context.SiteMaintenance({});
+settings.target = target;
+settings.endpoints = { rebuildCache: "/l/rebuild-cache" };
+settings._initActions();
+(async () => {
+  await cacheButton.events.click();
+  assert.equal(panel.dataset.visible, "true");
+  assert.equal(title.textContent, "Cache refreshed with errors");
+  assert.match(summary.textContent, /7 records processed; 2 skipped/);
+  assert.match(summary.textContent, /Showing 1 errors/);
+  assert.equal(errors.children[0].children[0].href, "/tasks/broken");
+  assert.equal(errors.children[0].children[0].textContent, "Broken task");
+  assert.match(cacheButton.textContent, /Review Errors/);
+  assert.equal(cleared, 1);
+  settings.postreconcile();
+  assert.equal(errors.children.length, 1);
+  response = {ok: true, cache_status: {status: "complete", processed: 9, failed: 0, errors: []}};
+  await cacheButton.events.click();
+  assert.equal(title.textContent, "Cache refreshed");
+  assert.equal(errors.children.length, 0);
+  assert.equal(cacheButton.textContent, "Cache Refreshed");
+})().catch(error => { console.error(error); process.exitCode = 1; });
+""")

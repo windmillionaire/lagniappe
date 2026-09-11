@@ -736,10 +736,10 @@ def test_task_restrictions_preserve_other_sources_when_one_requires_admin(admin_
     assert task.allowed(Action.VIEW, user=UtilityTestUser(owner=True)) is True
 
 
-# @matrix permissions relations : deleted-form fail-closed admin-only
+# @matrix permissions relations : deleted-form recalculation
 # @source lagniappe/core/properties/common_entity.py::RestrictedTo.value
 @pytest.mark.unit
-def test_deleted_task_form_preserves_admin_access_and_denies_unresolved_restrictions():
+def test_deleted_task_form_recalculates_remaining_restrictions():
     page = TestEntities.get("PAGE", {"hash": "deletedformpage", "restricted_to": ["staff"]})
     form = TestEntities.get("FORM", {"hash": "deletedtaskform", "restricted_to": ["staff"]})
     task = TestEntities.get("TASK", {"hash": "deletedformtask"}, page=page)
@@ -748,9 +748,9 @@ def test_deleted_task_form_preserves_admin_access_and_denies_unresolved_restrict
     viewer = UtilityTestUser(owner=False, permissions={page.hash: "EDIT"})
     viewer.db["belongs_to"] = ["staff"]
 
-    assert task.restricted_to == {"page": ["staff"], "task_form": ["admin"]}
+    assert task.restricted_to == {"page": ["staff"]}
     assert task.allowed(Action.VIEW, user=UtilityTestUser(owner=True)) is True
-    assert task.allowed(Action.VIEW, user=viewer) is False
+    assert task.allowed(Action.VIEW, user=viewer) is True
 
     task.properties.form.unset()
     with pytest.raises(UnloadedRelationError, match="task.form must be loaded"):

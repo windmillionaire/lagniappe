@@ -13,6 +13,22 @@ class Result(ReportProcessValue):
 
     _id = "result"
 
+    # @testable true
+    # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_report_result_exposes_legacy_skipped_submission_errors
+    # @matrix ai-report : validation result
+    @property
+    def submission_issues(self):
+        """Surface skipped patches, including reports saved by older runners."""
+        if not isinstance(self.value, dict):
+            return []
+        return [
+            {**update, "action_label": action.get("display_label") or "Submission update"}
+            for action in self.value.get("actions") or []
+            if action.get("type") == "update_form_values"
+            for update in (action.get("updates") or {}).get("skipped") or []
+            if update.get("reason") not in {"Value did not change.", "Value did not change after validation."}
+        ]
+
     @property
     def grouped_actions(self):
         if not isinstance(self.value, dict):

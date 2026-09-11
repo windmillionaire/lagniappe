@@ -286,7 +286,7 @@ def test_replaced_live_html_is_deleted_only_after_commit_and_preserves_archive(
     monkeypatch.setattr(executor, "execute_post_commit", memory_forms.execute_post_commit)
     monkeypatch.setattr(executor.cache, "update", lambda *args: None)
     monkeypatch.setattr(executor.cache, "update_owner_projection", lambda *args: None)
-    monkeypatch.setattr(restriction_cache, "previous_restrictions", lambda entities: {})
+    monkeypatch.setattr(restriction_cache, "prepare_changes", lambda entities: [])
     monkeypatch.setattr(restriction_cache, "dispatch_changes", lambda previous: None)
     bucket = SimpleNamespace(delete_blobs=delete_blobs)
     monkeypatch.setattr(database_utility, "DATA", SimpleNamespace(

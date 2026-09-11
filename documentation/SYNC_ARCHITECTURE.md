@@ -28,7 +28,11 @@ Entity and collection revisions can be reconstructed after Redis loss. Cached
 details retain the base modification digest, effective restrictions, own form
 version, and final fingerprint. Collection refresh loads the parent revision
 first and queries membership only when that revision or viewer authorization
-changes. Otherwise it compares cached projections for the existing rows.
+changes. Otherwise it compares cached projections for the existing rows,
+including a batched lookup of their distinct Forms' cached versions. When
+membership is refreshed, one root-depth Form batch uses the durable versions
+even if the Form cache write is still pending. Form content edits therefore
+refresh visible submissions without scheduling permission reconciliation.
 An absent or stale cache row
 falls back to loading and authorizing that entity. Root entity polling still
 loads the canonical permission graph.
