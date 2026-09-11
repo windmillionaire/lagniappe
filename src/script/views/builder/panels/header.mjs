@@ -34,6 +34,7 @@ export class Header {
 		this.editFormName = this.editFormName.bind(this);
 		this._nameBlur = this._nameBlur.bind(this);
 		this._nameKeyDown = this._nameKeyDown.bind(this);
+		this._nameInput = this._nameInput.bind(this);
 
 		this.renderer = null;
 
@@ -43,6 +44,7 @@ export class Header {
 	init() {
 		this.nameInput.addEventListener("blur", this._nameBlur);
 		this.nameInput.addEventListener("keydown", this._nameKeyDown);
+		this.nameInput.addEventListener("input", this._nameInput);
 	}
 
 	saved() {
@@ -80,11 +82,26 @@ export class Header {
 		}
 	}
 
+	showConflict(response) {
+		if (response?.code !== "stale_form_draft" || !response.saved_url)
+			return false;
+		this.message(
+			`${response.error || "The saved form changed. Your draft is preserved."} `,
+			{ persistent: true },
+		);
+		const link = document.createElement("a");
+		link.href = response.saved_url;
+		link.target = "_blank";
+		link.rel = "noopener";
+		link.dataset.role = "open-saved-form";
+		link.className = "underline";
+		link.textContent = "Open saved form";
+		this.notification.append(link);
+		return true;
+	}
+
 	get persistenceState() {
-		return {
-			schema: this.builder.schema,
-			name: this.nameHidden?.value ?? "",
-		};
+		return this.builder.captureDraft();
 	}
 
 	/**
@@ -100,6 +117,15 @@ export class Header {
 		}
 		this.unsaved();
 		return false;
+	}
+
+	closePreview() {
+		this._previewGeneration += 1;
+		this.renderer?.destroy();
+		this.renderer = null;
+		this.previewToggle.dataset.active = "false";
+		this.previewToggle.setAttribute("aria-checked", "false");
+		this.previewPanel.dataset.visible = "false";
 	}
 
 	/**
@@ -122,6 +148,12 @@ export class Header {
 				kind: "form",
 				key: this.builder.key,
 				submission: {},
+				htmlFields: Object.fromEntries(
+					Object.entries(this.builder.htmlFields).map(([id, html]) => [
+						id,
+						this.builder.previewHtml(html),
+					]),
+				),
 			});
 			await renderer.render();
 			if (this._destroyed || generation !== this._previewGeneration) {
@@ -159,6 +191,8 @@ export class Header {
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
 	 * @tests tests_e2e/003_forms/test_003e_retryable_builder_actions.py::test_builder_save_failure_releases_control_for_retry
+	 * @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_generation_is_one_undoable_unsaved_command
+	 * @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_saved_relabels_preserve_active_task_answers_and_conditions
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
 	 * @matrix forms : builder-reload builder-save focus-recovery persistent-error retryable-action single-flight stale-acknowledgement
 	 */
@@ -170,7 +204,20 @@ export class Header {
 
 		const button = this.saveButton;
 		const hadFocus = document.activeElement === button;
+		this.builder.updateSchema();
+		this.builder.draft.group = null;
 		const state = this.persistenceState;
+		if (
+			!this._saveAttempt ||
+			!this.builder.draft.equal(this._saveAttempt.state, state) ||
+			this._saveAttempt.baseline !== this.builder.draft.baseline
+		) {
+			this._saveAttempt = {
+				state,
+				baseline: this.builder.draft.baseline,
+				id: crypto.randomUUID(),
+			};
+		}
 		this.unsaved();
 		this.clearMessage();
 		button.disabled = true;
@@ -180,20 +227,29 @@ export class Header {
 
 		const pending = (async () => {
 			try {
+				const payload = await this.builder.draftPayload(
+					state,
+					this.schemaForm.dataset.route,
+					this._saveAttempt.id,
+				);
+				if (this._destroyed) return false;
 				const response = await request.put(
 					this.schemaForm.dataset.route,
-					new FormData(this.schemaForm),
+					payload,
 					{ replaceErrorPage: false },
 				);
 				if (this._destroyed) return false;
-				if (response?.ok === true) {
-					this.acknowledge(state);
+				if (response?.ok === true && response.draft && response.baseline) {
+					this.builder.draft.acknowledge(state, response);
+					this._saveAttempt = null;
+					await this.builder.restoreDraft({ preserveFocus: true });
 					return true;
 				}
-				this.message(
-					response?.error || "Could not save this form. Try again.",
-					{ persistent: true },
-				);
+				if (!this.showConflict(response))
+					this.message(
+						response?.error || "Could not save this form. Try again.",
+						{ persistent: true },
+					);
 				return false;
 			} catch (error) {
 				captureError(error, button, { context: "builder-save" });
@@ -227,6 +283,7 @@ export class Header {
 	}
 
 	editFormName() {
+		this._originalName = this.nameDisplay.textContent;
 		this.nameDisplay.dataset.visible = "false";
 		this.nameInput.dataset.visible = "true";
 		this.nameInput.focus();
@@ -240,13 +297,17 @@ export class Header {
 	 */
 	_nameBlur() {
 		const newName = this.nameInput.value.trim();
-		if (newName !== this.nameDisplay.textContent) {
-			this.nameDisplay.textContent = newName;
-			this.nameHidden.value = newName;
-			this.unsaved();
-		}
+		this.nameDisplay.textContent = newName;
+		this.nameHidden.value = newName;
+		this.builder.updateSchema(false, "form-name");
+		this.builder.draft.group = null;
 		this.nameInput.dataset.visible = "false";
 		this.nameDisplay.dataset.visible = "true";
+	}
+
+	_nameInput() {
+		this.nameHidden.value = this.nameInput.value.trim();
+		this.builder.updateSchema(false, "form-name");
 	}
 
 	_nameKeyDown(e) {
@@ -254,7 +315,7 @@ export class Header {
 			e.preventDefault();
 			this.nameInput.blur();
 		} else if (e.key === "Escape") {
-			this.nameInput.value = this.nameDisplay.textContent;
+			this.nameInput.value = this._originalName;
 			this.nameInput.blur();
 		}
 	}
@@ -267,6 +328,7 @@ export class Header {
 		this._messageTimer = null;
 		this.nameInput.removeEventListener("blur", this._nameBlur);
 		this.nameInput.removeEventListener("keydown", this._nameKeyDown);
+		this.nameInput.removeEventListener("input", this._nameInput);
 		this.renderer?.destroy();
 		this.renderer = null;
 	}

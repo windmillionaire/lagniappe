@@ -12,6 +12,11 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import dates
 from lagniappe.core.tools.database import get as database_get
 
+from .....form_definitions import (
+    require_mutable_submission,
+    stage_completion_definition,
+    validate_completion_values,
+)
 from ....debug import ai_debug
 from .common import (
     _first_data_reference,
@@ -62,6 +67,8 @@ def _task_checkpoint_state(task):
         "completed_on": _checkpoint_datetime(task.completed_on),
         "due_date": _checkpoint_datetime(task.due_date),
         "submission": copy.deepcopy(task.submission),
+        "default_submission": copy.deepcopy(task.default_submission),
+        "schema_version": task.schema_version,
         "history": bool(task.db.get("history", False)),
         "page": _snapshot_entity(task.page),
         "form": _snapshot_entity(task.form),
@@ -601,9 +608,7 @@ def _same_entity(left, right):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
 # @reason archive suppression is verified through completion promotion tests
 def _should_archive_live_completion(task):
-    if not task.completed:
-        return False
-    return bool(task.completed_on or task.files or _task_has_submission_data(task))
+    return bool(task.completed)
 
 
 # @testable false
@@ -630,13 +635,11 @@ def _apply_completed_task_event(
     submission,
     form,
 ):
+    require_mutable_submission(task)
     task.name = name
     task.description = description
     if form:
         task.form = form
-    task.completed = True
-    task.completed_on = completed_on
-    task.completed_by = None
     task.assigned_to = None
     task.due_date = None
     task.files = list(files or [])
@@ -645,6 +648,11 @@ def _apply_completed_task_event(
     else:
         task.submission = None
         task.linked_pages = []
+    validate_completion_values(task)
+    stage_completion_definition(task)
+    task.completed = True
+    task.completed_on = completed_on
+    task.completed_by = None
 
 
 # @testable false
@@ -779,7 +787,7 @@ def _restore_task_checkpoint_assets(task, state, histories):
 
 
 # @testable true
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
+# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported
 # @matrix ai-report : compensation completed-task reuse
 def _undo_reused_completed_task(action, user):
     before = action.get("before") or {}
@@ -791,6 +799,10 @@ def _undo_reused_completed_task(action, user):
         task.allowed(Action.EDIT, user=user),
         "You do not have permission to restore this task.",
     )
+    if task.completed or state.get("completed"):
+        raise exceptions.ValidationError(
+            "Recorded completions cannot be rewritten by undo. Reopen the task to begin a new occurrence."
+        )
 
     histories = _checkpoint_entities(action.get("created_histories"))
     _restore_task_checkpoint_assets(task, state, histories)

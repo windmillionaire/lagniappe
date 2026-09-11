@@ -4,6 +4,7 @@ from .form_links import Link
 from .base_submission import SubmissionProperty
 from .base_db import DBProperty
 from .schema import SchemaFields
+from ..tools.form_definitions import completed_envelope, require_mutable_submission
 
 
 # @testable false
@@ -33,25 +34,37 @@ class FormSubmission(SubmissionProperty, DBProperty):
     json = True
     _id = "submission"
 
+    # @testable true
+    # @tests tests_unit/test_015_ai_tools.py::test_get_task_history_returns_dates_submissions_and_files
+    # @matrix submission task-completion : ai missing-schema raw-values
     @property
     def ai_value(self):
+        if self.entity.submission_schema_error:
+            return {"Saved answers (original labels unavailable)": self.value}
         value = super().ai_value
         return value or None
 
     def __init__(self, *args, entity=None, **kwargs):
         super().__init__(*args, entity=entity, **kwargs)
-        self.value = self.entity.db.get("submission")
+        # Reading a completion must not reserialize its immutable raw answers.
+        envelope = completed_envelope(self.entity)
+        SubmissionProperty.value.fset(
+            self, envelope["submission"] if envelope is not None else self.entity.db.get("submission")
+        )
 
     # @testable true
     # @tests tests_unit/test_003_submission.py::test_submission_value
     # @tests tests_unit/test_003_submission.py::test_submission_save
     # @matrix submission : db-value save
+    # @pair submission:schema-version
     @property
     def value(self):
-        return super().value
+        envelope = completed_envelope(self.entity)
+        return envelope["submission"] if envelope is not None else super().value
 
     @value.setter
     def value(self, value):
+        require_mutable_submission(self.entity)
         SubmissionProperty.value.fset(self, value)
         DBProperty.value.fset(self, self._submission)
 
@@ -67,10 +80,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
     def fields(self):
         if getattr(self, "_fields", None):
             return self._fields
-        elif not getattr(self.entity, "form", None):
-            return {}
-
-        schema = self.entity.form.schema
+        schema = self.entity.submission_schema
         fields = [SchemaFields.create_field(f, self.entity) for f in schema]
         self._fields = {f.id: f for f in fields if f is not None}
 
@@ -91,6 +101,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
     # @tests tests_unit/test_003_submission.py::test_submission_patch
     # @pair submission:patch
     def patch(self, field_id, value):
+        require_mutable_submission(self.entity)
         field = self.fields[field_id]
         field.validate_submission(value)
         return field

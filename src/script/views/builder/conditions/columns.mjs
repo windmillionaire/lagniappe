@@ -1,13 +1,14 @@
 import { CONFIG } from "../../../config/builder";
 import { SelectBox } from "../../../elements/combobox";
 import { primitives } from "../../../elements/primitives";
-import { simpleHash } from "../../../shared";
+import { generateElementId } from "../../../shared";
 import { Condition } from "./base";
 
 /**
  * @testable true
  * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_table_column_condition_editor
  * @pair forms:builder-table-column
+ * @matrix forms : stable-identity
  */
 export default class Columns extends Condition {
 	constructor(builder) {
@@ -82,6 +83,19 @@ export default class Columns extends Condition {
 	}
 
 	addColumnType() {
+		const saved = this.builder
+			.savedField(this.element.schema.id)
+			?.columns?.some((column) => column.id === this.setting.id);
+		if (saved) {
+			const notice = document.createElement("p");
+			notice.className = "text-sm text-base-medium";
+			notice.textContent =
+				"The saved column type is fixed until submission migrations are available.";
+			this.header.after(notice);
+			this.destroyables.push({ destroy: () => notice.remove() });
+			this.addColumnName();
+			return;
+		}
 		const selectElt = primitives.select({
 			label: "Column Type",
 			kind: "form",
@@ -133,9 +147,13 @@ export default class Columns extends Condition {
 			return false;
 		}
 		if (!this.setting.id) {
-			this.setting.id = `column-${simpleHash(
-				`${this.setting.title}-${this.element.schema.id}`,
-			)}`;
+			do {
+				this.setting.id = generateElementId("column");
+			} while (
+				this.element.schema.columns.some(
+					(column) => column.id === this.setting.id,
+				)
+			);
 		}
 		return true;
 	}

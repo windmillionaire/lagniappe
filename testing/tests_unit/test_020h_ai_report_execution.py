@@ -38,6 +38,10 @@ def _completion_case(monkeypatch, *, completed=False, recurring=False):
     )
     task.page = user.page
     task.description = "Keep this description"
+    task.form = TestEntities.get("FORM", {
+        "name": "Completion notes", "hash": "remote-completion-form", "form_type": "task",
+    })
+    task.form.schema = [{"id": "notes", "type": "input", "title": "Notes"}]
     task.submission = {"notes": "Keep these values"}
     task.files = [_test_file("kept.pdf")]
     task.assigned_to = user
@@ -217,25 +221,28 @@ def test_complete_task_undo_rejects_changed_completion(monkeypatch):
 
 # @matrix ai-report task-completion : recovery undo
 @pytest.mark.unit
-def test_complete_task_undo_resumes_history_cleanup(monkeypatch):
+def test_complete_task_undo_recovers_after_save_and_retains_history(monkeypatch):
     user, task, report = _completion_case(monkeypatch, recurring="near")
     assert report_runner.run_report(report, user)["status"] == "complete"
     history = task.new_history_created[0]
-    delete = report_runner.Entities.delete
+    save = report_runner.Entities.save
     calls = []
 
-    def interrupted_delete(*entities):
-        calls.append(entities)
-        if len(calls) == 1:
-            raise RuntimeError("History deletion interrupted")
-        return delete(*entities)
+    def interrupted_save(*entities):
+        result = save(*entities)
+        if task in entities:
+            calls.append(entities)
+            if len(calls) == 1:
+                raise RuntimeError("Task save acknowledgement interrupted")
+        return result
 
-    monkeypatch.setattr(report_runner.Entities, "delete", interrupted_delete)
+    monkeypatch.setattr(report_runner.Entities, "save", interrupted_save)
     assert report_undo.undo_report(report, user)["status"] == "failed"
     assert task.submission == {"notes": "Keep these values"}
     assert report_undo.undo_report(report, user)["status"] == "complete"
-    assert len(calls) == 2
-    assert calls[-1] == (history,)
+    assert len(calls) == 1
+    assert task.new_history_created == [history]
+    assert history.submission == {"notes": "Keep these values"}
 
 
 # @source lagniappe/core/tools/ai/reporting/execution/actions/task_completion.py::_complete_task
@@ -841,7 +848,7 @@ def test_undo_report_stops_before_compensation_when_initial_save_is_rejected(
 
 # @matrix ai-report : compensation completed-task deterministic-run recovery reuse
 @pytest.mark.unit
-def test_completed_task_retry_and_undo_restore_reused_task(monkeypatch):
+def test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported(monkeypatch):
     _patch_fake_keys(monkeypatch)
     user = _test_user("report-completed-task-recovery-owner")
     page = TestEntities.get(
@@ -857,6 +864,10 @@ def test_completed_task_retry_and_undo_restore_reused_task(monkeypatch):
     )
     task.page = page
     task.description = "Before report"
+    task.form = TestEntities.get("FORM", {
+        "name": "Registration status", "hash": "completed-task-recovery-form", "form_type": "task",
+    })
+    task.form.schema = [{"id": "status", "type": "input", "title": "Status"}]
     task.completed = False
     task.submission = {"status": "pending"}
     page._tasks = [task]
@@ -928,12 +939,13 @@ def test_completed_task_retry_and_undo_restore_reused_task(monkeypatch):
             stored.pop(entity.urlsafe_key, None)
 
     monkeypatch.setattr(report_runner.Entities, "delete", delete)
-    report_undo.undo_report(report, user)
+    result = report_undo.undo_report(report, user)
 
-    assert task.completed is False
-    assert task.description == "Before report"
-    assert task.submission == {"status": "pending"}
-    assert report.result["status"] == "undone"
+    assert result["status"] == "failed"
+    assert task.completed is True
+    assert task.description == "After report"
+    assert task.submission == {"status": "complete"}
+    assert "cannot be rewritten" in str(result)
 
 
 # @matrix ai-report : grouping result

@@ -16,6 +16,11 @@ from lagniappe.core.definitions.default import DefaultEnum
 PREFIX = CONFIG.PREFIX
 
 
+# @testable infrastructure
+class ExactEntityState(dict):
+    """Guard a complete saved row, including absence of additional properties."""
+
+
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_database_initialize_only_marks_new_content_stores_as_fresh
 # @matrix database-migrations setup : detection fresh-install reserved-seeding
@@ -222,16 +227,24 @@ def save_mutations(writes, *, guards=None):
 
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_guarded_checkpoint_rejects_a_concurrent_asset_change
+# @tests tests_unit/test_004f_form_drafts.py::test_exact_publication_guard_rejects_new_properties_but_document_guard_is_subset
 # @matrix mutations sync : document checkpoint cas conflict
+# @matrix forms mutations permissions : guarded-save concurrent-restrictions
 @retry_aborted
 def _save_guarded_mutations(writes, fingerprints, guards):
     with DATA.datastore.transaction() as transaction:
         for key, expected in guards:
             current = DATA.datastore.get(key, transaction=transaction)
-            if current is None or any(current.get(name) != value for name, value in expected.items()):
-                from lagniappe.core.exceptions import ValidationError
-
-                raise ValidationError("Document changed while saving; sync and retry.")
+            conflict = (
+                current is not None if expected is None else
+                current is None or (
+                    dict(current) != expected if isinstance(expected, ExactEntityState) else
+                    any(current.get(name) != value for name, value in expected.items())
+                )
+            )
+            if conflict:
+                from lagniappe.core.exceptions import MutationConflict
+                raise MutationConflict("Saved state changed while saving; reload and retry.")
         for entity, mask in writes:
             _put_mutation(transaction, entity.db, mask)
         for fingerprint in fingerprints:

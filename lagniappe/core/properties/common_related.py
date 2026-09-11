@@ -1,5 +1,6 @@
 from ..definitions import Action, MutationIntent
 from ..entities import Entities
+from ..exceptions import ValidationError
 from ..mixins import (
     AIMixin,
     ColumnMixin,
@@ -8,6 +9,7 @@ from ..mixins import (
     RelatedEntityListMixin,
     RelatedEntityMixin,
 )
+from ..tools.form_definitions import immutable_submission
 from .base_db import DBProperty
 from .base_property import Property
 
@@ -43,6 +45,10 @@ class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProp
 
     @value.setter
     def value(self, value):
+        if self.entity.entity_kind in {"task", "task_history"} and self.key is not None:
+
+            if immutable_submission(self.entity) and self.key != getattr(value, "key", None):
+                raise ValidationError("A completed submission must keep its original form.")
         if value is not None and not getattr(value, "key", None):
             raise ValueError("Value must have a key")
         if value is not None and getattr(value, "entity_kind", None) != "form":
@@ -62,6 +68,15 @@ class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProp
 
     @property
     def ai_value(self):
+        if self.entity.entity_kind in {"task", "task_history"}:
+
+            if immutable_submission(self.entity):
+                if not self.entity.allowed(Action.VIEW, user=self.user):
+                    return None
+                definition = self.entity.submission_definition
+                if definition.error:
+                    return {"unavailable": definition.error}
+                return {"schema": definition.schema, "version": definition.version}
         if (
             not self.value
             or not self.value.allowed(Action.VIEW, self.user)

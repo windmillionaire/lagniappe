@@ -20,6 +20,16 @@ from .entity import Entity
 from . import Entities
 from lagniappe.core.tools.database import get as database_get
 from ..tools.tasks import scheduling
+from ..tools.form_definitions import (
+    capture_completion_identity,
+    compatible_values,
+    immutable_submission,
+    preload_definitions,
+    stage_completion_definition,
+    stage_completion_guards,
+    validate_completion_values,
+    validate_completion_write,
+)
 from ..tools.auth.context import current_context_user
 from ..tools.auth.restrictions import permission_relation
 
@@ -30,11 +40,22 @@ from ..tools.auth.restrictions import permission_relation
 class Task(AssetMixin, SubmitterMixin, Entity):
     entity_kind = "task"
 
+    # @testable false
+    # @covered-by lagniappe/core/tools/form_definitions.py::validate_completion_write
+    # @reason capture serialized identity only when raw data is actually accessed
+    @property
+    def db(self):
+        raw = Entity.db.fget(self)
+        if "_completion_identity" not in self.__dict__:
+            capture_completion_identity(self, raw)
+        return raw
+
     @property
     def exclude_from_index(self):
         return frozenset(
             {
                 "submission",
+                "completed_submission",
                 "default_submission",
                 "description",
                 "assets",
@@ -199,13 +220,16 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         """Load snapshots with their live Task and current attachment owners."""
         records = [record for record in records if record is not None]
         file_keys = {key for record in records for key in record.get("files", [])}
-        return [
+        histories = [
             entity for entity in Entities.fetch(
                 self, *records, *file_keys,
                 request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
             )
             if isinstance(entity, Entities.TASK_HISTORY)
         ]
+
+        preload_definitions(histories)
+        return histories
 
     def save_submission(self):
         super().save_submission()
@@ -245,8 +269,13 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_raises_when_required_submission_missing
     # @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_retries_and_undoes
     # @matrix task-completion : assignee complete completed-by no-schedule
+    # @matrix task-completion : schema-version
     # @matrix submission task-completion : required-fields validation
     def complete(self, *, user=None, history_key=None):
+        if self.completed:
+            return
+
+        validate_completion_values(self)
         incomplete = self._check_required() if self.form else []
         if incomplete:
             titles = [s.label for s in incomplete]
@@ -254,6 +283,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
                 "Required fields are incomplete: " + ", ".join(titles)
             )
 
+        stage_completion_definition(self)
         self.completed = True
         self.completed_on = datetime.now(timezone.utc)
         self.completed_by = user if user is not None else current_user
@@ -328,28 +358,53 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @matrix signature task-completion : asset-cleanup uncomplete
     def clear_submission_assets(self):
         for name in list(self.assets.keys()):
-            self.delete_asset(name)
+            asset = self.get_asset(name)
+            if asset:
+                self.add_mutation_intents(MutationIntent.delete_blob(
+                    asset.path, asset.visibility.value, reason="reopened-submission-assets",
+                ))
+        self.assets.clear()
+        self._assets = {}
+        self.db.pop("assets", None)
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_restores_default_submission_and_assignment
     # @tests tests_unit/test_003g_todo_lists.py::test_uncomplete_archives_then_clears_todo_items
     # @matrix task-completion : assignment history repeating-default uncomplete
+    # @matrix task-completion : schema-version
     # @pairs form-todo:field-reset signature:history
+    # @matrix task-completion mutations : immutable-submission concurrency
     def uncomplete(self, history_key=None):
         """Archive the current completion as TaskHistory and reset the task."""
+
+        validate_completion_write(self)
+        completed_cycle = immutable_submission(self)
+        defaults = deepcopy(self.default_submission)
+        if defaults and completed_cycle:
+            definition = self.submission_definition
+            if definition.error:
+                raise ValidationError(definition.error)
+            compatible_values(definition.schema, self.form.schema if self.form else [], defaults)
+        if completed_cycle:
+            stage_completion_guards(self)
         self._clear_scheduled_uncomplete()
-        if self.completed:
+        if completed_cycle:
             if history_key is None:
                 self.create_history_entry()
             else:
                 self.create_history_entry(history_key=history_key)
+            self._completion_reopening = True
+        self.db.pop("completed_submission", None)
+        self._completion_sealing = None
         self.completed = False
+        self._submission_definition = None
         self.completed_on = None
         self.completed_by = None
         self.due_date = None
         self.clear_submission_assets()
         submission = self.properties.submission
+        submission._fields = None
         fields = submission.fields
         defaults = {
             field_id: value
@@ -360,6 +415,10 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         self._set_default_submission(defaults)
         submission._fields = None
         submission.value = deepcopy(defaults)
+        if self.form:
+            self.db["schema_version"] = self.form.version
+        else:
+            self.db.pop("schema_version", None)
         self.files = []
 
     @property
@@ -404,6 +463,8 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_031_submitted_references.py::test_task_update_preserves_unchanged_assignee_eligibility
     # @matrix task : assignee-preservation file-assets tracking update uploaded-files
     def update(self, data):
+        if self.completed:
+            raise ValidationError("Reopen the task before editing its completion.")
         previous_form_key = self.properties.form.key
         self.page = data.get("page", self.page)
         self.form = data.get("form")

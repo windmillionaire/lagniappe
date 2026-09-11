@@ -7,6 +7,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.files.html import sanitize_form_content_html
+from lagniappe.core.tools.form_definitions import rendered_html_fields
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,
@@ -16,6 +17,7 @@ from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 
 from . import assets
+from .main import _asset_metadata_response, _asset_redirect, _large_asset
 
 
 # @testable true
@@ -29,11 +31,49 @@ def html_field(key, field_id, **kwargs):
         kwargs["entity"],
         request=Fetch.direct(),
     )
+    if isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
+        return responses.document_html(rendered_html_fields(entity).get(field_id, ""))
     form = entity if isinstance(entity, Entities.FORM) else entity.form
     html = form.get_html_field(field_id) if form else None
     return responses.document_html(
         sanitize_form_content_html(html, form, field_id) if form else ""
     )
+
+
+# @testable true
+# @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_historical_images_are_bound_to_the_authorized_completion
+# @matrix task-completion html-field permissions : schema-version owned-image record-scope
+@assets.route("<key>/form-version/<version>/<asset_name>", methods=["GET", "HEAD"])
+@permission(requested=Action.VIEW)
+def historical_form_image(key, version, asset_name, **kwargs):
+    """Serve retained images through the authorized completion, never a free snapshot key."""
+    entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
+    if not isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
+        abort(404)
+    definition = entity.submission_definition
+    if (
+        not definition.immutable or definition.error or not definition.content_available
+        or version != definition.version
+    ):
+        abort(404)
+    name = asset_name if asset_name in definition.source.assets else asset_name.rsplit(".", 1)[0]
+    html_ids = {field["id"] for field in definition.schema if field["type"] == "html"}
+    stored = definition.source.assets.get(name)
+    if not stored or stored.get("type") != "image" or not any(
+        name.startswith(f"image_{field_id}_") for field_id in html_ids
+    ):
+        abort(404)
+    asset = definition.source.get_asset(name)
+    if not asset:
+        abort(404)
+    if request.method == "HEAD":
+        return _asset_metadata_response(asset, asset.content_type)
+    if _large_asset(asset):
+        return _asset_redirect(asset, asset.content_type)
+    content = asset.get()
+    if content is None:
+        abort(404)
+    return responses.image_response(content, asset.content_type)
 
 
 # @testable true

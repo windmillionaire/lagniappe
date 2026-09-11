@@ -218,7 +218,7 @@ def _capture_action_before(action, report, user, created, context=None):
 
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
+# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported
 # @matrix ai-report : completed-task idempotency recovery
 def _prepare_action_checkpoint(action, report, user, created, context, record):
     if action.get("type") == "append_page_document":

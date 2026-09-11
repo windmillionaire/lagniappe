@@ -96,6 +96,7 @@ source = source.replace(
   'import { BaseTable, EmbeddedTable } from "../elements/base/baseTable";',
   "class BaseTable {} class EmbeddedTable {}",
 );
+source = source.replace(/^import .*;\n/gm, "");
 source = source.replaceAll("export class ", "class ");
 source += "\nglobalThis.IndexTable = IndexTable;";
 vm.runInContext(source, context);

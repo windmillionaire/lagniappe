@@ -1,6 +1,7 @@
 """Kind-specific save planners."""
 
 from ..definitions import Fetch, FetchReason
+from ..tools.form_definitions import validate_completion_write
 from .base import StandardMutation
 
 
@@ -57,6 +58,8 @@ class TaskMutation(StandardMutation):
     # @matrix permissions search files : task-move ancestor-tags
     # @matrix files : ownership history parent-key retry
     def plan_save(self, entity, builder, *, reason, depends_on=()):
+
+        validate_completion_write(entity)
         super().plan_save(
             entity,
             builder,
@@ -78,6 +81,8 @@ class TaskMutation(StandardMutation):
 class TaskHistoryMutation(StandardMutation):
     # @testable infrastructure
     def plan_save(self, entity, builder, *, reason, depends_on=()):
+
+        validate_completion_write(entity)
         super().plan_save(
             entity,
             builder,
@@ -115,13 +120,9 @@ class FormMutation(StandardMutation):
     # @matrix form : relations save schema-history
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         entity.properties.restricted_to.materialize()
-        previous_version = entity.version
-        entity.properties.version.update()
-        if previous_version != entity.version:
-            entity._permission_sources_changed = True
-        if previous_version != entity.version and entity.properties.schema.previous:
-            history = builder.entities.FORM_HISTORY.create(entity, previous_version)
-            builder.plan_standard(history, reason="form-schema-history")
+        from ..tools.form_drafts import prepare_form_publication
+
+        prepare_form_publication(entity, builder)
 
         super().plan_save(
             entity,

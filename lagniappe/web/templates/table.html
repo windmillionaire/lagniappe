@@ -21,10 +21,10 @@
   </tr>
 {% endmacro %}
 
-{% macro table(entities, parent) %}
+{% macro table(entities, parent, table_id=None) %}
   <table lp-component
          {% if entities is undefined and not parent.is_filter %}lp-prefetch{% endif %}
-         id="{{ 'table' if not parent.table.embedded else 'embedded-table' }}"
+         id="{{ table_id or ('table' if not parent.table.embedded else 'embedded-table') }}"
          data-kind="{{ parent.table.kind }}"
          data-preload='{{ parent.table.preload|tojson }}'
          data-default="{{ 'IndexTable' if not parent.table.embedded else 'EmbeddedTable' }}"

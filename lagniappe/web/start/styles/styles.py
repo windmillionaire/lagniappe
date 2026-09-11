@@ -13,7 +13,7 @@ STYLES = {
 		"icon": "icon-base text-kind-default"
 	},
 	"builder": {
-		"view": "group/builder mx-auto flex max-w-7xl flex-row justify-center gap-8 px-4 pt-4 sm:px-0 sm:pt-6 lg:pt-8",
+		"view": "group/builder mx-auto hidden max-w-7xl flex-row justify-center gap-8 px-4 pt-4 sm:px-0 sm:pt-6 lg:flex lg:pt-8",
 		"component": "text-md flex cursor-move flex-row items-center gap-3 rounded-md bg-form-bg px-3 py-1.5 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark",
 		"header": {
 			"model": "h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold",

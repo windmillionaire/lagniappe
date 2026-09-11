@@ -395,13 +395,16 @@ def test_builder_destroys_owned_search_modal_and_panels_during_startup(run_node)
             import assert from "node:assert/strict";
             import fs from "node:fs";
             import vm from "node:vm";
+            import { BuilderDraft } from "./src/script/views/builder/draft.mjs";
 
             let resolveSearch;
             const searchReady = new Promise((resolve) => { resolveSearch = resolve; });
             const destroyed = [];
             const panelClass = (name) => class {
-              constructor() { this.name = name; this.saveButton = { dataset: {} }; }
+              constructor() { this.name = name; this.saveButton = { dataset: {} }; this.nameHidden = { value: "Form" }; }
               init() {}
+              saved() {}
+              unsaved() {}
               destroy() { destroyed.push(name); }
             };
             class SearchBox {
@@ -426,6 +429,7 @@ def test_builder_destroys_owned_search_modal_and_panels_during_startup(run_node)
             const indicator = { dataset: {}, setAttribute() {} };
             const documentListeners = new Map();
             const context = {
+              structuredClone, BuilderDraft,
               captureError: (error) => { throw error; },
               ComponentsPanel: panelClass("components"),
               ConditionPanel: panelClass("conditions"),
@@ -433,6 +437,7 @@ def test_builder_destroys_owned_search_modal_and_panels_during_startup(run_node)
               DeleteModal: class {},
               document: {
                 hidden: false,
+                getElementById() { return null; },
                 addEventListener(type, callback) { documentListeners.set(type, callback); },
                 removeEventListener(type, callback) {
                   if (documentListeners.get(type) === callback) documentListeners.delete(type);
@@ -458,7 +463,7 @@ def test_builder_destroys_owned_search_modal_and_panels_during_startup(run_node)
               request: {},
               SearchBox,
               withTransition: async (callback) => callback(),
-              window: { location: {} },
+              window: { location: {}, addEventListener() {}, removeEventListener() {} },
             };
             vm.createContext(context);
             let source = fs.readFileSync("src/script/views/builder/builder.mjs", "utf8");
@@ -471,6 +476,7 @@ def test_builder_destroys_owned_search_modal_and_panels_during_startup(run_node)
               addEventListener() {},
               removeEventListener() {},
               setAttribute() {},
+              querySelector() { return null; },
             };
             const builder = new context.FormBuilder(node);
             await builder.init();

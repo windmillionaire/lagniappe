@@ -8,9 +8,10 @@ from ..definitions import (
     MutationPhase,
     MutationPlan,
 )
-from ..exceptions import capture
-from ..tools import cache
+from ..exceptions import MutationConflict, capture
+from ..tools import cache, form_definitions
 from lagniappe.core.tools.database import utility as database_utility
+from lagniappe.core.tools.database.assets import cleanup_rejected_attempt
 from ..tools.notifications import service as notification_service
 
 
@@ -64,6 +65,19 @@ def consume_mutation_intents(plan):
             effect.entity._permission_sources_changed = False
             if effect.entity.kind == "task":
                 effect.entity._page_changed = False
+            if effect.entity.kind in {"task", "task_history"}:
+                form_definitions.capture_completion_identity(effect.entity, effect.entity.db)
+                effect.entity._completion_sealing = None
+                effect.entity._completion_reopening = False
+                effect.entity._completion_write_guards = []
+            if effect.entity.kind == "form":
+                effect.entity.capture_saved_form_state()
+                effect.entity._pending_html = {}
+                effect.entity._form_save_guard = None
+                effect.entity._form_additional_guards = []
+                effect.entity._form_attempt_assets = []
+            if effect.entity.kind in {"form_history", "task_history"}:
+                effect.entity._form_attempt_assets = []
 
 
 # @testable infrastructure
@@ -251,10 +265,23 @@ def execute_mutation(plan, *, guards=None):
     ]
 
     if writes:
-        options = {"guards": guards} if guards else {}
-        database_utility.save_mutations(
-            ((effect.entity, effect.property_mask) for effect in writes), **options
-        )
+        mutation_guards = list(guards or [])
+        for effect in writes:
+            for attribute in ("_form_save_guard", "_definition_create_guard"):
+                guard = getattr(effect.entity, attribute, None)
+                if guard is not None:
+                    mutation_guards.append(guard)
+            for attribute in ("_completion_write_guards", "_form_additional_guards"):
+                mutation_guards.extend(getattr(effect.entity, attribute, None) or [])
+        options = {"guards": mutation_guards} if mutation_guards else {}
+        try:
+            database_utility.save_mutations(
+                ((effect.entity, effect.property_mask) for effect in writes), **options
+            )
+        except MutationConflict:
+            for effect in writes:
+                cleanup_rejected_attempt(effect.entity)
+            raise
         for effect in writes:
             _completed(outcome, effect.effect)
 

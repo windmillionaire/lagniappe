@@ -2983,6 +2983,7 @@ def test_ai_get_file_reports_unsupported_original_file(monkeypatch):
 
 
 # @matrix ai tasks : context files task-history tool-context
+# @matrix submission task-completion : ai missing-schema raw-values
 @pytest.mark.unit
 def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     user = TestEntities.get(
@@ -3102,10 +3103,12 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     )
     assert "completed_at" not in result["history"][0]
     assert result["history"][0]["description"] == "Completed at the service shop."
-    assert result["history"][0]["Form"]["hash"] == "hash:history-service-form"
-    assert result["history"][0]["Form"]["form_name"] == "Service Form"
-    assert result["history"][0]["Form"]["schema"] == form.schema
-    assert result["history"][0]["Service Notes"] == "Synthetic oil"
+    assert "unavailable" in result["history"][0]["Form"]["unavailable"]
+    assert "schema" not in result["history"][0]["Form"]
+    assert "Service Notes" not in result["history"][0]
+    assert result["history"][0]["Saved answers (original labels unavailable)"] == {
+        "input-service-notes": "Synthetic oil",
+    }
     assert "input-service-notes" not in result["history"][0]
     assert "submission" not in result["history"][0]
     assert result["history"][0]["Attachments"] == [

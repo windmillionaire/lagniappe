@@ -152,7 +152,7 @@ def test_uncomplete_archives_then_clears_todo_items():
     }
     task.properties.submission.value = current
     task.db["default_submission"] = json.dumps(current)
-    task.completed = True
+    task.complete(user=TestEntities.get("USER", {"name": "Todo owner", "hash": "todo-owner"}))
     archived = []
 
     def capture_history(**_kwargs):

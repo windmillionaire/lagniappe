@@ -92,6 +92,8 @@
       </div>
     </h2>
     <div class="flex flex-row items-center gap-2">
+      <button type="button" class="{{ styles.nav.button }}" data-role="undo-draft" aria-label="Undo draft change" title="Undo draft change" disabled>{{ render_icon("undo") }}</button>
+      <button type="button" class="{{ styles.nav.button }}" data-role="redo-draft" aria-label="Redo draft change" title="Redo draft change" disabled>{{ render_icon("redo") }}</button>
       <button id="preview-toggle"
               class="{{ styles.builder.switch.container }} group/toggle"
               role="switch"
@@ -137,6 +139,7 @@
 {% endmacro %}
 
 {% macro main() %}
+  {% if builder_draft is defined %}<script id="builder-draft" type="application/json">{{ builder_draft|tojson }}</script>{% endif %}
   {{ desktop('The form builder') }}
   <div lp-view
        lp-entity

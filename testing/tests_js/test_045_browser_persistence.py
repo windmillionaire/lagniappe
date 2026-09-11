@@ -339,6 +339,41 @@ function makeDocument({ acknowledged = "<p>Saved</p>", current = acknowledged } 
 '''
 
 
+# @matrix editor html-field : listener-teardown builder-save
+def test_editor_teardown_releases_toolbar_before_editor_view(run_node):
+    run_node(
+        _EDITOR_HARNESS + r'''
+const assert = require("node:assert/strict");
+const { document: owner } = makeDocument();
+let editorDestroyed = false;
+const order = [];
+owner.editor.destroy = () => { editorDestroyed = true; order.push("editor"); };
+owner.toolbar = { destroy() {
+  assert.equal(editorDestroyed, false, "Toolbar cleanup ran after the Tiptap view was unavailable");
+  order.push("toolbar");
+} };
+owner.destroy();
+owner.destroy();
+assert.deepEqual(order, ["toolbar", "editor"]);
+context.document = { removeEventListener() {} };
+vm.runInContext(fs.readFileSync("src/script/elements/editor/toolbar.mjs", "utf8")
+  .replace(/^import.*\n/gm, "").replace("export class Toolbar", "globalThis.TestToolbar = class Toolbar"), context);
+const removed = [], events = [];
+let cancellations = 0;
+const toolbar = {
+  editor: { get view() { throw new Error("Destroyed editor view accessed"); }, off(event) { events.push(event); } },
+  editorDom: { removeEventListener(event) { removed.push(event); } }, forms: {},
+  editorState: { cancel() { cancellations++; } }, toggleForm: { cancel() { cancellations++; } },
+};
+context.TestToolbar.prototype.destroy.call(toolbar);
+context.TestToolbar.prototype.destroy.call(toolbar);
+assert.deepEqual(events, ["transaction"]);
+assert.deepEqual(removed, ["click", "keydown", "editor-link-edit"]);
+assert.equal(cancellations, 2);
+'''
+    )
+
+
 # @matrix editor html-field : authoritative-content error-reporting initial-load retry
 def test_independent_editor_failed_load_stays_inert_and_retries(run_node):
     run_node(

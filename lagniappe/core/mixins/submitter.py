@@ -7,6 +7,10 @@ import json
 from ..definitions.fingerprints import restricted_fingerprint
 from ..exceptions import ValidationError
 from ..entities import Entities
+from ..tools.form_definitions import (
+    completed_envelope, definition_for, history_values_for,
+    immutable_submission, require_mutable_submission,
+)
 from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.references import (
     SubmittedReferenceResolver,
@@ -136,6 +140,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
     # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit submit-boundary
     def form_submission(self, values, *, actor=None):
+        require_mutable_submission(self)
         submission = self.properties.submission
         form_values = getattr(values, "form", values)
         files = getattr(values, "files", None)
@@ -251,6 +256,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004d_submitter.py::test_patch_submission_merges_multiple_fields
     # @matrix submission : json-payload multiple-fields patch single-field
     def patch_submission(self, update, *, actor=None):
+        require_mutable_submission(self)
         updated = json.loads(update) if isinstance(update, str) else update
         if actor is not None:
             self.validate_browser_submission_references(
@@ -263,7 +269,14 @@ class SubmitterMixin:
 
         self.save_submission()
 
+    # @testable true
+    # @tests tests_unit/test_004i_form_definitions.py::test_generated_answers_reject_unknown_fields_before_resetting_values
+    # @matrix submission : ai unknown-fields preservation
     def ai_submission(self, generated_submission):
+        require_mutable_submission(self)
+        unknown = set(generated_submission) - set(self.properties.submission.fields)
+        if unknown:
+            raise ValidationError("Generated answers include unavailable fields and need review.")
         for field_id, field in self.properties.submission.fields.items():
             field.reset()
             field.validate_ai(generated_submission.get(field_id, None))
@@ -278,6 +291,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
     # @matrix form-table submission text-input : error-message fuzzy-match import list-normalization save validation
     def import_submission(self, imported_submission, import_process):
+        require_mutable_submission(self)
         for field_id, field in self.properties.submission.fields.items():
             try:
                 field.reset()
@@ -304,7 +318,23 @@ class SubmitterMixin:
 
     @property
     def schema_version(self):
-        return self.db.get("schema_version")
+        envelope = completed_envelope(self)
+        return envelope.get("schema_version") if envelope is not None else self.db.get("schema_version")
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/form_definitions.py::definition_for
+    # @reason shared read boundary delegates exact-version resolution
+    @property
+    def submission_definition(self):
+        return definition_for(self)
+
+    @property
+    def submission_schema(self):
+        return self.submission_definition.schema
+
+    @property
+    def submission_schema_error(self):
+        return self.submission_definition.error
 
     # @testable true
     # @tests tests_unit/test_004d_submitter.py::test_save_default_field_copies_db_value_and_saves_only_submitter
@@ -337,6 +367,9 @@ class SubmitterMixin:
     # @pair form-todo:repeating-default
     def save_default_field(self, field_id, submission=None):
         """Persist one field's DB value as a repeating submission default."""
+        require_mutable_submission(self)
+        if submission is not None and submission.entity is not self:
+            history_values_for(self, submission.entity, field_id)
         submission = submission or self.properties.submission
         field = submission.fields.get(field_id)
         if field is None:
@@ -363,6 +396,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004d_submitter.py::test_save_submission_removes_changed_repeating_defaults
     # @matrix submission : blank-persistence empty-submission load-save normalization reconciliation repeating-default stored-false stored-null
     def save_submission(self):
+        require_mutable_submission(self)
         submission_value = self.properties.submission.db_value
         self.properties.submission.value = submission_value
         defaults = {
@@ -371,7 +405,7 @@ class SubmitterMixin:
             if field_id in submission_value and submission_value[field_id] == value
         }
         self._set_default_submission(defaults)
-        if self.form:
+        if self.form and self.entity_kind != "task_history":
             self.db["schema_version"] = self.form.version
         if "name" in submission_value:
             self.name = submission_value["name"]
@@ -400,10 +434,11 @@ class SubmitterMixin:
     @property
     def fingerprint(self):
         form = self.form
+        version = self.schema_version if immutable_submission(self) else (form.version if form else "")
         return restricted_fingerprint(
             super().fingerprint,
             self.restricted_to,
-            form_version=(form.version or "") if form else "",
+            form_version=version or "",
         )
 
     # @testable true

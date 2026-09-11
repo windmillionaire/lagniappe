@@ -353,13 +353,19 @@ export class IndependentDocument {
 		this.target.classList.remove("hidden");
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_045_browser_persistence.py::test_editor_teardown_releases_toolbar_before_editor_view
+	 * @matrix editor html-field : listener-teardown builder-save
+	 */
 	destroy() {
+		if (this._destroyed) return;
 		this._destroyed = true;
 		this.retryButton?.removeEventListener("click", this._retry);
 		this.pendingContent = null;
 		this._pendingKeepalive = false;
-		this.editor?.destroy();
 		this.toolbar?.destroy();
+		this.editor?.destroy();
 		this.editor = null;
 		this.toolbar = null;
 	}

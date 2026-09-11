@@ -1,6 +1,6 @@
 import json
 
-from flask import abort, request
+from flask import abort, request, get_template_attribute
 from flask_login import current_user
 
 from lagniappe.core import exceptions
@@ -832,11 +832,27 @@ def personal_direct(key, **kwargs):
 @permission(Resource.TASK, Action.VIEW)
 def history(key, **kwargs):
     task = kwargs["entity"]
-    history = task.history
+    from lagniappe.core.tools.form_definitions import history_groups
 
-    history_index = index.TaskHistoryIndex(entity=task)
+    groups = history_groups(task.history)
+    for group in groups:
+        group["index"] = index.TaskHistoryIndex(entity=group["records"][0])
+    template = get_template_attribute("tasks/history.html", "completion_history")
+    return template(groups), 200
 
-    return responses.table(history, history_index)
+
+# @testable true
+# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_definitions_remain_original_after_builder_save
+# @matrix tasks task-completion : history schema-version readonly
+@tasks.route("<key>/completion-details", methods=["GET"])
+@permission(requested=Action.VIEW)
+def completion_details(key, **kwargs):
+    entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
+    if not isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)) or (
+        isinstance(entity, Entities.TASK) and not entity.completed
+    ):
+        abort(404)
+    return responses.form_submission(entity)
 
 
 # @testable false
@@ -863,7 +879,14 @@ def latest_history_submission(key, **kwargs):
     task = kwargs["entity"]
     histories = task.load_history(database_get.latest_task_history(task))
     history = histories[0] if histories else None
-    submission = history.properties.submission.form_value if history else {}
+    from lagniappe.core.tools.form_definitions import history_values_for
+
+    try:
+        values = history_values_for(task, history) if history else {}
+    except exceptions.ValidationError as error:
+        return responses.json_response({"latest_submission": {}, "history_error": str(error)})
+    projected = history.properties.submission.form_value if history else {}
+    submission = {field_id: projected[field_id] for field_id in values if field_id in projected}
     return responses.json_response({"latest_submission": submission})
 
 

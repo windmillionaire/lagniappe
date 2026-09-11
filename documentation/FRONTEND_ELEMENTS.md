@@ -99,6 +99,13 @@ Empty submission-bearing fields on a reopened Task can restore their most
 recent history value. Static HTML, computed status, and signature assets do not
 offer that control.
 
+Completed Task forms use their recorded definition. The history view keeps its
+newest-first order and uses separate tables for consecutive definition versions,
+so column headings retain their original labels. **View completion** expands a
+read-only form with the original labels, answers and static HTML. Missing legacy
+definitions/content are shown as unavailable; they never fall back to the current
+Form. History-fill responses omit incompatible candidates and report the reason.
+
 ## Primitives
 
 `elements/primitives.mjs` owns DOM factories for inputs, labels, badges,

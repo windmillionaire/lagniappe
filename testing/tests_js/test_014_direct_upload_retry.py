@@ -172,6 +172,31 @@ if (progressValues.join(",") !== "4,8,12") {
     )
 
 
+# @matrix direct-upload forms : retryable-action persistent-error
+def test_builder_direct_upload_failure_preserves_owner_page(run_node):
+    run_direct_upload_check(
+        run_node,
+        """
+context.request = { post: async (route, body, options) => {
+  if (route !== "/forms/draft/update/direct-upload" || options.replaceErrorPage !== false) {
+    throw new Error("Builder upload failure could replace the draft page");
+  }
+  return { ok: false, error: "Editing permission changed" };
+} };
+let error;
+try {
+  await uploadElement.directUpload.createSession({
+    route: "/forms/draft/update", inputName: "draft-image-local", replaceErrorPage: false,
+    file: new File(["image"], "image.png", { type: "image/png" }),
+  });
+} catch (caught) { error = caught; }
+if (error?.message !== "Editing permission changed") {
+  throw new Error("Builder upload failure did not remain retryable on its owner");
+}
+""",
+    )
+
+
 # @matrix direct-upload : compatibility multipart-fallback single-file
 def test_single_file_keeps_compatibility_multipart_fallback(run_node):
     run_base_upload_check(

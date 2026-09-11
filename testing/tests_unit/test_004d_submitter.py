@@ -105,6 +105,7 @@ def test_save_default_field_copies_db_value_and_saves_only_submitter():
     task._db = _IndexableEntity(task.db)
     source_value = {"nested": ["original"]}
     submission = SimpleNamespace(
+        entity=task,
         db_value={"repeat-field": source_value},
         fields={"repeat-field": SimpleNamespace(repeating_default=True)},
     )

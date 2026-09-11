@@ -69,7 +69,7 @@
   {% set completed = t.completed %}
   {% set form_readonly = t.readonly or completed %}
   {% set show_settings = not form_readonly %}
-  {% set show_form = t.form and ((not completed) or t.submission) %}
+  {% set show_form = (t.properties.submission.value or t.submission_schema) if completed else t.form %}
   {% set can_move = t.allowed(Action.EDIT) %}
   {% set can_combine = t.allowed(Action.DELETE) %}
   <li id="{{ t.hash }}"
@@ -196,7 +196,9 @@
         data-history="{{ t.hash }}:TaskHistory"
         data-deferred-route="{{ url_for('tasks.get', key=t.urlsafe_key) }}"
         data-destination="{{ t.hash }}:TaskForm"
-        data-schema='{{ t.form.schema|tojson }}'
+        data-schema='{{ t.submission_schema|tojson }}'
+        {% if t.submission_schema_error %}data-schema-error="{{ t.submission_schema_error }}"{% endif %}
+        {% if t.submission_schema_error %}data-raw-submission='{{ t.properties.submission.value|tojson }}'{% endif %}
         data-submission='{{ t.properties.submission.form_value|tojson }}'
         data-close="{{ t.hash }}"
         class="{{ styles.form.default }}">

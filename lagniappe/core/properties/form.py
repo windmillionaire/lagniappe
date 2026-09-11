@@ -1,8 +1,5 @@
 """Form-related properties for form type filtering and display."""
 
-import hashlib
-import json
-
 from ..definitions import Ordering
 from ..mixins import (
     AIMixin,
@@ -16,6 +13,7 @@ from ..mixins import (
 from .base_db import DBProperty
 from .base_filters import Filters
 from .form_table import Table
+from ..tools.form_definitions import definition_version
 
 
 # @testable true
@@ -103,10 +101,7 @@ class SchemaVersion(DBProperty):
 
     def update(self):
         schema_hash = super().value
-
-        new_schema_hash = hashlib.md5(
-            json.dumps(self.entity.schema, sort_keys=True).encode()
-        ).hexdigest()
+        new_schema_hash = definition_version(self.entity)
 
         if schema_hash != new_schema_hash:
             self.value = new_schema_hash

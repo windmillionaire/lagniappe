@@ -789,6 +789,7 @@ class RestrictedTo(DBProperty):
     # @tests tests_unit/test_002_entity_general_properties.py::test_task_file_restrictions_use_stored_hashes_without_group_reads
     # @matrix permissions : source-clauses inherited-restrictions
     # @matrix task permissions : source-clauses admin-only
+    # @matrix permissions relations : deleted-form fail-closed admin-only
     # @matrix permissions relations : stored-restrictions group-free no-extra-read
     # @matrix forms permissions : access-restrictions group-restricted index-filter inheritance owner-restricted restricted-access side-effect-free stable-order
     @property
@@ -805,10 +806,17 @@ class RestrictedTo(DBProperty):
             }
         elif kind == "task":
             page = permission_relation(self.entity, "page", required=True)
-            form = permission_relation(self.entity, "form")
+            form_property = self.entity.properties.form
+            if form_property.key and form_property.is_set and form_property.value is None:
+                # A deleted Form has no current access policy to evaluate. Keep
+                # its Task readable by admins without relaxing unloaded checks.
+                form_restrictions = ["admin"]
+            else:
+                form = permission_relation(self.entity, "form")
+                form_restrictions = form.properties.restricted_to.stored if form else []
             restrictions = {
                 **page.restricted_to,
-                "task_form": form.properties.restricted_to.stored if form else [],
+                "task_form": form_restrictions,
             }
         elif kind == "file":
             owner = self.entity.owner

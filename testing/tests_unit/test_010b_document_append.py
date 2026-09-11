@@ -359,7 +359,7 @@ def test_guarded_checkpoint_rejects_a_concurrent_asset_change(monkeypatch):
         utility, "_put_mutation", lambda writer, row, mask: writes.append(row)
     )
     entity = SimpleNamespace(db={"assets": "loser"})
-    with pytest.raises(exceptions.ValidationError, match="Document changed"):
+    with pytest.raises(exceptions.MutationConflict, match="Saved state changed"):
         utility._save_guarded_mutations(
             [(entity, ("assets",))], [], [("page", {"assets": "old"})]
         )

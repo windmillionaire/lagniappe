@@ -22,6 +22,8 @@ export class TaskForm extends FormElement {
 		};
 		this._historyFillRequest = null;
 		this._historyFillSubmission = null;
+		this._historyFillError = null;
+		this._historyFillGeneration = 0;
 		this._defaultFieldSave = Promise.resolve();
 	}
 
@@ -56,7 +58,20 @@ export class TaskForm extends FormElement {
 	}
 
 	get append() {
-		return [this.autofillElement];
+		const error = this.target?.dataset.schemaError;
+		const notice = error ? document.createElement("p") : null;
+		if (notice) {
+			notice.textContent = error;
+			notice.setAttribute("role", "status");
+		}
+		let raw = null;
+		if (error && this.target?.dataset.rawSubmission) {
+			raw = document.createElement("pre");
+			raw.dataset.role = "original-raw-answers";
+			raw.className = "whitespace-pre-wrap break-words";
+			raw.textContent = JSON.stringify(JSON.parse(this.target.dataset.rawSubmission), null, 2);
+		}
+		return [this.autofillElement, notice, raw];
 	}
 
 	offline({ data, method, route }) {
@@ -87,6 +102,8 @@ export class TaskForm extends FormElement {
 	_resetHistoryFillCache() {
 		this._historyFillRequest = null;
 		this._historyFillSubmission = null;
+		this._historyFillError = null;
+		this._historyFillGeneration += 1;
 	}
 
 	async init() {
@@ -120,18 +137,28 @@ export class TaskForm extends FormElement {
 		if (this._historyFillSubmission) return this._historyFillSubmission;
 
 		if (!this._historyFillRequest) {
-			this._historyFillRequest = request
+			const pending = request
 				.get(this.historyFillRoute)
-				.then((response) => response.latest_submission || {})
+				.then((response) => {
+					if (this._historyFillRequest === pending)
+						this._historyFillError = response.history_error || null;
+					return response.latest_submission || {};
+				})
 				.catch((error) => {
-					this._historyFillRequest = null;
-					captureError(error, this.target, { route: this.historyFillRoute });
+					if (this._historyFillRequest === pending) {
+						this._historyFillRequest = null;
+						captureError(error, this.target, { route: this.historyFillRoute });
+					}
 					return {};
 				});
+			this._historyFillRequest = pending;
 		}
 
-		this._historyFillSubmission = await this._historyFillRequest;
-		return this._historyFillSubmission;
+		const pending = this._historyFillRequest;
+		const submission = await pending;
+		if (this._historyFillRequest === pending)
+			this._historyFillSubmission = submission;
+		return submission;
 	}
 
 	/**
@@ -158,13 +185,26 @@ export class TaskForm extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-	 * @matrix tasks : history-fill latest-submission
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses
+	 * @matrix tasks : history-fill latest-submission incompatible-value stale-response
 	 */
 	async loadHistoryFill() {
 		if (!this.historyFillEnabled || !this.form?.renderer) return;
 
+		const form = this.form;
+		const generation = this._historyFillGeneration;
 		const submission = await this.latestHistorySubmission();
-		this.form.renderer.addHistoryFillButtons(submission, (fieldId) =>
+		if (this.form !== form || this._historyFillGeneration !== generation) return;
+		this.target.querySelector("[data-role='history-fill-error']")?.remove();
+		if (this._historyFillError) {
+			const notice = document.createElement("p");
+			notice.dataset.role = "history-fill-error";
+			notice.setAttribute("role", "status");
+			notice.textContent = this._historyFillError;
+			this.target.append(notice);
+			return;
+		}
+		form.renderer.addHistoryFillButtons(submission, (fieldId) =>
 			this.saveDefaultField(fieldId),
 		);
 	}

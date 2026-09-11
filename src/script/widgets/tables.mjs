@@ -1,4 +1,5 @@
 import { BaseTable, EmbeddedTable } from "../elements/base/baseTable";
+import { request, captureError } from "../shared";
 
 /**
  * @testable infrastructure
@@ -238,6 +239,8 @@ export class TaskHistory extends EmbeddedTable {
 	constructor(attributes) {
 		super(attributes);
 		this._updated = null;
+		this._completionForms = new Map();
+		this._detailGeneration = 0;
 	}
 
 	get table() {
@@ -245,7 +248,94 @@ export class TaskHistory extends EmbeddedTable {
 	}
 
 	async updated(response) {
-		this._updated = response.html.querySelector("table");
+		this._updated = response.html.querySelector("[data-role='completion-history']");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_definitions_remain_original_after_builder_save
+	 * @matrix tasks task-completion : history readonly schema-version
+	 */
+	_click(event) {
+		const button = event.target.closest("button[data-role='completion-details']");
+		if (!button || !this.target.contains(button)) return super._click(event);
+		event.preventDefault();
+		event.stopPropagation();
+		void this._showCompletion(button);
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/tables.mjs::TaskHistory._click
+	 * @reason async detail rendering belongs to the history detail interaction
+	 */
+	async _showCompletion(button) {
+		const target = button.parentElement.querySelector("[data-role='completion-detail']");
+		if (button.disabled) return;
+		if (this._completionForms.has(target)) {
+			target.hidden = !target.hidden;
+			button.setAttribute("aria-expanded", String(!target.hidden));
+			return;
+		}
+		const generation = this._detailGeneration;
+		button.disabled = true;
+		try {
+			const response = await request.get(button.dataset.route);
+			const { BaseForm } = await import("../elements/base/baseForm");
+			const host = document.createElement("div");
+			host.dataset.kind = "task";
+			const form = new BaseForm({
+				target: host, key: button.dataset.key, readonly: true,
+				schema: response.schema || [], submission: response.submission || {},
+				htmlFields: response.html_fields || {}, showEmptyFields: false,
+			});
+			await form.init();
+			if (generation !== this._detailGeneration || !this.target.contains(button)) {
+				form.destroy();
+				return;
+			}
+			const error = response.schema_error || response.content_error;
+			if (error) {
+				const message = document.createElement("p");
+				message.setAttribute("role", "status");
+				message.textContent = error;
+				host.prepend(message);
+			}
+			if (response.raw_submission) {
+				const raw = document.createElement("pre");
+				raw.dataset.role = "original-raw-answers";
+				raw.className = "whitespace-pre-wrap break-words";
+				raw.textContent = JSON.stringify(response.raw_submission, null, 2);
+				host.append(raw);
+			}
+			target.replaceChildren(host);
+			target.hidden = false;
+			button.setAttribute("aria-expanded", "true");
+			this._completionForms.set(target, form);
+		} catch (error) {
+			if (generation !== this._detailGeneration) return;
+			target.textContent = "Could not load this completion. Please try again.";
+			target.hidden = false;
+			captureError(error, this.target, { route: button.dataset.route });
+		} finally {
+			button.disabled = false;
+		}
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/tables.mjs::TaskHistory._click
+	 * @reason owned completion renderers share the history widget lifetime
+	 */
+	_clearCompletions() {
+		this._detailGeneration += 1;
+		for (const form of this._completionForms.values()) form.destroy();
+		this._completionForms.clear();
+	}
+
+	destroy() {
+		this._clearCompletions();
+		super.destroy();
 	}
 
 	postreconcile() {
@@ -253,12 +343,13 @@ export class TaskHistory extends EmbeddedTable {
 
 		this.visible = true;
 		this.target.dataset.visible = "true";
+		this._clearCompletions();
 		this.table.replaceChildren(this._updated);
 		this._updated.dataset.visible = "true";
-		this.initVisibility(
-			this._updated,
-			`columns-${this.component.name}-history`,
-		);
+		for (const table of this._updated.querySelectorAll("table")) {
+			table.dataset.visible = "true";
+			this.initVisibility(table, `columns-${this.component.name}-history`);
+		}
 		this._updated = null;
 	}
 }

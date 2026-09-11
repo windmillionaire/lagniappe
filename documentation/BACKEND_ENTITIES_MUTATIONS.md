@@ -37,6 +37,21 @@ name narrow dependent changes; cache-state and search-delete intents are
 post-commit effects. Intents are consumed only after all durable writes and
 deletes succeed, so a failed commit can be retried from the same domain state.
 
+Form publication stages new HTML and immutable definition snapshots at isolated
+Storage paths, then atomically commits their references and Form changes with
+exact source-row guards. Form construction retains serialized JSON and scalar
+values, freezing small mutable collections without copying or parsing content.
+Keyed Forms capture that state on their first explicit row read. Publication
+reconstructs the saved row only when preparing its guard. `ExactEntityState` includes the absence of additional
+properties, so concurrently adding a restriction is detected even if the
+modified timestamp is unchanged. Document checkpoints retain their narrower
+property-subset guards. The shared executor also collects snapshot-creation
+and completion guards. A rejected compare-and-set raises `MutationConflict`
+before any durable Datastore mutation. Builder Save rechecks its baseline on retry and
+preserves concurrent restrictions. Known rejected attempt blobs are removed
+with generation-qualified deletion; ambiguous commit failures retain objects
+until their references can be reconciled. Saved version assets are not purged.
+
 ## Property masks
 
 Masked writes use Datastore `update`, not a partial upsert. A missing row is

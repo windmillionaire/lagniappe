@@ -348,7 +348,6 @@ def test_run_report_uses_category_form_from_stored_key_for_page_submission(
                             "category": category.urlsafe_key,
                             "submission": {
                                 "input-textab12": "Pediatric hospital provider.",
-                                "unknown-field": "must not persist",
                             },
                         },
                     }

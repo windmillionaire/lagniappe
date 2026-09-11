@@ -138,42 +138,40 @@ def test_schema_version_update_changes_when_schema_changes(get_schema):
 # @matrix form : relations save schema-history
 @pytest.mark.unit
 def test_form_save_records_schema_history_on_version_change(get_schema):
-    """The Form planner should stage history for the previous schema."""
-    form = TestEntities.get("FORM", {"name": "History", "hash": "form_history"})
-    form.schema = get_schema("integration_one_text")
-    form.properties.version.update()
-    previous_version = form.version
-    previous_schema = form.schema
-    form.schema = get_schema("number_input_only")
-    history = SimpleNamespace(
-        key="fake-form-history-key",
-        entity_kind="form_history",
-        properties={},
-        processes={},
-        mutation_intents=[],
-    )
+    """An accepted label edit stages both exact old and new definitions."""
+    from copy import deepcopy
+    from google.cloud import datastore
 
+    row = datastore.Entity(key=datastore.Key("models", "history-form", project="test-project"))
+    row.update(type="form", form_type="task", hash="history-form", name="History",
+               schema=json.dumps(get_schema("integration_one_text")), version="legacy-before")
+    form = Entities.FORM(row)
+    previous_schema = deepcopy(form.schema)
+    edited = deepcopy(previous_schema)
+    edited[0]["title"] = "Updated label"
+    form.schema = edited
     with (
-        patch.object(
-            form_module.Entities.FORM_HISTORY,
-            "create",
-            return_value=history,
-        ) as create_history,
         patch.object(form_module.database_get, "form_users", return_value=[]),
         patch.object(form_module.Entities, "fetch", return_value=[]),
+        patch.object(form_module.Entities, "fetch_one", return_value=None),
     ):
         plan = plan_mutation(MutationOperation.SAVE, form, registry=Entities)
 
-    create_history.assert_called_once_with(form, previous_version)
     assert form.properties.schema.previous == previous_schema
-    assert form.version != previous_version
+    assert form.version != "legacy-before"
     writes = [
         effect
         for effect in plan.effects
         if effect.effect is MutationEffectType.UPSERT
     ]
-    assert [effect.entity for effect in writes[:2]] == [history, form]
-    assert all(effect.property_mask is None for effect in writes[:2])
+    histories = [effect.entity for effect in writes if effect.entity.entity_kind == "form_history"]
+    assert len(histories) == 2
+    before = next(history for history in histories if history.version == "legacy-before")
+    after = next(history for history in histories if history.version == form.version)
+    assert before.schema == previous_schema and not before.content_available
+    assert after.schema == form.schema and after.content_available
+    assert writes[-1].entity is form
+    assert all(effect.property_mask is None for effect in writes)
 
 
 # @matrix forms cache : owner-reuse no-extra-read

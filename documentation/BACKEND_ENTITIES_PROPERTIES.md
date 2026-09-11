@@ -112,17 +112,38 @@ conditions, supplies defaults, and enforces unique IDs without mutating its
 input. The `todo` type is valid only on task forms.
 
 All durable assignment flows converge on `Schema.value` and should prefer
-`Form.set_schema()`: builder saves, AI generation, ingress-created forms,
+`Form.set_schema()`: builder saves, accepted AI form creation, ingress-created forms,
 category/report operations, and direct updates. Browser builder defaults are a
 presentation convenience, not a persistence contract.
 
 AI-generated static task-form fields use `content_markdown` only at the model
 boundary. `Schema.validate_ai()` removes that model-only field, renders it
-through the shared AI Markdown policy, and stores the resulting HTML sidecar
-after the Form object has been created. Raw model `html`, non-string Markdown,
+through the shared AI Markdown policy, and stages the resulting HTML sidecar
+on the Form. `Form.set_html_field()` does not write Storage; the common Form
+save mutation publishes staged content with the schema. Raw model `html`, non-string Markdown,
 static content on generated Page forms, and static fields in additive report
 schema updates are rejected. Existing stored sidecars are not migrated; Form
 read projections apply the Form-content policy before browser `innerHTML` use.
+
+`tools/form_drafts.py` validates builder drafts and guards every ordinary Form
+save against removal or representation changes to saved fields, options, and
+table columns until migration support is available. Relabeling preserves IDs
+and stored option values. Builder Save supplies the complete schema/HTML draft,
+an opaque saved baseline, and a request identity; a receipt recognizes a retry
+before its image uploads are consumed. Copy publishes an independent Form and
+never saves the source draft.
+
+New `fc1-` definition versions identify form type, schema and static-content
+fingerprints independently from the Form's display name.
+`tools/form_definitions.py` owns that content identity. Completion can reuse a
+clean persisted Form with the matching content version without a history read
+or asset copy; legacy or mismatched content goes through snapshot preparation.
+Each published version has a deterministic FormHistory record with independent
+HTML/image objects; historical readers must authorize the Task or TaskHistory
+that references it. FormHistory is not directly viewable through entity or
+asset endpoints. Older schema-only versions remain schema-only: current HTML
+must not be presented as their original content. Missing or inconsistent
+versions and unverifiable content fingerprints require repair.
 
 `schema_format` records the storage format independently from the form's
 user-facing version. During a data update, readable rows remain projectable so

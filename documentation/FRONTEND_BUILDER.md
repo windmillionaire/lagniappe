@@ -1,6 +1,6 @@
 # Frontend Builder
 
-The form builder (`src/script/views/builder/`) is a drag-and-drop interface for creating and editing form schemas. It lets users add form elements, configure their settings, set up conditional visibility/status rules, define table columns and select/radio options, and preview the rendered form. The schema is serialized as JSON and submitted to the server on save.
+The form builder (`src/script/views/builder/`) is a drag-and-drop interface for creating and editing form schemas. It lets users add form elements, configure their settings, set up conditional visibility/status rules, define table columns and select/radio options, and preview the rendered form. Name, schema, static HTML and local images belong to one browser draft and are published together on explicit Save.
 
 ## Architecture
 
@@ -19,6 +19,10 @@ FormBuilder
 
 The builder is a standalone view -- it does not use the Core/Component/Widget system. It manages its own click handler, element selection, and schema state.
 
+Below the `lg` breakpoint, the builder layout is hidden and the existing
+Desktop Only notice is shown. This prevents the desktop columns from creating
+horizontal overflow behind the notice.
+
 ## FormBuilder (`builder.mjs`)
 
 The main controller class. Owns the element map, sortable instances, all panel
@@ -33,6 +37,8 @@ OfflineModal.
 | `selectedElement` | The currently selected element entry from the map |
 | `sortables` | `{model, components}` -- SortableJS instances |
 | `schemaElt` | Hidden `<input name="schema">` that holds the serialized JSON |
+| `draft` | `BuilderDraft` owns the saved baseline, current snapshot and bounded Undo/Redo history. |
+| `htmlFields` | Static content keyed by field ID; local image references resolve to browser blobs for preview. |
 
 ### Initialization
 
@@ -50,7 +56,7 @@ listener.
 
 ### Schema Management
 
-**`updateSchema(silent)`** -- serializes all element schemas (in map order) to JSON and writes it to the hidden input. If the value changed and `silent` is false, marks the form as unsaved.
+**`updateSchema(silent, group)`** -- serializes all element schemas (in map order) to JSON, writes the hidden input and records the current draft. Dirty state compares the complete draft with the accepted saved baseline; typing in one group can share a history entry.
 
 **`updateSchemaOrder()`** -- rebuilds the elements map in DOM order (defaults first, then model panel children). Called after drag-and-drop reordering.
 
@@ -60,7 +66,13 @@ listener.
 
 **`selectElement(id)`** -- sets `selectedElement`, highlights the item in the model panel, and shows its settings.
 
-**`removeElement()`** -- destroys the selected element (including any conditions), removes it from the DOM and the map, and updates the schema.
+**`removeElement()`** -- removes an unsaved draft element and its conditions as an undoable change. Saved field identities cannot be removed until the migration workflow is available. The server enforces the same saved-field, option-value and table-column compatibility constraints.
+
+`BuilderDraft` keeps at most 100 commands covering schema, name, order,
+selection and HTML/image references. Generation is one command. Undo/Redo
+restores the local draft; Undo after Save produces a new unsaved draft and
+cannot bypass saved-identity constraints. Rich-text keyboard undo stays with
+the focused editor.
 
 ### Drag and Drop
 
@@ -132,16 +144,19 @@ style.
 The form-level settings panel handles AI schema generation and form access
 restrictions.
 
-**AI generation**: A `BaseForm` with a textarea prompt. Submits to
-`ENDPOINTS.createSchema` and receives a schema array. New elements are created
-and appended to the model. Supports an "explain" mode that shows the AI's prompt
+**AI generation**: A `BaseForm` with a textarea prompt. Submits the current
+schema and HTML draft, saved baseline, draft revision and request identity to
+`ENDPOINTS.createSchema`. The response contains validated additions and exact-ID
+title, placeholder, option-label and column-title updates, plus HTML sidecars.
+Unmentioned fields and settings survive. The response is applied as one local
+command and remains unsaved; generation writes no Form or content assets.
+Supports an "explain" mode that shows the AI's prompt
 interpretation in an Initial Prompt modal. The modal shows only the starting
 prompt; later tool or search context is dynamic and is not part of the preview.
 Generation is single-flight. Failure leaves its form error visible and releases
-the submitter for retry. Because schema generation persists its response on the
-server, the Builder only accepts that response as a saved acknowledgement when
-generation began from a saved form and the live schema/name still exactly match
-the acknowledged response; otherwise the Builder stays unsaved.
+the submitter for retry. A changed draft, canceled request or destroyed view
+cannot accept a late proposal. Stale-draft feedback retains the prompt for
+Regenerate; a no-op response does not create dirty state.
 
 Group restrictions and the owner checkbox are local drafts. Save Restrictions
 submits the complete snapshot in one PUT, using the standard `BaseForm` spinner
@@ -158,7 +173,7 @@ An overlay panel that opens over the model when editing conditions, options, col
 
 Controls for the form name (inline editable), save button, and preview toggle.
 
-**Form name**: Click to edit, blur or Enter to save. Escape reverts. Changes mark the form as unsaved.
+**Form name**: Click to edit, blur or Enter to finish the local edit. Escape reverts. Changes mark the form as unsaved.
 
 **Preview toggle**: Creates a `Renderer` instance with the current schema and renders a live preview of the form. Expands the builder layout and hides the model panel while previewing.
 
@@ -166,10 +181,14 @@ Preview rendering uses a generation guard. A renderer that finishes after a
 new toggle or Builder teardown destroys its detached resources and cannot
 reopen the preview.
 
-**Save button**: PUTs the schema/name snapshot to the server through one
-single-flight promise. While pending, it is disabled and exposes `aria-busy`.
+**Save button**: Publishes the complete name/schema/HTML/image snapshot, saved
+baseline and request identity through one single-flight promise. While pending,
+it is disabled and exposes `aria-busy`. The backend recognizes a retry before
+consuming its image uploads and rejects a changed saved baseline.
 Only an explicit successful response can acknowledge the submitted snapshot;
-if the live schema or name changed in the meantime, the form remains unsaved.
+if the live draft changed in the meantime, later edits remain unsaved. Copy
+uses the complete current draft to create a separate Form with independently
+owned content, without saving its source.
 Failure leaves an error in the Builder's polite live region and releases the
 connected button in `finally`, including its accessibility and focus state, so
 the same action can be retried. Connectivity continues to own whether the save
@@ -203,15 +222,15 @@ Conditions are property editors that open in the ConditionPanel. Each condition 
 |---|---|---|---|
 | `Visibility` | `visibility` | `ConditionTarget` | Show/hide element based on another element's value |
 | `Status` | `status` | `ConditionTarget` | Display a status message based on another element's value. Adds a text input for the message. |
-| `Options` | `options` | `Condition` | Add/edit radio or select options. Input for the option label, auto-generates a hashed value. |
-| `Columns` | `columns` | `Condition` | Add/edit table columns. Select for column type (from `CONFIG.TABLE_COLUMNS`), input for column name, auto-generates a hashed ID. |
-| `HtmlEditor` | `html` | `Condition` | Opens an `IndependentDocument` editor for rich text content. Expands the builder layout. Only initializes once. |
+| `Options` | `options` | `Condition` | Add/edit radio or select options. New options receive a value once; relabeling preserves the existing value. |
+| `Columns` | `columns` | `Condition` | Add/edit table columns. New columns receive an ID once; title edits preserve it. Saved column representations cannot change. |
+| `HtmlEditor` | `html` | `Condition` | Opens a builder-owned `DraftDocument` rich-text editor and expands the layout. Only initializes once. |
 
-`HtmlEditor` registers its `IndependentDocument` with `FormBuilder`. The builder
-owns hidden-view and reconnect flushes, while condition destruction unregisters
-the document before cleanup. This keeps teardown from initiating an untracked
-save and gives pending HTML one explicit keepalive flush opportunity when the
-page is hidden.
+`DraftDocument` reads and updates the builder's HTML state. Images stay in a
+browser-local blob registry until Save or Copy; temporary preview URLs are
+revoked during teardown. Blur, hide, reconnect and condition destruction do
+not publish HTML or initiate document checkpoints. Failed loading preserves
+the unavailable state instead of substituting blank content.
 
 ### Progressive Disclosure
 
@@ -227,8 +246,8 @@ The `showProgress()` method is called after each step to check if new inputs sho
 
 `FormBuilder.destroy()` is idempotent and owns the complete standalone view
 inventory: SearchBox, OfflineModal, Components/Model/Settings/Condition/Form
-Settings/Header panels, EntityMenu, active element conditions, independent
-documents, and the document click listener. Panel classes remove the exact
+Settings/Header panels, EntityMenu, active element conditions, draft editors,
+local image URLs, and the document click listener. Panel classes remove the exact
 delegated listeners they installed and destroy Sortable/combobox/form/modal
 children. Conditions destroy their current `BaseForm`, child controls, and
 feedback timers; rebuilt column editors replace their exact `updated` handler

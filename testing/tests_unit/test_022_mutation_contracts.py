@@ -1,6 +1,7 @@
 """Executable entity mutation contract and ordering regressions."""
 
 from datetime import datetime, timezone
+from copy import deepcopy
 
 from google.cloud import datastore
 import pytest
@@ -46,6 +47,21 @@ def _writes(plan):
     ]
 
 
+def _saved_permission_form(monkeypatch, *, name, identity):
+    """Use a valid saved empty definition while isolating its storage lookup."""
+    from lagniappe.core.tools.form_drafts import definition_version
+
+    row = datastore.Entity(key=datastore.Key("models", identity, project="test-project"))
+    row.update(type="form", form_type="task", hash=identity, name=name,
+               schema="[]", schema_format=1, form_content_version=1)
+    form = Entities.FORM(row)
+    form.version = definition_version(form)
+    form._form_source_state = deepcopy(dict(form.db))
+    snapshot = Entities.FORM_HISTORY.snapshot(form, form.version, content_available=True)
+    monkeypatch.setattr(Entities, "fetch_one", lambda key, *, request: snapshot if key == snapshot.key else None)
+    return form
+
+
 # @matrix mutations : write-identity dependency-order
 @pytest.mark.parametrize("report_first", [False, True])
 def test_mutation_write_order_preserves_distinct_roots_and_dependencies(report_first):
@@ -89,7 +105,8 @@ def test_report_save_does_not_touch_input_files(monkeypatch):
 def test_permission_source_marker_is_consumed_only_after_durable_success(monkeypatch, kind):
     from lagniappe.core.tools.database import get as database_get
 
-    source = TestEntities.get(kind, {"hash": "permission-source"})
+    source = (_saved_permission_form(monkeypatch, name="Permission source", identity="permission-source")
+              if kind == "FORM" else TestEntities.get(kind, {"hash": "permission-source"}))
     source.properties.restricted_to.materialize(admin_only=True)
     assert source._permission_sources_changed is True
     monkeypatch.setattr(database_get, "form_users", lambda *_forms: [])
@@ -98,11 +115,11 @@ def test_permission_source_marker_is_consumed_only_after_durable_success(monkeyp
     plan = plan_mutation(MutationOperation.SAVE, source, registry=Entities)
     assert [effect.entity for effect in _writes(plan)] == [source]
     monkeypatch.setattr(mutation_executor.database_utility, "save_mutations",
-                        lambda _writes: (_ for _ in ()).throw(RuntimeError("save failed")))
+                        lambda _writes, **kwargs: (_ for _ in ()).throw(RuntimeError("save failed")))
     with pytest.raises(RuntimeError, match="save failed"):
         execute_mutation(plan)
     assert source._permission_sources_changed is True
-    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", lambda _writes: None)
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", lambda _writes, **kwargs: None)
     execute_mutation(plan)
     assert source._permission_sources_changed is False
     source.properties.restricted_to.materialize()
@@ -112,7 +129,8 @@ def test_permission_source_marker_is_consumed_only_after_durable_success(monkeyp
 # @matrix permissions mutations : owner-reuse no-extra-read repeated-save
 @pytest.mark.parametrize("kind", ["PAGE", "FORM"])
 def test_permission_save_reuses_resolved_collection_owner_keys(monkeypatch, kind):
-    source = TestEntities.get(kind, {"name": "Permission source", "hash": "owner-source"})
+    source = (_saved_permission_form(monkeypatch, name="Permission source", identity="owner-source")
+              if kind == "FORM" else TestEntities.get(kind, {"name": "Permission source", "hash": "owner-source"}))
     category = TestEntities.get("CATEGORY", {"name": "Category", "hash": "owner-category"})
     other = TestEntities.get("PROJECT" if kind == "FORM" else "CATEGORY", {
         "name": "Other collection", "hash": "other-owner",

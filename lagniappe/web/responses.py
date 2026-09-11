@@ -283,7 +283,7 @@ def document_image(url):
 def page_task(task, **extra):
     submission = task.properties.submission.form_value
     template = get_template_attribute("pages/tasks.html", "task")
-    schema = task.form.schema if task.form else None
+    schema = task.submission_schema
     return entity_response(
         (
             jsonify(
@@ -291,6 +291,7 @@ def page_task(task, **extra):
                     "html": template(task, task.page),
                     "schema": schema,
                     "submission": submission,
+                    "schema_error": task.submission_schema_error,
                     **extra,
                 }
             ),
@@ -349,21 +350,20 @@ def task_combine_delta(main, removed, page):
 def form_submission(entity):
     from lagniappe.core.tools.files.html import sanitize_form_content_html
 
-    form = entity.form
+    from lagniappe.core.tools.form_definitions import rendered_html_fields
 
-    schema = form.schema if form else None
-    submission = entity.properties.submission.form_value if form else None
-    html = (
-        {
-            p.id: sanitize_form_content_html(p.asset or "", form, p.id)
-            for p in form.html_fields
-        }
-        if form and isinstance(entity, Entities.TASK)
-        else None
-    )
+    definition = entity.submission_definition
+    schema = definition.schema
+    submission = entity.properties.submission.form_value
+    html = rendered_html_fields(entity)
 
     return jsonify(
-        {"schema": schema, "submission": submission, "html_fields": html}
+        {"schema": schema, "submission": submission, "html_fields": html,
+         "schema_error": definition.error,
+         "raw_submission": entity.properties.submission.value if definition.error else None,
+         "content_error": ("Original static content is unavailable." if
+             definition.immutable and not definition.content_available and
+             any(field.get("type") == "html" for field in schema) else None)}
     ), 200
 
 

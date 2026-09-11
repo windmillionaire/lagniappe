@@ -54,6 +54,30 @@ def test_filter_result_revision_includes_tasks_only_for_projects(monkeypatch):
     assert before[1] == after[1]
 
 
+# @matrix tasks forms : cache-invalidation live-metadata
+def test_page_tasks_revision_changes_with_saved_forms_without_loading_tasks(monkeypatch):
+    page = SimpleNamespace(fingerprint="unchanged-page")
+    viewer = SimpleNamespace(authorization_fingerprint="viewer")
+    forms = {"revision": "forms-before"}
+    reads = []
+
+    def form_revision(path):
+        reads.append(path)
+        return forms["revision"]
+
+    monkeypatch.setattr(polling.database_utility, "site_fingerprint", form_revision)
+    initial = polling.page_tasks_revision(page, viewer)
+    assert polling.page_tasks_revision(page, viewer) == initial
+    forms["revision"] = "forms-after"
+    after_save = polling.page_tasks_revision(page, viewer)
+    assert after_save != initial
+    assert page.fingerprint == "unchanged-page"
+    assert polling.page_tasks_revision(page, viewer) == after_save
+    page.fingerprint = "changed-page"
+    assert polling.page_tasks_revision(page, viewer) != after_save
+    assert reads == ["/forms/index"] * 5
+
+
 # @pairs ai:autofill deferred-jobs:form-lock
 def test_autofill_explicit_lock_opt_out_skips_target_lock():
     adapter = deferred_job_adapters.AutofillAdapter()

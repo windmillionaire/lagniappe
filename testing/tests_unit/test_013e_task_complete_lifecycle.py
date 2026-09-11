@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from lagniappe.core.definitions.asset import AssetVisibility
-from lagniappe.core.definitions import MutationEffectType, MutationOperation
+from lagniappe.core.definitions import MutationEffectType, MutationOperation, MutationIntentType
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities.history import DocumentHistory, TaskHistory
 from lagniappe.core.entities.task import Task
@@ -197,7 +197,10 @@ def test_task_uncomplete_after_complete(get_test_entities):
     assert task.db.get("files", []) == []
     assert file_entity.task is task
     assert file_entity.db["task"] == task.key
-    delete_asset.assert_called_once_with("task-signature-field")
+    delete_asset.assert_not_called()
+    cleanup = [intent for intent in task.mutation_intents if intent.intent is MutationIntentType.BLOB_DELETE]
+    assert [(intent.path, intent.visibility) for intent in cleanup] == [("signature.png", "private")]
+    assert task.assets == {}
     assert task.db.get("history") is True
 
 
@@ -327,10 +330,11 @@ def test_task_history_create_snapshots_completed_task_state():
     )
 
     task.form.version = "schema-v1"
+    task.db["schema_version"] = "schema-v1"
+    task.submission = submission
     task.completed = True
     task.completed_on = completed_on
     task.completed_by = completed_by
-    task.submission = submission
     task.page = parent
     task.description = "Finished carefully"
     task.properties.linked_pages._value = [linked_page]
@@ -372,8 +376,9 @@ def test_task_history_create_snapshots_completed_task_state():
     assert history.db["completed_on"] == completed_on
     assert "hash" not in history.db
     assert "completed" not in history.db
+    assert history._definition_create_guard == (history.key, None)
 
-    copy_asset.assert_called_once_with(signature_asset)
+    copy_asset.assert_called_once_with(signature_asset, isolated=True)
 
 
 # @matrix task-combine : completed-on deterministic-tie modified winner
@@ -527,6 +532,15 @@ def test_asset_mixin_copy_asset_copies_storage_and_updates_definition(monkeypatc
         "large": False,
     }
     assert json.loads(target.db["assets"]) == target.assets
+
+    first_attempt = target.copy_asset(source_asset, isolated=True)
+    second_attempt = target.copy_asset(source_asset, isolated=True)
+    assert first_attempt.path != copied.path
+    assert second_attempt.path != first_attempt.path
+    assert first_attempt.path.endswith(".png")
+    assert second_attempt.path.endswith(".png")
+    assert calls[-1][2] == second_attempt.path
+    assert target.assets["task-signature-field"]["path"] == second_attempt.path
 
 
 # @pair document-history:asset-copy

@@ -1,4 +1,73 @@
-"""Node-backed checks for task-settings action-control lifecycle behavior."""
+"""Node-backed checks for task-settings and task-form lifecycle behavior."""
+
+
+# @matrix tasks : history-fill latest-submission incompatible-value stale-response
+def test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+const assert = require("node:assert/strict");
+const pending = [];
+const notices = [];
+const controls = [];
+const target = {
+  dataset: {history: "history"},
+  querySelector: () => notices[0] || null,
+  append(notice) { notices.push(notice); },
+};
+const context = {
+  FormElement: class { constructor(attributes) { Object.assign(this, attributes); } },
+  sections: {},
+  captureError: () => { throw new Error("unexpected request error"); },
+  request: { get: () => new Promise(resolve => pending.push(resolve)) },
+  document: { createElement: () => ({
+    dataset: {}, setAttribute() {},
+    remove() { notices.splice(notices.indexOf(this), 1); },
+  }) },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/taskForm.mjs", "utf8");
+source = source.replace(/import .*?;\n/g, "");
+source = source.replaceAll("export class ", "class ");
+vm.runInContext(source + "\nglobalThis.TaskForm = TaskForm;", context);
+
+(async () => {
+  const form = {renderer: {addHistoryFillButtons: values => controls.push(values)}};
+  const widget = new context.TaskForm({target, form, endpoints: {latestHistorySubmission: "/history"}});
+  const unavailable = widget.loadHistoryFill();
+  pending.shift()({latest_submission: {note: "Do not reuse"}, history_error: "Original <img> choices are unavailable."});
+  await unavailable;
+  assert.equal(notices[0].dataset.role, "history-fill-error");
+  assert.equal(notices[0].textContent, "Original <img> choices are unavailable.");
+  assert.equal(notices[0].innerHTML, undefined);
+  assert.equal(controls.length, 0);
+
+  widget._resetHistoryFillCache();
+  const old = widget.loadHistoryFill();
+  const oldResponse = pending.shift();
+  widget._resetHistoryFillCache();
+  const current = widget.loadHistoryFill();
+  pending.shift()({latest_submission: {note: "Reusable"}});
+  await current;
+  assert.equal(notices.length, 0);
+  assert.equal(controls.length, 1);
+  assert.equal(controls[0].note, "Reusable");
+  oldResponse({latest_submission: {}, history_error: "Stale failure"});
+  await old;
+  assert.equal(notices.length, 0);
+  assert.equal(controls.length, 1);
+
+  widget._resetHistoryFillCache();
+  const destroyed = widget.loadHistoryFill();
+  widget.form = null;
+  pending.shift()({history_error: "Late failure"});
+  await destroyed;
+  assert.equal(notices.length, 0);
+  assert.equal(controls.length, 1);
+})().catch(error => { console.error(error); process.exitCode = 1; });
+"""
+    )
 
 
 # @matrix tasks : action-control-lifecycle teardown

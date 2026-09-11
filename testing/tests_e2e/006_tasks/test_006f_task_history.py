@@ -72,7 +72,7 @@ def _open_history(task):
 
     history = task.element.locator(Task.TASK_HISTORY)
     expect(history).to_be_visible()
-    expect(history.locator("table")).to_be_visible()
+    expect(history.locator("[data-role='history-group'] > table").first).to_be_visible()
     return history
 
 
@@ -84,6 +84,78 @@ def _open_history_visibility(history):
     controller = history.locator("[data-widget='TableVisibility']")
     expect(controller).to_be_visible()
     return controller
+
+
+# @matrix tasks task-completion : history schema-version readonly
+# @template tasks/history.html::completion_history
+# @template pages/tasks.html::task_form
+def test_completion_definitions_remain_original_after_builder_save(get_user):
+    """Both live and archived completions retain labels and HTML after Save."""
+    from testing.resources.form import Form
+
+    user = get_user(Users.OWNER)
+    parent = Pages.test_create_page_task.get(user)
+    suffix = uuid4().hex[:8]
+    form = Entities.FORM.create({
+        "name": f"Completion definitions {suffix}", "form-type": "task",
+        "schema": [
+            {"id": "note", "type": "input", "title": "Original question"},
+            {"id": "intro", "type": "html", "title": "Instructions"},
+        ],
+    })
+    form.set_html_field("intro", "<p>Original instructions</p>")
+    form.save()
+    resources = []
+    try:
+        for name in ("Live completion", "Archived completion"):
+            entity = Entities.TASK.create({
+                "name": f"{name} {suffix}", "page": parent.entity, "form": form,
+                "submission": {"note": "Original answer"},
+            })
+            entity = Entities.fetch_one(entity, request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS))
+            entity.save()
+            resource = Task(user=user)
+            resource.entity = entity
+            resources.append(resource)
+            user.go(resource)
+            parent.complete_task(resource)
+        live, archived = resources
+        parent.uncomplete_task(archived)
+
+        form_resource = Form(user=user)
+        form_resource.entity = form
+        builder = form_resource.builder
+        builder.model.locator("[id='note']").click()
+        builder.settings.locator("input[name='title']").fill("Updated question")
+        builder.model.locator("[id='intro']").click()
+        builder.open_condition("html", role="edit")
+        editor = builder.condition.locator("[data-role='editor'] .ProseMirror")
+        expect(editor).to_have_attribute("contenteditable", "true")
+        editor.fill("Updated instructions")
+        editor.blur()
+        builder.condition.locator("button[data-role='close']").click()
+        builder.save()
+
+        user.go(live)
+        expect(live.task_form).to_contain_text("Original question")
+        expect(live.task_form).to_contain_text("Original instructions")
+        expect(live.task_form).not_to_contain_text("Updated question")
+
+        user.go(archived)
+        expect(archived.task_form).to_contain_text("Updated question")
+        expect(archived.task_form).to_contain_text("Updated instructions")
+        history = _open_history(archived)
+        history.get_by_role("button", name=re.compile("View completion")).click()
+        detail = history.locator("[data-role='completion-detail']")
+        expect(detail).to_be_visible()
+        expect(detail).to_contain_text("Original question")
+        expect(detail).to_contain_text("Original answer")
+        expect(detail).to_contain_text("Original instructions")
+        expect(detail.locator("input:not([type='hidden']), textarea, [contenteditable='true']")).to_have_count(0)
+    finally:
+        for resource in resources:
+            Entities.delete(resource.entity)
+        Entities.delete(form)
 
 
 def _create_combine_task(
@@ -111,9 +183,8 @@ def _create_combine_task(
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
     if completed_on:
-        entity.completed = True
+        entity.complete(user=user.entity)
         entity.completed_on = completed_on
-        entity.completed_by = user.entity
     entity.save()
 
     resource = Task(user=user)
@@ -505,6 +576,7 @@ def test_task_history_fill_controls_cover_submission_elements(get_user):
 # @pair embedded-table:table-cell-expand
 # @template cell.html::table_cell
 # @template controls.html::expand
+# @template tasks/history.html::completion_history
 def test_task_history_expands_table_submission_cell(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_history_table_task.get(user)
@@ -527,7 +599,7 @@ def test_task_history_expands_table_submission_cell(get_user):
 
     expect(expand).to_have_attribute("data-open", "true")
     embedded = history.locator(
-        "[data-role='table'] > #embedded-table > tbody > tr[data-embedded='true']"
+        "[data-role='history-group'] > table > tbody > tr[data-embedded='true']"
     )
     expect(embedded).to_be_visible()
     expect(embedded).to_contain_text("Note")
@@ -614,6 +686,7 @@ def test_combine_task_form_filters_compatible_tasks(get_user):
 # @matrix task-combine : attachments checkbox-submit completed-on current-snapshot delete delta existing-history isolated-form migrate-history no-reload ordering remove upsert winner
 # @template pages/tasks.html::combine_form
 # @template pages/tasks.html::task
+# @template tasks/history.html::completion_history
 def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
     user = get_user(Users.OWNER)
     fixture = Tasks.test_history_form_task.get(user)
@@ -648,10 +721,9 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
     )
     Entities.save(archived_attachment, current_attachment)
 
-    source.entity.completed = True
-    source.entity.completed_on = datetime(2026, 6, 1, tzinfo=timezone.utc)
-    source.entity.completed_by = user.entity
     source.entity.properties.files.add(archived_attachment)
+    source.entity.complete(user=user.entity)
+    source.entity.completed_on = datetime(2026, 6, 1, tzinfo=timezone.utc)
     source.entity.uncomplete()
     source.entity.name = "Combine source current"
     source.entity.submission = {"input-textab12": "Current source submission"}
@@ -692,16 +764,17 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
     expect(winner_row).to_be_visible()
     winner.element = winner_row
     history = _open_history(winner)
-    history_rows = history.locator("tbody")
+    groups = history.locator("[data-role='history-group']")
     for name in (
         "Combine source archived",
         "Combine source current",
         "Combine secondary current",
     ):
-        expect(history_rows).to_contain_text(name)
+        expect(history).to_contain_text(name)
 
-    controller = _open_history_visibility(history)
-    controller.locator("input[type='checkbox'][name='files']").set_checked(True)
+    for group in groups.all():
+        controller = _open_history_visibility(group)
+        controller.locator("input[type='checkbox'][name='files']").set_checked(True)
     for attachment in (
         "Combine archived attachment",
         "Combine current attachment",

@@ -107,19 +107,28 @@ def test_delete_components(get_user):
     expect(deleted).to_be_visible()
     deleted.click()
 
+    expect(builder.settings.locator("button[data-role='delete']")).to_be_disabled()
+
+    draft_field = SchemaFields.TEXT_INPUT.get(title="Temporary draft field")
+    builder.add_field(draft_field)
     builder.settings.locator("button[data-role='delete']").click()
+    assert builder.schema_field(draft_field.id) is None
+    user.locate("[data-role='undo-draft']").click()
+    expect(builder.model.locator(f"[id='{draft_field.id}']")).to_be_visible()
+    user.locate("[data-role='redo-draft']").click()
+    expect(builder.model.locator(f"[id='{draft_field.id}']")).not_to_be_attached()
 
     expect(
         builder.model.locator(".form-element").filter(has_text="Reason For Living")
-    ).not_to_be_attached()
-    assert builder.schema_field(title="Reason For Living") is None
+    ).to_be_visible()
+    assert builder.schema_field(title="Reason For Living") is not None
 
     builder.save()
     user.page.reload()
     builder = Builder(user)
     expect(
         builder.model.locator(".form-element").filter(has_text="Reason For Living")
-    ).not_to_be_attached()
+    ).to_be_visible()
 
 
 # @matrix forms : builder-field-title builder-select-options
@@ -144,6 +153,7 @@ def test_change_select_options(get_user):
     _close_condition(builder)
 
     assert _option_labels(builder.schema_field(field.id)) == ["Apple", "Banana"]
+    original_value = builder.schema_field(field.id)["options"][0]["value"]
 
     builder.settings.locator(
         "[data-setting='options'] li:has-text('Apple') [data-role='open']"
@@ -153,6 +163,8 @@ def test_change_select_options(get_user):
     option_name.fill("Apricot")
     _save_select_option(builder, "Apricot")
     _close_condition(builder)
+
+    assert builder.schema_field(field.id)["options"][0]["value"] == original_value
 
     builder.open_condition("options")
     builder.condition.locator("input[name='option-name']").fill("Cherry")
@@ -175,6 +187,7 @@ def test_change_select_options(get_user):
     user.page.reload()
     builder = Builder(user)
     builder.select_field(field)
+    assert builder.schema_field(field.id)["options"][0]["value"] == original_value
     assert _option_labels(builder.schema_field(field.id)) == [
         "Apricot",
         "Banana",
@@ -406,6 +419,9 @@ def test_html_field(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_html_field.get(user)
     builder = form.builder
+    persisted_before = Entities.fetch_one(form.key, request=Fetch.root())
+    before_schema = persisted_before.schema
+    before_assets = dict(persisted_before.assets)
     html = SchemaFields.HTML.get(title="Instructions")
     builder.add_field(html)
 
@@ -417,22 +433,22 @@ def test_html_field(get_user):
         toolbar=builder.condition.locator("[data-role='toolbar']")
     )
     image_form = EditorAddImage(editor).form
-    with user.page.expect_response(
-        f"**/assets/{form.key}/document/image?field={html.id}"
-    ):
-        Uploads.editor_test_image.set(image_form)
-        SpinnerButtons.UPLOAD.click(image_form)
+    Uploads.editor_test_image.set(image_form)
+    SpinnerButtons.UPLOAD.click(image_form)
     expect(text_entry.locator("img")).to_be_visible()
 
     text_entry.click()
-    with user.page.expect_response(f"**/assets/{form.key}/form-html/{html.id}"):
-        text_entry.blur()
+    text_entry.blur()
     _close_condition(builder)
 
     assert builder.schema_field(html.id)["type"] == "html"
     preview = builder.toggle_preview()
     expect(preview.locator(".html-content")).to_contain_text(text)
     expect(preview.locator(".html-content img")).to_be_visible()
+
+    still_saved = Entities.fetch_one(form.key, request=Fetch.root())
+    assert still_saved.schema == before_schema
+    assert dict(still_saved.assets) == before_assets
 
     builder.save()
 
@@ -493,8 +509,8 @@ def test_html_field(get_user):
     )
 
 
-# @matrix editor : authoritative-content error-reporting initial-load intentional-clear retry server-acknowledgement
-# @matrix html-field : authoritative-content builder-html-field error-reporting form-asset initial-load intentional-clear retry server-acknowledgement
+# @matrix editor : authoritative-content error-reporting intentional-clear retry server-acknowledgement
+# @matrix html-field : authoritative-content builder-html-field error-reporting form-asset intentional-clear retry server-acknowledgement
 # @style message
 # @style editor.container
 def test_html_editor_recovers_from_failed_load_and_save(
@@ -521,41 +537,18 @@ def test_html_editor_recovers_from_failed_load_and_save(
     _set_forms_permission(user, Action.EDIT)
     form.user = user
     builder = form.builder
-    load_path = f"/assets/{form.key}/html/{html.id}"
-    _set_forms_permission(user, Action.NONE)
-    with browser_failures.expect_http_error(user, status=403, path=load_path):
-        with user.page.context.expect_event(
-            "response",
-            predicate=lambda response: response.url.endswith(load_path)
-            and response.request.method == "GET"
-            and response.status == 403,
-        ):
-            builder.select_field(html)
-            builder.open_condition("html", role="edit")
-
-        status = builder.condition.locator("[data-role='editor-status']")
-        editor = builder.condition.locator("[data-role='editor']")
-        expect(status).to_be_visible()
-        expect(status).to_contain_text("Error 403")
-        expect(editor).to_have_attribute("inert", "")
-        expect(editor).not_to_have_attribute("aria-busy", "true")
-        expect(editor.locator(".ProseMirror")).to_have_count(0)
-
-    _set_forms_permission(user, Action.EDIT)
-    with user.page.context.expect_event(
-        "response",
-        predicate=lambda response: response.url.endswith(load_path)
-        and response.request.method == "GET"
-        and response.status == 200,
-    ):
-        status.locator("[data-role='retry']").click()
-
+    builder.select_field(html)
+    builder.open_condition("html", role="edit")
     text_entry = _html_editor_text_entry(builder)
-    expect(status).to_be_hidden()
 
-    save_path = f"/assets/{form.key}/form-html/{html.id}"
+    save_path = f"/forms/{form.key}/update"
     text = "Retry this durable text."
     text_entry.press_sequentially(text)
+    text_entry.blur()
+    _close_condition(builder)
+    expect(user.locate(builder.SAVE_BUTTON)).to_have_attribute("data-saved", "false")
+    before_save = Entities.fetch_one(form.key, request=Fetch.root())
+    assert not before_save.get_html_field(html.id)
     _set_forms_permission(user, Action.VIEW)
     with browser_failures.expect_http_error(user, status=403, path=save_path):
         with user.page.context.expect_event(
@@ -564,37 +557,35 @@ def test_html_editor_recovers_from_failed_load_and_save(
             and response.request.method == "PUT"
             and response.status == 403,
         ):
-            text_entry.blur()
+            user.locate(builder.SAVE_BUTTON).click()
 
-        expect(status).to_be_visible()
-        expect(status).to_contain_text("Error 403")
+        expect(user.locate("#notification")).to_be_visible()
+        expect(user.locate(builder.SAVE_BUTTON)).to_be_enabled()
+        expect(user.locate(builder.SAVE_BUTTON)).to_have_attribute("data-saved", "false")
 
     _set_forms_permission(user, Action.EDIT)
-    with user.page.context.expect_event(
-        "response",
-        predicate=lambda response: response.url.endswith(save_path)
-        and response.request.method == "PUT"
-        and response.status == 200,
-    ):
-        status.locator("[data-role='retry']").click()
-    expect(status).to_be_hidden()
+    builder.save()
+    expect(user.locate("#notification")).to_be_hidden()
 
     saved_form = Entities.fetch_one(form.key, request=Fetch.root())
     assert text in saved_form.get_html_field(html.id)
 
+    user.page.reload()
+    builder = Builder(user)
+    builder.select_field(html)
+    builder.open_condition("html", role="edit")
+    text_entry = _html_editor_text_entry(builder)
+    expect(text_entry).to_contain_text(text)
     text_entry.click()
     text_entry.press("Control+A")
     text_entry.press("Backspace")
-    with user.page.context.expect_event(
-        "response",
-        predicate=lambda response: response.url.endswith(save_path)
-        and response.request.method == "PUT"
-        and response.status == 200
-    ):
-        text_entry.blur()
+    text_entry.blur()
+    _close_condition(builder)
+    assert text in Entities.fetch_one(form.key, request=Fetch.root()).get_html_field(html.id)
+    builder.save()
 
     cleared_form = Entities.fetch_one(form.key, request=Fetch.root())
-    assert cleared_form.get_html_field(html.id) is None
+    assert not cleared_form.get_html_field(html.id)
 
 
 # @pair forms:builder-drag-component

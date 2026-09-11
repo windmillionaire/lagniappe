@@ -51,11 +51,36 @@ Duplicate or stale deliveries are successful no-ops. Manual uncompletion and
 schedule clearing remove the durable marker. Backup/restore regenerates only
 Cloud Tasks represented by these durable markers.
 
-Task completion creates immutable `TaskHistory` snapshots. A history row keeps
-the task/form schema, submission, attachments, relationships, name,
-description, and completion metadata from that event. Its `modified` value is
-fixed at creation, so its entity fingerprint remains stable even if the live
-Form later changes.
+Task completion pins an exact Form content version, including when completion
+does not post form answers. Trusted current content versions need no snapshot
+lookup or write during completion; publication retains the immutable FormHistory
+definition for later reads. Legacy Forms are captured at completion when needed.
+The completion initially remains on the live Task. Reopening first archives it
+as TaskHistory, preserving the recorded schema version, raw answers, attachments,
+relationships, name, description and completion metadata. History `modified` is
+fixed at creation. Ordinary answer/default edits and Form reassignment cannot
+mutate a completed Task or TaskHistory; guarded writes also reject changes made
+through a stale or directly modified root object.
+
+`tools/form_definitions.py` owns the effective submission definition boundary.
+Active Tasks and Pages use current Form metadata. Completing a Task stores one
+`completed_submission` JSON envelope containing the exact `submission`,
+`schema_version`, and original `form_key`. Completed readers use that envelope;
+legacy Tasks and existing TaskHistory rows continue reading their flat fields.
+Matching trusted current Form versions serve completed reads directly. Only a
+changed or missing Form requires a historical definition lookup; collection loads
+batch those unique mismatches. Reopening archives the envelope into the existing
+flat TaskHistory format before removing it and restoring compatible active values.
+Task construction does not hydrate or clone the database row. First actual raw
+access retains only serialized completion fields for mutation checks; guarded
+writes compare those protected fields so whole saves cannot overwrite a newer
+completion or reopen. Missing legacy definitions or static content produce an
+explicit unavailable state without substituting current labels or modifying the
+saved answers. Snapshot
+images are authorized through the Task/TaskHistory that references them. After
+a live Form is deleted, its current access policy is unavailable: only admins
+can read retained completion/history content, subject to the existing page access
+check. Ordinary users fail closed; no ACL tombstone or permission version is stored.
 
 ## Defaults and reopening
 
@@ -67,6 +92,12 @@ values that changed or disappeared.
 Todo fields never repeat as defaults. History retains the completed checklist;
 the reopened Task starts with no todo items. Assignment remains in place across
 completion and reopening.
+
+Reopening and history fill check exact field/option/column identities and compatible
+representations before copying values. Labels and added choices/columns are safe;
+missing definitions, removed identities or changed types require review. Failed
+checks retain the original completion and defaults. Reopening stages source-asset
+cleanup after the guarded durable archive/reset commit.
 
 ## Move and combine
 

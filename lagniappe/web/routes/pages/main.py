@@ -18,6 +18,7 @@ from lagniappe.core.tools.auth.references import (
     UNAVAILABLE_REFERENCE_ERROR,
 )
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
+from lagniappe.core.tools.polling.projections import page_tasks_revision
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -123,7 +124,7 @@ def document_settings(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
 # @matrix tasks : basic create
 @pages.route("<key>/tasks", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=page_tasks_revision)
 def tasks(key, **kwargs):
     page = kwargs["entity"]
 

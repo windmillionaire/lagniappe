@@ -1,5 +1,5 @@
-import { IndependentDocument } from "../../../elements/editor/independent";
 import { ENDPOINTS } from "../../../shared";
+import { DraftDocument } from "../draftDocument";
 import { Condition } from "./base";
 
 /**
@@ -18,24 +18,27 @@ export default class HtmlEditor extends Condition {
 	}
 
 	init() {
-		if (this._initialized) return;
+		if (this._initialized) return this.document?.ready;
 		this._initialized = true;
 
 		const container = document.createElement("div");
 		container.className =
 			"border-1 border-slate-300 rounded-md overflow-hidden";
 
-		this.document = new IndependentDocument({
+		this.document = new DraftDocument({
 			target: container,
 			kind: this.kind,
 			endpoints: this.endpoints,
+			builder: this.builder,
+			fieldId: this.element.schema.id,
 		});
 		this.builder.registerIndependentDocument(this.document);
-		void this.document.init();
+		const ready = this.document.init();
 		this.destroyables.push(this.document);
 
 		this.setTitle("Text Editor");
 		this.target.append(this.header, container);
+		return ready;
 	}
 
 	destroy() {

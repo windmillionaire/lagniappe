@@ -125,7 +125,9 @@ export class ModelPanel {
 	hasUniqueElement(type) {
 		return (
 			this.uniqueElements.includes(type) &&
-			this.panel.querySelector(`[id^="${type}"]`)
+			Array.from(this.builder.elements.values()).some(
+				(element) => element.schema.type === type,
+			)
 		);
 	}
 

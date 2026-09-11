@@ -134,7 +134,9 @@ export class FormSettings {
 			this.generateForm.target.dataset.visible = visible ? "false" : "true";
 			if (!visible) this.generateForm.target.querySelector("textarea")?.focus();
 		} else if (button?.dataset.role === "cancel" && this.generateForm?.target) {
+			this._generationIdentity = null;
 			this.generateForm.target.dataset.visible = "false";
+			this.generateForm.messages.submit = "Generate";
 			this.generateForm.resetSubmitButton();
 			const ta = this.generateForm.target.querySelector("textarea");
 			if (ta) ta.value = "";
@@ -207,6 +209,8 @@ export class FormSettings {
 	 * @testable true
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_generation_failure_stays_visible_and_releases_submitter
 	 * @matrix forms ui-action : persistent-error retryable-action schema-generation single-flight
+	 * @matrix forms : draft-history
+	 * @pair forms:stale-response
 	 */
 	_generateSchema(event) {
 		event.preventDefault();
@@ -227,10 +231,19 @@ export class FormSettings {
 			data.append("explain", submitter.dataset.explain);
 		}
 
-		const acknowledgement = {
-			wasSaved: this.builder.header.saveButton?.dataset.saved === "true",
-			name: this.builder.header.persistenceState.name,
+		this.builder.updateSchema();
+		this.builder.draft.group = null;
+		const identity = {
+			request_id: crypto.randomUUID(),
+			draft_revision: this.builder.draft.revision,
 		};
+		this._generationIdentity = identity;
+		const draft = this.builder.captureDraft();
+		data.set("schema", JSON.stringify(draft.schema));
+		data.set("html_fields", JSON.stringify(draft.html_fields));
+		data.set("baseline", this.builder.draft.baseline || "");
+		data.set("draft_revision", String(identity.draft_revision));
+		data.set("request_id", identity.request_id);
 		if (submitter) {
 			submitter.disabled = true;
 			submitter.setAttribute("aria-disabled", "true");
@@ -239,11 +252,29 @@ export class FormSettings {
 
 		const pending = (async () => {
 			try {
-				const response = await request.post(ENDPOINTS.createSchema, data);
+				const response = await request.post(ENDPOINTS.createSchema, data, {
+					replaceErrorPage: false,
+				});
 				if (this._destroyed) return false;
-				const success = await this._updateSchema(response, acknowledgement);
+				if (this._generationIdentity !== identity) return false;
+				if (
+					!response?.modal &&
+					(identity.draft_revision !== this.builder.draft.revision ||
+						response?.request_id !== identity.request_id ||
+						response?.draft_revision !== identity.draft_revision)
+				) {
+					if (response?.ok === true) {
+						this.generateForm.messages.submit = "Regenerate";
+						this.generateForm.showError(
+							"Your draft changed while generation was running. Regenerate using your current draft.",
+						);
+						return false;
+					}
+				}
+				const success = await this._updateSchema(response);
 				if (this._destroyed) return false;
 				if (success || (response?.ok === true && response.modal)) {
+					this.generateForm.messages.submit = "Generate";
 					this.generateForm.resetSubmitButton();
 				}
 				if (success) this.generateForm.target.dataset.visible = "false";
@@ -272,30 +303,25 @@ export class FormSettings {
 		return pending;
 	}
 
-	async _updateSchema(response, acknowledgement = null) {
+	async _updateSchema(response) {
 		if (this._destroyed || !this.generateForm) return false;
 
-		if (response?.ok === true && response.schema) {
-			if (response.schema.length === 0) {
-				this.generateForm.showError("No form elements generated");
+		if (response?.ok === true && response.operations) {
+			try {
+				if (!this.builder.draft.applyGeneration(response)) {
+					this.generateForm.showError(
+						"No changes were needed. Your draft is unchanged.",
+					);
+					return false;
+				}
+				this.builder.restoreDraft();
+				this.builder.header.message(
+					"Generated changes are in your draft. Save to keep them.",
+					{ persistent: true },
+				);
+			} catch (error) {
+				this.generateForm.showError(error.message);
 				return false;
-			}
-
-			for (const element of response.schema) {
-				if (this._destroyed) return false;
-				if (this.builder.elements.get(element.id)) continue;
-				const newElement = await this.builder.createElement(element);
-				if (this._destroyed) return false;
-				this.builder.model.panel.appendChild(newElement);
-			}
-			this.builder.updateSchemaOrder();
-			if (acknowledgement?.wasSaved) {
-				this.builder.header.acknowledge({
-					schema: response.schema,
-					name: acknowledgement.name,
-				});
-			} else {
-				this.builder.header.unsaved();
 			}
 			return true;
 		} else if (response?.ok === true && response.modal) {
@@ -306,6 +332,8 @@ export class FormSettings {
 			this.generateForm.showError(
 				response?.error || "Could not generate this form. Try again.",
 			);
+			if (response?.code === "stale_form_draft")
+				this.builder.header.showConflict(response);
 		}
 		return false;
 	}

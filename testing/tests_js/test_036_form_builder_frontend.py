@@ -39,12 +39,14 @@ const notification = {
   dataset: { visible: "false" },
   textContent: "",
   setAttribute(name, value) { this.attributes[name] = value; },
+  append(link) { this.link = link; },
 };
 const previewToggle = { dataset: {} };
 const previewPanel = { dataset: {} };
 const document = {
   activeElement: button,
   body: {},
+  createElement() { return { dataset: {} }; },
   getElementById(id) {
     return {
       "form-name-display": nameDisplay,
@@ -62,6 +64,8 @@ const document = {
 };
 const context = {
   areEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); },
+  crypto: require("node:crypto").webcrypto,
+  structuredClone,
   captureError() {},
   clearTimeout() {},
   console,
@@ -87,10 +91,16 @@ source += "\nglobalThis.Header = Header;";
 vm.runInContext(source, context);
 
 (async () => {
+const { BuilderDraft } = await import(process.cwd() + "/src/script/views/builder/draft.mjs");
 let schema = [{ id: "first", type: "text" }];
 const builder = {
   get schema() { return schema; },
+  captureDraft() { return { schema: structuredClone(schema), name: nameHidden.value, form_type: "task", html_fields: {} }; },
+  updateSchema() { this.draft.record(this.captureDraft()); },
+  async draftPayload(state) { return structuredClone(state); },
+  restoreDraft() { schema = structuredClone(this.draft.state.schema); this.draft.dirty ? header.unsaved() : header.saved(); },
 };
+builder.draft = new BuilderDraft(builder.captureDraft(), "initial");
 const header = new context.Header(builder);
 if (
   button.attributes["aria-describedby"] !== "notification" ||
@@ -102,6 +112,7 @@ if (
 
 const first = header.saveForm();
 const duplicate = header.saveForm();
+await new Promise(setImmediate);
 if (first !== duplicate || requests.length !== 1) {
   throw new Error("Concurrent saves were not coalesced");
 }
@@ -113,7 +124,9 @@ if (requests[0].args[2]?.replaceErrorPage !== false) {
 }
 
 schema = [...schema, { id: "second", type: "number" }];
-requests.shift().resolve({ ok: true });
+builder.updateSchema();
+const firstRequest = requests.shift();
+firstRequest.resolve({ ok: true, draft: firstRequest.args[1], baseline: "saved-1" });
 if (await first !== true) throw new Error("Successful request was not reported");
 if (button.dataset.saved !== "false") {
   throw new Error("A stale save response acknowledged newer builder edits");
@@ -123,6 +136,7 @@ if (button.disabled || button.attributes["aria-busy"] !== undefined) {
 }
 
 const rejected = header.saveForm();
+await new Promise(setImmediate);
 button.dataset.visible = "false";
 requests.shift().reject(new Error("transport failed"));
 if (await rejected !== false || button.disabled) {
@@ -134,6 +148,7 @@ if (button.dataset.visible !== "false") {
 button.dataset.visible = "true";
 
 const failed = header.saveForm();
+await new Promise(setImmediate);
 requests.shift().resolve({ ok: false, error: "Temporary save failure" });
 if (await failed !== false) throw new Error("Failed request was not reported");
 if (button.disabled || notification.dataset.visible !== "true") {
@@ -143,11 +158,23 @@ if (notification.textContent !== "Temporary save failure") {
   throw new Error(`Unexpected save error: ${notification.textContent}`);
 }
 
+const conflicted = header.saveForm();
+await new Promise(setImmediate);
+requests.shift().resolve({ ok: false, code: "stale_form_draft", error: "Changed elsewhere", saved_url: "/forms/current" });
+if (await conflicted !== false || notification.link?.href !== "/forms/current" || notification.link.target !== "_blank") {
+  throw new Error("Stale Save did not preserve the draft with a separate saved-form link");
+}
+if (builder.draft.state.schema.length !== 2 || !builder.draft.dirty) {
+  throw new Error("Stale Save discarded the current local draft");
+}
+
 const retry = header.saveForm();
+await new Promise(setImmediate);
 if (retry === failed || requests.length !== 1) {
   throw new Error("Released save could not be retried");
 }
-requests.shift().resolve({ ok: true });
+const retriedRequest = requests.shift();
+retriedRequest.resolve({ ok: true, draft: retriedRequest.args[1], baseline: "saved-2" });
 if (await retry !== true || button.dataset.saved !== "true") {
   throw new Error("Retry did not acknowledge the current builder state");
 }
@@ -156,6 +183,7 @@ if (notification.dataset.visible !== "false" || notification.textContent !== "")
 }
 
 const late = header.saveForm();
+await new Promise(setImmediate);
 header.destroy();
 requests.shift().resolve({ ok: true });
 if (await late !== false) {
@@ -180,6 +208,7 @@ let finishRequest;
 let requestCount = 0;
 const context = {
   BaseForm: class {},
+  crypto: require("node:crypto").webcrypto,
   captureError() {},
   console,
   ENDPOINTS: { createSchema: "/forms/create-schema" },
@@ -187,6 +216,7 @@ const context = {
   FormData: class {
     get(name) { return name === "description" ? "Create a form" : null; }
     append() {}
+    set() {}
   },
   Modal: class {},
   request: {
@@ -221,6 +251,9 @@ const settings = {
   _destroyed: false,
   _generationPromise: null,
   builder: {
+    updateSchema() {},
+    draft: { revision: 0, baseline: "source" },
+    captureDraft() { return { schema: [], html_fields: {} }; },
     header: {
       saveButton: { dataset: { saved: "true" } },
       persistenceState: { name: "Generated Form", schema: [] },

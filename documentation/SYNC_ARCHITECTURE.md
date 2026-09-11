@@ -179,6 +179,11 @@ invalidate a viewer's list even when membership is unchanged. Home widgets use
 independent channels. Personal Starred and Tool Reports channels combine their
 narrow User/report authorities.
 
+The Page Tasks fragment ETag combines the Page fingerprint with the Forms
+collection revision. A saved Task Form can change labels and static content
+without changing its Tasks or their Page, so this bounded revision read prevents
+reusing old fragment HTML after publication. It does not load or touch Tasks.
+
 Saved filtered Task indexes subscribe to both their Filter entity and the Tasks
 channel, periodically while active. Filter entity revisions include their parent
 Project and the viewer's authorization; result-page revisions also include Tasks.

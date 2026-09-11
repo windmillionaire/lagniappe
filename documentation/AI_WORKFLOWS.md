@@ -209,8 +209,19 @@ retry safety. Put field updates before completion and make it depend on them.
 The existing scheduling policy is unchanged: near-term tasks reopen immediately
 so the next occurrence appears on the homepage; other production completions
 retain their midnight reopening job. Nonproduction still reopens immediately.
-Already-completed Tasks are unchanged. Undo restores the prior task without
-ordinary reopening's form/file reset and refuses conflicting later changes.
+Already-completed Tasks are unchanged. Undo reopens through the normal archive
+boundary and restores compatible prior active answers, repeating defaults and
+attachments. The original completion remains in history, including for an
+occurrence that recurrence already reopened. Later edits or incompatible form
+changes stop the undo. Repeating an undo after an interrupted save recognizes
+the restored active state without deleting or duplicating the completion.
+
+Undoing an imported event on a reused Task would rewrite a recorded completion;
+that correction remains unavailable and fails before changing answer assets.
+New imported completion events save their answers before pinning the exact form
+definition. Unknown generated field IDs are rejected before existing values
+are reset. Historical AI reads use recorded definitions; missing originals are
+marked unavailable and recoverable answers are shown with their saved IDs.
 
 ## Workspace semantics
 
