@@ -21,12 +21,10 @@ export default class Columns extends Condition {
 	}
 
 	init() {
-		this.element.schema.columns ??= [];
-
 		if (this.index !== -1) {
 			this.setTitle("Edit Column");
 			this.messages.submit = "Update Column";
-			this.setting = { ...this.element.schema.columns[this.index] };
+			this.setting = { ...this.element.schema.columns?.[this.index] };
 		} else {
 			this.setTitle("Create Column");
 			this.setting = {};
@@ -116,11 +114,27 @@ export default class Columns extends Condition {
 			selectBox.values.add(initial);
 		}
 		selectBox.init();
+		this.columnType = selectBox;
 		this.destroyables.push(selectBox);
 		this.focusTarget = selectElt;
 
 		this.target.removeEventListener("updated", this._updated);
 		this.target.addEventListener("updated", this._updated);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
+	 * @matrix forms : builder-save stable-identity
+	 */
+	refreshSavedState() {
+		const saved = this.builder
+			.savedField(this.element.schema.id)
+			?.columns?.some((column) => column.id === this.setting.id);
+		if (!saved || !this.columnType) return;
+		this.columnType.hidePanel();
+		this.columnType.select.disabled = true;
+		this.columnType.element.disabled = true;
 	}
 
 	_updated(e) {
@@ -135,6 +149,7 @@ export default class Columns extends Condition {
 	destroy() {
 		this.target.removeEventListener("updated", this._updated);
 		super.destroy();
+		this.columnType = null;
 	}
 
 	validate() {
@@ -150,7 +165,7 @@ export default class Columns extends Condition {
 			do {
 				this.setting.id = generateElementId("column");
 			} while (
-				this.element.schema.columns.some(
+				this.element.schema.columns?.some(
 					(column) => column.id === this.setting.id,
 				)
 			);

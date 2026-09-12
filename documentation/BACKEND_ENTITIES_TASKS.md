@@ -59,16 +59,24 @@ use that current submission with the current Form, even while the Task is
 completed. Completion does not create a FormHistory record or copy Form assets.
 
 `tools/form_definitions.py` separates current reads from explicitly requested
-originals. **View original completion** reads the envelope. It uses the current
-Form when the recorded generation matches and resolves FormHistory only for a
-different or missing Form. Labels, HTML and other presentation changes within
+originals. **Show original submission** is offered only when a completed Task's
+current submission has advanced beyond the envelope's generation and its values differ.
+A changed Form version or generation alone does not establish a converted Task.
+The explicit view reads the envelope and uses the current Form when the recorded
+generation matches, resolving FormHistory only for a different or missing Form.
+Labels, HTML and other presentation changes within
 one generation remain visible in original views. Old `schema_version` hashes
 do not select history; legacy rows without a generation start at zero.
 
-Reopening first archives the envelope's original answers and generation into
-the existing flat TaskHistory format, preserving attachments, relationships,
-name, description and completion metadata. It then removes the envelope and
-restores compatible active values. TaskHistory has no completion envelope, and
+Manual reopening defaults to archiving the current modified submission. Opening
+the original view reveals a radio choice, initially original; the chosen source
+is sent as `completion_submission` when the existing completion checkbox is
+clicked. Automatic/scheduled reopening always uses the original envelope.
+`Task.uncomplete(submission_source=...)` keeps that automatic default; manual
+routes explicitly supply their modified/original choice. Both paths archive the
+chosen raw values and matching Form generation into flat TaskHistory, preserving
+attachments, relationships, name, description and completion metadata. Reopening
+removes the envelope and clears all submission values. TaskHistory has no completion envelope, and
 its `modified` value is fixed at creation. History readers use each record's
 generation and batch distinct older-definition lookups.
 
@@ -89,23 +97,22 @@ sources. Loading a stale Form key resolves it to `None` without requiring a
 record re-save; a relation that was never loaded still raises an unloaded-relation
 error. Reads do not silently rewrite stored relationship keys.
 
-## Defaults and reopening
+## Fresh submissions and reopening
 
-`default_submission` stores selected values that should repeat when a task is
-reopened. `SubmitterMixin.save_default_field()` writes one field through a
-root-only property mask. A later submit keeps unchanged defaults and removes
-values that changed or disappeared.
+Every uncompletion opens a fresh submission. The attached Form, Page/Project,
+assignment and other task settings remain in place; answer fields and completed
+Todo items do not repeat. Legacy `default_submission` data is discarded on
+uncompletion and ordinary submission saves.
 
-Todo fields never repeat as defaults. History retains the completed checklist;
-the reopened Task starts with no todo items. Assignment remains in place across
-completion and reopening.
+**Fill from latest history** is an explicit, local form action. It restores one
+field for the current submission, which is persisted through the normal Update
+or completion flow. It creates no repeating defaults.
 
 History fill checks exact field/option/column identities and compatible
 representations before copying values. Labels and added choices/columns are safe;
 missing definitions, removed identities or changed types require review. Failed
-checks retain the original history and current defaults. Reopening restores the
-Task's current defaults and stages source-asset cleanup after the guarded durable
-archive/reset commit.
+checks retain the original history and current answers. Reopening stages
+source-asset cleanup after the guarded durable archive/reset commit.
 
 ## Move and combine
 

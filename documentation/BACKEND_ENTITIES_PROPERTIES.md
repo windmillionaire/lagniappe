@@ -99,10 +99,10 @@ Checkboxes illustrate the unset contract: an absent stored checkbox projects
 as `None`; a complete submit without the checkbox input validates it to
 explicit `False`.
 
-Task defaults live in `default_submission`. Saving one default uses a masked
-root write, and a later task submit removes defaults whose values changed or
-disappeared. Todo fields never repeat as defaults; reopening starts a fresh
-checklist while history preserves completed items.
+Uncompleting a Task clears its submission while retaining its Form and task
+settings. History preserves completed answers and checklist items. Filling from
+history is a manual action for the current form; it does not establish repeating
+submission defaults.
 
 ## Canonical form schemas
 

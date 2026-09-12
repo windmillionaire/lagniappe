@@ -275,9 +275,9 @@ export class FormSettings {
 				if (this._destroyed) return false;
 				if (success || (response?.ok === true && response.modal)) {
 					this.generateForm.messages.submit = "Generate";
-					this.generateForm.resetSubmitButton();
+					if (success) this.generateForm.success();
+					else this.generateForm.resetSubmitButton();
 				}
-				if (success) this.generateForm.target.dataset.visible = "false";
 				return success;
 			} catch (error) {
 				captureError(error, submitter, { context: "builder-generate-schema" });
@@ -308,17 +308,9 @@ export class FormSettings {
 
 		if (response?.ok === true && response.operations) {
 			try {
-				if (!this.builder.draft.applyGeneration(response)) {
-					this.generateForm.showError(
-						"No changes were needed. Your draft is unchanged.",
-					);
-					return false;
+				if (this.builder.draft.applyGeneration(response)) {
+					this.builder.restoreDraft();
 				}
-				this.builder.restoreDraft();
-				this.builder.header.message(
-					"Generated changes are in your draft. Save to keep them.",
-					{ persistent: true },
-				);
 			} catch (error) {
 				this.generateForm.showError(error.message);
 				return false;

@@ -122,21 +122,7 @@ def _todo_task(hash_suffix):
     return task
 
 
-# @matrix form-todo submission : repeating-default
-@pytest.mark.unit
-def test_todo_list_cannot_be_saved_as_repeating_default():
-    task = _todo_task("default")
-    submission = task.properties.submission
-    submission.value = {
-        "todo-work": {"items": [{"text": "Old work", "checked": True}]}
-    }
-
-    with pytest.raises(ValidationError, match="cannot repeat automatically"):
-        task.save_default_field("todo-work", submission)
-    assert task.default_submission == {}
-
-
-# @matrix task-completion : history repeating-default
+# @matrix task-completion : history field-reset
 # @pair form-todo:field-reset
 @pytest.mark.unit
 def test_uncomplete_archives_then_clears_todo_items():
@@ -162,5 +148,6 @@ def test_uncomplete_archives_then_clears_todo_items():
         task.uncomplete()
 
     assert archived == [current]
-    assert task.submission == {"repeat-note": "Keep this"}
-    assert "todo-work" not in task.default_submission
+    assert task.submission == {}
+    assert "submission" not in task.db
+    assert "default_submission" not in task.db

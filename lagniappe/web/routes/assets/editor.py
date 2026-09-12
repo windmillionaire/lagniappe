@@ -41,7 +41,7 @@ def html_field(key, field_id, **kwargs):
 
 
 # @testable true
-# @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_historical_images_are_bound_to_the_authorized_completion
+# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_historical_images_are_bound_to_the_authorized_completion
 # @matrix task-completion html-field permissions : schema-version owned-image record-scope
 @assets.route("<key>/form-generation/<int:generation>/<asset_name>", methods=["GET", "HEAD"])
 @permission(requested=Action.VIEW, no_store=True)

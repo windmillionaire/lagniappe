@@ -59,6 +59,12 @@ Create and Organize expose optional Page rich text to models as
 editor-compatible `document` HTML before the proposal is stored. Existing
 ready reports that already contain `document` HTML remain executable.
 
+Updates to normal Page documents use `append_page_document`: preserve existing
+content and append the requested text with a server-generated source/time quote
+before the addition. Form-builder generation uses a separate prompt and may
+replace static instruction text in its local draft; that replacement behavior
+does not apply to normal document updates.
+
 ## Organize
 
 Organize evaluates an upload batch as a whole:
@@ -223,7 +229,7 @@ The existing scheduling policy is unchanged: near-term tasks reopen immediately
 so the next occurrence appears on the homepage; other production completions
 retain their midnight reopening job. Nonproduction still reopens immediately.
 Already-completed Tasks are unchanged. Undo reopens through the normal archive
-boundary and restores compatible prior active answers, repeating defaults and
+boundary and restores compatible prior active answers and
 attachments. The original completion remains in history, including for an
 occurrence that recurrence already reopened. Later edits or incompatible form
 changes stop the undo. Repeating an undo after an interrupted save recognizes

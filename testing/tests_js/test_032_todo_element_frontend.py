@@ -59,9 +59,6 @@ const filled = todo.fillFromHistory(input);
 if (!filled || rendered !== 1 || changed !== 1) {
   throw new Error("History fill did not redraw and publish one change");
 }
-if (todo.historyFillPersistsDefault !== false) {
-  throw new Error("Todo history fill must not become a repeating default");
-}
 if (todo.submission.items.some((item) => item.checked)) {
   throw new Error("History fill retained a completed checkbox");
 }
@@ -211,7 +208,6 @@ Object.assign(todo, {
   _draftVisible: false,
   _renamingIndex: null,
   _historyValue: { items: [{ text: "Earlier", checked: false }] },
-  _historyOnFill: null,
   label: "Checklist",
   readonly: false,
   hasSubmission: false,

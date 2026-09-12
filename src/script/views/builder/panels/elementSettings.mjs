@@ -328,7 +328,7 @@ const columns = (schema) => {
 	const toggle = _toggle("add", "add");
 	title.append(label, toggle);
 
-	if (schema.columns) {
+	if (schema.columns?.length) {
 		const columnList = document.createElement("ul");
 		columnList.className = `flex flex-col gap-1`;
 		const length = schema.columns.length;
@@ -385,6 +385,7 @@ const deleteButton = () => {
 	button.textContent = "Delete";
 	button.dataset.kind = "delete";
 	button.dataset.role = "delete";
+	button.dataset.setting = "deleteButton";
 	button.className = `${STYLES.button.submit}`;
 	return button;
 };
@@ -592,24 +593,34 @@ export class ElementSettings {
 			) {
 				return null;
 			}
-			const section = SettingsElement[setting](display);
-			const saved = this.builder.savedField(schema.id);
-			if (
-				saved &&
-				["input", "multiple", "location", "deleteButton"].includes(setting)
-			) {
+			return SettingsElement[setting](display);
+		});
+		const sections = settings.filter(Boolean);
+		this.refreshSavedState(schema, sections);
+		return sections;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
+	 * @matrix forms : builder-save stable-identity
+	 */
+	refreshSavedState(
+		schema = this.builder.selectedElement?.schema,
+		sections = this.panel.children,
+	) {
+		if (!schema) return;
+		const saved = this.builder.savedField(schema.id);
+		if (!saved) return;
+		for (const section of sections) {
+			const setting = section.dataset.setting;
+			if (["input", "multiple", "location", "deleteButton"].includes(setting)) {
 				const controls = section.matches("button, input, select")
 					? [section]
 					: section.querySelectorAll("button, input, select");
 				for (const control of controls) control.disabled = true;
-				const reason = document.createElement("p");
-				reason.className = "text-sm text-base-medium";
-				reason.textContent =
-					"Changing or removing saved fields will be available with submission migrations.";
-				if (section.matches("button")) section.title = reason.textContent;
-				else section.append(reason);
 			}
-			if (saved && ["options", "columns"].includes(setting)) {
+			if (["options", "columns"].includes(setting)) {
 				for (const row of section.querySelectorAll("[data-index]")) {
 					const item = schema[setting][Number(row.dataset.index)];
 					const key = setting === "options" ? "value" : "id";
@@ -623,9 +634,7 @@ export class ElementSettings {
 					}
 				}
 			}
-			return section;
-		});
-		return settings.filter(Boolean);
+		}
 	}
 
 	selectItem() {

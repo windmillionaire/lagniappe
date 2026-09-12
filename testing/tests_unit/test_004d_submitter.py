@@ -14,7 +14,6 @@ import pytest
 
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.mixins.submitter import normalize_submission_values
-from lagniappe.core.mutations import executor as mutation_executor
 from testing.utility.test_entities import TestEntities
 from testing.utility.mock_submission import WebFormSubmission
 
@@ -87,57 +86,13 @@ def test_patch_submission_merges_multiple_fields(get_test_entities, get_schema):
         assert json.loads(entity.db["submission"]) == spec["expected_submission"]
 
 
-# @matrix submission : direct-save field-copy repeating-default storage
+# @matrix submission : reconciliation
 @pytest.mark.unit
-def test_save_default_field_copies_db_value_and_saves_only_submitter():
+def test_save_submission_discards_legacy_defaults_and_keeps_current_answers(get_schema):
     task = TestEntities.get(
         "TASK",
         {
-            "name": "Repeating default task",
-            "hash": "repeat_default_task",
-            "page": {"name": "Parent", "hash": "repeat_default_parent"},
-        },
-    )
-
-    class _IndexableEntity(dict):
-        exclude_from_indexes = frozenset()
-
-    task._db = _IndexableEntity(task.db)
-    source_value = {"nested": ["original"]}
-    submission = SimpleNamespace(
-        entity=task,
-        db_value={"repeat-field": source_value},
-        fields={"repeat-field": SimpleNamespace(repeating_default=True)},
-    )
-
-    with (
-        patch.object(
-            mutation_executor.database_utility,
-            "save_mutations",
-        ) as database_save,
-        patch.object(task, "save") as task_save,
-    ):
-        saved = task.save_default_field("repeat-field", submission)
-
-    source_value["nested"].append("changed")
-
-    assert saved == {"nested": ["original"]}
-    assert task.default_submission == {"repeat-field": {"nested": ["original"]}}
-    assert json.loads(task.db["default_submission"]) == task.default_submission
-    assert "default_submission" in task.db.exclude_from_indexes
-    assert list(database_save.call_args.args[0]) == [
-        (task, ("default_submission",))
-    ]
-    task_save.assert_not_called()
-
-
-# @matrix submission : reconciliation repeating-default
-@pytest.mark.unit
-def test_save_submission_removes_changed_repeating_defaults(get_schema):
-    task = TestEntities.get(
-        "TASK",
-        {
-            "name": "Reconcile repeating defaults",
+            "name": "Discard legacy submission defaults",
             "hash": "reconcile_defaults",
             "page": {"name": "Parent", "hash": "reconcile_defaults_parent"},
             "form": {"name": "Inputs", "hash": "reconcile_defaults_form"},
@@ -157,10 +112,8 @@ def test_save_submission_removes_changed_repeating_defaults(get_schema):
     }
     task.save_submission()
 
-    assert task.default_submission == {"input-textab12": "unchanged"}
-    assert json.loads(task.db["default_submission"]) == {
-        "input-textab12": "unchanged"
-    }
+    assert "default_submission" not in task.db
+    assert task.submission == {"input-textab12": "unchanged", "input-numgh78": 7}
 
 
 # @matrix form-table submission : error-message import validation

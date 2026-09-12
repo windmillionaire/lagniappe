@@ -89,6 +89,11 @@ export class Task extends ViewComponent {
 		return data;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_uncomplete_history_replaces_row_in_one_prepared_transition
+	 * @matrix tasks : active-widget history-refresh uncomplete
+	 */
 	async updated(response) {
 		if (response.task_delta) {
 			this.deactivate(false);
@@ -98,18 +103,39 @@ export class Task extends ViewComponent {
 		}
 
 		const update = response.html?.querySelector(`[id='${this.name}']`);
-		const activeHistory =
-			this.completed && this.active?.name === "TaskHistory"
-				? this.active
-				: null;
 		const openSettings = Boolean(
-			activeHistory &&
+			this.completed &&
+				this.active?.name === "TaskHistory" &&
 				update?.dataset.completed === "false" &&
 				update.querySelector("[data-widget='TaskSettings']"),
 		);
-		const historyReplacement = openSettings
-			? update.querySelector("[data-widget='TaskHistory']")?.cloneNode(true)
-			: null;
+		if (openSettings) {
+			// Prepare the reopened row before replacing the completed history view.
+			const replacement = this.view.getComponent(update);
+			this.view.components[this.name] = this;
+			try {
+				await replacement.activate("TaskSettings");
+				await replacement.prepareRender(true);
+				await withTransition(
+					() => {
+						if (this._destroyed || this.view._destroyed) return;
+						this.elt.replaceWith(update);
+						this.destroy();
+						this.view.components[replacement.name] = replacement;
+						replacement.render(true);
+					},
+					{ label: `${this.name}:uncomplete-history` },
+				);
+			} finally {
+				if (!update.isConnected) {
+					replacement.destroy();
+					if (!this._destroyed && !this.view._destroyed) {
+						this.view.components[this.name] = this;
+					}
+				}
+			}
+			return;
+		}
 
 		if (update) {
 			Object.assign(this.elt.dataset, update.dataset);
@@ -118,24 +144,6 @@ export class Task extends ViewComponent {
 		}
 
 		await super.updated(response);
-		if (!openSettings) return;
-
-		await this.activate("TaskSettings");
-		await this.prepareRender(true);
-		await withTransition(
-			() => {
-				// Uncompletion archives a new row, so the loaded history is stale.
-				if (historyReplacement) {
-					activeHistory.target.replaceWith(historyReplacement);
-				} else {
-					activeHistory.target.remove();
-				}
-				activeHistory.destroy?.();
-				delete this.widgets.TaskHistory;
-				this.render(true);
-			},
-			{ label: `${this.name}:uncomplete-history` },
-		);
 	}
 
 	_replaceNav(update) {
@@ -147,8 +155,15 @@ export class Task extends ViewComponent {
 		this._nav = null;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_uncomplete_from_loaded_task_history_opens_settings
+	 * @matrix tasks : complete history-refresh
+	 */
 	_removeMissingWidgets(update) {
 		this.elt.querySelectorAll("[data-widget]").forEach((elt) => {
+			// Nested components own their widgets, including loaded history rows.
+			if (elt.closest("[lp-component]") !== this.elt) return;
 			const name = elt.dataset.widget;
 			const target = update.querySelector(`[data-widget='${name}']`);
 			if (target) return;

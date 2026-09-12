@@ -176,8 +176,8 @@
        {% if show_form %}data-form="{{ t.hash }}:TaskForm"{% endif %}
        {% if show_settings %}data-task="{{ t.hash }}:TaskSettings"{% endif %}
        data-route="{{ url_for('tasks.history', key=t.urlsafe_key) }}"
-       class="min-w-0 overflow-hidden max-w-full mx-4 mb-4 rounded-md outline-2 outline-task-default">
-    <div class="table-container px-4" data-role="table"></div>
+       class="min-w-0 max-w-full mx-4 mb-4 sm:mx-2">
+    <div data-role="table"></div>
   </div>
 {% endmacro %}
 
@@ -205,11 +205,31 @@
     {% if t.allowed(Action.EDIT) and not t.completed %}
       {{ autofill(enabled=current_user.access(AI.CREATE)) }}
     {% endif %}
-    {% if t.completed %}
+    {% if t.has_converted_completion %}
       <section data-role="original-completion-controls" class="flex flex-col gap-3">
-        <button type="button" data-role="view-original-completion" aria-expanded="false"
-                data-route="{{ url_for('tasks.completion_details', key=t.urlsafe_key) }}"
-                class="{{ styles.button.submit }}">View original completion</button>
+        <p data-role="submission-changed-warning" role="status"
+           class="rounded-md px-3 py-2 text-sm bg-amber-50 text-amber-900 ring-1 ring-amber-400">
+          This submission has changed.
+          <button type="button" data-role="view-original-completion"
+                  data-route="{{ url_for('tasks.completion_details', key=t.urlsafe_key) }}"
+                  class="font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2">Show original submission</button>
+        </p>
+        <fieldset data-role="completion-submission-options" hidden
+                  class="flex flex-wrap gap-x-6 gap-y-2">
+          <legend class="sr-only">Submission to save in history</legend>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="completion_submission" value="original"
+                   data-role="completion-submission-choice" disabled
+                   class="{{ styles.radio.default }}">
+            Save original submission
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="completion_submission" value="modified"
+                   data-role="completion-submission-choice" disabled
+                   class="{{ styles.radio.default }}">
+            Save modified submission
+          </label>
+        </fieldset>
         <div data-role="original-completion-detail" hidden></div>
       </section>
     {% endif %}

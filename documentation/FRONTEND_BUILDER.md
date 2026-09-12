@@ -56,7 +56,7 @@ listener.
 
 ### Schema Management
 
-**`updateSchema(silent, group)`** -- serializes all element schemas (in map order) to JSON, writes the hidden input and records the current draft. Dirty state compares the complete draft with the accepted saved baseline; typing in one group can share a history entry.
+**`updateSchema(silent, group)`** -- serializes all element schemas (in map order) to JSON, writes the hidden input and records form edits. Typing in one field setting can share a history entry. Document content uses `setHtml()` → `BuilderDraft.updateHtml()` instead: it updates HTML, revision and dirty status without copying or comparing the schema on every editor update.
 
 **`updateSchemaOrder()`** -- rebuilds the elements map in DOM order (defaults first, then model panel children). Called after drag-and-drop reordering.
 
@@ -68,11 +68,23 @@ listener.
 
 **`removeElement()`** -- removes an unsaved draft element and its conditions as an undoable change. Saved field identities cannot be removed until the migration workflow is available. The server enforces the same saved-field, option-value and table-column compatibility constraints.
 
-`BuilderDraft` keeps at most 100 commands covering schema, name, order,
-selection and HTML/image references. Generation is one command. Undo/Redo
-restores the local draft; Undo after Save produces a new unsaved draft and
-cannot bypass saved-identity constraints. Rich-text keyboard undo stays with
-the focused editor.
+`BuilderDraft` keeps at most 100 commands covering schema, name and field order,
+with selection restored alongside them. A generated schema change is one command.
+Document text, formatting and image layout belong to the editor's own Undo;
+these edits neither add Form history nor clear Form Redo. Generated HTML for
+existing Document fields also leaves Form history unchanged. Form Undo/Redo
+preserves their current content. Adding/removing a Document field is a schema change, so its
+snapshot retains content and image references for restoring that field.
+
+Dirty status still includes all active HTML and form edits. Undo after Save can
+produce an unsaved draft and cannot bypass saved-identity constraints. Ordinary
+Save retains the current editor and its keyboard history. Undo/Redo, generation,
+or a Save response that changes the visible draft rebuilds the form and recreates
+editors; their local keyboard history does not survive that rebuild.
+Consequently, generated replacement HTML currently has no local Undo; supporting
+that requires applying it through a retained editor history.
+The toolbar Undo/Redo controls are hidden during Preview and return with their
+existing enabled/disabled states when Preview closes.
 
 ### Drag and Drop
 
@@ -105,7 +117,7 @@ The center panel showing the current form layout. Each element is rendered as a 
 
 **Default elements** (`name`, `description` for page forms) appear in a separate panel above the model and cannot be deleted or reordered relative to custom elements.
 
-**`focusItem()` / `blurItem()`** -- when editing a condition, the model focuses on just the selected element (hides others). On close, all elements are restored.
+**`focusItem()` / `blurItem()`** -- when editing a condition, the model focuses on just the selected element (hides others) and removes its minimum height so the outline fits that element. On close, all elements and the normal drop area height are restored.
 
 ### ElementSettings (`panels/elementSettings.mjs`)
 
@@ -150,13 +162,24 @@ schema and HTML draft, saved baseline, draft revision and request identity to
 title, placeholder, option-label and column-title updates, plus HTML sidecars.
 Unmentioned fields and settings survive. The response is applied as one local
 command and remains unsaved; generation writes no Form or content assets.
+Generated instruction text may replace an HTML field's content. Existing images
+retain their attributes from the submitted draft before final sanitization,
+including unsaved size/alignment edits. The builder prompt requests ordinary
+Markdown image references; attribute suffixes are parsed instead of displayed
+as text. This does not change normal Page document updates: those remain
+append-only, with a server-generated source/time quote before each addition.
+Successful generation keeps the prompt open and uses the normal submitted
+checkmark, clearing the prompt's unsaved marker. The Form's Save icon still
+indicates that the generated schema is unsaved. Generation and Undo/Redo do not
+add success banners above the model.
 Supports an "explain" mode that shows the AI's prompt
 interpretation in an Initial Prompt modal. The modal shows only the starting
 prompt; later tool or search context is dynamic and is not part of the preview.
 Generation is single-flight. Failure leaves its form error visible and releases
 the submitter for retry. A changed draft, canceled request or destroyed view
 cannot accept a late proposal. Stale-draft feedback retains the prompt for
-Regenerate; a no-op response does not create dirty state.
+Regenerate. A no-op response uses the same success checkmark, without a notice,
+dirty state, Undo/Redo entry or rebuilding the form and its editors.
 
 Group restrictions and the owner checkbox are local drafts. Save Restrictions
 submits the complete snapshot in one PUT, using the standard `BaseForm` spinner
@@ -166,6 +189,10 @@ the draft available for retry; duplicate submissions share one pending request.
 ### ConditionPanel (`panels/condition.mjs`)
 
 An overlay panel that opens over the model when editing conditions, options, columns, or the HTML editor. Disables drag-and-drop while open and focuses the model on the selected element.
+
+Opening and closing a panel does not add empty lists to the schema or mark the
+Form unsaved. Option, column, visibility and status lists are created only when
+the user explicitly adds an entry.
 
 **Save flow**: validates the condition, pushes/updates the schema property, rebuilds settings, and updates the model preview.
 
@@ -180,18 +207,31 @@ Controls for the form name (inline editable), save button, and preview toggle.
 Preview rendering uses a generation guard. A renderer that finishes after a
 new toggle or Builder teardown destroys its detached resources and cannot
 reopen the preview.
+The Preview switch keeps keyboard focus and a visible outline in both states.
 
-**Save button**: Publishes the complete name/schema/HTML/image snapshot, saved
+**Save button**: Uses `aria-disabled` while the draft matches the saved Form or a
+Save is pending. It remains focusable so keyboard focus survives acknowledgement;
+the clean-draft and in-flight guards prevent redundant publication. Calling Save
+with no changes returns without publishing or rebuilding the open editor.
+Save always stays at full opacity. While pending, the standard spinner replaces
+the cloud; once settled, the cloud/check reflects the saved state. Only Undo/Redo
+fade when disabled.
+An edited draft publishes the complete name/schema/HTML/image snapshot, saved
 baseline and request identity through one single-flight promise. While pending,
-it is disabled and exposes `aria-busy`. The backend recognizes a retry before
+it is aria-disabled and exposes `aria-busy`. The backend recognizes a retry before
 consuming its image uploads and rejects a changed saved baseline.
 Only an explicit successful response can acknowledge the submitted snapshot;
-if the live draft changed in the meantime, later edits remain unsaved. Copy
-uses the complete current draft to create a separate Form with independently
-owned content, without saving its source.
+if the live draft changed in the meantime, later edits remain unsaved. When the
+acknowledged content matches the current display, Save retains the model,
+settings and open condition/editor, refreshing newly saved restrictions in
+place. This preserves unsubmitted option/column buffers and focus. The existing
+restore path is used only when server normalization or saved image URLs change
+the displayed draft. Copy uses the complete current draft to create a separate
+Form with independently owned content, without saving its source.
 Failure leaves an error in the Builder's polite live region and releases the
 connected button in `finally`, including its accessibility and focus state, so
-the same action can be retried. Connectivity continues to own whether the save
+the same action can be retried. Successful Save marks the button aria-disabled unless newer
+edits remain unsaved. Connectivity continues to own whether the save
 control is visible. Copy and restriction actions use the same retryable-failure
 rule, except successful copy navigation and successful row removal are terminal
 and do not restore the old control.

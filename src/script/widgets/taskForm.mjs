@@ -1,6 +1,42 @@
+import { BaseForm } from "../elements/base/baseForm";
 import { FormElement } from "../elements/form";
 import { sections } from "../elements/sections";
 import { captureError, request } from "../shared";
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
+ * @reason explicitly requested original submissions use the readonly form renderer
+ */
+async function renderOriginalSubmission(response, key) {
+	const host = document.createElement("div");
+	host.dataset.kind = "task";
+	const form = new BaseForm({
+		target: host,
+		key,
+		readonly: true,
+		schema: response.schema || [],
+		submission: response.submission || {},
+		htmlFields: response.html_fields || {},
+		showEmptyFields: false,
+	});
+	await form.init();
+	const error = response.schema_error || response.content_error;
+	if (error) {
+		const message = document.createElement("p");
+		message.setAttribute("role", "status");
+		message.textContent = error;
+		host.prepend(message);
+	}
+	if (response.raw_submission) {
+		const raw = document.createElement("pre");
+		raw.dataset.role = "original-raw-answers";
+		raw.className = "whitespace-pre-wrap break-words";
+		raw.textContent = JSON.stringify(response.raw_submission, null, 2);
+		host.append(raw);
+	}
+	return { form, host };
+}
 
 /**
  * @testable true
@@ -24,10 +60,11 @@ export class TaskForm extends FormElement {
 		this._historyFillSubmission = null;
 		this._historyFillError = null;
 		this._historyFillGeneration = 0;
-		this._defaultFieldSave = Promise.resolve();
 		this._originalCompletionForm = null;
 		this._originalCompletionGeneration = 0;
 		this._showOriginalCompletion = this._showOriginalCompletion.bind(this);
+		this._selectCompletionSubmission =
+			this._selectCompletionSubmission.bind(this);
 	}
 
 	get autofillElement() {
@@ -37,10 +74,6 @@ export class TaskForm extends FormElement {
 
 	get historyFillRoute() {
 		return this.endpoints?.latestHistorySubmission;
-	}
-
-	get saveDefaultFieldRoute() {
-		return this.endpoints?.saveDefaultField;
 	}
 
 	get historyFillEnabled() {
@@ -60,6 +93,24 @@ export class TaskForm extends FormElement {
 		);
 	}
 
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
+	 * @reason the warning and history selection stay above the displayed submission
+	 */
+	get prepend() {
+		const original = this.target.querySelector(
+			"[data-role='original-completion-controls']",
+		);
+		original
+			?.querySelector("[data-role='view-original-completion']")
+			?.addEventListener("click", this._showOriginalCompletion);
+		original
+			?.querySelector("[data-role='completion-submission-options']")
+			?.addEventListener("change", this._selectCompletionSubmission);
+		return [original];
+	}
+
 	get append() {
 		const error = this.target?.dataset.schemaError;
 		const notice = error ? document.createElement("p") : null;
@@ -72,63 +123,102 @@ export class TaskForm extends FormElement {
 			raw = document.createElement("pre");
 			raw.dataset.role = "original-raw-answers";
 			raw.className = "whitespace-pre-wrap break-words";
-			raw.textContent = JSON.stringify(JSON.parse(this.target.dataset.rawSubmission), null, 2);
+			raw.textContent = JSON.stringify(
+				JSON.parse(this.target.dataset.rawSubmission),
+				null,
+				2,
+			);
 		}
-		const original = this.target.querySelector("[data-role='original-completion-controls']");
-		original?.querySelector("[data-role='view-original-completion']")
-			?.addEventListener("click", this._showOriginalCompletion);
-		return [this.autofillElement, notice, raw, original];
+		return [this.autofillElement, notice, raw];
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
+	 * @reason retain the current rendered fields while showing the requested original
+	 */
+	_setCompletionView(showOriginal) {
+		const controls = this.target.querySelector(
+			"[data-role='original-completion-controls']",
+		);
+		let current = this.target.querySelector(
+			"[data-role='current-completion-detail']",
+		);
+		if (!current) {
+			current = document.createElement("div");
+			current.dataset.role = "current-completion-detail";
+			current.className = "flex flex-col gap-6";
+			// Group the current fields only when an original is first requested.
+			current.append(
+				...Array.from(this.target.children).filter(
+					(child) => child !== controls && !child.matches("[lp-edited-marker]"),
+				),
+			);
+			controls.after(current);
+		}
+		current.hidden = showOriginal;
+		controls.querySelector("[data-role='original-completion-detail']").hidden =
+			!showOriginal;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
+	 * @reason the selected history source and visible submission change together
+	 */
+	_selectCompletionSubmission(event) {
+		event.stopPropagation();
+		this._setCompletionView(event.target.value === "original");
 	}
 
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
-	 * @matrix task-completion : original-view readonly archive uncomplete
+	 * @matrix task-completion : original-view readonly
 	 */
 	async _showOriginalCompletion(event) {
 		event.preventDefault();
 		event.stopPropagation();
 		const button = event.currentTarget;
-		const target = button.parentElement.querySelector("[data-role='original-completion-detail']");
+		const controls = button.closest(
+			"[data-role='original-completion-controls']",
+		);
+		const target = controls.querySelector(
+			"[data-role='original-completion-detail']",
+		);
 		if (button.disabled) return;
-		if (this._originalCompletionForm) {
-			target.hidden = !target.hidden;
-			button.setAttribute("aria-expanded", String(!target.hidden));
-			return;
-		}
 		const generation = this._originalCompletionGeneration;
 		button.disabled = true;
 		try {
 			const response = await request.get(button.dataset.route);
-			const { renderCompletionForm } = await import("./tables");
-			const { form, host } = await renderCompletionForm(response, this.key);
-			if (generation !== this._originalCompletionGeneration || !this.target.contains(button)) {
+			const { form, host } = await renderOriginalSubmission(response, this.key);
+			host.className = "flex flex-col gap-6";
+			if (
+				generation !== this._originalCompletionGeneration ||
+				!this.target.contains(button)
+			) {
 				form.destroy();
 				return;
 			}
-			if (response.can_uncomplete) {
-				const archive = document.createElement("button");
-				archive.type = "button";
-				archive.dataset.role = "archive-completion";
-				archive.className = button.className;
-				archive.textContent = "Archive completion and uncomplete";
-				archive.addEventListener("click", (click) => {
-					click.preventDefault();
-					click.stopPropagation();
-					const data = new FormData();
-					data.append("role", "archive-completion");
-					this.component.disable();
-					void this.view.update(this.component, data, this.component.elt.dataset.route);
-				});
-				host.append(archive);
-			}
 			target.replaceChildren(host);
-			target.hidden = false;
-			button.setAttribute("aria-expanded", "true");
 			this._originalCompletionForm = form;
+			this._setCompletionView(true);
+			controls.querySelector(
+				"[data-role='submission-changed-warning']",
+			).hidden = true;
+			const options = controls.querySelector(
+				"[data-role='completion-submission-options']",
+			);
+			for (const radio of options.querySelectorAll("input")) {
+				radio.disabled = false;
+				radio.checked = radio.value === "original";
+			}
+			options.hidden = false;
+			options.querySelector("input:checked").focus();
 		} catch (error) {
 			if (generation !== this._originalCompletionGeneration) return;
-			target.textContent = "Could not load the original completion. Please try again.";
+			target.textContent =
+				"Could not load the original submission. Please try again.";
 			target.hidden = false;
 			captureError(error, this.target, { route: button.dataset.route });
 		} finally {
@@ -243,27 +333,6 @@ export class TaskForm extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-	 * @matrix tasks : history-fill patch repeating-default
-	 */
-	async saveDefaultField(fieldId) {
-		if (!this.saveDefaultFieldRoute || !fieldId) return;
-
-		this._defaultFieldSave = this._defaultFieldSave.then(() =>
-			request.patch(this.saveDefaultFieldRoute, { field_id: fieldId }),
-		);
-		const response = await this._defaultFieldSave;
-		if (!response?.ok) {
-			captureError(
-				new Error(response?.error || "Failed to save repeating task value"),
-				this.target,
-				{ fieldId, route: this.saveDefaultFieldRoute },
-			);
-		}
-	}
-
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
 	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses
 	 * @matrix tasks : history-fill latest-submission incompatible-value stale-response
 	 */
@@ -273,7 +342,8 @@ export class TaskForm extends FormElement {
 		const form = this.form;
 		const generation = this._historyFillGeneration;
 		const submission = await this.latestHistorySubmission();
-		if (this.form !== form || this._historyFillGeneration !== generation) return;
+		if (this.form !== form || this._historyFillGeneration !== generation)
+			return;
 		this.target.querySelector("[data-role='history-fill-error']")?.remove();
 		if (this._historyFillError) {
 			const notice = document.createElement("p");
@@ -283,8 +353,6 @@ export class TaskForm extends FormElement {
 			this.target.append(notice);
 			return;
 		}
-		form.renderer.addHistoryFillButtons(submission, (fieldId) =>
-			this.saveDefaultField(fieldId),
-		);
+		form.renderer.addHistoryFillButtons(submission);
 	}
 }

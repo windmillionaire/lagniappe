@@ -13,7 +13,7 @@ _ORIGINAL_UNAVAILABLE = (
     "The original form definition is unavailable. Saved answers are preserved."
 )
 _COMPLETION_FIELDS = (
-    "completed_submission", "submission", "default_submission", "generation",
+    "completed_submission", "submission", "generation",
     "form", "assets", "completed", "completed_on", "completed_by",
 )
 _COMPLETION_STATUS_FIELDS = (
@@ -330,7 +330,7 @@ def _representation(field):
 
 # @testable true
 # @tests tests_unit/test_004i_form_definitions.py::test_history_transfer_preserves_identity_and_rejects_incompatible_values
-# @matrix task-completion submission : history-fill repeating-default identity incompatible-value
+# @matrix task-completion submission : history-fill identity incompatible-value
 def compatible_values(source_schema, target_schema, values):
     """Copy exact values only when their source and destination mean the same thing."""
     source = {field["id"]: field for field in source_schema}
@@ -358,7 +358,7 @@ def compatible_values(source_schema, target_schema, values):
 
 # @testable true
 # @tests tests_unit/test_004i_form_definitions.py::test_history_transfer_preserves_identity_and_rejects_incompatible_values
-# @matrix task-completion submission : history-fill repeating-default identity incompatible-value
+# @matrix task-completion submission : history-fill identity incompatible-value
 def history_values_for(task, history, field_id=None):
     if task.completed:
         raise ValidationError("Reopen the task before filling saved answers.")
@@ -376,25 +376,24 @@ def history_values_for(task, history, field_id=None):
 
 
 # @testable true
-# @tests tests_unit/test_004i_form_definitions.py::test_history_groups_preserve_chronology_and_original_columns
+# @tests tests_unit/test_004i_form_definitions.py::test_history_groups_share_generation_tables_and_preserve_row_order
 # @matrix tasks task-completion : history schema-version ordering
 def history_groups(histories):
-    """Keep newest-first order, grouping only consecutive equal definitions."""
+    """Build one table per Form generation, keeping newest-first groups and rows."""
     preload_definitions(histories)
-    groups = []
-    definitions = {}
+    groups = {}
     for history in histories:
         identity = definition_identity(history)
-        if identity not in definitions:
-            definitions[identity] = definition_for(history)
-        if not groups or groups[-1]["identity"] != identity:
-            groups.append({"identity": identity, "records": [], "definition": definitions[identity]})
-        groups[-1]["records"].append(history)
-    return groups
+        if identity not in groups:
+            groups[identity] = {
+                "identity": identity, "records": [], "definition": definition_for(history),
+            }
+        groups[identity]["records"].append(history)
+    return list(groups.values())
 
 
 # @testable true
-# @tests tests_unit/test_004i_form_definitions.py::test_history_groups_preserve_chronology_and_original_columns
+# @tests tests_unit/test_004i_form_definitions.py::test_history_groups_share_generation_tables_and_preserve_row_order
 # @matrix tasks task-completion : history schema-version ordering
 def preload_definitions(records):
     """Batch mismatched generations only when a history collection is requested."""

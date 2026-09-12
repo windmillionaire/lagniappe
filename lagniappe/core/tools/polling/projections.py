@@ -57,7 +57,7 @@ def filter_result_revision(entity, user):
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_page_tasks_revision_changes_with_saved_forms_without_loading_tasks
-# @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_saved_relabels_preserve_active_task_answers_and_conditions
+# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_saved_relabels_preserve_active_task_answers_and_conditions
 # @matrix tasks forms : cache-invalidation live-metadata
 def page_tasks_revision(page, user):
     """Include saved Task Form definitions without reading the Page's Tasks."""

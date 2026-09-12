@@ -130,8 +130,8 @@ def view(key, **kwargs):
 # @testable true
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
-# @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_builder_publication_rejects_incompatible_payload_and_reuses_receipt
-# @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_stale_save_preserves_local_draft_after_another_editor_saves
+# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_builder_publication_rejects_incompatible_payload_and_reuses_receipt
+# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_stale_save_preserves_local_draft_after_another_editor_saves
 # @matrix forms : builder-add-fields builder-add-inputs builder-reload builder-save
 # @matrix forms : migration-required save-receipt stale-acknowledgement persistent-error concurrent-edit
 @forms.route("<key>/update", methods=["PUT"])

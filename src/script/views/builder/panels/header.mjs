@@ -24,6 +24,7 @@ export class Header {
 		this.notification = document.getElementById("notification");
 		this.previewToggle = document.getElementById("preview-toggle");
 		this.previewPanel = document.getElementById("preview-panel");
+		this.draftControls = document.querySelector("[data-role='draft-history']");
 		this.saveButton?.setAttribute("aria-describedby", "notification");
 		this.notification?.setAttribute("role", "status");
 		this.notification?.setAttribute("aria-live", "polite");
@@ -51,6 +52,7 @@ export class Header {
 		if (!this.saveButton) return;
 		this.saveButton.dataset.saved = "true";
 		this.saveButton.dataset.kind = "saved";
+		this.saveButton.setAttribute("aria-disabled", "true");
 		this.clearMessage();
 	}
 
@@ -58,6 +60,10 @@ export class Header {
 		if (!this.saveButton) return;
 		this.saveButton.dataset.saved = "false";
 		this.saveButton.dataset.kind = "unsaved";
+		this.saveButton.setAttribute(
+			"aria-disabled",
+			String(Boolean(this._savePromise)),
+		);
 	}
 
 	clearMessage() {
@@ -119,6 +125,11 @@ export class Header {
 		return false;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
+	 * @pair forms:builder-preview
+	 */
 	closePreview() {
 		this._previewGeneration += 1;
 		this.renderer?.destroy();
@@ -126,6 +137,7 @@ export class Header {
 		this.previewToggle.dataset.active = "false";
 		this.previewToggle.setAttribute("aria-checked", "false");
 		this.previewPanel.dataset.visible = "false";
+		if (this.draftControls) this.draftControls.dataset.visible = "true";
 	}
 
 	/**
@@ -168,6 +180,8 @@ export class Header {
 					renderer?.destroy();
 					return;
 				}
+				if (this.draftControls)
+					this.draftControls.dataset.visible = active ? "true" : "false";
 				if (!active) {
 					this.renderer = renderer;
 					this.builder.elt.dataset.expanded = "true";
@@ -191,8 +205,9 @@ export class Header {
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
 	 * @tests tests_e2e/003_forms/test_003e_retryable_builder_actions.py::test_builder_save_failure_releases_control_for_retry
-	 * @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_generation_is_one_undoable_unsaved_command
-	 * @tests tests_e2e/003_forms/test_003f_bsu_step1.py::test_saved_relabels_preserve_active_task_answers_and_conditions
+	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_save_feedback_retains_keyboard_focus
+	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_generation_is_one_undoable_unsaved_command
+	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_saved_relabels_preserve_active_task_answers_and_conditions
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
 	 * @matrix forms : builder-reload builder-save focus-recovery persistent-error retryable-action single-flight stale-acknowledgement
 	 */
@@ -205,6 +220,7 @@ export class Header {
 		const button = this.saveButton;
 		const hadFocus = document.activeElement === button;
 		this.builder.updateSchema();
+		if (!this.builder.draft.dirty) return Promise.resolve(true);
 		this.builder.draft.group = null;
 		const state = this.persistenceState;
 		if (
@@ -220,10 +236,9 @@ export class Header {
 		}
 		this.unsaved();
 		this.clearMessage();
-		button.disabled = true;
+		// Keep keyboard focus; clean and in-flight saves are guarded above.
 		button.setAttribute("aria-disabled", "true");
 		button.setAttribute("aria-busy", "true");
-		button.classList.add("opacity-50");
 
 		const pending = (async () => {
 			try {
@@ -242,7 +257,18 @@ export class Header {
 				if (response?.ok === true && response.draft && response.baseline) {
 					this.builder.draft.acknowledge(state, response);
 					this._saveAttempt = null;
-					await this.builder.restoreDraft({ preserveFocus: true });
+					if (
+						this.builder.draft.equal(
+							this.persistenceState,
+							this.builder.draft.state,
+						)
+					) {
+						this.builder.settings.refreshSavedState();
+						this.builder.conditions.condition?.refreshSavedState?.();
+						this.builder.refreshDraftControls();
+					} else {
+						await this.builder.restoreDraft({ preserveFocus: true });
+					}
 					return true;
 				}
 				if (!this.showConflict(response))
@@ -259,10 +285,11 @@ export class Header {
 				return false;
 			} finally {
 				if (!this._destroyed && button.isConnected !== false) {
-					button.disabled = false;
-					button.setAttribute("aria-disabled", "false");
+					button.setAttribute(
+						"aria-disabled",
+						String(button.dataset.saved === "true"),
+					);
 					button.removeAttribute("aria-busy");
-					button.classList.remove("opacity-50");
 					if (
 						hadFocus &&
 						(!document.activeElement ||

@@ -81,18 +81,60 @@ def test_preview_panel(get_user):
     form.schema = Schemas.add_fields.get()
 
     builder = form.builder
+    undo = user.locate("[data-role='undo-draft']")
+    redo = user.locate("[data-role='redo-draft']")
+    expect(undo).to_be_visible()
+    expect(redo).to_be_visible()
+    expect(undo).to_be_disabled()
+    expect(redo).to_be_disabled()
+
+    reason = builder.model.locator(".form-element").filter(
+        has_text="Reason For Living"
+    )
+    reason.click()
+    builder.settings.locator("input[name='title']").fill("Daily purpose")
+    expect(undo).to_be_enabled()
+    expect(redo).to_be_disabled()
+
     preview_panel = builder.toggle_preview()
     preview_toggle = user.locate(builder.PREVIEW_TOGGLE)
     expect(preview_toggle).to_have_attribute("data-active", "true")
     expect(preview_toggle).to_have_attribute("aria-checked", "true")
+    expect(undo).to_be_hidden()
+    expect(redo).to_be_hidden()
 
-    for field_title in ["Name", "Reason For Living", "Subscribe to Newsletter"]:
+    for field_title in ["Name", "Daily purpose", "Subscribe to Newsletter"]:
         expect(preview_panel).to_contain_text(field_title)
 
     preview_toggle.click()
     expect(preview_panel).to_be_hidden()
     expect(preview_toggle).to_have_attribute("data-active", "false")
     expect(preview_toggle).to_have_attribute("aria-checked", "false")
+    expect(undo).to_be_visible()
+    expect(redo).to_be_visible()
+    expect(undo).to_be_enabled()
+    expect(redo).to_be_disabled()
+
+    undo.click()
+    expect(reason).to_be_visible()
+    expect(undo).to_be_disabled()
+    expect(redo).to_be_enabled()
+    builder.toggle_preview()
+    expect(preview_panel).to_contain_text("Reason For Living")
+    expect(undo).to_be_hidden()
+    expect(redo).to_be_hidden()
+
+    builder.save()
+    expect(preview_panel).to_be_hidden()
+    expect(preview_toggle).to_have_attribute("aria-checked", "false")
+    expect(undo).to_be_visible()
+    expect(redo).to_be_visible()
+    expect(undo).to_be_disabled()
+    expect(redo).to_be_enabled()
+    redo.click()
+    expect(builder.model).to_contain_text("Daily purpose")
+    expect(undo).to_be_enabled()
+    expect(redo).to_be_disabled()
 
 
 # @pair forms:builder-delete-components

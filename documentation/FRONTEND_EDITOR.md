@@ -113,7 +113,9 @@ Two factory functions create TipTap `Editor` instances with shared extension con
 
 **`collaborativeEditor(target, ydoc)`** -- includes `Collaboration` extension (Yjs), `FlashRemoteChanges`, disables built-in history (Yjs handles undo).
 
-**`independentEditor(target)`** -- enables built-in history, no collaboration extensions.
+**`independentEditor(target, content)`** -- enables built-in history, no
+collaboration extensions. Initial HTML is passed to the editor constructor so
+loading it creates no Undo step; the first Undo only reverses a user edit.
 
 The document editors include: `StarterKit` (with underline; built-in links disabled), `CustomLink`, `Typography`, `Color`, `TextStyle`, `TextAlign`, `Superscript`, `Subscript`, `Youtube`, `CustomImage`, `FontFamily`, `TrackedRanges`, `SelectionHighlight`, `MarkdownSource`, and `EditorPaste`.
 
@@ -150,6 +152,11 @@ Extends TipTap's `Image` extension with width, float, and alignment attributes. 
 | `setImageAlignment(alignment)` | Set alignment, resets float to none |
 
 Uses a custom `addNodeView()` that creates an `<img>` element and updates attributes in-place without recreating the DOM node.
+`renderHTML()` exports the same inline layout CSS used by that node view.
+Width, float and alignment are stored through this CSS, which the editor parser
+and Form-content sanitizer preserve; raw layout attributes are not exported.
+Both collaborative documents and independent/Form Document fields use this
+serialization.
 
 ### FlashRemoteChanges (`remote.mjs`)
 

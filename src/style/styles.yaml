@@ -86,7 +86,7 @@ builder:
     surfaces: [server]
   switch:
     container:
-      classes: "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default"
+      classes: "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default"
       intent: container presentation within builder switch
       surfaces: [server]
     toggle:
@@ -1227,6 +1227,10 @@ signature:
     surfaces: [frontend]
 
 table:
+  container:
+    classes: min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white
+    intent: thin bordered container for embedded history and filter result tables
+    surfaces: [server, frontend]
   default:
     classes: w-full table-auto border-collapse divide-y sm:text-sm mt-4
     intent: default presentation within table

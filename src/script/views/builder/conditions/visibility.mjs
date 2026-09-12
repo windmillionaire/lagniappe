@@ -17,12 +17,10 @@ export default class Visibility extends ConditionTarget {
 	}
 
 	init() {
-		this.element.schema.visibility ??= [];
-
 		if (this.index !== -1) {
 			this.setTitle("Edit Visibility Condition");
 			this.messages.submit = "Update Visibility Condition";
-			this.setting = { ...this.element.schema.visibility[this.index] };
+			this.setting = { ...this.element.schema.visibility?.[this.index] };
 		} else {
 			this.setTitle("Create Visibility Condition");
 			this.setting = {};

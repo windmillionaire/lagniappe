@@ -19,13 +19,25 @@ Test Strategy:
     reloads the page, and verifies the content/formatting persisted.
 """
 
+import re
+from uuid import uuid4
+
+from bs4 import BeautifulSoup
 from playwright.sync_api import expect
 import pytest
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Projects, Users
-from testing.elements import EditorMenuOptions, EditorToggleOptions, Tabs
+from testing.definitions import Projects, Uploads, Users
+from testing.definitions.project_definitions import ProjectDefinition
+from testing.elements import (
+    EditorAddImage,
+    EditorMenuOptions,
+    EditorToggleOptions,
+    SpinnerButtons,
+    Tabs,
+)
+from testing.resources import Project
 from testing.utility.network import expect_successful_response
 from testing.utility.polling import expect_poll_result
 
@@ -143,6 +155,73 @@ def test_formatting_persists(get_user):
     expect(editor.get_element("h1")).to_contain_text(header_text)
     expect(editor.get_element("ul")).to_contain_text("First item")
     expect(editor.get_element("ul")).to_contain_text("Second item")
+
+
+# @source src/script/elements/editor/extensions/image.mjs::getImageStyles
+# @pair editor:image-layout
+def test_image_layout_survives_document_autosave_and_reload(get_user):
+    user = get_user(Users.OWNER)
+    project = Project(
+        user=user,
+        definition=ProjectDefinition(name=f"Document image layout {uuid4().hex[:8]}"),
+    ).create()
+    user.go(project)
+    editor = project.editor
+    editor.type_text("Keep this document instruction.").press("Enter")
+
+    form = EditorAddImage(editor).form
+    Uploads.editor_test_image.set(form)
+    SpinnerButtons.UPLOAD.click(form)
+    image = editor.get_element("img")
+    expect(image).to_be_visible()
+    image_src = image.get_attribute("src")
+    image.click()
+    editor.toolbar.locator("button[title='Decrease size']").click()
+    editor.toolbar.locator("button[title='Decrease size']").click()
+    editor.toolbar.locator("button[title='Align right']").click()
+    expect(image).to_have_attribute("style", re.compile(r"width:\s*80%"))
+    expect(image).to_have_css("float", "none")
+    assert image.evaluate("image => image.style.marginLeft") == "auto"
+    assert image.evaluate("image => image.style.marginRight") == "0px"
+
+    # Match this document's durable HTML checkpoint, not a background Yjs delta.
+    document_sync_id = project.entity.sync_ids["document"]["id"]
+    image.click()
+    editor.wait_for_render()
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/l/sync",
+        request_payload_contains=(document_sync_id, '"save":true', image_src, "80%"),
+    ):
+        editor.text_entry.blur()
+
+    # Reloaded collaborative state can retain image attributes even when its
+    # serialized HTML is broken. Inspect the separately persisted HTML as well.
+    persisted = Entities.fetch_one(project.key, request=Fetch.direct())
+    saved_html = persisted.properties.document.html
+    saved_image = BeautifulSoup(saved_html, "html.parser").find("img", src=image_src)
+    assert saved_image is not None
+    styles = dict(
+        declaration.strip().split(":", 1)
+        for declaration in saved_image.get("style", "").split(";")
+        if declaration.strip()
+    )
+    styles = {name.strip(): value.strip() for name, value in styles.items()}
+    assert styles["width"] == "80%"
+    assert styles["float"] == "none"
+    assert styles["margin-left"] == "auto"
+    assert styles["margin-right"] in {"0", "0px"}
+
+    user.go(project)
+    editor = project.editor
+    image = editor.get_element("img")
+    expect(image).to_be_visible()
+    expect(image).to_have_attribute("style", re.compile(r"width:\s*80%"))
+    expect(image).to_have_css("float", "none")
+    assert image.evaluate("image => image.style.marginLeft") == "auto"
+    assert image.evaluate("image => image.style.marginRight") == "0px"
+    expect(editor.text_entry).to_contain_text("Keep this document instruction.")
 
 
 # @matrix editor : formatting inline-code reload selection toggle

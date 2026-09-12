@@ -93,12 +93,20 @@ vm.runInContext(source, context);
 (async () => {
 const { BuilderDraft } = await import(process.cwd() + "/src/script/views/builder/draft.mjs");
 let schema = [{ id: "first", type: "text" }];
+let restores = 0;
+let settingRefreshes = 0;
+let conditionRefreshes = 0;
+let controlRefreshes = 0;
+const restoredOptions = [];
 const builder = {
   get schema() { return schema; },
   captureDraft() { return { schema: structuredClone(schema), name: nameHidden.value, form_type: "task", html_fields: {} }; },
-  updateSchema() { this.draft.record(this.captureDraft()); },
+  updateSchema() { this.draft.record(this.captureDraft()); this.draft.dirty ? header.unsaved() : header.saved(); },
   async draftPayload(state) { return structuredClone(state); },
-  restoreDraft() { schema = structuredClone(this.draft.state.schema); this.draft.dirty ? header.unsaved() : header.saved(); },
+  settings: { refreshSavedState() { settingRefreshes++; } },
+  conditions: { condition: { refreshSavedState() { conditionRefreshes++; } } },
+  refreshDraftControls() { controlRefreshes++; this.draft.dirty ? header.unsaved() : header.saved(); },
+  restoreDraft(options) { restores++; restoredOptions.push(options); schema = structuredClone(this.draft.state.schema); this.draft.dirty ? header.unsaved() : header.saved(); },
 };
 builder.draft = new BuilderDraft(builder.captureDraft(), "initial");
 const header = new context.Header(builder);
@@ -110,14 +118,22 @@ if (
   throw new Error("Builder save errors are not exposed as an accessible status");
 }
 
+schema = [{ ...schema[0], title: "Edited notes" }];
+builder.updateSchema();
+if (!builder.draft.dirty || button.disabled || button.attributes["aria-disabled"] !== "false") {
+  throw new Error("Editing a saved form did not enable Save");
+}
 const first = header.saveForm();
 const duplicate = header.saveForm();
 await new Promise(setImmediate);
 if (first !== duplicate || requests.length !== 1) {
   throw new Error("Concurrent saves were not coalesced");
 }
-if (!button.disabled || button.attributes["aria-busy"] !== "true") {
-  throw new Error("Save did not expose its pending state");
+if (button.disabled || button.attributes["aria-disabled"] !== "true" || button.attributes["aria-busy"] !== "true") {
+  throw new Error("Save did not stay focusable while exposing its pending state");
+}
+if (classes.has("opacity-50")) {
+  throw new Error("Saving dimmed the Save control");
 }
 if (requests[0].args[2]?.replaceErrorPage !== false) {
   throw new Error("Builder save did not preserve its retryable page on HTTP errors");
@@ -133,6 +149,12 @@ if (button.dataset.saved !== "false") {
 }
 if (button.disabled || button.attributes["aria-busy"] !== undefined) {
   throw new Error("Successful stale save did not release the control");
+}
+if (restores || settingRefreshes !== 1 || conditionRefreshes !== 1 || controlRefreshes !== 1) {
+  throw new Error("A save receipt rebuilt newer edits instead of refreshing the saved restrictions and controls");
+}
+if (schema.length !== 2 || builder.draft.state.schema.length !== 2 || builder.draft.saved.schema.length !== 1) {
+  throw new Error("A save receipt discarded newer edits or included them in the saved baseline");
 }
 
 const rejected = header.saveForm();
@@ -181,7 +203,51 @@ if (await retry !== true || button.dataset.saved !== "true") {
 if (notification.dataset.visible !== "false" || notification.textContent !== "") {
   throw new Error("Successful retry did not clear the prior error");
 }
+if (button.disabled || button.attributes["aria-disabled"] !== "true") {
+  throw new Error("Saved status did not remain focusable and aria-disabled");
+}
+if (restores || settingRefreshes !== 2 || conditionRefreshes !== 2 || controlRefreshes !== 2) {
+  throw new Error("An ordinary Save rebuilt the panel instead of refreshing its saved restrictions and controls");
+}
+if (classes.has("opacity-50")) {
+  throw new Error("The saved control remained dimmed");
+}
 
+const savedRestores = restores;
+const savedRevision = builder.draft.revision;
+if (await header.saveForm() !== true) {
+  throw new Error("Saving an unchanged form was not treated as already saved");
+}
+if (requests.length || restores !== savedRestores || builder.draft.revision !== savedRevision) {
+  throw new Error("Saving an unchanged form submitted or rebuilt the saved draft");
+}
+if (button.disabled || button.dataset.saved !== "true" || button.attributes["aria-disabled"] !== "true") {
+  throw new Error("An unchanged Save disturbed the saved control state");
+}
+
+schema = schema.map((field) => field.id === "first" ? { ...field, title: "   Normalized notes   " } : field);
+builder.updateSchema();
+const normalized = header.saveForm();
+await new Promise(setImmediate);
+const normalizationRequest = requests.shift();
+const accepted = structuredClone(normalizationRequest.args[1]);
+accepted.schema[0].title = "Normalized notes";
+normalizationRequest.resolve({ ok: true, draft: accepted, baseline: "saved-3" });
+if (await normalized !== true || restores !== 1 || restoredOptions[0]?.preserveFocus !== true) {
+  throw new Error("A server-normalized schema did not reconcile the visible form while preserving its panel");
+}
+if (schema[0].title !== "Normalized notes" || builder.draft.dirty || button.dataset.saved !== "true") {
+  throw new Error("The server-normalized saved form was not reflected in the builder");
+}
+if (settingRefreshes !== 2 || conditionRefreshes !== 2 || controlRefreshes !== 2) {
+  throw new Error("Normalization incorrectly used the unchanged-panel path");
+}
+
+schema = schema.map((field) => field.id === "first" ? { ...field, title: "Edited after saving" } : field);
+builder.updateSchema();
+if (button.disabled || button.attributes["aria-disabled"] !== "false") {
+  throw new Error("A new edit did not reenable Save after a successful retry");
+}
 const late = header.saveForm();
 await new Promise(setImmediate);
 header.destroy();

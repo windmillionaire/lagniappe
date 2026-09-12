@@ -26,7 +26,7 @@ STYLES = {
 		},
 		"name": "border-b border-dashed focus:outline-none ml-2 w-auto max-w-xs bg-transparent border-base-medium focus:border-form-default",
 		"switch": {
-			"container": "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default",
+			"container": "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default",
 			"toggle": "pointer-events-none h-5 w-5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out grid place-items-center group-data-[active=true]/toggle:translate-x-5"
 		},
 		"model": "form-element rounded-md bg-base-bg p-2 text-sm data-[selected=true]:outline-2 data-[selected=true]:outline-kind-default",
@@ -384,6 +384,7 @@ STYLES = {
 		"reset": "absolute top-2 left-2 px-2 py-1 text-base sm:text-sm border rounded shadow-sm text-base-dark border-base-light hover:bg-delete-default hover:text-white"
 	},
 	"table": {
+		"container": "min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white",
 		"default": "w-full table-auto border-collapse divide-y sm:text-sm mt-4",
 		"embedded": "w-full table-auto border-collapse divide-y sm:text-sm min-w-max bg-white",
 		"body": "sm:divide-y w-full sm:divide-base-light/50",

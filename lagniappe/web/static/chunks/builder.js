@@ -1,8 +1,5873 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.1.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="14d7144e-b7f2-4a81-9573-c24c12151b78",e._sentryDebugIdIdentifier="sentry-dbid-14d7144e-b7f2-4a81-9573-c24c12151b78");}catch(e){}}();import{SearchBox as Vt}from"./search.js?v=bf878195";import{EntityMenu as Zt}from"./entityMenu.js?v=bf878195";import{u as _t}from"./upload.js?v=bf878195";import{w as se,r as Re,c as Ie,E as Qt,f as ei,g as ti}from"./foundation.js?v=bf878195";import{c as et}from"./connectivity.js?v=bf878195";import{Modal as ii,OfflineModal as ni,DeleteModal as si,HelpModal as ri}from"./modal.js?v=bf878195";import{STYLES as S}from"./styles.js?v=bf878195";import{s as Et}from"./icons.js?v=bf878195";import{p as w}from"./primitives.js?v=bf878195";import{B as wt,R as ai}from"./baseForm.js?v=bf878195";import{F as oi}from"./facets.js?v=bf878195";const li={html:()=>import("./html.js?v=bf878195"),status:()=>import("./status.js?v=bf878195"),visibility:()=>import("./visibility.js?v=bf878195"),columns:()=>import("./columns.js?v=bf878195"),options:()=>import("./options.js?v=bf878195")},di=async(n,e)=>{const t=await li[e]();return new t.default(n)};class St{constructor(e,t=null){this.state=structuredClone(e),this.saved=structuredClone(e),this.baseline=t,this.revision=0,this.past=[],this.future=[],this.group=null}content(e=this.state){const{selected_id:t,...i}=e;return i}equal(e,t){return this.serialize(this.content(e))===this.serialize(this.content(t))}serialize(e){return JSON.stringify(e,(t,i)=>i&&typeof i=="object"&&!Array.isArray(i)?Object.fromEntries(Object.keys(i).sort().map(s=>[s,i[s]])):i)}get dirty(){return!this.equal(this.state,this.saved)}record(e,t=null){return this.equal(this.state,e)?(this.state.selected_id=e.selected_id,!1):((!t||this.group!==t)&&(this.past.push(structuredClone(this.state)),this.past.length>100&&this.past.shift()),this.state=structuredClone(e),this.future=[],this.group=t,this.revision+=1,!0)}undo(){return this.past.length?(this.future.push(structuredClone(this.state)),this.state=this.past.pop(),this.group=null,this.revision+=1,!0):!1}redo(){return this.future.length?(this.past.push(structuredClone(this.state)),this.state=this.future.pop(),this.group=null,this.revision+=1,!0):!1}acknowledge(e,t){const i=t.image_urls||{},s=l=>{const d=structuredClone(l);for(const[c,u]of Object.entries(d.html_fields||{}))d.html_fields[c]=Object.entries(i).reduce((f,[b,v])=>f.replaceAll(b.startsWith("draft-image:")?b:`draft-image:${b}`,v),u);return d},r=(l,d,c)=>{if(this.serialize(l)===this.serialize(d))return structuredClone(c);if(Array.isArray(l)&&Array.isArray(d)&&Array.isArray(c))return l.map((u,f)=>{const b=u?.id??u?.value,v=b===void 0?d[f]:d.find(T=>(T?.id??T?.value)===b),E=b===void 0?c[f]:c.find(T=>(T?.id??T?.value)===b);return v&&E?r(u,v,E):structuredClone(u)});if(l&&d&&c&&typeof l=="object"&&typeof d=="object"&&typeof c=="object"&&!Array.isArray(l)){const u=structuredClone(l);for(const f of new Set([...Object.keys(d),...Object.keys(c)])){const b=r(l[f],d[f],c[f]);b===void 0?delete u[f]:u[f]=b}return u}return structuredClone(l)},a=this.equal(this.state,e),o=l=>({...r(s(l),s(e),t.draft),selected_id:l.selected_id});return this.past=this.past.map(o),this.future=this.future.map(o),this.state=o(this.state),this.saved={...structuredClone(t.draft),selected_id:null},this.baseline=t.baseline,this.revision+=1,a&&(this.state={...structuredClone(this.saved),selected_id:this.state.selected_id}),this.group=null,a}applyGeneration(e){const t=structuredClone(this.state),i=new Map(t.schema.map(s=>[s.id,s]));if(!Array.isArray(e.operations))throw new Error("Invalid generated changes.");for(const s of e.operations){if(s.op==="add_field"){const a=s.field;if(!a?.id||i.has(a.id))throw new Error("Generated field identity is invalid.");if(!["input","textarea","checkbox","select","radio","table","html","status","signature","link","bookmark","location","todo"].includes(a.type))throw new Error("Unsupported generated field type.");const o=structuredClone(a);o.type==="html"&&(t.html_fields[o.id]=""),t.schema.push(o),i.set(o.id,o);continue}const r=i.get(s.field_id);if(!r)throw new Error("A generated change targets an unknown field.");if(s.op==="update_field"){if(!s.changes||Object.entries(s.changes).some(([a,o])=>!["title","placeholder"].includes(a)||typeof o!="string"))throw new Error("This generated change needs a later migration step.");Object.assign(r,s.changes)}else if(s.op==="update_option"){const a=r.options?.find(o=>o.value===s.value);if(!a||typeof s.label!="string")throw new Error("Invalid generated option label.");a.label=s.label}else if(s.op==="update_column"){const a=r.columns?.find(o=>o.id===s.column_id);if(!a||typeof s.title!="string")throw new Error("Invalid generated column label.");a.title=s.title}else throw new Error("This generated change needs a later migration step.")}for(const[s,r]of Object.entries(e.html_fields||{})){if(i.get(s)?.type!=="html"||typeof r!="string")throw new Error("Invalid generated text content.");t.html_fields[s]=r}return this.record(t)}}function ci(n,e,t){return(e=mi(e))in n?Object.defineProperty(n,e,{value:t,enumerable:!0,configurable:!0,writable:!0}):n[e]=t,n}function Q(){return Q=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var i in t)({}).hasOwnProperty.call(t,i)&&(n[i]=t[i])}return n},Q.apply(null,arguments)}function Dt(n,e){var t=Object.keys(n);if(Object.getOwnPropertySymbols){var i=Object.getOwnPropertySymbols(n);e&&(i=i.filter(function(s){return Object.getOwnPropertyDescriptor(n,s).enumerable})),t.push.apply(t,i)}return t}function J(n){for(var e=1;e<arguments.length;e++){var t=arguments[e]!=null?arguments[e]:{};e%2?Dt(Object(t),!0).forEach(function(i){ci(n,i,t[i])}):Object.getOwnPropertyDescriptors?Object.defineProperties(n,Object.getOwnPropertyDescriptors(t)):Dt(Object(t)).forEach(function(i){Object.defineProperty(n,i,Object.getOwnPropertyDescriptor(t,i))})}return n}function ui(n,e){if(n==null)return{};var t,i,s=hi(n,e);if(Object.getOwnPropertySymbols){var r=Object.getOwnPropertySymbols(n);for(i=0;i<r.length;i++)t=r[i],e.indexOf(t)===-1&&{}.propertyIsEnumerable.call(n,t)&&(s[t]=n[t])}return s}function hi(n,e){if(n==null)return{};var t={};for(var i in n)if({}.hasOwnProperty.call(n,i)){if(e.indexOf(i)!==-1)continue;t[i]=n[i]}return t}function fi(n,e){if(typeof n!="object"||!n)return n;var t=n[Symbol.toPrimitive];if(t!==void 0){var i=t.call(n,e);if(typeof i!="object")return i;throw new TypeError("@@toPrimitive must return a primitive value.")}return(e==="string"?String:Number)(n)}function mi(n){var e=fi(n,"string");return typeof e=="symbol"?e:e+""}function tt(n){"@babel/helpers - typeof";return tt=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(e){return typeof e}:function(e){return e&&typeof Symbol=="function"&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},tt(n)}var pi="1.15.7";function ee(n){if(typeof window<"u"&&window.navigator)return!!navigator.userAgent.match(n)}var te=ee(/(?:Trident.*rv[ :]?11\.|msie|iemobile|Windows Phone)/i),ke=ee(/Edge/i),Ct=ee(/firefox/i),xe=ee(/safari/i)&&!ee(/chrome/i)&&!ee(/android/i),it=ee(/iP(ad|od|hone)/i),It=ee(/chrome/i)&&ee(/android/i),kt={capture:!1,passive:!1};function _(n,e,t){n.addEventListener(e,t,!te&&kt)}function y(n,e,t){n.removeEventListener(e,t,!te&&kt)}function Ue(n,e){if(e){if(e[0]===">"&&(e=e.substring(1)),n)try{if(n.matches)return n.matches(e);if(n.msMatchesSelector)return n.msMatchesSelector(e);if(n.webkitMatchesSelector)return n.webkitMatchesSelector(e)}catch{return!1}return!1}}function xt(n){return n.host&&n!==document&&n.host.nodeType&&n.host!==n?n.host:n.parentNode}function $(n,e,t,i){if(n){t=t||document;do{if(e!=null&&(e[0]===">"?n.parentNode===t&&Ue(n,e):Ue(n,e))||i&&n===t)return n;if(n===t)break}while(n=xt(n))}return null}var Tt=/\s+/g;function R(n,e,t){if(n&&e)if(n.classList)n.classList[t?"add":"remove"](e);else{var i=(" "+n.className+" ").replace(Tt," ").replace(" "+e+" "," ");n.className=(i+(t?" "+e:"")).replace(Tt," ")}}function p(n,e,t){var i=n&&n.style;if(i){if(t===void 0)return document.defaultView&&document.defaultView.getComputedStyle?t=document.defaultView.getComputedStyle(n,""):n.currentStyle&&(t=n.currentStyle),e===void 0?t:t[e];!(e in i)&&e.indexOf("webkit")===-1&&(e="-webkit-"+e),i[e]=t+(typeof t=="string"?"":"px")}}function pe(n,e){var t="";if(typeof n=="string")t=n;else do{var i=p(n,"transform");i&&i!=="none"&&(t=i+" "+t)}while(!e&&(n=n.parentNode));var s=window.DOMMatrix||window.WebKitCSSMatrix||window.CSSMatrix||window.MSCSSMatrix;return s&&new s(t)}function At(n,e,t){if(n){var i=n.getElementsByTagName(e),s=0,r=i.length;if(t)for(;s<r;s++)t(i[s],s);return i}return[]}function K(){var n=document.scrollingElement;return n||document.documentElement}function k(n,e,t,i,s){if(!(!n.getBoundingClientRect&&n!==window)){var r,a,o,l,d,c,u;if(n!==window&&n.parentNode&&n!==K()?(r=n.getBoundingClientRect(),a=r.top,o=r.left,l=r.bottom,d=r.right,c=r.height,u=r.width):(a=0,o=0,l=window.innerHeight,d=window.innerWidth,c=window.innerHeight,u=window.innerWidth),(e||t)&&n!==window&&(s=s||n.parentNode,!te))do if(s&&s.getBoundingClientRect&&(p(s,"transform")!=="none"||t&&p(s,"position")!=="static")){var f=s.getBoundingClientRect();a-=f.top+parseInt(p(s,"border-top-width")),o-=f.left+parseInt(p(s,"border-left-width")),l=a+r.height,d=o+r.width;break}while(s=s.parentNode);if(i&&n!==window){var b=pe(s||n),v=b&&b.a,E=b&&b.d;b&&(a/=E,o/=v,u/=v,c/=E,l=a+c,d=o+u)}return{top:a,left:o,bottom:l,right:d,width:u,height:c}}}function Pt(n,e,t){for(var i=re(n,!0),s=k(n)[e];i;){var r=k(i)[t],a=void 0;if(a=s>=r,!a)return i;if(i===K())break;i=re(i,!1)}return!1}function ge(n,e,t,i){for(var s=0,r=0,a=n.children;r<a.length;){if(a[r].style.display!=="none"&&a[r]!==m.ghost&&(i||a[r]!==m.dragged)&&$(a[r],t.draggable,n,!1)){if(s===e)return a[r];s++}r++}return null}function nt(n,e){for(var t=n.lastElementChild;t&&(t===m.ghost||p(t,"display")==="none"||e&&!Ue(t,e));)t=t.previousElementSibling;return t||null}function Y(n,e){var t=0;if(!n||!n.parentNode)return-1;for(;n=n.previousElementSibling;)n.nodeName.toUpperCase()!=="TEMPLATE"&&n!==m.clone&&(!e||Ue(n,e))&&t++;return t}function Ot(n){var e=0,t=0,i=K();if(n)do{var s=pe(n),r=s.a,a=s.d;e+=n.scrollLeft*r,t+=n.scrollTop*a}while(n!==i&&(n=n.parentNode));return[e,t]}function gi(n,e){for(var t in n)if(n.hasOwnProperty(t)){for(var i in e)if(e.hasOwnProperty(i)&&e[i]===n[t][i])return Number(t)}return-1}function re(n,e){if(!n||!n.getBoundingClientRect)return K();var t=n,i=!1;do if(t.clientWidth<t.scrollWidth||t.clientHeight<t.scrollHeight){var s=p(t);if(t.clientWidth<t.scrollWidth&&(s.overflowX=="auto"||s.overflowX=="scroll")||t.clientHeight<t.scrollHeight&&(s.overflowY=="auto"||s.overflowY=="scroll")){if(!t.getBoundingClientRect||t===document.body)return K();if(i||e)return t;i=!0}}while(t=t.parentNode);return K()}function bi(n,e){if(n&&e)for(var t in e)e.hasOwnProperty(t)&&(n[t]=e[t]);return n}function st(n,e){return Math.round(n.top)===Math.round(e.top)&&Math.round(n.left)===Math.round(e.left)&&Math.round(n.height)===Math.round(e.height)&&Math.round(n.width)===Math.round(e.width)}var Te;function Nt(n,e){return function(){if(!Te){var t=arguments,i=this;t.length===1?n.call(i,t[0]):n.apply(i,t),Te=setTimeout(function(){Te=void 0},e)}}}function vi(){clearTimeout(Te),Te=void 0}function Ft(n,e,t){n.scrollLeft+=e,n.scrollTop+=t}function Lt(n){var e=window.Polymer,t=window.jQuery||window.Zepto;return e&&e.dom?e.dom(n).cloneNode(!0):t?t(n).clone(!0)[0]:n.cloneNode(!0)}function Bt(n,e,t){var i={};return Array.from(n.children).forEach(function(s){var r,a,o,l;if(!(!$(s,e.draggable,n,!1)||s.animated||s===t)){var d=k(s);i.left=Math.min((r=i.left)!==null&&r!==void 0?r:1/0,d.left),i.top=Math.min((a=i.top)!==null&&a!==void 0?a:1/0,d.top),i.right=Math.max((o=i.right)!==null&&o!==void 0?o:-1/0,d.right),i.bottom=Math.max((l=i.bottom)!==null&&l!==void 0?l:-1/0,d.bottom)}}),i.width=i.right-i.left,i.height=i.bottom-i.top,i.x=i.left,i.y=i.top,i}var L="Sortable"+new Date().getTime();function yi(){var n=[],e;return{captureAnimationState:function(){if(n=[],!!this.options.animation){var i=[].slice.call(this.el.children);i.forEach(function(s){if(!(p(s,"display")==="none"||s===m.ghost)){n.push({target:s,rect:k(s)});var r=J({},n[n.length-1].rect);if(s.thisAnimationDuration){var a=pe(s,!0);a&&(r.top-=a.f,r.left-=a.e)}s.fromRect=r}})}},addAnimationState:function(i){n.push(i)},removeAnimationState:function(i){n.splice(gi(n,{target:i}),1)},animateAll:function(i){var s=this;if(!this.options.animation){clearTimeout(e),typeof i=="function"&&i();return}var r=!1,a=0;n.forEach(function(o){var l=0,d=o.target,c=d.fromRect,u=k(d),f=d.prevFromRect,b=d.prevToRect,v=o.rect,E=pe(d,!0);E&&(u.top-=E.f,u.left-=E.e),d.toRect=u,d.thisAnimationDuration&&st(f,u)&&!st(c,u)&&(v.top-u.top)/(v.left-u.left)===(c.top-u.top)/(c.left-u.left)&&(l=Ei(v,f,b,s.options)),st(u,c)||(d.prevFromRect=c,d.prevToRect=u,l||(l=s.options.animation),s.animate(d,v,u,l)),l&&(r=!0,a=Math.max(a,l),clearTimeout(d.animationResetTimer),d.animationResetTimer=setTimeout(function(){d.animationTime=0,d.prevFromRect=null,d.fromRect=null,d.prevToRect=null,d.thisAnimationDuration=null},l),d.thisAnimationDuration=l)}),clearTimeout(e),r?e=setTimeout(function(){typeof i=="function"&&i()},a):typeof i=="function"&&i(),n=[]},animate:function(i,s,r,a){if(a){p(i,"transition",""),p(i,"transform","");var o=pe(this.el),l=o&&o.a,d=o&&o.d,c=(s.left-r.left)/(l||1),u=(s.top-r.top)/(d||1);i.animatingX=!!c,i.animatingY=!!u,p(i,"transform","translate3d("+c+"px,"+u+"px,0)"),this.forRepaintDummy=_i(i),p(i,"transition","transform "+a+"ms"+(this.options.easing?" "+this.options.easing:"")),p(i,"transform","translate3d(0,0,0)"),typeof i.animated=="number"&&clearTimeout(i.animated),i.animated=setTimeout(function(){p(i,"transition",""),p(i,"transform",""),i.animated=!1,i.animatingX=!1,i.animatingY=!1},a)}}}}function _i(n){return n.offsetWidth}function Ei(n,e,t,i){return Math.sqrt(Math.pow(e.top-n.top,2)+Math.pow(e.left-n.left,2))/Math.sqrt(Math.pow(e.top-t.top,2)+Math.pow(e.left-t.left,2))*i.animation}var be=[],rt={initializeByDefault:!0},Ae={mount:function(e){for(var t in rt)rt.hasOwnProperty(t)&&!(t in e)&&(e[t]=rt[t]);be.forEach(function(i){if(i.pluginName===e.pluginName)throw"Sortable: Cannot mount plugin ".concat(e.pluginName," more than once")}),be.push(e)},pluginEvent:function(e,t,i){var s=this;this.eventCanceled=!1,i.cancel=function(){s.eventCanceled=!0};var r=e+"Global";be.forEach(function(a){t[a.pluginName]&&(t[a.pluginName][r]&&t[a.pluginName][r](J({sortable:t},i)),t.options[a.pluginName]&&t[a.pluginName][e]&&t[a.pluginName][e](J({sortable:t},i)))})},initializePlugins:function(e,t,i,s){be.forEach(function(o){var l=o.pluginName;if(!(!e.options[l]&&!o.initializeByDefault)){var d=new o(e,t,e.options);d.sortable=e,d.options=e.options,e[l]=d,Q(i,d.defaults)}});for(var r in e.options)if(e.options.hasOwnProperty(r)){var a=this.modifyOption(e,r,e.options[r]);typeof a<"u"&&(e.options[r]=a)}},getEventProperties:function(e,t){var i={};return be.forEach(function(s){typeof s.eventProperties=="function"&&Q(i,s.eventProperties.call(t[s.pluginName],e))}),i},modifyOption:function(e,t,i){var s;return be.forEach(function(r){e[r.pluginName]&&r.optionListeners&&typeof r.optionListeners[t]=="function"&&(s=r.optionListeners[t].call(e[r.pluginName],i))}),s}};function wi(n){var e=n.sortable,t=n.rootEl,i=n.name,s=n.targetEl,r=n.cloneEl,a=n.toEl,o=n.fromEl,l=n.oldIndex,d=n.newIndex,c=n.oldDraggableIndex,u=n.newDraggableIndex,f=n.originalEvent,b=n.putSortable,v=n.extraEventProperties;if(e=e||t&&t[L],!!e){var E,T=e.options,V="on"+i.charAt(0).toUpperCase()+i.substr(1);window.CustomEvent&&!te&&!ke?E=new CustomEvent(i,{bubbles:!0,cancelable:!0}):(E=document.createEvent("Event"),E.initEvent(i,!0,!0)),E.to=a||t,E.from=o||t,E.item=s||t,E.clone=r,E.oldIndex=l,E.newIndex=d,E.oldDraggableIndex=c,E.newDraggableIndex=u,E.originalEvent=f,E.pullMode=b?b.lastPutMode:void 0;var N=J(J({},v),Ae.getEventProperties(i,e));for(var X in N)E[X]=N[X];t&&t.dispatchEvent(E),T[V]&&T[V].call(e,E)}}var Si=["evt"],B=function(e,t){var i=arguments.length>2&&arguments[2]!==void 0?arguments[2]:{},s=i.evt,r=ui(i,Si);Ae.pluginEvent.bind(m)(e,t,J({dragEl:h,parentEl:I,ghostEl:g,rootEl:D,nextEl:he,lastDownEl:Ge,cloneEl:C,cloneHidden:ae,dragStarted:Oe,putSortable:A,activeSortable:m.active,originalEvent:s,oldIndex:ve,oldDraggableIndex:Pe,newIndex:U,newDraggableIndex:oe,hideGhostForTarget:Yt,unhideGhostForTarget:Ht,cloneNowHidden:function(){ae=!0},cloneNowShown:function(){ae=!1},dispatchSortableEvent:function(o){F({sortable:t,name:o,originalEvent:s})}},r))};function F(n){wi(J({putSortable:A,cloneEl:C,targetEl:h,rootEl:D,oldIndex:ve,oldDraggableIndex:Pe,newIndex:U,newDraggableIndex:oe},n))}var h,I,g,D,he,Ge,C,ae,ve,U,Pe,oe,je,A,ye=!1,Ye=!1,He=[],fe,z,at,ot,Mt,qt,Oe,_e,Ne,Fe=!1,Xe=!1,$e,P,lt=[],dt=!1,ze=[],We=typeof document<"u",Je=it,Rt=ke||te?"cssFloat":"float",Di=We&&!It&&!it&&"draggable"in document.createElement("div"),Ut=(function(){if(We){if(te)return!1;var n=document.createElement("x");return n.style.cssText="pointer-events:auto",n.style.pointerEvents==="auto"}})(),Gt=function(e,t){var i=p(e),s=parseInt(i.width)-parseInt(i.paddingLeft)-parseInt(i.paddingRight)-parseInt(i.borderLeftWidth)-parseInt(i.borderRightWidth),r=ge(e,0,t),a=ge(e,1,t),o=r&&p(r),l=a&&p(a),d=o&&parseInt(o.marginLeft)+parseInt(o.marginRight)+k(r).width,c=l&&parseInt(l.marginLeft)+parseInt(l.marginRight)+k(a).width;if(i.display==="flex")return i.flexDirection==="column"||i.flexDirection==="column-reverse"?"vertical":"horizontal";if(i.display==="grid")return i.gridTemplateColumns.split(" ").length<=1?"vertical":"horizontal";if(r&&o.float&&o.float!=="none"){var u=o.float==="left"?"left":"right";return a&&(l.clear==="both"||l.clear===u)?"vertical":"horizontal"}return r&&(o.display==="block"||o.display==="flex"||o.display==="table"||o.display==="grid"||d>=s&&i[Rt]==="none"||a&&i[Rt]==="none"&&d+c>s)?"vertical":"horizontal"},Ci=function(e,t,i){var s=i?e.left:e.top,r=i?e.right:e.bottom,a=i?e.width:e.height,o=i?t.left:t.top,l=i?t.right:t.bottom,d=i?t.width:t.height;return s===o||r===l||s+a/2===o+d/2},Ii=function(e,t){var i;return He.some(function(s){var r=s[L].options.emptyInsertThreshold;if(!(!r||nt(s))){var a=k(s),o=e>=a.left-r&&e<=a.right+r,l=t>=a.top-r&&t<=a.bottom+r;if(o&&l)return i=s}}),i},jt=function(e){function t(r,a){return function(o,l,d,c){var u=o.options.group.name&&l.options.group.name&&o.options.group.name===l.options.group.name;if(r==null&&(a||u))return!0;if(r==null||r===!1)return!1;if(a&&r==="clone")return r;if(typeof r=="function")return t(r(o,l,d,c),a)(o,l,d,c);var f=(a?o:l).options.group.name;return r===!0||typeof r=="string"&&r===f||r.join&&r.indexOf(f)>-1}}var i={},s=e.group;(!s||tt(s)!="object")&&(s={name:s}),i.name=s.name,i.checkPull=t(s.pull,!0),i.checkPut=t(s.put),i.revertClone=s.revertClone,e.group=i},Yt=function(){!Ut&&g&&p(g,"display","none")},Ht=function(){!Ut&&g&&p(g,"display","")};We&&!It&&document.addEventListener("click",function(n){if(Ye)return n.preventDefault(),n.stopPropagation&&n.stopPropagation(),n.stopImmediatePropagation&&n.stopImmediatePropagation(),Ye=!1,!1},!0);var me=function(e){if(h){e=e.touches?e.touches[0]:e;var t=Ii(e.clientX,e.clientY);if(t){var i={};for(var s in e)e.hasOwnProperty(s)&&(i[s]=e[s]);i.target=i.rootEl=t,i.preventDefault=void 0,i.stopPropagation=void 0,t[L]._onDragOver(i)}}},ki=function(e){h&&h.parentNode[L]._isOutsideThisEl(e.target)};function m(n,e){if(!(n&&n.nodeType&&n.nodeType===1))throw"Sortable: `el` must be an HTMLElement, not ".concat({}.toString.call(n));this.el=n,this.options=e=Q({},e),n[L]=this;var t={group:null,sort:!0,disabled:!1,store:null,handle:null,draggable:/^[uo]l$/i.test(n.nodeName)?">li":">*",swapThreshold:1,invertSwap:!1,invertedSwapThreshold:null,removeCloneOnHide:!0,direction:function(){return Gt(n,this.options)},ghostClass:"sortable-ghost",chosenClass:"sortable-chosen",dragClass:"sortable-drag",ignore:"a, img",filter:null,preventOnFilter:!0,animation:0,easing:null,setData:function(a,o){a.setData("Text",o.textContent)},dropBubble:!1,dragoverBubble:!1,dataIdAttr:"data-id",delay:0,delayOnTouchOnly:!1,touchStartThreshold:(Number.parseInt?Number:window).parseInt(window.devicePixelRatio,10)||1,forceFallback:!1,fallbackClass:"sortable-fallback",fallbackOnBody:!1,fallbackTolerance:0,fallbackOffset:{x:0,y:0},supportPointer:m.supportPointer!==!1&&"PointerEvent"in window&&(!xe||it),emptyInsertThreshold:5};Ae.initializePlugins(this,n,t);for(var i in t)!(i in e)&&(e[i]=t[i]);jt(e);for(var s in this)s.charAt(0)==="_"&&typeof this[s]=="function"&&(this[s]=this[s].bind(this));this.nativeDraggable=e.forceFallback?!1:Di,this.nativeDraggable&&(this.options.touchStartThreshold=1),e.supportPointer?_(n,"pointerdown",this._onTapStart):(_(n,"mousedown",this._onTapStart),_(n,"touchstart",this._onTapStart)),this.nativeDraggable&&(_(n,"dragover",this),_(n,"dragenter",this)),He.push(this.el),e.store&&e.store.get&&this.sort(e.store.get(this)||[]),Q(this,yi())}m.prototype={constructor:m,_isOutsideThisEl:function(e){!this.el.contains(e)&&e!==this.el&&(_e=null)},_getDirection:function(e,t){return typeof this.options.direction=="function"?this.options.direction.call(this,e,t,h):this.options.direction},_onTapStart:function(e){if(e.cancelable){var t=this,i=this.el,s=this.options,r=s.preventOnFilter,a=e.type,o=e.touches&&e.touches[0]||e.pointerType&&e.pointerType==="touch"&&e,l=(o||e).target,d=e.target.shadowRoot&&(e.path&&e.path[0]||e.composedPath&&e.composedPath()[0])||l,c=s.filter;if(Li(i),!h&&!(/mousedown|pointerdown/.test(a)&&e.button!==0||s.disabled)&&!d.isContentEditable&&!(!this.nativeDraggable&&xe&&l&&l.tagName.toUpperCase()==="SELECT")&&(l=$(l,s.draggable,i,!1),!(l&&l.animated)&&Ge!==l)){if(ve=Y(l),Pe=Y(l,s.draggable),typeof c=="function"){if(c.call(this,e,l,this)){F({sortable:t,rootEl:d,name:"filter",targetEl:l,toEl:i,fromEl:i}),B("filter",t,{evt:e}),r&&e.preventDefault();return}}else if(c&&(c=c.split(",").some(function(u){if(u=$(d,u.trim(),i,!1),u)return F({sortable:t,rootEl:u,name:"filter",targetEl:l,fromEl:i,toEl:i}),B("filter",t,{evt:e}),!0}),c)){r&&e.preventDefault();return}s.handle&&!$(d,s.handle,i,!1)||this._prepareDragStart(e,o,l)}}},_prepareDragStart:function(e,t,i){var s=this,r=s.el,a=s.options,o=r.ownerDocument,l;if(i&&!h&&i.parentNode===r){var d=k(i);if(D=r,h=i,I=h.parentNode,he=h.nextSibling,Ge=i,je=a.group,m.dragged=h,fe={target:h,clientX:(t||e).clientX,clientY:(t||e).clientY},Mt=fe.clientX-d.left,qt=fe.clientY-d.top,this._lastX=(t||e).clientX,this._lastY=(t||e).clientY,h.style["will-change"]="all",l=function(){if(B("delayEnded",s,{evt:e}),m.eventCanceled){s._onDrop();return}s._disableDelayedDragEvents(),!Ct&&s.nativeDraggable&&(h.draggable=!0),s._triggerDragStart(e,t),F({sortable:s,name:"choose",originalEvent:e}),R(h,a.chosenClass,!0)},a.ignore.split(",").forEach(function(c){At(h,c.trim(),ct)}),_(o,"dragover",me),_(o,"mousemove",me),_(o,"touchmove",me),a.supportPointer?(_(o,"pointerup",s._onDrop),!this.nativeDraggable&&_(o,"pointercancel",s._onDrop)):(_(o,"mouseup",s._onDrop),_(o,"touchend",s._onDrop),_(o,"touchcancel",s._onDrop)),Ct&&this.nativeDraggable&&(this.options.touchStartThreshold=4,h.draggable=!0),B("delayStart",this,{evt:e}),a.delay&&(!a.delayOnTouchOnly||t)&&(!this.nativeDraggable||!(ke||te))){if(m.eventCanceled){this._onDrop();return}a.supportPointer?(_(o,"pointerup",s._disableDelayedDrag),_(o,"pointercancel",s._disableDelayedDrag)):(_(o,"mouseup",s._disableDelayedDrag),_(o,"touchend",s._disableDelayedDrag),_(o,"touchcancel",s._disableDelayedDrag)),_(o,"mousemove",s._delayedDragTouchMoveHandler),_(o,"touchmove",s._delayedDragTouchMoveHandler),a.supportPointer&&_(o,"pointermove",s._delayedDragTouchMoveHandler),s._dragStartTimer=setTimeout(l,a.delay)}else l()}},_delayedDragTouchMoveHandler:function(e){var t=e.touches?e.touches[0]:e;Math.max(Math.abs(t.clientX-this._lastX),Math.abs(t.clientY-this._lastY))>=Math.floor(this.options.touchStartThreshold/(this.nativeDraggable&&window.devicePixelRatio||1))&&this._disableDelayedDrag()},_disableDelayedDrag:function(){h&&ct(h),clearTimeout(this._dragStartTimer),this._disableDelayedDragEvents()},_disableDelayedDragEvents:function(){var e=this.el.ownerDocument;y(e,"mouseup",this._disableDelayedDrag),y(e,"touchend",this._disableDelayedDrag),y(e,"touchcancel",this._disableDelayedDrag),y(e,"pointerup",this._disableDelayedDrag),y(e,"pointercancel",this._disableDelayedDrag),y(e,"mousemove",this._delayedDragTouchMoveHandler),y(e,"touchmove",this._delayedDragTouchMoveHandler),y(e,"pointermove",this._delayedDragTouchMoveHandler)},_triggerDragStart:function(e,t){t=t||e.pointerType=="touch"&&e,!this.nativeDraggable||t?this.options.supportPointer?_(document,"pointermove",this._onTouchMove):t?_(document,"touchmove",this._onTouchMove):_(document,"mousemove",this._onTouchMove):(_(h,"dragend",this),_(D,"dragstart",this._onDragStart));try{document.selection?Ve(function(){document.selection.empty()}):window.getSelection().removeAllRanges()}catch{}},_dragStarted:function(e,t){if(ye=!1,D&&h){B("dragStarted",this,{evt:t}),this.nativeDraggable&&_(document,"dragover",ki);var i=this.options;!e&&R(h,i.dragClass,!1),R(h,i.ghostClass,!0),m.active=this,e&&this._appendGhost(),F({sortable:this,name:"start",originalEvent:t})}else this._nulling()},_emulateDragOver:function(){if(z){this._lastX=z.clientX,this._lastY=z.clientY,Yt();for(var e=document.elementFromPoint(z.clientX,z.clientY),t=e;e&&e.shadowRoot&&(e=e.shadowRoot.elementFromPoint(z.clientX,z.clientY),e!==t);)t=e;if(h.parentNode[L]._isOutsideThisEl(e),t)do{if(t[L]){var i=void 0;if(i=t[L]._onDragOver({clientX:z.clientX,clientY:z.clientY,target:e,rootEl:t}),i&&!this.options.dragoverBubble)break}e=t}while(t=xt(t));Ht()}},_onTouchMove:function(e){if(fe){var t=this.options,i=t.fallbackTolerance,s=t.fallbackOffset,r=e.touches?e.touches[0]:e,a=g&&pe(g,!0),o=g&&a&&a.a,l=g&&a&&a.d,d=Je&&P&&Ot(P),c=(r.clientX-fe.clientX+s.x)/(o||1)+(d?d[0]-lt[0]:0)/(o||1),u=(r.clientY-fe.clientY+s.y)/(l||1)+(d?d[1]-lt[1]:0)/(l||1);if(!m.active&&!ye){if(i&&Math.max(Math.abs(r.clientX-this._lastX),Math.abs(r.clientY-this._lastY))<i)return;this._onDragStart(e,!0)}if(g){a?(a.e+=c-(at||0),a.f+=u-(ot||0)):a={a:1,b:0,c:0,d:1,e:c,f:u};var f="matrix(".concat(a.a,",").concat(a.b,",").concat(a.c,",").concat(a.d,",").concat(a.e,",").concat(a.f,")");p(g,"webkitTransform",f),p(g,"mozTransform",f),p(g,"msTransform",f),p(g,"transform",f),at=c,ot=u,z=r}e.cancelable&&e.preventDefault()}},_appendGhost:function(){if(!g){var e=this.options.fallbackOnBody?document.body:D,t=k(h,!0,Je,!0,e),i=this.options;if(Je){for(P=e;p(P,"position")==="static"&&p(P,"transform")==="none"&&P!==document;)P=P.parentNode;P!==document.body&&P!==document.documentElement?(P===document&&(P=K()),t.top+=P.scrollTop,t.left+=P.scrollLeft):P=K(),lt=Ot(P)}g=h.cloneNode(!0),R(g,i.ghostClass,!1),R(g,i.fallbackClass,!0),R(g,i.dragClass,!0),p(g,"transition",""),p(g,"transform",""),p(g,"box-sizing","border-box"),p(g,"margin",0),p(g,"top",t.top),p(g,"left",t.left),p(g,"width",t.width),p(g,"height",t.height),p(g,"opacity","0.8"),p(g,"position",Je?"absolute":"fixed"),p(g,"zIndex","100000"),p(g,"pointerEvents","none"),m.ghost=g,e.appendChild(g),p(g,"transform-origin",Mt/parseInt(g.style.width)*100+"% "+qt/parseInt(g.style.height)*100+"%")}},_onDragStart:function(e,t){var i=this,s=e.dataTransfer,r=i.options;if(B("dragStart",this,{evt:e}),m.eventCanceled){this._onDrop();return}B("setupClone",this),m.eventCanceled||(C=Lt(h),C.removeAttribute("id"),C.draggable=!1,C.style["will-change"]="",this._hideClone(),R(C,this.options.chosenClass,!1),m.clone=C),i.cloneId=Ve(function(){B("clone",i),!m.eventCanceled&&(i.options.removeCloneOnHide||D.insertBefore(C,h),i._hideClone(),F({sortable:i,name:"clone"}))}),!t&&R(h,r.dragClass,!0),t?(Ye=!0,i._loopId=setInterval(i._emulateDragOver,50)):(y(document,"mouseup",i._onDrop),y(document,"touchend",i._onDrop),y(document,"touchcancel",i._onDrop),s&&(s.effectAllowed="move",r.setData&&r.setData.call(i,s,h)),_(document,"drop",i),p(h,"transform","translateZ(0)")),ye=!0,i._dragStartId=Ve(i._dragStarted.bind(i,t,e)),_(document,"selectstart",i),Oe=!0,window.getSelection().removeAllRanges(),xe&&p(document.body,"user-select","none")},_onDragOver:function(e){var t=this.el,i=e.target,s,r,a,o=this.options,l=o.group,d=m.active,c=je===l,u=o.sort,f=A||d,b,v=this,E=!1;if(dt)return;function T(Ce,Jt){B(Ce,v,J({evt:e,isOwner:c,axis:b?"vertical":"horizontal",revert:a,dragRect:s,targetRect:r,canSort:u,fromSortable:f,target:i,completed:N,onMove:function(yt,Kt){return Ke(D,t,h,s,yt,k(yt),e,Kt)},changed:X},Jt))}function V(){T("dragOverAnimationCapture"),v.captureAnimationState(),v!==f&&f.captureAnimationState()}function N(Ce){return T("dragOverCompleted",{insertion:Ce}),Ce&&(c?d._hideClone():d._showClone(v),v!==f&&(R(h,A?A.options.ghostClass:d.options.ghostClass,!1),R(h,o.ghostClass,!0)),A!==v&&v!==m.active?A=v:v===m.active&&A&&(A=null),f===v&&(v._ignoreWhileAnimating=i),v.animateAll(function(){T("dragOverAnimationComplete"),v._ignoreWhileAnimating=null}),v!==f&&(f.animateAll(),f._ignoreWhileAnimating=null)),(i===h&&!h.animated||i===t&&!i.animated)&&(_e=null),!o.dragoverBubble&&!e.rootEl&&i!==document&&(h.parentNode[L]._isOutsideThisEl(e.target),!Ce&&me(e)),!o.dragoverBubble&&e.stopPropagation&&e.stopPropagation(),E=!0}function X(){U=Y(h),oe=Y(h,o.draggable),F({sortable:v,name:"change",toEl:t,newIndex:U,newDraggableIndex:oe,originalEvent:e})}if(e.preventDefault!==void 0&&e.cancelable&&e.preventDefault(),i=$(i,o.draggable,t,!0),T("dragOver"),m.eventCanceled)return E;if(h.contains(e.target)||i.animated&&i.animatingX&&i.animatingY||v._ignoreWhileAnimating===i)return N(!1);if(Ye=!1,d&&!o.disabled&&(c?u||(a=I!==D):A===this||(this.lastPutMode=je.checkPull(this,d,h,e))&&l.checkPut(this,d,h,e))){if(b=this._getDirection(e,i)==="vertical",s=k(h),T("dragOverValid"),m.eventCanceled)return E;if(a)return I=D,V(),this._hideClone(),T("revert"),m.eventCanceled||(he?D.insertBefore(h,he):D.appendChild(h)),N(!0);var M=nt(t,o.draggable);if(!M||Pi(e,b,this)&&!M.animated){if(M===h)return N(!1);if(M&&t===e.target&&(i=M),i&&(r=k(i)),Ke(D,t,h,s,i,r,e,!!i)!==!1)return V(),M&&M.nextSibling?t.insertBefore(h,M.nextSibling):t.appendChild(h),I=t,X(),N(!0)}else if(M&&Ai(e,b,this)){var de=ge(t,0,o,!0);if(de===h)return N(!1);if(i=de,r=k(i),Ke(D,t,h,s,i,r,e,!1)!==!1)return V(),t.insertBefore(h,de),I=t,X(),N(!0)}else if(i.parentNode===t){r=k(i);var W=0,ce,Ee=h.parentNode!==t,q=!Ci(h.animated&&h.toRect||s,i.animated&&i.toRect||r,b),we=b?"top":"left",ie=Pt(i,"top","top")||Pt(h,"top","top"),Se=ie?ie.scrollTop:void 0;_e!==i&&(ce=r[we],Fe=!1,Xe=!q&&o.invertSwap||Ee),W=Oi(e,i,r,b,q?1:o.swapThreshold,o.invertedSwapThreshold==null?o.swapThreshold:o.invertedSwapThreshold,Xe,_e===i);var Z;if(W!==0){var ue=Y(h);do ue-=W,Z=I.children[ue];while(Z&&(p(Z,"display")==="none"||Z===g))}if(W===0||Z===i)return N(!1);_e=i,Ne=W;var De=i.nextElementSibling,ne=!1;ne=W===1;var qe=Ke(D,t,h,s,i,r,e,ne);if(qe!==!1)return(qe===1||qe===-1)&&(ne=qe===1),dt=!0,setTimeout(Ti,30),V(),ne&&!De?t.appendChild(h):i.parentNode.insertBefore(h,ne?De:i),ie&&Ft(ie,0,Se-ie.scrollTop),I=h.parentNode,ce!==void 0&&!Xe&&($e=Math.abs(ce-k(i)[we])),X(),N(!0)}if(t.contains(h))return N(!1)}return!1},_ignoreWhileAnimating:null,_offMoveEvents:function(){y(document,"mousemove",this._onTouchMove),y(document,"touchmove",this._onTouchMove),y(document,"pointermove",this._onTouchMove),y(document,"dragover",me),y(document,"mousemove",me),y(document,"touchmove",me)},_offUpEvents:function(){var e=this.el.ownerDocument;y(e,"mouseup",this._onDrop),y(e,"touchend",this._onDrop),y(e,"pointerup",this._onDrop),y(e,"pointercancel",this._onDrop),y(e,"touchcancel",this._onDrop),y(document,"selectstart",this)},_onDrop:function(e){var t=this.el,i=this.options;if(U=Y(h),oe=Y(h,i.draggable),B("drop",this,{evt:e}),I=h&&h.parentNode,U=Y(h),oe=Y(h,i.draggable),m.eventCanceled){this._nulling();return}ye=!1,Xe=!1,Fe=!1,clearInterval(this._loopId),clearTimeout(this._dragStartTimer),ut(this.cloneId),ut(this._dragStartId),this.nativeDraggable&&(y(document,"drop",this),y(t,"dragstart",this._onDragStart)),this._offMoveEvents(),this._offUpEvents(),xe&&p(document.body,"user-select",""),p(h,"transform",""),e&&(Oe&&(e.cancelable&&e.preventDefault(),!i.dropBubble&&e.stopPropagation()),g&&g.parentNode&&g.parentNode.removeChild(g),(D===I||A&&A.lastPutMode!=="clone")&&C&&C.parentNode&&C.parentNode.removeChild(C),h&&(this.nativeDraggable&&y(h,"dragend",this),ct(h),h.style["will-change"]="",Oe&&!ye&&R(h,A?A.options.ghostClass:this.options.ghostClass,!1),R(h,this.options.chosenClass,!1),F({sortable:this,name:"unchoose",toEl:I,newIndex:null,newDraggableIndex:null,originalEvent:e}),D!==I?(U>=0&&(F({rootEl:I,name:"add",toEl:I,fromEl:D,originalEvent:e}),F({sortable:this,name:"remove",toEl:I,originalEvent:e}),F({rootEl:I,name:"sort",toEl:I,fromEl:D,originalEvent:e}),F({sortable:this,name:"sort",toEl:I,originalEvent:e})),A&&A.save()):U!==ve&&U>=0&&(F({sortable:this,name:"update",toEl:I,originalEvent:e}),F({sortable:this,name:"sort",toEl:I,originalEvent:e})),m.active&&((U==null||U===-1)&&(U=ve,oe=Pe),F({sortable:this,name:"end",toEl:I,originalEvent:e}),this.save()))),this._nulling()},_nulling:function(){B("nulling",this),D=h=I=g=he=C=Ge=ae=fe=z=Oe=U=oe=ve=Pe=_e=Ne=A=je=m.dragged=m.ghost=m.clone=m.active=null;var e=this.el;ze.forEach(function(t){e.contains(t)&&(t.checked=!0)}),ze.length=at=ot=0},handleEvent:function(e){switch(e.type){case"drop":case"dragend":this._onDrop(e);break;case"dragenter":case"dragover":h&&(this._onDragOver(e),xi(e));break;case"selectstart":e.preventDefault();break}},toArray:function(){for(var e=[],t,i=this.el.children,s=0,r=i.length,a=this.options;s<r;s++)t=i[s],$(t,a.draggable,this.el,!1)&&e.push(t.getAttribute(a.dataIdAttr)||Fi(t));return e},sort:function(e,t){var i={},s=this.el;this.toArray().forEach(function(r,a){var o=s.children[a];$(o,this.options.draggable,s,!1)&&(i[r]=o)},this),t&&this.captureAnimationState(),e.forEach(function(r){i[r]&&(s.removeChild(i[r]),s.appendChild(i[r]))}),t&&this.animateAll()},save:function(){var e=this.options.store;e&&e.set&&e.set(this)},closest:function(e,t){return $(e,t||this.options.draggable,this.el,!1)},option:function(e,t){var i=this.options;if(t===void 0)return i[e];var s=Ae.modifyOption(this,e,t);typeof s<"u"?i[e]=s:i[e]=t,e==="group"&&jt(i)},destroy:function(){B("destroy",this);var e=this.el;e[L]=null,y(e,"mousedown",this._onTapStart),y(e,"touchstart",this._onTapStart),y(e,"pointerdown",this._onTapStart),this.nativeDraggable&&(y(e,"dragover",this),y(e,"dragenter",this)),Array.prototype.forEach.call(e.querySelectorAll("[draggable]"),function(t){t.removeAttribute("draggable")}),this._onDrop(),this._disableDelayedDragEvents(),He.splice(He.indexOf(this.el),1),this.el=e=null},_hideClone:function(){if(!ae){if(B("hideClone",this),m.eventCanceled)return;p(C,"display","none"),this.options.removeCloneOnHide&&C.parentNode&&C.parentNode.removeChild(C),ae=!0}},_showClone:function(e){if(e.lastPutMode!=="clone"){this._hideClone();return}if(ae){if(B("showClone",this),m.eventCanceled)return;h.parentNode==D&&!this.options.group.revertClone?D.insertBefore(C,h):he?D.insertBefore(C,he):D.appendChild(C),this.options.group.revertClone&&this.animate(h,C),p(C,"display",""),ae=!1}}};function xi(n){n.dataTransfer&&(n.dataTransfer.dropEffect="move"),n.cancelable&&n.preventDefault()}function Ke(n,e,t,i,s,r,a,o){var l,d=n[L],c=d.options.onMove,u;return window.CustomEvent&&!te&&!ke?l=new CustomEvent("move",{bubbles:!0,cancelable:!0}):(l=document.createEvent("Event"),l.initEvent("move",!0,!0)),l.to=e,l.from=n,l.dragged=t,l.draggedRect=i,l.related=s||e,l.relatedRect=r||k(e),l.willInsertAfter=o,l.originalEvent=a,n.dispatchEvent(l),c&&(u=c.call(d,l,a)),u}function ct(n){n.draggable=!1}function Ti(){dt=!1}function Ai(n,e,t){var i=k(ge(t.el,0,t.options,!0)),s=Bt(t.el,t.options,g),r=10;return e?n.clientX<s.left-r||n.clientY<i.top&&n.clientX<i.right:n.clientY<s.top-r||n.clientY<i.bottom&&n.clientX<i.left}function Pi(n,e,t){var i=k(nt(t.el,t.options.draggable)),s=Bt(t.el,t.options,g),r=10;return e?n.clientX>s.right+r||n.clientY>i.bottom&&n.clientX>i.left:n.clientY>s.bottom+r||n.clientX>i.right&&n.clientY>i.top}function Oi(n,e,t,i,s,r,a,o){var l=i?n.clientY:n.clientX,d=i?t.height:t.width,c=i?t.top:t.left,u=i?t.bottom:t.right,f=!1;if(!a){if(o&&$e<d*s){if(!Fe&&(Ne===1?l>c+d*r/2:l<u-d*r/2)&&(Fe=!0),Fe)f=!0;else if(Ne===1?l<c+$e:l>u-$e)return-Ne}else if(l>c+d*(1-s)/2&&l<u-d*(1-s)/2)return Ni(e)}return f=f||a,f&&(l<c+d*r/2||l>u-d*r/2)?l>c+d/2?1:-1:0}function Ni(n){return Y(h)<Y(n)?1:-1}function Fi(n){for(var e=n.tagName+n.className+n.src+n.href+n.textContent,t=e.length,i=0;t--;)i+=e.charCodeAt(t);return i.toString(36)}function Li(n){ze.length=0;for(var e=n.getElementsByTagName("input"),t=e.length;t--;){var i=e[t];i.checked&&ze.push(i)}}function Ve(n){return setTimeout(n,0)}function ut(n){return clearTimeout(n)}We&&_(document,"touchmove",function(n){(m.active||ye)&&n.cancelable&&n.preventDefault()}),m.utils={on:_,off:y,css:p,find:At,is:function(e,t){return!!$(e,t,e,!1)},extend:bi,throttle:Nt,closest:$,toggleClass:R,clone:Lt,index:Y,nextTick:Ve,cancelNextTick:ut,detectDirection:Gt,getChild:ge,expando:L},m.get=function(n){return n[L]},m.mount=function(){for(var n=arguments.length,e=new Array(n),t=0;t<n;t++)e[t]=arguments[t];e[0].constructor===Array&&(e=e[0]),e.forEach(function(i){if(!i.prototype||!i.prototype.constructor)throw"Sortable: Mounted plugin must be a constructor function, not ".concat({}.toString.call(i));i.utils&&(m.utils=J(J({},m.utils),i.utils)),Ae.mount(i)})},m.create=function(n,e){return new m(n,e)},m.version=pi;var x=[],Le,ht,ft=!1,mt,pt,Ze,Be;function Bi(){function n(){this.defaults={scroll:!0,forceAutoScrollFallback:!1,scrollSensitivity:30,scrollSpeed:10,bubbleScroll:!0};for(var e in this)e.charAt(0)==="_"&&typeof this[e]=="function"&&(this[e]=this[e].bind(this))}return n.prototype={dragStarted:function(t){var i=t.originalEvent;this.sortable.nativeDraggable?_(document,"dragover",this._handleAutoScroll):this.options.supportPointer?_(document,"pointermove",this._handleFallbackAutoScroll):i.touches?_(document,"touchmove",this._handleFallbackAutoScroll):_(document,"mousemove",this._handleFallbackAutoScroll)},dragOverCompleted:function(t){var i=t.originalEvent;!this.options.dragOverBubble&&!i.rootEl&&this._handleAutoScroll(i)},drop:function(){this.sortable.nativeDraggable?y(document,"dragover",this._handleAutoScroll):(y(document,"pointermove",this._handleFallbackAutoScroll),y(document,"touchmove",this._handleFallbackAutoScroll),y(document,"mousemove",this._handleFallbackAutoScroll)),Xt(),Qe(),vi()},nulling:function(){Ze=ht=Le=ft=Be=mt=pt=null,x.length=0},_handleFallbackAutoScroll:function(t){this._handleAutoScroll(t,!0)},_handleAutoScroll:function(t,i){var s=this,r=(t.touches?t.touches[0]:t).clientX,a=(t.touches?t.touches[0]:t).clientY,o=document.elementFromPoint(r,a);if(Ze=t,i||this.options.forceAutoScrollFallback||ke||te||xe){gt(t,this.options,o,i);var l=re(o,!0);ft&&(!Be||r!==mt||a!==pt)&&(Be&&Xt(),Be=setInterval(function(){var d=re(document.elementFromPoint(r,a),!0);d!==l&&(l=d,Qe()),gt(t,s.options,d,i)},10),mt=r,pt=a)}else{if(!this.options.bubbleScroll||re(o,!0)===K()){Qe();return}gt(t,this.options,re(o,!1),!1)}}},Q(n,{pluginName:"scroll",initializeByDefault:!0})}function Qe(){x.forEach(function(n){clearInterval(n.pid)}),x=[]}function Xt(){clearInterval(Be)}var gt=Nt(function(n,e,t,i){if(e.scroll){var s=(n.touches?n.touches[0]:n).clientX,r=(n.touches?n.touches[0]:n).clientY,a=e.scrollSensitivity,o=e.scrollSpeed,l=K(),d=!1,c;ht!==t&&(ht=t,Qe(),Le=e.scroll,c=e.scrollFn,Le===!0&&(Le=re(t,!0)));var u=0,f=Le;do{var b=f,v=k(b),E=v.top,T=v.bottom,V=v.left,N=v.right,X=v.width,M=v.height,de=void 0,W=void 0,ce=b.scrollWidth,Ee=b.scrollHeight,q=p(b),we=b.scrollLeft,ie=b.scrollTop;b===l?(de=X<ce&&(q.overflowX==="auto"||q.overflowX==="scroll"||q.overflowX==="visible"),W=M<Ee&&(q.overflowY==="auto"||q.overflowY==="scroll"||q.overflowY==="visible")):(de=X<ce&&(q.overflowX==="auto"||q.overflowX==="scroll"),W=M<Ee&&(q.overflowY==="auto"||q.overflowY==="scroll"));var Se=de&&(Math.abs(N-s)<=a&&we+X<ce)-(Math.abs(V-s)<=a&&!!we),Z=W&&(Math.abs(T-r)<=a&&ie+M<Ee)-(Math.abs(E-r)<=a&&!!ie);if(!x[u])for(var ue=0;ue<=u;ue++)x[ue]||(x[ue]={});(x[u].vx!=Se||x[u].vy!=Z||x[u].el!==b)&&(x[u].el=b,x[u].vx=Se,x[u].vy=Z,clearInterval(x[u].pid),(Se!=0||Z!=0)&&(d=!0,x[u].pid=setInterval(function(){i&&this.layer===0&&m.active._onTouchMove(Ze);var De=x[this.layer].vy?x[this.layer].vy*o:0,ne=x[this.layer].vx?x[this.layer].vx*o:0;typeof c=="function"&&c.call(m.dragged.parentNode[L],ne,De,n,Ze,x[this.layer].el)!=="continue"||Ft(x[this.layer].el,ne,De)}.bind({layer:u}),24))),u++}while(e.bubbleScroll&&f!==l&&(f=re(f,!1)));ft=d}},30),$t=function(e){var t=e.originalEvent,i=e.putSortable,s=e.dragEl,r=e.activeSortable,a=e.dispatchSortableEvent,o=e.hideGhostForTarget,l=e.unhideGhostForTarget;if(t){var d=i||r;o();var c=t.changedTouches&&t.changedTouches.length?t.changedTouches[0]:t,u=document.elementFromPoint(c.clientX,c.clientY);l(),d&&!d.el.contains(u)&&(a("spill"),this.onSpill({dragEl:s,putSortable:i}))}};function bt(){}bt.prototype={startIndex:null,dragStart:function(e){var t=e.oldDraggableIndex;this.startIndex=t},onSpill:function(e){var t=e.dragEl,i=e.putSortable;this.sortable.captureAnimationState(),i&&i.captureAnimationState();var s=ge(this.sortable.el,this.startIndex,this.options);s?this.sortable.el.insertBefore(t,s):this.sortable.el.appendChild(t),this.sortable.animateAll(),i&&i.animateAll()},drop:$t},Q(bt,{pluginName:"revertOnSpill"});function vt(){}vt.prototype={onSpill:function(e){var t=e.dragEl,i=e.putSortable,s=i||this.sortable;s.captureAnimationState(),t.parentNode&&t.parentNode.removeChild(t),s.animateAll()},drop:$t},Q(vt,{pluginName:"removeOnSpill"}),m.mount(new Bi),m.mount(vt,bt);const le={FORM_COMPONENTS:[{type:"input",label:"Input"},{type:"link",label:"Link"},{type:"location",label:"Location"},{type:"textarea",label:"Text"},{type:"checkbox",label:"Checkbox"},{type:"radio",label:"Radio Group"},{type:"select",label:"Select"},{type:"table",label:"Table"},{type:"todo",label:"Todo List",icon:"checklist"},{type:"signature",label:"Signature"},{type:"html",label:"Document"},{type:"status",label:"Status"}],PAGE_COMPONENTS:[{type:"input",label:"Input"},{type:"link",label:"Link"},{type:"location",label:"Location"},{type:"textarea",label:"Text"},{type:"bookmark",label:"Bookmark"},{type:"checkbox",label:"Checkbox"},{type:"radio",label:"Radio Group"},{type:"select",label:"Select"},{type:"table",label:"Table"}],INPUTS:[{type:"text",name:"Text"},{type:"tel",name:"Phone Number"},{type:"number",name:"Number"},{type:"email",name:"Email"},{type:"date",name:"Date"},{type:"time",name:"Time"}],TABLE_COLUMNS:[{type:"text",name:"Text"},{type:"tel",name:"Phone Number"},{type:"number",name:"Number"},{type:"email",name:"Email"},{type:"date",name:"Date"},{type:"time",name:"Time"},{type:"out",name:"External Link"},{type:"in",name:"Internal Link"},{type:"checkbox",name:"Checkbox"}],LINKS:[{type:"out",name:"External"},{type:"in",name:"Internal"}],PRESENTATION_DEFAULTS:{bookmark:{title:"Bookmark"},checkbox:{title:"Checkbox"},html:{title:"Rich Text"},input:{title:"Input",input:"text"},link:{title:"Link",location:"out"},location:{title:"Location"},radio:{title:"Radio Group"},select:{title:"Select"},signature:{title:"Signature"},status:{title:"Status"},table:{title:"Table"},todo:{title:"Todo List"},textarea:{title:"Text"}},DEFAULT_SETTINGS:{input:["title","placeholder","visibility","input","required","deleteButton"],link:["title","visibility","required","location","deleteButton"],location:["title","placeholder","visibility","required","deleteButton"],textarea:["title","placeholder","visibility","required","deleteButton"],bookmark:["title","deleteButton"],checkbox:["title","visibility","checked","required","deleteButton"],radio:["title","visibility","options","required","deleteButton"],select:["title","placeholder","visibility","options","multiple","required","deleteButton"],html:["title","visibility","editor","deleteButton"],signature:["title","required","deleteButton"],status:["title","status","deleteButton"],table:["title","columns","visibility","deleteButton"],todo:["title","visibility","deleteButton"]}};class Mi{constructor(e){this.builder=e,this.column=document.getElementById("components-column"),this.panel=document.getElementById("components-panel"),this._click=this._click.bind(this),this._move=this._move.bind(this),this.init()}init(){const e=this.builder.elt.dataset.formType==="page"?le.PAGE_COMPONENTS:le.FORM_COMPONENTS,t=[];e.forEach(({type:i,label:s,icon:r=i})=>{const a=document.createElement("div");a.className=`${S.builder.component}`,a.dataset.type=i;const o=a.appendChild(document.createElement("span"));Et(o,r,"text-form-default");const l=a.appendChild(document.createElement("span"));l.textContent=s;const d=a.appendChild(document.createElement("button"));d.dataset.role="add",d.type="button",d.title=`Add ${s}`,d.setAttribute("aria-label",`Add ${s}`),d.className="ml-auto grid size-6 place-items-center rounded-md text-form-default hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default";const c=d.appendChild(document.createElement("span"));Et(c,"add"),t.push(a)}),this.panel.append(...t),this.sortable=m.create(this.panel,{group:{name:"builder",pull:"clone",put:!1},onMove:this._move,animation:150,sort:!1}),this.column.addEventListener("click",this._click)}_move(e){const t=e.dragged.dataset.type;return this.builder.model.hasUniqueElement(t)?(this.builder.header.message(`Only one ${t} element is allowed per form`),!1):!0}_click(e){const t=e.target.closest("[data-role]");if(t?.dataset.role==="add"){const i=t.closest("[data-type]").dataset.type;if(this.builder.model.hasUniqueElement(i)){this.builder.header.message(`Only one ${i} element is allowed per form`);return}const s=this.builder.createElement({type:i});this.builder.model.sortable.el.appendChild(s),this.builder.updateSchemaOrder(),this.builder.selectElement(s.id)}}destroy(){this.column?.removeEventListener("click",this._click),this.sortable?.destroy(),this.sortable=null}}class qi{constructor(e){this.builder=e,this.panel=document.getElementById("condition-panel"),this.loading=!1,this.condition=null,this._click=this._click.bind(this),this._draftInput=this._draftInput.bind(this),this.init()}init(){this.panel.addEventListener("click",this._click);for(const e of["input","change","updated"])this.panel.addEventListener(e,this._draftInput)}_draftInput(){this.builder._restoringDraft||!this.condition?.key||(this.builder.draft.revision+=1,this.builder.draft.group=null)}_click(e){const t=e.target.closest("button");if(t?.dataset.role==="save"){if(!this.condition.validate())return;const s=this.condition.index,r=this.condition.element.schema,a=r[this.condition.key]??[];s===-1?a.push(this.condition.setting):a[s]=this.condition.setting,r[this.condition.key]=a,this.condition.element.settings=this.builder.settings.create(r),this.builder.updateSchema(),se(()=>{this.condition.index=-1,this.condition.init(),this.condition.showSuccess(),this.condition.focus(),this.builder.settings.updateItem(),this.builder.model.updateItem()})}else t?.dataset.role==="close"&&this.close()}destroy(){this.panel?.removeEventListener("click",this._click);for(const e of["input","change","updated"])this.panel?.removeEventListener(e,this._draftInput);this.loading=!1,this.condition=null}open(e){this.builder.model.sortable.option("disabled",!0),this.builder.components.sortable.option("disabled",!0),this.builder.model.focusItem(),e.expand&&(this.builder.elt.dataset.expanded="true"),this.panel.replaceChildren(e.target),this.panel.dataset.visible="true",this.condition=e,this.loading=!1}hide(){this.builder.model.sortable.option("disabled",!1),this.builder.components.sortable.option("disabled",!1),this.builder.model.blurItem(),this.panel.dataset.visible="false",this.condition=null}close(){se(()=>{this.hide(),this.builder.elt.dataset.expanded="false"})}}const O=(n,e)=>{const t=document.createElement("div");return t.className=S.builder.settings.section,t.append(...e.filter(Boolean)),t.dataset.setting=n,t},Me=n=>{const e=le.PRESENTATION_DEFAULTS[n.type]||{};return{title:n.title??e.title,input:n.input??e.input,location:n.location??e.location}},H=(n,e,t="form",i=!1)=>{const s=w.toggle({icon:n,styles:{container:S.builder.settings.toggle.container,icon:S.builder.settings.toggle.icon},data:{role:e}});return s.type="button",s.dataset.kind=t,i&&(s.disabled=!0,s.classList.add("opacity-50","pointer-events-none")),s},zt=(n,e)=>{const t=document.createElement("li");t.className=S.builder.settings.item,t.dataset.index=e;const i=document.createElement("button");i.type="button",i.className=S.builder.settings.open,i.dataset.role="open";const s=i.appendChild(document.createElement("span"));s.textContent=n.name,s.className="font-semibold text-form-dark";const r=i.appendChild(document.createElement("span"));r.className="italic text-base-dark",r.textContent=n.checked?" is ":" has the value ";const a=i.appendChild(document.createElement("span"));a.className="font-semibold text-project-default",a.textContent=n.checked?"checked":n.label;const o=H("x","remove","delete");return t.append(i,o),t},Ri=(n,e,t)=>{const i=document.createElement("li");i.className=S.builder.settings.item,i.dataset.index=e;const s=i.appendChild(document.createElement("button"));s.type="button",s.textContent=n.label,s.className=S.builder.settings.open,s.dataset.role="open";const r=document.createElement("div");return r.className="flex shrink-0 flex-row items-center gap-1",t>1&&(r.appendChild(H("down","moveDown","form",e===t-1)),r.appendChild(H("up","moveUp","form",e===0))),r.appendChild(H("x","remove","delete")),i.append(s,r),i},Ui=(n,e,t)=>{const i=document.createElement("li");i.className=S.builder.settings.item,i.dataset.index=e;const s=w.label({icon:n.location||n.input||n.type,label:n.name||n.title,tag:"button",role:"open",styles:{label:S.builder.settings.open,container:"flex flex-row items-center gap-1.5"}});s.type="button";const r=document.createElement("div");return r.className="flex shrink-0 flex-row items-center gap-1",t>1&&(r.appendChild(H("down","moveDown","form",e===t-1)),r.appendChild(H("up","moveUp","form",e===0))),r.appendChild(H("x","remove","delete")),i.append(s,r),i},Gi=n=>{const e=w.input({label:"Title",name:"title",value:Me(n).title});return O("title",[e])},ji=n=>{const e=w.input({label:"Placeholder",name:"placeholder",value:n.placeholder||""});return O("placeholder",[e])},Yi=n=>{const e=document.createElement("div");e.className=S.builder.settings.title;const t=w.label({label:"Visibility",tag:"h3"}),i=H("add","add");if(e.append(t,i),n.visibility){const s=document.createElement("ul");return s.className="flex flex-col gap-1",n.visibility.forEach((r,a)=>{s.appendChild(zt(r,a))}),O("visibility",[e,s])}return O("visibility",[e])},Hi=n=>{const e=document.createElement("div");e.className=S.builder.settings.title;const t=w.label({label:"Status",tag:"h3"}),i=H("add","add");if(e.append(t,i),n.status){const s=document.createElement("ul");return s.className="flex flex-col gap-1",n.status.forEach((r,a)=>{s.appendChild(zt(r,a))}),O("status",[e,s])}else return O("status",[e])},Xi=n=>{const e=document.createElement("div");e.className=S.builder.settings.title;const t=w.label({label:"Options",tag:"h3"}),i=H("add","add");if(e.append(t,i),n.options){const s=document.createElement("ul");s.className="flex flex-col gap-1";const r=n.options.length;return n.options.forEach((a,o)=>{s.appendChild(Ri(a,o,r))}),O("options",[e,s])}else return O("options",[e])},$i=()=>{const n=document.createElement("div");n.className=S.builder.settings.title;const e=w.label({label:"Editor",tag:"h3"}),t=H("edit","edit");return n.append(e,t),O("html",[n])},zi=n=>{const e=Me(n),t=document.createElement("fieldset");t.className=S.radio.fieldset.column,t.dataset.kind="base";const i=t.appendChild(document.createElement("legend"));return i.textContent="Input Type",i.className=`${S.label.sectionHeading}`,le.INPUTS.forEach(s=>{t.appendChild(w.radio({icon:s.type,label:s.name,name:"input",value:s.type,checked:s.type===e.input}))}),O("input",[t])},Wi=n=>{const e=Me(n),t=document.createElement("fieldset");t.className=S.radio.fieldset.column,t.dataset.kind="form";const i=t.appendChild(document.createElement("legend"));return i.textContent="Link Type",i.className=`${S.label.sectionHeading}`,le.LINKS.forEach(s=>{t.appendChild(w.radio({icon:s.type,label:s.name,name:"location",value:s.type,checked:s.type===e.location}))}),O("location",[t])},Ji=n=>{const e=document.createElement("div");e.className=S.builder.settings.title;const t=w.label({label:"Columns",tag:"h3"}),i=H("add","add");if(e.append(t,i),n.columns){const s=document.createElement("ul");s.className="flex flex-col gap-1";const r=n.columns.length;return n.columns.forEach((a,o)=>{s.appendChild(Ui(a,o,r))}),O("columns",[e,s])}else return O("columns",[e])},Ki=n=>{const e=w.checkbox({label:"Required",name:"required",checked:!!n.required});return O("required",[e])},Vi=n=>{const e=w.checkbox({label:"Multiple",name:"multiple",checked:!!n.multiple});return O("multiple",[e])},Zi=n=>{const e=w.checkbox({label:"Default",name:"checked",checked:!!n.checked});return O("checked",[e])},Qi=()=>{const n=document.createElement("button");return n.textContent="Delete",n.dataset.kind="delete",n.dataset.role="delete",n.className=`${S.button.submit}`,n},en={title:Gi,placeholder:ji,visibility:Yi,status:Hi,options:Xi,input:zi,location:Wi,columns:Ji,required:Ki,multiple:Vi,checked:Zi,editor:$i,deleteButton:Qi};class tn{constructor(e){this.builder=e,this.panel=document.getElementById("settings-panel"),this._input=this._input.bind(this),this._change=this._change.bind(this),this._click=this._click.bind(this),this._blur=this._blur.bind(this)}init(){this.panel.addEventListener("input",this._input),this.panel.addEventListener("change",this._change),this.panel.addEventListener("click",this._click),this.panel.addEventListener("blur",this._blur,!0)}destroy(){this.panel.removeEventListener("input",this._input),this.panel.removeEventListener("change",this._change),this.panel.removeEventListener("click",this._click),this.panel.removeEventListener("blur",this._blur,!0)}_input(e){const t=this.builder.selectedElement;e.target.closest("[data-setting=title]")?this._setTitle(t,e.target.value):e.target.closest("[data-setting=placeholder]")&&this._setPlaceholder(t,e.target.value),this.builder.updateSchema(!1,`${t.schema.id}:${e.target.name}`)}_change(e){const t=this.builder.selectedElement;e.target.closest("[data-setting=required]")?this._setRequired(t,e.target.checked):e.target.closest("[data-setting=checked]")?this._setChecked(t,e.target.checked):e.target.closest("[data-setting=multiple]")?this._setMultiple(t,e.target.checked):e.target.closest("[data-setting=input]")?this._setInput(t,e.target.value):e.target.closest("[data-setting=location]")&&this._setLocation(t,e.target.value),this.builder.updateSchema()}_click(e){if(e.target.closest("button")?.disabled)return;const t=this.builder.selectedElement,i=e.target.closest("[data-role]")?.dataset.role,s=e.target.closest("[data-index]"),r=s?parseInt(s.dataset.index,10):-1,a=e.target.closest("[data-setting]")?.dataset.setting;i==="remove"?this._removeSchemaListItem(t.schema[a],r):["moveUp","moveDown"].includes(i)?this._moveSchemaListItem(t,a,r,i):["add","edit","open"].includes(i)?this.builder.showCondition(a,r):i==="delete"&&(this.builder.removeElement(),this.deselectItem(),this.builder.formSettings.visible=!0)}_blur(){this.builder.updateSchema(),this.builder.draft&&(this.builder.draft.group=null)}_removeSchemaListItem(e,t){e.splice(t,1),this.builder.updateSchema(),se(()=>{this.builder.model.updateItem(),this.builder.selectedElement.settings=this.create(this.builder.selectedElement.schema),this.updateItem()})}_moveSchemaListItem(e,t,i,s){const r=e.schema[t],a=s==="moveUp"?i-1:i+1;a<0||a>=r.length||([r[i],r[a]]=[r[a],r[i]],this.builder.updateSchema(),se(()=>{this.builder.model.updateItem(),this.builder.selectedElement.settings=this.create(this.builder.selectedElement.schema),this.updateItem()}))}_setTitle(e,t){e.schema.title=t,e.item.querySelector("[data-role='label'] > span:not([data-icon])").textContent=t}_setPlaceholder(e,t){e.schema.placeholder=t;const i=e.item.querySelector("input, textarea");i&&(i.placeholder=t)}_setRequired(e,t){e.schema.required=t}_setChecked(e,t){e.schema.checked=t,e.item.querySelector("input[type='checkbox']").checked=t}_setMultiple(e,t){e.schema.multiple=t}_setInput(e,t){e.schema.input=t;const i=w.label({icon:t,label:Me(e.schema).title});e.item.querySelector("label > div").replaceWith(i.querySelector("div"))}_setLocation(e,t){e.schema.location=t;const i=w.label({icon:t,label:Me(e.schema).title,tag:"h3"});e.item.querySelector("h3").replaceWith(i)}create(e){const t={...e};for(const s of["visibility","status"])Array.isArray(e[s])&&(t[s]=e[s].map(r=>{const a=this.builder.elements.get(r.id)?.schema;return{...r,name:a?.title??r.name,label:a?.options?.find(o=>o.value===r.value)?.label??r.label}}));return le.DEFAULT_SETTINGS[e.type].map(s=>{if(["name","description"].includes(e.id)&&s==="deleteButton")return null;const r=en[s](t),a=this.builder.savedField(e.id);if(a&&["input","multiple","location","deleteButton"].includes(s)){const o=r.matches("button, input, select")?[r]:r.querySelectorAll("button, input, select");for(const d of o)d.disabled=!0;const l=document.createElement("p");l.className="text-sm text-base-medium",l.textContent="Changing or removing saved fields will be available with submission migrations.",r.matches("button")?r.title=l.textContent:r.append(l)}if(a&&["options","columns"].includes(s))for(const o of r.querySelectorAll("[data-index]")){const l=e[s][Number(o.dataset.index)],d=s==="options"?"value":"id";if(a[s]?.some(c=>c[d]===l[d])){const c=o.querySelector("[data-role='remove']");c&&(c.disabled=!0,c.title="Removing saved choices or columns requires submission migrations.")}}return r}).filter(Boolean)}selectItem(){const e=this.builder.selectedElement;e.settings=this.create(e.schema),this.panel.replaceChildren(...e.settings),this.panel.dataset.visible="true",this.builder.formSettings.visible=!1}deselectItem(){this.panel.dataset.visible="false"}updateItem(){this.panel.dataset.visible="false";const e=this.builder.selectedElement;this.panel.replaceChildren(...e.settings),this.panel.dataset.visible="true"}}class nn{constructor(e){this._destroyed=!1,this._generationPromise=null,this.builder=e,this.column=document.getElementById("form-settings-panel"),this.restrictions=document.querySelector("[data-role='restrict-access']"),this.selectGroup=null;const t=this.column?.querySelector("#generate");t?(this.generateForm=new wt({target:t,submitGroup:t.querySelector("[data-role='submit-group']"),messages:{submit:"Generate",submitting:"Thinking...",submitted:"Generated"}}),this.generateForm.error.setAttribute("role","status"),this.generateForm.error.setAttribute("aria-live","polite"),this.generateForm.error.setAttribute("aria-atomic","true")):this.generateForm=null,this._generateSchema=this._generateSchema.bind(this),this._saveRestrictions=this._saveRestrictions.bind(this),this._restrictionPromise=null,this.restrictionForm=this.restrictions?new wt({target:this.restrictions,messages:{submit:"Save Restrictions",submitting:"Saving",submitted:"Saved"}}):null,this._input=this._input.bind(this),this._click=this._click.bind(this),this._restrictionUpdated=this._restrictionUpdated.bind(this),this.modal=null}init(){if(!this._destroyed&&(this.generateForm&&(this.generateForm.init(),this.generateForm.target.addEventListener("submit",this._generateSchema)),this.column?.addEventListener("input",this._input),this.column?.addEventListener("click",this._click),this.restrictions)){this.restrictionForm.init(),this.restrictions.addEventListener("submit",this._saveRestrictions);const e=this.column.querySelector("[data-role='restrict-group-input']");this.selectGroup=new oi(e),this.selectGroup.init(),this.restrictions.addEventListener("updated",this._restrictionUpdated)}}_restrictionUpdated(e){if(this._destroyed)return;Object.keys(e.detail.options).length&&(this.restrictions.querySelector("[name='admin']").checked=!1);const t=this.restrictions.querySelector("ul"),i=this.restrictions.querySelector("template");for(const[s,r]of Object.entries(e.detail.options)){if([...t.querySelectorAll("input[name='group-key']")].some(o=>o.value===s))continue;const a=i.content.firstElementChild.cloneNode(!0);a.querySelector("input").value=s,a.querySelector("span").textContent=r.name,a.querySelector("button").dataset.key=s,t.append(a)}this.selectGroup.clear({notify:!1}),this.restrictionForm.markUnsavedState()}_input(e){if(e.target.name==="admin"&&e.target.checked&&(this.restrictions.querySelector("ul").replaceChildren(),this.selectGroup.clear({notify:!1}),this.restrictionForm.markUnsavedState()),e.target.name==="description"&&this.generateForm?.target){const t=this.generateForm.target.querySelector("[data-role='explain']");t&&(t.dataset.visible="true")}}_click(e){const t=e.target.closest("[data-role]");if(t?.dataset.role==="generate"&&this.generateForm?.target){const i=this.generateForm.target.dataset.visible==="true";this.generateForm.target.dataset.visible=i?"false":"true",i||this.generateForm.target.querySelector("textarea")?.focus()}else if(t?.dataset.role==="cancel"&&this.generateForm?.target){this._generationIdentity=null,this.generateForm.target.dataset.visible="false",this.generateForm.messages.submit="Generate",this.generateForm.resetSubmitButton();const i=this.generateForm.target.querySelector("textarea");i&&(i.value="")}else t?.dataset.role==="remove-restriction"&&(t.closest("li")?.remove(),this.restrictionForm.markUnsavedState())}get visible(){return this.column.dataset.visible==="true"}set visible(e){this.column.dataset.visible=e?"true":"false"}_saveRestrictions(e){if(e.preventDefault(),e.stopPropagation(),this._restrictionPromise)return this._restrictionPromise;if(this._destroyed)return;const t=this.restrictionForm,i=new FormData(this.restrictions),s=JSON.stringify([...i]);return t.submitting(),t.submitButton.disabled=!0,this._restrictionPromise=(async()=>{try{const r=await Re.put(this.restrictions.dataset.route,i);if(this._destroyed)return;r?.ok===!0?JSON.stringify([...new FormData(this.restrictions)])===s?t.success():(t.resetSubmitButton(),t.markUnsavedState()):t.showError(r?.error||"Could not save restrictions. Try again.")}catch(r){Ie(r,this.restrictions,{context:"builder-save-restrictions"}),this._destroyed||t.showError("Could not save restrictions. Try again.")}finally{this._destroyed||(t.submitButton.disabled=!1),this._restrictionPromise=null}})(),this._restrictionPromise}_generateSchema(e){if(e.preventDefault(),e.stopPropagation(),this._generationPromise)return this._generationPromise;if(this._destroyed||!this.generateForm?.target)return Promise.resolve(!1);const t=new FormData(this.generateForm.target),i=t.get("description"),s=e.submitter||this.generateForm.submitButton;if(i)s?.dataset.explain&&t.append("explain",s.dataset.explain);else return this.generateForm.showError("Please enter a description"),Promise.resolve(!1);this.builder.updateSchema(),this.builder.draft.group=null;const r={request_id:crypto.randomUUID(),draft_revision:this.builder.draft.revision};this._generationIdentity=r;const a=this.builder.captureDraft();t.set("schema",JSON.stringify(a.schema)),t.set("html_fields",JSON.stringify(a.html_fields)),t.set("baseline",this.builder.draft.baseline||""),t.set("draft_revision",String(r.draft_revision)),t.set("request_id",r.request_id),s&&(s.disabled=!0,s.setAttribute("aria-disabled","true"),s.setAttribute("aria-busy","true"));const o=(async()=>{try{const d=await Re.post(Qt.createSchema,t,{replaceErrorPage:!1});if(this._destroyed||this._generationIdentity!==r)return!1;if(!d?.modal&&(r.draft_revision!==this.builder.draft.revision||d?.request_id!==r.request_id||d?.draft_revision!==r.draft_revision)&&d?.ok===!0)return this.generateForm.messages.submit="Regenerate",this.generateForm.showError("Your draft changed while generation was running. Regenerate using your current draft."),!1;const c=await this._updateSchema(d);return this._destroyed?!1:((c||d?.ok===!0&&d.modal)&&(this.generateForm.messages.submit="Generate",this.generateForm.resetSubmitButton()),c&&(this.generateForm.target.dataset.visible="false"),c)}catch(d){return Ie(d,s,{context:"builder-generate-schema"}),this._destroyed||this.generateForm.showError("Could not generate this form. Try again."),!1}finally{s&&!this._destroyed&&s.isConnected!==!1&&(s.disabled=!1,s.setAttribute("aria-disabled","false"),s.removeAttribute("aria-busy"))}})();this._generationPromise=o;const l=()=>{this._generationPromise===o&&(this._generationPromise=null)};return o.then(l,l),o}async _updateSchema(e){if(this._destroyed||!this.generateForm)return!1;if(e?.ok===!0&&e.operations){try{if(!this.builder.draft.applyGeneration(e))return this.generateForm.showError("No changes were needed. Your draft is unchanged."),!1;this.builder.restoreDraft(),this.builder.header.message("Generated changes are in your draft. Save to keep them.",{persistent:!0})}catch(t){return this.generateForm.showError(t.message),!1}return!0}else e?.ok===!0&&e.modal?(this.modal?.destroy(),this.modal=new ii(this.builder),this.modal.attach(e.modal,this.generateForm)):(this.generateForm.showError(e?.error||"Could not generate this form. Try again."),e?.code==="stale_form_draft"&&this.builder.header.showConflict(e));return!1}destroy(){this._destroyed||(this._destroyed=!0,this.generateForm?.target?.removeEventListener("submit",this._generateSchema),this.column?.removeEventListener("input",this._input),this.column?.removeEventListener("click",this._click),this.restrictions?.removeEventListener("updated",this._restrictionUpdated),this.restrictions?.removeEventListener("submit",this._saveRestrictions),this.restrictionForm?.destroy(),this.generateForm?.destroy(),this.selectGroup?.destroy(),this.modal?.destroy(),this.modal=null)}}class sn{constructor(e){this._destroyed=!1,this._previewGeneration=0,this._messageTimer=null,this._savePromise=null,this.builder=e,this.nameDisplay=document.getElementById("form-name-display"),this.nameInput=document.getElementById("form-name-input"),this.nameHidden=document.getElementById("form-name-hidden"),this.saveButton=document.querySelector("[data-saved]"),this.schemaForm=document.getElementById("schema-form"),this.notification=document.getElementById("notification"),this.previewToggle=document.getElementById("preview-toggle"),this.previewPanel=document.getElementById("preview-panel"),this.saveButton?.setAttribute("aria-describedby","notification"),this.notification?.setAttribute("role","status"),this.notification?.setAttribute("aria-live","polite"),this.notification?.setAttribute("aria-atomic","true"),this.togglePreviewPanel=this.togglePreviewPanel.bind(this),this.saveForm=this.saveForm.bind(this),this.editFormName=this.editFormName.bind(this),this._nameBlur=this._nameBlur.bind(this),this._nameKeyDown=this._nameKeyDown.bind(this),this._nameInput=this._nameInput.bind(this),this.renderer=null,this.init()}init(){this.nameInput.addEventListener("blur",this._nameBlur),this.nameInput.addEventListener("keydown",this._nameKeyDown),this.nameInput.addEventListener("input",this._nameInput)}saved(){this.saveButton&&(this.saveButton.dataset.saved="true",this.saveButton.dataset.kind="saved",this.clearMessage())}unsaved(){this.saveButton&&(this.saveButton.dataset.saved="false",this.saveButton.dataset.kind="unsaved")}clearMessage(){clearTimeout(this._messageTimer),this._messageTimer=null,this.notification&&(this.notification.textContent="",this.notification.dataset.visible="false")}message(e,{persistent:t=!1}={}){this._destroyed||(clearTimeout(this._messageTimer),this._messageTimer=null,this.notification.textContent=e,this.notification.dataset.visible="true",t||(this._messageTimer=setTimeout(()=>{this._destroyed||(this.notification.dataset.visible="false")},3e3)))}showConflict(e){if(e?.code!=="stale_form_draft"||!e.saved_url)return!1;this.message(`${e.error||"The saved form changed. Your draft is preserved."} `,{persistent:!0});const t=document.createElement("a");return t.href=e.saved_url,t.target="_blank",t.rel="noopener",t.dataset.role="open-saved-form",t.className="underline",t.textContent="Open saved form",this.notification.append(t),!0}get persistenceState(){return this.builder.captureDraft()}acknowledge(e){const t=this.persistenceState;return t.name===e.name&&ei(t.schema,e.schema)?(this.saved(),!0):(this.unsaved(),!1)}closePreview(){this._previewGeneration+=1,this.renderer?.destroy(),this.renderer=null,this.previewToggle.dataset.active="false",this.previewToggle.setAttribute("aria-checked","false"),this.previewPanel.dataset.visible="false"}async togglePreviewPanel(){if(this._destroyed)return;const e=++this._previewGeneration,t=this.previewToggle.dataset.active==="true";this.previewToggle.dataset.active=t?"false":"true",this.previewToggle.setAttribute("aria-checked",t?"false":"true");let i=null;if(!t&&(i=new ai({target:this.previewPanel,schema:this.builder.schema,kind:"form",key:this.builder.key,submission:{},htmlFields:Object.fromEntries(Object.entries(this.builder.htmlFields).map(([s,r])=>[s,this.builder.previewHtml(r)]))}),await i.render(),this._destroyed||e!==this._previewGeneration)){i.destroy();return}await se(()=>{if(this._destroyed||e!==this._previewGeneration){i?.destroy();return}t?(this.renderer?.destroy(),this.renderer=null,this.builder.elt.dataset.expanded="false",this.previewPanel.dataset.visible="false",this.builder.model.show()):(this.renderer=i,this.builder.elt.dataset.expanded="true",this.previewPanel.dataset.visible="true",this.builder.conditions.hide(),this.builder.model.hide())},{label:"builder:toggle-preview"})}saveForm(){if(this._savePromise)return this._savePromise;if(this._destroyed||!this.saveButton||!this.schemaForm)return Promise.resolve(!1);const e=this.saveButton,t=document.activeElement===e;this.builder.updateSchema(),this.builder.draft.group=null;const i=this.persistenceState;(!this._saveAttempt||!this.builder.draft.equal(this._saveAttempt.state,i)||this._saveAttempt.baseline!==this.builder.draft.baseline)&&(this._saveAttempt={state:i,baseline:this.builder.draft.baseline,id:crypto.randomUUID()}),this.unsaved(),this.clearMessage(),e.disabled=!0,e.setAttribute("aria-disabled","true"),e.setAttribute("aria-busy","true"),e.classList.add("opacity-50");const s=(async()=>{try{const a=await this.builder.draftPayload(i,this.schemaForm.dataset.route,this._saveAttempt.id);if(this._destroyed)return!1;const o=await Re.put(this.schemaForm.dataset.route,a,{replaceErrorPage:!1});return this._destroyed?!1:o?.ok===!0&&o.draft&&o.baseline?(this.builder.draft.acknowledge(i,o),this._saveAttempt=null,await this.builder.restoreDraft({preserveFocus:!0}),!0):(this.showConflict(o)||this.message(o?.error||"Could not save this form. Try again.",{persistent:!0}),!1)}catch(a){return Ie(a,e,{context:"builder-save"}),this.message("Could not save this form. Try again.",{persistent:!0}),!1}finally{!this._destroyed&&e.isConnected!==!1&&(e.disabled=!1,e.setAttribute("aria-disabled","false"),e.removeAttribute("aria-busy"),e.classList.remove("opacity-50"),t&&(!document.activeElement||document.activeElement===document.body||document.activeElement===e)&&e.focus({preventScroll:!0}))}})();this._savePromise=s;const r=()=>{this._savePromise===s&&(this._savePromise=null)};return s.then(r,r),s}editFormName(){this._originalName=this.nameDisplay.textContent,this.nameDisplay.dataset.visible="false",this.nameInput.dataset.visible="true",this.nameInput.focus(),this.nameInput.select()}_nameBlur(){const e=this.nameInput.value.trim();this.nameDisplay.textContent=e,this.nameHidden.value=e,this.builder.updateSchema(!1,"form-name"),this.builder.draft.group=null,this.nameInput.dataset.visible="false",this.nameDisplay.dataset.visible="true"}_nameInput(){this.nameHidden.value=this.nameInput.value.trim(),this.builder.updateSchema(!1,"form-name")}_nameKeyDown(e){e.key==="Enter"?(e.preventDefault(),this.nameInput.blur()):e.key==="Escape"&&(this.nameInput.value=this._originalName,this.nameInput.blur())}destroy(){this._destroyed||(this._destroyed=!0,this._previewGeneration+=1,clearTimeout(this._messageTimer),this._messageTimer=null,this.nameInput.removeEventListener("blur",this._nameBlur),this.nameInput.removeEventListener("keydown",this._nameKeyDown),this.nameInput.removeEventListener("input",this._nameInput),this.renderer?.destroy(),this.renderer=null)}}class rn{constructor(e){this.builder=e,this.panel=document.getElementById("model-panel"),this.defaultPanel=document.getElementById("default-panel"),this.uniqueElements=["status","signature","bookmark"],this.defaultElements=["name","description"],this._addElement=this._addElement.bind(this),this._moveElement=this._moveElement.bind(this)}get elements(){return Array.from(this.panel.querySelectorAll(".form-element"))}get defaults(){return Array.from(this.defaultPanel.querySelectorAll(".form-element"))}show(){this.defaultPanel.dataset.visible=this.defaults.length>0?"true":"false",this.panel.dataset.visible="true"}hide(){this.defaultPanel.dataset.visible="false",this.panel.dataset.visible="false"}init(){const e=Array.from(this.builder.elements.values());e.filter(i=>this.defaultElements.includes(i.schema.id)).length>0&&(this.defaultPanel.dataset.visible="true"),e.forEach(i=>{this.defaultElements.includes(i.schema.id)?(Array.from(i.item.querySelectorAll("input, textarea")).forEach(s=>{s.remove()}),this.defaultPanel.appendChild(i.item)):this.panel.appendChild(i.item)}),this.sortable=m.create(this.panel,{group:{name:"builder",pull:!1,put:!0},animation:150,onAdd:this._addElement,onUpdate:this._moveElement})}_addElement(e){const t=this.builder.createElement({type:e.item.dataset.type});e.item.remove(),e.to.insertBefore(t,e.to.children[e.newDraggableIndex]),this.builder.updateSchemaOrder(),this.builder.selectElement(t.id)}_moveElement(){this.builder.updateSchemaOrder()}updateItem(){const e=this.builder.selectedElement,t=Wt[e.schema.type](e.schema);e.item.replaceWith(t),e.item=t,this.selectItem()}selectItem(){const e=this.builder.selectedElement.item;this.elements.forEach(t=>{t.dataset.selected=t===e?"true":"false"}),this.defaults.forEach(t=>{t.dataset.selected=t===e?"true":"false"})}deselectItem(){this.builder.selectedElement.item.dataset.selected="false"}hasUniqueElement(e){return this.uniqueElements.includes(e)&&Array.from(this.builder.elements.values()).some(t=>t.schema.type===e)}focusItem(){const e=this.builder.selectedElement.item;this.elements.forEach(t=>{t.dataset.visible=t===e?"true":"false"}),this.panel.classList.remove("min-h-[300px]"),this.defaultPanel.dataset.visible="false"}blurItem(){this.elements.forEach(e=>{e.dataset.visible="true"}),this.defaultPanel.children.length>0&&(this.defaultPanel.dataset.visible="true"),this.panel.classList.add("min-h-[300px]")}destroy(){this.sortable?.destroy(),this.sortable=null}}const G=n=>{const e=document.createElement("div");return e.id=n.id,e.dataset.selected="false",e.dataset.visible="true",e.className=`${S.builder.model}`,e},j=n=>{const e=le.PRESENTATION_DEFAULTS[n.type]||{};return{...n,title:n.title??e.title,input:n.input??e.input,location:n.location??e.location}},an=n=>{const e=G(n),t=j(n);return e.classList.add("flex","flex-row","gap-2"),e.appendChild(w.checkbox({label:t.title,checked:!!n.checked,name:n.id,disabled:!0})),e},on=n=>{const e=G(n),t=j(n),i=w.label({icon:"html",label:t.title,tag:"h3"});return e.appendChild(i),e},ln=n=>{const e=G(n),t=j(n);e.classList.add("flex","flex-col","gap-1");const i=w.input({icon:t.input,label:t.title,name:n.id,type:t.input,disabled:!0,placeholder:n.placeholder});return e.appendChild(i),e},dn=n=>{const e=G(n),t=j(n);let i;return t.location==="out"?i=w.label({icon:t.location,label:t.title,tag:"h3"}):i=w.select({label:t.title,icon:t.location,selectIcon:"search",disabled:!0}),e.appendChild(i),e},cn=n=>{const e=G(n),t=j(n),i=w.label({icon:"bookmark",label:t.title});return e.appendChild(i),e},un=n=>{const e=G(n),t=j(n);e.classList.add("flex","flex-col","gap-1");const i=w.input({label:t.title,icon:"location",name:n.id,selectIcon:"search",type:"text",disabled:!0,placeholder:n.placeholder});return e.appendChild(i),e},hn=n=>{const e=G(n),t=j(n);e.classList.add("flex","flex-col","gap-1");const i=w.select({label:t.title,icon:"select",selectIcon:"dropdown",name:n.id,disabled:!0,placeholder:n.placeholder||"select an option..."});return e.appendChild(i),e},fn=n=>{const e=G(n),t=j(n),i=e.appendChild(document.createElement("fieldset"));return i.className=`${S.radio.fieldset.column}`,i.appendChild(w.label({icon:"radio",tag:"legend",label:t.title})),n.options&&n.options.forEach(s=>{i.appendChild(w.radio({label:s.label,value:s.value,name:n.id,disabled:!0,styles:{label:`${S.radio.label} first-of-type:pt-1`}}))}),e},mn=n=>{const e=G(n),t=j(n),i=w.label({icon:"signature",label:t.title,tag:"h3"});return e.appendChild(i),e},pn=n=>{const e=G(n),t=j(n),i=w.label({tag:"h3",label:t.title,icon:"status"});return e.appendChild(i),e},gn=n=>{const e=G(n),t=j(n);e.classList.add("flex","flex-col","gap-1");const i=w.textarea({label:t.title,placeholder:n.placeholder||"",icon:"textarea",disabled:!0,rows:2});return e.appendChild(i),e},bn=n=>{const e=G(n),t=j(n);return e.appendChild(w.label({icon:"checklist",label:t.title,tag:"h3"})),e},vn=n=>{const e=G(n),t=j(n);e.classList.add("flex","flex-col","gap-1");const i=n.columns||[],s=w.label({icon:"table",label:t.title,tag:"h3"});e.appendChild(s);const r=e.appendChild(document.createElement("div"));return r.className="flex flex-row gap-2 empty:hidden flex-wrap",i.forEach(a=>{r.appendChild(w.badge({icon:a.location||a.input||a.type,text:a.title,kind:"form",styles:{badge:`${S.badge.builder}`,text:"text-base-dark"}}))}),e},Wt={checkbox:an,html:on,input:ln,link:dn,bookmark:cn,location:un,radio:fn,select:hn,signature:mn,status:pn,textarea:gn,table:vn,todo:bn};class yn{constructor(e){this._destroyed=!1,this.elt=e,this.elements=new Map,this._independentDocuments=new Set,this.images=new Map,this._restoringDraft=!1,this.bootstrap=JSON.parse(document.getElementById("builder-draft")?.textContent||"null"),this.htmlFields=structuredClone(this.bootstrap?.html_fields||{}),this.draft=this.bootstrap?new St(this.bootstrap,this.bootstrap.baseline):null,this.draft&&(delete this.draft.state.baseline,delete this.draft.saved.baseline),this.selectedElement=null,this.schemaElt=document.querySelector('input[name="schema"]'),this.key=e.dataset.key,this.offlineIndicator=document.querySelector('[data-role="offline"]'),this.online=et.online,this.hidden=et.hidden,this.EntityMenu=new Zt(this),this.SearchBox=null,this.offlineModal=null,this._searchPromise=null,this.components=new Mi(this),this.model=new rn(this),this.settings=new tn(this),this.conditions=new qi(this),this.header=new sn(this),this.formSettings=new nn(this),this.click=this._click.bind(this),this.keydown=this._keydown.bind(this),this.beforeUnload=t=>{this.draft?.dirty&&(t.preventDefault(),t.returnValue="")}}async init(){return this._destroyed?this:(this.createFormElements(),this.draft??=new St(this.captureDraft()),this.model.init(),this.settings.init(),this.formSettings.init(),this.offlineModal=new ni(this,this.offlineIndicator),this.offlineModal.enable(),this.offline(!this.online),document.addEventListener("click",this.click),document.addEventListener("keydown",this.keydown),window.addEventListener("beforeunload",this.beforeUnload),this.refreshDraftControls(),this.elt._lp_view=this,this._searchPromise=this._initSearch().catch(e=>(Ie(e,this.elt,{context:"builder-search-startup"}),null)),this.elt.setAttribute("initialized",""),this)}async _initSearch(){const e=document.querySelector("[lp-search]");if(!e||this._destroyed)return null;const t=new Vt(e);return this.SearchBox=t,await t.init(),this._destroyed||this.SearchBox!==t?(t.destroy(),null):t}async sync({hidden:e=document.hidden}={}){const t=this.online;this.hidden=e,this.online=et.online,this.offline(!this.online),this.online&&(e||!t)&&await this.flushIndependentDocuments({keepalive:e})}registerIndependentDocument(e){return this._independentDocuments.add(e),e}unregisterIndependentDocument(e){this._independentDocuments.delete(e)}async flushIndependentDocuments(e={}){return(await Promise.allSettled([...this._independentDocuments].map(i=>Promise.resolve().then(()=>i.flush(e))))).every(i=>i.status==="fulfilled"&&i.value===!0)}offline(e){const t=document.querySelector("[lp-search]");this.offlineIndicator&&(this.offlineIndicator.dataset.visible=e?"true":"false",this.offlineIndicator.setAttribute("aria-hidden",e?"false":"true")),t&&(t.dataset.visible=e?"false":"true");const i=this.header.saveButton;i&&(i.dataset.visible=e?"false":"true")}updateSchema(e=!1,t=null){const i=Array.from(this.elements.values()).map(r=>r.schema),s=JSON.stringify(i);s!==this.schemaElt.value&&(this.schemaElt.value=s,!e&&this.header.unsaved()),!e&&!this._restoringDraft&&this.draft&&(this.draft.record(this.captureDraft(),t),this.refreshDraftControls())}get schema(){return Array.from(this.elements.values(),e=>structuredClone(e.schema))}captureDraft(){return{name:this.header.nameHidden.value,schema:this.schema,form_type:this.elt.dataset.formType,html_fields:structuredClone(this.htmlFields),selected_id:this.selectedElement?.schema.id||null}}setHtml(e,t){this.htmlFields[e]=this.canonicalHtml(t),this.updateSchema(!1,`html:${e}`)}canonicalHtml(e){for(const[t,i]of this.images)e=e.replaceAll(i.url,`draft-image:${t}`);return e}previewHtml(e){for(const[t,i]of this.images)e=e.replaceAll(`draft-image:${t}`,i.url);return e}addDraftImage(e,t){const i=crypto.randomUUID(),s=URL.createObjectURL(t);return this.images.set(i,{file:t,fieldId:e,url:s,uploads:new Map}),s}pruneImages(){const e=[this.draft.state,...this.draft.past,...this.draft.future,this.header._saveAttempt?.state,this._copyAttempt?.state],t=new Set(Array.from(this.elements.values()).filter(i=>i.conditions?.html?.document?.editor).map(i=>i.schema.id));for(const[i,s]of this.images)t.has(s.fieldId)||e.some(r=>Object.values(r?.html_fields||{}).some(a=>a.includes(`draft-image:${i}`)))||(URL.revokeObjectURL(s.url),this.images.delete(i))}async draftPayload(e,t,i){const s=new FormData;s.set("name",e.name),s.set("schema",JSON.stringify(e.schema)),s.set("html_fields",JSON.stringify(e.html_fields)),s.set("baseline",this.draft.baseline||""),s.set("save_id",i);const r=[],a=[];for(const[o,l]of this.images){if(!Object.values(e.html_fields).some(c=>c.includes(`draft-image:${o}`)))continue;const d=`draft-image-${o}`;if(r.push({id:o,field_id:l.fieldId,input_name:d}),l.file.size>1024*1024){let c=l.uploads.get(t);if(!c){const u=await _t.directUpload.createSession({route:t,file:l.file,inputName:d,replaceErrorPage:!1}),f=await _t.directUpload.upload({file:l.file,sessionUrl:u.session_url,chunkSize:u.chunk_size});c={token:u.token,input_name:d,filename:l.file.name,content_type:l.file.type,size:l.file.size,generation:f.generation,path:f.name},l.uploads.set(t,c)}a.push(c)}else s.append(d,l.file,l.file.name||"image.png")}return s.set("image_manifest",JSON.stringify(r)),a.length&&s.set("direct_uploads",JSON.stringify(a)),s}refreshDraftControls(){if(!this.draft)return;this.draft.dirty?this.header.unsaved():this.header.saved();const e=this.elt.querySelector("[data-role='undo-draft']"),t=this.elt.querySelector("[data-role='redo-draft']");e&&(e.disabled=!this.draft.past.length),t&&(t.disabled=!this.draft.future.length)}restoreDraft({preserveFocus:e=!1}={}){const t=document.activeElement,i=this.conditions.condition,s=e&&i?.key?{key:i.key,index:i.index,fieldId:i.element.schema.id,setting:structuredClone(i.setting)}:null,r=this.conditions.condition?.document?.editor,a=e&&r?.view.dom.contains(t)?{from:r.state.selection.from,to:r.state.selection.to}:null,o=e&&(this.settings.panel.contains(t)||this.conditions.panel.contains(t))&&t.name?{name:t.name,start:t.selectionStart,end:t.selectionEnd}:null;this._restoringDraft=!0,this.conditions.hide(),this.header.closePreview(),this.elements.forEach(c=>{c.destroy?.()}),this.elements.clear(),this.pruneImages(),this.model.panel.replaceChildren(),this.model.defaultPanel.replaceChildren(),this.selectedElement=null;const l=this.draft.state;this.htmlFields=structuredClone(l.html_fields),this.header.nameHidden.value=l.name,this.header.nameInput.value=l.name,this.header.nameDisplay.textContent=l.name;for(const c of l.schema){const u=this.createElement(structuredClone(c)),f=["name","description"].includes(c.id);if(f)for(const v of u.querySelectorAll("input, textarea"))v.remove();(f?this.model.defaultPanel:this.model.panel).append(u)}this.updateSchema(!0),this.model.show(),l.selected_id&&this.elements.has(l.selected_id)?this.selectElement(l.selected_id):(this.settings.deselectItem(),this.formSettings.visible=!0),this.elt.dataset.expanded="false",this._restoringDraft=!1,this.refreshDraftControls();const d=()=>se(()=>{if(!o||this._destroyed)return;const c=s?this.conditions.panel:this.settings.panel,u=Array.from(c.querySelectorAll("input, textarea")).find(f=>f.name===o.name);u?.focus(),u?.setSelectionRange&&o.start!==null&&u.setSelectionRange(o.start,o.end)});if(s&&this.elements.has(s.fieldId))return this.selectElement(s.fieldId),this.showCondition(s.key,s.index,s.setting).then(d);if(a&&this.selectedElement)return this.showCondition("html").then(()=>{const c=this.conditions.condition?.document?.editor;c&&!this._destroyed&&c.chain().focus().setTextSelection(a).run()});if(o)return d()}undoDraft(e=!1){this.updateSchema(),(e?this.draft.redo():this.draft.undo())&&(this.restoreDraft(),this.header.message(e?"Redid draft change.":"Undid draft change."))}_keydown(e){!(e.ctrlKey||e.metaKey)||e.altKey||e.target.closest("input, textarea, select, [contenteditable='true']")||(e.key.toLowerCase()==="z"||e.key.toLowerCase()==="y")&&(e.preventDefault(),this.undoDraft(e.shiftKey||e.key.toLowerCase()==="y"))}savedField(e){return this.draft?.saved.schema.find(t=>t.id===e)}async createFormElements(){const e=this.schemaElt.value,t=this.bootstrap?JSON.stringify(this.bootstrap.schema):e||this.elt.dataset.schema,i=t?JSON.parse(t):[];for(const s of i)this.createElement(s);this.updateSchema(!0)}_click(e){const i=e.target.closest("[data-role='menu-trigger']")?.closest("[lp-menu]");if(i&&this.elt.contains(i)){e.preventDefault(),e.stopPropagation(),this.EntityMenu.toggle(i);return}const s=e.target.closest("button"),r=e.target.closest(".form-element"),a=e.target.closest("#preview-panel");r&&!a?this.selectElement(r.id):s?.hasAttribute("lp-help")?this._showHelpModal(s):s?.dataset.role==="form-settings"?(this.deselectElement(),this.formSettings.visible=!0):s?.id==="preview-toggle"?this.header.togglePreviewPanel():s?.dataset.role==="save-form"?this.header.saveForm():["undo-draft","redo-draft"].includes(s?.dataset.role)?this.undoDraft(s.dataset.role==="redo-draft"):s?.dataset.action==="copy-form"?this.copyForm(s):s?.getAttribute("lp-control")==="delete"?this._showDeleteModal(s):e.target?.id==="form-name-display"&&this.header.editFormName()}async copyForm(e){if(this._destroyed||!e?.dataset.route||e.disabled)return;const t=document.activeElement===e;let i=!1;e.disabled=!0,e.setAttribute("aria-disabled","true"),e.setAttribute("aria-busy","true"),this.header.clearMessage();try{this.updateSchema(),this.draft.group=null;const s=this.captureDraft(),r=this.draft.revision;this._copyAttempt??={state:s,id:crypto.randomUUID()},this.draft.equal(s,this._copyAttempt.state)||(this._copyAttempt={state:s,id:crypto.randomUUID()});const a=await this.draftPayload(s,e.dataset.route,this._copyAttempt.id),o=await Re.post(e.dataset.route,a,{replaceErrorPage:!1});if(this._destroyed)return;if(o?.ok===!0&&o.url){if(this._copyAttempt=null,this.draft.revision!==r||!this.draft.equal(this.captureDraft(),s)){this.header.message("Copy created. Your later draft edits are still here. ",{persistent:!0});const l=document.createElement("a");l.href=o.url,l.target="_blank",l.rel="noopener",l.textContent="Open copy",l.className="underline",this.header.notification.append(l);return}window.removeEventListener("beforeunload",this.beforeUnload),window.location.assign(o.url),i=!0;return}this.header.showConflict(o)||this.header.message(o?.error||"Could not copy this form.",{persistent:!0})}catch(s){Ie(s,e,{context:"builder-copy-form"}),this.header.message("Could not copy this form. Try again.",{persistent:!0})}finally{!i&&!this._destroyed&&e.isConnected!==!1&&(e.disabled=!1,e.setAttribute("aria-disabled","false"),e.removeAttribute("aria-busy"),t&&(!document.activeElement||document.activeElement===document.body||document.activeElement===e)&&e.focus({preventScroll:!0}))}}async _showDeleteModal(e){if(this._destroyed)return;await new si(this,e).init()}async _showHelpModal(e){if(this._destroyed)return;await new ri(this,e).init()}selectElement(e){this.selectedElement=this.elements.get(e),this.draft&&(this.draft.state.selected_id=e),se(()=>{this.model.selectItem(),this.settings.selectItem()})}deselectElement(){this.model.deselectItem(),this.settings.deselectItem(),this.selectedElement=null}createElement(e){e.id=e.id??ti(e.type),e.type==="html"&&!Object.hasOwn(this.htmlFields,e.id)&&(this.htmlFields[e.id]=""),e.type==="table"&&!Array.isArray(e.columns)&&(e.columns=[]);const t=Wt[e.type](e);return this.elements.set(e.id,{item:t,schema:e,settings:this.settings.create(e)}),t}getEligibleConditionTargets(){return Array.from(this.elements.values()).filter(e=>["checkbox","radio","select"].includes(e.schema.type)&&e!==this.selectedElement).map(e=>({label:e.schema.title,value:e.schema.id,details:{icon:e.schema.type,kind:"form",name:e.schema.title}}))}async showCondition(e,t=-1,i=null){if(this._destroyed||this.conditions.loading)return;this.conditions.loading=!0;const s=this.selectedElement;if(!s){this.conditions.loading=!1;return}s.conditions??={};let r=s.conditions[e]??null,a=!1;if(!r){if(r=await di(this,e),a=!0,this._destroyed||this.selectedElement!==s){r?.destroy?.(),this.conditions.loading=!1;return}s.conditions[e]=r}if(s.destroy||(s.destroy=()=>{Object.values(s.conditions).forEach(o=>{o.destroy()})}),r.index=t,r.draftSetting=i,await r.init(),this._destroyed||this.selectedElement!==s){a&&(r.destroy?.(),delete s.conditions[e]),this.conditions.loading=!1;return}await se(()=>{this._destroyed||this.selectedElement!==s||this.conditions.open(r)},{label:"builder:show-condition"})}updateSchemaOrder(){const e=new Map;Array.from(this.model.defaults).forEach(t=>{e.set(t.id,this.elements.get(t.id))}),Array.from(this.model.elements).forEach(t=>{e.set(t.id,this.elements.get(t.id))}),this.elements=e,this.updateSchema()}removeElement(){this.savedField(this.selectedElement.schema.id)||(delete this.htmlFields[this.selectedElement.schema.id],this.selectedElement.destroy&&this.selectedElement.destroy(),this.selectedElement.item.remove(),this.elements.delete(this.selectedElement.schema.id),this.selectedElement=null,this.updateSchema(),this.pruneImages())}destroy(){if(!this._destroyed){this._destroyed=!0,this.SearchBox?.destroy?.(),this.SearchBox=null,this.offlineModal?.destroy?.(),this.offlineModal=null,this.components.destroy(),this.model.destroy(),this.settings.destroy(),this.conditions.destroy(),this.header.destroy(),this.formSettings.destroy(),this.EntityMenu.destroy(),this.elements.forEach(e=>{e.destroy&&e.destroy()}),this.elements.clear(),this._independentDocuments.clear();for(const e of this.images.values())URL.revokeObjectURL(e.url);this.images.clear(),document.removeEventListener("click",this.click),document.removeEventListener("keydown",this.keydown),window.removeEventListener("beforeunload",this.beforeUnload),this.elt._lp_view===this&&delete this.elt._lp_view}}}export{le as C,yn as F};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { SearchBox } from './search.js?v=b60dadce';
+import { EntityMenu } from './entityMenu.js?v=b60dadce';
+import { u as uploadElement } from './upload.js?v=b60dadce';
+import { w as withTransition, r as request, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=b60dadce';
+import { c as connectivity } from './connectivity.js?v=b60dadce';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b60dadce';
+import { STYLES } from './styles.js?v=b60dadce';
+import { s as setIcon } from './icons.js?v=b60dadce';
+import { p as primitives } from './primitives.js?v=b60dadce';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=b60dadce';
+import { F as FacetsBox } from './facets.js?v=b60dadce';
+
+const CONDITION_REGISTRY = {
+	html: () => import('./html.js?v=b60dadce'),
+	status: () => import('./status.js?v=b60dadce'),
+	visibility: () => import('./visibility.js?v=b60dadce'),
+	columns: () => import('./columns.js?v=b60dadce'),
+	options: () => import('./options.js?v=b60dadce'),
+};
+
+/**
+ * @testable infrastructure
+ */
+const loadCondition = async (builder, condition) => {
+	const module = await CONDITION_REGISTRY[condition]();
+	return new module.default(builder);
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_036b_builder_draft.py::test_builder_draft_history_and_generation
+ * @matrix forms : draft-history stable-identity schema-generation stale-acknowledgement
+ */
+class BuilderDraft {
+	constructor(state, baseline = null) {
+		this.state = structuredClone(state);
+		this.saved = structuredClone(state);
+		this.baseline = baseline;
+		this.revision = 0;
+		this.past = [];
+		this.future = [];
+		this.group = null;
+		// Recomputed on form edits/Save, so Document typing only compares HTML.
+		this.formDirty = false;
+	}
+
+	content(state = this.state) {
+		const { selected_id: _selection, ...content } = state;
+		return content;
+	}
+
+	equal(a, b) {
+		return this.serialize(this.content(a)) === this.serialize(this.content(b));
+	}
+
+	equalForm(a, b) {
+		const { html_fields: _aHtml, ...aForm } = this.content(a);
+		const { html_fields: _bHtml, ...bForm } = this.content(b);
+		return this.serialize(aForm) === this.serialize(bForm);
+	}
+
+	serialize(value) {
+		return JSON.stringify(value, (_key, item) =>
+			item && typeof item === "object" && !Array.isArray(item)
+				? Object.fromEntries(
+						Object.keys(item)
+							.sort()
+							.map((key) => [key, item[key]]),
+					)
+				: item,
+		);
+	}
+
+	get dirty() {
+		return (
+			this.formDirty ||
+			this.serialize(this.state.html_fields) !==
+				this.serialize(this.saved.html_fields)
+		);
+	}
+
+	updateHtml(fieldId, html) {
+		if (this.state.html_fields[fieldId] === html) return false;
+		// The Document editor owns its history. Typing never snapshots the form.
+		this.state.html_fields[fieldId] = html;
+		this.revision += 1;
+		return true;
+	}
+
+	record(state, group = null) {
+		if (this.equal(this.state, state)) {
+			this.state.selected_id = state.selected_id;
+			return false;
+		}
+		if (!this.equalForm(this.state, state)) {
+			if (!group || this.group !== group) {
+				this.past.push(structuredClone(this.state));
+				if (this.past.length > 100) this.past.shift();
+			}
+			this.future = [];
+			this.group = group;
+		}
+		this.state = structuredClone(state);
+		this.formDirty = !this.equalForm(this.state, this.saved);
+		this.revision += 1;
+		return true;
+	}
+
+	restoreForm(state) {
+		const documents = new Set(
+			this.state.schema
+				.filter((field) => field.type === "html")
+				.map((field) => field.id),
+		);
+		// Keep current content for surviving fields; restored fields bring their
+		// snapshot content back with them, including any local image references.
+		for (const field of state.schema) {
+			if (field.type !== "html" || !documents.has(field.id)) continue;
+			if (Object.hasOwn(this.state.html_fields, field.id))
+				state.html_fields[field.id] = this.state.html_fields[field.id];
+			else delete state.html_fields[field.id];
+		}
+		this.state = state;
+		this.formDirty = !this.equalForm(this.state, this.saved);
+		this.group = null;
+		this.revision += 1;
+	}
+
+	undo() {
+		if (!this.past.length) return false;
+		this.future.push(structuredClone(this.state));
+		this.restoreForm(this.past.pop());
+		return true;
+	}
+
+	redo() {
+		if (!this.future.length) return false;
+		this.past.push(structuredClone(this.state));
+		this.restoreForm(this.future.pop());
+		return true;
+	}
+
+	acknowledge(submitted, response) {
+		const replacement = response.image_urls || {};
+		const map = (state) => {
+			const result = structuredClone(state);
+			for (const [id, html] of Object.entries(result.html_fields || {})) {
+				result.html_fields[id] = Object.entries(replacement).reduce(
+					(text, [token, url]) =>
+						text.replaceAll(
+							token.startsWith("draft-image:") ? token : `draft-image:${token}`,
+							url,
+						),
+					html,
+				);
+			}
+			return result;
+		};
+		const reconcile = (value, source, accepted) => {
+			if (this.serialize(value) === this.serialize(source))
+				return structuredClone(accepted);
+			if (
+				Array.isArray(value) &&
+				Array.isArray(source) &&
+				Array.isArray(accepted)
+			) {
+				return value.map((entry, index) => {
+					const identity = entry?.id ?? entry?.value;
+					const original =
+						identity === undefined
+							? source[index]
+							: source.find((item) => (item?.id ?? item?.value) === identity);
+					const saved =
+						identity === undefined
+							? accepted[index]
+							: accepted.find((item) => (item?.id ?? item?.value) === identity);
+					return original && saved
+						? reconcile(entry, original, saved)
+						: structuredClone(entry);
+				});
+			}
+			if (
+				value &&
+				source &&
+				accepted &&
+				typeof value === "object" &&
+				typeof source === "object" &&
+				typeof accepted === "object" &&
+				!Array.isArray(value)
+			) {
+				const result = structuredClone(value);
+				for (const key of new Set([
+					...Object.keys(source),
+					...Object.keys(accepted),
+				])) {
+					const merged = reconcile(value[key], source[key], accepted[key]);
+					if (merged === undefined) delete result[key];
+					else result[key] = merged;
+				}
+				return result;
+			}
+			return structuredClone(value);
+		};
+		const unchanged = this.equal(this.state, submitted);
+		const apply = (state) => ({
+			...reconcile(map(state), map(submitted), response.draft),
+			selected_id: state.selected_id,
+		});
+		this.past = this.past.map(apply);
+		this.future = this.future.map(apply);
+		this.state = apply(this.state);
+		this.saved = { ...structuredClone(response.draft), selected_id: null };
+		this.baseline = response.baseline;
+		this.revision += 1;
+		if (unchanged)
+			this.state = {
+				...structuredClone(this.saved),
+				selected_id: this.state.selected_id,
+			};
+		this.formDirty = !this.equalForm(this.state, this.saved);
+		this.group = null;
+		return unchanged;
+	}
+
+	applyGeneration(response) {
+		const next = structuredClone(this.state);
+		const fields = new Map(next.schema.map((field) => [field.id, field]));
+		if (!Array.isArray(response.operations))
+			throw new Error("Invalid generated changes.");
+		for (const operation of response.operations) {
+			if (operation.op === "add_field") {
+				const field = operation.field;
+				if (!field?.id || fields.has(field.id))
+					throw new Error("Generated field identity is invalid.");
+				if (
+					![
+						"input",
+						"textarea",
+						"checkbox",
+						"select",
+						"radio",
+						"table",
+						"html",
+						"status",
+						"signature",
+						"link",
+						"bookmark",
+						"location",
+						"todo",
+					].includes(field.type)
+				)
+					throw new Error("Unsupported generated field type.");
+				const added = structuredClone(field);
+				if (added.type === "html") next.html_fields[added.id] = "";
+				next.schema.push(added);
+				fields.set(added.id, added);
+				continue;
+			}
+			const field = fields.get(operation.field_id);
+			if (!field)
+				throw new Error("A generated change targets an unknown field.");
+			if (operation.op === "update_field") {
+				if (
+					!operation.changes ||
+					Object.entries(operation.changes).some(
+						([key, value]) =>
+							!["title", "placeholder"].includes(key) ||
+							typeof value !== "string",
+					)
+				) {
+					throw new Error(
+						"This generated change needs a later migration step.",
+					);
+				}
+				Object.assign(field, operation.changes);
+			} else if (operation.op === "update_option") {
+				const option = field.options?.find(
+					(item) => item.value === operation.value,
+				);
+				if (!option || typeof operation.label !== "string")
+					throw new Error("Invalid generated option label.");
+				option.label = operation.label;
+			} else if (operation.op === "update_column") {
+				const column = field.columns?.find(
+					(item) => item.id === operation.column_id,
+				);
+				if (!column || typeof operation.title !== "string")
+					throw new Error("Invalid generated column label.");
+				column.title = operation.title;
+			} else
+				throw new Error("This generated change needs a later migration step.");
+		}
+		for (const [id, html] of Object.entries(response.html_fields || {})) {
+			if (fields.get(id)?.type !== "html" || typeof html !== "string")
+				throw new Error("Invalid generated text content.");
+			next.html_fields[id] = html;
+		}
+		return this.record(next);
+	}
+}
+
 /**!
  * Sortable 1.15.7
  * @author	RubaXa   <trash@rubaxa.org>
  * @author	owenm    <owen23355@gmail.com>
  * @license MIT
  */
+function _defineProperty(e, r, t) {
+  return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, {
+    value: t,
+    enumerable: true,
+    configurable: true,
+    writable: true
+  }) : e[r] = t, e;
+}
+function _extends() {
+  return _extends = Object.assign ? Object.assign.bind() : function (n) {
+    for (var e = 1; e < arguments.length; e++) {
+      var t = arguments[e];
+      for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+    }
+    return n;
+  }, _extends.apply(null, arguments);
+}
+function ownKeys(e, r) {
+  var t = Object.keys(e);
+  if (Object.getOwnPropertySymbols) {
+    var o = Object.getOwnPropertySymbols(e);
+    r && (o = o.filter(function (r) {
+      return Object.getOwnPropertyDescriptor(e, r).enumerable;
+    })), t.push.apply(t, o);
+  }
+  return t;
+}
+function _objectSpread2(e) {
+  for (var r = 1; r < arguments.length; r++) {
+    var t = null != arguments[r] ? arguments[r] : {};
+    r % 2 ? ownKeys(Object(t), true).forEach(function (r) {
+      _defineProperty(e, r, t[r]);
+    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) {
+      Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
+    });
+  }
+  return e;
+}
+function _objectWithoutProperties(e, t) {
+  if (null == e) return {};
+  var o,
+    r,
+    i = _objectWithoutPropertiesLoose(e, t);
+  if (Object.getOwnPropertySymbols) {
+    var n = Object.getOwnPropertySymbols(e);
+    for (r = 0; r < n.length; r++) o = n[r], -1 === t.indexOf(o) && {}.propertyIsEnumerable.call(e, o) && (i[o] = e[o]);
+  }
+  return i;
+}
+function _objectWithoutPropertiesLoose(r, e) {
+  if (null == r) return {};
+  var t = {};
+  for (var n in r) if ({}.hasOwnProperty.call(r, n)) {
+    if (-1 !== e.indexOf(n)) continue;
+    t[n] = r[n];
+  }
+  return t;
+}
+function _toPrimitive(t, r) {
+  if ("object" != typeof t || !t) return t;
+  var e = t[Symbol.toPrimitive];
+  if (void 0 !== e) {
+    var i = e.call(t, r);
+    if ("object" != typeof i) return i;
+    throw new TypeError("@@toPrimitive must return a primitive value.");
+  }
+  return ("string" === r ? String : Number)(t);
+}
+function _toPropertyKey(t) {
+  var i = _toPrimitive(t, "string");
+  return "symbol" == typeof i ? i : i + "";
+}
+function _typeof(o) {
+  "@babel/helpers - typeof";
+
+  return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) {
+    return typeof o;
+  } : function (o) {
+    return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o;
+  }, _typeof(o);
+}
+
+var version = "1.15.7";
+
+function userAgent(pattern) {
+  if (typeof window !== 'undefined' && window.navigator) {
+    return !! /*@__PURE__*/navigator.userAgent.match(pattern);
+  }
+}
+var IE11OrLess = userAgent(/(?:Trident.*rv[ :]?11\.|msie|iemobile|Windows Phone)/i);
+var Edge = userAgent(/Edge/i);
+var FireFox = userAgent(/firefox/i);
+var Safari = userAgent(/safari/i) && !userAgent(/chrome/i) && !userAgent(/android/i);
+var IOS = userAgent(/iP(ad|od|hone)/i);
+var ChromeForAndroid = userAgent(/chrome/i) && userAgent(/android/i);
+
+var captureMode = {
+  capture: false,
+  passive: false
+};
+function on(el, event, fn) {
+  el.addEventListener(event, fn, !IE11OrLess && captureMode);
+}
+function off(el, event, fn) {
+  el.removeEventListener(event, fn, !IE11OrLess && captureMode);
+}
+function matches( /**HTMLElement*/el, /**String*/selector) {
+  if (!selector) return;
+  selector[0] === '>' && (selector = selector.substring(1));
+  if (el) {
+    try {
+      if (el.matches) {
+        return el.matches(selector);
+      } else if (el.msMatchesSelector) {
+        return el.msMatchesSelector(selector);
+      } else if (el.webkitMatchesSelector) {
+        return el.webkitMatchesSelector(selector);
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+  return false;
+}
+function getParentOrHost(el) {
+  return el.host && el !== document && el.host.nodeType && el.host !== el ? el.host : el.parentNode;
+}
+function closest( /**HTMLElement*/el, /**String*/selector, /**HTMLElement*/ctx, includeCTX) {
+  if (el) {
+    ctx = ctx || document;
+    do {
+      if (selector != null && (selector[0] === '>' ? el.parentNode === ctx && matches(el, selector) : matches(el, selector)) || includeCTX && el === ctx) {
+        return el;
+      }
+      if (el === ctx) break;
+      /* jshint boss:true */
+    } while (el = getParentOrHost(el));
+  }
+  return null;
+}
+var R_SPACE = /\s+/g;
+function toggleClass(el, name, state) {
+  if (el && name) {
+    if (el.classList) {
+      el.classList[state ? 'add' : 'remove'](name);
+    } else {
+      var className = (' ' + el.className + ' ').replace(R_SPACE, ' ').replace(' ' + name + ' ', ' ');
+      el.className = (className + (state ? ' ' + name : '')).replace(R_SPACE, ' ');
+    }
+  }
+}
+function css(el, prop, val) {
+  var style = el && el.style;
+  if (style) {
+    if (val === void 0) {
+      if (document.defaultView && document.defaultView.getComputedStyle) {
+        val = document.defaultView.getComputedStyle(el, '');
+      } else if (el.currentStyle) {
+        val = el.currentStyle;
+      }
+      return prop === void 0 ? val : val[prop];
+    } else {
+      if (!(prop in style) && prop.indexOf('webkit') === -1) {
+        prop = '-webkit-' + prop;
+      }
+      style[prop] = val + (typeof val === 'string' ? '' : 'px');
+    }
+  }
+}
+function matrix(el, selfOnly) {
+  var appliedTransforms = '';
+  if (typeof el === 'string') {
+    appliedTransforms = el;
+  } else {
+    do {
+      var transform = css(el, 'transform');
+      if (transform && transform !== 'none') {
+        appliedTransforms = transform + ' ' + appliedTransforms;
+      }
+      /* jshint boss:true */
+    } while (!selfOnly && (el = el.parentNode));
+  }
+  var matrixFn = window.DOMMatrix || window.WebKitCSSMatrix || window.CSSMatrix || window.MSCSSMatrix;
+  /*jshint -W056 */
+  return matrixFn && new matrixFn(appliedTransforms);
+}
+function find(ctx, tagName, iterator) {
+  if (ctx) {
+    var list = ctx.getElementsByTagName(tagName),
+      i = 0,
+      n = list.length;
+    if (iterator) {
+      for (; i < n; i++) {
+        iterator(list[i], i);
+      }
+    }
+    return list;
+  }
+  return [];
+}
+function getWindowScrollingElement() {
+  var scrollingElement = document.scrollingElement;
+  if (scrollingElement) {
+    return scrollingElement;
+  } else {
+    return document.documentElement;
+  }
+}
+
+/**
+ * Returns the "bounding client rect" of given element
+ * @param  {HTMLElement} el                       The element whose boundingClientRect is wanted
+ * @param  {[Boolean]} relativeToContainingBlock  Whether the rect should be relative to the containing block of (including) the container
+ * @param  {[Boolean]} relativeToNonStaticParent  Whether the rect should be relative to the relative parent of (including) the contaienr
+ * @param  {[Boolean]} undoScale                  Whether the container's scale() should be undone
+ * @param  {[HTMLElement]} container              The parent the element will be placed in
+ * @return {Object}                               The boundingClientRect of el, with specified adjustments
+ */
+function getRect(el, relativeToContainingBlock, relativeToNonStaticParent, undoScale, container) {
+  if (!el.getBoundingClientRect && el !== window) return;
+  var elRect, top, left, bottom, right, height, width;
+  if (el !== window && el.parentNode && el !== getWindowScrollingElement()) {
+    elRect = el.getBoundingClientRect();
+    top = elRect.top;
+    left = elRect.left;
+    bottom = elRect.bottom;
+    right = elRect.right;
+    height = elRect.height;
+    width = elRect.width;
+  } else {
+    top = 0;
+    left = 0;
+    bottom = window.innerHeight;
+    right = window.innerWidth;
+    height = window.innerHeight;
+    width = window.innerWidth;
+  }
+  if ((relativeToContainingBlock || relativeToNonStaticParent) && el !== window) {
+    // Adjust for translate()
+    container = container || el.parentNode;
+
+    // solves #1123 (see: https://stackoverflow.com/a/37953806/6088312)
+    // Not needed on <= IE11
+    if (!IE11OrLess) {
+      do {
+        if (container && container.getBoundingClientRect && (css(container, 'transform') !== 'none' || relativeToNonStaticParent && css(container, 'position') !== 'static')) {
+          var containerRect = container.getBoundingClientRect();
+
+          // Set relative to edges of padding box of container
+          top -= containerRect.top + parseInt(css(container, 'border-top-width'));
+          left -= containerRect.left + parseInt(css(container, 'border-left-width'));
+          bottom = top + elRect.height;
+          right = left + elRect.width;
+          break;
+        }
+        /* jshint boss:true */
+      } while (container = container.parentNode);
+    }
+  }
+  if (undoScale && el !== window) {
+    // Adjust for scale()
+    var elMatrix = matrix(container || el),
+      scaleX = elMatrix && elMatrix.a,
+      scaleY = elMatrix && elMatrix.d;
+    if (elMatrix) {
+      top /= scaleY;
+      left /= scaleX;
+      width /= scaleX;
+      height /= scaleY;
+      bottom = top + height;
+      right = left + width;
+    }
+  }
+  return {
+    top: top,
+    left: left,
+    bottom: bottom,
+    right: right,
+    width: width,
+    height: height
+  };
+}
+
+/**
+ * Checks if a side of an element is scrolled past a side of its parents
+ * @param  {HTMLElement}  el           The element who's side being scrolled out of view is in question
+ * @param  {String}       elSide       Side of the element in question ('top', 'left', 'right', 'bottom')
+ * @param  {String}       parentSide   Side of the parent in question ('top', 'left', 'right', 'bottom')
+ * @return {HTMLElement}               The parent scroll element that the el's side is scrolled past, or null if there is no such element
+ */
+function isScrolledPast(el, elSide, parentSide) {
+  var parent = getParentAutoScrollElement(el, true),
+    elSideVal = getRect(el)[elSide];
+
+  /* jshint boss:true */
+  while (parent) {
+    var parentSideVal = getRect(parent)[parentSide],
+      visible = void 0;
+    {
+      visible = elSideVal >= parentSideVal;
+    }
+    if (!visible) return parent;
+    if (parent === getWindowScrollingElement()) break;
+    parent = getParentAutoScrollElement(parent, false);
+  }
+  return false;
+}
+
+/**
+ * Gets nth child of el, ignoring hidden children, sortable's elements (does not ignore clone if it's visible)
+ * and non-draggable elements
+ * @param  {HTMLElement} el       The parent element
+ * @param  {Number} childNum      The index of the child
+ * @param  {Object} options       Parent Sortable's options
+ * @return {HTMLElement}          The child at index childNum, or null if not found
+ */
+function getChild(el, childNum, options, includeDragEl) {
+  var currentChild = 0,
+    i = 0,
+    children = el.children;
+  while (i < children.length) {
+    if (children[i].style.display !== 'none' && children[i] !== Sortable.ghost && (includeDragEl || children[i] !== Sortable.dragged) && closest(children[i], options.draggable, el, false)) {
+      if (currentChild === childNum) {
+        return children[i];
+      }
+      currentChild++;
+    }
+    i++;
+  }
+  return null;
+}
+
+/**
+ * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
+ * @param  {HTMLElement} el       Parent element
+ * @param  {selector} selector    Any other elements that should be ignored
+ * @return {HTMLElement}          The last child, ignoring ghostEl
+ */
+function lastChild(el, selector) {
+  var last = el.lastElementChild;
+  while (last && (last === Sortable.ghost || css(last, 'display') === 'none' || selector && !matches(last, selector))) {
+    last = last.previousElementSibling;
+  }
+  return last || null;
+}
+
+/**
+ * Returns the index of an element within its parent for a selected set of
+ * elements
+ * @param  {HTMLElement} el
+ * @param  {selector} selector
+ * @return {number}
+ */
+function index(el, selector) {
+  var index = 0;
+  if (!el || !el.parentNode) {
+    return -1;
+  }
+
+  /* jshint boss:true */
+  while (el = el.previousElementSibling) {
+    if (el.nodeName.toUpperCase() !== 'TEMPLATE' && el !== Sortable.clone && (!selector || matches(el, selector))) {
+      index++;
+    }
+  }
+  return index;
+}
+
+/**
+ * Returns the scroll offset of the given element, added with all the scroll offsets of parent elements.
+ * The value is returned in real pixels.
+ * @param  {HTMLElement} el
+ * @return {Array}             Offsets in the format of [left, top]
+ */
+function getRelativeScrollOffset(el) {
+  var offsetLeft = 0,
+    offsetTop = 0,
+    winScroller = getWindowScrollingElement();
+  if (el) {
+    do {
+      var elMatrix = matrix(el),
+        scaleX = elMatrix.a,
+        scaleY = elMatrix.d;
+      offsetLeft += el.scrollLeft * scaleX;
+      offsetTop += el.scrollTop * scaleY;
+    } while (el !== winScroller && (el = el.parentNode));
+  }
+  return [offsetLeft, offsetTop];
+}
+
+/**
+ * Returns the index of the object within the given array
+ * @param  {Array} arr   Array that may or may not hold the object
+ * @param  {Object} obj  An object that has a key-value pair unique to and identical to a key-value pair in the object you want to find
+ * @return {Number}      The index of the object in the array, or -1
+ */
+function indexOfObject(arr, obj) {
+  for (var i in arr) {
+    if (!arr.hasOwnProperty(i)) continue;
+    for (var key in obj) {
+      if (obj.hasOwnProperty(key) && obj[key] === arr[i][key]) return Number(i);
+    }
+  }
+  return -1;
+}
+function getParentAutoScrollElement(el, includeSelf) {
+  // skip to window
+  if (!el || !el.getBoundingClientRect) return getWindowScrollingElement();
+  var elem = el;
+  var gotSelf = false;
+  do {
+    // we don't need to get elem css if it isn't even overflowing in the first place (performance)
+    if (elem.clientWidth < elem.scrollWidth || elem.clientHeight < elem.scrollHeight) {
+      var elemCSS = css(elem);
+      if (elem.clientWidth < elem.scrollWidth && (elemCSS.overflowX == 'auto' || elemCSS.overflowX == 'scroll') || elem.clientHeight < elem.scrollHeight && (elemCSS.overflowY == 'auto' || elemCSS.overflowY == 'scroll')) {
+        if (!elem.getBoundingClientRect || elem === document.body) return getWindowScrollingElement();
+        if (gotSelf || includeSelf) return elem;
+        gotSelf = true;
+      }
+    }
+    /* jshint boss:true */
+  } while (elem = elem.parentNode);
+  return getWindowScrollingElement();
+}
+function extend(dst, src) {
+  if (dst && src) {
+    for (var key in src) {
+      if (src.hasOwnProperty(key)) {
+        dst[key] = src[key];
+      }
+    }
+  }
+  return dst;
+}
+function isRectEqual(rect1, rect2) {
+  return Math.round(rect1.top) === Math.round(rect2.top) && Math.round(rect1.left) === Math.round(rect2.left) && Math.round(rect1.height) === Math.round(rect2.height) && Math.round(rect1.width) === Math.round(rect2.width);
+}
+var _throttleTimeout;
+function throttle(callback, ms) {
+  return function () {
+    if (!_throttleTimeout) {
+      var args = arguments,
+        _this = this;
+      if (args.length === 1) {
+        callback.call(_this, args[0]);
+      } else {
+        callback.apply(_this, args);
+      }
+      _throttleTimeout = setTimeout(function () {
+        _throttleTimeout = void 0;
+      }, ms);
+    }
+  };
+}
+function cancelThrottle() {
+  clearTimeout(_throttleTimeout);
+  _throttleTimeout = void 0;
+}
+function scrollBy(el, x, y) {
+  el.scrollLeft += x;
+  el.scrollTop += y;
+}
+function clone(el) {
+  var Polymer = window.Polymer;
+  var $ = window.jQuery || window.Zepto;
+  if (Polymer && Polymer.dom) {
+    return Polymer.dom(el).cloneNode(true);
+  } else if ($) {
+    return $(el).clone(true)[0];
+  } else {
+    return el.cloneNode(true);
+  }
+}
+function getChildContainingRectFromElement(container, options, ghostEl) {
+  var rect = {};
+  Array.from(container.children).forEach(function (child) {
+    var _rect$left, _rect$top, _rect$right, _rect$bottom;
+    if (!closest(child, options.draggable, container, false) || child.animated || child === ghostEl) return;
+    var childRect = getRect(child);
+    rect.left = Math.min((_rect$left = rect.left) !== null && _rect$left !== void 0 ? _rect$left : Infinity, childRect.left);
+    rect.top = Math.min((_rect$top = rect.top) !== null && _rect$top !== void 0 ? _rect$top : Infinity, childRect.top);
+    rect.right = Math.max((_rect$right = rect.right) !== null && _rect$right !== void 0 ? _rect$right : -Infinity, childRect.right);
+    rect.bottom = Math.max((_rect$bottom = rect.bottom) !== null && _rect$bottom !== void 0 ? _rect$bottom : -Infinity, childRect.bottom);
+  });
+  rect.width = rect.right - rect.left;
+  rect.height = rect.bottom - rect.top;
+  rect.x = rect.left;
+  rect.y = rect.top;
+  return rect;
+}
+var expando = 'Sortable' + new Date().getTime();
+
+function AnimationStateManager() {
+  var animationStates = [],
+    animationCallbackId;
+  return {
+    captureAnimationState: function captureAnimationState() {
+      animationStates = [];
+      if (!this.options.animation) return;
+      var children = [].slice.call(this.el.children);
+      children.forEach(function (child) {
+        if (css(child, 'display') === 'none' || child === Sortable.ghost) return;
+        animationStates.push({
+          target: child,
+          rect: getRect(child)
+        });
+        var fromRect = _objectSpread2({}, animationStates[animationStates.length - 1].rect);
+
+        // If animating: compensate for current animation
+        if (child.thisAnimationDuration) {
+          var childMatrix = matrix(child, true);
+          if (childMatrix) {
+            fromRect.top -= childMatrix.f;
+            fromRect.left -= childMatrix.e;
+          }
+        }
+        child.fromRect = fromRect;
+      });
+    },
+    addAnimationState: function addAnimationState(state) {
+      animationStates.push(state);
+    },
+    removeAnimationState: function removeAnimationState(target) {
+      animationStates.splice(indexOfObject(animationStates, {
+        target: target
+      }), 1);
+    },
+    animateAll: function animateAll(callback) {
+      var _this = this;
+      if (!this.options.animation) {
+        clearTimeout(animationCallbackId);
+        if (typeof callback === 'function') callback();
+        return;
+      }
+      var animating = false,
+        animationTime = 0;
+      animationStates.forEach(function (state) {
+        var time = 0,
+          target = state.target,
+          fromRect = target.fromRect,
+          toRect = getRect(target),
+          prevFromRect = target.prevFromRect,
+          prevToRect = target.prevToRect,
+          animatingRect = state.rect,
+          targetMatrix = matrix(target, true);
+        if (targetMatrix) {
+          // Compensate for current animation
+          toRect.top -= targetMatrix.f;
+          toRect.left -= targetMatrix.e;
+        }
+        target.toRect = toRect;
+        if (target.thisAnimationDuration) {
+          // Could also check if animatingRect is between fromRect and toRect
+          if (isRectEqual(prevFromRect, toRect) && !isRectEqual(fromRect, toRect) &&
+          // Make sure animatingRect is on line between toRect & fromRect
+          (animatingRect.top - toRect.top) / (animatingRect.left - toRect.left) === (fromRect.top - toRect.top) / (fromRect.left - toRect.left)) {
+            // If returning to same place as started from animation and on same axis
+            time = calculateRealTime(animatingRect, prevFromRect, prevToRect, _this.options);
+          }
+        }
+
+        // if fromRect != toRect: animate
+        if (!isRectEqual(toRect, fromRect)) {
+          target.prevFromRect = fromRect;
+          target.prevToRect = toRect;
+          if (!time) {
+            time = _this.options.animation;
+          }
+          _this.animate(target, animatingRect, toRect, time);
+        }
+        if (time) {
+          animating = true;
+          animationTime = Math.max(animationTime, time);
+          clearTimeout(target.animationResetTimer);
+          target.animationResetTimer = setTimeout(function () {
+            target.animationTime = 0;
+            target.prevFromRect = null;
+            target.fromRect = null;
+            target.prevToRect = null;
+            target.thisAnimationDuration = null;
+          }, time);
+          target.thisAnimationDuration = time;
+        }
+      });
+      clearTimeout(animationCallbackId);
+      if (!animating) {
+        if (typeof callback === 'function') callback();
+      } else {
+        animationCallbackId = setTimeout(function () {
+          if (typeof callback === 'function') callback();
+        }, animationTime);
+      }
+      animationStates = [];
+    },
+    animate: function animate(target, currentRect, toRect, duration) {
+      if (duration) {
+        css(target, 'transition', '');
+        css(target, 'transform', '');
+        var elMatrix = matrix(this.el),
+          scaleX = elMatrix && elMatrix.a,
+          scaleY = elMatrix && elMatrix.d,
+          translateX = (currentRect.left - toRect.left) / (scaleX || 1),
+          translateY = (currentRect.top - toRect.top) / (scaleY || 1);
+        target.animatingX = !!translateX;
+        target.animatingY = !!translateY;
+        css(target, 'transform', 'translate3d(' + translateX + 'px,' + translateY + 'px,0)');
+        this.forRepaintDummy = repaint(target); // repaint
+
+        css(target, 'transition', 'transform ' + duration + 'ms' + (this.options.easing ? ' ' + this.options.easing : ''));
+        css(target, 'transform', 'translate3d(0,0,0)');
+        typeof target.animated === 'number' && clearTimeout(target.animated);
+        target.animated = setTimeout(function () {
+          css(target, 'transition', '');
+          css(target, 'transform', '');
+          target.animated = false;
+          target.animatingX = false;
+          target.animatingY = false;
+        }, duration);
+      }
+    }
+  };
+}
+function repaint(target) {
+  return target.offsetWidth;
+}
+function calculateRealTime(animatingRect, fromRect, toRect, options) {
+  return Math.sqrt(Math.pow(fromRect.top - animatingRect.top, 2) + Math.pow(fromRect.left - animatingRect.left, 2)) / Math.sqrt(Math.pow(fromRect.top - toRect.top, 2) + Math.pow(fromRect.left - toRect.left, 2)) * options.animation;
+}
+
+var plugins = [];
+var defaults = {
+  initializeByDefault: true
+};
+var PluginManager = {
+  mount: function mount(plugin) {
+    // Set default static properties
+    for (var option in defaults) {
+      if (defaults.hasOwnProperty(option) && !(option in plugin)) {
+        plugin[option] = defaults[option];
+      }
+    }
+    plugins.forEach(function (p) {
+      if (p.pluginName === plugin.pluginName) {
+        throw "Sortable: Cannot mount plugin ".concat(plugin.pluginName, " more than once");
+      }
+    });
+    plugins.push(plugin);
+  },
+  pluginEvent: function pluginEvent(eventName, sortable, evt) {
+    var _this = this;
+    this.eventCanceled = false;
+    evt.cancel = function () {
+      _this.eventCanceled = true;
+    };
+    var eventNameGlobal = eventName + 'Global';
+    plugins.forEach(function (plugin) {
+      if (!sortable[plugin.pluginName]) return;
+      // Fire global events if it exists in this sortable
+      if (sortable[plugin.pluginName][eventNameGlobal]) {
+        sortable[plugin.pluginName][eventNameGlobal](_objectSpread2({
+          sortable: sortable
+        }, evt));
+      }
+
+      // Only fire plugin event if plugin is enabled in this sortable,
+      // and plugin has event defined
+      if (sortable.options[plugin.pluginName] && sortable[plugin.pluginName][eventName]) {
+        sortable[plugin.pluginName][eventName](_objectSpread2({
+          sortable: sortable
+        }, evt));
+      }
+    });
+  },
+  initializePlugins: function initializePlugins(sortable, el, defaults, options) {
+    plugins.forEach(function (plugin) {
+      var pluginName = plugin.pluginName;
+      if (!sortable.options[pluginName] && !plugin.initializeByDefault) return;
+      var initialized = new plugin(sortable, el, sortable.options);
+      initialized.sortable = sortable;
+      initialized.options = sortable.options;
+      sortable[pluginName] = initialized;
+
+      // Add default options from plugin
+      _extends(defaults, initialized.defaults);
+    });
+    for (var option in sortable.options) {
+      if (!sortable.options.hasOwnProperty(option)) continue;
+      var modified = this.modifyOption(sortable, option, sortable.options[option]);
+      if (typeof modified !== 'undefined') {
+        sortable.options[option] = modified;
+      }
+    }
+  },
+  getEventProperties: function getEventProperties(name, sortable) {
+    var eventProperties = {};
+    plugins.forEach(function (plugin) {
+      if (typeof plugin.eventProperties !== 'function') return;
+      _extends(eventProperties, plugin.eventProperties.call(sortable[plugin.pluginName], name));
+    });
+    return eventProperties;
+  },
+  modifyOption: function modifyOption(sortable, name, value) {
+    var modifiedValue;
+    plugins.forEach(function (plugin) {
+      // Plugin must exist on the Sortable
+      if (!sortable[plugin.pluginName]) return;
+
+      // If static option listener exists for this option, call in the context of the Sortable's instance of this plugin
+      if (plugin.optionListeners && typeof plugin.optionListeners[name] === 'function') {
+        modifiedValue = plugin.optionListeners[name].call(sortable[plugin.pluginName], value);
+      }
+    });
+    return modifiedValue;
+  }
+};
+
+function dispatchEvent(_ref) {
+  var sortable = _ref.sortable,
+    rootEl = _ref.rootEl,
+    name = _ref.name,
+    targetEl = _ref.targetEl,
+    cloneEl = _ref.cloneEl,
+    toEl = _ref.toEl,
+    fromEl = _ref.fromEl,
+    oldIndex = _ref.oldIndex,
+    newIndex = _ref.newIndex,
+    oldDraggableIndex = _ref.oldDraggableIndex,
+    newDraggableIndex = _ref.newDraggableIndex,
+    originalEvent = _ref.originalEvent,
+    putSortable = _ref.putSortable,
+    extraEventProperties = _ref.extraEventProperties;
+  sortable = sortable || rootEl && rootEl[expando];
+  if (!sortable) return;
+  var evt,
+    options = sortable.options,
+    onName = 'on' + name.charAt(0).toUpperCase() + name.substr(1);
+  // Support for new CustomEvent feature
+  if (window.CustomEvent && !IE11OrLess && !Edge) {
+    evt = new CustomEvent(name, {
+      bubbles: true,
+      cancelable: true
+    });
+  } else {
+    evt = document.createEvent('Event');
+    evt.initEvent(name, true, true);
+  }
+  evt.to = toEl || rootEl;
+  evt.from = fromEl || rootEl;
+  evt.item = targetEl || rootEl;
+  evt.clone = cloneEl;
+  evt.oldIndex = oldIndex;
+  evt.newIndex = newIndex;
+  evt.oldDraggableIndex = oldDraggableIndex;
+  evt.newDraggableIndex = newDraggableIndex;
+  evt.originalEvent = originalEvent;
+  evt.pullMode = putSortable ? putSortable.lastPutMode : undefined;
+  var allEventProperties = _objectSpread2(_objectSpread2({}, extraEventProperties), PluginManager.getEventProperties(name, sortable));
+  for (var option in allEventProperties) {
+    evt[option] = allEventProperties[option];
+  }
+  if (rootEl) {
+    rootEl.dispatchEvent(evt);
+  }
+  if (options[onName]) {
+    options[onName].call(sortable, evt);
+  }
+}
+
+var _excluded = ["evt"];
+var pluginEvent = function pluginEvent(eventName, sortable) {
+  var _ref = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {},
+    originalEvent = _ref.evt,
+    data = _objectWithoutProperties(_ref, _excluded);
+  PluginManager.pluginEvent.bind(Sortable)(eventName, sortable, _objectSpread2({
+    dragEl: dragEl,
+    parentEl: parentEl,
+    ghostEl: ghostEl,
+    rootEl: rootEl,
+    nextEl: nextEl,
+    lastDownEl: lastDownEl,
+    cloneEl: cloneEl,
+    cloneHidden: cloneHidden,
+    dragStarted: moved,
+    putSortable: putSortable,
+    activeSortable: Sortable.active,
+    originalEvent: originalEvent,
+    oldIndex: oldIndex,
+    oldDraggableIndex: oldDraggableIndex,
+    newIndex: newIndex,
+    newDraggableIndex: newDraggableIndex,
+    hideGhostForTarget: _hideGhostForTarget,
+    unhideGhostForTarget: _unhideGhostForTarget,
+    cloneNowHidden: function cloneNowHidden() {
+      cloneHidden = true;
+    },
+    cloneNowShown: function cloneNowShown() {
+      cloneHidden = false;
+    },
+    dispatchSortableEvent: function dispatchSortableEvent(name) {
+      _dispatchEvent({
+        sortable: sortable,
+        name: name,
+        originalEvent: originalEvent
+      });
+    }
+  }, data));
+};
+function _dispatchEvent(info) {
+  dispatchEvent(_objectSpread2({
+    putSortable: putSortable,
+    cloneEl: cloneEl,
+    targetEl: dragEl,
+    rootEl: rootEl,
+    oldIndex: oldIndex,
+    oldDraggableIndex: oldDraggableIndex,
+    newIndex: newIndex,
+    newDraggableIndex: newDraggableIndex
+  }, info));
+}
+var dragEl,
+  parentEl,
+  ghostEl,
+  rootEl,
+  nextEl,
+  lastDownEl,
+  cloneEl,
+  cloneHidden,
+  oldIndex,
+  newIndex,
+  oldDraggableIndex,
+  newDraggableIndex,
+  activeGroup,
+  putSortable,
+  awaitingDragStarted = false,
+  ignoreNextClick = false,
+  sortables = [],
+  tapEvt,
+  touchEvt,
+  lastDx,
+  lastDy,
+  tapDistanceLeft,
+  tapDistanceTop,
+  moved,
+  lastTarget,
+  lastDirection,
+  pastFirstInvertThresh = false,
+  isCircumstantialInvert = false,
+  targetMoveDistance,
+  // For positioning ghost absolutely
+  ghostRelativeParent,
+  ghostRelativeParentInitialScroll = [],
+  // (left, top)
+
+  _silent = false,
+  savedInputChecked = [];
+
+/** @const */
+var documentExists = typeof document !== 'undefined',
+  PositionGhostAbsolutely = IOS,
+  CSSFloatProperty = Edge || IE11OrLess ? 'cssFloat' : 'float',
+  // This will not pass for IE9, because IE9 DnD only works on anchors
+  supportDraggable = documentExists && !ChromeForAndroid && !IOS && 'draggable' in document.createElement('div'),
+  supportCssPointerEvents = function () {
+    if (!documentExists) return;
+    // false when <= IE11
+    if (IE11OrLess) {
+      return false;
+    }
+    var el = document.createElement('x');
+    el.style.cssText = 'pointer-events:auto';
+    return el.style.pointerEvents === 'auto';
+  }(),
+  _detectDirection = function _detectDirection(el, options) {
+    var elCSS = css(el),
+      elWidth = parseInt(elCSS.width) - parseInt(elCSS.paddingLeft) - parseInt(elCSS.paddingRight) - parseInt(elCSS.borderLeftWidth) - parseInt(elCSS.borderRightWidth),
+      child1 = getChild(el, 0, options),
+      child2 = getChild(el, 1, options),
+      firstChildCSS = child1 && css(child1),
+      secondChildCSS = child2 && css(child2),
+      firstChildWidth = firstChildCSS && parseInt(firstChildCSS.marginLeft) + parseInt(firstChildCSS.marginRight) + getRect(child1).width,
+      secondChildWidth = secondChildCSS && parseInt(secondChildCSS.marginLeft) + parseInt(secondChildCSS.marginRight) + getRect(child2).width;
+    if (elCSS.display === 'flex') {
+      return elCSS.flexDirection === 'column' || elCSS.flexDirection === 'column-reverse' ? 'vertical' : 'horizontal';
+    }
+    if (elCSS.display === 'grid') {
+      return elCSS.gridTemplateColumns.split(' ').length <= 1 ? 'vertical' : 'horizontal';
+    }
+    if (child1 && firstChildCSS["float"] && firstChildCSS["float"] !== 'none') {
+      var touchingSideChild2 = firstChildCSS["float"] === 'left' ? 'left' : 'right';
+      return child2 && (secondChildCSS.clear === 'both' || secondChildCSS.clear === touchingSideChild2) ? 'vertical' : 'horizontal';
+    }
+    return child1 && (firstChildCSS.display === 'block' || firstChildCSS.display === 'flex' || firstChildCSS.display === 'table' || firstChildCSS.display === 'grid' || firstChildWidth >= elWidth && elCSS[CSSFloatProperty] === 'none' || child2 && elCSS[CSSFloatProperty] === 'none' && firstChildWidth + secondChildWidth > elWidth) ? 'vertical' : 'horizontal';
+  },
+  _dragElInRowColumn = function _dragElInRowColumn(dragRect, targetRect, vertical) {
+    var dragElS1Opp = vertical ? dragRect.left : dragRect.top,
+      dragElS2Opp = vertical ? dragRect.right : dragRect.bottom,
+      dragElOppLength = vertical ? dragRect.width : dragRect.height,
+      targetS1Opp = vertical ? targetRect.left : targetRect.top,
+      targetS2Opp = vertical ? targetRect.right : targetRect.bottom,
+      targetOppLength = vertical ? targetRect.width : targetRect.height;
+    return dragElS1Opp === targetS1Opp || dragElS2Opp === targetS2Opp || dragElS1Opp + dragElOppLength / 2 === targetS1Opp + targetOppLength / 2;
+  },
+  /**
+   * Detects first nearest empty sortable to X and Y position using emptyInsertThreshold.
+   * @param  {Number} x      X position
+   * @param  {Number} y      Y position
+   * @return {HTMLElement}   Element of the first found nearest Sortable
+   */
+  _detectNearestEmptySortable = function _detectNearestEmptySortable(x, y) {
+    var ret;
+    sortables.some(function (sortable) {
+      var threshold = sortable[expando].options.emptyInsertThreshold;
+      if (!threshold || lastChild(sortable)) return;
+      var rect = getRect(sortable),
+        insideHorizontally = x >= rect.left - threshold && x <= rect.right + threshold,
+        insideVertically = y >= rect.top - threshold && y <= rect.bottom + threshold;
+      if (insideHorizontally && insideVertically) {
+        return ret = sortable;
+      }
+    });
+    return ret;
+  },
+  _prepareGroup = function _prepareGroup(options) {
+    function toFn(value, pull) {
+      return function (to, from, dragEl, evt) {
+        var sameGroup = to.options.group.name && from.options.group.name && to.options.group.name === from.options.group.name;
+        if (value == null && (pull || sameGroup)) {
+          // Default pull value
+          // Default pull and put value if same group
+          return true;
+        } else if (value == null || value === false) {
+          return false;
+        } else if (pull && value === 'clone') {
+          return value;
+        } else if (typeof value === 'function') {
+          return toFn(value(to, from, dragEl, evt), pull)(to, from, dragEl, evt);
+        } else {
+          var otherGroup = (pull ? to : from).options.group.name;
+          return value === true || typeof value === 'string' && value === otherGroup || value.join && value.indexOf(otherGroup) > -1;
+        }
+      };
+    }
+    var group = {};
+    var originalGroup = options.group;
+    if (!originalGroup || _typeof(originalGroup) != 'object') {
+      originalGroup = {
+        name: originalGroup
+      };
+    }
+    group.name = originalGroup.name;
+    group.checkPull = toFn(originalGroup.pull, true);
+    group.checkPut = toFn(originalGroup.put);
+    group.revertClone = originalGroup.revertClone;
+    options.group = group;
+  },
+  _hideGhostForTarget = function _hideGhostForTarget() {
+    if (!supportCssPointerEvents && ghostEl) {
+      css(ghostEl, 'display', 'none');
+    }
+  },
+  _unhideGhostForTarget = function _unhideGhostForTarget() {
+    if (!supportCssPointerEvents && ghostEl) {
+      css(ghostEl, 'display', '');
+    }
+  };
+
+// #1184 fix - Prevent click event on fallback if dragged but item not changed position
+if (documentExists && !ChromeForAndroid) {
+  document.addEventListener('click', function (evt) {
+    if (ignoreNextClick) {
+      evt.preventDefault();
+      evt.stopPropagation && evt.stopPropagation();
+      evt.stopImmediatePropagation && evt.stopImmediatePropagation();
+      ignoreNextClick = false;
+      return false;
+    }
+  }, true);
+}
+var nearestEmptyInsertDetectEvent = function nearestEmptyInsertDetectEvent(evt) {
+  if (dragEl) {
+    evt = evt.touches ? evt.touches[0] : evt;
+    var nearest = _detectNearestEmptySortable(evt.clientX, evt.clientY);
+    if (nearest) {
+      // Create imitation event
+      var event = {};
+      for (var i in evt) {
+        if (evt.hasOwnProperty(i)) {
+          event[i] = evt[i];
+        }
+      }
+      event.target = event.rootEl = nearest;
+      event.preventDefault = void 0;
+      event.stopPropagation = void 0;
+      nearest[expando]._onDragOver(event);
+    }
+  }
+};
+var _checkOutsideTargetEl = function _checkOutsideTargetEl(evt) {
+  if (dragEl) {
+    dragEl.parentNode[expando]._isOutsideThisEl(evt.target);
+  }
+};
+
+/**
+ * @class  Sortable
+ * @param  {HTMLElement}  el
+ * @param  {Object}       [options]
+ */
+function Sortable(el, options) {
+  if (!(el && el.nodeType && el.nodeType === 1)) {
+    throw "Sortable: `el` must be an HTMLElement, not ".concat({}.toString.call(el));
+  }
+  this.el = el; // root element
+  this.options = options = _extends({}, options);
+
+  // Export instance
+  el[expando] = this;
+  var defaults = {
+    group: null,
+    sort: true,
+    disabled: false,
+    store: null,
+    handle: null,
+    draggable: /^[uo]l$/i.test(el.nodeName) ? '>li' : '>*',
+    swapThreshold: 1,
+    // percentage; 0 <= x <= 1
+    invertSwap: false,
+    // invert always
+    invertedSwapThreshold: null,
+    // will be set to same as swapThreshold if default
+    removeCloneOnHide: true,
+    direction: function direction() {
+      return _detectDirection(el, this.options);
+    },
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    ignore: 'a, img',
+    filter: null,
+    preventOnFilter: true,
+    animation: 0,
+    easing: null,
+    setData: function setData(dataTransfer, dragEl) {
+      dataTransfer.setData('Text', dragEl.textContent);
+    },
+    dropBubble: false,
+    dragoverBubble: false,
+    dataIdAttr: 'data-id',
+    delay: 0,
+    delayOnTouchOnly: false,
+    touchStartThreshold: (Number.parseInt ? Number : window).parseInt(window.devicePixelRatio, 10) || 1,
+    forceFallback: false,
+    fallbackClass: 'sortable-fallback',
+    fallbackOnBody: false,
+    fallbackTolerance: 0,
+    fallbackOffset: {
+      x: 0,
+      y: 0
+    },
+    // Disabled on Safari: #1571; Enabled on Safari IOS: #2244
+    supportPointer: Sortable.supportPointer !== false && 'PointerEvent' in window && (!Safari || IOS),
+    emptyInsertThreshold: 5
+  };
+  PluginManager.initializePlugins(this, el, defaults);
+
+  // Set default options
+  for (var name in defaults) {
+    !(name in options) && (options[name] = defaults[name]);
+  }
+  _prepareGroup(options);
+
+  // Bind all private methods
+  for (var fn in this) {
+    if (fn.charAt(0) === '_' && typeof this[fn] === 'function') {
+      this[fn] = this[fn].bind(this);
+    }
+  }
+
+  // Setup drag mode
+  this.nativeDraggable = options.forceFallback ? false : supportDraggable;
+  if (this.nativeDraggable) {
+    // Touch start threshold cannot be greater than the native dragstart threshold
+    this.options.touchStartThreshold = 1;
+  }
+
+  // Bind events
+  if (options.supportPointer) {
+    on(el, 'pointerdown', this._onTapStart);
+  } else {
+    on(el, 'mousedown', this._onTapStart);
+    on(el, 'touchstart', this._onTapStart);
+  }
+  if (this.nativeDraggable) {
+    on(el, 'dragover', this);
+    on(el, 'dragenter', this);
+  }
+  sortables.push(this.el);
+
+  // Restore sorting
+  options.store && options.store.get && this.sort(options.store.get(this) || []);
+
+  // Add animation state manager
+  _extends(this, AnimationStateManager());
+}
+Sortable.prototype = /** @lends Sortable.prototype */{
+  constructor: Sortable,
+  _isOutsideThisEl: function _isOutsideThisEl(target) {
+    if (!this.el.contains(target) && target !== this.el) {
+      lastTarget = null;
+    }
+  },
+  _getDirection: function _getDirection(evt, target) {
+    return typeof this.options.direction === 'function' ? this.options.direction.call(this, evt, target, dragEl) : this.options.direction;
+  },
+  _onTapStart: function _onTapStart( /** Event|TouchEvent */evt) {
+    if (!evt.cancelable) return;
+    var _this = this,
+      el = this.el,
+      options = this.options,
+      preventOnFilter = options.preventOnFilter,
+      type = evt.type,
+      touch = evt.touches && evt.touches[0] || evt.pointerType && evt.pointerType === 'touch' && evt,
+      target = (touch || evt).target,
+      originalTarget = evt.target.shadowRoot && (evt.path && evt.path[0] || evt.composedPath && evt.composedPath()[0]) || target,
+      filter = options.filter;
+    _saveInputCheckedState(el);
+
+    // Don't trigger start event when an element is been dragged, otherwise the evt.oldindex always wrong when set option.group.
+    if (dragEl) {
+      return;
+    }
+    if (/mousedown|pointerdown/.test(type) && evt.button !== 0 || options.disabled) {
+      return; // only left button and enabled
+    }
+
+    // cancel dnd if original target is content editable
+    if (originalTarget.isContentEditable) {
+      return;
+    }
+
+    // Safari ignores further event handling after mousedown
+    if (!this.nativeDraggable && Safari && target && target.tagName.toUpperCase() === 'SELECT') {
+      return;
+    }
+    target = closest(target, options.draggable, el, false);
+    if (target && target.animated) {
+      return;
+    }
+    if (lastDownEl === target) {
+      // Ignoring duplicate `down`
+      return;
+    }
+
+    // Get the index of the dragged element within its parent
+    oldIndex = index(target);
+    oldDraggableIndex = index(target, options.draggable);
+
+    // Check filter
+    if (typeof filter === 'function') {
+      if (filter.call(this, evt, target, this)) {
+        _dispatchEvent({
+          sortable: _this,
+          rootEl: originalTarget,
+          name: 'filter',
+          targetEl: target,
+          toEl: el,
+          fromEl: el
+        });
+        pluginEvent('filter', _this, {
+          evt: evt
+        });
+        preventOnFilter && evt.preventDefault();
+        return; // cancel dnd
+      }
+    } else if (filter) {
+      filter = filter.split(',').some(function (criteria) {
+        criteria = closest(originalTarget, criteria.trim(), el, false);
+        if (criteria) {
+          _dispatchEvent({
+            sortable: _this,
+            rootEl: criteria,
+            name: 'filter',
+            targetEl: target,
+            fromEl: el,
+            toEl: el
+          });
+          pluginEvent('filter', _this, {
+            evt: evt
+          });
+          return true;
+        }
+      });
+      if (filter) {
+        preventOnFilter && evt.preventDefault();
+        return; // cancel dnd
+      }
+    }
+    if (options.handle && !closest(originalTarget, options.handle, el, false)) {
+      return;
+    }
+
+    // Prepare `dragstart`
+    this._prepareDragStart(evt, touch, target);
+  },
+  _prepareDragStart: function _prepareDragStart( /** Event */evt, /** Touch */touch, /** HTMLElement */target) {
+    var _this = this,
+      el = _this.el,
+      options = _this.options,
+      ownerDocument = el.ownerDocument,
+      dragStartFn;
+    if (target && !dragEl && target.parentNode === el) {
+      var dragRect = getRect(target);
+      rootEl = el;
+      dragEl = target;
+      parentEl = dragEl.parentNode;
+      nextEl = dragEl.nextSibling;
+      lastDownEl = target;
+      activeGroup = options.group;
+      Sortable.dragged = dragEl;
+      tapEvt = {
+        target: dragEl,
+        clientX: (touch || evt).clientX,
+        clientY: (touch || evt).clientY
+      };
+      tapDistanceLeft = tapEvt.clientX - dragRect.left;
+      tapDistanceTop = tapEvt.clientY - dragRect.top;
+      this._lastX = (touch || evt).clientX;
+      this._lastY = (touch || evt).clientY;
+      dragEl.style['will-change'] = 'all';
+      dragStartFn = function dragStartFn() {
+        pluginEvent('delayEnded', _this, {
+          evt: evt
+        });
+        if (Sortable.eventCanceled) {
+          _this._onDrop();
+          return;
+        }
+        // Delayed drag has been triggered
+        // we can re-enable the events: touchmove/mousemove
+        _this._disableDelayedDragEvents();
+        if (!FireFox && _this.nativeDraggable) {
+          dragEl.draggable = true;
+        }
+
+        // Bind the events: dragstart/dragend
+        _this._triggerDragStart(evt, touch);
+
+        // Drag start event
+        _dispatchEvent({
+          sortable: _this,
+          name: 'choose',
+          originalEvent: evt
+        });
+
+        // Chosen item
+        toggleClass(dragEl, options.chosenClass, true);
+      };
+
+      // Disable "draggable"
+      options.ignore.split(',').forEach(function (criteria) {
+        find(dragEl, criteria.trim(), _disableDraggable);
+      });
+      on(ownerDocument, 'dragover', nearestEmptyInsertDetectEvent);
+      on(ownerDocument, 'mousemove', nearestEmptyInsertDetectEvent);
+      on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
+      if (options.supportPointer) {
+        on(ownerDocument, 'pointerup', _this._onDrop);
+        // Native D&D triggers pointercancel
+        !this.nativeDraggable && on(ownerDocument, 'pointercancel', _this._onDrop);
+      } else {
+        on(ownerDocument, 'mouseup', _this._onDrop);
+        on(ownerDocument, 'touchend', _this._onDrop);
+        on(ownerDocument, 'touchcancel', _this._onDrop);
+      }
+
+      // Make dragEl draggable (must be before delay for FireFox)
+      if (FireFox && this.nativeDraggable) {
+        this.options.touchStartThreshold = 4;
+        dragEl.draggable = true;
+      }
+      pluginEvent('delayStart', this, {
+        evt: evt
+      });
+
+      // Delay is impossible for native DnD in Edge or IE
+      if (options.delay && (!options.delayOnTouchOnly || touch) && (!this.nativeDraggable || !(Edge || IE11OrLess))) {
+        if (Sortable.eventCanceled) {
+          this._onDrop();
+          return;
+        }
+        // If the user moves the pointer or let go the click or touch
+        // before the delay has been reached:
+        // disable the delayed drag
+        if (options.supportPointer) {
+          on(ownerDocument, 'pointerup', _this._disableDelayedDrag);
+          on(ownerDocument, 'pointercancel', _this._disableDelayedDrag);
+        } else {
+          on(ownerDocument, 'mouseup', _this._disableDelayedDrag);
+          on(ownerDocument, 'touchend', _this._disableDelayedDrag);
+          on(ownerDocument, 'touchcancel', _this._disableDelayedDrag);
+        }
+        on(ownerDocument, 'mousemove', _this._delayedDragTouchMoveHandler);
+        on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
+        options.supportPointer && on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
+        _this._dragStartTimer = setTimeout(dragStartFn, options.delay);
+      } else {
+        dragStartFn();
+      }
+    }
+  },
+  _delayedDragTouchMoveHandler: function _delayedDragTouchMoveHandler( /** TouchEvent|PointerEvent **/e) {
+    var touch = e.touches ? e.touches[0] : e;
+    if (Math.max(Math.abs(touch.clientX - this._lastX), Math.abs(touch.clientY - this._lastY)) >= Math.floor(this.options.touchStartThreshold / (this.nativeDraggable && window.devicePixelRatio || 1))) {
+      this._disableDelayedDrag();
+    }
+  },
+  _disableDelayedDrag: function _disableDelayedDrag() {
+    dragEl && _disableDraggable(dragEl);
+    clearTimeout(this._dragStartTimer);
+    this._disableDelayedDragEvents();
+  },
+  _disableDelayedDragEvents: function _disableDelayedDragEvents() {
+    var ownerDocument = this.el.ownerDocument;
+    off(ownerDocument, 'mouseup', this._disableDelayedDrag);
+    off(ownerDocument, 'touchend', this._disableDelayedDrag);
+    off(ownerDocument, 'touchcancel', this._disableDelayedDrag);
+    off(ownerDocument, 'pointerup', this._disableDelayedDrag);
+    off(ownerDocument, 'pointercancel', this._disableDelayedDrag);
+    off(ownerDocument, 'mousemove', this._delayedDragTouchMoveHandler);
+    off(ownerDocument, 'touchmove', this._delayedDragTouchMoveHandler);
+    off(ownerDocument, 'pointermove', this._delayedDragTouchMoveHandler);
+  },
+  _triggerDragStart: function _triggerDragStart( /** Event */evt, /** Touch */touch) {
+    touch = touch || evt.pointerType == 'touch' && evt;
+    if (!this.nativeDraggable || touch) {
+      if (this.options.supportPointer) {
+        on(document, 'pointermove', this._onTouchMove);
+      } else if (touch) {
+        on(document, 'touchmove', this._onTouchMove);
+      } else {
+        on(document, 'mousemove', this._onTouchMove);
+      }
+    } else {
+      on(dragEl, 'dragend', this);
+      on(rootEl, 'dragstart', this._onDragStart);
+    }
+    try {
+      if (document.selection) {
+        _nextTick(function () {
+          document.selection.empty();
+        });
+      } else {
+        window.getSelection().removeAllRanges();
+      }
+    } catch (err) {}
+  },
+  _dragStarted: function _dragStarted(fallback, evt) {
+    awaitingDragStarted = false;
+    if (rootEl && dragEl) {
+      pluginEvent('dragStarted', this, {
+        evt: evt
+      });
+      if (this.nativeDraggable) {
+        on(document, 'dragover', _checkOutsideTargetEl);
+      }
+      var options = this.options;
+
+      // Apply effect
+      !fallback && toggleClass(dragEl, options.dragClass, false);
+      toggleClass(dragEl, options.ghostClass, true);
+      Sortable.active = this;
+      fallback && this._appendGhost();
+
+      // Drag start event
+      _dispatchEvent({
+        sortable: this,
+        name: 'start',
+        originalEvent: evt
+      });
+    } else {
+      this._nulling();
+    }
+  },
+  _emulateDragOver: function _emulateDragOver() {
+    if (touchEvt) {
+      this._lastX = touchEvt.clientX;
+      this._lastY = touchEvt.clientY;
+      _hideGhostForTarget();
+      var target = document.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
+      var parent = target;
+      while (target && target.shadowRoot) {
+        target = target.shadowRoot.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
+        if (target === parent) break;
+        parent = target;
+      }
+      dragEl.parentNode[expando]._isOutsideThisEl(target);
+      if (parent) {
+        do {
+          if (parent[expando]) {
+            var inserted = void 0;
+            inserted = parent[expando]._onDragOver({
+              clientX: touchEvt.clientX,
+              clientY: touchEvt.clientY,
+              target: target,
+              rootEl: parent
+            });
+            if (inserted && !this.options.dragoverBubble) {
+              break;
+            }
+          }
+          target = parent; // store last element
+        }
+        /* jshint boss:true */ while (parent = getParentOrHost(parent));
+      }
+      _unhideGhostForTarget();
+    }
+  },
+  _onTouchMove: function _onTouchMove( /**TouchEvent*/evt) {
+    if (tapEvt) {
+      var options = this.options,
+        fallbackTolerance = options.fallbackTolerance,
+        fallbackOffset = options.fallbackOffset,
+        touch = evt.touches ? evt.touches[0] : evt,
+        ghostMatrix = ghostEl && matrix(ghostEl, true),
+        scaleX = ghostEl && ghostMatrix && ghostMatrix.a,
+        scaleY = ghostEl && ghostMatrix && ghostMatrix.d,
+        relativeScrollOffset = PositionGhostAbsolutely && ghostRelativeParent && getRelativeScrollOffset(ghostRelativeParent),
+        dx = (touch.clientX - tapEvt.clientX + fallbackOffset.x) / (scaleX || 1) + (relativeScrollOffset ? relativeScrollOffset[0] - ghostRelativeParentInitialScroll[0] : 0) / (scaleX || 1),
+        dy = (touch.clientY - tapEvt.clientY + fallbackOffset.y) / (scaleY || 1) + (relativeScrollOffset ? relativeScrollOffset[1] - ghostRelativeParentInitialScroll[1] : 0) / (scaleY || 1);
+
+      // only set the status to dragging, when we are actually dragging
+      if (!Sortable.active && !awaitingDragStarted) {
+        if (fallbackTolerance && Math.max(Math.abs(touch.clientX - this._lastX), Math.abs(touch.clientY - this._lastY)) < fallbackTolerance) {
+          return;
+        }
+        this._onDragStart(evt, true);
+      }
+      if (ghostEl) {
+        if (ghostMatrix) {
+          ghostMatrix.e += dx - (lastDx || 0);
+          ghostMatrix.f += dy - (lastDy || 0);
+        } else {
+          ghostMatrix = {
+            a: 1,
+            b: 0,
+            c: 0,
+            d: 1,
+            e: dx,
+            f: dy
+          };
+        }
+        var cssMatrix = "matrix(".concat(ghostMatrix.a, ",").concat(ghostMatrix.b, ",").concat(ghostMatrix.c, ",").concat(ghostMatrix.d, ",").concat(ghostMatrix.e, ",").concat(ghostMatrix.f, ")");
+        css(ghostEl, 'webkitTransform', cssMatrix);
+        css(ghostEl, 'mozTransform', cssMatrix);
+        css(ghostEl, 'msTransform', cssMatrix);
+        css(ghostEl, 'transform', cssMatrix);
+        lastDx = dx;
+        lastDy = dy;
+        touchEvt = touch;
+      }
+      evt.cancelable && evt.preventDefault();
+    }
+  },
+  _appendGhost: function _appendGhost() {
+    // Bug if using scale(): https://stackoverflow.com/questions/2637058
+    // Not being adjusted for
+    if (!ghostEl) {
+      var container = this.options.fallbackOnBody ? document.body : rootEl,
+        rect = getRect(dragEl, true, PositionGhostAbsolutely, true, container),
+        options = this.options;
+
+      // Position absolutely
+      if (PositionGhostAbsolutely) {
+        // Get relatively positioned parent
+        ghostRelativeParent = container;
+        while (css(ghostRelativeParent, 'position') === 'static' && css(ghostRelativeParent, 'transform') === 'none' && ghostRelativeParent !== document) {
+          ghostRelativeParent = ghostRelativeParent.parentNode;
+        }
+        if (ghostRelativeParent !== document.body && ghostRelativeParent !== document.documentElement) {
+          if (ghostRelativeParent === document) ghostRelativeParent = getWindowScrollingElement();
+          rect.top += ghostRelativeParent.scrollTop;
+          rect.left += ghostRelativeParent.scrollLeft;
+        } else {
+          ghostRelativeParent = getWindowScrollingElement();
+        }
+        ghostRelativeParentInitialScroll = getRelativeScrollOffset(ghostRelativeParent);
+      }
+      ghostEl = dragEl.cloneNode(true);
+      toggleClass(ghostEl, options.ghostClass, false);
+      toggleClass(ghostEl, options.fallbackClass, true);
+      toggleClass(ghostEl, options.dragClass, true);
+      css(ghostEl, 'transition', '');
+      css(ghostEl, 'transform', '');
+      css(ghostEl, 'box-sizing', 'border-box');
+      css(ghostEl, 'margin', 0);
+      css(ghostEl, 'top', rect.top);
+      css(ghostEl, 'left', rect.left);
+      css(ghostEl, 'width', rect.width);
+      css(ghostEl, 'height', rect.height);
+      css(ghostEl, 'opacity', '0.8');
+      css(ghostEl, 'position', PositionGhostAbsolutely ? 'absolute' : 'fixed');
+      css(ghostEl, 'zIndex', '100000');
+      css(ghostEl, 'pointerEvents', 'none');
+      Sortable.ghost = ghostEl;
+      container.appendChild(ghostEl);
+
+      // Set transform-origin
+      css(ghostEl, 'transform-origin', tapDistanceLeft / parseInt(ghostEl.style.width) * 100 + '% ' + tapDistanceTop / parseInt(ghostEl.style.height) * 100 + '%');
+    }
+  },
+  _onDragStart: function _onDragStart( /**Event*/evt, /**boolean*/fallback) {
+    var _this = this;
+    var dataTransfer = evt.dataTransfer;
+    var options = _this.options;
+    pluginEvent('dragStart', this, {
+      evt: evt
+    });
+    if (Sortable.eventCanceled) {
+      this._onDrop();
+      return;
+    }
+    pluginEvent('setupClone', this);
+    if (!Sortable.eventCanceled) {
+      cloneEl = clone(dragEl);
+      cloneEl.removeAttribute("id");
+      cloneEl.draggable = false;
+      cloneEl.style['will-change'] = '';
+      this._hideClone();
+      toggleClass(cloneEl, this.options.chosenClass, false);
+      Sortable.clone = cloneEl;
+    }
+
+    // #1143: IFrame support workaround
+    _this.cloneId = _nextTick(function () {
+      pluginEvent('clone', _this);
+      if (Sortable.eventCanceled) return;
+      if (!_this.options.removeCloneOnHide) {
+        rootEl.insertBefore(cloneEl, dragEl);
+      }
+      _this._hideClone();
+      _dispatchEvent({
+        sortable: _this,
+        name: 'clone'
+      });
+    });
+    !fallback && toggleClass(dragEl, options.dragClass, true);
+
+    // Set proper drop events
+    if (fallback) {
+      ignoreNextClick = true;
+      _this._loopId = setInterval(_this._emulateDragOver, 50);
+    } else {
+      // Undo what was set in _prepareDragStart before drag started
+      off(document, 'mouseup', _this._onDrop);
+      off(document, 'touchend', _this._onDrop);
+      off(document, 'touchcancel', _this._onDrop);
+      if (dataTransfer) {
+        dataTransfer.effectAllowed = 'move';
+        options.setData && options.setData.call(_this, dataTransfer, dragEl);
+      }
+      on(document, 'drop', _this);
+
+      // #1276 fix:
+      css(dragEl, 'transform', 'translateZ(0)');
+    }
+    awaitingDragStarted = true;
+    _this._dragStartId = _nextTick(_this._dragStarted.bind(_this, fallback, evt));
+    on(document, 'selectstart', _this);
+    moved = true;
+    window.getSelection().removeAllRanges();
+    if (Safari) {
+      css(document.body, 'user-select', 'none');
+    }
+  },
+  // Returns true - if no further action is needed (either inserted or another condition)
+  _onDragOver: function _onDragOver( /**Event*/evt) {
+    var el = this.el,
+      target = evt.target,
+      dragRect,
+      targetRect,
+      revert,
+      options = this.options,
+      group = options.group,
+      activeSortable = Sortable.active,
+      isOwner = activeGroup === group,
+      canSort = options.sort,
+      fromSortable = putSortable || activeSortable,
+      vertical,
+      _this = this,
+      completedFired = false;
+    if (_silent) return;
+    function dragOverEvent(name, extra) {
+      pluginEvent(name, _this, _objectSpread2({
+        evt: evt,
+        isOwner: isOwner,
+        axis: vertical ? 'vertical' : 'horizontal',
+        revert: revert,
+        dragRect: dragRect,
+        targetRect: targetRect,
+        canSort: canSort,
+        fromSortable: fromSortable,
+        target: target,
+        completed: completed,
+        onMove: function onMove(target, after) {
+          return _onMove(rootEl, el, dragEl, dragRect, target, getRect(target), evt, after);
+        },
+        changed: changed
+      }, extra));
+    }
+
+    // Capture animation state
+    function capture() {
+      dragOverEvent('dragOverAnimationCapture');
+      _this.captureAnimationState();
+      if (_this !== fromSortable) {
+        fromSortable.captureAnimationState();
+      }
+    }
+
+    // Return invocation when dragEl is inserted (or completed)
+    function completed(insertion) {
+      dragOverEvent('dragOverCompleted', {
+        insertion: insertion
+      });
+      if (insertion) {
+        // Clones must be hidden before folding animation to capture dragRectAbsolute properly
+        if (isOwner) {
+          activeSortable._hideClone();
+        } else {
+          activeSortable._showClone(_this);
+        }
+        if (_this !== fromSortable) {
+          // Set ghost class to new sortable's ghost class
+          toggleClass(dragEl, putSortable ? putSortable.options.ghostClass : activeSortable.options.ghostClass, false);
+          toggleClass(dragEl, options.ghostClass, true);
+        }
+        if (putSortable !== _this && _this !== Sortable.active) {
+          putSortable = _this;
+        } else if (_this === Sortable.active && putSortable) {
+          putSortable = null;
+        }
+
+        // Animation
+        if (fromSortable === _this) {
+          _this._ignoreWhileAnimating = target;
+        }
+        _this.animateAll(function () {
+          dragOverEvent('dragOverAnimationComplete');
+          _this._ignoreWhileAnimating = null;
+        });
+        if (_this !== fromSortable) {
+          fromSortable.animateAll();
+          fromSortable._ignoreWhileAnimating = null;
+        }
+      }
+
+      // Null lastTarget if it is not inside a previously swapped element
+      if (target === dragEl && !dragEl.animated || target === el && !target.animated) {
+        lastTarget = null;
+      }
+
+      // no bubbling and not fallback
+      if (!options.dragoverBubble && !evt.rootEl && target !== document) {
+        dragEl.parentNode[expando]._isOutsideThisEl(evt.target);
+
+        // Do not detect for empty insert if already inserted
+        !insertion && nearestEmptyInsertDetectEvent(evt);
+      }
+      !options.dragoverBubble && evt.stopPropagation && evt.stopPropagation();
+      return completedFired = true;
+    }
+
+    // Call when dragEl has been inserted
+    function changed() {
+      newIndex = index(dragEl);
+      newDraggableIndex = index(dragEl, options.draggable);
+      _dispatchEvent({
+        sortable: _this,
+        name: 'change',
+        toEl: el,
+        newIndex: newIndex,
+        newDraggableIndex: newDraggableIndex,
+        originalEvent: evt
+      });
+    }
+    if (evt.preventDefault !== void 0) {
+      evt.cancelable && evt.preventDefault();
+    }
+    target = closest(target, options.draggable, el, true);
+    dragOverEvent('dragOver');
+    if (Sortable.eventCanceled) return completedFired;
+    if (dragEl.contains(evt.target) || target.animated && target.animatingX && target.animatingY || _this._ignoreWhileAnimating === target) {
+      return completed(false);
+    }
+    ignoreNextClick = false;
+    if (activeSortable && !options.disabled && (isOwner ? canSort || (revert = parentEl !== rootEl) // Reverting item into the original list
+    : putSortable === this || (this.lastPutMode = activeGroup.checkPull(this, activeSortable, dragEl, evt)) && group.checkPut(this, activeSortable, dragEl, evt))) {
+      vertical = this._getDirection(evt, target) === 'vertical';
+      dragRect = getRect(dragEl);
+      dragOverEvent('dragOverValid');
+      if (Sortable.eventCanceled) return completedFired;
+      if (revert) {
+        parentEl = rootEl; // actualization
+        capture();
+        this._hideClone();
+        dragOverEvent('revert');
+        if (!Sortable.eventCanceled) {
+          if (nextEl) {
+            rootEl.insertBefore(dragEl, nextEl);
+          } else {
+            rootEl.appendChild(dragEl);
+          }
+        }
+        return completed(true);
+      }
+      var elLastChild = lastChild(el, options.draggable);
+      if (!elLastChild || _ghostIsLast(evt, vertical, this) && !elLastChild.animated) {
+        // Insert to end of list
+
+        // If already at end of list: Do not insert
+        if (elLastChild === dragEl) {
+          return completed(false);
+        }
+
+        // if there is a last element, it is the target
+        if (elLastChild && el === evt.target) {
+          target = elLastChild;
+        }
+        if (target) {
+          targetRect = getRect(target);
+        }
+        if (_onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, !!target) !== false) {
+          capture();
+          if (elLastChild && elLastChild.nextSibling) {
+            // the last draggable element is not the last node
+            el.insertBefore(dragEl, elLastChild.nextSibling);
+          } else {
+            el.appendChild(dragEl);
+          }
+          parentEl = el; // actualization
+
+          changed();
+          return completed(true);
+        }
+      } else if (elLastChild && _ghostIsFirst(evt, vertical, this)) {
+        // Insert to start of list
+        var firstChild = getChild(el, 0, options, true);
+        if (firstChild === dragEl) {
+          return completed(false);
+        }
+        target = firstChild;
+        targetRect = getRect(target);
+        if (_onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, false) !== false) {
+          capture();
+          el.insertBefore(dragEl, firstChild);
+          parentEl = el; // actualization
+
+          changed();
+          return completed(true);
+        }
+      } else if (target.parentNode === el) {
+        targetRect = getRect(target);
+        var direction = 0,
+          targetBeforeFirstSwap,
+          differentLevel = dragEl.parentNode !== el,
+          differentRowCol = !_dragElInRowColumn(dragEl.animated && dragEl.toRect || dragRect, target.animated && target.toRect || targetRect, vertical),
+          side1 = vertical ? 'top' : 'left',
+          scrolledPastTop = isScrolledPast(target, 'top', 'top') || isScrolledPast(dragEl, 'top', 'top'),
+          scrollBefore = scrolledPastTop ? scrolledPastTop.scrollTop : void 0;
+        if (lastTarget !== target) {
+          targetBeforeFirstSwap = targetRect[side1];
+          pastFirstInvertThresh = false;
+          isCircumstantialInvert = !differentRowCol && options.invertSwap || differentLevel;
+        }
+        direction = _getSwapDirection(evt, target, targetRect, vertical, differentRowCol ? 1 : options.swapThreshold, options.invertedSwapThreshold == null ? options.swapThreshold : options.invertedSwapThreshold, isCircumstantialInvert, lastTarget === target);
+        var sibling;
+        if (direction !== 0) {
+          // Check if target is beside dragEl in respective direction (ignoring hidden elements)
+          var dragIndex = index(dragEl);
+          do {
+            dragIndex -= direction;
+            sibling = parentEl.children[dragIndex];
+          } while (sibling && (css(sibling, 'display') === 'none' || sibling === ghostEl));
+        }
+        // If dragEl is already beside target: Do not insert
+        if (direction === 0 || sibling === target) {
+          return completed(false);
+        }
+        lastTarget = target;
+        lastDirection = direction;
+        var nextSibling = target.nextElementSibling,
+          after = false;
+        after = direction === 1;
+        var moveVector = _onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, after);
+        if (moveVector !== false) {
+          if (moveVector === 1 || moveVector === -1) {
+            after = moveVector === 1;
+          }
+          _silent = true;
+          setTimeout(_unsilent, 30);
+          capture();
+          if (after && !nextSibling) {
+            el.appendChild(dragEl);
+          } else {
+            target.parentNode.insertBefore(dragEl, after ? nextSibling : target);
+          }
+
+          // Undo chrome's scroll adjustment (has no effect on other browsers)
+          if (scrolledPastTop) {
+            scrollBy(scrolledPastTop, 0, scrollBefore - scrolledPastTop.scrollTop);
+          }
+          parentEl = dragEl.parentNode; // actualization
+
+          // must be done before animation
+          if (targetBeforeFirstSwap !== undefined && !isCircumstantialInvert) {
+            targetMoveDistance = Math.abs(targetBeforeFirstSwap - getRect(target)[side1]);
+          }
+          changed();
+          return completed(true);
+        }
+      }
+      if (el.contains(dragEl)) {
+        return completed(false);
+      }
+    }
+    return false;
+  },
+  _ignoreWhileAnimating: null,
+  _offMoveEvents: function _offMoveEvents() {
+    off(document, 'mousemove', this._onTouchMove);
+    off(document, 'touchmove', this._onTouchMove);
+    off(document, 'pointermove', this._onTouchMove);
+    off(document, 'dragover', nearestEmptyInsertDetectEvent);
+    off(document, 'mousemove', nearestEmptyInsertDetectEvent);
+    off(document, 'touchmove', nearestEmptyInsertDetectEvent);
+  },
+  _offUpEvents: function _offUpEvents() {
+    var ownerDocument = this.el.ownerDocument;
+    off(ownerDocument, 'mouseup', this._onDrop);
+    off(ownerDocument, 'touchend', this._onDrop);
+    off(ownerDocument, 'pointerup', this._onDrop);
+    off(ownerDocument, 'pointercancel', this._onDrop);
+    off(ownerDocument, 'touchcancel', this._onDrop);
+    off(document, 'selectstart', this);
+  },
+  _onDrop: function _onDrop( /**Event*/evt) {
+    var el = this.el,
+      options = this.options;
+
+    // Get the index of the dragged element within its parent
+    newIndex = index(dragEl);
+    newDraggableIndex = index(dragEl, options.draggable);
+    pluginEvent('drop', this, {
+      evt: evt
+    });
+    parentEl = dragEl && dragEl.parentNode;
+
+    // Get again after plugin event
+    newIndex = index(dragEl);
+    newDraggableIndex = index(dragEl, options.draggable);
+    if (Sortable.eventCanceled) {
+      this._nulling();
+      return;
+    }
+    awaitingDragStarted = false;
+    isCircumstantialInvert = false;
+    pastFirstInvertThresh = false;
+    clearInterval(this._loopId);
+    clearTimeout(this._dragStartTimer);
+    _cancelNextTick(this.cloneId);
+    _cancelNextTick(this._dragStartId);
+
+    // Unbind events
+    if (this.nativeDraggable) {
+      off(document, 'drop', this);
+      off(el, 'dragstart', this._onDragStart);
+    }
+    this._offMoveEvents();
+    this._offUpEvents();
+    if (Safari) {
+      css(document.body, 'user-select', '');
+    }
+    css(dragEl, 'transform', '');
+    if (evt) {
+      if (moved) {
+        evt.cancelable && evt.preventDefault();
+        !options.dropBubble && evt.stopPropagation();
+      }
+      ghostEl && ghostEl.parentNode && ghostEl.parentNode.removeChild(ghostEl);
+      if (rootEl === parentEl || putSortable && putSortable.lastPutMode !== 'clone') {
+        // Remove clone(s)
+        cloneEl && cloneEl.parentNode && cloneEl.parentNode.removeChild(cloneEl);
+      }
+      if (dragEl) {
+        if (this.nativeDraggable) {
+          off(dragEl, 'dragend', this);
+        }
+        _disableDraggable(dragEl);
+        dragEl.style['will-change'] = '';
+
+        // Remove classes
+        // ghostClass is added in dragStarted
+        if (moved && !awaitingDragStarted) {
+          toggleClass(dragEl, putSortable ? putSortable.options.ghostClass : this.options.ghostClass, false);
+        }
+        toggleClass(dragEl, this.options.chosenClass, false);
+
+        // Drag stop event
+        _dispatchEvent({
+          sortable: this,
+          name: 'unchoose',
+          toEl: parentEl,
+          newIndex: null,
+          newDraggableIndex: null,
+          originalEvent: evt
+        });
+        if (rootEl !== parentEl) {
+          if (newIndex >= 0) {
+            // Add event
+            _dispatchEvent({
+              rootEl: parentEl,
+              name: 'add',
+              toEl: parentEl,
+              fromEl: rootEl,
+              originalEvent: evt
+            });
+
+            // Remove event
+            _dispatchEvent({
+              sortable: this,
+              name: 'remove',
+              toEl: parentEl,
+              originalEvent: evt
+            });
+
+            // drag from one list and drop into another
+            _dispatchEvent({
+              rootEl: parentEl,
+              name: 'sort',
+              toEl: parentEl,
+              fromEl: rootEl,
+              originalEvent: evt
+            });
+            _dispatchEvent({
+              sortable: this,
+              name: 'sort',
+              toEl: parentEl,
+              originalEvent: evt
+            });
+          }
+          putSortable && putSortable.save();
+        } else {
+          if (newIndex !== oldIndex) {
+            if (newIndex >= 0) {
+              // drag & drop within the same list
+              _dispatchEvent({
+                sortable: this,
+                name: 'update',
+                toEl: parentEl,
+                originalEvent: evt
+              });
+              _dispatchEvent({
+                sortable: this,
+                name: 'sort',
+                toEl: parentEl,
+                originalEvent: evt
+              });
+            }
+          }
+        }
+        if (Sortable.active) {
+          /* jshint eqnull:true */
+          if (newIndex == null || newIndex === -1) {
+            newIndex = oldIndex;
+            newDraggableIndex = oldDraggableIndex;
+          }
+          _dispatchEvent({
+            sortable: this,
+            name: 'end',
+            toEl: parentEl,
+            originalEvent: evt
+          });
+
+          // Save sorting
+          this.save();
+        }
+      }
+    }
+    this._nulling();
+  },
+  _nulling: function _nulling() {
+    pluginEvent('nulling', this);
+    rootEl = dragEl = parentEl = ghostEl = nextEl = cloneEl = lastDownEl = cloneHidden = tapEvt = touchEvt = moved = newIndex = newDraggableIndex = oldIndex = oldDraggableIndex = lastTarget = lastDirection = putSortable = activeGroup = Sortable.dragged = Sortable.ghost = Sortable.clone = Sortable.active = null;
+    var el = this.el;
+    savedInputChecked.forEach(function (checkEl) {
+      if (el.contains(checkEl)) {
+        checkEl.checked = true;
+      }
+    });
+    savedInputChecked.length = lastDx = lastDy = 0;
+  },
+  handleEvent: function handleEvent( /**Event*/evt) {
+    switch (evt.type) {
+      case 'drop':
+      case 'dragend':
+        this._onDrop(evt);
+        break;
+      case 'dragenter':
+      case 'dragover':
+        if (dragEl) {
+          this._onDragOver(evt);
+          _globalDragOver(evt);
+        }
+        break;
+      case 'selectstart':
+        evt.preventDefault();
+        break;
+    }
+  },
+  /**
+   * Serializes the item into an array of string.
+   * @returns {String[]}
+   */
+  toArray: function toArray() {
+    var order = [],
+      el,
+      children = this.el.children,
+      i = 0,
+      n = children.length,
+      options = this.options;
+    for (; i < n; i++) {
+      el = children[i];
+      if (closest(el, options.draggable, this.el, false)) {
+        order.push(el.getAttribute(options.dataIdAttr) || _generateId(el));
+      }
+    }
+    return order;
+  },
+  /**
+   * Sorts the elements according to the array.
+   * @param  {String[]}  order  order of the items
+   */
+  sort: function sort(order, useAnimation) {
+    var items = {},
+      rootEl = this.el;
+    this.toArray().forEach(function (id, i) {
+      var el = rootEl.children[i];
+      if (closest(el, this.options.draggable, rootEl, false)) {
+        items[id] = el;
+      }
+    }, this);
+    useAnimation && this.captureAnimationState();
+    order.forEach(function (id) {
+      if (items[id]) {
+        rootEl.removeChild(items[id]);
+        rootEl.appendChild(items[id]);
+      }
+    });
+    useAnimation && this.animateAll();
+  },
+  /**
+   * Save the current sorting
+   */
+  save: function save() {
+    var store = this.options.store;
+    store && store.set && store.set(this);
+  },
+  /**
+   * For each element in the set, get the first element that matches the selector by testing the element itself and traversing up through its ancestors in the DOM tree.
+   * @param   {HTMLElement}  el
+   * @param   {String}       [selector]  default: `options.draggable`
+   * @returns {HTMLElement|null}
+   */
+  closest: function closest$1(el, selector) {
+    return closest(el, selector || this.options.draggable, this.el, false);
+  },
+  /**
+   * Set/get option
+   * @param   {string} name
+   * @param   {*}      [value]
+   * @returns {*}
+   */
+  option: function option(name, value) {
+    var options = this.options;
+    if (value === void 0) {
+      return options[name];
+    } else {
+      var modifiedValue = PluginManager.modifyOption(this, name, value);
+      if (typeof modifiedValue !== 'undefined') {
+        options[name] = modifiedValue;
+      } else {
+        options[name] = value;
+      }
+      if (name === 'group') {
+        _prepareGroup(options);
+      }
+    }
+  },
+  /**
+   * Destroy
+   */
+  destroy: function destroy() {
+    pluginEvent('destroy', this);
+    var el = this.el;
+    el[expando] = null;
+    off(el, 'mousedown', this._onTapStart);
+    off(el, 'touchstart', this._onTapStart);
+    off(el, 'pointerdown', this._onTapStart);
+    if (this.nativeDraggable) {
+      off(el, 'dragover', this);
+      off(el, 'dragenter', this);
+    }
+    // Remove draggable attributes
+    Array.prototype.forEach.call(el.querySelectorAll('[draggable]'), function (el) {
+      el.removeAttribute('draggable');
+    });
+    this._onDrop();
+    this._disableDelayedDragEvents();
+    sortables.splice(sortables.indexOf(this.el), 1);
+    this.el = el = null;
+  },
+  _hideClone: function _hideClone() {
+    if (!cloneHidden) {
+      pluginEvent('hideClone', this);
+      if (Sortable.eventCanceled) return;
+      css(cloneEl, 'display', 'none');
+      if (this.options.removeCloneOnHide && cloneEl.parentNode) {
+        cloneEl.parentNode.removeChild(cloneEl);
+      }
+      cloneHidden = true;
+    }
+  },
+  _showClone: function _showClone(putSortable) {
+    if (putSortable.lastPutMode !== 'clone') {
+      this._hideClone();
+      return;
+    }
+    if (cloneHidden) {
+      pluginEvent('showClone', this);
+      if (Sortable.eventCanceled) return;
+
+      // show clone at dragEl or original position
+      if (dragEl.parentNode == rootEl && !this.options.group.revertClone) {
+        rootEl.insertBefore(cloneEl, dragEl);
+      } else if (nextEl) {
+        rootEl.insertBefore(cloneEl, nextEl);
+      } else {
+        rootEl.appendChild(cloneEl);
+      }
+      if (this.options.group.revertClone) {
+        this.animate(dragEl, cloneEl);
+      }
+      css(cloneEl, 'display', '');
+      cloneHidden = false;
+    }
+  }
+};
+function _globalDragOver( /**Event*/evt) {
+  if (evt.dataTransfer) {
+    evt.dataTransfer.dropEffect = 'move';
+  }
+  evt.cancelable && evt.preventDefault();
+}
+function _onMove(fromEl, toEl, dragEl, dragRect, targetEl, targetRect, originalEvent, willInsertAfter) {
+  var evt,
+    sortable = fromEl[expando],
+    onMoveFn = sortable.options.onMove,
+    retVal;
+  // Support for new CustomEvent feature
+  if (window.CustomEvent && !IE11OrLess && !Edge) {
+    evt = new CustomEvent('move', {
+      bubbles: true,
+      cancelable: true
+    });
+  } else {
+    evt = document.createEvent('Event');
+    evt.initEvent('move', true, true);
+  }
+  evt.to = toEl;
+  evt.from = fromEl;
+  evt.dragged = dragEl;
+  evt.draggedRect = dragRect;
+  evt.related = targetEl || toEl;
+  evt.relatedRect = targetRect || getRect(toEl);
+  evt.willInsertAfter = willInsertAfter;
+  evt.originalEvent = originalEvent;
+  fromEl.dispatchEvent(evt);
+  if (onMoveFn) {
+    retVal = onMoveFn.call(sortable, evt, originalEvent);
+  }
+  return retVal;
+}
+function _disableDraggable(el) {
+  el.draggable = false;
+}
+function _unsilent() {
+  _silent = false;
+}
+function _ghostIsFirst(evt, vertical, sortable) {
+  var firstElRect = getRect(getChild(sortable.el, 0, sortable.options, true));
+  var childContainingRect = getChildContainingRectFromElement(sortable.el, sortable.options, ghostEl);
+  var spacer = 10;
+  return vertical ? evt.clientX < childContainingRect.left - spacer || evt.clientY < firstElRect.top && evt.clientX < firstElRect.right : evt.clientY < childContainingRect.top - spacer || evt.clientY < firstElRect.bottom && evt.clientX < firstElRect.left;
+}
+function _ghostIsLast(evt, vertical, sortable) {
+  var lastElRect = getRect(lastChild(sortable.el, sortable.options.draggable));
+  var childContainingRect = getChildContainingRectFromElement(sortable.el, sortable.options, ghostEl);
+  var spacer = 10;
+  return vertical ? evt.clientX > childContainingRect.right + spacer || evt.clientY > lastElRect.bottom && evt.clientX > lastElRect.left : evt.clientY > childContainingRect.bottom + spacer || evt.clientX > lastElRect.right && evt.clientY > lastElRect.top;
+}
+function _getSwapDirection(evt, target, targetRect, vertical, swapThreshold, invertedSwapThreshold, invertSwap, isLastTarget) {
+  var mouseOnAxis = vertical ? evt.clientY : evt.clientX,
+    targetLength = vertical ? targetRect.height : targetRect.width,
+    targetS1 = vertical ? targetRect.top : targetRect.left,
+    targetS2 = vertical ? targetRect.bottom : targetRect.right,
+    invert = false;
+  if (!invertSwap) {
+    // Never invert or create dragEl shadow when target movemenet causes mouse to move past the end of regular swapThreshold
+    if (isLastTarget && targetMoveDistance < targetLength * swapThreshold) {
+      // multiplied only by swapThreshold because mouse will already be inside target by (1 - threshold) * targetLength / 2
+      // check if past first invert threshold on side opposite of lastDirection
+      if (!pastFirstInvertThresh && (lastDirection === 1 ? mouseOnAxis > targetS1 + targetLength * invertedSwapThreshold / 2 : mouseOnAxis < targetS2 - targetLength * invertedSwapThreshold / 2)) {
+        // past first invert threshold, do not restrict inverted threshold to dragEl shadow
+        pastFirstInvertThresh = true;
+      }
+      if (!pastFirstInvertThresh) {
+        // dragEl shadow (target move distance shadow)
+        if (lastDirection === 1 ? mouseOnAxis < targetS1 + targetMoveDistance // over dragEl shadow
+        : mouseOnAxis > targetS2 - targetMoveDistance) {
+          return -lastDirection;
+        }
+      } else {
+        invert = true;
+      }
+    } else {
+      // Regular
+      if (mouseOnAxis > targetS1 + targetLength * (1 - swapThreshold) / 2 && mouseOnAxis < targetS2 - targetLength * (1 - swapThreshold) / 2) {
+        return _getInsertDirection(target);
+      }
+    }
+  }
+  invert = invert || invertSwap;
+  if (invert) {
+    // Invert of regular
+    if (mouseOnAxis < targetS1 + targetLength * invertedSwapThreshold / 2 || mouseOnAxis > targetS2 - targetLength * invertedSwapThreshold / 2) {
+      return mouseOnAxis > targetS1 + targetLength / 2 ? 1 : -1;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Gets the direction dragEl must be swapped relative to target in order to make it
+ * seem that dragEl has been "inserted" into that element's position
+ * @param  {HTMLElement} target       The target whose position dragEl is being inserted at
+ * @return {Number}                   Direction dragEl must be swapped
+ */
+function _getInsertDirection(target) {
+  if (index(dragEl) < index(target)) {
+    return 1;
+  } else {
+    return -1;
+  }
+}
+
+/**
+ * Generate id
+ * @param   {HTMLElement} el
+ * @returns {String}
+ * @private
+ */
+function _generateId(el) {
+  var str = el.tagName + el.className + el.src + el.href + el.textContent,
+    i = str.length,
+    sum = 0;
+  while (i--) {
+    sum += str.charCodeAt(i);
+  }
+  return sum.toString(36);
+}
+function _saveInputCheckedState(root) {
+  savedInputChecked.length = 0;
+  var inputs = root.getElementsByTagName('input');
+  var idx = inputs.length;
+  while (idx--) {
+    var el = inputs[idx];
+    el.checked && savedInputChecked.push(el);
+  }
+}
+function _nextTick(fn) {
+  return setTimeout(fn, 0);
+}
+function _cancelNextTick(id) {
+  return clearTimeout(id);
+}
+
+// Fixed #973:
+if (documentExists) {
+  on(document, 'touchmove', function (evt) {
+    if ((Sortable.active || awaitingDragStarted) && evt.cancelable) {
+      evt.preventDefault();
+    }
+  });
+}
+
+// Export utils
+Sortable.utils = {
+  on: on,
+  off: off,
+  css: css,
+  find: find,
+  is: function is(el, selector) {
+    return !!closest(el, selector, el, false);
+  },
+  extend: extend,
+  throttle: throttle,
+  closest: closest,
+  toggleClass: toggleClass,
+  clone: clone,
+  index: index,
+  nextTick: _nextTick,
+  cancelNextTick: _cancelNextTick,
+  detectDirection: _detectDirection,
+  getChild: getChild,
+  expando: expando
+};
+
+/**
+ * Get the Sortable instance of an element
+ * @param  {HTMLElement} element The element
+ * @return {Sortable|undefined}         The instance of Sortable
+ */
+Sortable.get = function (element) {
+  return element[expando];
+};
+
+/**
+ * Mount a plugin to Sortable
+ * @param  {...SortablePlugin|SortablePlugin[]} plugins       Plugins being mounted
+ */
+Sortable.mount = function () {
+  for (var _len = arguments.length, plugins = new Array(_len), _key = 0; _key < _len; _key++) {
+    plugins[_key] = arguments[_key];
+  }
+  if (plugins[0].constructor === Array) plugins = plugins[0];
+  plugins.forEach(function (plugin) {
+    if (!plugin.prototype || !plugin.prototype.constructor) {
+      throw "Sortable: Mounted plugin must be a constructor function, not ".concat({}.toString.call(plugin));
+    }
+    if (plugin.utils) Sortable.utils = _objectSpread2(_objectSpread2({}, Sortable.utils), plugin.utils);
+    PluginManager.mount(plugin);
+  });
+};
+
+/**
+ * Create sortable instance
+ * @param {HTMLElement}  el
+ * @param {Object}      [options]
+ */
+Sortable.create = function (el, options) {
+  return new Sortable(el, options);
+};
+
+// Export
+Sortable.version = version;
+
+var autoScrolls = [],
+  scrollEl,
+  scrollRootEl,
+  scrolling = false,
+  lastAutoScrollX,
+  lastAutoScrollY,
+  touchEvt$1,
+  pointerElemChangedInterval;
+function AutoScrollPlugin() {
+  function AutoScroll() {
+    this.defaults = {
+      scroll: true,
+      forceAutoScrollFallback: false,
+      scrollSensitivity: 30,
+      scrollSpeed: 10,
+      bubbleScroll: true
+    };
+
+    // Bind all private methods
+    for (var fn in this) {
+      if (fn.charAt(0) === '_' && typeof this[fn] === 'function') {
+        this[fn] = this[fn].bind(this);
+      }
+    }
+  }
+  AutoScroll.prototype = {
+    dragStarted: function dragStarted(_ref) {
+      var originalEvent = _ref.originalEvent;
+      if (this.sortable.nativeDraggable) {
+        on(document, 'dragover', this._handleAutoScroll);
+      } else {
+        if (this.options.supportPointer) {
+          on(document, 'pointermove', this._handleFallbackAutoScroll);
+        } else if (originalEvent.touches) {
+          on(document, 'touchmove', this._handleFallbackAutoScroll);
+        } else {
+          on(document, 'mousemove', this._handleFallbackAutoScroll);
+        }
+      }
+    },
+    dragOverCompleted: function dragOverCompleted(_ref2) {
+      var originalEvent = _ref2.originalEvent;
+      // For when bubbling is canceled and using fallback (fallback 'touchmove' always reached)
+      if (!this.options.dragOverBubble && !originalEvent.rootEl) {
+        this._handleAutoScroll(originalEvent);
+      }
+    },
+    drop: function drop() {
+      if (this.sortable.nativeDraggable) {
+        off(document, 'dragover', this._handleAutoScroll);
+      } else {
+        off(document, 'pointermove', this._handleFallbackAutoScroll);
+        off(document, 'touchmove', this._handleFallbackAutoScroll);
+        off(document, 'mousemove', this._handleFallbackAutoScroll);
+      }
+      clearPointerElemChangedInterval();
+      clearAutoScrolls();
+      cancelThrottle();
+    },
+    nulling: function nulling() {
+      touchEvt$1 = scrollRootEl = scrollEl = scrolling = pointerElemChangedInterval = lastAutoScrollX = lastAutoScrollY = null;
+      autoScrolls.length = 0;
+    },
+    _handleFallbackAutoScroll: function _handleFallbackAutoScroll(evt) {
+      this._handleAutoScroll(evt, true);
+    },
+    _handleAutoScroll: function _handleAutoScroll(evt, fallback) {
+      var _this = this;
+      var x = (evt.touches ? evt.touches[0] : evt).clientX,
+        y = (evt.touches ? evt.touches[0] : evt).clientY,
+        elem = document.elementFromPoint(x, y);
+      touchEvt$1 = evt;
+
+      // IE does not seem to have native autoscroll,
+      // Edge's autoscroll seems too conditional,
+      // MACOS Safari does not have autoscroll,
+      // Firefox and Chrome are good
+      if (fallback || this.options.forceAutoScrollFallback || Edge || IE11OrLess || Safari) {
+        autoScroll(evt, this.options, elem, fallback);
+
+        // Listener for pointer element change
+        var ogElemScroller = getParentAutoScrollElement(elem, true);
+        if (scrolling && (!pointerElemChangedInterval || x !== lastAutoScrollX || y !== lastAutoScrollY)) {
+          pointerElemChangedInterval && clearPointerElemChangedInterval();
+          // Detect for pointer elem change, emulating native DnD behaviour
+          pointerElemChangedInterval = setInterval(function () {
+            var newElem = getParentAutoScrollElement(document.elementFromPoint(x, y), true);
+            if (newElem !== ogElemScroller) {
+              ogElemScroller = newElem;
+              clearAutoScrolls();
+            }
+            autoScroll(evt, _this.options, newElem, fallback);
+          }, 10);
+          lastAutoScrollX = x;
+          lastAutoScrollY = y;
+        }
+      } else {
+        // if DnD is enabled (and browser has good autoscrolling), first autoscroll will already scroll, so get parent autoscroll of first autoscroll
+        if (!this.options.bubbleScroll || getParentAutoScrollElement(elem, true) === getWindowScrollingElement()) {
+          clearAutoScrolls();
+          return;
+        }
+        autoScroll(evt, this.options, getParentAutoScrollElement(elem, false), false);
+      }
+    }
+  };
+  return _extends(AutoScroll, {
+    pluginName: 'scroll',
+    initializeByDefault: true
+  });
+}
+function clearAutoScrolls() {
+  autoScrolls.forEach(function (autoScroll) {
+    clearInterval(autoScroll.pid);
+  });
+  autoScrolls = [];
+}
+function clearPointerElemChangedInterval() {
+  clearInterval(pointerElemChangedInterval);
+}
+var autoScroll = throttle(function (evt, options, rootEl, isFallback) {
+  // Bug: https://bugzilla.mozilla.org/show_bug.cgi?id=505521
+  if (!options.scroll) return;
+  var x = (evt.touches ? evt.touches[0] : evt).clientX,
+    y = (evt.touches ? evt.touches[0] : evt).clientY,
+    sens = options.scrollSensitivity,
+    speed = options.scrollSpeed,
+    winScroller = getWindowScrollingElement();
+  var scrollThisInstance = false,
+    scrollCustomFn;
+
+  // New scroll root, set scrollEl
+  if (scrollRootEl !== rootEl) {
+    scrollRootEl = rootEl;
+    clearAutoScrolls();
+    scrollEl = options.scroll;
+    scrollCustomFn = options.scrollFn;
+    if (scrollEl === true) {
+      scrollEl = getParentAutoScrollElement(rootEl, true);
+    }
+  }
+  var layersOut = 0;
+  var currentParent = scrollEl;
+  do {
+    var el = currentParent,
+      rect = getRect(el),
+      top = rect.top,
+      bottom = rect.bottom,
+      left = rect.left,
+      right = rect.right,
+      width = rect.width,
+      height = rect.height,
+      canScrollX = void 0,
+      canScrollY = void 0,
+      scrollWidth = el.scrollWidth,
+      scrollHeight = el.scrollHeight,
+      elCSS = css(el),
+      scrollPosX = el.scrollLeft,
+      scrollPosY = el.scrollTop;
+    if (el === winScroller) {
+      canScrollX = width < scrollWidth && (elCSS.overflowX === 'auto' || elCSS.overflowX === 'scroll' || elCSS.overflowX === 'visible');
+      canScrollY = height < scrollHeight && (elCSS.overflowY === 'auto' || elCSS.overflowY === 'scroll' || elCSS.overflowY === 'visible');
+    } else {
+      canScrollX = width < scrollWidth && (elCSS.overflowX === 'auto' || elCSS.overflowX === 'scroll');
+      canScrollY = height < scrollHeight && (elCSS.overflowY === 'auto' || elCSS.overflowY === 'scroll');
+    }
+    var vx = canScrollX && (Math.abs(right - x) <= sens && scrollPosX + width < scrollWidth) - (Math.abs(left - x) <= sens && !!scrollPosX);
+    var vy = canScrollY && (Math.abs(bottom - y) <= sens && scrollPosY + height < scrollHeight) - (Math.abs(top - y) <= sens && !!scrollPosY);
+    if (!autoScrolls[layersOut]) {
+      for (var i = 0; i <= layersOut; i++) {
+        if (!autoScrolls[i]) {
+          autoScrolls[i] = {};
+        }
+      }
+    }
+    if (autoScrolls[layersOut].vx != vx || autoScrolls[layersOut].vy != vy || autoScrolls[layersOut].el !== el) {
+      autoScrolls[layersOut].el = el;
+      autoScrolls[layersOut].vx = vx;
+      autoScrolls[layersOut].vy = vy;
+      clearInterval(autoScrolls[layersOut].pid);
+      if (vx != 0 || vy != 0) {
+        scrollThisInstance = true;
+        /* jshint loopfunc:true */
+        autoScrolls[layersOut].pid = setInterval(function () {
+          // emulate drag over during autoscroll (fallback), emulating native DnD behaviour
+          if (isFallback && this.layer === 0) {
+            Sortable.active._onTouchMove(touchEvt$1); // To move ghost if it is positioned absolutely
+          }
+          var scrollOffsetY = autoScrolls[this.layer].vy ? autoScrolls[this.layer].vy * speed : 0;
+          var scrollOffsetX = autoScrolls[this.layer].vx ? autoScrolls[this.layer].vx * speed : 0;
+          if (typeof scrollCustomFn === 'function') {
+            if (scrollCustomFn.call(Sortable.dragged.parentNode[expando], scrollOffsetX, scrollOffsetY, evt, touchEvt$1, autoScrolls[this.layer].el) !== 'continue') {
+              return;
+            }
+          }
+          scrollBy(autoScrolls[this.layer].el, scrollOffsetX, scrollOffsetY);
+        }.bind({
+          layer: layersOut
+        }), 24);
+      }
+    }
+    layersOut++;
+  } while (options.bubbleScroll && currentParent !== winScroller && (currentParent = getParentAutoScrollElement(currentParent, false)));
+  scrolling = scrollThisInstance; // in case another function catches scrolling as false in between when it is not
+}, 30);
+
+var drop = function drop(_ref) {
+  var originalEvent = _ref.originalEvent,
+    putSortable = _ref.putSortable,
+    dragEl = _ref.dragEl,
+    activeSortable = _ref.activeSortable,
+    dispatchSortableEvent = _ref.dispatchSortableEvent,
+    hideGhostForTarget = _ref.hideGhostForTarget,
+    unhideGhostForTarget = _ref.unhideGhostForTarget;
+  if (!originalEvent) return;
+  var toSortable = putSortable || activeSortable;
+  hideGhostForTarget();
+  var touch = originalEvent.changedTouches && originalEvent.changedTouches.length ? originalEvent.changedTouches[0] : originalEvent;
+  var target = document.elementFromPoint(touch.clientX, touch.clientY);
+  unhideGhostForTarget();
+  if (toSortable && !toSortable.el.contains(target)) {
+    dispatchSortableEvent('spill');
+    this.onSpill({
+      dragEl: dragEl,
+      putSortable: putSortable
+    });
+  }
+};
+function Revert() {}
+Revert.prototype = {
+  startIndex: null,
+  dragStart: function dragStart(_ref2) {
+    var oldDraggableIndex = _ref2.oldDraggableIndex;
+    this.startIndex = oldDraggableIndex;
+  },
+  onSpill: function onSpill(_ref3) {
+    var dragEl = _ref3.dragEl,
+      putSortable = _ref3.putSortable;
+    this.sortable.captureAnimationState();
+    if (putSortable) {
+      putSortable.captureAnimationState();
+    }
+    var nextSibling = getChild(this.sortable.el, this.startIndex, this.options);
+    if (nextSibling) {
+      this.sortable.el.insertBefore(dragEl, nextSibling);
+    } else {
+      this.sortable.el.appendChild(dragEl);
+    }
+    this.sortable.animateAll();
+    if (putSortable) {
+      putSortable.animateAll();
+    }
+  },
+  drop: drop
+};
+_extends(Revert, {
+  pluginName: 'revertOnSpill'
+});
+function Remove() {}
+Remove.prototype = {
+  onSpill: function onSpill(_ref4) {
+    var dragEl = _ref4.dragEl,
+      putSortable = _ref4.putSortable;
+    var parentSortable = putSortable || this.sortable;
+    parentSortable.captureAnimationState();
+    dragEl.parentNode && dragEl.parentNode.removeChild(dragEl);
+    parentSortable.animateAll();
+  },
+  drop: drop
+};
+_extends(Remove, {
+  pluginName: 'removeOnSpill'
+});
+
+Sortable.mount(new AutoScrollPlugin());
+Sortable.mount(Remove, Revert);
+
+const CONFIG = {
+	FORM_COMPONENTS: [
+		{ type: "input", label: "Input" },
+		{ type: "link", label: "Link" },
+		{ type: "location", label: "Location" },
+		{ type: "textarea", label: "Text" },
+		{ type: "checkbox", label: "Checkbox" },
+		{ type: "radio", label: "Radio Group" },
+		{ type: "select", label: "Select" },
+		{ type: "table", label: "Table" },
+		{ type: "todo", label: "Todo List", icon: "checklist" },
+		{ type: "signature", label: "Signature" },
+		{ type: "html", label: "Document" },
+		{ type: "status", label: "Status" },
+	],
+	PAGE_COMPONENTS: [
+		{ type: "input", label: "Input" },
+		{ type: "link", label: "Link" },
+		{ type: "location", label: "Location" },
+		{ type: "textarea", label: "Text" },
+		{ type: "bookmark", label: "Bookmark" },
+		{ type: "checkbox", label: "Checkbox" },
+		{ type: "radio", label: "Radio Group" },
+		{ type: "select", label: "Select" },
+		{ type: "table", label: "Table" },
+	],
+	INPUTS: [
+		{ type: "text", name: "Text" },
+		{ type: "tel", name: "Phone Number" },
+		{ type: "number", name: "Number" },
+		{ type: "email", name: "Email" },
+		{ type: "date", name: "Date" },
+		{ type: "time", name: "Time" },
+	],
+	TABLE_COLUMNS: [
+		{ type: "text", name: "Text" },
+		{ type: "tel", name: "Phone Number" },
+		{ type: "number", name: "Number" },
+		{ type: "email", name: "Email" },
+		{ type: "date", name: "Date" },
+		{ type: "time", name: "Time" },
+		{ type: "out", name: "External Link" },
+		{ type: "in", name: "Internal Link" },
+		{ type: "checkbox", name: "Checkbox" },
+	],
+	LINKS: [
+		{ type: "out", name: "External" },
+		{ type: "in", name: "Internal" },
+	],
+	PRESENTATION_DEFAULTS: {
+		bookmark: { title: "Bookmark" },
+		checkbox: { title: "Checkbox" },
+		html: { title: "Rich Text" },
+		input: { title: "Input", input: "text" },
+		link: { title: "Link", location: "out" },
+		location: { title: "Location" },
+		radio: { title: "Radio Group" },
+		select: { title: "Select" },
+		signature: { title: "Signature" },
+		status: { title: "Status" },
+		table: { title: "Table" },
+		todo: { title: "Todo List" },
+		textarea: { title: "Text" },
+	},
+	DEFAULT_SETTINGS: {
+		input: [
+			"title",
+			"placeholder",
+			"visibility",
+			"input",
+			"required",
+			"deleteButton",
+		],
+		link: ["title", "visibility", "required", "location", "deleteButton"],
+		location: [
+			"title",
+			"placeholder",
+			"visibility",
+			"required",
+			"deleteButton",
+		],
+		textarea: [
+			"title",
+			"placeholder",
+			"visibility",
+			"required",
+			"deleteButton",
+		],
+		bookmark: ["title", "deleteButton"],
+		checkbox: ["title", "visibility", "checked", "required", "deleteButton"],
+		radio: ["title", "visibility", "options", "required", "deleteButton"],
+		select: [
+			"title",
+			"placeholder",
+			"visibility",
+			"options",
+			"multiple",
+			"required",
+			"deleteButton",
+		],
+		html: ["title", "visibility", "editor", "deleteButton"],
+		signature: ["title", "required", "deleteButton"],
+		status: ["title", "status", "deleteButton"],
+		table: ["title", "columns", "visibility", "deleteButton"],
+		todo: ["title", "visibility", "deleteButton"],
+	},
+};
+
+/**
+ * @testable infrastructure
+ */
+class ComponentsPanel {
+	constructor(builder) {
+		this.builder = builder;
+		this.column = document.getElementById("components-column");
+		this.panel = document.getElementById("components-panel");
+		this._click = this._click.bind(this);
+		this._move = this._move.bind(this);
+		this.init();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
+	 * @tests tests_js/test_032_todo_element_frontend.py::test_todo_builder_registration_is_task_only
+	 * @matrix forms : components page-form task-form
+	 */
+	init() {
+		const componentConfig =
+			this.builder.elt.dataset.formType === "page"
+				? CONFIG.PAGE_COMPONENTS
+				: CONFIG.FORM_COMPONENTS;
+
+		const components = [];
+
+		componentConfig.forEach(({ type, label, icon: iconType = type }) => {
+			const component = document.createElement("div");
+			component.className = `${STYLES.builder.component}`;
+			component.dataset.type = type;
+
+			const icon = component.appendChild(document.createElement("span"));
+			setIcon(icon, iconType, "text-form-default");
+
+			const name = component.appendChild(document.createElement("span"));
+			name.textContent = label;
+
+			const addButton = component.appendChild(document.createElement("button"));
+			addButton.dataset.role = "add";
+			addButton.type = "button";
+			addButton.title = `Add ${label}`;
+			addButton.setAttribute("aria-label", `Add ${label}`);
+			addButton.className =
+				"ml-auto grid size-6 place-items-center rounded-md text-form-default hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default";
+
+			const addIcon = addButton.appendChild(document.createElement("span"));
+			setIcon(addIcon, "add");
+
+			components.push(component);
+		});
+
+		this.panel.append(...components);
+
+		this.sortable = Sortable.create(this.panel, {
+			group: {
+				name: "builder",
+				pull: "clone",
+				put: false,
+			},
+			onMove: this._move,
+			animation: 150,
+			sort: false,
+		});
+
+		this.column.addEventListener("click", this._click);
+	}
+
+	_move(event) {
+		const type = event.dragged.dataset.type;
+		if (this.builder.model.hasUniqueElement(type)) {
+			this.builder.header.message(
+				`Only one ${type} element is allowed per form`,
+			);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
+	 * @matrix forms : builder-add-fields builder-add-inputs unique-component
+	 */
+	_click(event) {
+		const button = event.target.closest("[data-role]");
+		if (button?.dataset.role === "add") {
+			const type = button.closest("[data-type]").dataset.type;
+			if (this.builder.model.hasUniqueElement(type)) {
+				this.builder.header.message(
+					`Only one ${type} element is allowed per form`,
+				);
+				return;
+			}
+
+			const element = this.builder.createElement({ type });
+			this.builder.model.sortable.el.appendChild(element);
+			this.builder.updateSchemaOrder();
+			this.builder.selectElement(element.id);
+		}
+	}
+
+	destroy() {
+		this.column?.removeEventListener("click", this._click);
+		this.sortable?.destroy();
+		this.sortable = null;
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class ConditionPanel {
+	constructor(builder) {
+		this.builder = builder;
+		this.panel = document.getElementById("condition-panel");
+		this.loading = false;
+		this.condition = null;
+		this._click = this._click.bind(this);
+		this._draftInput = this._draftInput.bind(this);
+		this.init();
+	}
+
+	init() {
+		this.panel.addEventListener("click", this._click);
+		for (const event of ["input", "change", "updated"])
+			this.panel.addEventListener(event, this._draftInput);
+	}
+
+	_draftInput() {
+		if (this.builder._restoringDraft || !this.condition?.key) return;
+		// Dialog buffers are applied with Add/Update, but already count as newer
+		// user work when deciding whether an asynchronous proposal can replace UI.
+		this.builder.draft.revision += 1;
+		this.builder.draft.group = null;
+	}
+
+	_click(e) {
+		const button = e.target.closest("button");
+		if (button?.dataset.role === "save") {
+			const validated = this.condition.validate();
+			if (!validated) return;
+
+			const index = this.condition.index;
+			const schema = this.condition.element.schema;
+			const conditions = schema[this.condition.key] ?? [];
+
+			if (index === -1) {
+				conditions.push(this.condition.setting);
+			} else {
+				conditions[index] = this.condition.setting;
+			}
+
+			schema[this.condition.key] = conditions;
+			this.condition.element.settings = this.builder.settings.create(schema);
+			this.builder.updateSchema();
+
+			withTransition(() => {
+				this.condition.index = -1;
+				this.condition.init();
+				this.condition.showSuccess();
+				this.condition.focus();
+				this.builder.settings.updateItem();
+				this.builder.model.updateItem();
+			});
+		} else if (button?.dataset.role === "close") {
+			this.close();
+		}
+	}
+
+	destroy() {
+		this.panel?.removeEventListener("click", this._click);
+		for (const event of ["input", "change", "updated"])
+			this.panel?.removeEventListener(event, this._draftInput);
+		this.loading = false;
+		this.condition = null;
+	}
+
+	open(condition) {
+		this.builder.model.sortable.option("disabled", true);
+		this.builder.components.sortable.option("disabled", true);
+		this.builder.model.focusItem();
+
+		if (condition.expand) {
+			this.builder.elt.dataset.expanded = "true";
+		}
+
+		this.panel.replaceChildren(condition.target);
+		this.panel.dataset.visible = "true";
+		this.condition = condition;
+		this.loading = false;
+	}
+
+	hide() {
+		this.builder.model.sortable.option("disabled", false);
+		this.builder.components.sortable.option("disabled", false);
+		this.builder.model.blurItem();
+		this.panel.dataset.visible = "false";
+		this.condition = null;
+	}
+
+	close() {
+		withTransition(() => {
+			this.hide();
+			this.builder.elt.dataset.expanded = "false";
+		});
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+const _section = (name, elements) => {
+	const section = document.createElement("div");
+	section.className = STYLES.builder.settings.section;
+	section.append(...elements.filter(Boolean));
+	section.dataset.setting = name;
+	return section;
+};
+
+/**
+ * @testable infrastructure
+ */
+const _presentation$1 = (schema) => {
+	const defaults = CONFIG.PRESENTATION_DEFAULTS[schema.type] || {};
+	return {
+		title: schema.title ?? defaults.title,
+		input: schema.input ?? defaults.input,
+		location: schema.location ?? defaults.location,
+	};
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_036_form_builder_frontend.py::test_builder_schema_lists_use_button_surfaces_and_centered_actions
+ * @matrix forms : action-button-centering builder-list-actions
+ */
+const _toggle = (icon, role, kind = "form", disabled = false) => {
+	const toggle = primitives.toggle({
+		icon: icon,
+		styles: {
+			container: STYLES.builder.settings.toggle.container,
+			icon: STYLES.builder.settings.toggle.icon,
+		},
+		data: {
+			role: role,
+		},
+	});
+	toggle.type = "button";
+	toggle.dataset.kind = kind;
+	if (disabled) {
+		toggle.disabled = true;
+		toggle.classList.add("opacity-50", "pointer-events-none");
+	}
+	return toggle;
+};
+
+/**
+ * @testable infrastructure
+ */
+const _condition = (condition, index) => {
+	const elt = document.createElement("li");
+	elt.className = STYLES.builder.settings.item;
+	elt.dataset.index = index;
+
+	const wrapper = document.createElement("button");
+	wrapper.type = "button";
+	wrapper.className = STYLES.builder.settings.open;
+	wrapper.dataset.role = "open";
+
+	const target = wrapper.appendChild(document.createElement("span"));
+	target.textContent = condition.name;
+	target.className = `font-semibold text-form-dark`;
+
+	const text = wrapper.appendChild(document.createElement("span"));
+	text.className = `italic text-base-dark`;
+	text.textContent = condition.checked ? " is " : " has the value ";
+
+	const status = wrapper.appendChild(document.createElement("span"));
+	status.className = `font-semibold text-project-default`;
+	status.textContent = condition.checked ? "checked" : condition.label;
+
+	const remove = _toggle("x", "remove", "delete");
+
+	elt.append(wrapper, remove);
+	return elt;
+};
+
+/**
+ * @testable infrastructure
+ */
+const _option = (option, index, length) => {
+	const wrapper = document.createElement("li");
+	wrapper.className = STYLES.builder.settings.item;
+	wrapper.dataset.index = index;
+
+	const name = wrapper.appendChild(document.createElement("button"));
+	name.type = "button";
+	name.textContent = option.label;
+	name.className = STYLES.builder.settings.open;
+	name.dataset.role = "open";
+
+	const toggles = document.createElement("div");
+	toggles.className = `flex shrink-0 flex-row items-center gap-1`;
+	if (length > 1) {
+		toggles.appendChild(
+			_toggle("down", "moveDown", "form", index === length - 1),
+		);
+		toggles.appendChild(_toggle("up", "moveUp", "form", index === 0));
+	}
+	toggles.appendChild(_toggle("x", "remove", "delete"));
+
+	wrapper.append(name, toggles);
+
+	return wrapper;
+};
+
+/**
+ * @testable infrastructure
+ */
+const _column = (column, index, length) => {
+	const wrapper = document.createElement("li");
+	wrapper.className = STYLES.builder.settings.item;
+	wrapper.dataset.index = index;
+
+	const name = primitives.label({
+		icon: column.location || column.input || column.type,
+		label: column.name || column.title,
+		tag: "button",
+		role: "open",
+		styles: {
+			label: STYLES.builder.settings.open,
+			container: "flex flex-row items-center gap-1.5",
+		},
+	});
+	name.type = "button";
+
+	const toggles = document.createElement("div");
+	toggles.className = `flex shrink-0 flex-row items-center gap-1`;
+	if (length > 1) {
+		toggles.appendChild(
+			_toggle("down", "moveDown", "form", index === length - 1),
+		);
+		toggles.appendChild(_toggle("up", "moveUp", "form", index === 0));
+	}
+	toggles.appendChild(_toggle("x", "remove", "delete"));
+
+	wrapper.append(name, toggles);
+	return wrapper;
+};
+
+/**
+ * @testable infrastructure
+ */
+const title = (schema) => {
+	const title = primitives.input({
+		label: "Title",
+		name: "title",
+		value: _presentation$1(schema).title,
+	});
+	return _section("title", [title]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const placeholder = (schema) => {
+	const placeholder = primitives.input({
+		label: "Placeholder",
+		name: "placeholder",
+		value: schema.placeholder || "",
+	});
+	return _section("placeholder", [placeholder]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const visibility = (schema) => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Visibility",
+		tag: "h3",
+	});
+	const toggle = _toggle("add", "add");
+	title.append(label, toggle);
+
+	if (schema.visibility) {
+		const visibilityList = document.createElement("ul");
+		visibilityList.className = `flex flex-col gap-1`;
+		schema.visibility.forEach((condition, index) => {
+			visibilityList.appendChild(_condition(condition, index));
+		});
+		return _section("visibility", [title, visibilityList]);
+	}
+	return _section("visibility", [title]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const status$1 = (schema) => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Status",
+		tag: "h3",
+	});
+	const toggle = _toggle("add", "add");
+	title.append(label, toggle);
+
+	if (schema.status) {
+		const statusList = document.createElement("ul");
+		statusList.className = `flex flex-col gap-1`;
+		schema.status.forEach((status, index) => {
+			statusList.appendChild(_condition(status, index));
+		});
+		return _section("status", [title, statusList]);
+	} else {
+		return _section("status", [title]);
+	}
+};
+
+/**
+ * @testable infrastructure
+ */
+const options = (schema) => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Options",
+		tag: "h3",
+	});
+	const toggle = _toggle("add", "add");
+	title.append(label, toggle);
+
+	if (schema.options) {
+		const optionList = document.createElement("ul");
+		optionList.className = `flex flex-col gap-1`;
+		const length = schema.options.length;
+		schema.options.forEach((option, index) => {
+			optionList.appendChild(_option(option, index, length));
+		});
+		return _section("options", [title, optionList]);
+	} else {
+		return _section("options", [title]);
+	}
+};
+
+/**
+ * @testable infrastructure
+ */
+const editor = () => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Editor",
+		tag: "h3",
+	});
+	const toggle = _toggle("edit", "edit");
+	title.append(label, toggle);
+	return _section("html", [title]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const input$1 = (schema) => {
+	const display = _presentation$1(schema);
+	const fieldset = document.createElement("fieldset");
+	fieldset.className = STYLES.radio.fieldset.column;
+	fieldset.dataset.kind = "base";
+
+	const legend = fieldset.appendChild(document.createElement("legend"));
+	legend.textContent = "Input Type";
+	legend.className = `${STYLES.label.sectionHeading}`;
+
+	CONFIG.INPUTS.forEach((type) => {
+		fieldset.appendChild(
+			primitives.radio({
+				icon: type.type,
+				label: type.name,
+				name: "input",
+				value: type.type,
+				checked: type.type === display.input,
+			}),
+		);
+	});
+
+	return _section("input", [fieldset]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const location$1 = (schema) => {
+	const display = _presentation$1(schema);
+	const fieldset = document.createElement("fieldset");
+	fieldset.className = STYLES.radio.fieldset.column;
+	fieldset.dataset.kind = "form";
+
+	const legend = fieldset.appendChild(document.createElement("legend"));
+	legend.textContent = "Link Type";
+	legend.className = `${STYLES.label.sectionHeading}`;
+
+	CONFIG.LINKS.forEach((type) => {
+		fieldset.appendChild(
+			primitives.radio({
+				icon: type.type,
+				label: type.name,
+				name: "location",
+				value: type.type,
+				checked: type.type === display.location,
+			}),
+		);
+	});
+
+	return _section("location", [fieldset]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const columns = (schema) => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Columns",
+		tag: "h3",
+	});
+	const toggle = _toggle("add", "add");
+	title.append(label, toggle);
+
+	if (schema.columns?.length) {
+		const columnList = document.createElement("ul");
+		columnList.className = `flex flex-col gap-1`;
+		const length = schema.columns.length;
+		schema.columns.forEach((column, index) => {
+			columnList.appendChild(_column(column, index, length));
+		});
+		return _section("columns", [title, columnList]);
+	} else {
+		return _section("columns", [title]);
+	}
+};
+
+/**
+ * @testable infrastructure
+ */
+const required = (schema) => {
+	const required = primitives.checkbox({
+		label: "Required",
+		name: "required",
+		checked: !!schema.required,
+	});
+	return _section("required", [required]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const multiple = (schema) => {
+	const multiple = primitives.checkbox({
+		label: "Multiple",
+		name: "multiple",
+		checked: !!schema.multiple,
+	});
+	return _section("multiple", [multiple]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const checked = (schema) => {
+	const checked = primitives.checkbox({
+		label: "Default",
+		name: "checked",
+		checked: !!schema.checked,
+	});
+	return _section("checked", [checked]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const deleteButton = () => {
+	const button = document.createElement("button");
+	button.textContent = "Delete";
+	button.dataset.kind = "delete";
+	button.dataset.role = "delete";
+	button.dataset.setting = "deleteButton";
+	button.className = `${STYLES.button.submit}`;
+	return button;
+};
+
+const SettingsElement = {
+	title: title,
+	placeholder: placeholder,
+	visibility: visibility,
+	status: status$1,
+	options: options,
+	input: input$1,
+	location: location$1,
+	columns: columns,
+	required: required,
+	multiple: multiple,
+	checked: checked,
+	editor: editor,
+	deleteButton: deleteButton,
+};
+
+/**
+ * @testable infrastructure
+ */
+class ElementSettings {
+	constructor(builder) {
+		this.builder = builder;
+		this.panel = document.getElementById("settings-panel");
+		this._input = this._input.bind(this);
+		this._change = this._change.bind(this);
+		this._click = this._click.bind(this);
+		this._blur = this._blur.bind(this);
+	}
+
+	init() {
+		this.panel.addEventListener("input", this._input);
+		this.panel.addEventListener("change", this._change);
+		this.panel.addEventListener("click", this._click);
+		this.panel.addEventListener("blur", this._blur, true);
+	}
+
+	destroy() {
+		this.panel.removeEventListener("input", this._input);
+		this.panel.removeEventListener("change", this._change);
+		this.panel.removeEventListener("click", this._click);
+		this.panel.removeEventListener("blur", this._blur, true);
+	}
+
+	_input(e) {
+		const element = this.builder.selectedElement;
+		if (e.target.closest("[data-setting=title]")) {
+			this._setTitle(element, e.target.value);
+		} else if (e.target.closest("[data-setting=placeholder]")) {
+			this._setPlaceholder(element, e.target.value);
+		}
+		this.builder.updateSchema(false, `${element.schema.id}:${e.target.name}`);
+	}
+
+	_change(e) {
+		const element = this.builder.selectedElement;
+		if (e.target.closest("[data-setting=required]")) {
+			this._setRequired(element, e.target.checked);
+		} else if (e.target.closest("[data-setting=checked]")) {
+			this._setChecked(element, e.target.checked);
+		} else if (e.target.closest("[data-setting=multiple]")) {
+			this._setMultiple(element, e.target.checked);
+		} else if (e.target.closest("[data-setting=input]")) {
+			this._setInput(element, e.target.value);
+		} else if (e.target.closest("[data-setting=location]")) {
+			this._setLocation(element, e.target.value);
+		}
+		this.builder.updateSchema();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility
+	 * @matrix forms : builder-field-visibility builder-select-options
+	 */
+	_click(e) {
+		if (e.target.closest("button")?.disabled) return;
+		const element = this.builder.selectedElement;
+		const role = e.target.closest("[data-role]")?.dataset.role;
+		const setting = e.target.closest("[data-index]");
+		const index = setting ? parseInt(setting.dataset.index, 10) : -1;
+		const name = e.target.closest("[data-setting]")?.dataset.setting;
+
+		if (role === "remove") {
+			this._removeSchemaListItem(element.schema[name], index);
+		} else if (["moveUp", "moveDown"].includes(role)) {
+			this._moveSchemaListItem(element, name, index, role);
+		} else if (["add", "edit", "open"].includes(role)) {
+			this.builder.showCondition(name, index);
+		} else if (role === "delete") {
+			this.builder.removeElement();
+			this.deselectItem();
+			this.builder.formSettings.visible = true;
+		}
+	}
+
+	_blur() {
+		this.builder.updateSchema();
+		if (this.builder.draft) this.builder.draft.group = null;
+	}
+
+	_removeSchemaListItem(schema, index) {
+		schema.splice(index, 1);
+		this.builder.updateSchema();
+		withTransition(() => {
+			this.builder.model.updateItem();
+			this.builder.selectedElement.settings = this.create(
+				this.builder.selectedElement.schema,
+			);
+			this.updateItem();
+		});
+	}
+
+	_moveSchemaListItem(element, name, index, direction) {
+		const arr = element.schema[name];
+		const newIndex = direction === "moveUp" ? index - 1 : index + 1;
+		if (newIndex < 0 || newIndex >= arr.length) return;
+		[arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
+		this.builder.updateSchema();
+		withTransition(() => {
+			this.builder.model.updateItem();
+			this.builder.selectedElement.settings = this.create(
+				this.builder.selectedElement.schema,
+			);
+			this.updateItem();
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
+	 * @pairs forms:builder-field-title frontend-icons:material-icon-preservation
+	 */
+	_setTitle(element, value) {
+		element.schema.title = value;
+		element.item.querySelector(
+			"[data-role='label'] > span:not([data-icon])",
+		).textContent = value;
+	}
+
+	_setPlaceholder(element, value) {
+		element.schema.placeholder = value;
+		const input = element.item.querySelector("input, textarea");
+		if (input) input.placeholder = value;
+	}
+
+	_setRequired(element, value) {
+		element.schema.required = value;
+	}
+
+	_setChecked(element, value) {
+		element.schema.checked = value;
+		element.item.querySelector("input[type='checkbox']").checked = value;
+	}
+
+	_setMultiple(element, value) {
+		element.schema.multiple = value;
+	}
+
+	_setInput(element, value) {
+		element.schema.input = value;
+		const label = primitives.label({
+			icon: value,
+			label: _presentation$1(element.schema).title,
+		});
+		element.item
+			.querySelector("label > div")
+			.replaceWith(label.querySelector("div"));
+	}
+
+	_setLocation(element, value) {
+		element.schema.location = value;
+		const label = primitives.label({
+			icon: value,
+			label: _presentation$1(element.schema).title,
+			tag: "h3",
+		});
+		element.item.querySelector("h3").replaceWith(label);
+	}
+
+	create(schema) {
+		const display = { ...schema };
+		for (const key of ["visibility", "status"]) {
+			if (Array.isArray(schema[key]))
+				display[key] = schema[key].map((condition) => {
+					const target = this.builder.elements.get(condition.id)?.schema;
+					return {
+						...condition,
+						name: target?.title ?? condition.name,
+						label:
+							target?.options?.find(
+								(option) => option.value === condition.value,
+							)?.label ?? condition.label,
+					};
+				});
+		}
+		const settings = CONFIG.DEFAULT_SETTINGS[schema.type].map((setting) => {
+			if (
+				["name", "description"].includes(schema.id) &&
+				setting === "deleteButton"
+			) {
+				return null;
+			}
+			return SettingsElement[setting](display);
+		});
+		const sections = settings.filter(Boolean);
+		this.refreshSavedState(schema, sections);
+		return sections;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
+	 * @matrix forms : builder-save stable-identity
+	 */
+	refreshSavedState(
+		schema = this.builder.selectedElement?.schema,
+		sections = this.panel.children,
+	) {
+		if (!schema) return;
+		const saved = this.builder.savedField(schema.id);
+		if (!saved) return;
+		for (const section of sections) {
+			const setting = section.dataset.setting;
+			if (["input", "multiple", "location", "deleteButton"].includes(setting)) {
+				const controls = section.matches("button, input, select")
+					? [section]
+					: section.querySelectorAll("button, input, select");
+				for (const control of controls) control.disabled = true;
+			}
+			if (["options", "columns"].includes(setting)) {
+				for (const row of section.querySelectorAll("[data-index]")) {
+					const item = schema[setting][Number(row.dataset.index)];
+					const key = setting === "options" ? "value" : "id";
+					if (saved[setting]?.some((original) => original[key] === item[key])) {
+						const remove = row.querySelector("[data-role='remove']");
+						if (remove) {
+							remove.disabled = true;
+							remove.title =
+								"Removing saved choices or columns requires submission migrations.";
+						}
+					}
+				}
+			}
+		}
+	}
+
+	selectItem() {
+		const item = this.builder.selectedElement;
+		item.settings = this.create(item.schema);
+		this.panel.replaceChildren(...item.settings);
+		this.panel.dataset.visible = "true";
+		this.builder.formSettings.visible = false;
+	}
+
+	deselectItem() {
+		this.panel.dataset.visible = "false";
+	}
+
+	updateItem() {
+		this.panel.dataset.visible = "false";
+		const item = this.builder.selectedElement;
+		this.panel.replaceChildren(...item.settings);
+		this.panel.dataset.visible = "true";
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class FormSettings {
+	constructor(builder) {
+		this._destroyed = false;
+		this._generationPromise = null;
+		this.builder = builder;
+		this.column = document.getElementById("form-settings-panel");
+		this.restrictions = document.querySelector("[data-role='restrict-access']");
+		this.selectGroup = null;
+
+		const generateTarget = this.column?.querySelector("#generate");
+		if (generateTarget) {
+			this.generateForm = new BaseForm({
+				target: generateTarget,
+				submitGroup: generateTarget.querySelector("[data-role='submit-group']"),
+				messages: {
+					submit: "Generate",
+					submitting: "Thinking...",
+					submitted: "Generated",
+				},
+			});
+			this.generateForm.error.setAttribute("role", "status");
+			this.generateForm.error.setAttribute("aria-live", "polite");
+			this.generateForm.error.setAttribute("aria-atomic", "true");
+		} else {
+			this.generateForm = null;
+		}
+
+		this._generateSchema = this._generateSchema.bind(this);
+		this._saveRestrictions = this._saveRestrictions.bind(this);
+		this._restrictionPromise = null;
+		this.restrictionForm = this.restrictions
+			? new BaseForm({
+					target: this.restrictions,
+					messages: {
+						submit: "Save Restrictions",
+						submitting: "Saving",
+						submitted: "Saved",
+					},
+				})
+			: null;
+		this._input = this._input.bind(this);
+		this._click = this._click.bind(this);
+		this._restrictionUpdated = this._restrictionUpdated.bind(this);
+		this.modal = null;
+	}
+
+	/**
+	 * @testable true
+	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
+	 * @matrix forms : access-restrictions group-restricted
+	 */
+	init() {
+		if (this._destroyed) return;
+		if (this.generateForm) {
+			this.generateForm.init();
+			this.generateForm.target.addEventListener("submit", this._generateSchema);
+		}
+
+		this.column?.addEventListener("input", this._input);
+		this.column?.addEventListener("click", this._click);
+
+		if (this.restrictions) {
+			this.restrictionForm.init();
+			this.restrictions.addEventListener("submit", this._saveRestrictions);
+			const input = this.column.querySelector(
+				"[data-role='restrict-group-input']",
+			);
+			this.selectGroup = new FacetsBox(input);
+			this.selectGroup.init();
+			this.restrictions.addEventListener("updated", this._restrictionUpdated);
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
+	 * @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
+	 */
+	_restrictionUpdated(event) {
+		if (this._destroyed) return;
+		if (Object.keys(event.detail.options).length) {
+			this.restrictions.querySelector("[name='admin']").checked = false;
+		}
+		const list = this.restrictions.querySelector("ul");
+		const template = this.restrictions.querySelector("template");
+		for (const [key, option] of Object.entries(event.detail.options)) {
+			if (
+				[...list.querySelectorAll("input[name='group-key']")].some(
+					(input) => input.value === key,
+				)
+			)
+				continue;
+			const item = template.content.firstElementChild.cloneNode(true);
+			item.querySelector("input").value = key;
+			item.querySelector("span").textContent = option.name;
+			item.querySelector("button").dataset.key = key;
+			list.append(item);
+		}
+		this.selectGroup.clear({ notify: false });
+		this.restrictionForm.markUnsavedState();
+	}
+
+	/**
+	 * @testable true
+	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
+	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
+	 * @matrix forms : access-restrictions explicit-submit owner-restricted
+	 */
+	_input(event) {
+		if (event.target.name === "admin" && event.target.checked) {
+			this.restrictions.querySelector("ul").replaceChildren();
+			this.selectGroup.clear({ notify: false });
+			this.restrictionForm.markUnsavedState();
+		}
+		if (event.target.name === "description" && this.generateForm?.target) {
+			const explain = this.generateForm.target.querySelector(
+				"[data-role='explain']",
+			);
+			if (explain) explain.dataset.visible = "true";
+		}
+	}
+
+	_click(event) {
+		const button = event.target.closest("[data-role]");
+		if (button?.dataset.role === "generate" && this.generateForm?.target) {
+			const visible = this.generateForm.target.dataset.visible === "true";
+			this.generateForm.target.dataset.visible = visible ? "false" : "true";
+			if (!visible) this.generateForm.target.querySelector("textarea")?.focus();
+		} else if (button?.dataset.role === "cancel" && this.generateForm?.target) {
+			this._generationIdentity = null;
+			this.generateForm.target.dataset.visible = "false";
+			this.generateForm.messages.submit = "Generate";
+			this.generateForm.resetSubmitButton();
+			const ta = this.generateForm.target.querySelector("textarea");
+			if (ta) ta.value = "";
+		} else if (button?.dataset.role === "remove-restriction") {
+			button.closest("li")?.remove();
+			this.restrictionForm.markUnsavedState();
+		}
+	}
+
+	get visible() {
+		return this.column.dataset.visible === "true";
+	}
+
+	set visible(value) {
+		this.column.dataset.visible = value ? "true" : "false";
+	}
+
+	/**
+	 * @testable true
+	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
+	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
+	 * @matrix forms : access-restrictions group-restricted owner-restricted
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_restriction_save_submits_snapshot_and_releases_failed_submitter
+	 * @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants
+	 * @matrix forms : access-restrictions explicit-submit retryable-action single-flight
+	 */
+	_saveRestrictions(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._restrictionPromise) return this._restrictionPromise;
+		if (this._destroyed) return;
+		const form = this.restrictionForm;
+		const data = new FormData(this.restrictions);
+		const snapshot = JSON.stringify([...data]);
+		form.submitting();
+		form.submitButton.disabled = true;
+		this._restrictionPromise = (async () => {
+			try {
+				const response = await request.put(
+					this.restrictions.dataset.route,
+					data,
+				);
+				if (this._destroyed) return;
+				if (response?.ok === true) {
+					if (JSON.stringify([...new FormData(this.restrictions)]) === snapshot)
+						form.success();
+					else {
+						form.resetSubmitButton();
+						form.markUnsavedState();
+					}
+				} else
+					form.showError(
+						response?.error || "Could not save restrictions. Try again.",
+					);
+			} catch (error) {
+				captureError(error, this.restrictions, {
+					context: "builder-save-restrictions",
+				});
+				if (!this._destroyed)
+					form.showError("Could not save restrictions. Try again.");
+			} finally {
+				if (!this._destroyed) form.submitButton.disabled = false;
+				this._restrictionPromise = null;
+			}
+		})();
+		return this._restrictionPromise;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_generation_failure_stays_visible_and_releases_submitter
+	 * @matrix forms ui-action : persistent-error retryable-action schema-generation single-flight
+	 * @matrix forms : draft-history
+	 * @pair forms:stale-response
+	 */
+	_generateSchema(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._generationPromise) return this._generationPromise;
+		if (this._destroyed || !this.generateForm?.target) {
+			return Promise.resolve(false);
+		}
+
+		const data = new FormData(this.generateForm.target);
+		const prompt = data.get("description");
+		const submitter = event.submitter || this.generateForm.submitButton;
+
+		if (!prompt) {
+			this.generateForm.showError("Please enter a description");
+			return Promise.resolve(false);
+		} else if (submitter?.dataset.explain) {
+			data.append("explain", submitter.dataset.explain);
+		}
+
+		this.builder.updateSchema();
+		this.builder.draft.group = null;
+		const identity = {
+			request_id: crypto.randomUUID(),
+			draft_revision: this.builder.draft.revision,
+		};
+		this._generationIdentity = identity;
+		const draft = this.builder.captureDraft();
+		data.set("schema", JSON.stringify(draft.schema));
+		data.set("html_fields", JSON.stringify(draft.html_fields));
+		data.set("baseline", this.builder.draft.baseline || "");
+		data.set("draft_revision", String(identity.draft_revision));
+		data.set("request_id", identity.request_id);
+		if (submitter) {
+			submitter.disabled = true;
+			submitter.setAttribute("aria-disabled", "true");
+			submitter.setAttribute("aria-busy", "true");
+		}
+
+		const pending = (async () => {
+			try {
+				const response = await request.post(ENDPOINTS.createSchema, data, {
+					replaceErrorPage: false,
+				});
+				if (this._destroyed) return false;
+				if (this._generationIdentity !== identity) return false;
+				if (
+					!response?.modal &&
+					(identity.draft_revision !== this.builder.draft.revision ||
+						response?.request_id !== identity.request_id ||
+						response?.draft_revision !== identity.draft_revision)
+				) {
+					if (response?.ok === true) {
+						this.generateForm.messages.submit = "Regenerate";
+						this.generateForm.showError(
+							"Your draft changed while generation was running. Regenerate using your current draft.",
+						);
+						return false;
+					}
+				}
+				const success = await this._updateSchema(response);
+				if (this._destroyed) return false;
+				if (success || (response?.ok === true && response.modal)) {
+					this.generateForm.messages.submit = "Generate";
+					if (success) this.generateForm.success();
+					else this.generateForm.resetSubmitButton();
+				}
+				return success;
+			} catch (error) {
+				captureError(error, submitter, { context: "builder-generate-schema" });
+				if (!this._destroyed) {
+					this.generateForm.showError(
+						"Could not generate this form. Try again.",
+					);
+				}
+				return false;
+			} finally {
+				if (submitter && !this._destroyed && submitter.isConnected !== false) {
+					submitter.disabled = false;
+					submitter.setAttribute("aria-disabled", "false");
+					submitter.removeAttribute("aria-busy");
+				}
+			}
+		})();
+		this._generationPromise = pending;
+		const clearPending = () => {
+			if (this._generationPromise === pending) this._generationPromise = null;
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
+	}
+
+	async _updateSchema(response) {
+		if (this._destroyed || !this.generateForm) return false;
+
+		if (response?.ok === true && response.operations) {
+			try {
+				if (this.builder.draft.applyGeneration(response)) {
+					this.builder.restoreDraft();
+				}
+			} catch (error) {
+				this.generateForm.showError(error.message);
+				return false;
+			}
+			return true;
+		} else if (response?.ok === true && response.modal) {
+			this.modal?.destroy();
+			this.modal = new Modal(this.builder);
+			void this.modal.attach(response.modal, this.generateForm);
+		} else {
+			this.generateForm.showError(
+				response?.error || "Could not generate this form. Try again.",
+			);
+			if (response?.code === "stale_form_draft")
+				this.builder.header.showConflict(response);
+		}
+		return false;
+	}
+
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.generateForm?.target?.removeEventListener(
+			"submit",
+			this._generateSchema,
+		);
+		this.column?.removeEventListener("input", this._input);
+		this.column?.removeEventListener("click", this._click);
+		this.restrictions?.removeEventListener("updated", this._restrictionUpdated);
+		this.restrictions?.removeEventListener("submit", this._saveRestrictions);
+		this.restrictionForm?.destroy();
+		this.generateForm?.destroy();
+		this.selectGroup?.destroy();
+		this.modal?.destroy();
+		this.modal = null;
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class Header {
+	constructor(builder) {
+		this._destroyed = false;
+		this._previewGeneration = 0;
+		this._messageTimer = null;
+		this._savePromise = null;
+		this.builder = builder;
+		this.nameDisplay = document.getElementById("form-name-display");
+		this.nameInput = document.getElementById("form-name-input");
+		this.nameHidden = document.getElementById("form-name-hidden");
+		this.saveButton = document.querySelector("[data-saved]");
+		this.schemaForm = document.getElementById("schema-form");
+		this.notification = document.getElementById("notification");
+		this.previewToggle = document.getElementById("preview-toggle");
+		this.previewPanel = document.getElementById("preview-panel");
+		this.draftControls = document.querySelector("[data-role='draft-history']");
+		this.saveButton?.setAttribute("aria-describedby", "notification");
+		this.notification?.setAttribute("role", "status");
+		this.notification?.setAttribute("aria-live", "polite");
+		this.notification?.setAttribute("aria-atomic", "true");
+
+		this.togglePreviewPanel = this.togglePreviewPanel.bind(this);
+		this.saveForm = this.saveForm.bind(this);
+		this.editFormName = this.editFormName.bind(this);
+		this._nameBlur = this._nameBlur.bind(this);
+		this._nameKeyDown = this._nameKeyDown.bind(this);
+		this._nameInput = this._nameInput.bind(this);
+
+		this.renderer = null;
+
+		this.init();
+	}
+
+	init() {
+		this.nameInput.addEventListener("blur", this._nameBlur);
+		this.nameInput.addEventListener("keydown", this._nameKeyDown);
+		this.nameInput.addEventListener("input", this._nameInput);
+	}
+
+	saved() {
+		if (!this.saveButton) return;
+		this.saveButton.dataset.saved = "true";
+		this.saveButton.dataset.kind = "saved";
+		this.saveButton.setAttribute("aria-disabled", "true");
+		this.clearMessage();
+	}
+
+	unsaved() {
+		if (!this.saveButton) return;
+		this.saveButton.dataset.saved = "false";
+		this.saveButton.dataset.kind = "unsaved";
+		this.saveButton.setAttribute(
+			"aria-disabled",
+			String(Boolean(this._savePromise)),
+		);
+	}
+
+	clearMessage() {
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		if (!this.notification) return;
+		this.notification.textContent = "";
+		this.notification.dataset.visible = "false";
+	}
+
+	message(text, { persistent = false } = {}) {
+		if (this._destroyed) return;
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		this.notification.textContent = text;
+		this.notification.dataset.visible = "true";
+		if (!persistent) {
+			this._messageTimer = setTimeout(() => {
+				if (this._destroyed) return;
+				this.notification.dataset.visible = "false";
+			}, 3000);
+		}
+	}
+
+	showConflict(response) {
+		if (response?.code !== "stale_form_draft" || !response.saved_url)
+			return false;
+		this.message(
+			`${response.error || "The saved form changed. Your draft is preserved."} `,
+			{ persistent: true },
+		);
+		const link = document.createElement("a");
+		link.href = response.saved_url;
+		link.target = "_blank";
+		link.rel = "noopener";
+		link.dataset.role = "open-saved-form";
+		link.className = "underline";
+		link.textContent = "Open saved form";
+		this.notification.append(link);
+		return true;
+	}
+
+	get persistenceState() {
+		return this.builder.captureDraft();
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/builder/panels/header.mjs::Header.saveForm
+	 * @reason acknowledgements are only valid when the live state matches the submitted snapshot
+	 */
+	acknowledge(state) {
+		const current = this.persistenceState;
+		if (current.name === state.name && areEqual(current.schema, state.schema)) {
+			this.saved();
+			return true;
+		}
+		this.unsaved();
+		return false;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
+	 * @pair forms:builder-preview
+	 */
+	closePreview() {
+		this._previewGeneration += 1;
+		this.renderer?.destroy();
+		this.renderer = null;
+		this.previewToggle.dataset.active = "false";
+		this.previewToggle.setAttribute("aria-checked", "false");
+		this.previewPanel.dataset.visible = "false";
+		if (this.draftControls) this.draftControls.dataset.visible = "true";
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
+	 * @pair forms:builder-preview
+	 */
+	async togglePreviewPanel() {
+		if (this._destroyed) return;
+		const generation = ++this._previewGeneration;
+		const active = this.previewToggle.dataset.active === "true";
+		this.previewToggle.dataset.active = active ? "false" : "true";
+		this.previewToggle.setAttribute("aria-checked", active ? "false" : "true");
+
+		let renderer = null;
+		if (!active) {
+			renderer = new Renderer({
+				target: this.previewPanel,
+				schema: this.builder.schema,
+				kind: "form",
+				key: this.builder.key,
+				submission: {},
+				htmlFields: Object.fromEntries(
+					Object.entries(this.builder.htmlFields).map(([id, html]) => [
+						id,
+						this.builder.previewHtml(html),
+					]),
+				),
+			});
+			await renderer.render();
+			if (this._destroyed || generation !== this._previewGeneration) {
+				renderer.destroy();
+				return;
+			}
+		}
+
+		await withTransition(
+			() => {
+				if (this._destroyed || generation !== this._previewGeneration) {
+					renderer?.destroy();
+					return;
+				}
+				if (this.draftControls)
+					this.draftControls.dataset.visible = active ? "true" : "false";
+				if (!active) {
+					this.renderer = renderer;
+					this.builder.elt.dataset.expanded = "true";
+					this.previewPanel.dataset.visible = "true";
+					this.builder.conditions.hide();
+					this.builder.model.hide();
+				} else {
+					this.renderer?.destroy();
+					this.renderer = null;
+					this.builder.elt.dataset.expanded = "false";
+					this.previewPanel.dataset.visible = "false";
+					this.builder.model.show();
+				}
+			},
+			{ label: "builder:toggle-preview" },
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
+	 * @tests tests_e2e/003_forms/test_003e_retryable_builder_actions.py::test_builder_save_failure_releases_control_for_retry
+	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_save_feedback_retains_keyboard_focus
+	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_generation_is_one_undoable_unsaved_command
+	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_saved_relabels_preserve_active_task_answers_and_conditions
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
+	 * @matrix forms : builder-reload builder-save focus-recovery persistent-error retryable-action single-flight stale-acknowledgement
+	 */
+	saveForm() {
+		if (this._savePromise) return this._savePromise;
+		if (this._destroyed || !this.saveButton || !this.schemaForm) {
+			return Promise.resolve(false);
+		}
+
+		const button = this.saveButton;
+		const hadFocus = document.activeElement === button;
+		this.builder.updateSchema();
+		if (!this.builder.draft.dirty) return Promise.resolve(true);
+		this.builder.draft.group = null;
+		const state = this.persistenceState;
+		if (
+			!this._saveAttempt ||
+			!this.builder.draft.equal(this._saveAttempt.state, state) ||
+			this._saveAttempt.baseline !== this.builder.draft.baseline
+		) {
+			this._saveAttempt = {
+				state,
+				baseline: this.builder.draft.baseline,
+				id: crypto.randomUUID(),
+			};
+		}
+		this.unsaved();
+		this.clearMessage();
+		// Keep keyboard focus; clean and in-flight saves are guarded above.
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+
+		const pending = (async () => {
+			try {
+				const payload = await this.builder.draftPayload(
+					state,
+					this.schemaForm.dataset.route,
+					this._saveAttempt.id,
+				);
+				if (this._destroyed) return false;
+				const response = await request.put(
+					this.schemaForm.dataset.route,
+					payload,
+					{ replaceErrorPage: false },
+				);
+				if (this._destroyed) return false;
+				if (response?.ok === true && response.draft && response.baseline) {
+					this.builder.draft.acknowledge(state, response);
+					this._saveAttempt = null;
+					if (
+						this.builder.draft.equal(
+							this.persistenceState,
+							this.builder.draft.state,
+						)
+					) {
+						this.builder.settings.refreshSavedState();
+						this.builder.conditions.condition?.refreshSavedState?.();
+						this.builder.refreshDraftControls();
+					} else {
+						await this.builder.restoreDraft({ preserveFocus: true });
+					}
+					return true;
+				}
+				if (!this.showConflict(response))
+					this.message(
+						response?.error || "Could not save this form. Try again.",
+						{ persistent: true },
+					);
+				return false;
+			} catch (error) {
+				captureError(error, button, { context: "builder-save" });
+				this.message("Could not save this form. Try again.", {
+					persistent: true,
+				});
+				return false;
+			} finally {
+				if (!this._destroyed && button.isConnected !== false) {
+					button.setAttribute(
+						"aria-disabled",
+						String(button.dataset.saved === "true"),
+					);
+					button.removeAttribute("aria-busy");
+					if (
+						hadFocus &&
+						(!document.activeElement ||
+							document.activeElement === document.body ||
+							document.activeElement === button)
+					) {
+						button.focus({ preventScroll: true });
+					}
+				}
+			}
+		})();
+		this._savePromise = pending;
+		const clearPending = () => {
+			if (this._savePromise === pending) this._savePromise = null;
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
+	}
+
+	editFormName() {
+		this._originalName = this.nameDisplay.textContent;
+		this.nameDisplay.dataset.visible = "false";
+		this.nameInput.dataset.visible = "true";
+		this.nameInput.focus();
+		this.nameInput.select();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
+	 * @pairs entity-menu:title-menu forms:builder-form-name frontend-icons:material-icon-preservation
+	 */
+	_nameBlur() {
+		const newName = this.nameInput.value.trim();
+		this.nameDisplay.textContent = newName;
+		this.nameHidden.value = newName;
+		this.builder.updateSchema(false, "form-name");
+		this.builder.draft.group = null;
+		this.nameInput.dataset.visible = "false";
+		this.nameDisplay.dataset.visible = "true";
+	}
+
+	_nameInput() {
+		this.nameHidden.value = this.nameInput.value.trim();
+		this.builder.updateSchema(false, "form-name");
+	}
+
+	_nameKeyDown(e) {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			this.nameInput.blur();
+		} else if (e.key === "Escape") {
+			this.nameInput.value = this._originalName;
+			this.nameInput.blur();
+		}
+	}
+
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this._previewGeneration += 1;
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		this.nameInput.removeEventListener("blur", this._nameBlur);
+		this.nameInput.removeEventListener("keydown", this._nameKeyDown);
+		this.nameInput.removeEventListener("input", this._nameInput);
+		this.renderer?.destroy();
+		this.renderer = null;
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class ModelPanel {
+	constructor(builder) {
+		this.builder = builder;
+		this.panel = document.getElementById("model-panel");
+		this.defaultPanel = document.getElementById("default-panel");
+		this.uniqueElements = ["status", "signature", "bookmark"];
+		this.defaultElements = ["name", "description"];
+		this._addElement = this._addElement.bind(this);
+		this._moveElement = this._moveElement.bind(this);
+	}
+
+	get elements() {
+		return Array.from(this.panel.querySelectorAll(".form-element"));
+	}
+
+	get defaults() {
+		return Array.from(this.defaultPanel.querySelectorAll(".form-element"));
+	}
+
+	show() {
+		this.defaultPanel.dataset.visible =
+			this.defaults.length > 0 ? "true" : "false";
+		this.panel.dataset.visible = "true";
+	}
+
+	hide() {
+		this.defaultPanel.dataset.visible = "false";
+		this.panel.dataset.visible = "false";
+	}
+
+	init() {
+		const elements = Array.from(this.builder.elements.values());
+		const defaults = elements.filter((element) =>
+			this.defaultElements.includes(element.schema.id),
+		);
+		if (defaults.length > 0) {
+			this.defaultPanel.dataset.visible = "true";
+		}
+
+		elements.forEach((element) => {
+			if (this.defaultElements.includes(element.schema.id)) {
+				Array.from(element.item.querySelectorAll("input, textarea")).forEach(
+					(input) => {
+						input.remove();
+					},
+				);
+				this.defaultPanel.appendChild(element.item);
+			} else {
+				this.panel.appendChild(element.item);
+			}
+		});
+
+		this.sortable = Sortable.create(this.panel, {
+			group: {
+				name: "builder",
+				pull: false,
+				put: true,
+			},
+			animation: 150,
+			onAdd: this._addElement,
+			onUpdate: this._moveElement,
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_drag_component
+	 * @pair forms:builder-drag-component
+	 */
+	_addElement(event) {
+		const item = this.builder.createElement({
+			type: event.item.dataset.type,
+		});
+		event.item.remove();
+		event.to.insertBefore(item, event.to.children[event.newDraggableIndex]);
+		this.builder.updateSchemaOrder();
+		this.builder.selectElement(item.id);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_drag_component
+	 * @pair forms:builder-drag-component
+	 */
+	_moveElement() {
+		this.builder.updateSchemaOrder();
+	}
+
+	updateItem() {
+		const element = this.builder.selectedElement;
+		const item = ModelElement[element.schema.type](element.schema);
+		element.item.replaceWith(item);
+		element.item = item;
+		this.selectItem();
+	}
+
+	selectItem() {
+		const selected = this.builder.selectedElement.item;
+
+		this.elements.forEach((element) => {
+			element.dataset.selected = element === selected ? "true" : "false";
+		});
+		this.defaults.forEach((element) => {
+			element.dataset.selected = element === selected ? "true" : "false";
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle
+	 */
+	deselectItem() {
+		const selected = this.builder.selectedElement;
+		if (selected) selected.item.dataset.selected = "false";
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
+	 * @matrix forms signature : unique-component
+	 */
+	hasUniqueElement(type) {
+		return (
+			this.uniqueElements.includes(type) &&
+			Array.from(this.builder.elements.values()).some(
+				(element) => element.schema.type === type,
+			)
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle
+	 */
+	focusItem() {
+		const selected = this.builder.selectedElement.item;
+		this.elements.forEach((element) => {
+			element.dataset.visible = element === selected ? "true" : "false";
+		});
+		this.panel.classList.remove("min-h-75");
+		this.defaultPanel.dataset.visible = "false";
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle
+	 */
+	blurItem() {
+		this.elements.forEach((element) => {
+			element.dataset.visible = "true";
+		});
+		if (this.defaultPanel.children.length > 0) {
+			this.defaultPanel.dataset.visible = "true";
+		}
+		this.panel.classList.add("min-h-75");
+	}
+
+	destroy() {
+		this.sortable?.destroy();
+		this.sortable = null;
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+const _model = (schema) => {
+	const element = document.createElement("div");
+	element.id = schema.id;
+	element.dataset.selected = "false";
+	element.dataset.visible = "true";
+	element.className = `${STYLES.builder.model}`;
+	return element;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_019_form_sync_frontend.py::test_builder_model_defaults_are_presentation_only
+ * @matrix form-schema forms : builder immutable-schema presentation-defaults
+ */
+const _presentation = (schema) => {
+	const defaults = CONFIG.PRESENTATION_DEFAULTS[schema.type] || {};
+	return {
+		...schema,
+		title: schema.title ?? defaults.title,
+		input: schema.input ?? defaults.input,
+		location: schema.location ?? defaults.location,
+	};
+};
+
+/**
+ * @testable infrastructure
+ */
+const checkbox = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-row", "gap-2");
+
+	element.appendChild(
+		primitives.checkbox({
+			label: display.title,
+			checked: !!schema.checked,
+			name: schema.id,
+			disabled: true,
+		}),
+	);
+
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const html = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const label = primitives.label({
+		icon: "html",
+		label: display.title,
+		tag: "h3",
+	});
+	element.appendChild(label);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const input = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+
+	const input = primitives.input({
+		icon: display.input,
+		label: display.title,
+		name: schema.id,
+		type: display.input,
+		disabled: true,
+		placeholder: schema.placeholder,
+	});
+
+	element.appendChild(input);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const link = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	let linkElt;
+	if (display.location === "out") {
+		linkElt = primitives.label({
+			icon: display.location,
+			label: display.title,
+			tag: "h3",
+		});
+	} else {
+		linkElt = primitives.select({
+			label: display.title,
+			icon: display.location,
+			selectIcon: "search",
+			disabled: true,
+		});
+	}
+
+	element.appendChild(linkElt);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const bookmark = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const label = primitives.label({
+		icon: "bookmark",
+		label: display.title,
+	});
+
+	element.appendChild(label);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const location = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+
+	const input = primitives.input({
+		label: display.title,
+		icon: "location",
+		name: schema.id,
+		selectIcon: "search",
+		type: "text",
+		disabled: true,
+		placeholder: schema.placeholder,
+	});
+
+	element.appendChild(input);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const select = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+
+	const select = primitives.select({
+		label: display.title,
+		icon: "select",
+		selectIcon: "dropdown",
+		name: schema.id,
+		disabled: true,
+		placeholder: schema.placeholder || "select an option...",
+	});
+
+	element.appendChild(select);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const radio = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const fieldset = element.appendChild(document.createElement("fieldset"));
+	fieldset.className = `${STYLES.radio.fieldset.column}`;
+
+	fieldset.appendChild(
+		primitives.label({
+			icon: "radio",
+			tag: "legend",
+			label: display.title,
+		}),
+	);
+
+	if (!schema.options) {
+		return element;
+	}
+
+	schema.options.forEach((option) => {
+		fieldset.appendChild(
+			primitives.radio({
+				label: option.label,
+				value: option.value,
+				name: schema.id,
+				disabled: true,
+				styles: {
+					label: `${STYLES.radio.label} first-of-type:pt-1`,
+				},
+			}),
+		);
+	});
+
+	return element;
+};
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
+ * @matrix forms signature : builder-preview builder-signature-field
+ */
+const signature = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const label = primitives.label({
+		icon: "signature",
+		label: display.title,
+		tag: "h3",
+	});
+
+	element.appendChild(label);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const status = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const label = primitives.label({
+		tag: "h3",
+		label: display.title,
+		icon: "status",
+	});
+
+	element.appendChild(label);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const textarea = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+
+	const textarea = primitives.textarea({
+		label: display.title,
+		placeholder: schema.placeholder || "",
+		icon: "textarea",
+		disabled: true,
+		rows: 2,
+	});
+
+	element.appendChild(textarea);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const todo = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	element.appendChild(
+		primitives.label({
+			icon: "checklist",
+			label: display.title,
+			tag: "h3",
+		}),
+	);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const table = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+	const columns = schema.columns || [];
+
+	const label = primitives.label({
+		icon: "table",
+		label: display.title,
+		tag: "h3",
+	});
+	element.appendChild(label);
+
+	const badgesContainer = element.appendChild(document.createElement("div"));
+	badgesContainer.className = `flex flex-row gap-2 empty:hidden flex-wrap`;
+
+	columns.forEach((column) => {
+		badgesContainer.appendChild(
+			primitives.badge({
+				icon: column.location || column.input || column.type,
+				text: column.title,
+				kind: "form",
+				styles: {
+					badge: `${STYLES.badge.builder}`,
+					text: "text-base-dark",
+				},
+			}),
+		);
+	});
+
+	return element;
+};
+
+const ModelElement = {
+	checkbox,
+	html,
+	input,
+	link,
+	bookmark,
+	location,
+	radio,
+	select,
+	signature,
+	status,
+	textarea,
+	table,
+	todo,
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_046_async_query_lifecycle.py::test_builder_destroys_owned_search_modal_and_panels_during_startup
+ * @matrix forms : builder-lifecycle late-publication listener-teardown
+ */
+class FormBuilder {
+	constructor(node) {
+		this._destroyed = false;
+		this.elt = node;
+		this.elements = new Map();
+		this._independentDocuments = new Set();
+		this.images = new Map();
+		this._restoringDraft = false;
+		this.bootstrap = JSON.parse(
+			document.getElementById("builder-draft")?.textContent || "null",
+		);
+		this.htmlFields = structuredClone(this.bootstrap?.html_fields || {});
+		this.draft = this.bootstrap
+			? new BuilderDraft(this.bootstrap, this.bootstrap.baseline)
+			: null;
+		if (this.draft) {
+			delete this.draft.state.baseline;
+			delete this.draft.saved.baseline;
+		}
+		this.selectedElement = null;
+		this.schemaElt = document.querySelector('input[name="schema"]');
+		this.key = node.dataset.key;
+		this.offlineIndicator = document.querySelector('[data-role="offline"]');
+		this.online = connectivity.online;
+		this.hidden = connectivity.hidden;
+		this.EntityMenu = new EntityMenu(this);
+		this.SearchBox = null;
+		this.offlineModal = null;
+		this._searchPromise = null;
+
+		this.components = new ComponentsPanel(this);
+		this.model = new ModelPanel(this);
+		this.settings = new ElementSettings(this);
+		this.conditions = new ConditionPanel(this);
+		this.header = new Header(this);
+		this.formSettings = new FormSettings(this);
+
+		this.click = this._click.bind(this);
+		this.keydown = this._keydown.bind(this);
+		this.beforeUnload = (event) => {
+			if (this.draft?.dirty) {
+				event.preventDefault();
+				event.returnValue = "";
+			}
+		};
+	}
+
+	async init() {
+		if (this._destroyed) return this;
+		this.createFormElements();
+		this.draft ??= new BuilderDraft(this.captureDraft());
+
+		this.model.init();
+		this.settings.init();
+		this.formSettings.init();
+
+		this.offlineModal = new OfflineModal(this, this.offlineIndicator);
+		this.offlineModal.enable();
+		this.offline(!this.online);
+
+		document.addEventListener("click", this.click);
+		document.addEventListener("keydown", this.keydown);
+		window.addEventListener("beforeunload", this.beforeUnload);
+		this.refreshDraftControls();
+		this.elt._lp_view = this;
+
+		this._searchPromise = this._initSearch().catch((error) => {
+			captureError(error, this.elt, { context: "builder-search-startup" });
+			return null;
+		});
+		this.elt.setAttribute("initialized", "");
+		return this;
+	}
+
+	async _initSearch() {
+		const search = document.querySelector("[lp-search]");
+		if (!search || this._destroyed) return null;
+
+		const searchBox = new SearchBox(search);
+		this.SearchBox = searchBox;
+		await searchBox.init();
+		if (this._destroyed || this.SearchBox !== searchBox) {
+			searchBox.destroy();
+			return null;
+		}
+		return searchBox;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
+	 * @tests tests_js/test_045_browser_persistence.py::test_builder_owns_independent_editor_lifecycle_flushes
+	 * @matrix editor html-field : teardown
+	 * @matrix forms offline : builder-lifecycle
+	 */
+	async sync({ hidden = document.hidden } = {}) {
+		const wasOnline = this.online;
+		this.hidden = hidden;
+		this.online = connectivity.online;
+		this.offline(!this.online);
+		if (this.online && (hidden || !wasOnline)) {
+			await this.flushIndependentDocuments({ keepalive: hidden });
+		}
+	}
+
+	registerIndependentDocument(document) {
+		this._independentDocuments.add(document);
+		return document;
+	}
+
+	unregisterIndependentDocument(document) {
+		this._independentDocuments.delete(document);
+	}
+
+	async flushIndependentDocuments(options = {}) {
+		const results = await Promise.allSettled(
+			[...this._independentDocuments].map((document) =>
+				Promise.resolve().then(() => document.flush(options)),
+			),
+		);
+		return results.every(
+			(result) => result.status === "fulfilled" && result.value === true,
+		);
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/builder/builder.mjs::FormBuilder.sync
+	 * @reason builder connectivity controls are applied through the shared view lifecycle
+	 */
+	offline(offline) {
+		const search = document.querySelector("[lp-search]");
+		if (this.offlineIndicator) {
+			this.offlineIndicator.dataset.visible = offline ? "true" : "false";
+			this.offlineIndicator.setAttribute(
+				"aria-hidden",
+				offline ? "false" : "true",
+			);
+		}
+		if (search) search.dataset.visible = offline ? "false" : "true";
+		const saveButton = this.header.saveButton;
+		if (saveButton) saveButton.dataset.visible = offline ? "false" : "true";
+	}
+
+	updateSchema(silent = false, group = null) {
+		const schemas = Array.from(this.elements.values()).map(
+			(element) => element.schema,
+		);
+		const schemaString = JSON.stringify(schemas);
+		if (schemaString !== this.schemaElt.value) {
+			this.schemaElt.value = schemaString;
+			!silent && this.header.unsaved();
+		}
+		if (!silent && !this._restoringDraft && this.draft) {
+			this.draft.record(this.captureDraft(), group);
+			this.refreshDraftControls();
+		}
+	}
+
+	get schema() {
+		return Array.from(this.elements.values(), (element) =>
+			structuredClone(element.schema),
+		);
+	}
+
+	captureDraft() {
+		return {
+			name: this.header.nameHidden.value,
+			schema: this.schema,
+			form_type: this.elt.dataset.formType,
+			html_fields: structuredClone(this.htmlFields),
+			selected_id: this.selectedElement?.schema.id || null,
+		};
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : draft-history
+	 */
+	setHtml(fieldId, html) {
+		this.htmlFields[fieldId] = this.canonicalHtml(html);
+		if (this.draft.updateHtml(fieldId, this.htmlFields[fieldId]))
+			this.refreshDraftControls();
+	}
+
+	canonicalHtml(html) {
+		for (const [id, image] of this.images)
+			html = html.replaceAll(image.url, `draft-image:${id}`);
+		return html;
+	}
+
+	previewHtml(html) {
+		for (const [id, image] of this.images)
+			html = html.replaceAll(`draft-image:${id}`, image.url);
+		return html;
+	}
+
+	addDraftImage(fieldId, file) {
+		const id = crypto.randomUUID();
+		const url = URL.createObjectURL(file);
+		this.images.set(id, { file, fieldId, url, uploads: new Map() });
+		return url;
+	}
+
+	pruneImages() {
+		const states = [
+			this.draft.state,
+			...this.draft.past,
+			...this.draft.future,
+			this.header._saveAttempt?.state,
+			this._copyAttempt?.state,
+		];
+		const openEditors = new Set(
+			Array.from(this.elements.values())
+				.filter((element) => element.conditions?.html?.document?.editor)
+				.map((element) => element.schema.id),
+		);
+		for (const [id, image] of this.images) {
+			if (openEditors.has(image.fieldId)) continue;
+			if (
+				states.some((state) =>
+					Object.values(state?.html_fields || {}).some((html) =>
+						html.includes(`draft-image:${id}`),
+					),
+				)
+			)
+				continue;
+			URL.revokeObjectURL(image.url);
+			this.images.delete(id);
+		}
+	}
+
+	async draftPayload(state, route, saveId) {
+		const data = new FormData();
+		data.set("name", state.name);
+		data.set("schema", JSON.stringify(state.schema));
+		data.set("html_fields", JSON.stringify(state.html_fields));
+		data.set("baseline", this.draft.baseline || "");
+		data.set("save_id", saveId);
+		const manifest = [];
+		const direct = [];
+		for (const [id, image] of this.images) {
+			if (
+				!Object.values(state.html_fields).some((html) =>
+					html.includes(`draft-image:${id}`),
+				)
+			)
+				continue;
+			const inputName = `draft-image-${id}`;
+			manifest.push({ id, field_id: image.fieldId, input_name: inputName });
+			if (image.file.size > 1024 * 1024) {
+				let uploaded = image.uploads.get(route);
+				if (!uploaded) {
+					const session = await uploadElement.directUpload.createSession({
+						route,
+						file: image.file,
+						inputName,
+						replaceErrorPage: false,
+					});
+					const metadata = await uploadElement.directUpload.upload({
+						file: image.file,
+						sessionUrl: session.session_url,
+						chunkSize: session.chunk_size,
+					});
+					uploaded = {
+						token: session.token,
+						input_name: inputName,
+						filename: image.file.name,
+						content_type: image.file.type,
+						size: image.file.size,
+						generation: metadata.generation,
+						path: metadata.name,
+					};
+					image.uploads.set(route, uploaded);
+				}
+				direct.push(uploaded);
+			} else data.append(inputName, image.file, image.file.name || "image.png");
+		}
+		data.set("image_manifest", JSON.stringify(manifest));
+		if (direct.length) data.set("direct_uploads", JSON.stringify(direct));
+		return data;
+	}
+
+	refreshDraftControls() {
+		if (!this.draft) return;
+		this.draft.dirty ? this.header.unsaved() : this.header.saved();
+		const undo = this.elt.querySelector("[data-role='undo-draft']");
+		const redo = this.elt.querySelector("[data-role='redo-draft']");
+		if (undo) undo.disabled = !this.draft.past.length;
+		if (redo) redo.disabled = !this.draft.future.length;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036b_builder_draft.py::test_builder_save_restores_unsubmitted_condition_buffer
+	 * @matrix forms : draft-history stale-acknowledgement focus-recovery
+	 */
+	restoreDraft({ preserveFocus = false } = {}) {
+		const active = document.activeElement;
+		const condition = this.conditions.condition;
+		const dialog =
+			preserveFocus && condition?.key
+				? {
+						key: condition.key,
+						index: condition.index,
+						fieldId: condition.element.schema.id,
+						setting: structuredClone(condition.setting),
+					}
+				: null;
+		const editor = this.conditions.condition?.document?.editor;
+		const htmlFocus =
+			preserveFocus && editor?.view.dom.contains(active)
+				? { from: editor.state.selection.from, to: editor.state.selection.to }
+				: null;
+		const inputFocus =
+			preserveFocus &&
+			(this.settings.panel.contains(active) ||
+				this.conditions.panel.contains(active)) &&
+			active.name
+				? {
+						name: active.name,
+						start: active.selectionStart,
+						end: active.selectionEnd,
+					}
+				: null;
+		this._restoringDraft = true;
+		this.conditions.hide();
+		this.header.closePreview();
+		this.elements.forEach((element) => {
+			element.destroy?.();
+		});
+		this.elements.clear();
+		this.pruneImages();
+		this.model.panel.replaceChildren();
+		this.model.defaultPanel.replaceChildren();
+		this.selectedElement = null;
+		const state = this.draft.state;
+		this.htmlFields = structuredClone(state.html_fields);
+		this.header.nameHidden.value = state.name;
+		this.header.nameInput.value = state.name;
+		this.header.nameDisplay.textContent = state.name;
+		for (const field of state.schema) {
+			const item = this.createElement(structuredClone(field));
+			const isDefault = ["name", "description"].includes(field.id);
+			if (isDefault)
+				for (const input of item.querySelectorAll("input, textarea"))
+					input.remove();
+			const panel = isDefault ? this.model.defaultPanel : this.model.panel;
+			panel.append(item);
+		}
+		this.updateSchema(true);
+		this.model.show();
+		if (state.selected_id && this.elements.has(state.selected_id))
+			this.selectElement(state.selected_id);
+		else {
+			this.settings.deselectItem();
+			this.formSettings.visible = true;
+		}
+		this.elt.dataset.expanded = "false";
+		this._restoringDraft = false;
+		this.refreshDraftControls();
+		const restoreInput = () =>
+			withTransition(() => {
+				if (!inputFocus || this._destroyed) return;
+				const panel = dialog ? this.conditions.panel : this.settings.panel;
+				const input = Array.from(
+					panel.querySelectorAll("input, textarea"),
+				).find((control) => control.name === inputFocus.name);
+				input?.focus();
+				if (input?.setSelectionRange && inputFocus.start !== null)
+					input.setSelectionRange(inputFocus.start, inputFocus.end);
+			});
+		if (dialog && this.elements.has(dialog.fieldId)) {
+			this.selectElement(dialog.fieldId);
+			return this.showCondition(dialog.key, dialog.index, dialog.setting).then(
+				restoreInput,
+			);
+		}
+		if (htmlFocus && this.selectedElement) {
+			return this.showCondition("html").then(() => {
+				const current = this.conditions.condition?.document?.editor;
+				if (current && !this._destroyed)
+					current.chain().focus().setTextSelection(htmlFocus).run();
+			});
+		}
+		if (inputFocus) return restoreInput();
+	}
+
+	undoDraft(redo = false) {
+		this.updateSchema();
+		if (redo ? this.draft.redo() : this.draft.undo()) {
+			this.restoreDraft();
+		}
+	}
+
+	_keydown(event) {
+		if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+		if (
+			event.target.closest("input, textarea, select, [contenteditable='true']")
+		)
+			return;
+		if (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y") {
+			event.preventDefault();
+			this.undoDraft(event.shiftKey || event.key.toLowerCase() === "y");
+		}
+	}
+
+	savedField(id) {
+		return this.draft?.saved.schema.find((field) => field.id === id);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
+	 * @matrix forms : builder-defaults page-form task-form
+	 */
+	async createFormElements() {
+		const recentSchema = this.schemaElt.value;
+		const schemaJSON = this.bootstrap
+			? JSON.stringify(this.bootstrap.schema)
+			: recentSchema
+				? recentSchema
+				: this.elt.dataset.schema;
+		const schema = schemaJSON ? JSON.parse(schemaJSON) : [];
+
+		for (const elt of schema) {
+			this.createElement(elt);
+		}
+
+		this.updateSchema(true);
+	}
+
+	_click(event) {
+		const menuTrigger = event.target.closest("[data-role='menu-trigger']");
+		const menu = menuTrigger?.closest("[lp-menu]");
+		if (menu && this.elt.contains(menu)) {
+			event.preventDefault();
+			event.stopPropagation();
+			this.EntityMenu.toggle(menu);
+			return;
+		}
+
+		const button = event.target.closest("button");
+		const element = event.target.closest(".form-element");
+		const preview = event.target.closest("#preview-panel");
+
+		if (element && !preview) {
+			this.selectElement(element.id);
+		} else if (button?.hasAttribute("lp-help")) {
+			this._showHelpModal(button);
+		} else if (button?.dataset.role === "form-settings") {
+			this.deselectElement();
+			this.formSettings.visible = true;
+		} else if (button?.id === "preview-toggle") {
+			this.header.togglePreviewPanel();
+		} else if (button?.dataset.role === "save-form") {
+			this.header.saveForm();
+		} else if (["undo-draft", "redo-draft"].includes(button?.dataset.role)) {
+			this.undoDraft(button.dataset.role === "redo-draft");
+		} else if (button?.dataset.action === "copy-form") {
+			this.copyForm(button);
+		} else if (button?.getAttribute("lp-control") === "delete") {
+			this._showDeleteModal(button);
+		} else if (event.target?.id === "form-name-display") {
+			this.header.editFormName();
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
+	 * @matrix forms : builder-copy navigation schema
+	 * @pair entity-menu:builder-copy
+	 */
+	async copyForm(button) {
+		if (this._destroyed || !button?.dataset.route || button.disabled) return;
+
+		const hadFocus = document.activeElement === button;
+		let terminal = false;
+		button.disabled = true;
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+		this.header.clearMessage();
+		try {
+			this.updateSchema();
+			this.draft.group = null;
+			const state = this.captureDraft();
+			const revision = this.draft.revision;
+			this._copyAttempt ??= { state, id: crypto.randomUUID() };
+			if (!this.draft.equal(state, this._copyAttempt.state))
+				this._copyAttempt = { state, id: crypto.randomUUID() };
+			const data = await this.draftPayload(
+				state,
+				button.dataset.route,
+				this._copyAttempt.id,
+			);
+			const response = await request.post(button.dataset.route, data, {
+				replaceErrorPage: false,
+			});
+			if (this._destroyed) return;
+			if (response?.ok === true && response.url) {
+				this._copyAttempt = null;
+				if (
+					this.draft.revision !== revision ||
+					!this.draft.equal(this.captureDraft(), state)
+				) {
+					this.header.message(
+						"Copy created. Your later draft edits are still here. ",
+						{ persistent: true },
+					);
+					const link = document.createElement("a");
+					link.href = response.url;
+					link.target = "_blank";
+					link.rel = "noopener";
+					link.textContent = "Open copy";
+					link.className = "underline";
+					this.header.notification.append(link);
+					return;
+				}
+				window.removeEventListener("beforeunload", this.beforeUnload);
+				window.location.assign(response.url);
+				terminal = true;
+				return;
+			}
+			if (!this.header.showConflict(response))
+				this.header.message(response?.error || "Could not copy this form.", {
+					persistent: true,
+				});
+		} catch (error) {
+			captureError(error, button, { context: "builder-copy-form" });
+			this.header.message("Could not copy this form. Try again.", {
+				persistent: true,
+			});
+		} finally {
+			if (!terminal && !this._destroyed && button.isConnected !== false) {
+				button.disabled = false;
+				button.setAttribute("aria-disabled", "false");
+				button.removeAttribute("aria-busy");
+				if (
+					hadFocus &&
+					(!document.activeElement ||
+						document.activeElement === document.body ||
+						document.activeElement === button)
+				) {
+					button.focus({ preventScroll: true });
+				}
+			}
+		}
+	}
+
+	async _showDeleteModal(button) {
+		if (this._destroyed) return;
+		const modal = new DeleteModal(this, button);
+		await modal.init();
+	}
+
+	async _showHelpModal(button) {
+		if (this._destroyed) return;
+		const modal = new HelpModal(this, button);
+		await modal.init();
+	}
+
+	selectElement(id) {
+		this.selectedElement = this.elements.get(id);
+		if (this.draft) this.draft.state.selected_id = id;
+		withTransition(() => {
+			this.model.selectItem();
+			this.settings.selectItem();
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle draft-history
+	 */
+	deselectElement() {
+		this.model.deselectItem();
+		this.settings.deselectItem();
+		this.selectedElement = null;
+		if (this.draft) this.draft.state.selected_id = null;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_table_creation_defaults_columns_for_unsaved_preview
+	 * @matrix form-table forms : builder-defaults empty-columns unsaved-preview
+	 */
+	createElement(schema) {
+		schema.id = schema.id ?? generateElementId(schema.type);
+		if (schema.type === "html" && !Object.hasOwn(this.htmlFields, schema.id))
+			this.htmlFields[schema.id] = "";
+		if (schema.type === "table" && !Array.isArray(schema.columns)) {
+			schema.columns = [];
+		}
+		const element = ModelElement[schema.type](schema);
+
+		this.elements.set(schema.id, {
+			item: element,
+			schema: schema,
+			settings: this.settings.create(schema),
+		});
+
+		return element;
+	}
+
+	getEligibleConditionTargets() {
+		return Array.from(this.elements.values())
+			.filter(
+				(element) =>
+					["checkbox", "radio", "select"].includes(element.schema.type) &&
+					element !== this.selectedElement,
+			)
+			.map((element) => ({
+				label: element.schema.title,
+				value: element.schema.id,
+				details: {
+					icon: element.schema.type,
+					kind: "form",
+					name: element.schema.title,
+				},
+			}));
+	}
+
+	async showCondition(name, index = -1, draftSetting = null) {
+		if (this._destroyed || this.conditions.loading) return;
+		this.conditions.loading = true;
+		const element = this.selectedElement;
+		if (!element) {
+			this.conditions.loading = false;
+			return;
+		}
+
+		element.conditions ??= {};
+		let condition = element.conditions[name] ?? null;
+		let created = false;
+		if (!condition) {
+			condition = await loadCondition(this, name);
+			created = true;
+			if (this._destroyed || this.selectedElement !== element) {
+				condition?.destroy?.();
+				this.conditions.loading = false;
+				return;
+			}
+			element.conditions[name] = condition;
+		}
+
+		if (!element.destroy) {
+			element.destroy = () => {
+				Object.values(element.conditions).forEach((condition) => {
+					condition.destroy();
+				});
+			};
+		}
+
+		condition.index = index;
+		condition.draftSetting = draftSetting;
+		await condition.init();
+		if (this._destroyed || this.selectedElement !== element) {
+			if (created) {
+				condition.destroy?.();
+				delete element.conditions[name];
+			}
+			this.conditions.loading = false;
+			return;
+		}
+
+		await withTransition(
+			() => {
+				if (this._destroyed || this.selectedElement !== element) return;
+				this.conditions.open(condition);
+			},
+			{ label: "builder:show-condition" },
+		);
+	}
+
+	updateSchemaOrder() {
+		const sortedMap = new Map();
+
+		Array.from(this.model.defaults).forEach((element) => {
+			sortedMap.set(element.id, this.elements.get(element.id));
+		});
+
+		Array.from(this.model.elements).forEach((element) => {
+			sortedMap.set(element.id, this.elements.get(element.id));
+		});
+
+		this.elements = sortedMap;
+
+		this.updateSchema();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_delete_components
+	 * @pair forms:builder-delete-components
+	 */
+	removeElement() {
+		if (this.savedField(this.selectedElement.schema.id)) return;
+		delete this.htmlFields[this.selectedElement.schema.id];
+		if (this.selectedElement.destroy) this.selectedElement.destroy();
+		this.selectedElement.item.remove();
+		this.elements.delete(this.selectedElement.schema.id);
+
+		this.selectedElement = null;
+		this.updateSchema();
+		this.pruneImages();
+	}
+
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.SearchBox?.destroy?.();
+		this.SearchBox = null;
+		this.offlineModal?.destroy?.();
+		this.offlineModal = null;
+		this.components.destroy();
+		this.model.destroy();
+		this.settings.destroy();
+		this.conditions.destroy();
+		this.header.destroy();
+		this.formSettings.destroy();
+		this.EntityMenu.destroy();
+
+		this.elements.forEach((element) => {
+			if (element.destroy) element.destroy();
+		});
+		this.elements.clear();
+		this._independentDocuments.clear();
+		for (const image of this.images.values()) URL.revokeObjectURL(image.url);
+		this.images.clear();
+
+		document.removeEventListener("click", this.click);
+		document.removeEventListener("keydown", this.keydown);
+		window.removeEventListener("beforeunload", this.beforeUnload);
+		if (this.elt._lp_view === this) delete this.elt._lp_view;
+	}
+}
+
+export { CONFIG as C, FormBuilder as F };

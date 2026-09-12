@@ -128,7 +128,7 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     # @matrix task-completion : history schema-version
     # @pair signature:asset-copy
     @classmethod
-    def create(cls, task, overrides=None, *, source=None):
+    def create(cls, task, overrides=None, *, source=None, submission_source="original"):
         overrides = dict(overrides or {})
         source = source or task
         history_key = overrides.pop("_key", None)
@@ -151,7 +151,10 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
 
         form = overrides.get("form", source.form)
         explicit_answers = "submission" in overrides
-        envelope = form_definitions.completed_envelope(source)
+        envelope = (
+            form_definitions.completed_envelope(source)
+            if submission_source == "original" else None
+        )
         if envelope is not None and not explicit_answers and "form" not in overrides:
             form_key = source.properties.form.key
             if envelope.get("form_key") != database_get.urlsafe_key(form_key):

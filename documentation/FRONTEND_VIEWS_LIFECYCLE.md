@@ -149,6 +149,14 @@ component HTML, prepares its replacement, and commits replacement plus nav and
 visibility in one transition. Unloaded widget targets may be replaced directly;
 loaded widgets retain their instance and run their update contract.
 
+Task-row updates remove missing widgets only when the Task component owns them.
+Nested components keep their own widgets, so an already-loaded history table
+retains its rows and column controls when the Task is completed or updated.
+
+Uncompleting a Task while its history is open prepares the reopened row and
+Settings before one replacement commit. That commit destroys the old widgets;
+opening history again loads the newly archived completion.
+
 An offline update stores the mutation and keeps the form in `Queued Sync`.
 Successful replay triggers a fresh poll/EditWatcher pass; it does not directly
 install the replay response as authoritative form state.

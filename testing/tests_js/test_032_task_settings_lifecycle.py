@@ -70,6 +70,149 @@ vm.runInContext(source + "\nglobalThis.TaskForm = TaskForm;", context);
     )
 
 
+# @matrix tasks : active-widget history-refresh uncomplete
+def test_uncomplete_history_replaces_row_in_one_prepared_transition(run_node):
+    run_node(
+        r'''
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const transitions = [];
+let committing = false;
+const context = {
+  console,
+  withTransition: async (commit, options) => {
+    transitions.push(options.label);
+    committing = true;
+    try { commit(); } finally { committing = false; }
+  },
+};
+vm.createContext(context);
+let component = fs.readFileSync("src/script/views/base/component.mjs", "utf8")
+  .replace(/^import .*$/gm, "")
+  .replace("export default class ViewComponent", "class ViewComponent");
+let taskSource = fs.readFileSync("src/script/views/base/task.mjs", "utf8")
+  .replace(/^import .*$/gm, "")
+  .replace("export class Task", "class Task");
+vm.runInContext(`${component}\n${taskSource}\nglobalThis.Task = Task;`, context);
+
+async function updateTask({ completed = true, reopening = true, cancel = false, fail = false } = {}) {
+  transitions.length = 0;
+  const renders = [];
+  const destroyed = [];
+  const row = (completed, connected) => ({
+    id: "task-row",
+    dataset: { key: fail ? "task-row" : "task-key", completed: String(completed) },
+    isConnected: connected,
+    closest() { return this; },
+    append(...items) { assert.equal(items.length, 0); },
+    querySelector(selector) {
+      return selector === "[data-widget='TaskSettings']" && !completed ? {} : null;
+    },
+  });
+  const currentRow = row(completed, true);
+  const nextRow = row(!reopening, false);
+  const view = { components: {} };
+  const current = new context.Task(currentRow, view);
+  current.widgets.TaskHistory = {
+    name: "TaskHistory",
+    destroy() { destroyed.push("history"); },
+  };
+  current.widgets.TaskForm = { destroy() { destroyed.push("old form"); } };
+  current.active = current.widgets.TaskHistory;
+  current._replaceNav = () => {};
+  current._removeMissingWidgets = () => {};
+  current.prepareRender = async () => {};
+  current.render = () => {
+    assert.equal(committing, true);
+    renders.push(current.active.name);
+  };
+  view.components[current.name] = current;
+
+  let replacement;
+  view.getComponent = (elt) => {
+    assert.equal(elt, nextRow);
+    replacement = new context.Task(elt, view);
+    view.components[replacement.name] = replacement;
+    replacement.widgets.TaskSettings = {
+      name: "TaskSettings",
+      destroy() { destroyed.push("new settings"); },
+    };
+    replacement.activate = async (name) => {
+      assert.equal(name, "TaskSettings");
+      assert.equal(currentRow.isConnected, true);
+      assert.equal(view.components[current.name], current);
+      replacement.active = replacement.widgets[name];
+    };
+    replacement.prepareRender = async () => {
+      assert.equal(nextRow.isConnected, false);
+      assert.equal(renders.length, 0);
+      if (cancel) current.destroy();
+      if (fail) throw new Error("settings unavailable");
+    };
+    replacement.render = () => {
+      assert.equal(committing, true);
+      assert.equal(nextRow.isConnected, true);
+      assert.equal(currentRow.isConnected, false);
+      assert.equal(view.components[current.name], replacement);
+      renders.push(replacement.active.name);
+    };
+    return replacement;
+  };
+  currentRow.replaceWith = (elt) => {
+    assert.equal(committing, true);
+    assert.equal(elt, nextRow);
+    currentRow.isConnected = false;
+    nextRow.isConnected = true;
+  };
+  const updating = current.updated({
+    html: {
+      querySelector() { return nextRow; },
+      querySelectorAll() { return []; },
+    },
+  });
+  if (fail) {
+    await assert.rejects(updating, /settings unavailable/);
+    assert.equal(currentRow.isConnected, true);
+    assert.equal(view.components[current.name], current);
+    assert.deepEqual(destroyed, ["new settings"]);
+    assert.deepEqual(renders, []);
+    assert.deepEqual(transitions, []);
+    return;
+  }
+  await updating;
+
+  if (!completed || !reopening) {
+    assert.equal(replacement, undefined, "Ordinary history updates retain their component");
+    assert.deepEqual(renders, ["TaskHistory"]);
+    assert.deepEqual(destroyed, []);
+  } else if (cancel) {
+    assert.equal(nextRow.isConnected, false);
+    assert.deepEqual(renders, []);
+    assert.deepEqual(destroyed, ["history", "old form", "new settings"]);
+  } else {
+    assert.deepEqual(renders, ["TaskSettings"], "Never render stale history after reopening");
+    assert.deepEqual(destroyed, ["history", "old form"]);
+    assert.equal(replacement.widgets.TaskHistory, undefined, "Reopening history must reload its new row");
+    assert.equal(nextRow.dataset.completed, "false");
+  }
+  assert.equal(transitions.length, 1, "One prepared task update must use one transition");
+}
+
+(async () => {
+  await updateTask();
+  await updateTask({ completed: false });
+  await updateTask({ reopening: false });
+  await updateTask({ cancel: true });
+  await updateTask({ fail: true });
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
 # @matrix tasks : action-control-lifecycle teardown
 def test_task_settings_awaits_action_controls_and_cleans_up(run_node):
     run_node(

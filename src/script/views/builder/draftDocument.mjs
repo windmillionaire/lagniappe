@@ -50,14 +50,6 @@ export class DraftDocument extends IndependentDocument {
 		return Promise.resolve(true);
 	}
 
-	_initEditor(html) {
-		const ready = super._initEditor(html);
-		this.editor.on("blur", () => {
-			this.builder.draft.group = null;
-		});
-		return ready;
-	}
-
 	addDraftImage(file) {
 		return this.builder.addDraftImage(this.fieldId, file);
 	}

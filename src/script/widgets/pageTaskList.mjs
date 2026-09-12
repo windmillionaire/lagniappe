@@ -54,8 +54,10 @@ export class PageTaskList extends BaseList {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
 	 * @tests tests_js/test_028_form_state_split.py::test_task_completion_keeps_component_update_route_when_history_is_active
 	 * @matrix tasks : active-widget complete route-override
+	 * @matrix task-completion : archive uncomplete
 	 */
 	_click(e) {
 		const submitter = e.target.closest(
@@ -69,9 +71,18 @@ export class PageTaskList extends BaseList {
 			e.stopPropagation();
 			e.preventDefault();
 
-			if (!task.active && role === "complete-toggle") {
+			if (
+				role === "complete-toggle" &&
+				(!task.active || task.elt.dataset.completed === "true")
+			) {
 				const data = new FormData();
 				data.append("role", role);
+				if (task.elt.dataset.completed === "true") {
+					const choice = task.elt.querySelector(
+						"[data-role='completion-submission-choice']:checked",
+					);
+					data.append("completion_submission", choice?.value || "modified");
+				}
 				this.view.update(task, data, route);
 				return;
 			}

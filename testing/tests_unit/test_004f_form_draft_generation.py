@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 
+from bs4 import BeautifulSoup
 import pytest
 
 from lagniappe.core.exceptions import ValidationError
@@ -115,6 +116,48 @@ def test_generated_static_content_retains_only_known_images():
     assert local in html
     assert "untrusted.example" not in html
     assert "<script" not in html
+
+
+# @source lagniappe/core/tools/files/html.py::render_markdown
+# @matrix forms ai : draft-generation validation no-side-effects
+# @matrix form-html security : html-sanitization owned-image
+@pytest.mark.unit
+@pytest.mark.parametrize("source", ["https://example.test/assets/original/image", "draft-image:local-one"])
+@pytest.mark.parametrize(("style", "suffix"), [
+    ('width: 50%; display: block; float: none; margin-left: auto; margin-right: 0', ''),
+    ('width: 50%; display: block; float: none; margin-left: auto; margin-right: 0',
+     '{width="50%" style="display:block;float:none;margin-left:auto;margin-right:0"}'),
+    ('width: 70%; display: block; float: left; margin: 0 1em 1em 0', ''),
+])
+def test_generated_text_preserves_draft_image_layout(source, style, suffix):
+    draft = _draft()
+    draft["html_fields"]["intro"] = (
+        '<p><strong>Original instruction</strong></p>'
+        f'<img src="{source}" alt="Bookshelf" title="Original image" style="{style}" onclick="bad()">'
+    )
+    original = deepcopy(draft)
+    proposal = prepare_generated_changes({
+        "operations": [{"op": "update_field", "field_id": "notes", "changes": {
+            "placeholder": "Enter a generated verification note",
+        }}],
+        "content_markdown": {"intro": f'**Generated instruction**\n\n![Image]({source}){suffix}'},
+    }, draft, form_type="task", image_sources={"intro": [(source, source)]})
+
+    content = BeautifulSoup(proposal["html_fields"]["intro"], "html.parser")
+    assert content.get_text(" ", strip=True) == "Generated instruction"
+    assert content.strong.string == "Generated instruction"
+    assert len(content.find_all("img")) == 1
+    assert content.img["src"] == source
+    assert content.img["alt"] == "Bookshelf"
+    assert content.img["title"] == "Original image"
+    declarations = dict(part.strip().split(":", 1) for part in content.img["style"].split(";") if part.strip())
+    expected = dict(part.strip().split(":", 1) for part in style.split(";") if part.strip())
+    assert {key: value.strip() for key, value in declarations.items()} == {
+        key: value.strip() for key, value in expected.items()
+    }
+    assert "onclick" not in content.img.attrs
+    assert proposal["operations"][0]["changes"]["placeholder"] == "Enter a generated verification note"
+    assert draft == original
 
 
 # @source lagniappe/core/tools/ai/schema.py::form_generation_prompt

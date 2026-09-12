@@ -60,8 +60,6 @@ class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty):
 
     _icon = "checklist"
     _ordering = Ordering.EXISTS
-    repeating_default = False
-    restore_on_uncomplete = False
 
     @property
     def value(self):

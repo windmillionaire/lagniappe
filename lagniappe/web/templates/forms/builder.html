@@ -11,15 +11,17 @@
 {% set can_restrict_form = Resource.SITE.allowed(Action.PERMISSIONS) %}
 
 {% macro save() %}
-  <button class="{{ styles.nav.button }} group/toggle"
+  <button class="{{ styles.nav.button }}"
           data-saved="true"
           data-role="save-form"
           data-kind="saved"
           type="button"
+          aria-disabled="true"
           aria-label="Save form"
           title="Save form">
-    {{ render_icon("builder.saved", "icon-2xl text-kind-default invisible group-data-[saved=true]/toggle:visible", "saved") }}
-    {{ render_icon("builder.unsaved", "icon-2xl text-kind-default invisible group-data-[saved=false]/toggle:visible", "unsaved") }}
+    {{ render_icon("builder.saved", "icon-2xl text-kind-default", "saved") }}
+    {{ render_icon("builder.unsaved", "icon-2xl text-kind-default", "unsaved") }}
+    {{ render_icon("spinner", "icon-2xl text-kind-default") }}
   </button>
 {% endmacro %}
 
@@ -92,8 +94,10 @@
       </div>
     </h2>
     <div class="flex flex-row items-center gap-2">
-      <button type="button" class="{{ styles.nav.button }}" data-role="undo-draft" aria-label="Undo draft change" title="Undo draft change" disabled>{{ render_icon("undo") }}</button>
-      <button type="button" class="{{ styles.nav.button }}" data-role="redo-draft" aria-label="Redo draft change" title="Redo draft change" disabled>{{ render_icon("redo") }}</button>
+      <div data-role="draft-history" data-visible="true" class="flex flex-row items-center gap-2">
+        <button type="button" class="{{ styles.nav.button }} disabled:opacity-50" data-role="undo-draft" aria-label="Undo draft change" title="Undo draft change" disabled>{{ render_icon("undo") }}</button>
+        <button type="button" class="{{ styles.nav.button }} disabled:opacity-50" data-role="redo-draft" aria-label="Redo draft change" title="Redo draft change" disabled>{{ render_icon("redo") }}</button>
+      </div>
       <button id="preview-toggle"
               class="{{ styles.builder.switch.container }} group/toggle"
               role="switch"

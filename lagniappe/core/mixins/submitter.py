@@ -1,6 +1,5 @@
 """Submitter mixin for entities with form submissions."""
 
-from copy import deepcopy
 import hashlib
 import json
 
@@ -8,7 +7,7 @@ from ..definitions.fingerprints import restricted_fingerprint
 from ..exceptions import ValidationError
 from ..entities import Entities
 from ..tools.form_definitions import (
-    definition_for, history_values_for,
+    definition_for,
     require_mutable_submission,
 )
 from lagniappe.core.tools.database import get as database_get
@@ -128,8 +127,6 @@ class SubmitterMixin:
         ai_submission(submission): Validate and save AI-generated field values.
         import_submission(submission): Validate and save CSV-imported field values.
         save_submission(): Persist ``submission.db_value`` and form metadata.
-        save_default_field(field_id, submission): Persist one field as a repeating
-            default without running the entity's normal save plan.
         fingerprint: MD5 combining the base entity revision, its own Form's
             schema version, and every effective restriction group.
     """
@@ -346,74 +343,16 @@ class SubmitterMixin:
         return self.submission_definition.error
 
     # @testable true
-    # @tests tests_unit/test_004d_submitter.py::test_save_default_field_copies_db_value_and_saves_only_submitter
-    # @tests tests_unit/test_004d_submitter.py::test_save_submission_removes_changed_repeating_defaults
-    # @matrix submission : repeating-default storage
-    @property
-    def default_submission(self):
-        value = self.db.get("default_submission")
-        if isinstance(value, str):
-            try:
-                value = json.loads(value)
-            except (TypeError, json.JSONDecodeError):
-                return {}
-        return value if isinstance(value, dict) else {}
-
-    # @testable false
-    # @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.save_default_field
-    # @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.save_submission
-    # @reason repeating-default storage normalization is owned by its public mutation methods
-    def _set_default_submission(self, submission):
-        if submission:
-            self.db["default_submission"] = json.dumps(submission)
-        else:
-            self.db.pop("default_submission", None)
-
-    # @testable true
-    # @tests tests_unit/test_004d_submitter.py::test_save_default_field_copies_db_value_and_saves_only_submitter
-    # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_cannot_be_saved_as_repeating_default
-    # @matrix submission : direct-save field-copy repeating-default
-    # @pair form-todo:repeating-default
-    def save_default_field(self, field_id, submission=None):
-        """Persist one field's DB value as a repeating submission default."""
-        require_mutable_submission(self)
-        if submission is not None and submission.entity is not self:
-            history_values_for(self, submission.entity, field_id)
-        submission = submission or self.properties.submission
-        field = submission.fields.get(field_id)
-        if field is None:
-            raise ValidationError(f"Submission field {field_id!r} does not exist.")
-        if not getattr(field, "repeating_default", True):
-            raise ValidationError(
-                f"Submission field {field_id!r} cannot repeat automatically."
-            )
-        submission_value = submission.db_value
-        if field_id not in submission_value:
-            raise ValidationError(f"Submission field {field_id!r} has no saved value.")
-
-        defaults = deepcopy(self.default_submission)
-        value = deepcopy(submission_value[field_id])
-        defaults[field_id] = value
-        self._set_default_submission(defaults)
-        Entities.save_root(self, property_mask=("default_submission",))
-        return value
-
-    # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_stored_explicit_checkbox_false_survives_load_save
     # @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
     # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
-    # @tests tests_unit/test_004d_submitter.py::test_save_submission_removes_changed_repeating_defaults
-    # @matrix submission : blank-persistence empty-submission load-save normalization reconciliation repeating-default stored-false stored-null
+    # @tests tests_unit/test_004d_submitter.py::test_save_submission_discards_legacy_defaults_and_keeps_current_answers
+    # @matrix submission : blank-persistence empty-submission load-save normalization reconciliation stored-false stored-null
     def save_submission(self):
         require_mutable_submission(self)
         submission_value = self.properties.submission.db_value
         self.properties.submission.value = submission_value
-        defaults = {
-            field_id: value
-            for field_id, value in self.default_submission.items()
-            if field_id in submission_value and submission_value[field_id] == value
-        }
-        self._set_default_submission(defaults)
+        self.db.pop("default_submission", None)
         if self.form and self.entity_kind != "task_history":
             self.db["schema_version"] = self.form.version
             self.db["generation"] = self.form.generation
@@ -479,7 +418,6 @@ class SubmitterMixin:
                 "form_version": getattr(form, "version", None),
                 "schema_version": self.schema_version,
                 "submission": self.properties.submission.value or {},
-                "default_submission": self.default_submission,
                 "mirrored": mirrored,
             },
             sort_keys=True,

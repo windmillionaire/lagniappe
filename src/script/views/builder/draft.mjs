@@ -1,7 +1,7 @@
 /**
  * @testable true
  * @tests tests_js/test_036b_builder_draft.py::test_builder_draft_history_and_generation
- * @matrix forms : draft-history stable-identity schema-generation
+ * @matrix forms : draft-history stable-identity schema-generation stale-acknowledgement
  */
 export class BuilderDraft {
 	constructor(state, baseline = null) {
@@ -12,6 +12,8 @@ export class BuilderDraft {
 		this.past = [];
 		this.future = [];
 		this.group = null;
+		// Recomputed on form edits/Save, so Document typing only compares HTML.
+		this.formDirty = false;
 	}
 
 	content(state = this.state) {
@@ -21,6 +23,12 @@ export class BuilderDraft {
 
 	equal(a, b) {
 		return this.serialize(this.content(a)) === this.serialize(this.content(b));
+	}
+
+	equalForm(a, b) {
+		const { html_fields: _aHtml, ...aForm } = this.content(a);
+		const { html_fields: _bHtml, ...bForm } = this.content(b);
+		return this.serialize(aForm) === this.serialize(bForm);
 	}
 
 	serialize(value) {
@@ -36,7 +44,19 @@ export class BuilderDraft {
 	}
 
 	get dirty() {
-		return !this.equal(this.state, this.saved);
+		return (
+			this.formDirty ||
+			this.serialize(this.state.html_fields) !==
+				this.serialize(this.saved.html_fields)
+		);
+	}
+
+	updateHtml(fieldId, html) {
+		if (this.state.html_fields[fieldId] === html) return false;
+		// The Document editor owns its history. Typing never snapshots the form.
+		this.state.html_fields[fieldId] = html;
+		this.revision += 1;
+		return true;
 	}
 
 	record(state, group = null) {
@@ -44,32 +64,51 @@ export class BuilderDraft {
 			this.state.selected_id = state.selected_id;
 			return false;
 		}
-		if (!group || this.group !== group) {
-			this.past.push(structuredClone(this.state));
-			if (this.past.length > 100) this.past.shift();
+		if (!this.equalForm(this.state, state)) {
+			if (!group || this.group !== group) {
+				this.past.push(structuredClone(this.state));
+				if (this.past.length > 100) this.past.shift();
+			}
+			this.future = [];
+			this.group = group;
 		}
 		this.state = structuredClone(state);
-		this.future = [];
-		this.group = group;
+		this.formDirty = !this.equalForm(this.state, this.saved);
 		this.revision += 1;
 		return true;
+	}
+
+	restoreForm(state) {
+		const documents = new Set(
+			this.state.schema
+				.filter((field) => field.type === "html")
+				.map((field) => field.id),
+		);
+		// Keep current content for surviving fields; restored fields bring their
+		// snapshot content back with them, including any local image references.
+		for (const field of state.schema) {
+			if (field.type !== "html" || !documents.has(field.id)) continue;
+			if (Object.hasOwn(this.state.html_fields, field.id))
+				state.html_fields[field.id] = this.state.html_fields[field.id];
+			else delete state.html_fields[field.id];
+		}
+		this.state = state;
+		this.formDirty = !this.equalForm(this.state, this.saved);
+		this.group = null;
+		this.revision += 1;
 	}
 
 	undo() {
 		if (!this.past.length) return false;
 		this.future.push(structuredClone(this.state));
-		this.state = this.past.pop();
-		this.group = null;
-		this.revision += 1;
+		this.restoreForm(this.past.pop());
 		return true;
 	}
 
 	redo() {
 		if (!this.future.length) return false;
 		this.past.push(structuredClone(this.state));
-		this.state = this.future.pop();
-		this.group = null;
-		this.revision += 1;
+		this.restoreForm(this.future.pop());
 		return true;
 	}
 
@@ -150,6 +189,7 @@ export class BuilderDraft {
 				...structuredClone(this.saved),
 				selected_id: this.state.selected_id,
 			};
+		this.formDirty = !this.equalForm(this.state, this.saved);
 		this.group = null;
 		return unchanged;
 	}

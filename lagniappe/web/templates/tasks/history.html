@@ -1,23 +1,13 @@
 {% from 'table.html' import table %}
 
 {% macro completion_history(groups) %}
-  <div data-role="completion-history" class="flex flex-col gap-4 py-3">
+  <div data-role="completion-history" class="flex flex-col gap-4">
     {% for group in groups %}
-      <section data-role="history-group" data-generation="{{ group.definition.generation }}">
-        {% if group.definition.error %}<p role="status">{{ group.definition.error }}</p>{% endif %}
-        {{ table(group.records, group.index, 'history-table-' ~ loop.index) }}
-        <div class="flex flex-col gap-2 py-2">
-          {% for completion in group.records %}
-            <div data-role="completion-entry">
-              <button type="button" data-role="completion-details" aria-expanded="false"
-                      data-key="{{ completion.urlsafe_key }}"
-                      data-route="{{ url_for('tasks.completion_details', key=completion.urlsafe_key) }}"
-                      class="{{ styles.button.submit }}">
-                View completion{% if completion.completed_on %} from {{ completion.completed_on|format_date }}{% endif %}
-              </button>
-              <div data-role="completion-detail" hidden></div>
-            </div>
-          {% endfor %}
+      <section data-role="history-group" data-generation="{{ group.definition.generation }}"
+               class="{{ styles.table.container }}">
+        {% if group.definition.error %}<p role="status" class="px-4 py-2">{{ group.definition.error }}</p>{% endif %}
+        <div class="table-container px-4" data-embedded="true">
+          {{ table(group.records, group.index, 'history-table-' ~ loop.index) }}
         </div>
       </section>
     {% else %}

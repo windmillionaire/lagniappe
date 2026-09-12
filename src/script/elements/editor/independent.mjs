@@ -303,18 +303,20 @@ export class IndependentDocument {
 		return normalizeHTML(this.editor.getHTML());
 	}
 
+	/**
+	 * @testable true
+	 * @matrix editor : initial-load
+	 */
 	_initEditor(html) {
 		return new Promise((resolve) => {
-			this.editor = independentEditor(this.container);
+			this.editor = independentEditor(this.container, html);
 
 			this.editor.on("create", () => {
 				if (this._destroyed) {
 					resolve(false);
 					return;
 				}
-				if (html.length > 0) {
-					this.editor.commands.setContent(html);
-				} else {
+				if (!html.length) {
 					this.container
 						.querySelector(".ProseMirror")
 						.classList.add("min-h-[200px]");

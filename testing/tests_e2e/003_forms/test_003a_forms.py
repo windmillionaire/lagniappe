@@ -331,7 +331,7 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     assert generated_response.ok, response_text
     response_body = json.loads(response_text)
     assert isinstance(response_body["operations"], list)
-    expect(generate).to_be_hidden()
+    expect(generate.get_by_role("button", name="Generated", exact=True)).to_be_visible()
     expect(user.locate(builder.SAVE_BUTTON)).to_have_attribute("data-saved", "false")
     schema = builder.schema
     default_schema = [

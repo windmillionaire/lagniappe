@@ -1,38 +1,5 @@
+import { STYLES } from "styles";
 import { BaseTable, EmbeddedTable } from "../elements/base/baseTable";
-import { request, captureError } from "../shared";
-
-/**
- * @testable false
- * @covered-by src/script/widgets/tables.mjs::TaskHistory._click
- * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
- * @reason both explicit completion views use the existing readonly form renderer
- */
-export async function renderCompletionForm(response, key) {
-	const { BaseForm } = await import("../elements/base/baseForm");
-	const host = document.createElement("div");
-	host.dataset.kind = "task";
-	const form = new BaseForm({
-		target: host, key, readonly: true,
-		schema: response.schema || [], submission: response.submission || {},
-		htmlFields: response.html_fields || {}, showEmptyFields: false,
-	});
-	await form.init();
-	const error = response.schema_error || response.content_error;
-	if (error) {
-		const message = document.createElement("p");
-		message.setAttribute("role", "status");
-		message.textContent = error;
-		host.prepend(message);
-	}
-	if (response.raw_submission) {
-		const raw = document.createElement("pre");
-		raw.dataset.role = "original-raw-answers";
-		raw.className = "whitespace-pre-wrap break-words";
-		raw.textContent = JSON.stringify(response.raw_submission, null, 2);
-		host.append(raw);
-	}
-	return { form, host };
-}
 
 /**
  * @testable infrastructure
@@ -265,15 +232,15 @@ export class IndexTable extends BaseTable {
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_appears_after_completion_cycle
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
  * @matrix tasks : completion-cycle history reload
+ * @matrix task-completion : history readonly generation
  * @pair embedded-table:table-cell-expand
  */
 export class TaskHistory extends EmbeddedTable {
 	constructor(attributes) {
 		super(attributes);
 		this._updated = null;
-		this._completionForms = new Map();
-		this._detailGeneration = 0;
 	}
 
 	get table() {
@@ -281,72 +248,9 @@ export class TaskHistory extends EmbeddedTable {
 	}
 
 	async updated(response) {
-		this._updated = response.html.querySelector("[data-role='completion-history']");
-	}
-
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
-	 * @matrix tasks task-completion : history readonly schema-version
-	 */
-	_click(event) {
-		const button = event.target.closest("button[data-role='completion-details']");
-		if (!button || !this.target.contains(button)) return super._click(event);
-		event.preventDefault();
-		event.stopPropagation();
-		void this._showCompletion(button);
-	}
-
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/tables.mjs::TaskHistory._click
-	 * @reason async detail rendering belongs to the history detail interaction
-	 */
-	async _showCompletion(button) {
-		const target = button.parentElement.querySelector("[data-role='completion-detail']");
-		if (button.disabled) return;
-		if (this._completionForms.has(target)) {
-			target.hidden = !target.hidden;
-			button.setAttribute("aria-expanded", String(!target.hidden));
-			return;
-		}
-		const generation = this._detailGeneration;
-		button.disabled = true;
-		try {
-			const response = await request.get(button.dataset.route);
-			const { form, host } = await renderCompletionForm(response, button.dataset.key);
-			if (generation !== this._detailGeneration || !this.target.contains(button)) {
-				form.destroy();
-				return;
-			}
-			target.replaceChildren(host);
-			target.hidden = false;
-			button.setAttribute("aria-expanded", "true");
-			this._completionForms.set(target, form);
-		} catch (error) {
-			if (generation !== this._detailGeneration) return;
-			target.textContent = "Could not load this completion. Please try again.";
-			target.hidden = false;
-			captureError(error, this.target, { route: button.dataset.route });
-		} finally {
-			button.disabled = false;
-		}
-	}
-
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/tables.mjs::TaskHistory._click
-	 * @reason owned completion renderers share the history widget lifetime
-	 */
-	_clearCompletions() {
-		this._detailGeneration += 1;
-		for (const form of this._completionForms.values()) form.destroy();
-		this._completionForms.clear();
-	}
-
-	destroy() {
-		this._clearCompletions();
-		super.destroy();
+		this._updated = response.html.querySelector(
+			"[data-role='completion-history']",
+		);
 	}
 
 	postreconcile() {
@@ -354,7 +258,6 @@ export class TaskHistory extends EmbeddedTable {
 
 		this.visible = true;
 		this.target.dataset.visible = "true";
-		this._clearCompletions();
 		this.table.replaceChildren(this._updated);
 		this._updated.dataset.visible = "true";
 		for (const table of this._updated.querySelectorAll("table")) {
@@ -412,8 +315,7 @@ export class FilterResults extends EmbeddedTable {
 
 		this.container = document.createElement("div");
 		this.container.dataset.role = "results-table";
-		this.container.className =
-			"min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white";
+		this.container.className = STYLES.table.container;
 		this.tableContainer = document.createElement("div");
 		this.tableContainer.className = "table-container px-4";
 		this.tableContainer.dataset.role = "table";

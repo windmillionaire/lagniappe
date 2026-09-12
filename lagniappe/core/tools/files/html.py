@@ -489,6 +489,23 @@ def _prepare_owned_images(content, image_sources):
     return str(soup)
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/files/html.py::render_markdown
+# @reason generated text retains draft image attributes before the final image safety policy
+def _retain_original_images(content, original_html):
+    """Keep existing image layout when Markdown rewrites the surrounding text."""
+    originals = BeautifulSoup(original_html, "html.parser").find_all("img")
+    soup = BeautifulSoup(content, "html.parser")
+    for image in soup.find_all("img"):
+        for index, original in enumerate(originals):
+            if _same_resource_url(image.get("src"), original.get("src")):
+                image.attrs = dict(original.attrs)
+                # Repeated uses of one image can have different layouts.
+                originals.pop(index)
+                break
+    return str(soup)
+
+
 # @testable true
 # @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_markdown_html
 # @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_text_html
@@ -552,8 +569,8 @@ def sanitize_public_document_html(content, image_sources) -> SafeHTML:
 # @tests tests_unit/test_014_security.py::test_render_markdown_normalizes_indented_html_source
 # @matrix editor files markdown : code-block hard-break html-source list-kind mixed-list soft-wrap task-list
 # @matrix form-html security : html-sanitization owned-image
-def render_markdown(text, *, image_sources=None) -> SafeHTML:
-    """Render Markdown through the shared sanitized editor-compatible pipeline."""
+def render_markdown(text, *, image_sources=None, original_html=None) -> SafeHTML:
+    """Render Markdown safely, optionally retaining images from existing content."""
     if not isinstance(text, str):
         return _stamp_safe_html("")
     if text.lstrip().startswith("<") and HTML_FRAGMENT_PATTERN.search(text):
@@ -565,7 +582,7 @@ def render_markdown(text, *, image_sources=None) -> SafeHTML:
             "tables",
             "pymdownx.tasklist",
             "pymdownx.tilde",
-        ],
+        ] + (["attr_list"] if image_sources is not None else []),
         extension_configs={
             "pymdownx.tasklist": {
                 "custom_checkbox": True,
@@ -576,6 +593,8 @@ def render_markdown(text, *, image_sources=None) -> SafeHTML:
     )
     normalized = _normalize_task_lists(converter.convert(text))
     if image_sources is not None:
+        if original_html:
+            normalized = _retain_original_images(normalized, original_html)
         # Browser-local image identities are not general allowed URL schemes.
         # Carry only explicitly supplied identities through the rich sanitizer
         # using inert relative placeholders, then restore their draft tokens.

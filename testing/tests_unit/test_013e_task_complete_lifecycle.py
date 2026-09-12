@@ -204,9 +204,9 @@ def test_task_uncomplete_after_complete(get_test_entities):
     assert task.db.get("history") is True
 
 
-# @matrix task-completion : assignment repeating-default uncomplete
+# @matrix task-completion : assignment field-reset uncomplete
 @pytest.mark.unit
-def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
+def test_task_uncomplete_clears_submission_and_legacy_defaults_preserving_assignment(get_schema):
     assignee = TestEntities.get(
         "PAGE", {"name": "Persistent assignee", "hash": "persistent_assignee"}
     )
@@ -216,10 +216,10 @@ def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
     task = TestEntities.get(
         "TASK",
         {
-            "name": "Repeating submission task",
-            "hash": "repeating_submission_task",
-            "page": {"name": "Parent", "hash": "repeating_submission_parent"},
-            "form": {"name": "Inputs", "hash": "repeating_submission_form"},
+            "name": "Fresh submission task",
+            "hash": "fresh_submission_task",
+            "page": {"name": "Parent", "hash": "fresh_submission_parent"},
+            "form": {"name": "Inputs", "hash": "fresh_submission_form"},
         },
     )
     task.form.schema = get_schema("basic_inputs")
@@ -227,7 +227,7 @@ def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
     task.db["assigned_to"] = assignee.key
     task.properties.assigned_by._value = assigner
     task.db["assigned_by"] = assigner.key
-    task.db["default_submission"] = json.dumps({"input-textab12": "Repeat this value"})
+    task.db["default_submission"] = json.dumps({"input-textab12": "Legacy saved value"})
     task.properties.submission.value = {
         "input-textab12": "Completed value",
         "input-numgh78": 12,
@@ -236,10 +236,10 @@ def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
 
     task.uncomplete()
 
-    assert task.submission == {"input-textab12": "Repeat this value"}
-    assert task.properties.submission.form_value == {
-        "input-textab12": "Repeat this value"
-    }
+    assert task.submission == {}
+    assert task.properties.submission.form_value == {}
+    assert "submission" not in task.db
+    assert "default_submission" not in task.db
     assert task.assigned_to is assignee
     assert task.assigned_by is assigner
     assert task.db["assigned_to"] == assignee.key
@@ -831,7 +831,7 @@ def test_task_complete_with_near_term_schedule_uncompletes_immediately():
         task.complete()
 
     create_task.assert_not_called()
-    create_history_entry.assert_called_once_with()
+    create_history_entry.assert_called_once_with(history_key=None, submission_source="original")
     assert task.completed is False
     assert task.completed_on is None
     assert task.properties.completed_by.value is None

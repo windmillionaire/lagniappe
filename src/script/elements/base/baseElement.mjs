@@ -57,10 +57,6 @@ export class BaseElement {
 		return !NON_HISTORY_FILLABLE_TYPES.has(this.schema?.type);
 	}
 
-	get historyFillPersistsDefault() {
-		return true;
-	}
-
 	get canHistoryFill() {
 		return Boolean(
 			this.renderer.historyFillEnabled &&
@@ -153,7 +149,7 @@ export class BaseElement {
 		return true;
 	}
 
-	historyFillButton(value, onFill = null) {
+	historyFillButton(value) {
 		if (!this.canHistoryFill || !this.historyValueAvailable(value)) return null;
 
 		const button = document.createElement("button");
@@ -171,16 +167,14 @@ export class BaseElement {
 		button.addEventListener("click", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
-			if (this.fillFromHistory(value)) {
-				if (this.historyFillPersistsDefault) onFill?.(this.schema.id);
-			}
+			this.fillFromHistory(value);
 		});
 
 		return button;
 	}
 
-	addHistoryFill(value, onFill = null) {
-		const button = this.historyFillButton(value, onFill);
+	addHistoryFill(value) {
+		const button = this.historyFillButton(value);
 		if (!button) return false;
 
 		const elt = this.elt;

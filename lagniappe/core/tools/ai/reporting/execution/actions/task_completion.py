@@ -153,15 +153,13 @@ def _undo_complete_task(record, report, user):
         else source.submission_definition
     )
     values = deepcopy(state.get("submission") or {})
-    defaults = deepcopy(state.get("default_submission") or {})
     prior_form = (state.get("form") or {}).get("id")
     if prior_form != (task.form.urlsafe_key if task.form else None):
         raise exceptions.ValidationError("The task form changed; undo needs review.")
-    if definition.error and (values or defaults):
+    if definition.error and values:
         raise exceptions.ValidationError(definition.error)
     schema = task.form.schema if task.form else []
     compatible_values(definition.schema, schema, values)
-    compatible_values(definition.schema, schema, defaults)
     try:
         if task.completed:
             key = database_get.datastore_key(record.get("history_output_key"))
@@ -177,7 +175,6 @@ def _undo_complete_task(record, report, user):
             record_attempt_asset(task, copied.definition)
         task.properties.submission._fields = None
         task.submission = values
-        task._set_default_submission(defaults)
         task.files = _checkpoint_entities(state.get("files"))
         task.linked_pages = _checkpoint_entities(state.get("linked_pages"))
         task.due_date = _restore_checkpoint_datetime(before["due_date"])

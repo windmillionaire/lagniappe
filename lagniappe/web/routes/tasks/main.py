@@ -655,15 +655,6 @@ def update(key, **kwargs):
     role = request.form.get("role")
     explain = request.form.get("explain")
 
-    if role == "archive-completion":
-        try:
-            if task.completed:
-                task.uncomplete()
-                task.save()
-        except exceptions.ValidationError as error:
-            return responses.error(str(error))
-        return responses.page_task(task)
-
     if (
         _should_submit_task_form(active, role, task)
         or role == "autofill-submit"
@@ -711,8 +702,13 @@ def update(key, **kwargs):
 
     if role == "complete-toggle":
         try:
-            task.complete() if not task.completed else task.uncomplete()
-        except exceptions.TaskCompletionError as e:
+            if task.completed:
+                task.uncomplete(
+                    submission_source=request.form.get("completion_submission", "modified"),
+                )
+            else:
+                task.complete()
+        except (exceptions.TaskCompletionError, exceptions.ValidationError) as e:
             return responses.error(str(e))
 
     if role in ["autofill-submit"] or explain == "autofill":
@@ -896,33 +892,6 @@ def latest_history_submission(key, **kwargs):
     return responses.json_response({"latest_submission": submission})
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-# @matrix tasks : history-fill patch repeating-default
-@tasks.route("<key>/default-submission", methods=["PATCH"])
-@permission(Resource.TASK, Action.EDIT)
-def save_default_field(key, **kwargs):
-    task = kwargs["entity"]
-    locked = deferred_autofill.locked_response(task)
-    if locked:
-        return locked
-    field_id = (request.get_json(silent=True) or {}).get("field_id")
-    if not field_id:
-        return responses.error("A submission field is required")
-
-    histories = task.load_history(database_get.latest_task_history(task))
-    history = histories[0] if histories else None
-    if not history:
-        return responses.error("No task history is available")
-
-    try:
-        task.save_default_field(field_id, history.properties.submission)
-    except exceptions.ValidationError as error:
-        return responses.error(str(error))
-
-    return responses.entity_response(responses.ok(), task)
-
-
 # @testable false
 # @covered-by lagniappe/web/routes/tasks/main.py::delete_file
 def _delete_file_if_unreferenced(file):
@@ -1003,8 +972,10 @@ def patch(key, **kwargs):
                 if value and not task.completed:
                     task.complete()
                 elif not value and task.completed:
-                    task.uncomplete()
-            except exceptions.TaskCompletionError as e:
+                    task.uncomplete(
+                        submission_source=task_data.get("completion_submission", "modified"),
+                    )
+            except (exceptions.TaskCompletionError, exceptions.ValidationError) as e:
                 return responses.error(str(e))
         else:
             field.value = value
@@ -1053,8 +1024,13 @@ def complete(key, **kwargs):
             return locked
 
     try:
-        task.complete() if completed else task.uncomplete()
-    except exceptions.TaskCompletionError as e:
+        if completed:
+            task.complete()
+        else:
+            task.uncomplete(
+                submission_source=request.form.get("completion_submission", "modified"),
+            )
+    except (exceptions.TaskCompletionError, exceptions.ValidationError) as e:
         return responses.error(str(e))
 
     task.save()

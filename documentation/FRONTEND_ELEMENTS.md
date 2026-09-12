@@ -92,19 +92,29 @@ Common schema keys are `id`, `type`, `title`, `placeholder`, `required`,
 
 Todo values use `{items: [{text, checked}]}`. Enter or forward Tab commits a
 nonempty draft and opens a new one; Shift+Tab exits. The history action restores
-the latest item text with all checkboxes unchecked. Todo values do not become
-repeating Task defaults.
+the latest item text with all checkboxes unchecked.
 
 Empty submission-bearing fields on a reopened Task can restore their most
 recent history value. Static HTML, computed status, and signature assets do not
-offer that control.
+offer that control. Filling changes only the current form and uses its normal
+Update/completion flow to save; every uncompletion starts with fresh answer
+fields while retaining the attached Form and task settings.
 
 Completed Task forms show their flat current answers with the current Form.
-**View original completion** explicitly opens the saved completion answers;
-**Archive completion and uncomplete** archives those originals before reopening.
-The history view keeps its newest-first order and uses separate tables for
-consecutive Form generations. **View completion** expands a read-only history
-record. Original/history views use the current Form while its generation matches,
+Only a completed Task whose answers changed through a generation conversion shows
+the warning **This submission has changed**, with **Show original submission**.
+That action replaces the displayed form with the original and replaces the warning
+with **Save original submission** / **Save modified submission** radios. Original
+is initially selected; changing the radio switches the rendered form. The existing
+completion checkbox archives the selected submission when reopening. Without
+opening the original, manual uncompletion archives the modified submission.
+Completed forms have no submit or separate archive button. Ordinary completion
+and same-generation schema/content edits show no warning or selection controls.
+The history view uses one normal table per Form generation, with newest-first
+rows and groups ordered by their newest record. Each table has the standard
+column controls and expandable cells, with the same frame and header spacing as
+project filter results. There are no per-row completion forms.
+Original/history views use the current Form while its generation matches,
 so same-generation label and HTML edits remain visible; older generations use
 their archived definitions and content. Missing definitions are shown as
 unavailable with raw original answers retained for review. History-fill responses

@@ -70,6 +70,52 @@ def _task():
     return task
 
 
+# @matrix task-completion : generation original-view no-extra-read
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "completed,task_generation,form_generation,original_generation,original,current,expected",
+    [
+        pytest.param(False, 1, 1, 0, {"note": "Old"}, {"note": "New"}, False, id="active-task"),
+        pytest.param(True, 0, 0, 0, {"note": "Old"}, {"note": "New"}, False, id="generation-zero"),
+        pytest.param(True, 2, 2, 2, {"note": "Old"}, {"note": "New"}, False, id="same-generation"),
+        pytest.param(True, 0, 1, 0, {"note": "Old"}, {"note": "New"}, False, id="form-generation-only"),
+        pytest.param(True, 1, 1, 0, {"note": "Old"}, {"note": "New"}, True, id="converted-answers"),
+        pytest.param(True, 1, 1, 0, {"note": "Same"}, {"note": "Same"}, False, id="unaffected-answers"),
+        pytest.param(True, 1, 1, 0, {}, {}, False, id="empty-answers"),
+        pytest.param(True, 1, 1, 0, {"a": 1, "b": 2}, {"b": 2, "a": 1}, False, id="dictionary-order"),
+        pytest.param(True, 2, 2, 2, {"note": "Same"}, {"note": "Same"}, False, id="completed-in-new-generation"),
+        pytest.param(True, 1, 2, 2, {"note": "Old"}, {"note": "New"}, False, id="newer-original-generation"),
+        pytest.param(True, 1, 1, None, None, {"note": "New"}, False, id="missing-original"),
+        pytest.param(True, 1, 1, 0, {"note": True}, {"note": 1}, True, id="boolean-to-number"),
+    ],
+)
+def test_original_answers_are_available_only_after_completed_values_change(
+    completed, task_generation, form_generation, original_generation, original, current, expected,
+):
+    task = _task()
+    task.completed = completed
+    task.db["generation"] = task_generation
+    task.form.generation = form_generation
+    task.form.version = "updated-presentation"
+    task.form.schema = [{"id": "note", "type": "input", "title": "Updated label"}]
+    task.db["submission"] = json.dumps(current)
+    if original_generation is not None:
+        task.db["completed_submission"] = json.dumps({
+            "submission": original, "generation": original_generation, "form_key": None,
+        })
+
+    with (
+        patch("lagniappe.core.entities.task.completed_envelope", wraps=definitions.completed_envelope) as read_original,
+        patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve,
+        patch.object(definitions.database_get, "entity") as fetch,
+    ):
+        assert task.has_converted_completion is expected
+        resolve.assert_not_called()
+        fetch.assert_not_called()
+        if not completed or task_generation == 0:
+            read_original.assert_not_called()
+
+
 # @matrix task-completion : immutable-submission
 @pytest.mark.unit
 def test_completed_mutations_are_rejected_before_changing_values():
@@ -80,7 +126,6 @@ def test_completed_mutations_are_rejected_before_changing_values():
         lambda: task.patch_submission({"note": "Changed"}),
         lambda: task.ai_submission({"note": "Changed"}),
         lambda: task.form_submission({"note": "Changed"}),
-        lambda: task.save_default_field("note"),
         lambda: task.update({"name": "Changed"}),
     ):
         with pytest.raises(ValidationError, match="[Cc]omplet|[Rr]eopen"):
@@ -92,7 +137,7 @@ def test_completed_mutations_are_rejected_before_changing_values():
     assert dict(task.db) == before
 
 
-# @matrix task-completion submission : history-fill repeating-default identity incompatible-value
+# @matrix task-completion submission : history-fill identity incompatible-value
 @pytest.mark.unit
 def test_history_transfer_preserves_identity_and_rejects_incompatible_values():
     source = [{"id": "choice", "type": "select", "title": "Old", "options": [{"value": "a", "label": "Old A"}]}]
@@ -129,17 +174,29 @@ def test_history_transfer_preserves_identity_and_rejects_incompatible_values():
 
 # @matrix tasks task-completion : history schema-version ordering
 @pytest.mark.unit
-def test_history_groups_preserve_chronology_and_original_columns():
+@pytest.mark.parametrize("last_form_key", ["form-key", "other-form-key"])
+def test_history_groups_share_generation_tables_and_preserve_row_order(last_form_key):
     records = [_record(generation=generation) for generation in (0, 0, 2, 0)]
+    for position, record in enumerate(records):
+        record.urlsafe_key = f"completion-{position}"
+    records[-1].properties.form.key = last_form_key
+    identities = [("form-key", 0), ("form-key", 2)]
+    grouped_records = [[records[0], records[1], records[3]], [records[2]]]
+    if last_form_key != "form-key":
+        identities.append((last_form_key, 0))
+        grouped_records = [records[:2], [records[2]], [records[3]]]
     with patch("lagniappe.core.tools.form_drafts.resolve_form_generations", side_effect=lambda pairs: {
-        (key, version): SimpleNamespace(schema=[{"id": "note", "title": version}])
-        for key, version in pairs
+        (key, generation): SimpleNamespace(schema=[{"id": "note", "title": generation}])
+        for key, generation in pairs
     }) as resolve:
         groups = definitions.history_groups(records)
-    assert list(resolve.call_args.args[0]) == [("form-key", 0), ("form-key", 2)]
-    assert [len(group["records"]) for group in groups] == [2, 1, 1]
-    assert [group["definition"].schema[0]["title"] for group in groups] == [0, 2, 0]
-    assert [record for group in groups for record in group["records"]] == records
+    assert list(resolve.call_args.args[0]) == identities
+    assert [group["identity"] for group in groups] == identities
+    assert [group["definition"].schema[0]["title"] for group in groups] == [
+        generation for _, generation in identities
+    ]
+    assert [group["records"] for group in groups] == grouped_records
+    assert [record.generation for record in records] == [0, 0, 2, 0]
 
 
 # @matrix task-completion html-field : schema-version owned-image missing-content
@@ -194,6 +251,105 @@ def test_completion_without_answers_pins_definition_and_reopen_archives_original
     assert task.submission == {}
 
 
+# @source lagniappe/core/entities/task.py::Task.uncomplete
+# @source lagniappe/core/entities/task.py::Task.create_history_entry
+# @source lagniappe/core/entities/history.py::TaskHistory.create
+# @matrix task-completion : history schema-version asset-copy uncomplete
+@pytest.mark.unit
+@pytest.mark.parametrize("submission_source", [None, "original", "modified"])
+def test_uncomplete_archives_selected_raw_answers_and_their_generation(submission_source):
+    task = _task()
+    original = {"note": "Original answer", "old_value": False}
+    modified = {"note": "Modified answer", "new_value": [0, False, None, ""]}
+    task.db["submission"] = json.dumps(modified)
+    task.db["generation"] = 1
+    task.form.db["generation"] = 2
+    task.completed = True
+    task.db["completed_submission"] = json.dumps({
+        "submission": original, "generation": 0,
+        "form_key": definitions.database_get.urlsafe_key(task.properties.form.key),
+    })
+    task.db["default_submission"] = json.dumps({"note": "Repeat this"})
+    envelope = task.db["completed_submission"]
+    kwargs = {} if submission_source is None else {"submission_source": submission_source}
+
+    with (
+        patch("lagniappe.core.entities.entity.database_utility.create_key", return_value="history-key"),
+        patch.object(definitions.database_get, "entity", return_value=None),
+        patch.object(TaskHistory, "copy_assets", autospec=True) as copy_assets,
+        patch.object(TaskHistory, "ai_submission", side_effect=AssertionError("Do not convert saved answers")),
+        patch.object(definitions, "completed_envelope", wraps=definitions.completed_envelope) as read_original,
+    ):
+        task.uncomplete(**kwargs)
+        history = task.new_history_created[0]
+        copy_assets.assert_called_once_with(history, task)
+        if submission_source == "modified":
+            read_original.assert_not_called()
+        else:
+            read_original.assert_called_once_with(task)
+        task.uncomplete(**kwargs)
+        assert task.new_history_created == [history]
+        copy_assets.assert_called_once()
+
+    assert history.submission == (modified if submission_source == "modified" else original)
+    assert history.generation == (1 if submission_source == "modified" else 0)
+    assert history.properties.form.key == task.properties.form.key
+    assert "completed_submission" not in history.db
+    assert task._completion_transition["envelope"] == envelope
+    assert task.completed is False
+    assert "completed_submission" not in task.db
+    assert task.submission == {}
+    assert "default_submission" not in task.db
+    assert task.generation == 2
+
+
+# @source lagniappe/core/entities/task.py::Task.uncomplete
+# @matrix task-completion mutations : immutable-submission concurrency
+@pytest.mark.unit
+@pytest.mark.parametrize("changed_field,new_value", [
+    ("submission", '{"note":"Newer conversion"}'),
+    ("generation", 2),
+    ("form", "different-form"),
+    ("assets", {"signature": {"path": "newer-signature"}}),
+])
+def test_modified_uncomplete_rejects_stale_current_answers_before_archiving(changed_field, new_value):
+    task = _task()
+    task.completed = True
+    task.db["generation"] = 1
+    task.db["completed_submission"] = json.dumps({
+        "submission": {"note": "Original"}, "generation": 0, "form_key": None,
+    })
+    before = deepcopy(dict(task.db))
+    persisted = {**before, changed_field: new_value}
+    with (
+        patch.object(
+            definitions.database_get, "entity",
+            side_effect=lambda key: persisted if key == task.key else None,
+        ),
+        patch.object(task, "create_history_entry") as archive,
+    ):
+        with pytest.raises(ValidationError, match="changed before reopening"):
+            task.uncomplete(submission_source="modified")
+        archive.assert_not_called()
+    assert dict(task.db) == before
+
+
+# @source lagniappe/core/entities/task.py::Task.uncomplete
+# @matrix task-completion : immutable-submission uncomplete
+@pytest.mark.unit
+@pytest.mark.parametrize("submission_source", [None, "unexpected", ""])
+def test_uncomplete_rejects_invalid_submission_selection_before_mutation(submission_source):
+    task = _task()
+    task.completed = True
+    before = deepcopy(dict(task.db))
+    with patch.object(definitions.database_get, "entity") as fetch:
+        with pytest.raises(ValidationError, match="original or modified"):
+            task.uncomplete(submission_source=submission_source)
+        fetch.assert_not_called()
+    assert dict(task.db) == before
+    assert not task.new_history_created
+
+
 # @matrix task-completion mutations : immutable-submission concurrency
 @pytest.mark.unit
 def test_completion_write_rejects_raw_changes_and_stages_original_guards():
@@ -206,7 +362,6 @@ def test_completion_write_rejects_raw_changes_and_stages_original_guards():
     definitions.validate_completion_write(task, persisted)
     expected = task._completion_write_guards[0][1]
     assert expected["completed"] is True
-    assert expected["default_submission"] is None
     # The current representation can be updated separately by a future transfer;
     # it never replaces the original completion envelope.
     task.db["submission"] = json.dumps({"note": "Transferred current value"})

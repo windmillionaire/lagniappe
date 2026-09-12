@@ -124,9 +124,10 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 };
 
 /**
- * @testable infrastructure
+ * @testable true
+ * @matrix editor : initial-load
  */
-export const independentEditor = (target) => {
+export const independentEditor = (target, content = "") => {
 	const extensions = [
 		StarterKit.configure({
 			link: false,
@@ -181,6 +182,7 @@ export const independentEditor = (target) => {
 	const editor = new Editor({
 		element: target,
 		editable: true,
+		content,
 		extensions,
 	});
 

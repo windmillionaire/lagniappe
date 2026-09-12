@@ -67,7 +67,6 @@ def _task_checkpoint_state(task):
         "completed_on": _checkpoint_datetime(task.completed_on),
         "due_date": _checkpoint_datetime(task.due_date),
         "submission": copy.deepcopy(task.submission),
-        "default_submission": copy.deepcopy(task.default_submission),
         "generation": task.generation,
         "completed_submission": task.db.get("completed_submission"),
         "schema_version": task.schema_version,

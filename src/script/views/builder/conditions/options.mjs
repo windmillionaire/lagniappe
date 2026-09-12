@@ -18,12 +18,10 @@ export default class Options extends Condition {
 	}
 
 	init() {
-		this.element.schema.options ??= [];
-
 		if (this.index !== -1) {
 			this.setTitle("Edit Option");
 			this.messages.submit = "Update Option";
-			this.setting = { ...this.element.schema.options[this.index] };
+			this.setting = { ...this.element.schema.options?.[this.index] };
 		} else {
 			this.setTitle("Create Option");
 			this.messages.submit = "Add Option";
@@ -72,7 +70,7 @@ export default class Options extends Condition {
 			do {
 				this.setting.value = generateElementId("option");
 			} while (
-				this.element.schema.options.some(
+				this.element.schema.options?.some(
 					(option) => option.value === this.setting.value,
 				)
 			);

@@ -200,9 +200,14 @@ class FormBuilder {
 		};
 	}
 
+	/**
+	 * @testable true
+	 * @matrix forms : draft-history
+	 */
 	setHtml(fieldId, html) {
 		this.htmlFields[fieldId] = this.canonicalHtml(html);
-		this.updateSchema(false, `html:${fieldId}`);
+		if (this.draft.updateHtml(fieldId, this.htmlFields[fieldId]))
+			this.refreshDraftControls();
 	}
 
 	canonicalHtml(html) {
@@ -412,7 +417,6 @@ class FormBuilder {
 		this.updateSchema();
 		if (redo ? this.draft.redo() : this.draft.undo()) {
 			this.restoreDraft();
-			this.header.message(redo ? "Redid draft change." : "Undid draft change.");
 		}
 	}
 
@@ -593,10 +597,15 @@ class FormBuilder {
 		});
 	}
 
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle draft-history
+	 */
 	deselectElement() {
 		this.model.deselectItem();
 		this.settings.deselectItem();
 		this.selectedElement = null;
+		if (this.draft) this.draft.state.selected_id = null;
 	}
 
 	/**

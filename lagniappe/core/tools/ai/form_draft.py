@@ -130,5 +130,6 @@ def prepare_generated_changes(result, draft, *, form_type, image_sources=None):
         _text(markdown, empty=True)
         html_fields[field_id] = str(render_markdown(
             markdown, image_sources=(image_sources or {}).get(field_id, ()),
+            original_html=draft.get("html_fields", {}).get(field_id, ""),
         ))
     return {"operations": operations, "html_fields": html_fields}

@@ -94,6 +94,20 @@
 	grid-area: 1 / 1;
 }
 
+/* @style nav.button */
+[data-role="save-form"] > .icon {
+	visibility: hidden;
+}
+
+/* @style nav.button */
+[data-role="save-form"][aria-busy="true"] > [data-icon="spinner"],
+[data-role="save-form"][data-saved="true"]:not([aria-busy="true"])
+	> [data-icon="builder.saved"],
+[data-role="save-form"][data-saved="false"]:not([aria-busy="true"])
+	> [data-icon="builder.unsaved"] {
+	visibility: visible;
+}
+
 /* @style task.home.snooze */
 .home-task-snooze {
 	outline: none;
