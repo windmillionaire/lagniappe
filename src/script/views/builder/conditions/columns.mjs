@@ -2,6 +2,7 @@ import { CONFIG } from "../../../config/builder";
 import { SelectBox } from "../../../elements/combobox";
 import { primitives } from "../../../elements/primitives";
 import { generateElementId } from "../../../shared";
+import { fieldKind } from "../migrations";
 import { Condition } from "./base";
 
 /**
@@ -83,23 +84,30 @@ export default class Columns extends Condition {
 	addColumnType() {
 		const saved = this.builder
 			.savedField(this.element.schema.id)
-			?.columns?.some((column) => column.id === this.setting.id);
+			?.columns?.find((column) => column.id === this.setting.id);
 		if (saved) {
 			const notice = document.createElement("p");
 			notice.className = "text-sm text-base-medium";
 			notice.textContent =
-				"The saved column type is fixed until submission migrations are available.";
+				"Save will convert this column. Values that cannot be converted will be cleared.";
 			this.header.after(notice);
 			this.destroyables.push({ destroy: () => notice.remove() });
-			this.addColumnName();
-			return;
 		}
 		const selectElt = primitives.select({
 			label: "Column Type",
 			kind: "form",
 			placeholder: "select column type...",
 			name: this.element.schema.id,
-			options: CONFIG.TABLE_COLUMNS.map((input) => ({
+			options: CONFIG.TABLE_COLUMNS.filter(
+				(input) =>
+					!saved ||
+					(this.builder.conversionCatalog?.rules[fieldKind(saved)]?.[
+						input.type
+					] &&
+						this.builder.conversionCatalog.rules[fieldKind(saved)][
+							input.type
+						] !== "ai"),
+			).map((input) => ({
 				label: input.name,
 				value: input.type,
 				details: { kind: "form", icon: input.type, name: input.name },
@@ -127,15 +135,7 @@ export default class Columns extends Condition {
 	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
 	 * @matrix forms : builder-save stable-identity
 	 */
-	refreshSavedState() {
-		const saved = this.builder
-			.savedField(this.element.schema.id)
-			?.columns?.some((column) => column.id === this.setting.id);
-		if (!saved || !this.columnType) return;
-		this.columnType.hidePanel();
-		this.columnType.select.disabled = true;
-		this.columnType.element.disabled = true;
-	}
+	refreshSavedState() {}
 
 	_updated(e) {
 		const options = Object.values(e.detail.options);

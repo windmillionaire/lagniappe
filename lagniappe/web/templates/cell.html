@@ -39,6 +39,7 @@
       {% if editable %}
         data-editable="true"
         data-edit-value='{{ field.form_value|tojson }}'
+        {% if entity.entity_kind in ['page', 'task'] %}data-form-generation="{{ entity.generation }}"{% endif %}
       {% endif %}
       data-column="{{ field.id }}"
       data-label="{{ field.label }}">

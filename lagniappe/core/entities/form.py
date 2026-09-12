@@ -24,7 +24,7 @@ class Form(Entity, AssetMixin):
 
     @property
     def exclude_from_index(self):
-        return frozenset({"schema", "schema_format", "version", "form_draft_receipt"})
+        return frozenset({"schema", "schema_format", "version", "form_draft_receipt", "pending_form_change"})
 
     @property
     def required(self):

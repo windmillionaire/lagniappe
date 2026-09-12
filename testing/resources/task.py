@@ -32,8 +32,6 @@ Creation Flow:
         create=False); it fills CreateUserTask and waits for POST **/personal.
 """
 
-from datetime import datetime
-
 from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
@@ -212,14 +210,13 @@ class Task(SiteResource):
         return self.element.locator(self.COMPLETE_TASK_CHECKBOX).is_checked()
 
     def _open_task(self):
-        nav_toggles = self.element.locator(self.NAV_TOGGLES)
-        if nav_toggles.is_visible():
+        # Completed tasks can have an empty navigation strip even when closed.
+        if self.element.get_attribute("data-open") == "false":
             self.element.locator(self.HEADER).click()
-            expect(nav_toggles).to_be_hidden()
+            expect(self.element).not_to_have_attribute("data-open", "false")
 
     def _close_task(self):
-        nav_toggles = self.element.locator(self.NAV_TOGGLES)
-        if nav_toggles.is_visible():
+        if self.element.get_attribute("data-open") == "false":
             return
 
         close_toggle = self.element.locator("[lp-control='close']:visible")
@@ -228,7 +225,7 @@ class Task(SiteResource):
         else:
             self.element.locator(self.HEADER).click()
 
-        expect(nav_toggles).to_be_visible()
+        expect(self.element).to_have_attribute("data-open", "false")
 
     def _click_visible_settings_toggle(self):
         settings_toggle = self.element.locator(f"{self.SETTINGS_FORM_TOGGLE}:visible")
@@ -314,8 +311,10 @@ class Task(SiteResource):
         Do not use this helper when completion or its persistence is the E2E
         behavior under test; use the visible completion control in that story.
         """
-        self.entity.completed = True
-        self.entity.completed_on = datetime.now()
+        self.entity = Entities.fetch_one(
+            self.key, request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+        )
+        self.entity.complete(user=self.user.entity)
         self.entity.save()
 
     def save(self):

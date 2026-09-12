@@ -44,6 +44,8 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         return frozenset(
             {
                 "submission",
+                "pre_migration",
+                "form_change_receipt",
                 "completed_submission",
                 "default_submission",
                 "description",
@@ -209,11 +211,17 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             self.properties.submission.value, sort_keys=True,
         )
 
+    # @testable true
+    # @tests tests_unit/test_004i_form_definitions.py::test_history_orders_same_day_completions_by_archive_time
+    # @matrix tasks task-completion : history ordering schema-version
     @property
     def history(self):
         return sorted(
             self.load_history(*database_get.task_history(self)),
-            key=lambda h: h.completed_on or datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda h: (
+                h.completed_on or datetime.min.replace(tzinfo=timezone.utc),
+                h.created or datetime.min.replace(tzinfo=timezone.utc),
+            ),
             reverse=True,
         )
 
@@ -289,6 +297,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             )
 
         capture_completed_submission(self)
+        self.db.pop("pre_migration", None)
         self.completed = True
         self.completed_on = datetime.now(timezone.utc)
         self.completed_by = user if user is not None else current_user
@@ -413,6 +422,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
                 "envelope": self.db.get("completed_submission"),
             }
         self.db.pop("completed_submission", None)
+        self.db.pop("pre_migration", None)
         self.completed = False
         self._submission_definition = None
         self.completed_on = None

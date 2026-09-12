@@ -55,6 +55,7 @@ const context = {
 };
 context.globalThis = context;
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/views/base/shell.mjs", "utf8");
 source = source.replace(
@@ -267,6 +268,7 @@ const context = {
 };
 context.globalThis = context;
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/views/base/shell.mjs", "utf8");
 source = source.replace(
@@ -352,6 +354,7 @@ const context = {
   window: { location: { search: "" } },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/views/base/core.mjs", "utf8");
 source = source.replace(
@@ -572,6 +575,7 @@ const context = {
   window: { location: { search: "" } },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/views/base/core.mjs", "utf8");
 source = source.replace(
@@ -680,6 +684,7 @@ const context = {
   document: { getElementById() { return null; } },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/views/base/component.mjs", "utf8");
 source = source.replace(
@@ -737,6 +742,7 @@ const context = {
   document: { getElementById() { return null; } },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/views/base/component.mjs", "utf8");
 source = source.replace(
@@ -800,6 +806,7 @@ const vm = require("node:vm");
 
 const context = { console };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
 source = source.replace('import { withTransition } from "../shared";\n', "");
@@ -807,6 +814,7 @@ source = source.replace(
   'import { BaseForm } from "./base/baseForm";',
   "const BaseForm = class {};",
 );
+source = source.replace(/^import.*\n/gm, "");
 source = source.replace("export class FormElement", "class FormElement");
 source += "\nglobalThis.FormElement = FormElement;";
 vm.runInContext(source, context);
@@ -898,6 +906,7 @@ const context = {
   },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/elements/editor/collaborative.mjs", "utf8");
 source = source.replace(
@@ -990,6 +999,7 @@ const vm = require("node:vm");
 
 const context = { console };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/elements/editor/collaborative.mjs", "utf8");
 source = source.replace(

@@ -26,6 +26,7 @@ export class DraftDocument extends IndependentDocument {
 			this.acknowledgedContent = html;
 			await this._publishLoadedContent(this.builder.previewHtml(html));
 			if (this._destroyed) return false;
+			this._lastFlushedContent = this._currentContent();
 			this.editor.on("update", () => this.flush());
 			this._hideStatus();
 			return true;
@@ -46,7 +47,11 @@ export class DraftDocument extends IndependentDocument {
 			!this.container.hasAttribute("loaded")
 		)
 			return Promise.resolve(false);
-		this.builder.setHtml(this.fieldId, this._currentContent());
+		const html = this._currentContent();
+		if (html !== this._lastFlushedContent) {
+			this.builder.setHtml(this.fieldId, html);
+			this._lastFlushedContent = html;
+		}
 		return Promise.resolve(true);
 	}
 

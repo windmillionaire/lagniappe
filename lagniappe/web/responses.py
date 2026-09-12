@@ -26,7 +26,7 @@ from lagniappe.core.definitions import (
 from lagniappe.core.definitions.manual import VALID_MANUAL_SECTIONS
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.schema import SchemaFields
-from lagniappe.core.tools.form_definitions import original_completion, rendered_html_fields
+from lagniappe.core.tools.form_definitions import definition_for, original_completion, rendered_html_fields
 from lagniappe.core.tools.database import assets as database_assets
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
@@ -347,13 +347,19 @@ def task_combine_delta(main, removed, page):
 
 # @testable true
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
+# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_deleted_migrated_form_retains_completed_submissions_and_history
 # @matrix html-field : html-fields
 # @matrix security : html-sanitization inner-html
-def form_submission(entity, *, original=False):
-    if original:
-        completion = original_completion(entity)
-        definition = completion["definition"]
-        values = completion["submission"]
+# @matrix task-completion : deleted-form generation raw-values
+def form_submission(entity, *, original=False, archived=False):
+    if original or archived:
+        if original:
+            completion = original_completion(entity)
+            definition = completion["definition"]
+            values = completion["submission"]
+        else:
+            definition = definition_for(entity, archived=True)
+            values = entity.properties.submission.value
         submission = {}
         for schema_field in definition.schema:
             if schema_field["id"] not in values:
@@ -371,7 +377,9 @@ def form_submission(entity, *, original=False):
     return jsonify({
         "schema": schema,
         "submission": submission,
-        "html_fields": rendered_html_fields(entity, original=original),
+        "generation": definition.generation,
+        "migration_notice": [] if original or archived else entity.migration_notice,
+        "html_fields": rendered_html_fields(entity, definition=definition),
         "schema_error": definition.error,
         "raw_submission": values if definition.error else None,
         "can_uncomplete": bool(original and entity.allowed(Action.EDIT, user=current_user)),
@@ -457,7 +465,7 @@ def new_file_upload(file, page):
 # @covered-by lagniappe/web/responses.py::entity_response
 def page_info(page, **extra):
     template = get_template_attribute("pages/info.html", "info_form")
-    schema = page.form.schema if page.form else None
+    schema = page.submission_schema if page.form else None
     submission = page.properties.submission.form_value if page.form else None
     return entity_response(
         (
@@ -479,7 +487,7 @@ def page_info(page, **extra):
 # @covered-by lagniappe/web/responses.py::entity_response
 def user_settings(page):
     template = get_template_attribute("pages/info.html", "user_settings")
-    schema = page.form.schema if page.form else None
+    schema = page.submission_schema if page.form else None
     submission = page.properties.submission.form_value if page.form else None
     is_own_page = current_user.page.key == page.key
     is_owner_viewer = current_user.is_owner

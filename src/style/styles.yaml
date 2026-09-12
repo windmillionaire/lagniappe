@@ -1158,7 +1158,7 @@ radio:
     column:
       classes: flex flex-col gap-1 sm:text-sm font-semibold
       intent: column presentation within radio fieldset
-      surfaces: [frontend]
+      surfaces: [server, frontend]
   label:
     classes: flex items-center gap-2 font-semibold sm:text-sm text-base-dark
     intent: label presentation within radio

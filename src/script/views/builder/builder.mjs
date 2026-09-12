@@ -11,8 +11,10 @@ import {
 	request,
 	withTransition,
 } from "../../shared";
+import { FormChangeStatus } from "./changeStatus";
 import { loadCondition } from "./conditions/loader";
 import { BuilderDraft } from "./draft";
+import { needsMigration, repairConditions } from "./migrations";
 import { ComponentsPanel } from "./panels/components";
 import { ConditionPanel } from "./panels/condition";
 import { ElementSettings } from "./panels/elementSettings";
@@ -37,12 +39,17 @@ class FormBuilder {
 			document.getElementById("builder-draft")?.textContent || "null",
 		);
 		this.htmlFields = structuredClone(this.bootstrap?.html_fields || {});
+		this.conversionCatalog = JSON.parse(
+			document.getElementById("builder-conversions")?.textContent || "null",
+		);
 		this.draft = this.bootstrap
 			? new BuilderDraft(this.bootstrap, this.bootstrap.baseline)
 			: null;
 		if (this.draft) {
 			delete this.draft.state.baseline;
 			delete this.draft.saved.baseline;
+			delete this.draft.state.pending_change;
+			delete this.draft.saved.pending_change;
 		}
 		this.selectedElement = null;
 		this.schemaElt = document.querySelector('input[name="schema"]');
@@ -50,6 +57,8 @@ class FormBuilder {
 		this.offlineIndicator = document.querySelector('[data-role="offline"]');
 		this.online = connectivity.online;
 		this.hidden = connectivity.hidden;
+		this.blurred = false;
+		this.blurredAt = null;
 		this.EntityMenu = new EntityMenu(this);
 		this.SearchBox = null;
 		this.offlineModal = null;
@@ -80,6 +89,8 @@ class FormBuilder {
 		this.model.init();
 		this.settings.init();
 		this.formSettings.init();
+		if (this.bootstrap?.pending_change)
+			this.setPendingChange(this.bootstrap.pending_change);
 
 		this.offlineModal = new OfflineModal(this, this.offlineIndicator);
 		this.offlineModal.enable();
@@ -117,14 +128,33 @@ class FormBuilder {
 	 * @testable true
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
 	 * @tests tests_js/test_045_browser_persistence.py::test_builder_owns_independent_editor_lifecycle_flushes
+	 * @tests tests_js/test_036c_form_migrations.py::test_builder_resumes_migration_polling_and_clears_completed_status
 	 * @matrix editor html-field : teardown
 	 * @matrix forms offline : builder-lifecycle
+	 * @matrix form-migration : progress recovery
 	 */
-	async sync({ hidden = document.hidden } = {}) {
+	async sync({
+		hidden = document.hidden,
+		blurred = false,
+		blurredAt = null,
+	} = {}) {
 		const wasOnline = this.online;
+		const wasInactive = this.hidden || !wasOnline;
+		const visibleBlur = Boolean(hidden && blurred);
+		if (visibleBlur && !this.blurred) this.blurredAt = blurredAt ?? Date.now();
+		else if (!visibleBlur) this.blurredAt = null;
 		this.hidden = hidden;
+		this.blurred = visibleBlur;
 		this.online = connectivity.online;
 		this.offline(!this.online);
+		const polling = this.changeStatus?.polling;
+		if (hidden || !this.online) {
+			if (visibleBlur && this.online) polling?.blur(this.blurredAt);
+			else polling?.pause();
+		}
+		// A request started before leaving may still report the job as pending.
+		else if (wasInactive) await polling?.trigger(null, { fresh: true });
+		else await polling?.resume();
 		if (this.online && (hidden || !wasOnline)) {
 			await this.flushIndependentDocuments({ keepalive: hidden });
 		}
@@ -173,6 +203,11 @@ class FormBuilder {
 		const schemas = Array.from(this.elements.values()).map(
 			(element) => element.schema,
 		);
+		if (!silent && repairConditions(schemas))
+			this.header.message(
+				"Conditions that depended on removed or incompatible choices were removed from this draft.",
+				{ persistent: true },
+			);
 		const schemaString = JSON.stringify(schemas);
 		if (schemaString !== this.schemaElt.value) {
 			this.schemaElt.value = schemaString;
@@ -188,6 +223,11 @@ class FormBuilder {
 		return Array.from(this.elements.values(), (element) =>
 			structuredClone(element.schema),
 		);
+	}
+
+	setPendingChange(change) {
+		if (change) this.changeStatus ??= new FormChangeStatus(this);
+		this.changeStatus?.show(change);
 	}
 
 	captureDraft() {
@@ -261,6 +301,14 @@ class FormBuilder {
 		const data = new FormData();
 		data.set("name", state.name);
 		data.set("schema", JSON.stringify(state.schema));
+		if (needsMigration(this.draft.saved.schema, state.schema))
+			data.set(
+				"migration",
+				JSON.stringify({
+					version: this.conversionCatalog?.version || 1,
+					clear_invalid: true,
+				}),
+			);
 		data.set("html_fields", JSON.stringify(state.html_fields));
 		data.set("baseline", this.draft.baseline || "");
 		data.set("save_id", saveId);
@@ -353,11 +401,21 @@ class FormBuilder {
 		this._restoringDraft = true;
 		this.conditions.hide();
 		this.header.closePreview();
+		const retainedDocuments = new Map();
 		this.elements.forEach((element) => {
-			element.destroy?.();
+			const survives = this.draft.state.schema.some(
+				(field) => field.id === element.schema.id && field.type === "html",
+			);
+			for (const [name, condition] of Object.entries(
+				element.conditions || {},
+			)) {
+				if (name === "html" && survives)
+					retainedDocuments.set(element.schema.id, condition);
+				else condition.destroy?.();
+			}
 		});
-		this.elements.clear();
 		this.pruneImages();
+		this.elements.clear();
 		this.model.panel.replaceChildren();
 		this.model.defaultPanel.replaceChildren();
 		this.selectedElement = null;
@@ -368,6 +426,26 @@ class FormBuilder {
 		this.header.nameDisplay.textContent = state.name;
 		for (const field of state.schema) {
 			const item = this.createElement(structuredClone(field));
+			const documentCondition = retainedDocuments.get(field.id);
+			if (documentCondition) {
+				const element = this.elements.get(field.id);
+				documentCondition.element = element;
+				element.conditions = { html: documentCondition };
+				element.destroy = () =>
+					Object.values(element.conditions).forEach((condition) => {
+						condition.destroy();
+					});
+				const editor = documentCondition.document?.editor;
+				const html = this.previewHtml(state.html_fields[field.id] || "");
+				if (
+					editor &&
+					this.canonicalHtml(editor.getHTML()) !== state.html_fields[field.id]
+				) {
+					editor.commands.setContent(html, { emitUpdate: false });
+					documentCondition.document._lastFlushedContent =
+						documentCondition.document._currentContent();
+				}
+			}
 			const isDefault = ["name", "description"].includes(field.id);
 			if (isDefault)
 				for (const input of item.querySelectorAll("input, textarea"))
@@ -413,7 +491,38 @@ class FormBuilder {
 		if (inputFocus) return restoreInput();
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_generated_document_uses_editor_undo_before_first_open
+	 * @matrix html-field : generated-document-undo retained-editor
+	 */
+	async prepareGeneratedDocuments(htmlFields) {
+		const { default: HtmlEditor } = await import("./conditions/html");
+		for (const [id, html] of Object.entries(htmlFields || {})) {
+			const element = this.elements.get(id);
+			if (
+				this._destroyed ||
+				element?.schema.type !== "html" ||
+				this.htmlFields[id] === html
+			)
+				continue;
+			element.conditions ??= {};
+			if (!element.conditions.html) {
+				const selected = this.selectedElement;
+				this.selectedElement = element;
+				element.conditions.html = new HtmlEditor(this);
+				this.selectedElement = selected;
+				element.destroy = () =>
+					Object.values(element.conditions).forEach((condition) => {
+						condition.destroy();
+					});
+			}
+			await element.conditions.html.init();
+		}
+	}
+
 	undoDraft(redo = false) {
+		if (this.pendingChange) return;
 		this.updateSchema();
 		if (redo ? this.draft.redo() : this.draft.undo()) {
 			this.restoreDraft();
@@ -723,7 +832,6 @@ class FormBuilder {
 	 * @pair forms:builder-delete-components
 	 */
 	removeElement() {
-		if (this.savedField(this.selectedElement.schema.id)) return;
 		delete this.htmlFields[this.selectedElement.schema.id];
 		if (this.selectedElement.destroy) this.selectedElement.destroy();
 		this.selectedElement.item.remove();
@@ -747,6 +855,7 @@ class FormBuilder {
 		this.conditions.destroy();
 		this.header.destroy();
 		this.formSettings.destroy();
+		this.changeStatus?.destroy();
 		this.EntityMenu.destroy();
 
 		this.elements.forEach((element) => {

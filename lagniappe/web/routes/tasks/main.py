@@ -15,7 +15,8 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.entities import Entities, index
-from lagniappe.core.tools import ai
+from lagniappe.core.tools import ai, dates
+from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools.form_definitions import history_groups, history_values_for
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools import collaboration
@@ -639,7 +640,11 @@ def _should_submit_task_form(active, role, task):
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page
+# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_completion_during_migration_returns_inline_error_without_saving
 # @matrix tasks : assignee attached-form complete due-date empty-fields partial-submission permission-gates readonly submitted-reference
+# @matrix tasks : active-widget uncomplete update-state
+# @matrix form-migration : writer-fence completion-race
+# @matrix form-migration : stale-generation direct-write
 @tasks.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.TASK, Action.EDIT)
 def update(key, **kwargs):
@@ -722,7 +727,10 @@ def update(key, **kwargs):
                     request.form, input_name="autofill-file"
                 )
 
-        task.save()
+        try:
+            task.save()
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
         return responses.entity_response(
             deferred_autofill.start_deferred_autofill(
                 task,
@@ -734,7 +742,10 @@ def update(key, **kwargs):
             task.page,
         )
 
-    task.save()
+    try:
+        task.save()
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
 
     return responses.page_task(task)
 
@@ -820,6 +831,18 @@ def personal(key, **kwargs):
     return _home_task_response(task)
 
 
+# @testable true
+# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_deleted_migrated_form_retains_completed_submissions_and_history
+# @matrix task-completion : deleted-form generation raw-values
+@tasks.route("<key>/archived-submission", methods=["GET"])
+@permission(Resource.TASK, Action.VIEW, no_store=True)
+def archived_submission(key, **kwargs):
+    task = kwargs["entity"]
+    if not task.completed or task.form is not None or task.properties.form.key is None:
+        abort(404)
+    return responses.form_submission(task, archived=True)
+
+
 # @testable false
 # @covered-by lagniappe/web/routes/tasks/main.py::personal
 # @reason route permission mirrors personal task create for upload-backed form data
@@ -847,7 +870,9 @@ def history(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
+# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
 # @matrix tasks task-completion : history generation readonly
+# @matrix task-completion : original-view permission-gates
 @tasks.route("<key>/completion-details", methods=["GET"])
 @permission(requested=Action.VIEW, no_store=True)
 def completion_details(key, **kwargs):
@@ -856,6 +881,8 @@ def completion_details(key, **kwargs):
         isinstance(entity, Entities.TASK) and not entity.completed
     ):
         abort(404)
+    if isinstance(entity, Entities.TASK) and not entity.allowed(Action.EDIT):
+        abort(403)
     return responses.form_submission(entity, original=isinstance(entity, Entities.TASK))
 
 
@@ -877,19 +904,33 @@ def _home_task_response(task):
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_history_routes_are_forbidden_without_permission
 # @matrix tasks : history-fill latest-submission
 # @pair tasks:history
+# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_history_fill_converts_selected_fields_and_reports_invalid_values
 @tasks.route("<key>/history/latest-submission", methods=["GET"])
-@permission(Resource.TASK, Action.VIEW)
+@permission(Resource.TASK, Action.VIEW, no_store=True)
 def latest_history_submission(key, **kwargs):
     task = kwargs["entity"]
     histories = task.load_history(database_get.latest_task_history(task))
     history = histories[0] if histories else None
+    field_id = request.args.get("field")
+    schema = {field["id"]: field for field in task.submission_schema}
+    if field_id is None:
+        values = history.properties.submission.value if history else {}
+        fields = [key for key, value in values.items()
+                  if key in schema and value is not None and value != ""
+                  and value != [] and value != {}
+                  and schema[key]["type"] not in {"html", "signature", "status"}]
+        return responses.json_response({"history_fields": fields})
     try:
-        values = history_values_for(task, history) if history else {}
+        if not history:
+            raise exceptions.ValidationError("This task has no saved answers to reuse.")
+        values = history_values_for(task, history, field_id, zone=str(dates.user_timezone()))
+        field = SchemaFields.create_field(schema[field_id], history)
+        if field is None:
+            raise exceptions.ValidationError("This field cannot be filled from history.")
+        field.db_value = values[field_id]
+        return responses.json_response({"latest_submission": {field_id: field.form_value}})
     except exceptions.ValidationError as error:
-        return responses.json_response({"latest_submission": {}, "history_error": str(error)})
-    projected = history.properties.submission.form_value if history else {}
-    submission = {field_id: projected[field_id] for field_id in values if field_id in projected}
-    return responses.json_response({"latest_submission": submission})
+        return responses.json_response({"error": str(error)}, status=422)
 
 
 # @testable false
@@ -961,6 +1002,8 @@ def patch(key, **kwargs):
         locked = deferred_autofill.locked_response(task)
         if locked:
             return locked
+        if str(task_data.get("form_generation", "0")) != str(task.generation):
+            return responses.error("The form fields changed. Reload this table before editing the value.")
 
     if schema_id in task.properties:
         field = task.properties[schema_id]

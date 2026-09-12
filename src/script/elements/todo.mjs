@@ -450,7 +450,10 @@ export class TodoElement extends BaseElement {
 	}
 
 	addHistoryFill(value) {
-		this._historyValue = normalizeTodoValue(value, { resetChecked: true });
+		this._historyValue =
+			typeof value === "function"
+				? value
+				: normalizeTodoValue(value, { resetChecked: true });
 		this._render();
 		return Boolean(this._elt?.querySelector("[data-role='history-fill']"));
 	}

@@ -382,8 +382,8 @@ const checked = (schema) => {
  */
 const deleteButton = () => {
 	const button = document.createElement("button");
-	button.textContent = "Delete";
-	button.dataset.kind = "delete";
+	button.textContent = "Replace or Delete";
+	button.dataset.kind = "form";
 	button.dataset.role = "delete";
 	button.dataset.setting = "deleteButton";
 	button.className = `${STYLES.button.submit}`;
@@ -480,9 +480,7 @@ export class ElementSettings {
 		} else if (["add", "edit", "open"].includes(role)) {
 			this.builder.showCondition(name, index);
 		} else if (role === "delete") {
-			this.builder.removeElement();
-			this.deselectItem();
-			this.builder.formSettings.visible = true;
+			this.builder.showCondition("modify");
 		}
 	}
 
@@ -603,6 +601,7 @@ export class ElementSettings {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
+	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_inputs_use_replacement_panel_after_first_save
 	 * @matrix forms : builder-save stable-identity
 	 */
 	refreshSavedState(
@@ -614,7 +613,26 @@ export class ElementSettings {
 		if (!saved) return;
 		for (const section of sections) {
 			const setting = section.dataset.setting;
-			if (["input", "multiple", "location", "deleteButton"].includes(setting)) {
+			if (setting === "input") {
+				if (!section.querySelector("[data-role='saved-input-type']")) {
+					const notice = document.createElement("p");
+					notice.dataset.role = "saved-input-type";
+					notice.className = "text-sm text-base-medium";
+					if (["name", "description"].includes(schema.id)) {
+						notice.textContent = "This input's type cannot be changed.";
+					} else {
+						const action = document.createElement("strong");
+						action.textContent = "Replace or Delete";
+						notice.append(
+							"Click ",
+							action,
+							" in order to change this input's type.",
+						);
+					}
+					section.replaceChildren(notice);
+				}
+			}
+			if (["multiple", "location"].includes(setting)) {
 				const controls = section.matches("button, input, select")
 					? [section]
 					: section.querySelectorAll("button, input, select");
@@ -627,9 +645,9 @@ export class ElementSettings {
 					if (saved[setting]?.some((original) => original[key] === item[key])) {
 						const remove = row.querySelector("[data-role='remove']");
 						if (remove) {
-							remove.disabled = true;
+							remove.disabled = false;
 							remove.title =
-								"Removing saved choices or columns requires submission migrations.";
+								"Save will clear values for this removed choice or column.";
 						}
 					}
 				}

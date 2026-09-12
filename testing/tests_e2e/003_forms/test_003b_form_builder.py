@@ -124,7 +124,9 @@ def test_preview_panel(get_user):
     expect(undo).to_be_hidden()
     expect(redo).to_be_hidden()
 
-    builder.save()
+    # Undo returned to the saved baseline, so there is nothing to save yet.
+    expect(user.locate(builder.SAVE_BUTTON)).to_be_disabled()
+    preview_toggle.click()
     expect(preview_panel).to_be_hidden()
     expect(preview_toggle).to_have_attribute("aria-checked", "false")
     expect(undo).to_be_visible()
@@ -136,8 +138,29 @@ def test_preview_panel(get_user):
     expect(undo).to_be_enabled()
     expect(redo).to_be_disabled()
 
+    builder.toggle_preview()
+    builder.save()
+    expect(preview_panel).to_be_visible()
+    expect(preview_toggle).to_have_attribute("aria-checked", "true")
+    expect(user.locate(builder.SAVE_BUTTON)).to_be_disabled()
+    saved = Entities.fetch_one(form.key, request=Fetch.root())
+    assert any(field.get("title") == "Daily purpose" for field in saved.schema)
+    expect(undo).to_be_hidden()
+    expect(redo).to_be_hidden()
+
+    # Restoring an earlier draft closes Preview and leaves the saved schema intact.
+    user.locate(builder.SAVE_BUTTON).press("Control+z")
+    expect(preview_panel).to_be_hidden()
+    expect(preview_toggle).to_have_attribute("aria-checked", "false")
+    expect(undo).to_be_visible()
+    expect(undo).to_be_disabled()
+    expect(redo).to_be_enabled()
+    expect(reason).to_be_visible()
+    expect(user.locate(builder.SAVE_BUTTON)).to_be_enabled()
+
 
 # @pair forms:builder-delete-components
+# @template forms/builder.html::main
 def test_delete_components(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_delete_components.get(user)
@@ -149,11 +172,22 @@ def test_delete_components(get_user):
     expect(deleted).to_be_visible()
     deleted.click()
 
-    expect(builder.settings.locator("button[data-role='delete']")).to_be_disabled()
+    builder.settings.get_by_role("button", name="Replace or Delete", exact=True).click()
+    builder.condition.get_by_role(
+        "button", name="Delete", exact=True
+    ).click()
+    expect(deleted).not_to_be_attached()
+    user.locate("[data-role='undo-draft']").click()
+    expect(deleted).to_be_visible()
 
     draft_field = SchemaFields.TEXT_INPUT.get(title="Temporary draft field")
     builder.add_field(draft_field)
-    builder.settings.locator("button[data-role='delete']").click()
+    builder.settings.get_by_role("button", name="Replace or Delete", exact=True).click()
+    builder.condition.get_by_role(
+        "button", name="Delete", exact=True
+    ).click()
+    expect(builder.model.locator(f"[id='{draft_field.id}']")).not_to_be_attached()
+    expect(builder.condition).to_be_hidden()
     assert builder.schema_field(draft_field.id) is None
     user.locate("[data-role='undo-draft']").click()
     expect(builder.model.locator(f"[id='{draft_field.id}']")).to_be_visible()
@@ -165,7 +199,9 @@ def test_delete_components(get_user):
     ).to_be_visible()
     assert builder.schema_field(title="Reason For Living") is not None
 
-    builder.save()
+    # The staged saved-field removal was undone; the temporary field was removed.
+    # Returning to the saved draft requires no publication.
+    expect(user.locate(builder.SAVE_BUTTON)).to_have_attribute("data-saved", "true")
     user.page.reload()
     builder = Builder(user)
     expect(

@@ -7,11 +7,11 @@ const ISOLATED_TASK_ACTIONS = new Set(["TaskMove", "TaskCombine"]);
  * @testable true
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
- * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_uncomplete_from_loaded_task_history_opens_settings
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_uncomplete_from_loaded_task_history_closes_task
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
  * @matrix task-combine : delta isolated-form lazy-reload linked-page no-reload view-page
- * @matrix tasks : active-widget history-refresh settings uncomplete
+ * @matrix tasks : active-widget history-refresh uncomplete
  * @matrix tasks : create list-state readonly refresh update-state while-open
  */
 export class Task extends ViewComponent {
@@ -91,8 +91,11 @@ export class Task extends ViewComponent {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_uncomplete_history_replaces_row_in_one_prepared_transition
-	 * @matrix tasks : active-widget history-refresh uncomplete
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_completion_replaces_closed_row_in_one_transition
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_reopening_discards_inactive_history_until_next_click
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_waits_for_acceptance_and_moves_closed_task
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_uncomplete_from_loaded_task_history_closes_task
+	 * @matrix tasks : active-widget complete history-refresh uncomplete update-state
 	 */
 	async updated(response) {
 		if (response.task_delta) {
@@ -103,42 +106,30 @@ export class Task extends ViewComponent {
 		}
 
 		const update = response.html?.querySelector(`[id='${this.name}']`);
-		const openSettings = Boolean(
-			this.completed &&
-				this.active?.name === "TaskHistory" &&
-				update?.dataset.completed === "false" &&
-				update.querySelector("[data-widget='TaskSettings']"),
-		);
-		if (openSettings) {
-			// Prepare the reopened row before replacing the completed history view.
-			const replacement = this.view.getComponent(update);
-			this.view.components[this.name] = this;
-			try {
-				await replacement.activate("TaskSettings");
-				await replacement.prepareRender(true);
-				await withTransition(
-					() => {
-						if (this._destroyed || this.view._destroyed) return;
-						this.elt.replaceWith(update);
-						this.destroy();
-						this.view.components[replacement.name] = replacement;
-						replacement.render(true);
-					},
-					{ label: `${this.name}:uncomplete-history` },
-				);
-			} finally {
-				if (!update.isConnected) {
-					replacement.destroy();
-					if (!this._destroyed && !this.view._destroyed) {
-						this.view.components[this.name] = this;
-					}
-				}
-			}
+		if (update && this.completed !== (update.dataset.completed === "true")) {
+			// Commit the closed row and its list move together, after server acceptance.
+			// Widgets stay unloaded, including History, until the next explicit open.
+			await withTransition(
+				() => {
+					if (this._destroyed || this.view._destroyed) return;
+					const replacement = this.view.getComponent(update);
+					update.dataset.open = "false";
+					this.elt.replaceWith(update);
+					this.destroy();
+					this.view.components[replacement.name] = replacement;
+					replacement.render(false);
+				},
+				{ label: `${this.name}:completion` },
+			);
 			return;
 		}
 
 		if (update) {
-			Object.assign(this.elt.dataset, update.dataset);
+			// The server's closed-row default must not flash during preparation.
+			Object.assign(this.elt.dataset, {
+				...update.dataset,
+				open: this.elt.dataset.open,
+			});
 			this._replaceNav(update);
 			this._removeMissingWidgets(update);
 		}
@@ -156,9 +147,9 @@ export class Task extends ViewComponent {
 	}
 
 	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_uncomplete_from_loaded_task_history_opens_settings
-	 * @matrix tasks : complete history-refresh
+	 * @testable false
+	 * @covered-by src/script/views/base/task.mjs::Task.updated
+	 * @reason ordinary update widget cleanup belongs to the task response lifecycle
 	 */
 	_removeMissingWidgets(update) {
 		this.elt.querySelectorAll("[data-widget]").forEach((elt) => {

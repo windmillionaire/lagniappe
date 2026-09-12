@@ -63,6 +63,11 @@ completion date, and due date. Multiple source columns may map to one field;
 task-name and ordinary text values are combined in source-column order. Each
 source column maps to at most one destination field.
 
+Generated page forms keep the reserved name field as a text input and the
+description field as a textarea, regardless of CSV type inference. In task
+imports, a column named `name` maps to the special page-name destination rather
+than creating a reserved field inside the task form.
+
 Every task-import row creates a distinct task, even when another imported or
 existing model-linked task targets the same page. Multiple completion-date
 columns within one row remain the supported history projection: those dates

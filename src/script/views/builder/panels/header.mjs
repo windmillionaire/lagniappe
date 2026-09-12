@@ -53,7 +53,7 @@ export class Header {
 		this.saveButton.dataset.saved = "true";
 		this.saveButton.dataset.kind = "saved";
 		this.saveButton.setAttribute("aria-disabled", "true");
-		this.clearMessage();
+		if (!this.builder.pendingChange) this.clearMessage();
 	}
 
 	unsaved() {
@@ -62,7 +62,7 @@ export class Header {
 		this.saveButton.dataset.kind = "unsaved";
 		this.saveButton.setAttribute(
 			"aria-disabled",
-			String(Boolean(this._savePromise)),
+			String(Boolean(this._savePromise || this.builder.pendingChange)),
 		);
 	}
 
@@ -212,6 +212,7 @@ export class Header {
 	 * @matrix forms : builder-reload builder-save focus-recovery persistent-error retryable-action single-flight stale-acknowledgement
 	 */
 	saveForm() {
+		if (this.builder.pendingChange) return Promise.resolve(false);
 		if (this._savePromise) return this._savePromise;
 		if (this._destroyed || !this.saveButton || !this.schemaForm) {
 			return Promise.resolve(false);
@@ -257,6 +258,7 @@ export class Header {
 				if (response?.ok === true && response.draft && response.baseline) {
 					this.builder.draft.acknowledge(state, response);
 					this._saveAttempt = null;
+					this.builder.setPendingChange?.(response.pending_change || null);
 					if (
 						this.builder.draft.equal(
 							this.persistenceState,
@@ -287,7 +289,11 @@ export class Header {
 				if (!this._destroyed && button.isConnected !== false) {
 					button.setAttribute(
 						"aria-disabled",
-						String(button.dataset.saved === "true"),
+						String(
+							Boolean(
+								this.builder.pendingChange || button.dataset.saved === "true",
+							),
+						),
 					);
 					button.removeAttribute("aria-busy");
 					if (
@@ -310,6 +316,7 @@ export class Header {
 	}
 
 	editFormName() {
+		if (this.builder.pendingChange) return;
 		this._originalName = this.nameDisplay.textContent;
 		this.nameDisplay.dataset.visible = "false";
 		this.nameInput.dataset.visible = "true";

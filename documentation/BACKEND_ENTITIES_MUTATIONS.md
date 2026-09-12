@@ -60,6 +60,13 @@ with generation-qualified deletion; ambiguous commit failures retain objects
 until their references can be reconciled. Replaced live HTML is deleted only after
 an accepted commit; independently archived generation assets remain intact.
 
+Representation-changing builder Saves stage a `pending_form_change` and deferred
+job rather than publishing the schema immediately. The executor fences affected
+writes and deletes using the current pending marker and generation. Migration
+application uses explicit, lease-guarded answer masks and normal projection/cache
+effects; successful publication uses the same archive and exact-source guards
+above. See [BACKEND_JOBS.md](BACKEND_JOBS.md#deterministic-form-changes).
+
 ## Property masks
 
 Masked writes use Datastore `update`, not a partial upsert. A missing row is
@@ -96,7 +103,8 @@ lifecycle. See [SYNC_DOCUMENTS.md](SYNC_DOCUMENTS.md).
 Deleting a Form archives its current generation and deletes the Form in the same
 guarded Datastore transaction. A concurrent Form edit rejects both operations.
 The mutation writer accepts explicit `deletes` alongside writes for this atomic
-boundary; remaining cascade deletes retain their existing flow.
+boundary. When a plan has concurrency guards, its remaining durable deletes also
+commit with the guarded writes so that a racing migration cannot be bypassed.
 
 A post-commit Redis or Storage failure never rolls back or obscures the durable
 result. Callers must inspect and report post-commit errors when their workflow

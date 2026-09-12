@@ -149,6 +149,12 @@ export class BaseElement {
 		return true;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_history_fill_waits_without_overwriting_new_input
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
+	 * @matrix tasks : history-fill stale-response element-matrix
+	 */
 	historyFillButton(value) {
 		if (!this.canHistoryFill || !this.historyValueAvailable(value)) return null;
 
@@ -164,10 +170,27 @@ export class BaseElement {
 			"icon-sm",
 		);
 
-		button.addEventListener("click", (event) => {
+		button.addEventListener("click", async (event) => {
 			event.preventDefault();
 			event.stopPropagation();
-			this.fillFromHistory(value);
+			if (button.disabled) return;
+			if (typeof value !== "function") {
+				this.fillFromHistory(value);
+				return;
+			}
+			const before = JSON.stringify(this.value ?? this.submission);
+			button.disabled = true;
+			try {
+				const restored = await value();
+				if (
+					button.isConnected &&
+					this.canHistoryFill &&
+					JSON.stringify(this.value ?? this.submission) === before
+				)
+					this.fillFromHistory(restored);
+			} finally {
+				button.disabled = false;
+			}
 		});
 
 		return button;

@@ -103,6 +103,16 @@ class DeferredJobAdapter:
         return None
 
     # @testable infrastructure
+    def start_writes(self, spec, job):
+        """Optional guarded domain writes committed atomically with job creation."""
+        return (), ()
+
+    # @testable infrastructure
+    def before_cancel(self, job):
+        """Allow domains with partially applied work to retain their write fence."""
+        return None
+
+    # @testable infrastructure
     def can_view_status(self, job, actor):
         """Authorize a non-owner for the bounded browser status projection."""
         return False

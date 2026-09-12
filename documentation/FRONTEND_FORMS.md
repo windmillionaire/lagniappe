@@ -25,6 +25,26 @@ It implements the widget lifecycle:
 
 `prepareReset()` builds detached state; `commitReset()` applies it synchronously.
 Use those phases whenever the replacement participates in a view transition.
+Migration notices and their modals belong to the same prepared state as the form.
+Preparation leaves the current notice intact; committing adopts the replacement's
+notice, and discarding destroys only the prepared notice. A settings-only update
+retains the notice supplied by the server, while saving submission values clears it.
+
+Completed Tasks with a deleted attached form initially show a warning and
+**Load the archived version**. TaskForm fetches and renders that readonly view
+inline only after the click, retaining it for the widget lifetime. Reset and
+destruction discard the archive renderer and invalidate pending loads. Viewers
+can load the saved current submission; original-completion archive choices keep
+their existing edit-access gate.
+
+Completed task forms omit `lp-edited-marker`. When a completion has no stored
+answers, its form shows **Task was completed with an empty submission**; a missing
+attached form retains the separate archived-version prompt. Reopening restores
+the editable form and its revision marker.
+
+CreatePage requires a name in the browser, including after selecting an attached
+form. The category create endpoint also rejects empty or whitespace-only names
+before creating a page.
 
 ## BaseForm initialization
 

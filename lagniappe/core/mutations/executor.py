@@ -265,8 +265,11 @@ def execute_mutation(plan, *, guards=None):
         effect for effect in durable if effect.effect is MutationEffectType.DELETE
     ]
 
-    if writes:
-        mutation_guards = list(guards or [])
+    from ..tools.form_changes import mutation_guards
+    form_change_guards = mutation_guards(writes, deletes)
+
+    if writes or (deletes and (guards or form_change_guards)):
+        mutation_guards = [*(guards or []), *form_change_guards]
         for effect in writes:
             guard = getattr(effect.entity, "_form_save_guard", None)
             if guard is not None:
@@ -274,7 +277,7 @@ def execute_mutation(plan, *, guards=None):
             for attribute in ("_completion_write_guards", "_form_additional_guards"):
                 mutation_guards.extend(getattr(effect.entity, attribute, None) or [])
         options = {"guards": mutation_guards} if mutation_guards else {}
-        form_deletes = [effect for effect in deletes if effect.entity.entity_kind == "form"]
+        form_deletes = deletes if mutation_guards else [effect for effect in deletes if effect.entity.entity_kind == "form"]
         if form_deletes:
             # A Form's last generation and its deletion must commit together.
             options["deletes"] = [effect.entity for effect in form_deletes]
@@ -290,7 +293,7 @@ def execute_mutation(plan, *, guards=None):
             _completed(outcome, effect.effect)
         if form_deletes:
             _completed(outcome, MutationEffectType.DELETE)
-            deletes = [effect for effect in deletes if effect.entity.entity_kind != "form"]
+            deletes = [effect for effect in deletes if effect not in form_deletes]
 
     if deletes:
         database_utility.delete_entities(effect.entity for effect in deletes)

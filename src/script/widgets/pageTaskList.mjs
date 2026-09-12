@@ -117,14 +117,23 @@ export class PageTaskList extends BaseList {
 		this._setListVisibility();
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_completion_replaces_closed_row_in_one_transition
+	 * @tests tests_js/test_028_form_state_split.py::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
+	 * @matrix tasks : active-widget complete create dedupe refresh uncomplete
+	 */
 	_moveTaskIfNecessary(taskElt) {
 		if (this._existingTask(taskElt)) return;
 
 		const completed = taskElt.dataset.completed === "true";
 		const list = completed ? this.completedTasks : this.activeTasks;
 		if (!list.contains(taskElt)) {
+			const moving =
+				this.activeTasks.contains(taskElt) ||
+				this.completedTasks.contains(taskElt);
 			list.prepend(taskElt);
-			this.view.addFlash(taskElt);
+			if (!moving) this.view.addFlash(taskElt);
 		}
 	}
 

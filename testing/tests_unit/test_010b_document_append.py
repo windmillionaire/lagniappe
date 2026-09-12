@@ -51,6 +51,8 @@ def test_document_save_retires_only_superseded_blobs_after_commit(monkeypatch, f
         "snapshot": {"type": "ydoc", "path": "old.ydoc"},
         "image_keep": {"type": "image", "path": "image.png"},
     }), document_history=True)
+    from lagniappe.core.tools.database import get as database_get
+    monkeypatch.setattr(database_get, "entity", lambda key: row)
     page = Entities.PAGE(row)
     stored = {"old.html": "old", "old.ydoc": "old", "image.png": "image", "named.html": "pinned"}
     events = []

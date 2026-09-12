@@ -102,9 +102,15 @@ fields while retaining the attached Form and task settings.
 
 Completed Task forms show their flat current answers with the current Form.
 Only a completed Task whose answers changed through a generation conversion shows
-the warning **This submission has changed**, with **Show original submission**.
-That action replaces the displayed form with the original and replaces the warning
-with **Save original submission** / **Save modified submission** radios. Original
+editors the warning **This form was modified after this task was completed.**, with
+**View Original Submission**. View-only users see neither this notice nor the
+archive choices, and the live Task's original-submission endpoint requires edit
+access. Completed forms do not show the separate migration **View changes** notice.
+That action replaces the displayed form with the original and keeps the warning
+visible. Inside it, a **When Reopened** fieldset reveals vertically stacked,
+standard site **Archive original submission** / **Archive modified submission**
+radios; no modal opens. The link remains available and reuses the loaded original
+when clicked again. Original
 is initially selected; changing the radio switches the rendered form. The existing
 completion checkbox archives the selected submission when reopening. Without
 opening the original, manual uncompletion archives the modified submission.
@@ -114,11 +120,23 @@ The history view uses one normal table per Form generation, with newest-first
 rows and groups ordered by their newest record. Each table has the standard
 column controls and expandable cells, with the same frame and header spacing as
 project filter results. There are no per-row completion forms.
+Completion and reopening leave the task open in its current list until the server
+accepts the change. Errors preserve the open widget and entered values. On success,
+one transition replaces it with a closed row and moves it to the appropriate list,
+without the new-task highlight animation. The completed section keeps its existing
+expanded/collapsed state. Loaded widgets are discarded in both directions; no
+history request runs during the transition. The next History click loads the latest
+records through the usual lazy-loading route. Ordinary Update saves keep the current
+widget open.
 Original/history views use the current Form while its generation matches,
 so same-generation label and HTML edits remain visible; older generations use
 their archived definitions and content. Missing definitions are shown as
-unavailable with raw original answers retained for review. History-fill responses
-omit incompatible candidates and report the reason.
+unavailable with raw original answers retained for review. History-fill controls
+remain available for saved answers whose fields still exist. Clicking one requests
+that field's value and applies the deterministic conversion to the current schema.
+An unconvertible value returns HTTP 422 with a field-specific error in the form;
+other history-fill controls remain usable. Filling changes only the draft and
+ignores responses after the field is replaced or the user enters a new value.
 
 ## Primitives
 

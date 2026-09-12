@@ -91,15 +91,15 @@ def validate_draft_schema(schema, form_type):
 # @tests tests_unit/test_004f_form_drafts.py::test_compatible_schema_preserves_representation_and_identity
 # @matrix form-schema : identity migration-required save-guard
 def validate_compatible_schema(previous, proposed, form_type=None):
-    """Block durable identity/removal/type changes until migration support ships."""
+    """Require the guarded form-change workflow for representation changes."""
     kind = form_type or "task"
     old = canonicalize_schema(previous or [], form_type=kind)
     new = validate_draft_schema(proposed, kind)
-    removed_fields = {field["id"] for field in old} - {field["id"] for field in new}
+    removed_fields = {field["id"] for field in old if field["type"] not in {"html", "status"}} - {field["id"] for field in new}
     if removed_fields or requires_submission_conversion(old, new):
         raise exceptions.ValidationError(
             "Removing or changing a saved field, option or column requires a form migration, "
-            "which is not available yet."
+            "using Modify in the form builder and then Save."
         )
     return new
 
@@ -242,7 +242,15 @@ def prepare_form_publication(form, builder):
             raise exceptions.MutationConflict("This Form changed before saving; reload and retry.")
         if source.form_type != form.form_type:
             raise exceptions.ValidationError("A saved Form's type cannot be changed.")
-        validate_compatible_schema(source.schema, form.schema, form.form_type)
+        from .form_changes import PENDING, json_value
+        change = json_value(source.db, PENDING)
+        if change and getattr(form, "_form_change_publication", None) == change["id"]:
+            if form.schema != change["target"]["schema"] or not change["applied"]:
+                raise exceptions.ValidationError("The pending Form change does not match its publication.")
+        else:
+            if change:
+                raise exceptions.ValidationError("This Form is being updated. Wait for the update to finish.")
+            validate_compatible_schema(source.schema, form.schema, form.form_type)
         form._form_save_guard = (form.key, ExactEntityState(dict(source.db)))
     else:
         if form.created:
@@ -262,19 +270,8 @@ def prepare_form_publication(form, builder):
     previous_generation = source.generation if source else 0
     changed_generation = bool(source) and requires_submission_conversion(source.schema, form.schema)
     form.generation = previous_generation + 1 if changed_generation else previous_generation
-    pending = getattr(form, "_pending_html", {})
-    for field_id, content in pending.items():
-        if field_id not in _html_ids(form):
-            raise exceptions.ValidationError("Static content must belong to a draft HTML field.")
-        content = sanitize_form_content_html(content, form, field_id)
-        if content:
-            previous_path = (form.assets.get(field_id) or {}).get("path")
-            asset = form.save_asset(content, field_id, "html", isolated=True)
-            if asset and asset.path != previous_path:
-                record_attempt_asset(form, asset.definition)
-        else:
-            form.assets.pop(field_id, None)
-            form.db["assets"] = json.dumps(form.assets)
+    if not getattr(form, "_form_change_publication", None):
+        stage_form_content(form)
 
     # Ordinary Step 1 saves are compatible. The existing migration guard stays
     # in place until the later transfer workflow can convert affected values.
@@ -290,6 +287,25 @@ def prepare_form_publication(form, builder):
     form.properties.version.update()
     if form.version != previous_version:
         form._permission_sources_changed = True
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/form_drafts.py::prepare_form_publication
+# @covered-by lagniappe/core/tools/form_changes.py::start_change
+# @reason explicit Save stages isolated content for immediate or deferred publication
+def stage_form_content(form):
+    for field_id, content in getattr(form, "_pending_html", {}).items():
+        if field_id not in _html_ids(form):
+            raise exceptions.ValidationError("Static content must belong to a draft HTML field.")
+        content = sanitize_form_content_html(content, form, field_id)
+        if content:
+            previous_path = (form.assets.get(field_id) or {}).get("path")
+            asset = form.save_asset(content, field_id, "html", isolated=True)
+            if asset and asset.path != previous_path:
+                record_attempt_asset(form, asset.definition)
+        else:
+            form.assets.pop(field_id, None)
+            form.db["assets"] = json.dumps(form.assets)
 
 
 # @testable false
@@ -420,7 +436,15 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
     name = draft.get("name")
     if not isinstance(name, str) or not name.strip():
         raise exceptions.ValidationError("Please enter a Form name.")
-    schema = validate_compatible_schema(current.schema, draft.get("schema"), current.form_type)
+    from .form_changes import PENDING, start_change, change_response, json_value
+    pending = json_value(current.db, PENDING)
+    if pending:
+        if pending["id"] == save_id and pending["digest"] == payload_digest:
+            return change_response(current)
+        raise FormDraftConflict("A form change is already saved. Wait for it to finish before saving another draft.")
+    schema = validate_draft_schema(draft.get("schema"), current.form_type)
+    if requires_submission_conversion(current.schema, schema):
+        return start_change(current, draft, save_id, actor, images=images)
     html = draft.get("html_fields")
     images = images or {}
     _validate_content(schema, html, images)

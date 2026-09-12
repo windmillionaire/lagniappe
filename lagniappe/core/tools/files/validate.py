@@ -269,13 +269,15 @@ def create_options(values, column_schema):
 
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_builds_or_selects_the_submission_form
+# @tests tests_unit/test_006b_ingress_entity.py::test_generated_import_schema_preserves_reserved_page_fields
 # @matrix form ingress : choose-form default-form schema-generation
-def create_schema(columns, rows):
+def create_schema(columns, rows, *, form_type):
     """Generate a form schema from inferred column types and row data.
 
     Args:
         columns: Dict of column dicts keyed by column ID.
         rows: List of row dicts for option extraction.
+        form_type: Page or task form being generated.
 
     Returns:
         Tuple of (schema list, detected multi-value separator or None).
@@ -302,16 +304,11 @@ def create_schema(columns, rows):
         column_schema = {"title": label}
 
         settings = type_to_schema[column["type"]]
-        if label.lower() == "name":
-            column_schema["title"] = "Name"
-            column_schema["id"] = "name"
-        elif label.lower() == "description":
-            column_schema["title"] = "Description"
-            column_schema["id"] = "description"
-            column_schema["type"] = "textarea"
-            column_schema.pop("input", None)
-        else:
-            column_schema["id"] = f"{settings['type']}-{short_uuid()}"
+        if form_type == "page" and label.lower() == "name":
+            return {"title": "Name", "id": "name", "type": "input", "input": "text"}
+        if form_type == "page" and label.lower() == "description":
+            return {"title": "Description", "id": "description", "type": "textarea"}
+        column_schema["id"] = f"{settings['type']}-{short_uuid()}"
         column_schema.update(settings)
 
         if column["type"] in ["multi_categorical", "categorical"]:
@@ -323,6 +320,9 @@ def create_schema(columns, rows):
         return column_schema
 
     for column in columns.values():
+        if form_type == "task" and column["label"].strip().lower() == "name":
+            # This column selects the task's page through the special mapping.
+            continue
         column_schema = build_schema(column, separators)
         schema.append(column_schema)
 

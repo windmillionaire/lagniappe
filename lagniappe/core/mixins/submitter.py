@@ -136,10 +136,13 @@ class SubmitterMixin:
     # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
     # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
     # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit submit-boundary
+    # @matrix form-migration : stale-generation direct-write
     def form_submission(self, values, *, actor=None):
         require_mutable_submission(self)
         submission = self.properties.submission
         form_values = getattr(values, "form", values)
+        if actor is not None and str(form_values.get("form-generation", "0")) != str(self.submission_definition.generation):
+            raise ValidationError("The form fields changed. Your answers were not saved. Review the updated form before trying again.")
         files = getattr(values, "files", None)
         updated = normalize_submission_values(form_values, submission.fields)
         preserved = (
@@ -350,9 +353,12 @@ class SubmitterMixin:
     # @matrix submission : blank-persistence empty-submission load-save normalization reconciliation stored-false stored-null
     def save_submission(self):
         require_mutable_submission(self)
+        if self.entity_kind in {"page", "task"}:
+            self._submission_input_generation = self.generation
         submission_value = self.properties.submission.db_value
         self.properties.submission.value = submission_value
         self.db.pop("default_submission", None)
+        self.db.pop("pre_migration", None)
         if self.form and self.entity_kind != "task_history":
             self.db["schema_version"] = self.form.version
             self.db["generation"] = self.form.generation
@@ -360,6 +366,14 @@ class SubmitterMixin:
             self.name = submission_value["name"]
         if "description" in submission_value:
             self.description = submission_value["description"]
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/form_changes.py::notice_projection
+    # @reason shared Page and Task read-only template projection
+    @property
+    def migration_notice(self):
+        from ..tools.form_changes import notice_projection
+        return notice_projection(self) if self.db.get("pre_migration") else []
 
     # @testable true
     # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row

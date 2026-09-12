@@ -144,6 +144,7 @@
 
 {% macro main() %}
   {% if builder_draft is defined %}<script id="builder-draft" type="application/json">{{ builder_draft|tojson }}</script>{% endif %}
+  {% if conversion_catalog is defined %}<script id="builder-conversions" type="application/json">{{ conversion_catalog|tojson }}</script>{% endif %}
   {{ desktop('The form builder') }}
   <div lp-view
        lp-entity

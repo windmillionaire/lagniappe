@@ -229,6 +229,37 @@ const manager = new context.DeferredOperationManager(view).init();
     throw new Error("Generated progress kept a replaced operation subscribed");
   }
 
+  for (const [scope, expected] of [
+    ["form-change", "Schema migration in progress"],
+    ["form-autofill", "Autofill queued"],
+  ]) {
+    const form = operationNode(`operation-${scope}`);
+    const submit = { replaceWith(progress) { form.progress = progress; } };
+    const autofill = { remove() {} };
+    form.dataset.deferredLock = "form";
+    form.dataset.operationScope = scope;
+    form.setAttribute = () => {};
+    form.querySelector = (selector) => {
+      if (selector === "[data-role='autofill']") return autofill;
+      if (selector === "[data-role='submit-group']") return submit;
+      return form.progress?.children.find((child) =>
+        selector === `[data-role='${child.dataset?.role}']`);
+    };
+    nodes.push(form);
+    // A newly started manager scans the DOM before the explicit tracking call.
+    manager.scan({ querySelectorAll() { return [form]; } });
+    if (form.querySelector("[data-role='deferred-phase']")?.textContent !== expected) {
+      throw new Error(`Initial progress did not respect the form lock scope: ${scope}`);
+    }
+    await manager.receive({
+      key: form.dataset.operation, revision: 1, status: "running",
+      phase_label: "Applying changes", terminal: false,
+    });
+    if (form.querySelector("[data-role='deferred-phase']").textContent !== "Applying changes") {
+      throw new Error("Polled progress did not replace the initial form-lock message");
+    }
+  }
+
   manager.destroy();
   if (manager.operations.size || subscriptions.size) {
     throw new Error("Destroy did not clear operation state");

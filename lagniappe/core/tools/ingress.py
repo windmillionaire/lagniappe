@@ -203,6 +203,8 @@ class IngressMapping:
     # @testable infrastructure
     def guess_field(self, column_id):
         column = self.columns.get(column_id) or {}
+        if self.entity_type == "task" and column.get("label", "").strip().lower() == "name":
+            return self.fields.get("name")
         return next(
             (
                 field
@@ -1121,6 +1123,7 @@ class IngressService:
             schema, separator = file_validation.create_schema(
                 self.entity.properties.process_csv.columns,
                 self.entity.properties.rows.asset,
+                form_type=self.entity.properties.choose_type.entity_type,
             )
             data = {
                 "name": status.form_name or f"{self.entity.name} Form",

@@ -68,6 +68,10 @@ const option = (details) => {
 	const option = document.createElement("div");
 	option.className = STYLES.dropdown.option.flow;
 	option.setAttribute("role", "option");
+	if (details.disabled) {
+		option.setAttribute("aria-disabled", "true");
+		option.classList.add("opacity-50", "cursor-not-allowed");
+	}
 	if (details.id) {
 		option.id = details.id;
 		option.dataset.id = details.id;

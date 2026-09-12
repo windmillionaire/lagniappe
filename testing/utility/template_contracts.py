@@ -706,6 +706,8 @@ def jinja_macro_calls(
 
 def extract_contract_attributes(text: str, source: str) -> list[ContractAttribute]:
     attributes: list[ContractAttribute] = []
+    if any(match.group("id") == "modal" for match in ID_RE.finditer(text)):
+        attributes.append(ContractAttribute(name="id", value="modal", source=source))
 
     tag_matches = list(CONTRACT_TAG_RE.finditer(text))
     contract_chunks = (
@@ -1622,6 +1624,11 @@ def has_attr_name(attrs: Iterable[ContractAttribute], name: str) -> bool:
 
 def routed_control_issues(attrs: list[ContractAttribute]) -> list[str]:
     issues: list[str] = []
+    # Modal owns Close through its document listener, outside NavElement routing.
+    modal_sources = {
+        attr.source for attr in attrs
+        if attr.name == "id" and attr.value == "modal" and not attr.dynamic
+    }
     attrs_by_element: dict[tuple[str, int | None], list[ContractAttribute]] = (
         defaultdict(list)
     )
@@ -1635,6 +1642,9 @@ def routed_control_issues(attrs: list[ContractAttribute]) -> list[str]:
             or attr.dynamic
             or attr.value not in ROUTED_LP_CONTROL_CONTRACTS
         ):
+            continue
+
+        if attr.value == "close" and attr.source in modal_sources:
             continue
 
         controls, own_target, widget_target = ROUTED_LP_CONTROL_CONTRACTS[attr.value]

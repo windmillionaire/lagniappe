@@ -7,7 +7,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.files.html import sanitize_form_content_html
-from lagniappe.core.tools.form_definitions import original_completion, rendered_html_fields
+from lagniappe.core.tools.form_definitions import definition_for, original_completion, rendered_html_fields
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,
@@ -52,7 +52,14 @@ def historical_form_image(key, generation, asset_name, **kwargs):
         abort(404)
     if isinstance(entity, Entities.TASK) and not entity.completed:
         abort(404)
-    definition = original_completion(entity)["definition"] if isinstance(entity, Entities.TASK) else entity.submission_definition
+    if isinstance(entity, Entities.TASK):
+        definition = (
+            definition_for(entity, archived=True)
+            if entity.form is None and generation == entity.generation
+            else original_completion(entity)["definition"]
+        )
+    else:
+        definition = entity.submission_definition
     if (
         not definition.immutable or definition.error or not definition.content_available
         or generation != definition.generation

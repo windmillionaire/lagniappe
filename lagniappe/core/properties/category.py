@@ -15,6 +15,7 @@ from ..mixins import ColumnMixin
 # @testable true
 # @tests tests_unit/test_007a_category_index.py::test_category_index
 # @matrix category-index : columns table
+# @matrix form-migration : pending-projection removed-field typed-filter
 class CategoryTable(Columns):
     _id = "table"
     _kind = "page"
@@ -34,7 +35,7 @@ class CategoryTable(Columns):
             field = f(entity=self.entity)
             fields[field.id] = field
 
-        if self.entity.form:
+        if self.entity.form and not self.entity.form.db.get("pending_form_change"):
             fields.update(
                 {
                     f.id: f

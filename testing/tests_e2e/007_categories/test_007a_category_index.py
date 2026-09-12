@@ -15,7 +15,7 @@ from testing.elements import (
     SpinnerButtons,
     Table,
 )
-from testing.utility.network import scoped_browser_route
+from testing.utility.network import scoped_browser_route, expect_successful_response
 from testing.utility.reconnect import expect_reconnect_refresh
 from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
 
@@ -162,6 +162,60 @@ def test_category_index_reconnect_refreshes_external_page(get_user, browser_fail
         expect(Table(user).get_row(external_page.name)).to_be_visible()
     finally:
         Entities.delete(external_page)
+
+
+# @source lagniappe/web/routes/pages/main.py::create
+# @source src/script/widgets/pageInfo.mjs::CreatePage
+# @matrix pages : category-index create required-name row-navigation
+# @template categories/tools.html::create_page
+# @template table.html::row
+def test_page_creation_requires_name_and_rows_do_not_follow_attached_form(get_user, browser_failures):
+    user = get_user(Users.OWNER)
+    existing = Pages.test_category_filter_related_form_registration_page.get(user)
+    category = existing.definition.category.get(user)
+    attached = existing.definition.form.get(user)
+    user.go(category)
+    category_url = user.page.url
+    create_form = category.new_page_form()
+    create_form.locator("[data-role='related-form']", has_text=attached.definition.name).click()
+    name = create_form.locator("input[name='name']")
+    expect(name).to_have_attribute("required", "")
+    SpinnerButtons.CREATE.click(create_form)
+    assert name.evaluate("input => input.validity.valueMissing")
+    expect(create_form).to_be_visible()
+    name.fill("   ")
+    path = f"/pages/{category.key}/create"
+    with browser_failures.expect_http_error(user, status=422, path=path, count=0, max_count=1):
+        with user.page.expect_response(lambda response: response.request.method == "POST" and response.url.endswith(path)) as response:
+            SpinnerButtons.CREATE.click(create_form)
+        assert response.value.status == 422
+        expect(create_form).to_contain_text("Name this page before creating it.")
+        page_name = f"Named page {uuid4().hex[:8]}"
+        name.fill(page_name)
+        with expect_successful_response(user.page, method="POST", path=path):
+            SpinnerButtons.CREATE.click(create_form)
+        row = Table(user).get_row(page_name)
+        expect(row).to_be_visible()
+        page_key = row.get_attribute("data-key")
+        expect(user.page).to_have_url(category_url)
+        row.locator("td[data-column='modified']").click()
+        expect(user.page).to_have_url(re.compile(rf"/pages/{re.escape(page_key)}(?:\?.*)?$"))
+
+        # Older nameless rows may still exist. Their row action must not pick the form link.
+        legacy = Entities.PAGE.create({"model": category.entity, "form": attached.entity})
+        legacy.save()
+        try:
+            user.go(category)
+            panel = _open_visibility_panel(user, category)
+            panel.locator("input[name='form']").check()
+            user.locate(category.TABLE_VISIBILITY_TOGGLE).click()
+            legacy_row = user.locate(f"tr[lp-entity][data-key='{legacy.urlsafe_key}']")
+            expect(legacy_row.locator("td[data-column='form'] a")).to_be_visible()
+            legacy_row.locator("td[data-column='name']").click()
+            expect(user.page).to_have_url(category_url)
+            expect(legacy_row).to_be_visible()
+        finally:
+            Entities.delete(legacy)
 
 
 # @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope

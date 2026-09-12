@@ -752,7 +752,7 @@ def test_historical_images_are_bound_to_the_authorized_completion(get_user):
     task.complete(user=user.entity)
     task.save()
     archive_form_generation(form.entity).save()
-    form.entity.set_html_field(field.id, "<p>New active instructions</p>")
+    form.entity.set_html_field(field.id, f'<p>New active instructions</p><img src="{source_url}">')
     form.entity.save()
     # Supply a later-generation fixture; conversion itself is outside step 1.
     form.entity.generation = 1
@@ -781,11 +781,25 @@ def test_historical_images_are_bound_to_the_authorized_completion(get_user):
 
     assert "New active instructions" in rendered_html_fields(task)[field.id]
     assert "Original instructions" in rendered_html_fields(task, original=True)[field.id]
+    # Arrange the current migrated generation; the original completion stays at 0.
+    task._form_change_write = True
+    task.db["generation"] = 1
+    Entities.save_root(task, property_mask=("generation",))
     Entities.delete(form.entity)
     restored = Entities.fetch_one(task.key, request=Fetch.root())
     assert "Original instructions" in rendered_html_fields(restored, original=True)[field.id]
     assert _http(user, "GET", image_url).status_code == 200
     assert _http(outsider, "GET", image_url).status_code == 403
+    archived = _http(user, "GET", f"/tasks/{task.urlsafe_key}/archived-submission")
+    assert archived.status_code == 200
+    assert _http(outsider, "GET", f"/tasks/{task.urlsafe_key}/archived-submission").status_code == 403
+    assert archived.json()["generation"] == 1
+    archived_html = archived.json()["html_fields"][field.id]
+    assert "New active instructions" in archived_html
+    current_image_url = BeautifulSoup(archived_html, "html.parser").find("img")["src"]
+    assert "/form-generation/1/" in current_image_url
+    assert _http(user, "GET", current_image_url).status_code == 200
+    assert _http(outsider, "GET", current_image_url).status_code == 403
 
 
 # @source src/script/views/builder/conditions/options.mjs::Options

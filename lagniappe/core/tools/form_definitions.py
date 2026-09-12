@@ -121,16 +121,25 @@ def _historical_definition(entity, identity):
 # @tests tests_unit/test_004i_form_definitions.py::test_completed_definition_uses_recorded_version_and_reports_missing_schema
 # @tests tests_unit/test_004i_form_definitions.py::test_active_definition_uses_latest_metadata
 # @tests tests_unit/test_004i_form_definitions.py::test_completed_envelope_uses_matching_current_definition_without_history_read
+# @tests tests_unit/test_004i_form_definitions.py::test_completed_task_resolves_saved_generation_after_form_deletion
+# @tests tests_unit/test_004i_form_definitions.py::test_active_submission_does_not_restore_deleted_form
+# @tests tests_unit/test_004i_form_definitions.py::test_completed_task_without_an_attached_form_stays_empty
+# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_deleted_migrated_form_retains_completed_submissions_and_history
 # @matrix submission task-completion : schema-version missing-schema live-metadata
+# @matrix task-completion : deleted-form generation raw-values active-form empty-submission
 # @pairs task-completion:current-definition task-completion:no-extra-read
-def definition_for(entity):
-    """Normal Tasks use current fields; requested history uses its recorded generation."""
-    if entity.entity_kind == "task_history":
+def definition_for(entity, *, archived=False):
+    """Use live fields unless history or an archived completion is explicitly requested."""
+    if entity.entity_kind == "task_history" or (
+        archived and entity.entity_kind == "task" and entity.completed and entity.form is None
+    ):
         identity = definition_identity(entity)
         if identity[0] is None and not entity.properties.submission.value:
             return SubmissionDefinition(generation=identity[1], immutable=True)
         return _historical_definition(entity, identity)
     form = entity.form
+    from .form_changes import effective_definition
+    form = effective_definition(entity, form)
     return SubmissionDefinition(form, getattr(form, "generation", 0) or 0)
 
 
@@ -358,8 +367,9 @@ def compatible_values(source_schema, target_schema, values):
 
 # @testable true
 # @tests tests_unit/test_004i_form_definitions.py::test_history_transfer_preserves_identity_and_rejects_incompatible_values
+# @tests tests_unit/test_004i_form_definitions.py::test_history_fill_converts_one_field_without_changing_history
 # @matrix task-completion submission : history-fill identity incompatible-value
-def history_values_for(task, history, field_id=None):
+def history_values_for(task, history, field_id=None, *, zone="UTC"):
     if task.completed:
         raise ValidationError("Reopen the task before filling saved answers.")
     if task.properties.form.key != history.properties.form.key:
@@ -372,7 +382,39 @@ def history_values_for(task, history, field_id=None):
         if field_id not in values:
             raise ValidationError("This completion has no saved answer for that field.")
         values = {field_id: values[field_id]}
-    return compatible_values(definition.schema, task.submission_schema, values)
+    source = {field["id"]: field for field in definition.schema}
+    target = {field["id"]: field for field in task.submission_schema}
+    return {
+        key: _history_value(source.get(key), target.get(key), value, zone)
+        for key, value in values.items()
+    }
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/form_definitions.py::history_values_for
+# @reason history reuse applies existing deterministic rules without clearing invalid answers
+def _history_value(source, target, value, zone):
+    from .form_conversions import MISSING, conversion_rule, convert_value
+
+    label = (target or source or {}).get("title", "this field")
+    error = f'The saved value for "{label}" cannot be converted to the current field type.'
+    if not source or not target or conversion_rule(source, target) in {None, "ai", "delete"}:
+        raise ValidationError(error)
+    if source["type"] == target["type"] == "table":
+        rows = value.get("rows", []) if isinstance(value, dict) else value
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValidationError(error)
+        old_columns = {column["id"]: column for column in source.get("columns", [])}
+        new_columns = {column["id"]: column for column in target.get("columns", [])}
+        return {"rows": [
+            {key: _history_value(old_columns.get(key), new_columns[key], item, zone)
+             for key, item in row.items() if key in new_columns}
+            for row in rows
+        ]}
+    converted, reason = convert_value(value, source, target, zone=zone)
+    if converted is MISSING or reason == "invalid":
+        raise ValidationError(error)
+    return converted
 
 
 # @testable true
@@ -428,9 +470,10 @@ def preload_definitions(records):
 # @testable true
 # @tests tests_unit/test_004i_form_definitions.py::test_history_html_uses_authorized_record_asset_urls
 # @matrix task-completion html-field : schema-version owned-image missing-content
-def rendered_html_fields(entity, *, original=False):
+def rendered_html_fields(entity, *, original=False, definition=None):
     """Use current Task content unless its original completion was explicitly requested."""
-    definition = original_completion(entity)["definition"] if original else definition_for(entity)
+    if definition is None:
+        definition = original_completion(entity)["definition"] if original else definition_for(entity)
     result = {}
     for field in definition.schema:
         if field.get("type") != "html":

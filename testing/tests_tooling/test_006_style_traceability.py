@@ -93,6 +93,21 @@ const registryPath = "src/style/icons.yaml";
     ]
 
 
+def test_icon_traceability_checks_choices_without_treating_conditions_as_icons(tmp_path):
+    write_file(
+        tmp_path / "src/script/choices.mjs",
+        '''
+const valid = { icon: item.value === "todo" ? "checklist" : item.value };
+const invalid = { icon: "todo" === item.value ? "missingChoice" : "checklist" };
+''',
+    )
+    report = icon_traceability.build_report(
+        tmp_path, definitions={"checklist": {"glyph": "checklist", "fill": 1}},
+    )
+    assert report.used == ["checklist"]
+    assert [(item.icon_id, item.line) for item in report.unknown] == [("missingChoice", 2)]
+
+
 def test_style_candidates_reports_cleanup_candidates(tmp_path):
     write_file(
         tmp_path / "src/style/styles.yaml",

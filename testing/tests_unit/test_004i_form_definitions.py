@@ -1,6 +1,7 @@
 """Immutable completion definitions, compatibility checks and history reads."""
 
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 import json
@@ -10,6 +11,7 @@ import pytest
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.tools import form_definitions as definitions
 from lagniappe.core.entities.history import TaskHistory
+from lagniappe.core.entities.task import Task
 from testing.utility.test_entities import TestEntities
 
 
@@ -55,6 +57,91 @@ def test_active_definition_uses_latest_metadata():
         record.form.schema[0]["title"] = "Later label"
         assert definitions.definition_for(record).schema[0]["title"] == "Later label"
         resolve.assert_not_called()
+
+
+# @matrix task-completion : deleted-form generation missing-schema raw-values
+@pytest.mark.unit
+@pytest.mark.parametrize("generation", [0, 2])
+@pytest.mark.parametrize("available", [True, False])
+def test_completed_task_resolves_saved_generation_after_form_deletion(generation, available):
+    record = _record(kind="task", generation=generation)
+    record.form = None
+    values = {"note": 9}
+    record.properties.submission = SimpleNamespace(value=values)
+    record.db["submission"] = json.dumps(values)
+    if generation:
+        record.db["completed_submission"] = json.dumps({
+            "submission": {"note": "009"}, "generation": 0, "form_key": "form-key",
+        })
+    before = deepcopy(record.db)
+    archived = SimpleNamespace(schema=[{
+        "id": "note", "type": "input", "input": "number", "title": "Quantity",
+    }]) if available else None
+    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=archived) as resolve:
+        assert definitions.definition_for(record).schema == []
+        resolve.assert_not_called()
+        definition = definitions.definition_for(record, archived=True)
+        assert definition.source is archived
+        assert definition.generation == generation
+        assert definition.immutable is True
+        if available:
+            assert definition.schema == archived.schema
+            assert definition.error is None
+        else:
+            assert "unavailable" in definition.error
+        assert definitions.definition_for(record, archived=True) is definition
+        resolve.assert_called_once_with("form-key", generation)
+    assert record.db == before
+    assert record.properties.submission.value == values
+
+
+# @matrix task-completion : deleted-form active-form
+@pytest.mark.unit
+@pytest.mark.parametrize("kind", ["task", "page"])
+def test_active_submission_does_not_restore_deleted_form(kind):
+    record = _record(kind=kind, completed=False)
+    record.form = None
+    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve:
+        definition = definitions.definition_for(record, archived=True)
+        assert definition.schema == []
+        assert definition.error is None
+        resolve.assert_not_called()
+
+
+# @matrix task-completion : deleted-form empty-submission
+@pytest.mark.unit
+def test_completed_task_without_an_attached_form_stays_empty():
+    record = _record(kind="task")
+    record.form = None
+    record.properties.form.key = None
+    record.properties.submission = SimpleNamespace(value={})
+    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve:
+        definition = definitions.definition_for(record, archived=True)
+        assert definition.schema == []
+        assert definition.error is None
+        resolve.assert_not_called()
+
+
+# @source lagniappe/core/tools/form_definitions.py::history_groups
+# @matrix tasks task-completion : history ordering schema-version
+@pytest.mark.unit
+def test_history_orders_same_day_completions_by_archive_time():
+    day = datetime(2026, 9, 12, tzinfo=timezone.utc)
+    records = [_record(generation=generation) for generation in (0, 1, 0, 2)]
+    for index, record in enumerate(records):
+        record.completed_on = day
+        record.created = day + timedelta(hours=index + 1)
+    records[-1].completed_on = day - timedelta(days=1)
+    task = SimpleNamespace(load_history=lambda *rows: records)
+    with patch("lagniappe.core.entities.task.database_get.task_history", return_value=[]):
+        ordered = Task.history.fget(task)
+    assert ordered == [records[2], records[1], records[0], records[3]]
+    with patch("lagniappe.core.tools.form_drafts.resolve_form_generations", side_effect=lambda pairs: {
+        pair: SimpleNamespace(schema=[]) for pair in pairs
+    }):
+        groups = definitions.history_groups(ordered)
+    assert [group["identity"][1] for group in groups] == [0, 1, 2]
+    assert groups[0]["records"] == [records[2], records[0]]
 
 
 def _task():
@@ -172,6 +259,43 @@ def test_history_transfer_preserves_identity_and_rejects_incompatible_values():
             definitions.history_values_for(live, historical, "note")
 
 
+# @matrix task-completion submission : history-fill identity incompatible-value
+@pytest.mark.unit
+def test_history_fill_converts_one_field_without_changing_history():
+    live = _task()
+    historical = _record(kind="task_history")
+    historical.properties.form.key = live.properties.form.key
+    original = {"note": "7", "invalid": "not a number", "zero": "0"}
+    historical.properties.submission = SimpleNamespace(value=deepcopy(original))
+    source = [{"id": key, "type": "input", "input": "text", "title": key}
+              for key in original]
+    live.form.schema = [{**field, "input": "number"} for field in source]
+    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=SimpleNamespace(schema=source)):
+        assert definitions.history_values_for(live, historical, "note") == {"note": 7}
+        assert definitions.history_values_for(live, historical, "zero") == {"zero": 0}
+        with pytest.raises(ValidationError, match='"invalid" cannot be converted'):
+            definitions.history_values_for(live, historical, "invalid")
+    assert historical.properties.submission.value == original
+
+    source = [{"id": "items", "type": "table", "columns": [
+        {"id": "count", "title": "Count", "type": "input", "input": "text"},
+    ]}]
+    target = deepcopy(source)
+    target[0]["columns"][0]["input"] = "number"
+    live.form.schema = target
+    historical = _record(kind="task_history")
+    historical.properties.form.key = live.properties.form.key
+    historical.properties.submission = SimpleNamespace(value={"items": {"rows": [{"count": "bad"}]}})
+    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=SimpleNamespace(schema=source)):
+        with pytest.raises(ValidationError, match='"Count" cannot be converted'):
+            definitions.history_values_for(live, historical, "items")
+        historical.properties.submission.value["items"]["rows"][0]["count"] = "12"
+        assert definitions.history_values_for(live, historical, "items") == {
+            "items": {"rows": [{"count": 12}]},
+        }
+        assert historical.properties.submission.value["items"]["rows"][0]["count"] == "12"
+
+
 # @matrix tasks task-completion : history schema-version ordering
 @pytest.mark.unit
 @pytest.mark.parametrize("last_form_key", ["form-key", "other-form-key"])
@@ -229,11 +353,13 @@ def test_history_html_uses_authorized_record_asset_urls():
 def test_completion_without_answers_pins_definition_and_reopen_archives_original():
     task = _task()
     task.submission = {}
+    task.db["pre_migration"] = json.dumps({"note": {"value": "Before"}})
     completer = TestEntities.get("USER", {
         "name": "Completer", "hash": "completion-actor",
         "page": {"name": "Completer page", "hash": "completion-actor-page"},
     })
     task.complete(user=completer)
+    assert "pre_migration" not in task.db
     envelope = json.loads(task.db["completed_submission"])
     assert envelope == {"submission": {}, "generation": 0, "form_key": None}
     assert task.generation == 0
@@ -270,6 +396,7 @@ def test_uncomplete_archives_selected_raw_answers_and_their_generation(submissio
         "form_key": definitions.database_get.urlsafe_key(task.properties.form.key),
     })
     task.db["default_submission"] = json.dumps({"note": "Repeat this"})
+    task.db["pre_migration"] = json.dumps({"note": {"value": "Before conversion"}})
     envelope = task.db["completed_submission"]
     kwargs = {} if submission_source is None else {"submission_source": submission_source}
 
@@ -295,11 +422,13 @@ def test_uncomplete_archives_selected_raw_answers_and_their_generation(submissio
     assert history.generation == (1 if submission_source == "modified" else 0)
     assert history.properties.form.key == task.properties.form.key
     assert "completed_submission" not in history.db
+    assert "pre_migration" not in history.db
     assert task._completion_transition["envelope"] == envelope
     assert task.completed is False
     assert "completed_submission" not in task.db
     assert task.submission == {}
     assert "default_submission" not in task.db
+    assert "pre_migration" not in task.db
     assert task.generation == 2
 
 

@@ -325,6 +325,17 @@ finish();
 assert.equal(await accepted, true);
 assert.equal(restores, 1);
 assert.equal(builder.draft.state.schema[0].id, "generated");
+// Loading an unopened Document editor is another asynchronous boundary.
+let finishEditor;
+builder.prepareGeneratedDocuments = () => new Promise(resolve => { finishEditor = resolve; });
+const loading = context.FormSettings.prototype._updateSchema.call(settings, {
+  ok: true, operations: [], html_fields: { instructions: "Generated text" },
+});
+builder.draft.record({ ...builder.draft.state, name: "Changed during editor load" });
+finishEditor();
+assert.equal(await loading, false);
+assert.match(message, /Regenerate/);
+assert.equal(restores, 1);
 const late = generate();
 context.FormSettings.prototype.destroy.call(settings);
 finish();
@@ -688,7 +699,13 @@ def test_saved_controls_refresh_without_replacing_draft_inputs(run_node):
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const context = { Condition: class {} };
+const context = {
+  Condition: class {},
+  document: { createElement: (tagName) => ({
+    tagName, dataset: {}, children: [],
+    append(...children) { this.children.push(...children); },
+  }) },
+};
 vm.createContext(context);
 for (const [file, exported, name] of [
   ["panels/elementSettings", "export class ElementSettings", "ElementSettings"],
@@ -706,7 +723,12 @@ const schema = {
   options: [{ value: "first", label: "First" }, { value: "later", label: "Later" }],
 };
 const title = { disabled: false, value: "Still editing this label" };
-const type = { disabled: false };
+let typeNotice;
+const inputSection = {
+  dataset: { setting: "input" },
+  querySelector: () => typeNotice,
+  replaceChildren: (notice) => { typeNotice = notice; },
+};
 const multiple = { disabled: false };
 const location = { disabled: false };
 const remove = {
@@ -716,12 +738,12 @@ const remove = {
 const removeFirst = { disabled: false };
 const removeLater = { disabled: false };
 const sections = [
-  ...[["title", title], ["input", type], ["multiple", multiple], ["location", location]]
+  ...[["title", title], ["multiple", multiple], ["location", location]]
     .map(([setting, control]) => ({
       dataset: { setting }, matches: () => false,
       querySelectorAll: () => [control],
     })),
-  remove,
+  inputSection, remove,
   {
     dataset: { setting: "options" },
     querySelectorAll: () => [removeFirst, removeLater].map((control, index) => ({
@@ -734,18 +756,25 @@ const settings = Object.assign(Object.create(context.ElementSettings.prototype),
   builder, panel: { children: sections },
 });
 settings.refreshSavedState();
-assert.equal(type.disabled, false);
+assert.equal(typeNotice, undefined, "Unsaved fields retain their input type controls");
 assert.equal(remove.disabled, false);
 saved = { ...schema, options: [schema.options[0]] };
 settings.refreshSavedState();
-assert.ok(type.disabled && multiple.disabled && location.disabled && remove.disabled);
-assert.equal(removeFirst.disabled, true, "Persisted options cannot be removed after Save");
+assert.equal(typeNotice.dataset.role, "saved-input-type");
+assert.equal(typeNotice.children[0], "Click ");
+assert.equal(typeNotice.children[1].tagName, "strong");
+assert.equal(typeNotice.children[1].textContent, "Replace or Delete");
+assert.equal(typeNotice.children[2], " in order to change this input's type.");
+assert.ok(multiple.disabled && location.disabled && !remove.disabled);
+assert.equal(removeFirst.disabled, false, "Persisted option removal is staged until Save");
 assert.equal(removeLater.disabled, false, "New unsaved options remain removable");
 assert.deepEqual(title, { disabled: false, value: "Still editing this label" });
 assert.equal(settings.panel.children, sections, "Acknowledgment retains the settings inputs");
 saved = schema;
+const previousNotice = typeNotice;
 settings.refreshSavedState();
-assert.equal(removeLater.disabled, true, "An option becomes fixed only after its own Save");
+assert.equal(typeNotice, previousNotice, "Repeated saves retain the informational notice");
+assert.equal(removeLater.disabled, false, "Saved options can be removed through a migration");
 
 const columnBuffer = { id: "quantity", title: "A name not yet applied", type: "input", input: "number" };
 const columnType = {
@@ -761,8 +790,8 @@ columns.refreshSavedState();
 assert.equal(columnType.element.disabled, false, "Unsubmitted columns keep their type selector");
 saved = { columns: [{ id: "quantity", title: "Quantity", type: "input", input: "number" }] };
 columns.refreshSavedState();
-assert.equal(columnType.panelOpen, false);
-assert.ok(columnType.select.disabled && columnType.element.disabled);
+assert.equal(columnType.panelOpen, true);
+assert.ok(!columnType.select.disabled && !columnType.element.disabled);
 assert.equal(columns.setting, columnBuffer);
 assert.equal(columns.setting.title, "A name not yet applied", "Saving must retain the unapplied column-name buffer");
 '''

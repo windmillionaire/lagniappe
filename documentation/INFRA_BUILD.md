@@ -80,7 +80,7 @@ The main startup path has four measured closures:
 | `main` | Main entry alone, including upstream failure recovery | 40 |
 | `shell` | Main plus a shell view | 64 |
 | `core` | Main plus a Core view | 120 |
-| `builder` | Builder view | 224 |
+| `builder` | Builder view | 288 |
 
 `build/startupBudget.mjs` measures deduplicated minified static imports and
 fails when a closure exceeds its budget. It also prevents heavy interactive

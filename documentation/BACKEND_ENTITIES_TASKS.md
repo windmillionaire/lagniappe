@@ -59,8 +59,10 @@ use that current submission with the current Form, even while the Task is
 completed. Completion does not create a FormHistory record or copy Form assets.
 
 `tools/form_definitions.py` separates current reads from explicitly requested
-originals. **Show original submission** is offered only when a completed Task's
-current submission has advanced beyond the envelope's generation and its values differ.
+originals. **View Original Submission** is offered to editors only when a completed
+Task's current submission has advanced beyond the envelope's generation and its
+values differ. The live Task's completion-details endpoint also requires edit
+access; immutable history retains its existing view permission.
 A changed Form version or generation alone does not establish a converted Task.
 The explicit view reads the envelope and uses the current Form when the recorded
 generation matches, resolving FormHistory only for a different or missing Form.
@@ -79,6 +81,9 @@ attachments, relationships, name, description and completion metadata. Reopening
 removes the envelope and clears all submission values. TaskHistory has no completion envelope, and
 its `modified` value is fixed at creation. History readers use each record's
 generation and batch distinct older-definition lookups.
+History rows sort by completion date, then by archive creation time, newest first.
+Generation tables follow their newest row, so multiple completions on the same
+date retain their creation order rather than Datastore query order.
 
 Ordinary answer/default edits and Form reassignment still require reopening a
 completed Task. A later transfer workflow may update flat current values on
@@ -97,6 +102,14 @@ sources. Loading a stale Form key resolves it to `None` without requiring a
 record re-save; a relation that was never loaded still raises an unloaded-relation
 error. Reads do not silently rewrite stored relationship keys.
 
+A completed Task whose stored Form key no longer resolves shows **This
+submission's form has been deleted. Load the archived version**. Ordinary Task
+reads do not query FormHistory. The explicit `archived-submission` GET checks
+Task view access, then resolves the Task's current stored generation and renders
+its saved values readonly. Original-completion review remains an editor-only
+action when earlier answers differ. Loading either view does not save the Task;
+missing archived definitions expose the existing unavailable state and raw answers.
+
 ## Fresh submissions and reopening
 
 Every uncompletion opens a fresh submission. The attached Form, Page/Project,
@@ -108,10 +121,13 @@ uncompletion and ordinary submission saves.
 field for the current submission, which is persisted through the normal Update
 or completion flow. It creates no repeating defaults.
 
-History fill checks exact field/option/column identities and compatible
-representations before copying values. Labels and added choices/columns are safe;
-missing definitions, removed identities or changed types require review. Failed
-checks retain the original history and current answers. Reopening stages
+History fill discovers saved field IDs without rejecting the whole submission.
+Each click requests one field and converts it from the archived definition to the
+current schema using the deterministic migration rules. Table cells are converted
+by column ID; removed columns are omitted. Missing definitions and unconvertible
+values return HTTP 422 with specific feedback, retaining the original history and
+current answers. Invalid cells or selections reject that field's fill instead of
+silently clearing part of it. Reopening stages
 source-asset cleanup after the guarded durable archive/reset commit.
 
 ## Move and combine

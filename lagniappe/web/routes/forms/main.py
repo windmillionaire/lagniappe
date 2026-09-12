@@ -42,6 +42,8 @@ def _builder_request(data, form):
         "html_fields": _draft_json(data, "html_fields", {}),
         "image_manifest": _draft_json(data, "image_manifest", []),
     }
+    if data.get("migration"):
+        draft["migration"] = _draft_json(data, "migration")
     manifest = draft["image_manifest"]
     if not isinstance(manifest, list):
         raise exceptions.ValidationError("Invalid builder image manifest.")
@@ -120,11 +122,33 @@ def rows():
 # @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_builder_*
 # @matrix forms : builder-edit permission-gates restriction-control
 @forms.route("/<key>", methods=["GET"])
-@permission(Resource.FORM, Action.VIEW)
+@permission(Resource.FORM, Action.VIEW, no_store=True)
 def view(key, **kwargs):
     form = kwargs["entity"]
 
-    return render_template("forms/builder.html", form=form, builder_draft=form_drafts.builder_draft(form))
+    from lagniappe.core.tools import form_changes, form_conversions
+    draft = form_drafts.builder_draft(form)
+    if form.db.get(form_changes.PENDING):
+        result = form_changes.change_response(form)
+        draft.update(result["draft"], pending_change=result["pending_change"])
+    return render_template("forms/builder.html", form=form, builder_draft=draft,
+                           conversion_catalog=form_conversions.conversion_catalog())
+
+
+# @testable true
+# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_failed_preflight_recovers_after_reload
+# @matrix form-migration : status recovery
+@forms.route("/<key>/change", methods=["GET", "POST"])
+@permission(Resource.FORM, Action.EDIT, no_store=True)
+def form_change(key, **kwargs):
+    from lagniappe.core.tools import form_changes
+    try:
+        result = (form_changes.change_response(kwargs["entity"]) if request.method == "GET"
+                  else form_changes.recover_change(kwargs["entity"], current_user,
+                      (request.get_json(silent=True) or request.form).get("action")))
+        return responses.json_response(result)
+    except (exceptions.ValidationError, exceptions.MutationConflict) as error:
+        return responses.error(str(error))
 
 
 # @testable true

@@ -34,6 +34,8 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     def exclude_from_index(self):
         exclude = {
             "submission",
+            "pre_migration",
+            "form_change_receipt",
             "description",
             "assets",
             "schema_version",

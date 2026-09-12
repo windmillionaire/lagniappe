@@ -70,6 +70,8 @@ class FormFilters(Filters):
     # @matrix filters form : schema-fields
     @property
     def fields(self):
+        if self.entity.db.get("pending_form_change"):
+            return {}
         return {
             k: v
             for k, v in self.entity.fields.items()

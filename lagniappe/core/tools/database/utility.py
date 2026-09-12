@@ -246,24 +246,31 @@ def save_mutations(writes, *, guards=None, deletes=()):
 @retry_aborted
 def _save_guarded_mutations(writes, fingerprints, guards, *, deletes=()):
     with DATA.datastore.transaction() as transaction:
-        for key, expected in guards:
-            current = DATA.datastore.get(key, transaction=transaction)
-            conflict = (
-                current is not None if expected is None else
-                current is None or (
-                    dict(current) != expected if isinstance(expected, ExactEntityState) else
-                    any(current.get(name) != value for name, value in expected.items())
-                )
-            )
-            if conflict:
-                from lagniappe.core.exceptions import MutationConflict
-                raise MutationConflict("Saved state changed while saving; reload and retry.")
+        check_mutation_guards(transaction, guards)
         for entity, mask in writes:
             _put_mutation(transaction, entity.db, mask)
         for fingerprint in fingerprints:
             transaction.put(fingerprint)
         for entity in deletes:
             transaction.delete(entity.key)
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/database/utility.py::_save_guarded_mutations
+# @reason the same transaction preconditions protect ordinary writes and atomic job starts
+def check_mutation_guards(transaction, guards):
+    for key, expected in guards:
+        current = DATA.datastore.get(key, transaction=transaction)
+        conflict = (
+            current is not None if expected is None else
+            current is None or (
+                dict(current) != expected if isinstance(expected, ExactEntityState) else
+                any(current.get(name) != value for name, value in expected.items())
+            )
+        )
+        if conflict:
+            from lagniappe.core.exceptions import MutationConflict
+            raise MutationConflict("Saved state changed while saving; reload and retry.")
 
 
 # @testable true

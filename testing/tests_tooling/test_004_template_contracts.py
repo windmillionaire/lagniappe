@@ -543,6 +543,29 @@ def test_routed_controls():
     assert not any("lp-control value 'reset'" in issue for issue in group.issues)
 
 
+def test_template_contract_distinguishes_modal_close_from_routed_close(tmp_path):
+    write_file(tmp_path / "lagniappe/web/templates/things.html", """
+{% macro modal() %}
+  <div id="modal"><div id="modal-content"><button lp-control="close">Close</button></div></div>
+{% endmacro %}
+{% macro panel() %}
+  <button lp-control="close">Close panel</button>
+{% endmacro %}
+""")
+    write_file(tmp_path / "testing/tests_e2e/test_thing.py", """
+# @template things.html::modal
+def test_modal():
+    pass
+# @template things.html::panel
+def test_panel():
+    pass
+""")
+    report = template_contracts.build_report(tmp_path, "test_thing.py")
+    issues = [issue for group in report.groups for issue in group.issues]
+    assert len(issues) == 2
+    assert all("things.html::panel" in issue for issue in issues)
+
+
 def test_template_contract_counts_common_helper_evidence(tmp_path):
     write_file(
         tmp_path / "lagniappe/web/templates/things.html",

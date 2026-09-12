@@ -1,6 +1,6 @@
 import { NavElement } from "../../elements/nav";
 import { captureError } from "../../shared/errors";
-import { showBriefly, withTransition } from "../../shared/utilities";
+import { withTransition } from "../../shared/utilities";
 import { loadWidget } from "../../widgets/loader";
 
 /**
@@ -363,10 +363,17 @@ export default class ViewComponent {
 		return this.attributes[property] ?? null;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_closed_task_errors_persist_while_waiting_and_retrying
+	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_completion_during_migration_returns_inline_error_without_saving
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_waits_for_acceptance_and_moves_closed_task
+	 * @matrix tasks : active-widget complete uncomplete update-state
+	 */
 	showError(message) {
 		this.enable();
 
-		if (this.active?.showError) {
+		if (this.open !== "false" && this.active?.showError) {
 			this.active.showError(message);
 		} else {
 			const errorElt = this.error;
@@ -375,7 +382,13 @@ export default class ViewComponent {
 			const error = document.createElement("span");
 			error.textContent = message;
 
-			showBriefly(errorElt, error);
+			void withTransition(
+				() => {
+					errorElt.replaceChildren(error);
+					errorElt.dataset.visible = "true";
+				},
+				{ label: `${this.name}:error` },
+			);
 			this.active?.enable();
 		}
 	}

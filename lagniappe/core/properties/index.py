@@ -68,7 +68,7 @@ class TaskHistoryTable(Columns):
 
         definition = getattr(self.entity, "submission_definition", None)
         form = definition.source if definition is not None else self.entity.form
-        if form:
+        if form and not form.db.get("pending_form_change"):
             fields.update(
                 {
                     f.id: f

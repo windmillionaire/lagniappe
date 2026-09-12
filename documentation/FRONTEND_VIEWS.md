@@ -56,7 +56,9 @@ view is interactive.
 
 Controls are delegated from the view root. `lp-control` handles help, star,
 delete, pagination, close, and routed component controls; `lp-show` navigates
-between widgets; `lp-link` forwards a row click to its title link. Local widget
+between widgets; `lp-link` forwards a row click to its title link. Entity table
+rows use only the name column's title, so a nameless row cannot follow a related
+form's link. Local widget
 behavior such as table expansion stays with the widget instead of growing the
 Core switch.
 

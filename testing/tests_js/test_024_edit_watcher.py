@@ -36,6 +36,7 @@ const context = {
   ICONS: { builder: { unsaved: "unsaved" } },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/base/baseForm.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class BaseForm", "class BaseForm");
@@ -97,6 +98,7 @@ const context = {
   primitives: {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class FormElement", "class FormElement");
@@ -312,6 +314,7 @@ const context = {
   },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
@@ -508,6 +511,7 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
@@ -597,6 +601,7 @@ const context = {
   withTransition: async (callback) => callback(),
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8")
   .replace(/^import .*$/gm, "")
   .replace("export class EditReconciler", "class EditReconciler");

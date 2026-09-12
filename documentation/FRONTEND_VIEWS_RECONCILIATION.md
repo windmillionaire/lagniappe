@@ -35,7 +35,8 @@ For a changed active form, `EditReconciler` renders the focused response in a
 detached preview and compares normalized submissions:
 
 - an unchanged saved baseline and schema leave the live form and draft intact;
-- otherwise, equal state installs automatically;
+- otherwise, equal state installs automatically unless projecting an unsaved or
+  queued draft omitted incompatible fields;
 - schema-only change projects stable local field IDs into the current schema;
 - renderer-capable value drift offers field-by-field saved/local choices;
 - a dirty non-renderer form offers **Reset form**;
@@ -140,7 +141,12 @@ widget key where repeated widget names exist.
 
 PageInfo and TaskForm also consume `form-lock`. A reload or another tab can
 restore the active job and progress state even when the target fingerprint did
-not change. The terminal result may replace an active form automatically only
+not change. The lock scope is retained as `data-operation-scope` before the
+deferred manager starts, so its initial DOM scan uses the correct progress text:
+form changes show
+**Schema migration in progress**, while autofill keeps its own queued message.
+Subsequent operation responses supply the current phase.
+The terminal result may replace an active form automatically only
 when the operation matches its durable lock and the form has no unsaved or
 queued state. Otherwise normal form reconciliation protects the draft.
 

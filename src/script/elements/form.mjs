@@ -1,4 +1,6 @@
 import { withTransition } from "../shared";
+import { installMigrationNotice } from "../shared/formMigrationNotice";
+import { compatibleField } from "../shared/formRepresentation";
 import { BaseForm } from "./base/baseForm";
 
 /**
@@ -23,6 +25,7 @@ export class FormElement {
 		this._updated = false;
 		this._success = false;
 		this._preparedReset = null;
+		this._migrationNotice = null;
 
 		this._deferredOperation = this.target?.dataset?.operation || null;
 
@@ -43,6 +46,7 @@ export class FormElement {
 			if (!target) continue;
 			target.dataset.operation = operation;
 			target.dataset.operationRevision = String(descriptor.revision ?? 0);
+			target.dataset.operationScope = descriptor.scope || "";
 			target.dataset.deferredLock = "form";
 		}
 		this.clearUnsavedState();
@@ -163,7 +167,15 @@ export class FormElement {
 		const mergedSubmission = structuredClone(remoteSubmission);
 		const localSubmission = state.renderer_submission ?? {};
 		for (const id of localIds) {
-			if (!latestIds.has(id) || !Object.hasOwn(localSubmission, id)) continue;
+			if (
+				!latestIds.has(id) ||
+				!Object.hasOwn(localSubmission, id) ||
+				!compatibleField(
+					this.schema.find((field) => field.id === id),
+					latestSchema.find((field) => field.id === id),
+				)
+			)
+				continue;
 			mergedSubmission[id] = structuredClone(localSubmission[id]);
 		}
 
@@ -386,6 +398,18 @@ export class FormElement {
 		this.target._lp_widget = this;
 		this.form = new BaseForm(this);
 		await this.form.init();
+		if (
+			this.target.dataset.migrationNotice &&
+			this.target.dataset.migrationNotice !== "[]"
+		)
+			installMigrationNotice(this);
+		if (this.target.dataset.formGeneration !== undefined) {
+			const generation = document.createElement("input");
+			generation.type = "hidden";
+			generation.name = "form-generation";
+			generation.value = this.target.dataset.formGeneration;
+			this.target.append(generation);
+		}
 		this.target.addEventListener("click", this._click);
 		const hasDeferredOperation =
 			this.target.matches?.("[data-operation]") ||
@@ -437,6 +461,12 @@ export class FormElement {
 		return this.target?.querySelector('button[type="submit"]:not([data-role])');
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_migration_notice_survives_form_replacement_and_discard
+	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
+	 * @matrix form-migration : informational-notice
+	 */
 	async prepareReset({
 		nextTarget = this.initialTarget || this.target.cloneNode(true),
 		staged = {},
@@ -453,6 +483,7 @@ export class FormElement {
 			initialTarget: null,
 			form: null,
 			destroyables: [],
+			_migrationNotice: null,
 			...staged,
 		};
 		const stagedWidget = new Proxy(this, {
@@ -502,6 +533,7 @@ export class FormElement {
 	discardPreparedReset() {
 		if (!this._preparedReset) return;
 		const { state } = this._preparedReset;
+		state._migrationNotice?.destroy();
 		state.form?.destroy?.();
 		state.destroyables?.forEach((destroyable) => {
 			destroyable.destroy?.();
@@ -573,6 +605,20 @@ export class FormElement {
 		if (ownsRendererState && Object.hasOwn(response, "submission")) {
 			this.submission = response.submission;
 		}
+		if (
+			ownsRendererState &&
+			Object.hasOwn(response, "generation") &&
+			this.initialTarget
+		)
+			this.initialTarget.dataset.formGeneration = String(response.generation);
+		if (
+			ownsRendererState &&
+			Object.hasOwn(response, "migration_notice") &&
+			this.initialTarget
+		)
+			this.initialTarget.dataset.migrationNotice = JSON.stringify(
+				response.migration_notice,
+			);
 	}
 
 	async prereconcile() {
@@ -598,6 +644,8 @@ export class FormElement {
 	}
 
 	destroy() {
+		this._migrationNotice?.destroy();
+		this._migrationNotice = null;
 		this.form?.destroy();
 		this.destroyables.forEach((destroyable) => {
 			if (destroyable.destroy) destroyable.destroy();

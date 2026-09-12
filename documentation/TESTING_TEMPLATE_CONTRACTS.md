@@ -45,6 +45,11 @@ Errors include missing templates/macros, unsupported `lp-*` vocabulary, and
 controls whose routed target cannot be resolved. Frontend targets that need
 human interpretation and branch/loop-dependent markup are review findings.
 
+Shared modal macros with an `id="modal"` wrapper use `Modal._click()` for their
+Close controls. Those controls do not need a NavElement routing target. The
+exception applies only inside that modal macro; ordinary routed Close controls
+still require a resolvable target.
+
 `--check` fails on errors by default. `--fail-on warning` also fails on warning
 findings. Baselines use stable IDs:
 

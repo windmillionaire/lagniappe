@@ -66,7 +66,39 @@ listener.
 
 **`selectElement(id)`** -- sets `selectedElement`, highlights the item in the model panel, and shows its settings.
 
-**`removeElement()`** -- removes an unsaved draft element and its conditions as an undoable change. Saved field identities cannot be removed until the migration workflow is available. The server enforces the same saved-field, option-value and table-column compatibility constraints.
+**`removeElement()`** -- stages removal of an element and repairs its conditions as an undoable draft change. The **Replace or Delete** action opens the existing options panel below Model. It uses the standard site combobox for deterministic conversions and disabled AI choices, followed by side-by-side **Convert** and **Delete** buttons. Conversion retains the field ID. Removing saved options/columns also requires migration on Save. Reserved Page fields remain protected.
+
+The panel is titled **Replace or Delete** and uses the table column selector's
+type labels and icons. Its help button uses the shared help modal with the
+`form_element_changes` reference topic. The note explains draft Undo, conversion
+and clearing rules, preserved completed originals/history, and the informational
+notice shown after submission values change.
+Delete closes the options panel, removes the model element, clears its settings
+and reveals form settings in one view transition. A queued click cannot delete
+a different element if selection changes before the transition commits.
+
+**Replace With** shows one Select choice; options and Multiple are configured on
+the replacement before Save. Available conversions come from the backend's
+schema-only rules against the saved source field, so repeated draft replacements
+cannot offer a conversion that the final Save would reject. Checkboxes offer Text
+and Radio; external links offer Text and Bookmark; locations offer Text. The
+multiline Text component offers Text, plus AI-only Todo List and Table. Radio and
+Select offer Text or the other choice component, retaining option identities.
+Table and Todo List export to Textarea with Markdown formatting; Todo List keeps
+every item and its checked state as `- [ ]` / `- [x]`. Save uses the final schema,
+including the replacement's options and Multiple setting.
+
+Saved Input components offer compatible input subtypes and Textarea. Text inputs
+can become any other input subtype; Number, Email, Phone Number, Date and Time
+can become Text or Textarea. Unrelated typed conversions, such as Number to Time,
+are not offered.
+
+A green description below the selector updates on selection without reading
+submissions. Each reviewed pair has its own explanation; checkbox → Radio seeds
+`True`/`False` options. Internal links, signatures, Documents and Status have no
+replacement controls: the replacement paragraph and selector are replaced by the
+red **This component type cannot be converted** message, with Delete as the only
+action. AI choices remain visible and disabled.
 
 `BuilderDraft` keeps at most 100 commands covering schema, name and field order,
 with selection restored alongside them. A generated schema change is one command.
@@ -76,15 +108,55 @@ existing Document fields also leaves Form history unchanged. Form Undo/Redo
 preserves their current content. Adding/removing a Document field is a schema change, so its
 snapshot retains content and image references for restoring that field.
 
-Dirty status still includes all active HTML and form edits. Undo after Save can
-produce an unsaved draft and cannot bypass saved-identity constraints. Ordinary
-Save retains the current editor and its keyboard history. Undo/Redo, generation,
-or a Save response that changes the visible draft rebuilds the form and recreates
-editors; their local keyboard history does not survive that rebuild.
-Consequently, generated replacement HTML currently has no local Undo; supporting
-that requires applying it through a retained editor history.
+Dirty status includes all active HTML and form edits. Undo after Save creates a
+new draft; it never reverses saved submission values. Ordinary Save and draft
+rebuilds retain editors for surviving Document fields. Generated replacement HTML
+is applied through that editor's history, including when the editor had not yet
+been opened. Form Undo continues to affect schema rather than Document text.
+Generation is rejected if the draft changes while the response or editor load is
+pending.
 The toolbar Undo/Redo controls are hidden during Preview and return with their
 existing enabled/disabled states when Preview closes.
+
+### Saved representation changes
+
+The conversion catalog depends only on schemas. Opening Replace or Delete or selecting a
+conversion never enumerates submissions or displays affected-value counts.
+`draftPayload()` attaches versioned migration intent to Save when required; the
+server independently classifies and validates the change. Invalid deterministic
+values and unmatched options are cleared. Unsupported AI conversions cannot be
+submitted through the same endpoint.
+
+Save stages a durable `form-change` job. `FormChangeStatus` pauses editing and
+uses the shared PollingCoordinator to refresh authoritative status. Reload restores
+the pending draft; status routes are not cacheable. The builder's sync lifecycle
+pauses migration polling in hidden tabs or offline and immediately catches up on
+focus or reconnection, including when the builder was loaded in a background tab.
+A visible migration notice keeps the shared scheduler's bounded operation polling
+while the browser window is unfocused, for up to ten minutes. Detached or hidden
+notices do not qualify. Independent document sync remains suspended during blur.
+Returning requests a fresh poll cycle after any in-flight cycle, so a status read
+started before leaving cannot satisfy the return check with an older pending
+state. This also applies to later migrations saved in the same builder session.
+The existing notification
+slot shows **Schema migration in progress, Save temporarily disabled** until the
+job finishes. Save remains aria-disabled across acknowledgement and reload.
+There is no separate status panel or cancellation control. Failed updates retain
+the Form lock and show an inline Retry action in the same slot.
+The saved source definition remains published until
+all live submissions have moved to the target generation. See
+[BACKEND_JOBS.md](BACKEND_JOBS.md#deterministic-form-changes).
+
+Page and active Task forms show an informational **View changes** modal for stored
+`pre_migration` values. It lists changed values/cells only, with no selection or
+restore action. Completed Tasks use the editor-only original-submission notice
+and inline archive choices described in [FRONTEND_ELEMENTS.md](FRONTEND_ELEMENTS.md).
+Viewing the modal does not acknowledge or save anything. A successful
+submission update, completion or reopening clears the notice. This is separate
+from the existing completed-original selection and concurrent-edit review.
+The modal shares the concurrent-edit review's padded header/body and before/after
+cards. Failed conversions display **Value not able to be converted** in red italic
+text, including cleared table cells.
 
 ### Drag and Drop
 
@@ -135,13 +207,21 @@ of setting names, and each name maps to a `SettingsElement` factory function.
 | `status` | List of status message conditions with add/edit/remove |
 | `options` | List of radio/select options with add/edit/remove |
 | `columns` | List of table columns with add/edit/remove |
-| `input` | Radio group to select input subtype (text, tel, number, email, date, time) |
+| `input` | Input subtype radios for new fields; replacement guidance after Save |
 | `location` | Radio group to select link type (internal/external) |
 | `required` | Checkbox |
 | `multiple` | Checkbox (select elements) |
 | `checked` | Checkbox for default checked state |
 | `editor` | Toggle to open the rich text editor |
-| `deleteButton` | Delete button for removing the element |
+| `deleteButton` | Replace or Delete button opening the conversion/removal panel |
+
+New inputs can change subtype directly until their first Save. After Save, the
+Input Type selector becomes “Click **Replace or Delete** in order to change this
+input's type.” The button name is bold, without quotes. This refreshes immediately
+without rebuilding unrelated settings and also applies when reopening the builder
+or restoring a saved input with Undo.
+Protected page fields show **This input's type cannot be changed.** instead, since
+they have no Replace or Delete action.
 
 Settings changes update the element schema and model preview in real-time. The
 `input` and `change` event handlers on the settings panel delegate to `_set*`
@@ -209,8 +289,8 @@ new toggle or Builder teardown destroys its detached resources and cannot
 reopen the preview.
 The Preview switch keeps keyboard focus and a visible outline in both states.
 
-**Save button**: Uses `aria-disabled` while the draft matches the saved Form or a
-Save is pending. It remains focusable so keyboard focus survives acknowledgement;
+**Save button**: Uses `aria-disabled` while the draft matches the saved Form, a
+Save is pending, or a schema migration remains unresolved. It remains focusable so keyboard focus survives acknowledgement;
 the clean-draft and in-flight guards prevent redundant publication. Calling Save
 with no changes returns without publishing or rebuilding the open editor.
 Save always stays at full opacity. While pending, the standard spinner replaces
@@ -223,7 +303,7 @@ consuming its image uploads and rejects a changed saved baseline.
 Only an explicit successful response can acknowledge the submitted snapshot;
 if the live draft changed in the meantime, later edits remain unsaved. When the
 acknowledged content matches the current display, Save retains the model,
-settings and open condition/editor, refreshing newly saved restrictions in
+settings, preview and open condition/editor, refreshing newly saved restrictions in
 place. This preserves unsubmitted option/column buffers and focus. The existing
 restore path is used only when server normalization or saved image URLs change
 the displayed draft. Copy uses the complete current draft to create a separate

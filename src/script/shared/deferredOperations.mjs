@@ -248,7 +248,13 @@ export class DeferredOperationManager {
 		icon.setAttribute("aria-hidden", "true");
 		const phase = document.createElement("span");
 		phase.dataset.role = "deferred-phase";
-		phase.textContent = autofillTarget ? "Autofill queued" : "Waiting to start";
+		phase.textContent =
+			node.dataset.operationPhaseLabel ||
+			(node.dataset.operationScope === "form-change"
+				? "Schema migration in progress"
+				: autofillTarget
+					? "Autofill queued"
+					: "Waiting to start");
 		const separator = document.createElement("span");
 		separator.setAttribute("aria-hidden", "true");
 		separator.textContent = " · ";

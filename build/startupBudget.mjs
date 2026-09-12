@@ -5,7 +5,7 @@ export const STARTUP_BUDGETS = Object.freeze({
 	main: 40 * KIB,
 	shell: 64 * KIB,
 	core: 120 * KIB,
-	builder: 256 * KIB,
+	builder: 288 * KIB,
 });
 
 export const SHELL_VIEW_ENTRIES = Object.freeze([

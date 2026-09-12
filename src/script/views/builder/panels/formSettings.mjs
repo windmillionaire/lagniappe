@@ -308,6 +308,17 @@ export class FormSettings {
 
 		if (response?.ok === true && response.operations) {
 			try {
+				const revision = this.builder.draft.revision;
+				if (Object.keys(response.html_fields || {}).length)
+					await this.builder.prepareGeneratedDocuments(response.html_fields);
+				if (this._destroyed || this.builder._destroyed) return false;
+				if (revision !== this.builder.draft.revision) {
+					this.generateForm.messages.submit = "Regenerate";
+					this.generateForm.showError(
+						"Your draft changed while generation was running. Regenerate using your current draft.",
+					);
+					return false;
+				}
 				if (this.builder.draft.applyGeneration(response)) {
 					this.builder.restoreDraft();
 				}

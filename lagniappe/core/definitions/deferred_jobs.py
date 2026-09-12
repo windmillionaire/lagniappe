@@ -31,6 +31,7 @@ class DeferredJobType(Enum):
     AUTOFILL = "autofill"
     FILE_EXTRACT = "file-extract"
     FILE_SUMMARIZE = "file-summarize"
+    FORM_CHANGE = "form-change"
 
 
 class DeferredJobStatus(Enum):

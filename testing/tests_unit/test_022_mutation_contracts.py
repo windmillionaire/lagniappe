@@ -111,6 +111,7 @@ def test_permission_source_marker_is_consumed_only_after_durable_success(monkeyp
               if kind == "FORM" else TestEntities.get(kind, {"hash": "permission-source"}))
     source.properties.restricted_to.materialize(admin_only=True)
     assert source._permission_sources_changed is True
+    monkeypatch.setattr(database_get, "entity", lambda key: deepcopy(source.db) if key == source.key else None)
     monkeypatch.setattr(database_get, "form_users", lambda *_forms: [])
     monkeypatch.setattr(Entities, "fetch", lambda *items, request: list(items))
     monkeypatch.setattr(mutation_executor, "execute_post_commit", lambda _plan: ([], []))
@@ -715,11 +716,12 @@ def test_mixed_delete_keeps_form_archive_atomic_and_deletes_other_root_once(monk
     monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", save_mutations)
     monkeypatch.setattr(mutation_executor.database_utility, "delete_entities", delete_entities)
 
+    from lagniappe.core.tools.database import get as database_get
+    monkeypatch.setattr(database_get, "entity", lambda key: form_row if key == form.key else other_row)
     outcome = execute_mutation(plan)
 
     assert calls == [
-        ("save", [(archive, None)], {"guards": [guard], "deletes": [form]}),
-        ("delete", [other]),
+        ("save", [(archive, None)], {"guards": [(form.key, {"pending_form_change": None}), guard], "deletes": [form, other]}),
     ]
     assert outcome.complete is True
     assert outcome.completed_effects.count(MutationEffectType.DELETE) == 1

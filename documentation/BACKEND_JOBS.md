@@ -1,7 +1,7 @@
 # Backend Deferred Jobs
 
 Deferred jobs provide one durable execution model for report generation and
-execution, Page/Task autofill, file OCR, file summary, AI
+execution, deterministic Form changes, Page/Task autofill, file OCR, file summary, AI
 email handoff, and selected site work. Ingress, filter-cache maintenance,
 notification email, and scheduled task uncompletion use focused workflows.
 
@@ -121,6 +121,51 @@ The Administrator diagnostic projection contains bounded timing, dispatch,
 recovery, stage, safe entity references, and AI-generation summaries correlated
 by an opaque ID. It excludes prompts, parameters, checkpoints, generated
 content, authorization data, and provider/tool payloads.
+
+## Deterministic Form changes
+
+`form_changes.py` and `adapters/form_change.py` implement one Form update without
+an AI report or approval plan. Builder Save uses `start_writes()` to persist the
+Form's `pending_form_change`, DeferredJob, Notification and Form-scoped lock in
+one guarded transaction. The pending payload owns the proposed schema/content,
+conversion operations, actor timezone and source/target generations. Selection
+in the builder and Save itself do not query submissions.
+
+The worker enumerates all live Page/Task rows attached to the Form, including
+completed Tasks, in cursor batches of 50. Edit access to the Form authorizes its
+deterministic schema migration across all attached submissions, including those
+on restricted Pages. The job rechecks Form edit access; it does not require the
+actor to view or edit each Page/Task. Submission restrictions still govern viewing
+values, notices and history, and directly editing answers. Preflight validates
+generations and record sizes before application starts. Each application write
+checks the current job lease, Form owner marker and exact submission row, then
+patches only answer/generation/notice/receipt fields and required projections.
+Task links, list owners and caches use normal mutation effects. Rows with this
+change's receipt skip conversion on retry but retry their display effects.
+
+`pre_migration` retains the earliest before-value and schema for changed fields.
+Table notices display only changed cells. Completion envelopes are preserved;
+legacy completed Tasks receive an original envelope before conversion. TaskHistory
+is never a migration target. The source definition stays published until all
+rows are converted, then ordinary Form publication archives its retired generation
+and commits the target definition with a Save receipt.
+
+During application, readers select source or target schema by each row's
+generation. Typed filter/aggregate fields are withheld while their Form is pending.
+The mutation executor fences affected full saves, answer patches, attachment
+changes, completion/reopening and deletes at commit, including writers that began
+before the lock. New attachments adopt the published generation; stale answers
+must reconcile before saving.
+
+The builder exposes progress and Retry through its notification slot, with Save
+disabled and no cancellation control. The backend's pre-application cancellation
+guard still revokes the job, removes the pending marker and cleans owned attempt
+assets. After application starts, there is no bulk
+rollback: terminal failure/expiry keeps the durable pending marker and lock. Any
+current Form editor can Retry after a terminal or missing job. A fresh job takes
+over the same change ID, rechecks targets and skips converted receipts. This
+remains recoverable even after normal job retention removes the previous job.
+`before_cancel()` prevents generic cancellation from discarding partial work.
 
 ## Adapter checklist
 

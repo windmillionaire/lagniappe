@@ -8,7 +8,6 @@ PAGE (and similar) entities with ``SubmitterMixin`` plus an attached form for sc
 
 import json
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
@@ -110,9 +109,11 @@ def test_save_submission_discards_legacy_defaults_and_keeps_current_answers(get_
         "input-textab12": "unchanged",
         "input-numgh78": 7,
     }
+    task.db["pre_migration"] = json.dumps({"input-numgh78": {"value": "Before"}})
     task.save_submission()
 
     assert "default_submission" not in task.db
+    assert "pre_migration" not in task.db
     assert task.submission == {"input-textab12": "unchanged", "input-numgh78": 7}
 
 

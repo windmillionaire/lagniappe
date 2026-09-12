@@ -78,8 +78,9 @@ class IngressWizard:
     def continue_stage(self, next_stage=None, title=None):
         button = self.active_process.locator(self.NEXT_BUTTON)
         expect(button).to_be_visible()
-        with self.page.expect_response("**/next"):
+        with self.page.expect_response("**/next") as response:
             button.click()
+        assert response.value.ok, response.value.text()
         if next_stage:
             self.expect_stage(next_stage, title)
 

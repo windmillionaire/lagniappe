@@ -31,7 +31,8 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import PropertyError, ValidationError
-from lagniappe.core.tools.files.validate import process_csv
+from lagniappe.core.tools.files.validate import create_schema, process_csv
+from lagniappe.core.tools.form_drafts import validate_draft_schema
 from lagniappe.core.properties.file_ingress import ProcessCSV, Stage
 
 from testing.utility.test_entities import TestEntities
@@ -271,6 +272,29 @@ def test_import_wizard_story_restarts_downstream_choices_when_entity_type_change
     assert ingress_entity.properties.verify_import.section == {}
     assert ingress_entity.properties.importing.section == {}
     assert ingress_entity.properties.completed.section == {}
+
+
+# @matrix form ingress : schema-generation
+@pytest.mark.unit
+@pytest.mark.parametrize("form_type", ["page", "task"])
+@pytest.mark.parametrize("inferred_type", ["string", "number", "categorical"])
+def test_generated_import_schema_preserves_reserved_page_fields(form_type, inferred_type):
+    columns = {
+        "c-name": {"id": "c-name", "label": "Name", "type": inferred_type},
+        "c-description": {"id": "c-description", "label": "Description", "type": inferred_type},
+    }
+    rows = [{"c-name": "007", "c-description": "First line\nSecond line"}]
+    schema, _ = create_schema(columns, rows, form_type=form_type)
+    assert validate_draft_schema(schema, form_type) == schema
+    if form_type == "page":
+        assert schema == [
+            {"title": "Name", "id": "name", "type": "input", "input": "text"},
+            {"title": "Description", "id": "description", "type": "textarea"},
+        ]
+    else:
+        assert len(schema) == 1
+        assert schema[0]["title"] == "Description"
+        assert schema[0]["id"] not in {"name", "description"}
 
 
 # @matrix form ingress : choose-form default-form schema-generation

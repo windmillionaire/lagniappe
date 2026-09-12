@@ -23,7 +23,11 @@ from lagniappe.core.tools.tasks.ordering import page_task_roots
 from lagniappe.core.tools.form_drafts import archive_form_generation
 from testing.definitions import ModelTasks, Pages, Tasks, Users
 from testing.resources import Task
-from testing.utility.network import expect_successful_response, multipart_form_fields
+from testing.utility.network import (
+    expect_successful_response,
+    multipart_form_fields,
+    scoped_browser_route,
+)
 
 pytestmark = pytest.mark.e2e
 
@@ -167,9 +171,9 @@ def test_completion_views_follow_generation_and_archive_original_answers(get_use
         expect(history.locator("th[data-column='note']")).to_have_accessible_name("Updated question")
         expect(history.locator("td[data-column='note']")).to_have_text("Original answer")
 
-        # Fixture for a future converted generation. This does not exercise or
-        # claim an implemented conversion engine: it supplies an archived Form
-        # and distinct current values so the two read surfaces can be verified.
+        # Controlled generation fixture for the two completion read surfaces.
+        # The real conversion engine has separate builder/job coverage; ordinary
+        # saves correctly reject these synthetic generation jumps now.
         form = Entities.fetch_one(form.key, request=Fetch.root())
         archive_form_generation(form).save()
         form.schema = [
@@ -180,10 +184,13 @@ def test_completion_views_follow_generation_and_archive_original_answers(get_use
         form.save()
         form.generation = 1
         Entities.save_root(form, property_mask=("generation",))
+        from lagniappe.core.tools.database.utility import save_mutations
+
         for live in live_completions:
             live.entity = Entities.fetch_one(live.key, request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS))
             live.entity.db["submission"] = json.dumps({"note": "Current converted answer"})
             live.entity.db["generation"] = 1
+            save_mutations([(live.entity, ("submission", "generation"))])
             live.entity.save()
 
         for live, choice in zip(live_completions, ("unopened", "original", "modified")):
@@ -209,10 +216,10 @@ def test_completion_views_follow_generation_and_archive_original_answers(get_use
 
                 warning = task_form.locator("[data-role='submission-changed-warning']")
                 expect(warning).to_be_visible()
-                expect(warning).to_contain_text("This submission has changed.")
-                original_button = task_form.get_by_role("button", name="Show original submission", exact=True)
+                expect(warning).to_contain_text("This form was modified after this task was completed.")
+                original_button = task_form.get_by_role("button", name="View Original Submission", exact=True)
                 expect(original_button).to_be_visible()
-                choices = task_form.locator("[data-role='completion-submission-options']")
+                choices = warning.get_by_role("group", name="When Reopened", include_hidden=True)
                 expect(choices).to_be_hidden()
                 original = task_form.locator("[data-role='original-completion-detail']")
                 expect(original).to_be_hidden()
@@ -221,11 +228,11 @@ def test_completion_views_follow_generation_and_archive_original_answers(get_use
                     with expect_successful_response(user.page, method="GET", path=completion_path) as original_response:
                         original_button.click()
                     assert original_response.value.headers["cache-control"] == "no-store"
-                    expect(warning).to_be_hidden()
-                    expect(original_button).to_be_hidden()
+                    expect(warning).to_be_visible()
+                    expect(original_button).to_be_visible()
                     expect(choices).to_be_visible()
-                    save_original = choices.get_by_role("radio", name="Save original submission", exact=True)
-                    save_modified = choices.get_by_role("radio", name="Save modified submission", exact=True)
+                    save_original = choices.get_by_role("radio", name="Archive original submission", exact=True)
+                    save_modified = choices.get_by_role("radio", name="Archive modified submission", exact=True)
                     expect(save_original).to_be_checked()
                     expect(save_modified).not_to_be_checked()
                     expect(original).to_be_visible()
@@ -237,6 +244,15 @@ def test_completion_views_follow_generation_and_archive_original_answers(get_use
                     expect(current_question).to_be_hidden()
                     expect(current_answer).to_be_hidden()
                     expect(current_instructions).to_be_hidden()
+
+                    # The persistent link can show the loaded original again
+                    # after previewing the modified values, without a second fetch.
+                    save_modified.check()
+                    expect(current_answer).to_be_visible()
+                    original_button.click()
+                    expect(save_original).to_be_checked()
+                    expect(original).to_be_visible()
+                    expect(current_answer).to_be_hidden()
 
                     if choice == "modified":
                         # Only the final selected radio should determine the
@@ -302,7 +318,8 @@ def test_completion_views_follow_generation_and_archive_original_answers(get_use
             record = Entities.TASK_HISTORY.create(archived.entity, {
                 "submission": {"note": answer},
                 "generation": generation,
-                "completed_on": completed_on + timedelta(seconds=offset),
+                "completed_on": completed_on,
+                "created": completed_on + timedelta(seconds=offset),
             })
             record.save()
             later_histories.append(record)
@@ -462,10 +479,9 @@ def test_task_history_appears_after_completion_cycle(get_user):
     expect(attachment_link).to_have_attribute("href", re.compile(r"/files/.+"))
 
 
-# @matrix tasks : active-widget complete history-refresh settings uncomplete
+# @matrix tasks : active-widget complete history-refresh uncomplete
 # @template pages/tasks.html::task
-# @template pages/tasks.html::settings_form
-def test_uncomplete_from_loaded_task_history_opens_settings(get_user):
+def test_uncomplete_from_loaded_task_history_closes_task(get_user):
     user = get_user(Users.OWNER)
     task_name = f"History Uncomplete Task {uuid4().hex}"
     task = _create_combine_task(
@@ -484,10 +500,8 @@ def test_uncomplete_from_loaded_task_history_opens_settings(get_user):
     expect(history.locator("tbody tr[lp-entity]")).to_have_count(1)
     task._close_task()
     task.complete()
-    task._close_task()
-    # Reopen the already-loaded history without navigating or fetching it again.
-    task.element.locator(Task.TASK_HISTORY_TOGGLE).click()
-    expect(history).to_be_visible()
+    expect(task.element).to_have_attribute("data-open", "false")
+    history = _open_history(task)
     expect(history.locator("tbody tr[lp-entity]")).to_have_count(1)
     controller = _open_history_visibility(history)
     expect(controller.get_by_role("checkbox", name="Completed On", exact=True)).to_be_visible()
@@ -497,14 +511,141 @@ def test_uncomplete_from_loaded_task_history_opens_settings(get_user):
     task.uncomplete()
 
     expect(task.element).to_have_attribute("data-completed", "false")
-    expect(task.element).to_have_attribute("data-open", "TaskSettings")
+    expect(task.element).to_have_attribute("data-open", "false")
     settings = task.element.locator(Task.SETTINGS_FORM)
-    expect(settings).to_have_attribute("rendered", "")
-    expect(settings).to_be_visible()
+    expect(settings).not_to_have_attribute("rendered", "")
+    expect(settings).to_be_hidden()
     expect(task.element.locator(Task.TASK_HISTORY)).to_be_hidden()
 
     refreshed_history = _open_history(task)
     expect(refreshed_history.locator("tbody tr[lp-entity]")).to_have_count(2)
+
+
+# @matrix tasks : active-widget history-refresh uncomplete
+# @template pages/tasks.html::task_form
+# @template pages/tasks.html::task_history
+def test_reopening_discards_inactive_history_until_next_click(get_user):
+    user = get_user(Users.OWNER)
+    parent = Pages.test_create_page_task.get(user)
+    form = Entities.FORM.create({
+        "name": f"History refresh {uuid4().hex[:8]}", "form-type": "task",
+        "schema": [{"id": "answer", "type": "input", "title": "Answer"}],
+    })
+    form.save()
+    task = _create_combine_task(
+        user, parent.entity, f"History refresh {uuid4().hex[:8]}",
+        form=form, submission={"answer": "First completion"},
+    )
+    user.go(task)
+    parent.complete_task(task)
+    parent.uncomplete_task(task)
+    history = _open_history(task)
+    expect(history.locator("tbody tr[lp-entity]")).to_have_count(1)
+
+    task.task_form.locator("input[name='answer']").fill("Second completion")
+    parent.complete_task(task)
+    expect(task.element).to_have_attribute("data-open", "false")
+    history = _open_history(task)
+    expect(history.locator("tbody tr[lp-entity]")).to_have_count(1)
+    expect(task.task_form).to_contain_text("Second completion")
+    expect(history).to_be_hidden()
+    expect(history.locator("tbody tr[lp-entity]")).to_have_count(1)
+
+    history_requests = []
+    history_path = f"/tasks/{task.key}/history"
+
+    def track_history(request):
+        if request.method == "GET" and request.url.split("?", 1)[0].endswith(history_path):
+            history_requests.append(request)
+
+    user.page.on("request", track_history)
+    try:
+        parent.uncomplete_task(task)
+        expect(task.element).to_have_attribute("data-open", "false")
+        expect(task.element.locator(Task.TASK_FORM)).to_be_hidden()
+        expect(task.task_form.locator("input[name='answer']")).to_have_value("")
+        expect(history).to_be_hidden()
+        assert history_requests == [], "Reopening must not fetch History"
+
+        refreshed = _open_history(task)
+        assert len(history_requests) == 1
+        expect(refreshed.locator("tbody tr[lp-entity]")).to_have_count(2)
+        controller = _open_history_visibility(refreshed)
+        controller.get_by_role("checkbox", name="Answer", exact=True).check()
+        expect(refreshed.locator("td[data-column='answer']")).to_have_text(
+            ["Second completion", "First completion"]
+        )
+    finally:
+        user.page.remove_listener("request", track_history)
+
+
+# @matrix tasks : active-widget complete uncomplete update-state
+# @template pages/tasks.html::task
+# @template pages/tasks.html::task_form
+def test_completion_waits_for_acceptance_and_moves_closed_task(get_user, browser_failures):
+    user = get_user(Users.OWNER)
+    parent = Pages.test_create_page_task.get(user)
+    form = Entities.FORM.create({
+        "name": f"Completion transition {uuid4().hex[:8]}", "form-type": "task",
+        "schema": [{"id": "answer", "type": "input", "title": "Answer"}],
+    })
+    form.save()
+    task = _create_combine_task(
+        user, parent.entity, f"Completion transition {uuid4().hex[:8]}", form=form,
+    )
+    user.go(task)
+    task.task_form.locator("input[name='answer']").fill("Keep this answer")
+    row = user.locate(f"li[lp-component][data-key='{task.key}']")
+    path = f"/tasks/{task.key}/update"
+    held = []
+
+    def hold_update(route):
+        held.append(route)
+
+    with scoped_browser_route(user.page.context, f"**{path}", hold_update):
+        for completed in (False, True):
+            # Hold the response in each direction: the current form stays open,
+            # and a server rejection must preserve it and its entered values.
+            for rejected in (True, False):
+                with user.page.context.expect_event(
+                    "request",
+                    predicate=lambda request: request.method == "PUT" and request.url.endswith(path),
+                ):
+                    row.locator("[data-role='complete-toggle']").click()
+                expect(row).to_have_attribute("data-completed", str(completed).lower())
+                expect(row).to_have_attribute("data-open", "TaskForm")
+                expect(row.locator(Task.TASK_FORM)).to_be_visible()
+                assert len(held) == 1
+                pending = held.pop()
+                if rejected:
+                    with browser_failures.expect_http_error(user, status=422, path=path):
+                        pending.fulfill(
+                            status=422, content_type="text/plain",
+                            body="Completion change rejected; review your answer.",
+                        )
+                        expect(row.locator("[data-role='error']:visible")).to_contain_text(
+                            "Completion change rejected"
+                        )
+                    expect(row).to_have_attribute("data-open", "TaskForm")
+                    expect(row).to_have_attribute("data-completed", str(completed).lower())
+                    if completed:
+                        expect(row.locator(Task.TASK_FORM)).to_contain_text("Keep this answer")
+                    else:
+                        expect(row.locator("input[name='answer']")).to_have_value("Keep this answer")
+                else:
+                    with expect_successful_response(
+                        user.page, method="PUT", path=path, entity_key=task.key,
+                    ):
+                        pending.continue_()
+                    expect(row).to_have_attribute("data-completed", str(not completed).lower())
+                    expect(row).to_have_attribute("data-open", "false")
+                    expect(row.locator(Task.TASK_FORM)).to_be_hidden()
+
+            destination = parent.active_task_list if completed else parent.completed_task_list
+            task.element = destination.get_item(task)
+            expect(task.element).to_be_visible()
+            if not completed:
+                expect(task.task_form).to_contain_text("Keep this answer")
 
 
 # @matrix table-controls : column-visibility persistence
@@ -618,6 +759,75 @@ def test_task_form_field_fills_from_latest_history(get_user):
     assert "default_submission" not in saved_task.db
     history = _open_history(task)
     expect(history.locator("tbody tr[lp-entity]")).to_have_count(2)
+
+
+# @matrix tasks : history-fill latest-submission incompatible-value
+# @template pages/tasks.html::task_form
+def test_history_fill_converts_selected_fields_and_reports_invalid_values(get_user, browser_failures):
+    user = get_user(Users.OWNER)
+    parent = Pages.test_create_page_task.get(user)
+    source = [{"id": key, "type": "input", "input": "text", "title": title}
+              for key, title in (("quantity", "Quantity"), ("invalid", "Invalid quantity"), ("notes", "Notes"))]
+    form = Entities.FORM.create({
+        "name": f"History conversion {uuid4().hex[:8]}", "form-type": "task", "schema": source,
+    })
+    form.save()
+    task = Entities.TASK.create({
+        "name": f"History conversion {uuid4().hex[:8]}", "page": parent.entity,
+        "form": form, "submission": {"quantity": "7", "invalid": "not a number", "notes": "Keep this"},
+    })
+    task = Entities.fetch_one(task, request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS))
+    task.save()
+    task.complete(user=user.entity)
+    task.save()
+    # Archived-generation fixture; this story tests requesting individual old
+    # answers after reopening. Builder/job conversion has its own browser story.
+    archive_form_generation(form).save()
+    form.schema = [{**field, "input": "number" if field["id"] != "notes" else "text"} for field in source]
+    form.generation = 1
+    from lagniappe.core.tools.database.utility import save_mutations
+
+    save_mutations([(form, ("schema", "generation"))])
+    task.db["generation"] = 1
+    task.db["submission"] = json.dumps({"quantity": 7, "notes": "Keep this"})
+    save_mutations([(task, ("generation", "submission"))])
+    task.save()
+    resource = Task(user=user)
+    resource.entity = task
+    user.go(resource)
+    resource.task_form.get_by_role("button", name="View Original Submission", exact=True).click()
+    expect(resource.task_form.get_by_role("radio", name="Archive original submission", exact=True)).to_be_checked()
+    parent.uncomplete_task(resource)
+    task_form = resource.task_form
+    expect(task_form.get_by_text("Saved answers use a different form definition", exact=False)).to_have_count(0)
+    expect(task_form.locator("[data-role='history-fill-error']")).to_have_count(0)
+    fields = {key: task_form.locator(f"[id^='{key}-'].form-element") for key in ("quantity", "invalid", "notes")}
+    for field in fields.values():
+        expect(field.get_by_role("button", name="Fill from latest history", exact=True)).to_be_visible()
+
+    route = f"/tasks/{task.urlsafe_key}/history/latest-submission"
+    with expect_successful_response(user.page, method="GET", path=route):
+        fields["quantity"].get_by_role("button", name="Fill from latest history", exact=True).click()
+    expect(fields["quantity"].locator("input")).to_have_value("7")
+    invalid_button = fields["invalid"].get_by_role("button", name="Fill from latest history", exact=True)
+    with browser_failures.expect_http_error(user, status=422, path=route):
+        with user.page.expect_response(lambda response: response.url.endswith(f"{route}?field=invalid")) as rejected:
+            invalid_button.click()
+        assert rejected.value.status == 422
+        expect(task_form.locator("[data-role='error']")).to_have_text(
+            'The saved value for "Invalid quantity" cannot be converted to the current field type.'
+        )
+    expect(fields["invalid"].locator("input")).to_have_value("")
+    expect(invalid_button).to_be_enabled()
+    fields["notes"].get_by_role("button", name="Fill from latest history", exact=True).click()
+    expect(fields["notes"].locator("input")).to_have_value("Keep this")
+    expect(task_form.locator("[data-role='error']")).to_be_hidden()
+    expect(fields["quantity"].locator("input")).to_have_value("7")
+    assert Entities.fetch_one(task.key, request=Fetch.root()).properties.submission.value == {}
+    history = _open_history(resource)
+    controller = _open_history_visibility(history)
+    controller.get_by_role("checkbox", name="Invalid quantity", exact=True).check()
+    expect(history.locator("td[data-column='invalid']")).to_have_text("not a number")
 
 
 # @matrix tasks : element-matrix history-fill latest-submission live-update

@@ -1,4 +1,5 @@
 const CONDITION_REGISTRY = {
+	modify: () => import("./modify"),
 	html: () => import("./html"),
 	status: () => import("./status"),
 	visibility: () => import("./visibility"),
