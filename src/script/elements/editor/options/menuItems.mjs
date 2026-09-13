@@ -6,8 +6,11 @@ import { setIcon } from "../../../shared/icons";
  * @tests tests_js/test_033_editor_menu_items.py::test_editor_menu_item_serializes_current_active_state
  * @tests tests_js/test_033_editor_menu_items.py::test_editor_inline_code_menu_item_toggles_from_local_active_state
  * @tests tests_e2e/004_projects/test_004d_document.py::test_inline_code_style_formats_selected_text_and_persists
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_task_list_persists
+ * @tests tests_e2e/004_projects/test_004j_editor_menus.py::test_list_menu_formats_selection
  * @matrix editor : dropdown-rerender menu-active-state
  * @matrix editor : formatting inline-code selection toggle
+ * @matrix editor : task-list list-menu
  */
 class ToolbarMenuItem {
 	constructor(toolbar) {
@@ -51,6 +54,7 @@ class ToolbarMenuItem {
 	init(settings) {
 		Object.assign(this, settings);
 		this.button.role = "option";
+		this.button.type = "button";
 		this.button.dataset.active = "false";
 		this.button.className = `${STYLES.dropdown.option.action} group`;
 
@@ -65,6 +69,12 @@ class ToolbarMenuItem {
 		this.button = option;
 		const editor = this.toolbar.editor;
 		const chain = editor.chain().focus();
+		if (
+			editor.isEmpty &&
+			["bulletList", "orderedList", "taskList"].includes(this.name)
+		) {
+			chain.setTextSelection(1);
+		}
 
 		// Use local toggle intent so the command always mirrors the clicked state.
 		if (this.active) {
@@ -113,6 +123,27 @@ class ToolbarMenuItem {
 }
 
 /**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004j_editor_menus.py::test_table_menu_creates_edits_and_saves
+ * @tests tests_e2e/004_projects/test_004j_editor_menus.py::test_table_menu_edits_pasted_table
+ * @matrix editor : table-menu
+ */
+class TableMenuItem extends ToolbarMenuItem {
+	isAvailable() {
+		const editor = this.toolbar.editor;
+		if (editor.isDestroyed || !editor.isEditable) return false;
+		const inTable = editor.isActive("table");
+		if (this.command === "insertTable" ? inTable : !inTable) return false;
+		return editor.can()[this.command](this.args);
+	}
+
+	_onClick(option) {
+		if (!this.isAvailable()) return;
+		super._onClick(option);
+	}
+}
+
+/**
  * @testable infrastructure
  */
 class ClearFormatMenuItem extends ToolbarMenuItem {
@@ -140,6 +171,18 @@ export {
 	FormMenuItem as addImage, // Insert
 	FormMenuItem as addYouTube, // Insert
 	FormMenuItem as generateText, // Insert
+	TableMenuItem as insertTable, // Table
+	TableMenuItem as toggleHeaderRow, // Table
+	TableMenuItem as addRowBefore, // Table
+	TableMenuItem as addRowAfter, // Table
+	TableMenuItem as addColumnBefore, // Table
+	TableMenuItem as addColumnAfter, // Table
+	TableMenuItem as deleteRow, // Table
+	TableMenuItem as deleteColumn, // Table
+	TableMenuItem as deleteTable, // Table
+	ToolbarMenuItem as toggleBulletList, // Lists
+	ToolbarMenuItem as toggleOrderedList, // Lists
+	ToolbarMenuItem as toggleTaskList, // Lists
 	ToolbarMenuItem as toggleUnderline, // Style
 	ToolbarMenuItem as toggleStrike, // Style
 	ToolbarMenuItem as toggleCode, // Style

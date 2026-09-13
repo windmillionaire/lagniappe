@@ -154,6 +154,22 @@ stacking; its direct Material span owns icon geometry. `icons.css` is the sole
 owner of the icon box, glyph size, line height, and optical offsets. Component
 styles may position, color, stack, or hide the icon.
 
+## Document editor menus
+
+Document editor toolbar menus use compact icon-and-arrow triggers at every
+viewport size, with History last and Align immediately before Insert. History
+opens from the start edge of its trigger, subject to viewport collision handling.
+Buttons and menus share one wrapping row so each control uses the available
+width, including Style and Headings beside the buttons on smaller screens.
+Menu glyphs use the standard dropdown size rather than the larger toolbar size.
+Lists contains the bullet, ordered, and task list toggles. Table inserts a
+three-by-three table with a shaded header row when the
+cursor is outside a table; inside a new or pasted table it offers applicable
+row/column insertion and deletion actions, Toggle Header Row, and Delete Table.
+The header toggle changes the first row, keeping its contents, even when the
+cursor is in a body cell. Menu actions
+retain the editor selection and use the existing editor commands and autosave.
+
 ## Messaging and mention elements
 
 `MessageComposer` is a shared modal form with a single User `FacetsBox`, a

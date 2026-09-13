@@ -92,7 +92,7 @@ STYLES = {
 				"default": "group/toolbar mt-4 border-base-light/50 bg-base-bg"
 			},
 			"divider": "mx-1 hidden h-6 w-px bg-base-light/50 md:block md:first:hidden md:last:hidden",
-			"section": "flex flex-row items-center gap-2",
+			"section": "flex flex-row flex-wrap items-center gap-2",
 			"tool": "grid size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm",
 			"menu": "flex min-h-8 w-fit flex-row items-center gap-1 rounded-md bg-white outline outline-base-light/50 px-2 py-1 text-center text-base font-semibold shadow-sm",
 			"optionHeader": "text-lg font-bold pt-2 text-kind-default pb-1",
@@ -107,7 +107,6 @@ STYLES = {
 			"iconContext": "editor-toolbar-icon-context",
 			"portalIconContext": "editor-toolbar-portal-icon-context",
 			"menuIcon": "editor-toolbar-menu-icon",
-			"historyIcon": "editor-toolbar-history-icon",
 			"caret": "editor-toolbar-caret opacity-50"
 		},
 		"container": "html-content min-h-50 px-4 pt-6 pb-4 focus:outline-none sm:px-6 sm:pt-8 sm:pb-6"

@@ -142,7 +142,7 @@ def test_formatting_persists(get_user):
     EditorMenuOptions.HEADING_1.click(editor)
 
     editor.enter()
-    EditorToggleOptions.BULLET_LIST.toggle(editor)
+    EditorMenuOptions.BULLET_LIST.click(editor)
     editor.type_text("First item").press("Enter")
     editor.type_text("Second item")
 
@@ -493,7 +493,7 @@ def test_task_list_persists(get_user):
     editor = project.editor
     editor.clear_text()
 
-    EditorToggleOptions.TASK_LIST.toggle(editor)
+    EditorMenuOptions.TASK_LIST.click(editor)
     editor.type_text("First task").press("Enter")
     editor.type_text("Second task")
     editor.wait_for_render()

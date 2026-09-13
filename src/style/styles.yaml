@@ -295,7 +295,7 @@ editor:
       intent: divider presentation within editor toolbar
       surfaces: [frontend]
     section:
-      classes: flex flex-row items-center gap-2
+      classes: flex flex-row flex-wrap items-center gap-2
       intent: section presentation within editor toolbar
       surfaces: [frontend]
     tool:
@@ -350,7 +350,7 @@ editor:
       css: [src/style/icons.css]
     portalIconContext:
       classes: editor-toolbar-portal-icon-context
-      intent: extends matched editor icon geometry into body-portaled toolbar menus and form panels
+      intent: matches standard dropdown icon sizing in body-portaled editor menus and form panels
       surfaces: [frontend]
       hooks: [editor-toolbar-portal-icon-context]
       css: [src/style/icons.css]
@@ -359,12 +359,6 @@ editor:
       intent: optically centers primary toolbar menu glyphs
       surfaces: [frontend]
       hooks: [editor-toolbar-menu-icon]
-      css: [src/style/icons.css]
-    historyIcon:
-      classes: editor-toolbar-history-icon
-      intent: optically centers the document history glyph within its toolbar control
-      surfaces: [frontend]
-      hooks: [editor-toolbar-history-icon]
       css: [src/style/icons.css]
     caret:
       classes: editor-toolbar-caret opacity-50

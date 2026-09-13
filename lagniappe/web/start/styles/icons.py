@@ -370,6 +370,11 @@ ICONS = {
 		"glyph": "link_2",
 		"fill": 1
 	},
+	"lists": {
+		"glyph": "lists",
+		"fill": 0,
+		"weight": 300
+	},
 	"listOl": {
 		"glyph": "format_list_numbered",
 		"fill": 1
@@ -642,7 +647,27 @@ ICONS = {
 	},
 	"table": {
 		"glyph": "table",
-		"fill": 1
+		"fill": 0
+	},
+	"tableHeader": {
+		"glyph": "table_chart",
+		"fill": 0
+	},
+	"tableRowAbove": {
+		"glyph": "add_row_above",
+		"fill": 0
+	},
+	"tableRowBelow": {
+		"glyph": "add_row_below",
+		"fill": 0
+	},
+	"tableColumnLeft": {
+		"glyph": "add_column_left",
+		"fill": 0
+	},
+	"tableColumnRight": {
+		"glyph": "add_column_right",
+		"fill": 0
 	},
 	"tableEdit": {
 		"glyph": "table_edit",

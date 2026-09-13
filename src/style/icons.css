@@ -266,21 +266,22 @@ button.tab-icon .icon {
 	--icon-size: var(--icon-2xl-glyph-size);
 }
 
-/* @style editor.toolbar.iconContext editor.toolbar.portalIconContext */
-.editor-toolbar-icon-context .icon,
-.editor-toolbar-portal-icon-context .icon {
+/* @style editor.toolbar.iconContext */
+.editor-toolbar-icon-context .icon {
 	--icon-box-size: var(--icon-base-box-size);
 	--icon-default-size: var(--icon-lg-glyph-size);
 	--icon-size: var(--icon-lg-glyph-size);
 }
 
-/* @style editor.toolbar.menuIcon */
-.editor-toolbar-icon-context .editor-toolbar-menu-icon {
-	--icon-offset-y: 1px;
+/* @style editor.toolbar.portalIconContext */
+.editor-toolbar-portal-icon-context .icon {
+	--icon-box-size: var(--icon-base-box-size);
+	--icon-default-size: var(--icon-base-glyph-size);
+	--icon-size: var(--icon-base-glyph-size);
 }
 
-/* @style editor.toolbar.historyIcon */
-.editor-toolbar-icon-context .editor-toolbar-history-icon {
+/* @style editor.toolbar.menuIcon */
+.editor-toolbar-icon-context .editor-toolbar-menu-icon {
 	--icon-offset-y: 1px;
 }
 

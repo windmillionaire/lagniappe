@@ -1,2 +1,36 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.1.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="ec1ed9af-20ea-49a9-8925-634a986a59a0",e._sentryDebugIdIdentifier="sentry-dbid-ec1ed9af-20ea-49a9-8925-634a986a59a0");}catch(e){}}();const l=async e=>{const t={mutations:!!e.elt.querySelector("[lp-offline]"),sync:!!e.elt.querySelector("[lp-sync]")};if(!globalThis.indexedDB)return{mutations:!1,sync:!1};if(typeof globalThis.indexedDB.databases!="function")return t;try{if(!(await globalThis.indexedDB.databases()).some(({name:s})=>s==="offline-db"))return{mutations:!1,sync:!1};const{getAllOfflineRecords:o}=await import("./offline.js?v=b3d8f43a"),a=await o();return{mutations:!!a.mutations?.length,sync:!!a.sync?.length}}catch(n){return e.reportStartupError(n,e.elt,"offline-work-inspection"),t}};export{l as inspectOfflineWork};
 /*! Third-party licenses: /third-party-licenses.txt */
+/**
+ * Inspect persisted offline work without loading either manager into the Core
+ * startup closure. Database enumeration avoids opening or creating storage for
+ * users who have never used offline behavior.
+ *
+ * @testable false
+ * @covered-by src/script/views/base/services.mjs::initializeCoreServices
+ * @reason lazy capability probe controls manager loading without changing queue semantics
+ */
+const inspectOfflineWork = async (view) => {
+	const fallback = {
+		mutations: Boolean(view.elt.querySelector("[lp-offline]")),
+		sync: Boolean(view.elt.querySelector("[lp-sync]")),
+	};
+	if (!globalThis.indexedDB) return { mutations: false, sync: false };
+	if (typeof globalThis.indexedDB.databases !== "function") return fallback;
+
+	try {
+		const databases = await globalThis.indexedDB.databases();
+		if (!databases.some(({ name }) => name === "offline-db")) {
+			return { mutations: false, sync: false };
+		}
+		const { getAllOfflineRecords } = await import('./offline.js?v=b7c13b49');
+		const records = await getAllOfflineRecords();
+		return {
+			mutations: Boolean(records.mutations?.length),
+			sync: Boolean(records.sync?.length),
+		};
+	} catch (error) {
+		view.reportStartupError(error, view.elt, "offline-work-inspection");
+		return fallback;
+	}
+};
+
+export { inspectOfflineWork };

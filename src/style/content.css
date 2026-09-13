@@ -25,6 +25,7 @@
 }
 
 /* @style dropdown.option.flow dropdown.search.link dropdown.search.result */
+.dropdown-option-flow > span:last-child,
 .dropdown-option-flow > p:first-child > span:last-child {
 	vertical-align: middle;
 }

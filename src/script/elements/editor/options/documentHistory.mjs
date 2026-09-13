@@ -1,7 +1,7 @@
 import { STYLES } from "styles";
 import { Modal, request } from "../../../shared";
-import { setIcon } from "../../../shared/icons";
 import { Dropdown } from "../../combobox/dropdown";
+import { createMenuButton } from "../dropdowns";
 
 /**
  * @testable true
@@ -13,7 +13,7 @@ class DocumentHistoryButton {
 	constructor(toolbar) {
 		this.toolbar = toolbar;
 		this.active = false;
-		this.button = document.createElement("button");
+		this.button = null;
 		this._dropdown = null;
 		this._restore = this._restore.bind(this);
 		this._loadEntries = this._loadEntries.bind(this);
@@ -22,17 +22,12 @@ class DocumentHistoryButton {
 
 	init(settings) {
 		Object.assign(this, settings);
-		this.button.title = this.title;
-		this.button.className = `${STYLES.editor.toolbar.tool}`;
-
-		const iconElement = document.createElement("span");
-		setIcon(iconElement, this.icon, STYLES.editor.toolbar.historyIcon);
-		this.button.replaceChildren(iconElement);
+		this.button = createMenuButton(settings);
 
 		this._dropdown = new Dropdown(this.button);
 		this._dropdown.init({
 			loadOptions: this._loadEntries,
-			placement: "bottom-end",
+			placement: "bottom-start",
 			styles: {
 				panel: `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext}`,
 			},

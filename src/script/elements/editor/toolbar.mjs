@@ -225,14 +225,14 @@ export class Toolbar {
 
 	async _createTools() {
 		const toolRow = document.createElement("div");
-		toolRow.className = `${STYLES.editor.toolbar.tools}`;
+		toolRow.className = STYLES.editor.toolbar.section;
 
 		const primaryTools = document.createElement("div");
-		primaryTools.className = STYLES.editor.toolbar.section;
+		primaryTools.className = "contents";
 		toolRow.appendChild(primaryTools);
 
 		const menuTools = document.createElement("div");
-		menuTools.className = STYLES.editor.toolbar.section;
+		menuTools.className = "contents";
 		menuTools.dataset.role = "toolbar-menus";
 		toolRow.appendChild(menuTools);
 		this.element.appendChild(toolRow);
@@ -247,7 +247,7 @@ export class Toolbar {
 				return await this._createToolbarMenu(menu);
 			}),
 		);
-		menuTools.append(...dropdownButtons);
+		menuTools.append(...dropdownButtons.filter(Boolean));
 	}
 
 	_toolAllowed(tool) {
@@ -274,6 +274,7 @@ export class Toolbar {
 	}
 
 	async _createToolbarMenu(menu) {
+		if (menu.command) return this._createToolbarButton(menu);
 		const menuItems = menu.items.filter((item) => this._toolAllowed(item));
 		const items = await Promise.all(
 			menuItems.map((item) => this._loadOption(item.command, item)),
@@ -287,7 +288,9 @@ export class Toolbar {
 			}
 		});
 
-		const dropdownButton = toolbarDropdown(menu, items);
+		const dropdownButton = toolbarDropdown(menu, items, () =>
+			this._editorState(),
+		);
 		return dropdownButton;
 	}
 
