@@ -109,7 +109,7 @@ class FormChangeAdapter(DeferredJobAdapter):
                         for item in change["operations"]
                         if item["rule"] == "ai"
                     }
-                    if change.get("ai_mode") == "external":
+                    if change.get("report"):
                         placeholders = {
                             item["schema_id"]: item
                             for item in self.report_candidates(context, change)
@@ -154,7 +154,7 @@ class FormChangeAdapter(DeferredJobAdapter):
                 and scope["scope_fingerprint"] != change["scope_fingerprint"]
             ):
                 raise ValidationError(STALE_MESSAGE)
-            if change.get("ai_mode") == "external":
+            if change.get("report"):
                 validate_candidates(
                     self.report_candidates(context, change), scope, change["operations"]
                 )
@@ -229,6 +229,7 @@ class FormChangeAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_004l_form_schema_updates.py::test_worker_checkpoints_ai_before_write_and_external_execution_is_provider_free
     # @matrix form-migration : ai-checkpoint external-provider-free retry
+    # @pair form-migration:ai-telemetry
     def prepare_ai_target(self, context, change, target):
         from lagniappe.core.tools import form_schema_updates as updates
         from lagniappe.core.tools.ai.form_conversion import generate_conversions
@@ -254,7 +255,7 @@ class FormChangeAdapter(DeferredJobAdapter):
         saved = context.checkpoint.get("ai_batch") or {}
         if saved.get("entity") == target.urlsafe_key and saved.get("sources") == hashes:
             return saved["values"]
-        if change.get("ai_mode") == "external":
+        if change.get("report"):
             prepared = {
                 item["schema_id"]: item
                 for item in self.report_candidates(context, change)
@@ -278,6 +279,7 @@ class FormChangeAdapter(DeferredJobAdapter):
                 job_type=context.job.job_type,
                 attempt=context.job.attempt,
                 contract_version=context.job.job_version,
+                telemetry_id=getattr(context.job, "telemetry_id", None),
                 execution_control=context.execution_control,
             ):
                 try:
@@ -307,7 +309,7 @@ class FormChangeAdapter(DeferredJobAdapter):
 
     # @testable false
     # @covered-by lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter.prepare_ai_target
-    # @reason external output is loaded only from the immutable approved report
+    # @reason prepared output is loaded only from the immutable approved report
     def report_candidates(self, context, change):
         from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 

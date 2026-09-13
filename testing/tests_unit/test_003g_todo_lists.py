@@ -44,7 +44,7 @@ def test_todo_list_submission_projections():
     assert field.value == expected
     assert field.form_value == expected
     assert field.db_value == expected
-    assert field.ai_value == expected["items"]
+    assert field.ai_value == expected
     assert field.search_key == ["Work", "Work"]
     assert field.search_value == ["First step", "Second step"]
     assert field.column_value == "1 of 2 complete"

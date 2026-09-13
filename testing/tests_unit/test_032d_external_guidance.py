@@ -32,9 +32,8 @@ def test_schema_conversion_guidance_is_selected_by_trusted_invocation():
         actor,
         external=True,
     )
-    assert "conversion_instructions" in onsite["guidelines"]
-    assert "data.conversions" not in onsite["guidelines"]
-    assert "include_values=true" not in onsite["guidelines"]
+    assert onsite == external
+    assert "include_values=true for scalar before/after evidence" in onsite["guidelines"]
     assert "data.conversions" in external["guidelines"]
     assert "unresolved_reason" in external["guidelines"]
     assert "conversion_instructions" not in external["guidelines"]
@@ -48,8 +47,8 @@ def test_schema_conversion_guidance_is_selected_by_trusted_invocation():
     public_schema = schema.external_report_proposal_response_schema(
         allowed_actions=["update_form_schema"]
     )
-    assert '"conversions"' not in json.dumps(native_schema)
-    assert '"conversion_instructions"' in json.dumps(native_schema)
+    assert '"conversions"' in json.dumps(native_schema)
+    assert '"conversion_instructions"' not in json.dumps(native_schema)
     assert '"conversion_instructions"' not in json.dumps(public_schema)
     assert '"conversions"' in json.dumps(public_schema)
 
@@ -80,8 +79,8 @@ def test_schema_guidance_filters_definitions_without_submission_rules(external):
         assert "Input element values are strings" not in text
         if task == "schema_evolution":
             assert "scope_fingerprint" in text
-            assert ("finite JSON numbers" in text) is external
-            assert ("conversion_instructions" in text) is not external
+            assert "finite JSON numbers" in text
+            assert "conversion_instructions" not in text
         else:
             assert "data.conversions" not in text
             assert "conversion_instructions" not in text
@@ -279,9 +278,10 @@ def test_external_duplicate_check_reuses_evidence_without_a_filename_search_ritu
     assert "server performs focused form completion afterward" in internal
 
 
-# @matrix ai agent-api : guidelines tool-dispatch
+# @matrix ai agent-api : guidelines tool-dispatch provider-neutral-schema tool-catalog
+# @source lagniappe/core/tools/ai/functions.py::tool_catalog
 @pytest.mark.unit
-def test_external_search_dispatch_selects_candidates_without_changing_provider_default(
+def test_search_dispatch_and_catalog_match_across_ai_entry_points(
     monkeypatch,
 ):
     calls = []
@@ -299,13 +299,15 @@ def test_external_search_dispatch_selects_candidates_without_changing_provider_d
         "search_entities", arguments, actor, external=True
     )
     assert native == public
-    assert calls == [(arguments, actor, False), (arguments, actor, True)]
+    assert calls == [(arguments, actor, True), (arguments, actor, True)]
 
     native_definition = deepcopy(functions.tool_catalog(names=["search_entities"])[0])
     external_definition = functions.tool_catalog(
         names=["search_entities"], transport="rest"
     )[0]
     assert external_definition["description"] == search.CANDIDATE_SEARCH_DESCRIPTION
+    assert native_definition == external_definition
+    assert functions.DECLARATIONS["search_entities"].description == external_definition["description"]
     assert (
         "keyword candidates"
         in external_definition["input_schema"]["properties"]["parent_id"]["description"]

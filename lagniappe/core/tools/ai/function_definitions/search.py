@@ -97,16 +97,7 @@ def _format_detail_hashes(details):
 
 SEARCH_ENTITIES = types.FunctionDeclaration(
     name="search_entities",
-    description=(
-        "Search the workspace by keyword for pages, tasks, categories, "
-        "projects, files, and forms. Returns names, types, hash tokens, and "
-        "matching snippets. Use the returned hash with get_entity to load full details, "
-        "get_file to retrieve file content, or get_category_pages to load "
-        "sample pages from a category. Also useful for finding forms by name "
-        "across the entire workspace. Use match_mode=exact_name for a bounded, "
-        "case-insensitive full-name lookup. Exact Page lookup may also be scoped "
-        "to one Category with parent_id; exact matches include permissions."
-    ),
+    description=CANDIDATE_SEARCH_DESCRIPTION,
     parameters={
         "type": "object",
         "properties": {
@@ -137,15 +128,16 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
                 "type": "string",
                 "enum": list(SEARCH_MATCH_MODES),
                 "description": (
-                    "keywords uses the existing full-text search. exact_name uses "
-                    "a separate bounded full-name cache lookup. Defaults to keywords."
+                    "keywords returns bounded ranked candidates and may relax sparse "
+                    "multiword queries; exact_name requires normalized full-name "
+                    "equality. Defaults to keywords."
                 ),
             },
             "parent_id": {
                 "type": "string",
                 "description": (
-                    "Optional Category hash token for exact_name Page lookup. "
-                    "It is rejected for keyword search or non-Page kinds."
+                    'Optional viewable Category hash token when kinds is exactly ["page"]. '
+                    "Applies to keyword candidates and exact-name lookup."
                 ),
             },
         },
@@ -159,7 +151,7 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
 # @covered-by lagniappe/core/tools/ai/function_definitions/search.py::format_search_result
 # @matrix ai : search-filter search-limit
 # @tests tests_unit/test_015e_ai_candidate_search.py::test_external_candidates_use_cached_context_without_entity_loading
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_scope_preserves_native_and_exact_modes
+# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_scope_preserves_full_text_and_exact_modes
 # @matrix ai search : candidate-routing cached-details parent-scope
 def execute_search(args, user, *, candidate_search=False):
     query = args.get("query", "")

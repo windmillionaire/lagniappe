@@ -108,10 +108,10 @@ exact target. If repair cannot produce complete safe coverage, the result is a
 review-only proposal. Large or unreadable Files remain represented by metadata
 and visible issues so the proposal does not silently drop evidence.
 
-UI Organize remains file-backed; its instruction-only fallback remains Ask.
-API/MCP and email Organize also support a fileless existing-record update
-profile. Trusted intake origin and the absence of uploads select that profile;
-clients cannot opt a UI report into it. The email classifier can choose
+Website, API/MCP, and email Organize support the same fileless existing-record
+update profile. Trusted intake origin and the absence of uploads select that
+profile. Instruction-only website Organize requests now produce reviewed update
+proposals. The email classifier can choose
 Organize for an update without attachments, but does not discover targets itself.
 The planner discovers exact editable records, reads relevant schemas, and
 proposes bounded updates for the same browser approval and execution pipeline.
@@ -121,7 +121,8 @@ The update profile omits upload summaries, retrieval prepasses, and secondary
 form completion. Its planner authors final field patches directly, including
 on revision or validation repair. Once uploads are supplied, normal file
 coverage and completion obligations apply. External starters return a compact
-action contract; clients request selected schemas and guidance on demand.
+action contract; `start_organize(actions=[...])` can include selected schemas in
+that first response. Clients request additional schemas and guidance on demand.
 Table-shaped patches are checked during proposal validation, so malformed row
 arrays enter the existing proposal repair flow before browser review. Execution
 also checks the current Form's exact column ids before saving any field patches.
@@ -176,6 +177,16 @@ revising, and undone states); Executed includes only complete Create/Organize
 proposals. All Ask reports stay in Ask regardless of status. Counts include
 hidden reports. The browser remembers each user's choices, initially Active and
 Ask, and reveals a newly created report's category.
+
+List snippets flatten Markdown to plain text and show at most five lines at
+the current screen width. Full summaries remain available in each report.
+
+On-site and external schema plans carry exact converted values or explicit
+unresolved reasons in `conversions`. The planning model prepares these from the
+complete preview; the server validates them before review. Execution applies
+the reviewed candidates without another model call. Todo conversion preserves
+identifiable list items and tasks, but treats prose reporting an absence of items
+as unresolved. Summaries describe proposed values, not changes already saved.
 
 Selecting Executed alone exposes bulk history deletion with one count-based
 confirmation. `DELETE /tools/reports/executed` accepts JSON `{"keys": [...]}`
@@ -263,7 +274,20 @@ Both site AI and external agents use `update_form_schema`. Read the
 changes to saved values. The shared preparation layer records complete affected
 identities and source preconditions for review, and the Form-change adapter
 handles deterministic and AI conversions in the same guarded mutation workflow.
-Site reports generate AI candidates after approval; external reports supply
-strict candidates before approval and execute without a provider. Builder AI
-conversion uses the same adapter without a report. See
+Both report origins supply strict candidates before approval and execute without
+a provider. Native Organize binds and validates candidates inside its existing
+one-pass proposal repair boundary, before the planning result is checkpointed.
+Malformed candidates can be corrected before review; unsuccessful repair yields
+a non-executable review result. Publication and execution still recheck current
+preconditions. Missing, invalid or stale candidates prevent proposal publication
+or execution; execution never fills in missing conversions. Builder AI conversion
+uses the same adapter without a report and retains its utility-model instructions
+and resumable batches. The 750 KiB schema-proposal limit applies to both report
+origins; oversized changes require a smaller scope or Builder. See
 [the external contract](AI_EXTERNAL_API.md) and [Form jobs](BACKEND_JOBS.md).
+
+Schema preparation assigns stable, collision-free IDs when the author omitted
+an action ID, including when approving an older saved proposal. Existing IDs and
+conversion values are preserved. Schema-impact review uses the original action
+positions, matching the skip controls, so opening an ID-less report does not
+mutate it or require regeneration.

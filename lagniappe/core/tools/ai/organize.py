@@ -34,8 +34,8 @@ from .reporting.contracts.permissions import (
 from .reporting.contracts.schema import report_proposal_response_schema
 from .reporting.contracts.workflows import (
     ORGANIZE_UPDATE_GUIDELINES,
-    REMOTE_UPDATE_ACTIONS,
-    is_remote_organize_update,
+    ORGANIZE_UPDATE_ACTIONS,
+    is_organize_update,
 )
 from .reporting.completion.files import (
     OVERSIZED_REPORT_SUMMARY,
@@ -166,7 +166,7 @@ def _organize_action_permission_context(user, allowed_actions):
 # @matrix ai-report : files iteration-limit prompt tools remote-update
 def organize_prompt(report, user, retrieval_context=None):
     """Build the AI prompt used to create an organize report proposal."""
-    if is_remote_organize_update(report):
+    if is_organize_update(report):
         return _organize_update_prompt(report, user)
     prompt = _organize_prompt_base(
         report,
@@ -194,7 +194,7 @@ to run it.
 # @matrix ai-report : context feedback proposal revision
 def revise_organize_prompt(report, user, feedback, retrieval_context=None):
     """Build the AI prompt used to revise an organize report proposal."""
-    if is_remote_organize_update(report):
+    if is_organize_update(report):
         return _organize_update_prompt(report, user, feedback=feedback)
     prompt = _organize_prompt_base(
         report,
@@ -247,7 +247,7 @@ def _organize_update_prompt(report, user, feedback=None):
     allowed = tuple(
         action
         for action in allowed_report_actions(user)
-        if action in REMOTE_UPDATE_ACTIONS
+        if action in ORGANIZE_UPDATE_ACTIONS
     )
     prompt = Prompt(
         "You are the Lagniappe Organize tool, planning updates to existing records.",
@@ -256,7 +256,7 @@ def _organize_update_prompt(report, user, feedback=None):
     )
     prompt._organize_update_only = True
     prompt.set_instructions_before_context()
-    prompt.enable_tools(*READ_ONLY_CONTEXT_TOOLS)
+    prompt.enable_tools(*READ_ONLY_CONTEXT_TOOLS, "get_task_history")
     prompt.set_max_tool_iterations(ORGANIZE_MAX_TOOL_ITERATIONS)
     prompt.set_allowed_actions(allowed)
     prompt.set_response_schema(
@@ -273,7 +273,7 @@ def _organize_update_prompt(report, user, feedback=None):
         "report_action_permissions", report_action_permission_context(user, allowed)
     )
     prompt.add_instructions(
-        ORGANIZE_UPDATE_GUIDELINES, section_title="Remote Organize updates"
+        ORGANIZE_UPDATE_GUIDELINES, section_title="Organize updates"
     )
     if feedback is not None:
         prompt.add_context("user_feedback", feedback, quote=True)
@@ -417,9 +417,10 @@ def _input_file_context(report, user=None, retrieval_context=None):
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_validates_ai_output
-# @matrix ai-report : generate validate
+# @tests tests_unit/test_004l_form_schema_updates.py::test_organize_repairs_prepared_conversions_before_returning_plan
+# @matrix ai-report : generate validate schema-update repair validation
 def generate_organize_plan(prompt):
-    """Generate and structurally validate the Organize planning stage."""
+    """Generate an Organize plan, validating prepared values before checkpointing."""
     ai_debug(
         "organize.generate.start",
         prompt_type=getattr(prompt, "prompt_type", None),
@@ -460,7 +461,7 @@ def generate_organize_plan(prompt):
 def generate_organize_report(prompt, report, user):
     """Generate, complete, and validate an Organize report proposal."""
     proposal = generate_organize_plan(prompt)
-    if is_remote_organize_update(report):
+    if is_organize_update(report):
         return proposal
     proposal = complete_organize_submissions(
         proposal,

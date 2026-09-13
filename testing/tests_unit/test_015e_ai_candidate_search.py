@@ -1,4 +1,4 @@
-"""Bounded external discovery without changing native full-text search."""
+"""Ranked AI discovery with a separate ordinary full-text search path."""
 
 import json
 from types import SimpleNamespace
@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from lagniappe.core.definitions import Restriction
+from lagniappe.core.tools.ai import functions
 from lagniappe.core.tools.ai.function_definitions import search as ai_search
 from lagniappe.core.tools.cache import details as cache_details
 from lagniappe.core.tools.cache import query
@@ -180,6 +181,44 @@ def _actor():
     ))
 
 
+# @source lagniappe/core/tools/ai/functions.py::execute_registered_tool
+# @source lagniappe/core/tools/ai/functions.py::execute_function_calls
+# @source lagniappe/core/tools/ai/function_definitions/search.py::execute_search
+# @matrix ai search : candidate-routing candidate-ranking term-relaxation permissions
+# @matrix ai agent-api : tool-dispatch
+@pytest.mark.parametrize("external", [False, True], ids=["on-site", "mcp"])
+def test_registered_search_returns_ranked_partial_matches_in_both_ai_paths(
+    monkeypatch, external
+):
+    strict = _document("strict", "Community allotment", score=1)
+    partial = _document("partial", "Rain garden", score=0.1)
+    weak = _document("weak", "Rain forecast", score=100)
+    cache = _install_cache(monkeypatch, [[strict], [weak, partial]])
+
+    arguments = {"query": "Rain garden planning", "kinds": ["page"], "limit": 3}
+    if external:
+        results, parts = functions.execute_registered_tool(
+            "search_entities", arguments, _actor(), external=True
+        )
+    else:
+        responses, parts = functions.execute_function_calls(
+            [SimpleNamespace(name="search_entities", args=arguments)], _actor()
+        )
+        results = json.loads(responses[0].function_response.response["result"])
+
+    assert [result["name"] for result in results] == [
+        "Community allotment", "Rain garden", "Rain forecast"
+    ]
+    assert [result["hash"] for result in results] == [
+        "hash:strict", "hash:partial", "hash:weak"
+    ]
+    assert parts == []
+    assert len(cache.queries) == 2
+    assert all("(@requires:{ models })" in request._query_string for request in cache.queries)
+    assert all("@restricted_to_page:{ team }" in request._query_string for request in cache.queries)
+    assert all(request._num <= 100 for request in cache.queries)
+
+
 # @matrix ai search : candidate-routing cached-details
 # @pair ai:search-url
 def test_external_candidates_use_cached_context_without_entity_loading(monkeypatch):
@@ -229,7 +268,7 @@ def test_external_candidates_use_cached_context_without_entity_loading(monkeypat
 
 
 # @matrix ai search : candidate-routing parent-scope
-def test_candidate_scope_preserves_native_and_exact_modes(monkeypatch):
+def test_candidate_scope_preserves_full_text_and_exact_modes(monkeypatch):
     calls = []
     parent = SimpleNamespace(hash="parent", allowed=lambda action, user=None: True)
     monkeypatch.setattr(ai_search.Entities, "CATEGORY", parent.__class__)
@@ -238,7 +277,7 @@ def test_candidate_scope_preserves_native_and_exact_modes(monkeypatch):
         ("candidate", kwargs)
     ) or [])
     monkeypatch.setattr(ai_search.cache, "search", lambda *args, **kwargs: calls.append(
-        ("native", kwargs)
+        ("full_text", kwargs)
     ) or ([], 0))
     monkeypatch.setattr(ai_search.cache, "exact_name_search", lambda *args, **kwargs: calls.append(
         ("exact", kwargs)
@@ -261,7 +300,7 @@ def test_candidate_scope_preserves_native_and_exact_modes(monkeypatch):
     assert calls[-1][0] == "exact"
 
     assert ai_search.execute_search({"query": "Rain garden"}, _actor()) == []
-    assert calls[-1][0] == "native"
+    assert calls[-1][0] == "full_text"
     parent.allowed = lambda action, user=None: False
     before = len(calls)
     assert ai_search.execute_search(args, _actor(), candidate_search=True) == {"error": "Access denied"}

@@ -232,7 +232,6 @@ def _update_form_schema(action, report, user, created, context):
         migration={
             "version": form_conversions.VERSION,
             "clear_invalid": True,
-            "instructions": data.get("conversion_instructions", {}),
         },
     )
     response = form_changes.start_change(

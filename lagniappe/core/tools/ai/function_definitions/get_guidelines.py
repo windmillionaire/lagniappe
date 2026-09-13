@@ -1,7 +1,6 @@
 """Function declaration and handler for on-demand AI guideline bundles."""
 
 from google.genai import types
-from ..guidelines.schema_evolution import EXTERNAL_SCHEMA_EVOLUTION_GUIDELINES
 
 from lagniappe.core.tools.ai.debug import ai_debug
 from lagniappe.core.tools.ai.guidelines import (
@@ -86,7 +85,7 @@ ACTION_GUIDELINES = {
     "create_project": "Create a project before its model tasks and use it for a durable area of goal-directed work.",
     "create_model_task": "Create a model task after its Project and optional task Form; model tasks describe reusable work types.",
     "create_page": "Choose the stable subject, compare plausible existing Pages, use an executable Category/Form reference, and include grounded final submission values when the workflow requires them.",
-    "create_task": "Use an editable Page or earlier page action, a stable work name, task Forms only, and a source-backed completed_on date only for completed evidence. To check off an existing Task while preserving its details use complete_task, not historical-occurrence import.",
+    "create_task": "Use an editable Page or earlier page action, a stable work name, task Forms only, and a source-backed completed_on date only for completed evidence. To check off an existing Task while preserving its details use complete_task, not historical-occurrence import. For dated history, first create the current completion, then another create_task with task_action pointing to that earlier action and an older completed_on date. Example: current id=visit, completed=true, completed_on=2026-09-12; older task_action=visit, completed=true, completed_on=2026-09-05 (both also supply name and page/page_action). These are two actions for one Task plus one older history occurrence; the older event leaves the current completion intact.",
     "add_form_to_page": "Reference one editable existing Page and one page Form; this does not require a Category.",
     "add_page_category": "Reference both the editable existing Page and additional existing Category; readable names are not executable references.",
     "update_form_schema": "Preview exact-ID schema operations, explain destructive changes, and place the update before actions that use it. The user reviews the plan.",
@@ -375,8 +374,6 @@ def _guidelines_result(args, *, external):
         bundle = EXTERNAL_ORGANIZE_BUNDLE
     elif external and task == "form_autofill":
         bundle = EXTERNAL_FORM_AUTOFILL_BUNDLE
-    elif external and task == "schema_evolution":
-        bundle = {**bundle, "sections": (EXTERNAL_SCHEMA_EVOLUTION_GUIDELINES,)}
     if not bundle:
         ai_debug(
             "tool.get_guidelines.result",

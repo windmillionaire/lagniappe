@@ -131,8 +131,7 @@ def start_change(form, draft, save_id, actor, *, images=None, report=None, schem
         not isinstance(value, str) or len(value) > 4000 for value in instructions.values()
     ):
         raise ValidationError("Conversion instructions must name AI-converted fields and contain at most 4000 characters each.")
-    ai_mode = "external" if report is not None and report.origin == "api" else "onsite"
-    if ai_fields and ai_mode == "onsite" and not actor.access(AI.CREATE):
+    if ai_fields and report is None and not actor.access(AI.CREATE):
         raise ValidationError("This user does not have the required AI access.")
     if ai_fields or report is not None:
         scope = form_schema_updates.inspect_scope(form, operations, actor)
@@ -158,7 +157,6 @@ def start_change(form, draft, save_id, actor, *, images=None, report=None, schem
             "baseline": form_drafts.builder_draft(form)["baseline"],
             "zone": str(dates.user_timezone(actor)),
             "operations": operations,
-            "ai_mode": ai_mode,
             "instructions": deepcopy(instructions),
             "require_visibility": bool(ai_fields or report is not None),
             "phase": "checking",

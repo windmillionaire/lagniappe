@@ -360,7 +360,7 @@
             <section id="schema-impact" data-role="schema-impact" class="flex flex-col gap-3">
               <h2 class="text-base font-semibold">Form schema changes</h2>
               {% for action in report.proposal.actions %}
-                {% set impact = schema_impacts.get(action.id) %}
+                {% set impact = schema_impacts.get(loop.index) %}
                 {% if impact %}
                   <div data-role="schema-impact-action" data-schema-action-index="{{ loop.index }}" class="flex flex-col gap-3">
                     {% if impact.form_url %}
@@ -425,6 +425,13 @@
               <h2 class="text-base font-semibold text-base-dark">{{ "Suggested Actions" if is_ask else "Proposal" }}</h2>
               {% if report.proposal.summary and not is_ask %}
                 <p class="text-base-dark">{{ report.proposal.summary }}</p>
+              {% endif %}
+              {% if has_actions %}
+                {% set action_summary = report.properties.proposal.action_summary %}
+                <div data-role="proposal-action-summary" class="text-sm text-base-medium">
+                  <p>{{ action_summary.total }} proposed actions{% if action_summary.maximum %} · {{ action_summary.maximum }} maximum{% endif %}</p>
+                  <p>{% for type, count in action_summary.by_type.items() %}{{ type|replace("_", " ")|capitalize }}: {{ count }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+                </div>
               {% endif %}
               {% if report.proposal.issues %}
                 <div class="flex flex-col gap-1 rounded-md bg-base-bg p-3 outline-2 outline-kind-default">

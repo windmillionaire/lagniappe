@@ -5,12 +5,9 @@ from google.genai import types
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.mixins import AIMixin
-from lagniappe.core.properties.form_checkbox import Checkbox
-from lagniappe.core.properties.form_table import Table
-from lagniappe.core.properties.form_todo import TodoList
 from ..debug import ai_debug
 from ..references import hash_reference
+from ..submission_values import values_by_id
 
 
 GET_SCHEMA = types.FunctionDeclaration(
@@ -123,35 +120,8 @@ def execute_get_schema(args, user):
             # Keep collection structure and typed values, using normal AI
             # projections for references rather than exposing raw stored keys.
             entity.form = form
-            values = {}
-            for field_id, field in submission.fields.items():
-                if isinstance(field, AIMixin) and field.is_set:
-                    value = _schema_value(field, user)
-                    if value is not None:
-                        values[field_id] = value
-            result["values"] = values
+            result["values"] = values_by_id(submission.fields, user)
     return result
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
-# @reason typed collection and reference projections are exercised through schema reads
-def _schema_value(field, user):
-    field.user = user
-    if isinstance(field, Table):
-        rows = []
-        for row in field.rows:
-            values = {}
-            for column_id, cell in row.fields.items():
-                if isinstance(cell, AIMixin) and cell.is_set:
-                    value = _schema_value(cell, user)
-                    if value is not None:
-                        values[column_id] = value
-            rows.append(values)
-        return {"rows": rows}
-    if isinstance(field, (Checkbox, TodoList)):
-        return field.form_value
-    return field.ai_value
 
 
 # @testable false

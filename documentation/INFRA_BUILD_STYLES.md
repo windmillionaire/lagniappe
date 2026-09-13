@@ -55,9 +55,53 @@ Rendered markup has an outer `.icon` box and an `.icon-glyph` child. Contextual
 `icon-xs` through `icon-2xl` modifiers scale intentionally, while semantic
 optical exceptions use `data-icon` selectors in `icons.css`.
 
-The font source and glyph registry are committed under `src/fonts/`. The build
-emits the subset with a digest-derived filename so any glyph change creates a
-new cache identity.
+The icon font source and glyph registry are committed under `src/fonts/`.
+Icons and text webfonts share the same build inventory: every top-level WOFF2
+source is emitted with a digest-derived filename, and authored CSS URLs are
+resolved to those assets. Missing font sources fail the build. The generated
+`FONTS` Python map supplies the same URLs to Jinja preload links, so CSS and
+preloads cannot request different copies. Obsolete published fonts are removed.
+
+## Text fonts and document coverage
+
+Bitter and Source Sans 3 each have normal and italic variable fonts. Each face
+has two loading partitions: Latin/common punctuation, accents and arrows; and
+every remaining character in the full upstream font. These are not app-string
+subsets. The complete upstream character map remains available for user-created
+documents: 977 codepoints per Bitter face and 1,615 per Source Sans 3 face.
+OpenType layout features and the full weight ranges are retained. Characters
+outside those families' upstream coverage continue to use system fallback.
+The existing Open Sans math and symbol faces are also retained.
+Combining marks are shared between partitions so decomposed accents can stay
+with their bases in either script. The common face is declared last to prefer
+its already-loaded accents on Latin pages.
+
+The browser loads extended characters and italics when content needs them.
+Only upright Source Sans 3 is preloaded. The two common upright faces total
+about 108 KiB, versus 277 KiB for their full WOFF2 counterparts. Loading every
+partition of all four faces costs about 18% more than four unsplit WOFF2 fonts.
+This trades a smaller initial Latin-page download for one additional request
+when a face needs extended characters. It replaces the 24 hand-maintained
+Bitter/Source Sans language faces with eight generated declarations.
+
+Pinned upstream sources, their URLs and SHA-256 hashes live in
+`src/fonts/upstream/` and `src/fonts/sources.json`. Normal builds use the vendored
+WOFF2 outputs and require neither FontTools nor network access. To change a
+font version or loading partition:
+
+```bash
+venv/bin/python -m pip install -r build/font-requirements.txt
+venv/bin/python build/subset_fonts.py
+venv/bin/python build/subset_fonts.py --check
+npm run dev
+```
+
+`build/subset_fonts.py` generates `src/style/fonts.css` and the text WOFF2
+sources. It checks input digests, derives Unicode ranges from actual output
+character maps, verifies that partition coverage equals the full upstream
+coverage, and requires all four directional arrows in each common face.
+`--check` also verifies that committed outputs can be reproduced byte for byte.
+Update the pinned source and its existing third-party notice when upgrading.
 
 ## Generated consumers
 
@@ -68,6 +112,7 @@ Python dictionaries to:
 ```text
 lagniappe/web/start/styles/styles.py
 lagniappe/web/start/styles/icons.py
+lagniappe/web/start/styles/fonts.py
 ```
 
 The YAML records are therefore the source of truth on both browser and server

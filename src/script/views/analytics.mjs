@@ -10,14 +10,34 @@ import ShellView from "./base/shell";
  * @pair analytics:page-tracking
  */
 export default class Analytics extends ShellView {
+	async init() {
+		await super.init();
+		if (!this._analyticsToggle) {
+			this._analyticsToggle = (event) => {
+				const group = event.target;
+				if (
+					group.matches("details[data-role='analytics-prefix']") &&
+					group.open
+				) {
+					void this._loadGroup(group);
+				}
+			};
+			this.elt.addEventListener("toggle", this._analyticsToggle, true);
+		}
+		return this;
+	}
+
+	destroy() {
+		this.elt.removeEventListener("toggle", this._analyticsToggle, true);
+		super.destroy();
+	}
+
 	_click(event) {
-		const retentionToggle = event.target.closest(
-			"[data-role='analytics-retention-toggle']",
-		);
-		if (retentionToggle && this.elt.contains(retentionToggle)) {
+		const copyButton = event.target.closest("[data-role='ai-run-copy']");
+		if (copyButton && this.elt.contains(copyButton)) {
 			event.preventDefault();
 			event.stopPropagation();
-			this._toggleRetention(retentionToggle);
+			void this._copyRun(copyButton);
 			return;
 		}
 
@@ -29,52 +49,7 @@ export default class Analytics extends ShellView {
 			return;
 		}
 
-		const toggle = event.target.closest("[data-role='expand']");
-		const group = toggle?.closest("[data-role='analytics-prefix']");
-		if (group && this.elt.contains(group)) {
-			event.preventDefault();
-			event.stopPropagation();
-			this._toggleGroup(group, toggle);
-			return;
-		}
-
 		super._click(event);
-	}
-
-	async _toggleRetention(toggle) {
-		const retention = toggle.closest("[data-role='analytics-retention']");
-		const panel = retention?.querySelector(
-			"[data-role='analytics-retention-panel']",
-		);
-		if (!panel) return;
-
-		await withTransition(
-			() => {
-				const open = panel.dataset.visible !== "true";
-				panel.dataset.visible = open ? "true" : "false";
-				toggle.dataset.open = panel.dataset.visible;
-				toggle.setAttribute("aria-expanded", open ? "true" : "false");
-				if (retention) retention.dataset.open = panel.dataset.visible;
-			},
-			{ label: "analytics:toggle-retention" },
-		);
-	}
-
-	async _toggleGroup(group, toggle) {
-		const open = group.dataset.open !== "true";
-		await withTransition(
-			() => {
-				group.dataset.open = open ? "true" : "false";
-				toggle.dataset.open = group.dataset.open;
-				toggle.setAttribute("aria-expanded", open ? "true" : "false");
-
-				const target = group.querySelector("[data-role='analytics-events']");
-				if (target) target.dataset.visible = group.dataset.open;
-			},
-			{ label: "analytics:toggle-group" },
-		);
-
-		if (open) this._loadGroup(group);
 	}
 
 	async _loadGroup(group) {
@@ -86,6 +61,7 @@ export default class Analytics extends ShellView {
 
 		group.dataset.loaded = "true";
 		const response = await request.get(route);
+		if (!response?.ok) group.dataset.loaded = "false";
 		const html =
 			response?.ok && response.html
 				? response.html.body.innerHTML
@@ -96,6 +72,53 @@ export default class Analytics extends ShellView {
 			},
 			{ label: "analytics:load-group" },
 		);
+	}
+
+	async _copyRun(button) {
+		if (button.disabled) return;
+		const run = button.closest("[data-role='ai-run']");
+		const status = run.querySelector("[data-role='ai-run-copy-status']");
+		const fallback = run.querySelector("[data-role='ai-run-json-fallback']");
+		button.disabled = true;
+		button.setAttribute("aria-busy", "true");
+		status.textContent = "Loading run JSON…";
+		fallback.dataset.visible = "false";
+
+		try {
+			const response = await request.get(button.dataset.route);
+			if (!response?.ok || !response.job_id) {
+				status.textContent = "Unable to load run JSON. Try again.";
+				return;
+			}
+			const payload = {};
+			for (const key of [
+				"schema_version",
+				"job_id",
+				"telemetry_id",
+				"operation",
+				"ai_generations",
+				"ai_record_query_limit",
+				"ai_records_may_be_truncated",
+			]) {
+				payload[key] = response[key];
+			}
+			const text = JSON.stringify(payload, null, 2);
+			try {
+				await navigator.clipboard.writeText(text);
+				status.textContent = "Run JSON copied.";
+			} catch {
+				fallback.value = text;
+				fallback.dataset.visible = "true";
+				fallback.focus();
+				fallback.select();
+				status.textContent = "Select and copy the JSON below.";
+			}
+		} catch {
+			status.textContent = "Unable to load run JSON. Try again.";
+		} finally {
+			button.disabled = false;
+			button.removeAttribute("aria-busy");
+		}
 	}
 
 	async _clearRecords(button) {
@@ -160,15 +183,7 @@ export default class Analytics extends ShellView {
 				panel = retention?.querySelector(
 					"[data-role='analytics-retention-panel']",
 				);
-				const toggle = retention?.querySelector(
-					"[data-role='analytics-retention-toggle']",
-				);
-				if (panel) panel.dataset.visible = "true";
-				if (retention) retention.dataset.open = "true";
-				if (toggle) {
-					toggle.dataset.open = "true";
-					toggle.setAttribute("aria-expanded", "true");
-				}
+				if (retention) retention.open = true;
 			},
 			{ label: "analytics:refresh-dashboard" },
 		);

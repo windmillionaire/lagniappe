@@ -382,7 +382,7 @@ def test_navbar_task_results_render_current_completion_state(get_user):
         model,
         f"{token} completed task",
     )
-    completed_task.completed = True
+    completed_task.complete(user=user.entity)
     completed_task.save()
     active_task = _create_project_task(
         user,

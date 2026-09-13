@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from google.cloud import datastore
 import pytest
 
-from lagniappe.core.definitions import Action, DeferredJobType
+from lagniappe.core.definitions import DeferredJobType
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.tools import (
@@ -16,7 +16,9 @@ from lagniappe.core.tools import (
     form_conversions as conversions,
     form_schema_updates as updates,
 )
-from lagniappe.core.tools.ai import form_conversion
+from lagniappe.core.tools.ai import core as ai_core, form_conversion, observability, organize
+from lagniappe.core.tools.ai.prompt import Prompt
+from lagniappe.core.tools.ai.observability import GenerationObserver
 from lagniappe.core.tools.ai.function_definitions.preview_form_schema_update import (
     execute_preview_form_schema_update,
 )
@@ -191,6 +193,28 @@ def test_scope_is_exhaustive_permission_checked_and_projects_only_affected_value
         updates.inspect_scope(scope.form, scope.changes[1:], scope.actor)
 
 
+# @source lagniappe/core/tools/form_schema_updates.py::inspect_scope
+# @matrix form-migration : affected-values pagination
+@pytest.mark.parametrize("before, after, clears", [("000", 0, False), ("007", 7, False), ("unknown", None, True)])
+def test_scalar_preview_reports_exact_conversion_and_clearing(scope, before, after, clears):
+    scope.tasks[0].db["submission"] = json.dumps({"count": before, "private": "unaffected"})
+    result = execute_preview_form_schema_update({"id": scope.form.urlsafe_key, "operations": scope.operations, "include_values": True, "limit": 1}, scope.actor)
+    field = result["instances"][0]["fields"][0]
+    assert field["before"] == before
+    assert field["clears"] is clears
+    if clears:
+        assert "after" not in field
+        assert field["reason"] == "invalid"
+    else:
+        assert field["after"] == after
+        assert type(field["after"]) in (int, float)
+    assert "private" not in json.dumps(result)
+    compact = execute_preview_form_schema_update({"id": scope.form.urlsafe_key, "operations": scope.operations, "limit": 1}, scope.actor)
+    assert "before" not in compact["instances"][0]["fields"][0]
+    assert result["scope_fingerprint"] == compact["scope_fingerprint"]
+    assert result["next_cursor"] == compact["next_cursor"]
+
+
 def candidates_for(scope):
     preview = updates.inspect_scope(scope.form, scope.changes, scope.actor)
     return preview, [
@@ -245,6 +269,7 @@ def test_ai_candidates_validate_exact_shapes_without_truthiness_coercion():
         {"rows": [{}]},
         {"rows": []},
         {"rows": [{"unknown": 1}]},
+        {"rows": ["row-item", "Pens"]},
     ]:
         with pytest.raises(ValidationError):
             conversions.validate_ai_candidate({"value": value}, table)
@@ -466,18 +491,31 @@ def test_report_schema_preparation_binds_impact_and_external_candidates(scope):
             },
         ]
     }
-    schema_updates.prepare_schema_updates(proposal, scope.actor, external=True)
+    missing = deepcopy(proposal)
+    missing["actions"][0]["data"].pop("conversions")
+    with pytest.raises(ValidationError, match="AI conversions are missing"):
+        schema_updates.prepare_schema_updates(missing, scope.actor)
+    invalid = deepcopy(proposal)
+    invalid["actions"][0]["data"]["conversions"][0]["value"] = {"items": []}
+    with pytest.raises(ValidationError):
+        schema_updates.prepare_schema_updates(invalid, scope.actor)
+    stale = deepcopy(proposal)
+    stale["actions"][0]["data"]["scope_fingerprint"] = "old-scope"
+    with pytest.raises(ValidationError, match=updates.STALE_MESSAGE):
+        schema_updates.prepare_schema_updates(stale, scope.actor)
+    schema_updates.prepare_schema_updates(proposal, scope.actor)
+    assert action["data"]["conversions"] == candidates
     assert action["data"]["baseline"]
     assert len(action["_schema_change"]["impact"]) == 3
     assert proposal["actions"][1]["depends_on"] == ["schema"]
     assert "unaffected" not in json.dumps(action["_schema_change"])
     schema_updates.prepare_schema_updates(
-        proposal, scope.actor, external=True, verify=True
+        proposal, scope.actor, verify=True
     )
     scope.tasks[-1].db["restricted"] = True
     with pytest.raises(updates.RestrictedFormChange):
         schema_updates.prepare_schema_updates(
-            proposal, scope.actor, external=True, verify=True
+            proposal, scope.actor, verify=True
         )
     new_form_proposal = {
         "actions": [
@@ -503,8 +541,175 @@ def test_report_schema_preparation_binds_impact_and_external_candidates(scope):
         schema_updates.prepare_schema_updates(new_form_proposal, scope.actor)
 
 
+# @matrix ai-report form-migration : preview preparation approval external
+def test_schema_preparation_assigns_missing_ids_without_collisions(scope):
+    preview, candidates = candidates_for(scope)
+    proposal = {"actions": [
+        {"type": "update_form_schema", "data": {
+            "form": scope.form.urlsafe_key, "operations": scope.operations,
+            "scope_fingerprint": preview["scope_fingerprint"], "conversions": candidates,
+        }},
+        {"id": "schema_change_1", "type": "rename_entity", "data": {
+            "entity": scope.tasks[0].urlsafe_key, "name": "After migration",
+        }},
+        {"id": "schema_change_1_2", "type": "complete_task", "data": {
+            "task": scope.tasks[1].urlsafe_key,
+        }},
+    ]}
+    schema_updates.prepare_schema_updates(proposal, scope.actor)
+    assert [action["id"] for action in proposal["actions"]] == [
+        "schema_change_1_3", "schema_change_1", "schema_change_1_2",
+    ]
+    assert proposal["actions"][0]["data"]["conversions"] == candidates
+    assert all(action["depends_on"] == ["schema_change_1_3"] for action in proposal["actions"][1:])
+    prepared = deepcopy(proposal)
+    schema_updates.prepare_schema_updates(proposal, scope.actor)
+    schema_updates.prepare_schema_updates(proposal, scope.actor, verify=True)
+    assert proposal == prepared
+    # A saved ID-less proposal must also get an execution identity when the
+    # user approves it. Its reviewed operations and values remain unchanged.
+    legacy = deepcopy(prepared)
+    legacy["actions"] = legacy["actions"][:1]
+    legacy["actions"][0].pop("id")
+    schema_updates.prepare_schema_updates(legacy, scope.actor, verify=True)
+    assert legacy["actions"][0]["id"] == "schema_change_1"
+    assert legacy["actions"][0]["data"] == prepared["actions"][0]["data"]
+
+
+# @matrix ai-report : structured-output
+@pytest.mark.parametrize("external", [False, True])
+def test_report_conversion_schema_rejects_flattened_items(external):
+    from lagniappe.core.tools.ai.external_api import _schema_errors
+    from lagniappe.core.tools.ai.reporting.contracts.schema import (
+        external_report_proposal_response_schema,
+        report_proposal_response_schema,
+    )
+
+    factory = external_report_proposal_response_schema if external else report_proposal_response_schema
+    schema = factory(("update_form_schema",))
+    proposal = {
+        "summary": "Convert Notes.", "confidence": 0.9, "issues": [],
+        "actions": [{
+            "type": "update_form_schema",
+            "data": {
+                "form": "hash:123456789abc", "baseline": "preview",
+                "scope_fingerprint": "scope",
+                "operations": [{"op": "update_field", "schema_id": "notes", "patch": {"type": "todo"}}],
+                "conversions": [],
+            },
+        }],
+    }
+    identity = {"entity": "hash:23456789abcd", "schema_id": "notes", "source_fingerprint": "source"}
+    for outcome in (
+        {"value": {"items": [{"text": "Buy tea", "checked": False}, {"text": "Pack mugs", "checked": True}]}},
+        {"value": {"rows": [{"row-item": "Pens", "row-qty": 0, "row-done": False}, {"row-item": "Tape"}]}},
+        {"unresolved_reason": "No identifiable checklist items."},
+    ):
+        proposal["actions"][0]["data"]["conversions"] = [{**identity, **outcome}]
+        assert _schema_errors(proposal, schema, schema, "proposal") == []
+    for outcome in (
+        {},
+        {"value": {"items": ["checked", False, "text", "Buy tea"]}},
+        {"value": {"items": [{"text": "Buy tea", "checked": "false"}]}},
+        {"value": {"items": [{"text": "Buy tea"}]}},
+        {"value": {"items": []}},
+        {"value": {"items": [{"text": "Buy tea", "checked": False}]}, "unresolved_reason": "Conflicting outcome"},
+    ):
+        proposal["actions"][0]["data"]["conversions"] = [{**identity, **outcome}]
+        assert _schema_errors(proposal, schema, schema, "proposal"), outcome
+
+
+# @matrix ai-report : schema-update
+@pytest.mark.parametrize("invalid_kind", ["flattened", "boolean", "missing", "stale"])
+@pytest.mark.parametrize("repair_succeeds", [True, False])
+def test_organize_repairs_prepared_conversions_before_returning_plan(
+    scope, monkeypatch, invalid_kind, repair_succeeds
+):
+    notes = "- [ ] Buy tea\n- [x] Pack mugs"
+    scope.tasks[0].db["submission"] = json.dumps({"notes": notes, "count": "000"})
+    scope.tasks[-1].db["submission"] = json.dumps(
+        {"notes": "No identifiable checklist items were recorded.", "count": "unknown"}
+    )
+    preview, candidates = candidates_for(scope)
+    candidates[0]["value"] = {"items": [
+        {"text": "Buy tea", "checked": False},
+        {"text": "Pack mugs", "checked": True},
+    ]}
+    candidates[-1].pop("value")
+    candidates[-1]["unresolved_reason"] = "No identifiable checklist items."
+    valid = {
+        "summary": "Proposed Notes and Count conversions.",
+        "confidence": 0.9,
+        "issues": [],
+        "actions": [{
+            "id": "schema",
+            "type": "update_form_schema",
+            "data": {
+                "form": scope.form.urlsafe_key,
+                "operations": scope.operations,
+                "scope_fingerprint": preview["scope_fingerprint"],
+                "conversions": candidates,
+            },
+        }],
+    }
+    invalid = deepcopy(valid)
+    data = invalid["actions"][0]["data"]
+    if invalid_kind == "flattened":
+        # Exact malformed envelope saved by the deployed parity retest.
+        data["conversions"][0]["value"]["items"] = [
+            "checked", False, "text", "Buy tea", "checked", True, "text", "Pack mugs",
+        ]
+    elif invalid_kind == "boolean":
+        data["conversions"][0]["value"]["items"][0]["checked"] = "false"
+    elif invalid_kind == "missing":
+        data["conversions"].pop()
+    else:
+        data["conversions"][0]["source_fingerprint"] = "stale"
+    snapshot = {key: deepcopy(entity.db) for key, entity in scope.rows.items()}
+    calls, summaries = [], []
+
+    def provider_response(prompt, *, model):
+        calls.append(prompt)
+        assert model == "primary-test"
+        return deepcopy(valid if len(calls) > 1 and repair_succeeds else invalid)
+
+    monkeypatch.setattr(ai_core.CONFIG, "AI_ENABLED", True)
+    monkeypatch.setattr(observability.CONFIG, "AI_OBSERVABILITY", True)
+    monkeypatch.setattr(ai_core, "runtime_ai_settings", lambda: {
+        "AI_MODEL": "primary-test", "AI_UTILITY_MODEL": "utility-test",
+    })
+    monkeypatch.setattr(organize.ai_model, "_generate_content_once", provider_response)
+    monkeypatch.setattr(observability, "_write_summary", lambda summary: summaries.append(summary.payload()))
+    monkeypatch.setattr(observability, "prune_old_records", lambda: None)
+    prompt = Prompt("Prepare a schema migration.", user=scope.actor, type="organize report")
+    prompt.set_allowed_actions(("update_form_schema", "needs_review"))
+    prompt.set_response_schema(organize.report_proposal_response_schema(prompt.allowed_actions))
+    prompt.add_output_contract("JSON", "Return a complete proposal.")
+    result = organize.generate_organize_plan(prompt)
+
+    assert len(calls) == 2
+    assert all(call.model_tier == "primary" for call in calls)
+    assert "update_form_schema" in json.dumps(calls[-1].context_blocks)
+    assert len(summaries) == 2
+    assert summaries[-1]["success"] is True
+    assert summaries[-1]["outcome"] == (
+        "model_repair" if repair_succeeds else "review_fallback"
+    )
+    if repair_succeeds:
+        action = result["actions"][0]
+        assert action["type"] == "update_form_schema"
+        assert action["data"]["conversions"] == candidates
+        assert action["_schema_change"]["migration"] is True
+        schema_updates.prepare_schema_updates(result, scope.actor, verify=True)
+    else:
+        assert [action["type"] for action in result["actions"]] == ["needs_review"]
+        assert "_schema_change" not in result["actions"][0]
+    assert {key: entity.db for key, entity in scope.rows.items()} == snapshot
+
+
 # @matrix ai-report form-migration : review links pagination permissions
 def test_report_impact_redacts_revoked_access_and_paginates(scope):
+    preview, candidates = candidates_for(scope)
     proposal = {
         "actions": [
             {
@@ -513,6 +718,8 @@ def test_report_impact_redacts_revoked_access_and_paginates(scope):
                 "data": {
                     "form": scope.form.urlsafe_key,
                     "operations": scope.operations,
+                    "scope_fingerprint": preview["scope_fingerprint"],
+                    "conversions": candidates,
                 },
             }
         ]
@@ -521,28 +728,54 @@ def test_report_impact_redacts_revoked_access_and_paginates(scope):
     impact = proposal["actions"][0]["_schema_change"]["impact"]
     impact.extend(deepcopy(impact[0]) for _ in range(24))
     report = SimpleNamespace(proposal=proposal)
-    first = schema_updates.report_impact(report, scope.actor)["schema"]
+    first = schema_updates.report_impact(report, scope.actor)[1]
     assert first["has_more"] and len(first["items"]) == 25
     assert first["items"][0]["url"]
     scope.tasks[0].db["restricted"] = True
-    last = schema_updates.report_impact(report, scope.actor, page=2)["schema"]
+    last = schema_updates.report_impact(report, scope.actor, page=2)[1]
     assert last["items"] == [{"unavailable": True}, {"unavailable": True}]
     assert not last["has_more"]
 
 
+# @matrix ai-report form-migration : review links pagination permissions
+@pytest.mark.parametrize("action_id", [None, "custom-schema-action"])
+def test_report_impact_matches_positions_without_action_ids(scope, action_id):
+    preview, candidates = candidates_for(scope)
+    proposal = {"actions": [{"type": "update_form_schema", "data": {
+        "form": scope.form.urlsafe_key, "operations": scope.operations,
+        "scope_fingerprint": preview["scope_fingerprint"], "conversions": candidates,
+    }}]}
+    schema_updates.prepare_schema_updates(proposal, scope.actor)
+    if action_id is None:
+        # Reproduce a saved proposal from before missing IDs were assigned.
+        proposal["actions"][0].pop("id")
+    else:
+        proposal["actions"][0]["id"] = action_id
+    proposal["actions"].insert(0, {"id": "2", "type": "needs_review", "data": {"note": "Unrelated review"}})
+    snapshot = deepcopy(proposal)
+    result = schema_updates.report_impact(SimpleNamespace(proposal=proposal), scope.actor)
+    assert set(result) == {2}
+    assert result[2]["total"] == 3
+    assert [item["name"] for item in result[2]["items"]] == [task.name for task in scope.tasks]
+    assert all('"checked": false' in item["fields"][0]["candidate"] for item in result[2]["items"])
+    assert proposal == snapshot
+
+
 # @matrix form-migration : ai-checkpoint external-provider-free retry
+# @pair form-migration:ai-telemetry
 def test_worker_checkpoints_ai_before_write_and_external_execution_is_provider_free(
     scope, monkeypatch
 ):
     preview, candidates = candidates_for(scope)
     job = SimpleNamespace(
-        job_type=DeferredJobType.FORM_CHANGE, attempt=1, job_version=1
+        job_type=DeferredJobType.FORM_CHANGE, attempt=1, job_version=1,
+        telemetry_id="form-conversion-telemetry",
     )
     context = DeferredJobContext(job, scope.actor, None, {"form": scope.form}, {}, {})
     change = {
         "id": "migration",
         "operations": scope.changes,
-        "ai_mode": "external",
+        "report": "approved-report",
         "source_generation": 0,
         "zone": "UTC",
         "target": {"generation": 1, "version": "new"},
@@ -554,7 +787,7 @@ def test_worker_checkpoints_ai_before_write_and_external_execution_is_provider_f
     monkeypatch.setattr(
         form_conversion,
         "generate_conversions",
-        lambda *args: pytest.fail("external execution called provider"),
+        lambda *args: pytest.fail("report execution called provider"),
     )
     prepared = adapter.prepare_ai_target(context, change, scope.tasks[0])
     assert context.checkpoint["ai_batch"]["values"] == prepared
@@ -569,20 +802,19 @@ def test_worker_checkpoints_ai_before_write_and_external_execution_is_provider_f
         form_changes.json_value(converted.db, form_changes.NOTICE)["notes"]["value"]
         == "Item 0"
     )
-    monkeypatch.setattr(
-        adapter,
-        "report_candidates",
-        lambda *args: pytest.fail("prepared output not reused"),
-    )
     assert adapter.prepare_ai_target(context, change, scope.tasks[0]) == prepared
     assert form_changes.json_value(scope.tasks[0].db, "submission")["notes"] == "Item 0"
 
     context.checkpoint = {}
-    change["ai_mode"] = "onsite"
+    change.pop("report")
+    change["instructions"] = {"notes": "Preserve identifiable checklist items only."}
     failure = ValidationError("Quantity must be a number.")
     failure.context = {"form_conversion_field": "notes"}
+    observed = []
 
-    def fail_conversion(*args):
+    def fail_conversion(requests, actor):
+        assert requests[0]["instructions"] == change["instructions"]["notes"]
+        observed.append(GenerationObserver(SimpleNamespace()).summary.payload())
         raise failure
 
     monkeypatch.setattr(form_conversion, "generate_conversions", fail_conversion)
@@ -593,7 +825,23 @@ def test_worker_checkpoints_ai_before_write_and_external_execution_is_provider_f
         "form_conversion_target": scope.tasks[0].urlsafe_key,
     }
     assert context.checkpoint == {}
+    assert observed[0]["telemetry_id"] == job.telemetry_id
+    assert observed[0]["deferred_job_type"] == "form-change"
+    assert observed[0]["deferred_job_attempt"] == 1
     assert form_changes.json_value(scope.tasks[0].db, "submission")["notes"] == "Item 0"
+
+    calls = []
+
+    def convert(requests, actor):
+        calls.append(requests)
+        return {"notes": {"value": {"items": [{"text": "Builder item", "checked": True}]}}}
+
+    monkeypatch.setattr(form_conversion, "generate_conversions", convert)
+    prepared = adapter.prepare_ai_target(context, change, scope.tasks[0])
+    assert prepared["notes"]["value"]["items"] == [{"text": "Builder item", "checked": True}]
+    assert context.checkpoint["ai_batch"]["values"] == prepared
+    assert adapter.prepare_ai_target(context, change, scope.tasks[0]) == prepared
+    assert len(calls) == 1
 
 
 # @matrix form-migration : permissions preflight ownership

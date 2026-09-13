@@ -14,7 +14,9 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai.function_definitions.preview_form_schema_update import execute_preview_form_schema_update
 from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_updates
+from lagniappe.web import app
 from testing.definitions import SitePages, Uploads, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements import Buttons, List, Modal
@@ -844,11 +846,13 @@ def test_lazy_report_list_reconciles_active_job_status(get_user):
     )
 
 
-# @matrix ai-report : ask-fallback async create text-only
-def test_text_only_organize_uses_ask(get_user):
+# @matrix ai-report : remote-update async create text-only
+# @template home/tools.html::tool_switcher
+# @template home/tools.html::create_report
+def test_text_only_organize_plans_updates(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
-    question = f"Where should I record this note? {_suffix()}"
+    question = f"Rename the CLI task to CLI review {_suffix()}"
 
     user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
@@ -858,11 +862,11 @@ def test_text_only_organize_uses_ask(get_user):
         form.get_by_role("button", name="Start").click()
 
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
-    item = report_list.new_item(ai.ask_report_name(question), flash=False)
-    expect(item.locator("[data-role='report-stage']")).to_have_text("Answer pending")
+    item = report_list.new_item("Organize: " + question, flash=False)
+    expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
 
     report = Entities.fetch_one(item.get_attribute("data-key"), request=Fetch.direct())
-    assert report.tool == "ask"
+    assert report.tool == "organize"
     assert report.instructions == question
     assert report.input_files == []
 
@@ -1029,6 +1033,67 @@ def _create_uploaded_report_item(user):
     return item, report
 
 
+# @pair ai-report:list-snippets
+# @template home/tools.html::report_item
+def test_report_list_snippets_are_plain_text_and_at_most_five_lines(get_user, tmp_path):
+    user = get_user(Users.OWNER)
+    markdown = (
+        "**Prepared for review.** [Checklist](https://example.com/long-task-id)\n\n"
+        "| Task | Count |\n| --- | --- |\n| Pens | 0 |\n\n"
+        "Preserve &lt;original&gt; values. "
+        + "Review the proposed conversions before executing this report. " * 30
+    )
+    prose = "A detailed proposal summary in ordinary prose. " * 40
+    reports = []
+    for summary in (markdown, prose):
+        report, _, _ = _ready_report(user)
+        report.summary = summary
+        report.proposal = {**report.proposal, "summary": summary}
+        Entities.save(report)
+        reports.append(report)
+
+    home = user.go(SitePages.HOME)
+    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+    report_list = user.locate(home.TOOL_REPORT_LIST)
+    markdown_item = report_list.locator(f"li[data-key='{reports[0].urlsafe_key}']")
+    markdown_snippet = markdown_item.locator("[data-role='report-snippet']")
+    expect(markdown_snippet).to_contain_text(
+        "Prepared for review. Checklist Task Count Pens 0 Preserve <original> values."
+    )
+    expect(markdown_snippet).not_to_contain_text("https://")
+    expect(markdown_snippet).not_to_contain_text("**")
+    expect(markdown_snippet).not_to_contain_text("|")
+    expect(markdown_snippet.locator("a, table, original")).to_have_count(0)
+
+    for width in (1280, 390):
+        user.page.set_viewport_size({"width": width, "height": 900})
+        user.page.evaluate("() => document.fonts.ready.then(() => true)")
+        for report in reports:
+            item = report_list.locator(f"li[data-key='{report.urlsafe_key}']")
+            snippet = item.locator("[data-role='report-snippet']")
+            expect(snippet).to_be_visible()
+            size = snippet.evaluate(
+                """element => ({
+                    height: element.getBoundingClientRect().height,
+                    lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+                    scrollHeight: element.scrollHeight,
+                    width: element.clientWidth,
+                    scrollWidth: element.scrollWidth,
+                })"""
+            )
+            assert 4.9 <= size["height"] / size["lineHeight"] <= 5.1
+            assert size["scrollHeight"] > size["height"]
+            assert size["scrollWidth"] <= size["width"] + 1
+        report_list.screenshot(path=str(tmp_path / f"report-snippets-{width}.png"))
+
+    markdown_item.locator("[data-role='title']").click()
+    expect(user.page).to_have_url(re.compile(f"/tools/reports/{reports[0].urlsafe_key}$"))
+    expect(user.locate("[data-role='report-proposal']")).to_contain_text(markdown)
+    saved = Entities.fetch_one(reports[0].urlsafe_key, request=Fetch.direct())
+    assert saved.summary == markdown
+    assert saved.proposal["summary"] == markdown
+
+
 # @matrix ai-report : deferred-refresh list operation-poll stage-labels
 # @template home/tools.html::report_stage_label
 # @template home/tools.html::report_item
@@ -1142,7 +1207,7 @@ def test_report_list_item_delete_removes_report_only_file(get_user):
     assert Entities.fetch_one(uploaded_file.urlsafe_key, request=Fetch.root()) is None
 
 
-# @matrix ai-report : delete-modal detail deterministic-run idempotent repeat-run result-json
+# @matrix ai-report : delete-modal detail deterministic-run idempotent repeat-run result-json action-counts
 def test_report_detail_runs_ready_report(get_user):
     user = get_user(Users.OWNER)
     report, category_name, page_name = _ready_report(user)
@@ -1150,6 +1215,11 @@ def test_report_detail_runs_ready_report(get_user):
     report_page = user.go(Report.for_entity(user, report))
     expect(report_page.execute_button).to_be_visible()
     expect(report_page.execute_button).to_have_attribute("data-kind", "success")
+    action_summary = user.page.locator("[data-role='proposal-action-summary']")
+    expect(action_summary).to_contain_text("3 proposed actions")
+    expect(action_summary).to_contain_text("Create category: 1")
+    expect(action_summary).to_contain_text("Create page: 1")
+    expect(action_summary).to_contain_text("Suggest page deletion: 1")
     report_page.execute()
 
     expect(user.page.get_by_text("Work done.")).to_be_visible()
@@ -1681,8 +1751,12 @@ def test_stale_schema_plan_keeps_review_and_explains_recovery(get_user, browser_
     report.proposal["actions"][0]["data"]["operations"].append(
         {"op": "update_field", "schema_id": "input-note", "patch": {"input": "number"}}
     )
+    data = report.proposal["actions"][0]["data"]
+    with app.test_request_context("/"):
+        preview = execute_preview_form_schema_update({"id": form.urlsafe_key, "operations": data["operations"]}, _owner(user))
+    data["scope_fingerprint"] = preview["scope_fingerprint"]
     report.proposal = prepare_schema_updates(report.proposal, _owner(user))
-    prepare_schema_updates(report.proposal, _owner(user), external=origin == "api", verify=True)
+    prepare_schema_updates(report.proposal, _owner(user), verify=True)
     reviewed_proposal = deepcopy(report.proposal)
     original_schema = deepcopy(form.schema)
     Entities.save(report)
@@ -1753,6 +1827,32 @@ def test_stale_schema_plan_keeps_review_and_explains_recovery(get_user, browser_
     assert Entities.fetch_one(page.urlsafe_key, request=Fetch.direct()).submission == edited_submission
 
 
+# @source lagniappe/core/tools/ai/reporting/schema_updates.py::report_impact
+# @matrix ai-report : review
+def test_report_detail_reviews_schema_action_without_id(get_user):
+    user = get_user(Users.OWNER)
+    report, form, page = _schema_section_report(user)
+    schema_action = report.proposal["actions"][0]
+    schema_action.pop("id")
+    report.proposal["actions"] = [
+        {"id": "2", "type": "needs_review", "data": {"note": "Unrelated review"}},
+        schema_action,
+    ]
+    reviewed_proposal = deepcopy(report.proposal)
+    original_schema = deepcopy(form.schema)
+    Entities.save(report)
+
+    user.go(Report.for_entity(user, report))
+    impact = user.page.locator("[data-role='schema-impact-action']")
+    expect(impact).to_have_count(1)
+    expect(impact).to_have_attribute("data-schema-action-index", "2")
+    expect(impact.get_by_role("link", name=form.name, exact=True)).to_be_visible()
+    expect(impact).to_contain_text("Add choice: Paid")
+    assert Entities.fetch_one(report.urlsafe_key, request=Fetch.direct()).proposal == reviewed_proposal
+    assert Entities.fetch_one(form.urlsafe_key, request=Fetch.direct()).schema == original_schema
+    assert Entities.fetch_one(page.urlsafe_key, request=Fetch.direct()).submission["input-note"] == "unpaid"
+
+
 # @matrix ai-report : batch-field-patch detail deterministic-run schema-update skip-action
 # @template tools/report.html::proposal_action_item
 def test_report_detail_skips_schema_section_and_dependent_submission_updates(get_user):
@@ -1761,6 +1861,10 @@ def test_report_detail_skips_schema_section_and_dependent_submission_updates(get
     report.proposal["actions"][0]["data"]["operations"].append(
         {"op": "update_field", "schema_id": "input-note", "patch": {"input": "number"}}
     )
+    data = report.proposal["actions"][0]["data"]
+    with app.test_request_context("/"):
+        preview = execute_preview_form_schema_update({"id": form.urlsafe_key, "operations": data["operations"]}, _owner(user))
+    data["scope_fingerprint"] = preview["scope_fingerprint"]
     report.proposal = prepare_schema_updates(report.proposal, _owner(user))
     Entities.save(report)
 

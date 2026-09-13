@@ -679,7 +679,7 @@
 							"value": true,
 							"form_value": true,
 							"filter_value": true,
-							"ai_value": "True"
+							"ai_value": true
 						}
 					}
 				}
@@ -700,7 +700,7 @@
 							"value": false,
 							"form_value": false,
 							"filter_value": false,
-							"ai_value": "False"
+							"ai_value": false
 						}
 					}
 				}
@@ -721,7 +721,7 @@
 							"value": true,
 							"form_value": true,
 							"filter_value": true,
-							"ai_value": "True"
+							"ai_value": true
 						}
 					}
 				}
@@ -742,7 +742,7 @@
 							"value": false,
 							"form_value": false,
 							"filter_value": false,
-							"ai_value": "False"
+							"ai_value": false
 						}
 					}
 				}
@@ -763,7 +763,7 @@
 							"value": true,
 							"form_value": true,
 							"filter_value": true,
-							"ai_value": "True"
+							"ai_value": true
 						}
 					}
 				}
@@ -784,7 +784,7 @@
 							"value": true,
 							"form_value": true,
 							"filter_value": true,
-							"ai_value": "True"
+							"ai_value": true
 						}
 					}
 				}
@@ -805,7 +805,7 @@
 							"value": false,
 							"form_value": false,
 							"filter_value": false,
-							"ai_value": "False"
+							"ai_value": false
 						}
 					}
 				}
@@ -826,7 +826,7 @@
 							"value": false,
 							"form_value": false,
 							"filter_value": false,
-							"ai_value": "False"
+							"ai_value": false
 						}
 					}
 				}

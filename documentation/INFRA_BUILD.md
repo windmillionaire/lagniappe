@@ -95,7 +95,7 @@ from entering every Core view's static closure.
 - Tailwind processing and cssnano;
 - production build metadata and the startup budget;
 - a Rollup visualizer at `reports/bundle-stats.html`;
-- the content-addressed Material Symbols subset;
+- content-addressed text webfonts and the Material Symbols subset;
 - versioned chunk imports and service-worker precache entries; and
 - optional hidden Sentry source maps.
 
@@ -130,10 +130,10 @@ The custom plugins in `build/utility.mjs` enforce one artifact contract:
 - `recordBuildArtifacts(...)` collects every Rollup output across all entry
   configurations. The build wrapper validates that inventory and publishes the
   completion marker last.
-- `emitMaterialSymbols()` emits the vendored glyph subset under a filename
-  derived from its digest.
-- `resolveMaterialSymbolsFont()` rewrites the stable authored font URL to that
-  generated asset.
+- `emitFonts()` emits vendored text and icon WOFF2 files under filenames
+  derived from their digests and removes obsolete published fonts.
+- `resolveFonts()` rewrites stable authored font URLs to those generated
+  assets. `buildStyles()` emits their matching Jinja preload URL map.
 - `buildStyles()` validates the semantic style and icon registries and emits
   their JavaScript and Python representations. See
   [INFRA_BUILD_STYLES.md](INFRA_BUILD_STYLES.md).

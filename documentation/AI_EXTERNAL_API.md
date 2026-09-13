@@ -252,6 +252,20 @@ display array keyed by column titles. Other fields retain their existing
 actor-aware AI projections, including reference handling; this is not a raw
 storage export. Follow the field type's submission format when writing. Unset
 fields are omitted; a Form itself has no submission and returns `values: null`.
+The same collection and boolean projections apply to entity, task-list and
+history reads. Their outer field keys remain human labels; use `get_schema` when
+exact outer field IDs are needed.
+
+`get_task_history(id=..., include_original=true)` adds `original_completion` for
+the currently completed Task: `{generation, schema, schema_available, values}`.
+Values use exact field IDs and the saved completion's schema, even after the
+live Form migrates. This opt-in read requires edit access, matching the website;
+ordinary history still requires view access. Open Tasks return `null`. If the
+historical definition is unavailable, `schema_available` is false, `values` is
+null, and an `error` explains the gap. Private raw keys are never substituted for
+an unavailable projection. The existing `task` and `history` fields retain their
+current-task and older-occurrence meanings.
+
 For patches, `get_guidelines(task="form_autofill",
 actions=["update_form_values"], field_types=[...])` omits the full Autofill
 and file-discovery workflow. Reuse guidance already received when sufficient.
@@ -264,6 +278,19 @@ and save the combined result. Undo restores the same batch in reverse row order.
 The browser report labels successful patches as `Task Updated` or `Page Updated`
 with a link to each distinct applied target. Skipped-only targets are not labeled
 as updated; this display projection leaves the execution/undo ledger unchanged.
+
+Create/Organize plan reads and submission receipts also expose `action_summary`:
+`{total, by_type, maximum}`. The external maximum is 100. These count the saved
+proposal's action rows, including skipped and review-only rows, without
+predicting how many records or history occurrences execution will create.
+The shared website review shows the total and counts by action type; native
+reports omit the external action maximum. Ask omits this metadata.
+
+After a Create/Organize plan executes, read workspace state without `plan_id`;
+use `get_plan` for execution outcomes. A plan-scoped read rejected at this stage
+includes that recovery instruction. MCP schema validation errors include the
+applicable public numeric bound (for example `details.maximum: 50`), alongside
+the existing path and validator, without echoing submitted values or schemas.
 
 For clients that prefer direct HTTP, the API-key workflow and downloadable
 [client skill](#minimal-client-skill) remain independent of OAuth and MCP.
@@ -480,7 +507,7 @@ concerning the authenticated user's own Page. Proposal submission rejects a
 Task without an executable Page reference, and the deterministic runner does not
 gain permission to write to any other Page.
 
-External `search_entities` uses ranked keyword candidates, with bounded OR fill
+On-site and external `search_entities` use ranked keyword candidates, with bounded OR fill
 when a multiword query has too few strict matches. Exact names and stronger name
 matches rank ahead of weak matches. Caller permissions and requested kind/parent
 scope apply to both queries. Cached parent, snippet and Task completion context
@@ -488,8 +515,9 @@ helps target selection without loading every entity for extra permission flags.
 When `kinds` is exactly `["page"]`, `parent_id` may constrain keyword candidates
 or explicit exact lookup to one viewable Category. `match_mode: "exact_name"`
 retains its case-insensitive full-name equality and permission metadata. Built-in
-Gemini, automatic Organize retrieval and website search retain their existing
-full-text behavior; trusted API dispatch selects the candidate path.
+Gemini and the external API share the same search description and candidate
+dispatch. Automatic Organize retrieval and ordinary website search retain their
+existing full-text behavior.
 
 One-time Task reminders use `due_date` without `schedule`. Repeating schedules
 declare their interval/unit or calendar mode and its dependent fields. The
@@ -574,9 +602,9 @@ the corresponding Form bundle only when designing a Form. `schema_evolution`
 combines migration rules with filtered source/destination schema definitions,
 and its contract advertises that filter. Ordinary `form_autofill` guidance
 prefers JSON numbers for Number inputs and explains their accepted numeric-string
-coercion. External migration candidates instead require exact JSON types and
-receive their own strict rules. On-site planners receive after-approval conversion
-instructions without external candidate-authoring rules.
+coercion. Migration candidates require exact JSON types. On-site and external
+schema planners receive the same strict candidate-authoring rules and prepare
+the exact values before review; execution never invokes another conversion model.
 
 External Organize guidance is selected by the API route, not by a public client
 or workflow flag. File-backed on-site/email Gemini retains its separate server-managed
@@ -618,14 +646,16 @@ unchanged.
 
 ### Publication and browser approval
 
-Fileless API/MCP Organize drafts expose an existing-record update subset:
+Fileless website, API/MCP, and email Organize drafts use an existing-record update subset:
 completion, Form-value patches, document appends, reviewed schema changes,
 rename/move and category/form attachment. `needs_review` handles ambiguous work.
-Trusted API/email origin and the absence of uploads select this shared profile;
-there is no new UI tool or client-controlled authorization flag. UI Organize
-continues to require files (instruction-only UI requests still become Ask).
+Trusted intake origin and the absence of uploads select this shared profile;
+there is no new UI tool or client-controlled authorization flag. Instruction-only
+website Organize produces an update proposal for browser review.
 
-Start Organize and use the compact action list, then request
+Start Organize with `actions=["update_form_values", "complete_task"]` when the
+needed actions are known to include selected schemas in the first response.
+Otherwise use the compact action list, then request
 `get_plan_contract(actions=["update_form_values", "complete_task"])`
 for exact shapes. Use read tools to identify the intended record and inspect its
 current schema. Put final field patches before `complete_task`, with the patch's
@@ -693,8 +723,11 @@ message. It returns `baseline`, `scope_fingerprint`, and cursor-paginated
 Task instances also include a boolean `completed`; Page instances omit it.
 Follow every cursor with unchanged operations; concurrent changes invalidate it.
 
-For AI conversions, use `include_values=true`. The source values preserve exact
-rows and types and include only affected AI fields. Supply every populated AI
+Use `include_values=true` for conversion evidence. AI fields include their source
+`value`, preserving exact rows and types. Affected deterministic scalar fields
+include `before` and `clears`, plus `after` when the value survives. `clears: true`
+explicitly means removal and omits `after`. Unaffected fields are not returned;
+pagination and the existing response size guard still apply. Supply every populated AI
 field in `data.conversions` as `{entity, schema_id, source_fingerprint, value}` or
 `{entity, schema_id, source_fingerprint, unresolved_reason}`. Tables use
 `{rows: [{column_id: value}]}` and todos `{items: [{text, checked}]}`; only exact

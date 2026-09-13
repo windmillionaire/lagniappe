@@ -115,7 +115,7 @@ class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty):
 
     @property
     def ai_value(self):
-        return deepcopy(self.items) or None
+        return deepcopy(self.value) or None
 
     @property
     def search_key(self):

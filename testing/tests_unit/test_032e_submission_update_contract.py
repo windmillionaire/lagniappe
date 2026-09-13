@@ -21,6 +21,8 @@ TARGETS = ("page", "task", "page_action", "task_action")
 
 
 def _proposal(data):
+    # Creation references belong to file-backed Organize, whose wider action
+    # contract these row-shape tests intentionally exercise.
     return {
         "summary": "Update reproduction details",
         "confidence": 1,
@@ -47,7 +49,7 @@ def _proposal(data):
 )
 def test_update_rows_require_one_target_in_contract_and_runtime(targets):
     actor = _test_user("field-contract-owner")
-    report = SimpleNamespace(tool="organize", origin="web", input_files=[])
+    report = SimpleNamespace(tool="organize", origin="web", input_files=[object()])
     row = {"schema_id": "textarea-notes", "new_value": "Updated notes"}
     row.update({target: "new-page" if target.startswith("page") else "new-task"
                 for target in targets})
@@ -86,7 +88,7 @@ def test_update_rows_require_one_target_in_contract_and_runtime(targets):
 @pytest.mark.unit
 def test_top_level_update_target_is_only_valid_for_internal_pending_planning():
     actor = _test_user("pending-contract-owner")
-    report = SimpleNamespace(tool="organize", origin="web", input_files=[])
+    report = SimpleNamespace(tool="organize", origin="web", input_files=[object()])
     pending = _proposal({"task": "new-task"})
     assert validate_proposal(
         deepcopy(pending), allow_empty_submission_updates=True,
@@ -123,7 +125,7 @@ def test_selected_update_guidance_example_satisfies_external_contract():
     example, _remainder = json.JSONDecoder().raw_decode(guidance.split("Example data: ")[1])
     assert external_api.submission_validation_errors(
         {"contract_version": external_api.CONTRACT_VERSION, "proposal": _proposal(example)},
-        SimpleNamespace(tool="organize", origin="web", input_files=[]), actor,
+        SimpleNamespace(tool="organize", origin="web", input_files=[object()]), actor,
     ) == []
     assert "Put the target inside every data.updates row" in guidance
     assert "internal pending planning only" in guidance

@@ -7,7 +7,7 @@
       <button class="{{ styles.home.generate }}"
               data-tool="organize"
               data-route="{{ url_for('tools.create_organize_report') }}"
-              data-placeholder="Optional guidance for organizing these files..."
+              data-placeholder="Describe updates to existing records, or add files to organize..."
               data-upload="true"
               data-explain="organize"
               data-active="true"
@@ -237,9 +237,9 @@
       <div class="{{ styles.home.card.actions }} translate-y-0.5">{{ controls.delete(label='Delete ' ~ report.name) }}</div>
     </div>
     <div class="{{ styles.home.ingress.details }}">
-      <p>
+      <p data-role="report-snippet" class="line-clamp-5 break-words font-normal">
         {% if report.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
-        <span class="font-normal">{{ report.note }}</span>
+        <span>{{ report.note|format_markdown_text }}</span>
       </p>
     </div>
   </li>

@@ -1,0 +1,64 @@
+{
+  "fonts": [
+    {
+      "name": "bitter",
+      "family": "Bitter",
+      "style": "normal",
+      "weight": "100 900",
+      "source": "upstream/Bitter[wght].ttf",
+      "sha256": "ef2b9a711fb02f1e5823b34da1b7450e0fc76793b7d733a8b41006e24916d4a7",
+      "url": "https://raw.githubusercontent.com/google/fonts/b6380fac8e94cdc92aa045cf44d80a7743dde8d6/ofl/bitter/Bitter%5Bwght%5D.ttf",
+      "partition": true
+    },
+    {
+      "name": "bitter-italic",
+      "family": "Bitter",
+      "style": "italic",
+      "weight": "100 900",
+      "source": "upstream/Bitter-Italic[wght].ttf",
+      "sha256": "5e6e0af503171c9d7b4be7a22c16f474d7a638cf83a80051d825bcc58d664bc3",
+      "url": "https://raw.githubusercontent.com/google/fonts/b6380fac8e94cdc92aa045cf44d80a7743dde8d6/ofl/bitter/Bitter-Italic%5Bwght%5D.ttf",
+      "partition": true
+    },
+    {
+      "name": "source-sans",
+      "family": "Source Sans 3",
+      "style": "normal",
+      "weight": "200 900",
+      "source": "upstream/SourceSans3[wght].ttf",
+      "sha256": "042fe2cc0b933e328410d7acbd0aa6a1873dca5aef81875f4bc214b08825c7b9",
+      "url": "https://raw.githubusercontent.com/google/fonts/914ec116571b1162d886aa402e715552221f0b77/ofl/sourcesans3/SourceSans3%5Bwght%5D.ttf",
+      "partition": true
+    },
+    {
+      "name": "source-sans-italic",
+      "family": "Source Sans 3",
+      "style": "italic",
+      "weight": "200 900",
+      "source": "upstream/SourceSans3-Italic[wght].ttf",
+      "sha256": "39e3ab05ccd7cb94907c31005bb5bec1d5432f0b096a2b782976e217a540eb6c",
+      "url": "https://raw.githubusercontent.com/google/fonts/914ec116571b1162d886aa402e715552221f0b77/ofl/sourcesans3/SourceSans3-Italic%5Bwght%5D.ttf",
+      "partition": true
+    },
+    {
+      "name": "open-sans-math",
+      "family": "Open Sans",
+      "style": "normal",
+      "weight": "300 800",
+      "source": "upstream/open-sans-math.woff2",
+      "sha256": "a093b888254afd7deb8e37cccfd434e7d06ed47d22cfed9621631d80e1e81554",
+      "url": "https://fonts.gstatic.com/s/opensans/v44/memvYaGs126MiZpBA-UvWbX2vVnXBbObj2OVTVOmu1aB.woff2",
+      "partition": false
+    },
+    {
+      "name": "open-sans-symbols",
+      "family": "Open Sans",
+      "style": "normal",
+      "weight": "300 800",
+      "source": "upstream/open-sans-symbols.woff2",
+      "sha256": "8f80f993e523f2e6c2d097552740fd26331658da23ffad31d26edcdd3aeec370",
+      "url": "https://fonts.gstatic.com/s/opensans/v44/memvYaGs126MiZpBA-UvWbX2vVnXBbObj2OVTUGmu1aB.woff2",
+      "partition": false
+    }
+  ]
+}

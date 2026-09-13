@@ -1,4 +1,4 @@
-"""Schema guidance selected by trusted invocation context."""
+"""Shared guidance for reviewed Form schema proposals."""
 
 _SCHEMA_EVOLUTION_COMMON = """
 ### Schema Evolution Guidelines
@@ -16,6 +16,8 @@ Follow every next_cursor with identical operations. Preserve baseline and
 scope_fingerprint in the action. Restricted affected Pages/Tasks block the whole
 AI-proposed migration; do not substitute a filtered query or omit hidden targets.
 Link affected entities in the plan; the server also supplies paginated review links.
+Use include_values=true for scalar before/after evidence: clears=true means the
+value will be removed and after is omitted. Explain that loss explicitly.
 
 Operations use exact IDs:
 - add_field: a complete field with a new stable id, type and title; input fields
@@ -45,20 +47,10 @@ schema or saved values change.
 """
 
 SCHEMA_EVOLUTION_GUIDELINES = _SCHEMA_EVOLUTION_COMMON + """
-### Conversion instructions
-
-Include optional conversion_instructions keyed by AI-converted field ID (maximum
-4000 characters each). Describe how to interpret the values and destination
-columns. Saved-value conversion happens after the user approves the plan; your
-proposal contains the schema changes and instructions, not generated conversions.
-Use the preview's affected entities and conversion rules to explain the impact.
-"""
-
-EXTERNAL_SCHEMA_EVOLUTION_GUIDELINES = _SCHEMA_EVOLUTION_COMMON + """
 ### Prepared conversions
 
 Call preview_form_schema_update with include_values=true and follow ALL pages.
-Only affected AI field values are returned, preserving rows and types. Supply
+Affected AI field values preserve rows and types. Supply
 data.conversions with exactly one {entity, schema_id, source_fingerprint, value}
 or {entity, schema_id, source_fingerprint, unresolved_reason} per populated AI
 field. Copy each entity and source_fingerprint from the preview. Value must match
@@ -67,15 +59,20 @@ the exact destination shape: {rows: [{column_id: value}]} or
 completion states. Do not infer entity links. An unresolved value requires a
 nonempty unresolved_reason and no value; empty collections cannot clear a
 populated source implicitly. No duplicate, missing or extra conversion targets.
+For Todo, preserve identifiable list/checklist entries or tasks. Prose stating
+that no items, findings or actions were recorded is unresolved, not itself a Todo
+item. Negation within an actual item, such as "Confirm no leaks", is valid.
 
 The user will review these exact candidates before they are applied. Author the
 complete conversions now; execution does not generate or repair candidates.
+Describe these as proposed values, not as changes already saved.
 Candidate cells use exact destination JSON types: text/email/tel are strings,
 numbers are finite JSON numbers, and checkboxes are booleans (not strings).
 Dates are ISO 8601 timestamps with a timezone; times use HH:MM. External links
 use {title, url}. Omit missing cells rather than inventing a value. Numeric-string
 coercion accepted by ordinary submission entry does not apply to candidates.
 Keep candidates inside the proposal size limit. For a storage-size rejection,
-reduce the change's scope; never truncate source values. Changed values,
+reduce the change's scope or use the on-site Builder; never truncate source values
+or defer candidate generation until execution. Changed values,
 membership, permissions or schema require a fresh preview and review.
 """

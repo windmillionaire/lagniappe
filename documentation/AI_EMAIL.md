@@ -65,7 +65,7 @@ classifier selects intent only; the planner discovers and disambiguates exact
 targets, loads relevant schemas, and returns a plan for browser review.
 Fileless updates skip file preparation and secondary form-completion generation.
 Attachment-bearing requests retain the normal file-processing/placement rules.
-UI Organize's file requirement and instruction-only Ask fallback are unchanged.
+Website Organize uses this same update profile for instruction-only requests.
 
 ## Durable handoff
 

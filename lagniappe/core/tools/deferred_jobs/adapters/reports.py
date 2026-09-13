@@ -16,7 +16,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.ai import external_operations
-from lagniappe.core.tools.ai.reporting.contracts.workflows import is_remote_organize_update
+from lagniappe.core.tools.ai.reporting.contracts.workflows import is_organize_update
 from lagniappe.core.tools.database import agent_api as agent_api_store
 
 from .base import DeferredJobAdapter
@@ -225,7 +225,7 @@ class OrganizeReportAdapter(ReportAdapter):
             )
             stage_index = 1
 
-        update_only = is_remote_organize_update(report)
+        update_only = is_organize_update(report)
         if not report.input_files and not update_only:
             raise exceptions.ValidationError("Organize requires at least one uploaded file in the UI.")
         if update_only and stage_index < 2:

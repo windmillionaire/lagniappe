@@ -14,6 +14,11 @@ bundled code listed here retain their upstream licenses.
 | Source Sans 3 webfonts | Google Fonts `ofl/sourcesans3` | [SIL OFL 1.1](source-sans-3-OFL.txt) |
 | Open Sans math and symbol subsets | Google Fonts `ofl/opensans` | [SIL OFL 1.1](open-sans-OFL.txt) |
 
+Text font sources and their pinned provenance are recorded in
+`src/fonts/sources.json`. The reproducible loading partitions retain the full
+Bitter and Source Sans 3 character maps; see
+[`INFRA_BUILD_STYLES.md`](../documentation/INFRA_BUILD_STYLES.md).
+
 The Material Symbols subset source request, included glyphs, axes, upstream
 version, and SHA-256 digest are recorded in
 `src/fonts/material-symbols-rounded.json`.

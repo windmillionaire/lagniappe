@@ -2,6 +2,47 @@
 
 import textwrap
 
+
+# @pair analytics:internal-request-exclusion
+def test_analytics_skips_internal_requests(run_node):
+    run_node(r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+const assert = require("node:assert/strict");
+const sent = [];
+const context = {
+  request: {csrfFailed: () => false},
+  document: {
+    querySelector: () => ({getAttribute: () => "true"}),
+    getElementById: () => ({value: "csrf"}),
+  },
+  window: {location: {pathname: "/"}},
+  fetch: async (_url, options) => {
+    sent.push(JSON.parse(options.body));
+    return {ok: true};
+  },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/analytics.mjs", "utf8")
+  .replace(/^import .*;$/m, "")
+  .replace("export const analytics =", "globalThis.analytics =");
+vm.runInContext(source, context);
+(async () => {
+  for (const action of ["view", "public_view", "create", "update", "delete"]) {
+    for (const path of ["/api", "/api/v1/me", "/mcp", "/mcp/tools", "/l", "/l/poll", "/analytics/"]) {
+      await context.analytics.tag(action, {path});
+    }
+  }
+  context.window.location.pathname = "/l/update";
+  await context.analytics.tag("update");
+  assert.equal(sent.length, 0);
+  for (const path of ["/", "/pages/example", "/tools/api-plan/example", "/links"]) {
+    await context.analytics.tag("view", {path});
+  }
+  assert.deepEqual(sent.map(row => row.path), ["/", "/pages/example", "/tools/api-plan/example", "/links"]);
+})().catch(error => { console.error(error); process.exitCode = 1; });
+''')
+
 def run_request_check(run_node, assertion: str):
     script = f"""
 const fs = require("node:fs");

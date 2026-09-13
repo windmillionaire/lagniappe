@@ -9,6 +9,7 @@
 		"virtual_module": "styles",
 		"icons_virtual_module": "icons",
 		"python_styles": "lagniappe/web/start/styles/styles.py",
+		"python_fonts": "lagniappe/web/start/styles/fonts.py",
 		"python_icons": "lagniappe/web/start/styles/icons.py"
 	},
 	"css": {

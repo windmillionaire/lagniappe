@@ -17,6 +17,7 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason, MutationOperation
 from lagniappe.core.entities import Entities
+from lagniappe.core.properties.ai_report_proposal import summarize_actions
 from lagniappe.core.mutations import (
     consume_mutation_intents,
     execute_post_commit,
@@ -590,6 +591,8 @@ def _plan_payload(report, *, include_proposal=True):
                 report, g.agent_api_user
             )
         payload["original_brief"] = (report.agent_manifest or {}).get("original_brief")
+    if report.tool != "ask":
+        payload["action_summary"] = summarize_actions(report.proposal, maximum=external_api.MAX_PROPOSAL_ACTIONS)
     return _json_safe(payload)
 
 
@@ -612,6 +615,7 @@ def _submission_receipt(report):
         "status_url": plan["status_url"],
         "contract_version": plan["contract_version"],
         "proposal_fingerprint": manifest.get("proposal_fingerprint"),
+        **({"action_summary": plan["action_summary"]} if "action_summary" in plan else {}),
     }
 
 
@@ -657,7 +661,8 @@ def _require_tools_available(report):
     raise APIProblem(
         "plan_tools_unavailable",
         "Read tools are available only for draft plans, completed Ask plans, and "
-        "ready Create or Organize plans.",
+        "ready Create or Organize plans. For ordinary workspace reads after "
+        "execution, omit plan_id; use get_plan for the execution outcomes.",
         409,
     )
 
@@ -1487,11 +1492,22 @@ def openapi_document():
                             "type": ["object", "null"],
                             "description": "Create/Organize action outcomes and permission-rechecked result entity references; no private ledger data. Absent for Ask.",
                         },
+                        "action_summary": {"$ref": "#/components/schemas/ActionSummary"},
                         "original_brief": {
                             "type": ["object", "null"],
                             "description": "Initial name/instructions, retained when the current brief is revised.",
                         },
                     },
+                },
+                "ActionSummary": {
+                    "type": "object",
+                    "required": ["total", "by_type"],
+                    "properties": {
+                        "total": {"type": "integer", "minimum": 0},
+                        "by_type": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+                        "maximum": {"type": "integer", "minimum": 1},
+                    },
+                    "additionalProperties": False,
                 },
                 "PlanSubmissionFormat": {
                     "type": "object",
@@ -1623,6 +1639,7 @@ def openapi_document():
                             "type": "integer",
                             "const": external_api.CONTRACT_VERSION,
                         },
+                        "action_summary": {"$ref": "#/components/schemas/ActionSummary"},
                         "proposal_fingerprint": {
                             "oneOf": [
                                 {"type": "string", "minLength": 1},

@@ -976,6 +976,11 @@ def test_generate_organize_report_repairs_create_form_field_missing_id(monkeypat
 # @matrix ai-report form-schema : deterministic-repair schema-update
 @pytest.mark.unit
 def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
+    from lagniappe.core.tools.ai.reporting import schema_updates
+
+    # This characterization owns mechanical field completion; workspace-backed
+    # preparation and candidate repair are covered by test_004l.
+    monkeypatch.setattr(schema_updates, "prepare_schema_updates", lambda proposal, user: proposal)
     proposal = {
         "summary": "Add a payment reference field.",
         "confidence": 0.8,

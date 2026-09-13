@@ -17,7 +17,7 @@ PREVIEW_FORM_SCHEMA_UPDATE = types.FunctionDeclaration(
     description=(
         "Validate proposed exact-ID Form schema operations and discover every affected "
         "Page/Task, including Task completion state. Read-only: does not save, lock, or call AI. "
-        "Follow every next_cursor; include_values=true returns original affected AI values. "
+        "Follow every next_cursor; include_values=true returns original affected AI values and scalar before/after values (clears=true omits after). "
         "Return baseline and scope_fingerprint unchanged in update_form_schema."
     ),
     parameters={

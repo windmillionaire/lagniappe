@@ -42,8 +42,9 @@ LIFECYCLE_TOOLS = (
 # Contract v8 updates the declared version bounds in lifecycle results.
 # Reviewed conversational contracts: plan-free context, optional brief revisions,
 # execution receipts, and compact/selected schemas in starter/upload context.
-# Optional Create action selection uses the contract reader's identifier schema;
-# shared lifecycle recovery retains selected actions and the requested view.
+# Optional Create/Organize action selection uses the contract reader's identifier schema;
+# Shared lifecycle recovery retains selected actions and the requested view.
+# Action totals/type counts are optional in plan and receipt envelopes.
 LIFECYCLE_SCHEMA_SHA256 = {
     "answer_question": (
         "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
@@ -55,19 +56,19 @@ LIFECYCLE_SCHEMA_SHA256 = {
     ),
     "start_ask": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "6816cc7c761769bf62f02bcdfff9551eec5aa94677f4fb13004b645b1cbdbcc2",
+        "0df96d8dd0fba9462f6e917a1691913d5e3c1415e3784ad5cd04209babf70c8e",
     ),
     "start_create": (
         "6ad98deac652b8e18d90e813977bfa39667d284bc0ed00171b5c4ae0a96e8c20",
-        "6816cc7c761769bf62f02bcdfff9551eec5aa94677f4fb13004b645b1cbdbcc2",
+        "0df96d8dd0fba9462f6e917a1691913d5e3c1415e3784ad5cd04209babf70c8e",
     ),
     "start_organize": (
-        "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "6816cc7c761769bf62f02bcdfff9551eec5aa94677f4fb13004b645b1cbdbcc2",
+        "6ad98deac652b8e18d90e813977bfa39667d284bc0ed00171b5c4ae0a96e8c20",
+        "0df96d8dd0fba9462f6e917a1691913d5e3c1415e3784ad5cd04209babf70c8e",
     ),
     "get_plan": (
         "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
-        "409ade01190ecef168a86d29ff300787de6dda5a78a0a43b0957add82405f076",
+        "af9b90b27c3a2d949bb3e23bcc338ec6232c864eea58c8c0cebdf7586c501f27",
     ),
     "get_plan_contract": (
         "5b95dc7a76a81e9dea530ba2519c92c1de410e59d6e1e7f115068c604c961553",
@@ -75,11 +76,11 @@ LIFECYCLE_SCHEMA_SHA256 = {
     ),
     "upload_local_files": (
         "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
-        "4a5d9aa1443971f18fd6169a27a4d678180954076153685571eff1e8162889bc",
+        "63d2a4845bf9054d0a3203ab72937f4e9c1a63156c9ad88ff4a4494fe50dd674",
     ),
     "submit_plan": (
         "18e44236fd78c5fa56314d6df698b339be168781d967947a7ac9efcfee57a9ef",
-        "7de596c08b72d6550afb5c07f6cef05f2a84475a69b374eeeab0324c375d0765",
+        "afbba8f57cbd320062c5ccf455f3833397099bedb42e9e124a21f4c952e418cc",
     ),
 }
 PLAN_KEYS = {
@@ -294,7 +295,7 @@ def _assert_safe_plan(
 ) -> dict:
     value = _structured(result)
     assert isinstance(value, dict)
-    expected_keys = PLAN_KEYS | {"original_brief"} | ({"execution"} if tool != "ask" else set()) | ({"context"} if context else set())
+    expected_keys = PLAN_KEYS | {"original_brief"} | ({"execution", "action_summary"} if tool != "ask" else set()) | ({"context"} if context else set())
     assert set(value) in (expected_keys, expected_keys - {"proposal"})
     assert value["tool"] == tool
     assert value["status"] == status
@@ -335,7 +336,7 @@ def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
 
 def _assert_safe_receipt(result: dict, *, status: str) -> dict:
     value = _structured(result)
-    assert isinstance(value, dict) and set(value) == RECEIPT_KEYS
+    assert isinstance(value, dict) and set(value) == RECEIPT_KEYS | ({"action_summary"} if status == "ready" else set())
     assert value["status"] == status
     assert not PRIVATE_TRANSPORT_FIELDS.intersection(value)
     _assert_human_url(value["preview_url"], preview=True)

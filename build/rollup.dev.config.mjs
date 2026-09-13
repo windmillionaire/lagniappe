@@ -10,12 +10,12 @@ import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
 import { recordBuildArtifacts } from "./publication.mjs";
 import {
 	buildStyles,
-	emitMaterialSymbols,
+	emitFonts,
 	emitPdfWorker,
 	emitThirdPartyLicenses,
 	generateBuildId,
 	interactionFoundationChunk,
-	resolveMaterialSymbolsFont,
+	resolveFonts,
 	STYLE_PIPELINE,
 	updateServiceWorker,
 	versionChunkImports,
@@ -134,13 +134,13 @@ export default [
 			}),
 			postcss({
 				extract: STYLE_PIPELINE.css.output,
-				plugins: [tailwindcss(), resolveMaterialSymbolsFont()],
+				plugins: [tailwindcss(), resolveFonts()],
 				extensions: [".scss", ".css"],
 				modules: false,
 				inject: false,
 			}),
 			buildStyles(),
-			emitMaterialSymbols(),
+			emitFonts(),
 			emitPdfWorker(),
 			emitThirdPartyLicenses(),
 			updateServiceWorker(buildId),
@@ -156,6 +156,7 @@ export default [
 				version: settings.VERSION,
 				extraArtifacts: [
 					"lagniappe/web/start/styles/icons.py",
+					"lagniappe/web/start/styles/fonts.py",
 					"lagniappe/web/start/styles/styles.py",
 					"lagniappe/web/static/sw.js",
 				],

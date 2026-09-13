@@ -71,6 +71,7 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_create_task_page_reference
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_remote_organize_repairs_malformed_table_patch
+# @tests tests_unit/test_004l_form_schema_updates.py::test_organize_repairs_prepared_conversions_before_returning_plan
 # @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission task-page validation
 # @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
@@ -86,6 +87,7 @@ def validate_proposal(
     preserve_document_markdown=False,
     resolved_reference_details=None,
     allow_legacy_schema=False,
+    prepare_schema_changes=False,
 ):
     """Validate the JSON action proposal returned by the organize prompt."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
@@ -261,6 +263,14 @@ def validate_proposal(
                     "input file. Duplicate report_file_ref values: "
                     f"{', '.join(str(file_ref) for file_ref in duplicate_summary_refs)}"
                 )
+
+    if prepare_schema_changes:
+        from ..schema_updates import prepare_schema_updates
+
+        try:
+            prepare_schema_updates(proposal, user)
+        except exceptions.ValidationError as error:
+            raise exceptions.AIException(f"update_form_schema: {error}") from error
 
     return proposal
 

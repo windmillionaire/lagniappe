@@ -27,7 +27,8 @@ from testing.utility.test_entities import TestEntities
 # @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_proposal_repair_prompt
 # @matrix ai-report : remote-update prompt tools revision repair
 @pytest.mark.unit
-def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance():
+@pytest.mark.parametrize("origin", ["email", "web"])
+def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance(origin):
     from lagniappe.core.tools.ai.reporting.proposals.repair import _proposal_repair_prompt
     user = _test_user("remote-prompt-owner")
     report = TestEntities.get("REPORT", {
@@ -35,7 +36,7 @@ def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance():
         "origin": "email", "tool": "organize", "instructions": "Complete CLI and add notes",
         "proposal": {"summary": "Update CLI", "confidence": 1, "actions": []},
     })
-    report.origin = "email"
+    report.origin = origin
     report.tool = "organize"
     initial = organize.organize_prompt(report, user)
     revised = organize.revise_organize_prompt(report, user, "Use the newer notes")
@@ -47,6 +48,7 @@ def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance():
         assert "attach_file" not in schemas
         assert "updates" in schemas["update_form_values"]["properties"]["data"]["properties"]
         assert "search_entities" in prompt.tools
+        assert "get_task_history" in prompt.tools
         text = str(prompt.preview())
         assert "normal completion rules" in text
         assert "Check every requested outcome against the actions" in text

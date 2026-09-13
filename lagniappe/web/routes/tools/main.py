@@ -124,6 +124,8 @@ def _preview_report_files():
 # @reason explain modal shares the real organize prompt assembly
 def _explain_organize_prompt():
     report = SimpleNamespace(
+        tool="organize",
+        origin="web",
         instructions=request.form.get("instructions"),
         input_files=_preview_report_files(),
     )
@@ -239,9 +241,9 @@ def _start_tool_report(
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_refreshes_stage_labels
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_uses_ask
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_plans_updates
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
-# @matrix ai-report : ask-fallback async create http-boundary text-only upload validation
+# @matrix ai-report : remote-update async create http-boundary text-only upload validation
 # @matrix ai-report : list stage-labels
 @tools.route("/organize", methods=["POST"])
 @ai_access(AI.CREATE)
@@ -259,9 +261,9 @@ def create_organize_report():
         return responses.error("Add files or instructions before creating a report.")
     if not input_files and not upload_manifest:
         return _start_tool_report(
-            "ask",
+            "organize",
             instructions,
-            default_name=ai.ask_report_name(instructions),
+            default_name="Organize: " + _create_report_name(instructions).removeprefix("Create: "),
         )
 
     uploaded_filenames = [file.filename for file in input_files] + [
@@ -433,7 +435,7 @@ def run_report(key):
 
     try:
         if not retryable:
-            prepare_schema_updates(report.proposal, current_user, external=report.origin == "api", verify=True)
+            prepare_schema_updates(report.proposal, current_user, verify=True)
         else:
             for record in result.get("actions", []):
                 if record.get("migration_id"):

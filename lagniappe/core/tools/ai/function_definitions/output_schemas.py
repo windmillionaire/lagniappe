@@ -157,6 +157,18 @@ OUTPUT_SCHEMAS = {
             "limit": {"type": "integer"},
             "truncated": {"type": "boolean"},
             "history": ENTITY_LIST,
+            "original_completion": {
+                "type": ["object", "null"],
+                "required": ["generation", "schema", "schema_available", "values"],
+                "properties": {
+                    "generation": {"type": "integer"},
+                    "schema": {"type": "array", "items": {"type": "object"}},
+                    "schema_available": {"type": "boolean"},
+                    "values": {"type": ["object", "null"]},
+                    "error": {"type": "string"},
+                },
+                "additionalProperties": False,
+            },
         },
     ),
     "get_category_details": ENTITY,

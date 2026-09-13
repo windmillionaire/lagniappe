@@ -108,11 +108,6 @@ def test_organize_fileless_remote_pipeline_and_resume(monkeypatch, origin):
     context = DeferredJobContext(job=SimpleNamespace(attempt=1), actor=actor, notification=None,
         inputs={"report": report}, parameters={}, checkpoint={})
     adapter = report_adapters.OrganizeReportAdapter()
-    if origin == "web":
-        with pytest.raises(exceptions.ValidationError, match="uploaded file in the UI"):
-            adapter.prepare(context)
-        assert not generated
-        return
     adapter.prepare(context)
     assert context.checkpoint["stage"] == "ready_to_apply"
     assert context.checkpoint["proposal"] == proposal

@@ -146,6 +146,43 @@ recovery, stage, safe entity references, and AI-generation summaries correlated
 by an opaque ID. It excludes prompts, parameters, checkpoints, generated
 content, authorization data, and provider/tool payloads.
 
+In Analytics, expand a Recent Run to see its report link when available, elapsed job time,
+and the individual AI stages recorded for the selected period. Each stage
+separates model requests, tool rounds/calls, input and cached tokens, output
+and reasoning tokens, and duration. Cached tokens are a subset of input tokens;
+stage durations are not the whole job's elapsed time. Tool names appear once
+each, with repeated calls labelled by count; this is not an ordered transcript.
+The JSON export preserves the original tool-name entries. Missing summaries
+are shown as unavailable.
+
+Recent Runs omits report-execution jobs without AI generation summaries. Those
+jobs apply reviewed actions, including exact schema-conversion candidates for
+both on-site and external reports. Builder utility conversions run under their
+separate Form Change job. Execution diagnostics remain accessible through the
+existing diagnostic route, and executions still retain their ordinary job and
+report history. Missing summaries for AI planning jobs remain visible.
+The Form Change worker supplies its own telemetry ID at the utility-model
+boundary, so new conversion summaries join to that job's run JSON.
+
+Result processing is separate from job success. `normalized` (shown as
+**Formatted / normalized**) means validation changed the representation, for
+example by rendering Markdown as HTML or adding default fields. Explicit local
+corrections still record `local_repair`; **Locally adjusted** also accommodates
+older records that used that value for ordinary normalization. `model_repair`
+means the workflow requested a separate model repair. Explicit repair/review
+outcomes take precedence over subsequent normalization. Historical JSON is not
+rewritten, and the export retains these machine-readable outcome values.
+
+**Copy run JSON** reads the existing owner-only operation diagnostic endpoint
+and copies its indented JSON, including available retained stages for the run
+and the query-limit indicator. A selectable text field appears if clipboard
+access fails. This is the preferred handoff for per-run evaluation; it does
+not require a separate cloud query or capture additional content.
+
+Report links are offered only for reports owned by the current user, matching
+the report route's existing access rules. Other users' jobs still expose the
+owner diagnostic JSON and its safe references.
+
 ## Form changes
 
 `form_changes.py` and `adapters/form_change.py` implement one Form update without
@@ -168,15 +205,17 @@ patches only answer/generation/notice/receipt fields and required projections.
 Task links, list owners and caches use normal mutation effects. Rows with this
 change's receipt skip conversion on retry but retry their display effects.
 
-AI conversions (textarea→table/todo and table↔todo) share this worker. Site
+AI conversions (textarea→table/todo and table↔todo) share this worker. Builder
 calls use the utility tier synchronously for one target's affected fields at a
 time, with bounded input/output and one malformed-output repair. A prepared
 `ai_batch` checkpoint precedes the live write; a replay verifies source hashes
-and reuses those results. External candidates come from an immutable approved
-report; no provider is invoked. Retry carries any pending prepared batch to the
-replacement worker. Every AI-originated migration, deterministic included, checks
+and reuses those results. On-site Organize and external candidates come from an
+immutable approved report; no provider is invoked. The presence of a linked
+report selects prepared conversion, independently of report origin. Retry carries
+any pending prepared batch to the replacement worker. Every AI-originated
+migration, deterministic included, checks
 Form edit and complete population view access before application and rechecks
-current access per target. This does not require per-target edit access. Site AI
+current access per target. This does not require per-target edit access. Builder AI
 calls additionally require AI.CREATE. Initial restricted/stale preflight failure
 releases only an unapplied change using guarded rejection state; partial changes
 retain ownership. Manual deterministic builder migrations retain Form-only
@@ -186,7 +225,7 @@ The on-site utility prompt requires absent table cells to omit their column keys
 Its output boundary also treats null and blank-string cells in known columns as
 absent, preserving explicit zero/false and rejecting populated values of the wrong
 type. Unknown columns and empty rows/collections remain validation failures;
-external reviewed candidates retain exact-shape validation without normalization.
+all reviewed report candidates retain exact-shape validation without normalization.
 Validation failures name the field, column, row and expected type where available.
 The worker retains target/field references in private job error context; builder
 status resolves an affected Page/Task link only after checking current visibility

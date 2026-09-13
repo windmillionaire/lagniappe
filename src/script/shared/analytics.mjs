@@ -69,7 +69,9 @@ const viewData = (action) => {
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
+ * @tests tests_js/test_009_request_csrf.py::test_analytics_skips_internal_requests
  * @pair analytics:page-load
+ * @pair analytics:internal-request-exclusion
  */
 class AnalyticsManager {
 	get enabled() {
@@ -84,10 +86,7 @@ class AnalyticsManager {
 		if (!this.enabled) return;
 
 		const path = payload.path || window.location.pathname;
-		if (
-			["view", "public_view"].includes(action) &&
-			path.startsWith("/analytics")
-		) {
+		if (/^\/(?:analytics|api|mcp|l)(?:\/|$)/.test(path)) {
 			return;
 		}
 

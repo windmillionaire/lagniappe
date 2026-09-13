@@ -2200,6 +2200,7 @@ def test_get_schema_includes_values_by_id_without_label_collisions(monkeypatch, 
 
 
 # @matrix ai form-schema : schema tool-context
+# @pair form-table:typed-values
 @pytest.mark.unit
 def test_get_schema_preserves_collection_rows_and_typed_cells(monkeypatch):
     form = TestEntities.get("FORM", {"name": "Inventory", "hash": "typed-form"})
@@ -2241,6 +2242,11 @@ def test_get_schema_preserves_collection_rows_and_typed_cells(monkeypatch):
     assert "row-qty" not in rows[3]
     assert rows[0]["row-name"] == "Pens"
     assert rows[0]["row-link"] == {"title": "Catalog", "url": "https://example.com/catalog"}
+    # The ordinary entity/history projection uses the same typed collection
+    # values as exact-ID schema reads, without a second raw-value copy.
+    projected = task.to_ai(user)
+    assert projected["Items"] == expected["table-items"]
+    assert projected["Checklist"] == expected["todo-items"]
 
 
 # @matrix ai form-schema : autofill category-forms schema
@@ -3176,6 +3182,66 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     assert ai_get_task_history.execute_get_task_history({}, user) == {
         "error": "id is required"
     }
+
+
+# @matrix ai tasks : original-completion permissions schema-version
+@pytest.mark.unit
+def test_get_task_history_original_answers_use_saved_schema_and_permissions(monkeypatch):
+    from copy import deepcopy
+    from lagniappe.core.definitions import Action
+    from lagniappe.core.tools import form_drafts, form_definitions
+
+    monkeypatch.setattr(form_definitions.database_get, "urlsafe_key", lambda key: key)
+    user = TestEntities.get("USER", {"name": "Owner", "owner": True, "hash": "original-owner"})
+    task = TestEntities.get("TASK", {"name": "Inventory", "hash": "original-task"})
+    task.page = TestEntities.get("PAGE", {"name": "Stock", "hash": "original-page"})
+    form = TestEntities.get("FORM", {"name": "Inventory", "hash": "original-form"})
+    old_schema = [
+        {"id": "count", "type": "input", "input": "text", "title": "Count"},
+        {"id": "signed", "type": "signature", "title": "Signed"},
+        {"id": "inventory", "type": "table", "title": "Inventory", "columns": [
+            {"id": "name", "type": "input", "input": "text", "title": "Same"},
+            {"id": "quantity", "type": "input", "input": "number", "title": "Same"},
+            {"id": "done", "type": "checkbox", "title": "Done"},
+        ]},
+    ]
+    original_values = {"count": "007", "signed": True, "inventory": {"rows": [{"name": "Pens", "quantity": 0, "done": False}]}}
+    form.schema = [{"id": "count", "type": "input", "input": "number", "title": "Count"}]
+    form.generation = 1
+    task.form = form
+    task.submission = {"count": 7}
+    task.db.update(completed=True, generation=1, completed_submission={
+        "form_key": form.urlsafe_key, "generation": 0, "submission": deepcopy(original_values),
+    })
+    monkeypatch.setattr(ai_get_task_history.Entities, "fetch_one", lambda *a, **k: task)
+    monkeypatch.setattr(task.__class__, "history", property(lambda self: []))
+    monkeypatch.setattr(form_drafts, "resolve_form_generation", lambda *args: SimpleNamespace(schema=old_schema))
+    before = deepcopy(task.db)
+    result = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)
+    assert result["task"]["Count"] == 7
+    assert result["original_completion"] == {"generation": 0, "schema": old_schema, "schema_available": True, "values": original_values}
+    assert result["original_completion"]["values"]["inventory"]["rows"][0]["done"] is False
+    assert task.db == before
+    assert "original_completion" not in ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key}, user)
+    monkeypatch.setattr(task, "allowed", lambda action, user=None: action == Action.VIEW)
+    denied = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)
+    assert denied == {"error": "Original completed answers require edit access to this Task."}
+    assert "task" in ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key}, user)
+    monkeypatch.setattr(task, "allowed", lambda *a, **k: True)
+    task._submission_definition = None
+    monkeypatch.setattr(form_drafts, "resolve_form_generation", lambda *args: None)
+    unavailable = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)["original_completion"]
+    assert unavailable["schema_available"] is False
+    assert unavailable["values"] is None
+    assert "007" not in str(unavailable)
+    task.db["completed_submission"] = "not-json"
+    assert ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user) == {"error": "The saved completion is invalid and needs review."}
+    task.db.pop("completed_submission")
+    legacy = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)["original_completion"]
+    assert legacy["generation"] == 1
+    assert legacy["values"] == {"count": 7}
+    task.completed = False
+    assert ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)["original_completion"] is None
 
 
 # @matrix ai : category citations project schedule schema validation

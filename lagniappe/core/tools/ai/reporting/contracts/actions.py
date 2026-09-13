@@ -180,7 +180,7 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "required_groups": (("entity", "entity_action"),),
     },
     "update_form_schema": {
-        "fields": ("form", "form_action", "form_name", "operations", "baseline", "scope_fingerprint", "conversion_instructions", "conversions"),
+        "fields": ("form", "form_action", "form_name", "operations", "baseline", "scope_fingerprint", "conversions"),
         "required": ("operations",),
         "required_groups": (("form", "form_action"),),
     },

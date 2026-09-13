@@ -1,6 +1,6 @@
 """Shared Organize profiles; transport origin is assigned by trusted intake."""
 
-REMOTE_UPDATE_ACTIONS = frozenset(
+ORGANIZE_UPDATE_ACTIONS = frozenset(
     {
         "complete_task",
         "set_task_due_date",
@@ -20,7 +20,7 @@ REMOTE_UPDATE_ACTIONS = frozenset(
 ORGANIZE_UPDATE_GUIDELINES = """
 Propose updates to existing workspace records for authenticated browser review;
 do not execute changes or say they have been performed. No upload is required
-for this remote Organize profile. Creation requests belong in Create instead.
+for this Organize update profile. Creation requests belong in Create instead.
 
 Discover the intended records with permission-bounded reads. Compare approximate
 names, descriptions and parent context rather than assuming the user's wording
@@ -64,11 +64,11 @@ and place every supplied file; update requests do not waive those obligations.
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_remote_organize_update_contract_and_submission
 # @matrix agent-api ai-report : remote-update transport-boundary
-def is_remote_organize_update(report):
-    """Allow fileless edits only on API/email reports, never on UI reports."""
+def is_organize_update(report):
+    """Use the same fileless update profile for every trusted report intake."""
     return (
         getattr(report, "tool", None) == "organize"
-        and getattr(report, "origin", None) in {"api", "email"}
+        and getattr(report, "origin", None) in {"api", "email", "web"}
         and not getattr(report, "input_files", None)
         and not getattr(report, "upload_manifest", None)
     )

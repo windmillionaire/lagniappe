@@ -50,7 +50,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
         fields (dict): {field_id: TableColumnField} from column definitions.
         rows (list[RowSubmission]): Validated row submission objects.
         filter_value (dict): {field_id: [values across all rows]}.
-        ai_value (dict): {field_id: [AI values across all rows]}.
+        ai_value (dict): {rows: [{column_id: typed AI value}]}.
         db_value (dict | None): {rows: [row dicts]}, or None if empty.
     """
 
@@ -187,19 +187,22 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
     # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
+    # @tests tests_unit/test_015_ai_tools.py::test_get_schema_preserves_collection_rows_and_typed_cells
     # @matrix form-table : ai-value multiple-rows
+    # @pair form-table:typed-values
     @property
     def ai_value(self):
         rows = []
         for row in self.rows:
             row_dict = {}
-            for field in self.fields.values():
-                value = row.fields[field.id].ai_value
-                if value:
-                    row_dict[field.get("title")] = value
-            if row_dict:
-                rows.append(row_dict)
-        return rows or None
+            for column_id, field in row.fields.items():
+                field.user = self.user
+                if isinstance(field, AIMixin) and field.is_set:
+                    value = field.ai_value
+                    if value is not None:
+                        row_dict[column_id] = value
+            rows.append(row_dict)
+        return {"rows": rows} if rows else None
 
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox

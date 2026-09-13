@@ -36,7 +36,16 @@ def generate_conversions(requests, actor, *, generate=None):
         "Keep recorded zero and false values. "
         "Dates use ISO 8601 timestamps with a timezone; times use HH:MM. "
         "Preserve all meaningful source information when it fits the destination. If the value cannot be "
-        "converted, return unresolved_reason rather than an empty or invented value.",
+        "converted, return unresolved_reason rather than an empty or invented value. "
+        "For Todo destinations, identify actual list/checklist entries or tasks before "
+        "creating items. Prose that only states that no items, findings or actions were "
+        "recorded has no items to convert: return unresolved_reason. Do not turn that "
+        "absence statement into an unchecked item or invent follow-up work. "
+        "For example, 'Nothing to list' is unresolved; '- [x] Inspect the seal' "
+        "becomes one checked item with text 'Inspect the seal'. Existing list entries "
+        "need not be imperatives, and negation within a real item does not make it "
+        "unresolved (for example, 'Confirm no leaks'). Follow each request's "
+        "conversion instructions when interpreting its source.",
         user=actor,
         type="form conversion",
     )
@@ -101,7 +110,7 @@ def generate_conversions(requests, actor, *, generate=None):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/form_conversion.py::generate_conversions
-# @reason on-site blank-cell normalization is tested through utility conversion; external candidates stay strict
+# @reason Builder blank-cell normalization is tested through utility conversion; reviewed candidates stay strict
 def _omit_blank_table_cells(result, target):
     """Treat blank model cells as absent, without coercing populated values."""
     value = result.get("value")

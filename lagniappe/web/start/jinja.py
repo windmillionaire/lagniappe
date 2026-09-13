@@ -148,7 +148,11 @@ def is_before_today(value):
 
 # @testable true
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
+# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_snippets_are_plain_text_and_at_most_five_lines
 # @matrix template-formatting : safe-json tojson
+# @pair frontend-build:font-delivery
+# @pair ai-report:list-snippets
 def initialize(app):
     app.json_provider_class = SafeJSONProvider
     app.json = SafeJSONProvider(app)
@@ -169,6 +173,7 @@ def initialize(app):
             "format_time": formatters.format_time,
             "format_phone": formatters.format_phone,
             "format_number": formatters.format_number,
+            "format_markdown_text": formatters.format_markdown_text,
             "format_date_as_input_string": dates.format_date_as_input_string,
             "yesno": yesno,
             "safe_html": render_safe_html,
@@ -180,6 +185,7 @@ def initialize(app):
             "CONFIG": CONFIG,
             "render_icon": render_icon,
             "styles": styles.STYLES,
+            "fonts": styles.FONTS,
             "is_starred": starred,
             "current_user": current_user,
             "Action": Action,

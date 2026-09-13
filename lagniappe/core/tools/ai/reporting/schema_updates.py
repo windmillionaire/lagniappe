@@ -15,8 +15,9 @@ from lagniappe.core.tools import (
 
 # @testable true
 # @tests tests_unit/test_004l_form_schema_updates.py::test_report_schema_preparation_binds_impact_and_external_candidates
+# @tests tests_unit/test_004l_form_schema_updates.py::test_schema_preparation_assigns_missing_ids_without_collisions
 # @matrix ai-report form-migration : preview preparation approval external
-def prepare_schema_updates(proposal, user, *, external=False, verify=False):
+def prepare_schema_updates(proposal, user, *, verify=False):
     """Bind existing Form edits to complete impact before the report is reviewed."""
     if not any(
         action.get("type") == "update_form_schema"
@@ -24,12 +25,21 @@ def prepare_schema_updates(proposal, user, *, external=False, verify=False):
     ):
         return proposal
     virtual, seen, schema_actions = {}, set(), {}
-    for action in proposal.get("actions", []):
+    used_ids = {action.get("id") for action in proposal.get("actions", [])}
+    for index, action in enumerate(proposal.get("actions", []), 1):
         data = action.get("data") or {}
         if action.get("type") == "create_form":
             virtual[action.get("id")] = deepcopy(data)
         if action.get("type") != "update_form_schema" or action.get("skip"):
             continue
+        if not action.get("id"):
+            action_id = f"schema_change_{index}"
+            suffix = 2
+            while action_id in used_ids:
+                action_id = f"schema_change_{index}_{suffix}"
+                suffix += 1
+            action["id"] = action_id
+            used_ids.add(action_id)
         reference = data.get("form_action") or data.get("form")
         if reference in virtual:
             source = virtual[reference]
@@ -68,31 +78,13 @@ def prepare_schema_updates(proposal, user, *, external=False, verify=False):
         if (verify or data.get("baseline")) and data.get("baseline") != baseline:
             raise ValidationError(updates.STALE_MESSAGE)
         scope = updates.inspect_scope(form, changes, user)
-        if (verify or (external and changes)) and data.get(
+        if (verify or changes) and data.get(
             "scope_fingerprint"
         ) != scope["scope_fingerprint"]:
             raise ValidationError(
                 updates.STALE_MESSAGE + " Use preview_form_schema_update first."
             )
-        if external:
-            updates.validate_candidates(data.get("conversions", []), scope, changes)
-        elif data.get("conversions"):
-            raise ValidationError(
-                "On-site proposals specify conversion instructions; the worker prepares values after approval."
-            )
-        ai_fields = {item["id"] for item in changes if item["rule"] == "ai"}
-        instructions = data.get("conversion_instructions") or {}
-        if (
-            not isinstance(instructions, dict)
-            or set(instructions) - ai_fields
-            or any(
-                not isinstance(value, str) or len(value) > 4000
-                for value in instructions.values()
-            )
-        ):
-            raise ValidationError(
-                "Conversion instructions must name AI-converted fields and contain at most 4000 characters each."
-            )
+        updates.validate_candidates(data.get("conversions", []), scope, changes)
         if not verify:
             data["baseline"] = baseline
             data["scope_fingerprint"] = scope["scope_fingerprint"]
@@ -102,7 +94,7 @@ def prepare_schema_updates(proposal, user, *, external=False, verify=False):
                 "migration": bool(changes),
                 "changes": changes,
                 "review": _operation_review(
-                    form.schema, target, data["operations"], instructions
+                    form.schema, target, data["operations"]
                 ),
                 "impact": [
                     {
@@ -133,7 +125,7 @@ def prepare_schema_updates(proposal, user, *, external=False, verify=False):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/schema_updates.py::prepare_schema_updates
 # @reason human review describes schema changes without exposing provider or storage details
-def _operation_review(source, target, operations, instructions):
+def _operation_review(source, target, operations):
     before = {field["id"]: field for field in source}
     after = {field["id"]: field for field in target}
     result = []
@@ -169,7 +161,6 @@ def _operation_review(source, target, operations, instructions):
             {
                 "label": label,
                 "detail": detail,
-                "instructions": instructions.get(field_id, ""),
             }
         )
     return result
@@ -226,11 +217,12 @@ def _bind_dependencies(proposal, schema_actions):
 
 # @testable true
 # @tests tests_unit/test_004l_form_schema_updates.py::test_report_impact_redacts_revoked_access_and_paginates
+# @tests tests_unit/test_004l_form_schema_updates.py::test_report_impact_matches_positions_without_action_ids
 # @matrix ai-report form-migration : review links pagination permissions
 def report_impact(report, user, *, page=1):
     """Project saved affected identities through current permissions, one page at a time."""
     result = {}
-    for action in (getattr(report, "proposal", None) or {}).get("actions", []):
+    for index, action in enumerate((getattr(report, "proposal", None) or {}).get("actions", []), 1):
         change = action.get("_schema_change")
         if not change:
             continue
@@ -276,7 +268,7 @@ def report_impact(report, user, *, page=1):
             output["items"].append(
                 {"name": entity.name, "url": entity.url, "fields": fields}
             )
-        result[action["id"]] = output
+        result[index] = output
     return result
 
 

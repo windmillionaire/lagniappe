@@ -173,6 +173,73 @@ def _report_schema_operation_response_schema():
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
+# @reason conversion envelopes are asserted through the public response schema
+def _report_conversion_response_schema():
+    """Keep Todo item objects typed while allowing exact dynamic table columns."""
+    identity = {
+        "entity": {"type": "string"},
+        "schema_id": {"type": "string"},
+        "source_fingerprint": {"type": "string"},
+    }
+    value = {
+        "anyOf": [
+            {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "text": {"type": "string", "minLength": 1},
+                                "checked": {"type": "boolean"},
+                            },
+                            "required": ["text", "checked"],
+                            "propertyOrdering": ["text", "checked"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["items"],
+                "additionalProperties": False,
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "rows": {
+                        "type": "array",
+                        "minItems": 1,
+                        # Column IDs come from the runtime preview. An object
+                        # with no declared properties can constrain Vertex to empty
+                        # rows; preparation validates these open row values.
+                        "items": {},
+                        "description": "Rows must be objects keyed by exact destination column IDs; omit absent cells.",
+                    },
+                },
+                "required": ["rows"],
+                "additionalProperties": False,
+            },
+        ],
+    }
+    return {
+        "anyOf": [
+            {
+                "type": "object",
+                "properties": {**identity, outcome: schema},
+                "required": [*identity, outcome],
+                "additionalProperties": False,
+            }
+            for outcome, schema in (
+                ("value", value),
+                ("unresolved_reason", {"type": "string", "minLength": 1}),
+            )
+        ],
+    }
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
 # @reason nested update contract is asserted through the public response schema
 def _report_submission_update_response_schema():
     """Return the provider schema for one exact submission field update."""
@@ -277,24 +344,9 @@ def _report_action_data_properties():
         },
         "baseline": {"type": "string"},
         "scope_fingerprint": {"type": "string"},
-        "conversion_instructions": {
-            "type": "object",
-            "additionalProperties": {"type": "string", "maxLength": 4000},
-        },
         "conversions": {
             "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "entity": {"type": "string"},
-                    "schema_id": {"type": "string"},
-                    "source_fingerprint": {"type": "string"},
-                    "value": {},
-                    "unresolved_reason": {"type": "string"},
-                },
-                "required": ["entity", "schema_id", "source_fingerprint"],
-                "additionalProperties": False,
-            },
+            "items": _report_conversion_response_schema(),
         },
         "updates": {
             "type": "array",
@@ -369,9 +421,7 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
 # @reason action variants are asserted through the public response schema
-def _report_action_response_schema(
-    action_type, include_submission_fields, *, external=False
-):
+def _report_action_response_schema(action_type, include_submission_fields):
     """Return one discriminated action variant with its exact data contract."""
     properties = {
         "id": {"type": "string"},
@@ -384,11 +434,6 @@ def _report_action_response_schema(
             include_submission_fields,
         ),
     }
-    if action_type == "update_form_schema":
-        properties["data"]["properties"].pop(
-            "conversion_instructions" if external else "conversions", None
-        )
-        properties["data"]["propertyOrdering"] = list(properties["data"]["properties"])
     return {
         "type": "object",
         "properties": properties,
@@ -401,6 +446,7 @@ def _report_action_response_schema(
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_attach_provider_json_schema
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_response_schema_uses_provider_compatible_any_of_nodes
+# @tests tests_unit/test_004l_form_schema_updates.py::test_report_conversion_schema_rejects_flattened_items
 # @matrix ai-report : allowed-actions provider-validation schema structured-output
 def report_proposal_response_schema(
     allowed_actions=None,
@@ -589,7 +635,6 @@ def _external_report_action_response_schema(
     schema = _report_action_response_schema(
         action_type,
         include_submission_fields,
-        external=True,
     )
     schema["properties"]["type"] = {
         "type": "string",
@@ -684,6 +729,7 @@ def _standard_json_schema(value):
 
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_proposal_schema_has_named_discriminated_actions
+# @tests tests_unit/test_004l_form_schema_updates.py::test_report_conversion_schema_rejects_flattened_items
 # @matrix agent-api ai-report : external-schema proposal-contract structured-output
 def external_report_proposal_response_schema(
     allowed_actions=None,

@@ -253,6 +253,11 @@ def inspect_scope(form, changes, actor, *, include_values=False, ensure_active=N
                 }
                 if ai and include_values:
                     item["value"] = deepcopy(before)
+                elif include_values and change["rule"] == "scalar":
+                    item["before"] = deepcopy(before)
+                    item["clears"] = after is conversions.MISSING
+                    if after is not conversions.MISSING:
+                        item["after"] = deepcopy(after)
                 fields.append(item)
             members.append([entity.urlsafe_key, entity.generation, hashes])
             if fields:

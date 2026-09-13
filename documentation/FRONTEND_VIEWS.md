@@ -36,6 +36,16 @@ The shell also delegates copy controls for the Manual command-block component,
 so its padded, scrollable, copyable presentation can be reused in views such as
 Admin without view-specific clipboard code.
 
+Analytics uses native `details`/`summary` disclosures for retention controls,
+activity groups, run details, and aggregate breakdowns. Its delegated capture
+listener loads activity rows when a group opens; a failed load can be retried
+by closing and reopening the group. Run JSON is fetched on demand from the
+existing diagnostic route, with a selectable-text fallback for denied clipboard
+access. Both the browser tracker and the server event writer exclude the
+`/analytics`, `/api`, `/mcp`, and `/l` route families from activity records,
+including exact root paths. Human report-review pages under `/tools` remain
+eligible for normal tracking. Existing historical records are not rewritten.
+
 ## Core
 
 `views/base/core.mjs` adds components and private application services. It owns:
