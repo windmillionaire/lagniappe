@@ -409,7 +409,7 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     )""")
     preload = owner.page.locator("link[rel='preload'][as='font']")
     expect(preload).to_have_count(1)
-    assert "/fonts/source-sans-latin." in preload.get_attribute("href")
+    expect(preload).to_have_attribute("href", re.compile(r"/fonts/source-sans-latin\."))
     expect(run.locator("[data-role='ai-run-report']")).to_have_attribute(
         "href", f"/tools/reports/{report.urlsafe_key}"
     )

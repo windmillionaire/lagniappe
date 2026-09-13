@@ -9,7 +9,6 @@ Out of scope here: ``get_html_field`` / ``set_html_field`` (e2e).
 
 import json
 from copy import deepcopy
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest

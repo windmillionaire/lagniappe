@@ -13,35 +13,35 @@
 {% block traceback %}
   {% if show_debug and debug %}
     <div class="mt-4">
-      {% if debug.error_type %}<div class="error-debug-type">{{ debug.error_type }}</div>{% endif %}
-      {% if debug.timestamp %}<div class="error-debug-timestamp">Occurred at: {{ debug.timestamp }}</div>{% endif %}
+      {% if debug.error_type %}<div class="{{ styles.error.debug.type }}">{{ debug.error_type }}</div>{% endif %}
+      {% if debug.timestamp %}<div class="{{ styles.error.debug.timestamp }}">Occurred at: {{ debug.timestamp }}</div>{% endif %}
     </div>
     {% if debug.entity %}
-      <details class="error-debug-section" open>
+      <details class="{{ styles.error.debug.section }}" open>
         <summary>
-          <span class="error-debug-badge error-debug-badge-entity">Entity</span> Entity Data
+          <span class="{{ styles.error.debug.badge.base }} {{ styles.error.debug.badge.entity }}">Entity</span> Entity Data
         </summary>
-        <div class="error-debug-content">
+        <div class="{{ styles.error.debug.content }}">
           <pre>{{ debug.entity }}</pre>
         </div>
       </details>
     {% endif %}
     {% if debug.request %}
-      <details class="error-debug-section" open>
+      <details class="{{ styles.error.debug.section }}" open>
         <summary>
-          <span class="error-debug-badge error-debug-badge-request">Request</span> Request Information
+          <span class="{{ styles.error.debug.badge.base }} {{ styles.error.debug.badge.request }}">Request</span> Request Information
         </summary>
-        <div class="error-debug-content">
+        <div class="{{ styles.error.debug.content }}">
           <pre>{{ debug.request }}</pre>
         </div>
       </details>
     {% endif %}
     {% if debug.traceback %}
-      <details class="error-debug-section">
+      <details class="{{ styles.error.debug.section }}">
         <summary>
-          <span class="error-debug-badge error-debug-badge-error">Traceback</span> Full Traceback
+          <span class="{{ styles.error.debug.badge.base }} {{ styles.error.debug.badge.error }}">Traceback</span> Full Traceback
         </summary>
-        <div class="error-debug-content">
+        <div class="{{ styles.error.debug.content }}">
           <pre class="text-red-700">{{ debug.traceback }}</pre>
         </div>
       </details>

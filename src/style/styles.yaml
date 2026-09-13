@@ -972,6 +972,58 @@ list:
       intent: item presentation within list links
       surfaces: [server]
 
+error:
+  debug:
+    section:
+      classes: error-debug-section
+      intent: expandable diagnostic section on the server error page
+      surfaces: [server]
+      hooks: [error-debug-section]
+      css: [src/style/content.css]
+    content:
+      classes: error-debug-content
+      intent: readable diagnostic payload and traceback content
+      surfaces: [server]
+      hooks: [error-debug-content]
+      css: [src/style/content.css]
+    badge:
+      base:
+        classes: error-debug-badge
+        intent: compact label identifying a diagnostic section
+        surfaces: [server]
+        hooks: [error-debug-badge]
+        css: [src/style/content.css]
+      error:
+        classes: error-debug-badge-error
+        intent: traceback diagnostic badge color
+        surfaces: [server]
+        hooks: [error-debug-badge-error]
+        css: [src/style/content.css]
+      request:
+        classes: error-debug-badge-request
+        intent: request diagnostic badge color
+        surfaces: [server]
+        hooks: [error-debug-badge-request]
+        css: [src/style/content.css]
+      entity:
+        classes: error-debug-badge-entity
+        intent: entity diagnostic badge color
+        surfaces: [server]
+        hooks: [error-debug-badge-entity]
+        css: [src/style/content.css]
+    type:
+      classes: error-debug-type
+      intent: exception type displayed above diagnostic details
+      surfaces: [server]
+      hooks: [error-debug-type]
+      css: [src/style/content.css]
+    timestamp:
+      classes: error-debug-timestamp
+      intent: occurrence time displayed above diagnostic details
+      surfaces: [server]
+      hooks: [error-debug-timestamp]
+      css: [src/style/content.css]
+
 siteSettings:
   migration:
     releaseSummary:

@@ -87,7 +87,6 @@ def test_report_phases_reuse_current_report_without_loading_input_files(monkeypa
 # @matrix deferred-jobs : checkpoint
 @pytest.mark.parametrize("origin", ["email", "api", "web"])
 def test_organize_fileless_remote_pipeline_and_resume(monkeypatch, origin):
-    from lagniappe.core import exceptions
     from testing.utility.ai_report_fakes import _test_user
     actor = _test_user("email-update-owner")
     report = SimpleNamespace(

@@ -301,6 +301,20 @@ STYLES = {
 			"item": "group/item flex flex-row items-center justify-between gap-2 px-4 py-2 text-sm font-semibold hover:bg-kind-bg sm:px-6 sm:py-3"
 		}
 	},
+	"error": {
+		"debug": {
+			"section": "error-debug-section",
+			"content": "error-debug-content",
+			"badge": {
+				"base": "error-debug-badge",
+				"error": "error-debug-badge-error",
+				"request": "error-debug-badge-request",
+				"entity": "error-debug-badge-entity"
+			},
+			"type": "error-debug-type",
+			"timestamp": "error-debug-timestamp"
+		}
+	},
 	"siteSettings": {
 		"migration": {
 			"releaseSummary": "cursor-pointer font-semibold",

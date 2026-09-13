@@ -72,7 +72,9 @@ export class SiteMaintenance extends SiteSetting {
 			this._cacheStatus = response.cache_status || null;
 			this._renderCacheStatus(this._cacheStatus);
 			rebuildCache.deactivate(
-				this._cacheStatus?.failed ? "Cache Refreshed — Review Errors" : undefined,
+				this._cacheStatus?.failed
+					? "Cache Refreshed — Review Errors"
+					: undefined,
 			);
 			clearRecentSearchResults();
 		});
@@ -129,8 +131,12 @@ export class SiteMaintenance extends SiteSetting {
 		const errors = status.errors || [];
 		panel.querySelector("[data-role='cache-status-summary']").textContent =
 			`${status.processed} records processed; ${status.failed} skipped.` +
-			(status.failed ? " Skipped records could not be safely cached. Review them, then refresh again." : "") +
-			(status.failed > errors.length ? ` Showing ${errors.length} errors.` : "");
+			(status.failed
+				? " Skipped records could not be safely cached. Review them, then refresh again."
+				: "") +
+			(status.failed > errors.length
+				? ` Showing ${errors.length} errors.`
+				: "");
 		const list = panel.querySelector("[data-role='cache-status-errors']");
 		list.replaceChildren();
 		for (const error of errors) {

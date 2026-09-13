@@ -459,7 +459,6 @@ def test_copy_draft_owns_content_and_is_idempotent_without_saving_source(memory_
     assert len(memory_forms.commits) == commits
 
 
-# @source lagniappe/core/entities/history.py::FormHistory.allowed
 # @matrix form-schema html-field : history permission-boundary
 def test_definition_snapshot_requires_submitter_scoped_authorization(memory_forms):
     snapshot = drafts.archive_form_generation(memory_forms.form())

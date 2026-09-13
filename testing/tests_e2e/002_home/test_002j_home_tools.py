@@ -1805,8 +1805,8 @@ def test_stale_schema_plan_keeps_review_and_explains_recovery(get_user, browser_
     expect(error).to_be_visible()
     expect(report_page.execute_button).to_be_enabled()
     expect(report_page.proposal_actions).to_have_count(2)
-    for action in report_page.proposal_actions.all():
-        expect(action).to_have_attribute("data-skipped", "false")
+    for index in range(2):
+        expect(report_page.proposal_actions.nth(index)).to_have_attribute("data-skipped", "false")
     expect(user.page.get_by_role("button", name="Revise Plan", exact=True)).to_have_count(0 if origin == "api" else 1)
 
     # The live error has breathing room above it and before Execute Proposal.

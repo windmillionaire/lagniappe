@@ -380,13 +380,19 @@ export default class Report extends Core {
 						skipped.has(Number(item.dataset.actionIndex)),
 					);
 				});
-				this.elt.querySelectorAll("[data-schema-action-index]").forEach((impact) => {
-					const isSkipped = skipped.has(Number(impact.dataset.schemaActionIndex));
-					impact.querySelector("[data-role='schema-impact-skipped']").dataset.visible =
-						isSkipped ? "true" : "false";
-					impact.querySelector("[data-role='schema-impact-details']").dataset.visible =
-						isSkipped ? "false" : "true";
-				});
+				this.elt
+					.querySelectorAll("[data-schema-action-index]")
+					.forEach((impact) => {
+						const isSkipped = skipped.has(
+							Number(impact.dataset.schemaActionIndex),
+						);
+						impact.querySelector(
+							"[data-role='schema-impact-skipped']",
+						).dataset.visible = isSkipped ? "true" : "false";
+						impact.querySelector(
+							"[data-role='schema-impact-details']",
+						).dataset.visible = isSkipped ? "false" : "true";
+					});
 			},
 			{ label: "report:toggle-skipped-actions" },
 		);

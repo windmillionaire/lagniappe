@@ -149,6 +149,7 @@ li[lp-component][data-open="false"] {
 }
 
 /* Debug error details, served through the shared stylesheet under the CSP. */
+/* @style error.debug.section */
 .error-debug-section {
 	margin-top: 1.5rem;
 	border: 1px solid #e5e7eb;
@@ -156,6 +157,7 @@ li[lp-component][data-open="false"] {
 	overflow: hidden;
 }
 
+/* @style error.debug.section */
 .error-debug-section summary {
 	padding: 0.75rem 1rem;
 	background: linear-gradient(to right, #f9fafb, #f3f4f6);
@@ -168,15 +170,18 @@ li[lp-component][data-open="false"] {
 	gap: 0.5rem;
 }
 
+/* @style error.debug.section */
 .error-debug-section summary:hover {
 	background: linear-gradient(to right, #f3f4f6, #e5e7eb);
 }
 
+/* @style error.debug.section */
 .error-debug-section[open] summary {
 	background: linear-gradient(to right, #dbeafe, #eff6ff);
 	color: #1e40af;
 }
 
+/* @style error.debug.content */
 .error-debug-content {
 	padding: 1rem;
 	background: #fff;
@@ -186,12 +191,14 @@ li[lp-component][data-open="false"] {
 	overflow-x: auto;
 }
 
+/* @style error.debug.content */
 .error-debug-content pre {
 	margin: 0;
 	white-space: pre-wrap;
 	word-break: break-word;
 }
 
+/* @style error.debug.badge.base */
 .error-debug-badge {
 	display: inline-block;
 	padding: 0.125rem 0.5rem;
@@ -201,21 +208,25 @@ li[lp-component][data-open="false"] {
 	text-transform: uppercase;
 }
 
+/* @style error.debug.badge.error */
 .error-debug-badge-error {
 	background: #fee2e2;
 	color: #991b1b;
 }
 
+/* @style error.debug.badge.request */
 .error-debug-badge-request {
 	background: #dbeafe;
 	color: #1e40af;
 }
 
+/* @style error.debug.badge.entity */
 .error-debug-badge-entity {
 	background: #d1fae5;
 	color: #065f46;
 }
 
+/* @style error.debug.type */
 .error-debug-type {
 	display: inline-block;
 	padding: 0.25rem 0.75rem;
@@ -228,6 +239,7 @@ li[lp-component][data-open="false"] {
 	margin-bottom: 0.5rem;
 }
 
+/* @style error.debug.timestamp */
 .error-debug-timestamp {
 	font-size: 0.75rem;
 	color: #6b7280;

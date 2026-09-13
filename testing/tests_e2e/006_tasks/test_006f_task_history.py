@@ -1212,9 +1212,11 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
     ):
         expect(history).to_contain_text(name)
 
-    for group in groups.all():
-        controller = _open_history_visibility(group)
-        controller.locator("input[type='checkbox'][name='files']").set_checked(True)
+    source_group = groups.filter(has_text="Combine source archived")
+    expect(source_group).to_have_count(1)
+    expect(source_group).to_contain_text("Combine source current")
+    controller = _open_history_visibility(source_group)
+    controller.locator("input[type='checkbox'][name='files']").set_checked(True)
     for attachment in (
         "Combine archived attachment",
         "Combine current attachment",
