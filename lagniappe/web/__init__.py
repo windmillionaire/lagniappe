@@ -93,7 +93,9 @@ CSP = "; ".join(
     [
         "default-src 'self'",
         SCRIPT_SRC,
-        f"style-src 'self' 'unsafe-inline' {GOOGLE_IDENTITY_STYLE}",
+        f"style-src 'self' {GOOGLE_IDENTITY_STYLE}",
+        f"style-src-elem 'self' {GOOGLE_IDENTITY_STYLE}",
+        "style-src-attr 'unsafe-inline'",
         f"img-src 'self' blob: data: {STORAGE_SRC}",
         f"media-src 'self' {STORAGE_SRC}",
         "font-src 'self'",

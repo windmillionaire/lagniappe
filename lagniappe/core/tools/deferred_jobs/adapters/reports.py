@@ -104,6 +104,9 @@ class ReportAdapter(DeferredJobAdapter):
         self.validate_apply(context)
         report = context.input("report")
         proposal = deepcopy(context.checkpoint["proposal"])
+        from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_updates
+
+        prepare_schema_updates(proposal, context.actor)
         report.properties.process.set_proposal(
             proposal,
             status=context.checkpoint.get("status") or "ready",
@@ -363,6 +366,7 @@ class CreateReportAdapter(ReportAdapter):
 
 # @testable true
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_adapter_runs_the_reviewed_proposal
+# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_schedules_report_dependency_checks_with_backoff
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_failure_preserves_a_retryable_ledger
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_execution_start_rejects_stale_browser_snapshot
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal
@@ -373,10 +377,12 @@ class CreateReportAdapter(ReportAdapter):
 # @matrix deferred-jobs : cancellation provider-boundary report-execution tier-declaration
 # @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution terminal-delivery
 # @matrix ai-report : input-files no-extra-read fresh-read
+# @matrix deferred-jobs : dependency-wait backoff
 class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 
     job_type = DeferredJobType.REPORT_EXECUTION
+    dependency_retry_delays = (5, 10, 20, 30)
     synchronous_testing = True
     queued_message = "Saving report changes..."
     retry_message = "Saving is taking longer than expected; retrying safely..."

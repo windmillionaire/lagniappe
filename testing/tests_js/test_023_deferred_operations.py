@@ -194,7 +194,7 @@ const manager = new context.DeferredOperationManager(view).init();
   nodes.push(newer, older);
   manager.scan();
   for (const node of [nodes[0], newer, older]) {
-    if (node.phase.textContent !== "Checking context. Automatic recovery is active." ||
+    if (node.phase.textContent !== "Checking context. Taking longer than expected." ||
         node.dataset.operationRevision !== "5") {
       throw new Error("An older sibling snapshot replaced the shared latest status");
     }

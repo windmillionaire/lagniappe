@@ -27,13 +27,14 @@ def user_timezone(user=None):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ingress.py::IngressMutationPlanner._set_history
-# @reason imported date parsing is owned by the ingress task-import workflow
-def parse_imported_date_as_utc(date_string):
-    """Parse a date string as UTC, returning None on failure."""
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_parse_completed_task_completed_on
+# @reason imported date parsing is exercised through ingress and report completion workflows
+def parse_imported_date_as_utc(date_string, *, user=None):
+    """Parse an imported calendar day as UTC, using the actor's zone if unzoned."""
     try:
         date = date_parser.parse(date_string)
         if not date.tzinfo:
-            date = date.replace(tzinfo=user_timezone())
+            date = date.replace(tzinfo=user_timezone(user))
         return beginning_of_day(date).astimezone(timezone.utc)
     except (ValueError, TypeError, date_parser.ParserError):
         return None

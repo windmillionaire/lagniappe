@@ -244,9 +244,14 @@ continuation or focused details, not an assumption that no duplicate exists.
 `get_schema(id=<Page or Task>, include_values=true)` returns the schema and
 current AI-readable values keyed by exact field id. This avoids matching
 human-readable labels (which can repeat) and loading unrelated entity details.
-Values use the existing AI field representations, not a raw storage export;
-follow the field type's submission format when writing. Unset fields are omitted;
-a Form itself has no submission and returns `values: null`.
+Tables return `{"rows": [{"<column id>": value}]}`, preserving row order, repeated
+column labels, missing cells, numeric zero and boolean false. Todo lists return
+`{"items": [{"text": "...", "checked": false}]}`; checkboxes return JSON booleans.
+Clients must use these collection envelopes and IDs rather than the former
+display array keyed by column titles. Other fields retain their existing
+actor-aware AI projections, including reference handling; this is not a raw
+storage export. Follow the field type's submission format when writing. Unset
+fields are omitted; a Form itself has no submission and returns `values: null`.
 For patches, `get_guidelines(task="form_autofill",
 actions=["update_form_values"], field_types=[...])` omits the full Autofill
 and file-discovery workflow. Reuse guidance already received when sufficient.
@@ -336,7 +341,7 @@ still be fetched after uploads and immediately before submission.
    replaces the prior result while the report remains reusable; `status_url`
    retrieves the detailed Plan resource.
 
-Contract version 7 is an intentional breaking cutover: the contract uses only
+Contract version 8 is an intentional breaking cutover: the contract uses only
 top-level `contract_version`, and primary read-tool subjects use only `id`.
 There are no legacy aliases. Clients must refresh discovery, OpenAPI, the tool
 catalog, and the current Plan contract rather than replaying an older shape or
@@ -562,6 +567,17 @@ bundle; it is metadata, never a literal tool argument. Guideline responses repor
 sizes. Correlated API logs record tool-call sequence number, result bytes, and
 elapsed time.
 
+The `page_form` and `task_form` bundles contain schema definitions without
+submission-value rules. `field_types` filters the definitions; include actual
+nested table column types too. Category and Project bundles direct clients to
+the corresponding Form bundle only when designing a Form. `schema_evolution`
+combines migration rules with filtered source/destination schema definitions,
+and its contract advertises that filter. Ordinary `form_autofill` guidance
+prefers JSON numbers for Number inputs and explains their accepted numeric-string
+coercion. External migration candidates instead require exact JSON types and
+receive their own strict rules. On-site planners receive after-approval conversion
+instructions without external candidate-authoring rules.
+
 External Organize guidance is selected by the API route, not by a public client
 or workflow flag. File-backed on-site/email Gemini retains its separate server-managed
 summary, retrieval, structure-planning and form-completion stages. Those
@@ -603,7 +619,7 @@ unchanged.
 ### Publication and browser approval
 
 Fileless API/MCP Organize drafts expose an existing-record update subset:
-completion, Form-value patches, document appends, additive schema changes,
+completion, Form-value patches, document appends, reviewed schema changes,
 rename/move and category/form attachment. `needs_review` handles ambiguous work.
 Trusted API/email origin and the absence of uploads select this shared profile;
 there is no new UI tool or client-controlled authorization flag. UI Organize
@@ -652,11 +668,53 @@ The browser preview distinguishes setting a date from clearing it. Retry checks
 the recorded scheduling state; undo restores the prior timestamp and refuses to
 overwrite later due-date, recurrence, or completion changes.
 
+For imported completed occurrences, a date-only `completed_on` represents
+midnight in the acting user's timezone and is stored in UTC. Background report
+execution passes that actor explicitly when preparing the checkpoint and when
+recording either a live completion or older history. Calendar dates therefore
+survive local readback across daylight-saving transitions. This does not rewrite
+timestamps from earlier imports.
+
 The current action vocabulary is deliberately not backward-compatible. Contract
-version 7 uses `update_form_values`, `extend_form_schema`, `add_page_category`,
-`suggest_page_deletion`, and one `attach_file` action. Recreate old saved proposals
-that use retired action names; there are no execution aliases. Schema extension
-remains additive, and a deletion suggestion still requires manual cleanup.
+version 8 uses `update_form_values`, `update_form_schema`, `add_page_category`,
+`suggest_page_deletion`, and one `attach_file` action. Clients must refresh the
+contract; new proposals cannot use `extend_form_schema`. Previously stored
+additive schema actions retain their execution/recovery behavior.
+
+`update_form_schema` accepts `add_field`, `add_select_option`, `update_field`
+(`schema_id`, partial `patch`), `remove_field`, and `reorder_fields` (`ids`). IDs
+remain stable. Read `schema_evolution` and call `preview_form_schema_update` with
+`id`, `operations`, optional `include_values`, `limit` (1–50), and `cursor`.
+The preview validates the whole target schema, classifies deterministic/AI
+conversions, and checks every attached live Page/Task, including completed Tasks.
+Restricted members block the entire migration with a generic admin-required
+message. It returns `baseline`, `scope_fingerprint`, and cursor-paginated
+`instances` with entity references, links, affected field IDs and source hashes.
+Task instances also include a boolean `completed`; Page instances omit it.
+Follow every cursor with unchanged operations; concurrent changes invalidate it.
+
+For AI conversions, use `include_values=true`. The source values preserve exact
+rows and types and include only affected AI fields. Supply every populated AI
+field in `data.conversions` as `{entity, schema_id, source_fingerprint, value}` or
+`{entity, schema_id, source_fingerprint, unresolved_reason}`. Tables use
+`{rows: [{column_id: value}]}` and todos `{items: [{text, checked}]}`; only exact
+destination IDs and types are accepted. Copy `baseline` and `scope_fingerprint`
+into the action. Missing, duplicate, unexpected or stale candidates fail before
+publication. Empty collections cannot clear populated sources implicitly.
+
+Supported AI pairs are textarea→table/todo, table→todo, and todo→table; todo is
+Task-only. Table/todo→textarea remains deterministic. Internal links, assets,
+identity inference and nested AI cell conversions are excluded. External
+execution never calls a site model and does not require site AI entitlement.
+Candidate values are reviewed in the browser alongside affected links and
+explicit destructive-change warnings; viewing candidates rechecks permissions.
+The parent report waits for Form publication before dependent actions continue.
+Once a migration starts, report Undo is unavailable; partial failures use Retry.
+
+The API envelope remains capped at 1 MiB. The prepared schema proposal, including
+server-owned review metadata, has a 750 KiB guard to reserve Datastore space for
+execution. Oversized complete values must not be truncated; use a smaller change
+or the on-site builder. There is no external candidate-upload endpoint.
 
 `attach_file` takes `file` (the exact report upload reference) and either `entity`
 (an existing Page, Task, or TaskHistory) or `entity_action` (an earlier Page/Task

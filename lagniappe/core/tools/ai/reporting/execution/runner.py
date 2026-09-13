@@ -17,7 +17,7 @@ from .actions.recovery import (
     _record_recoverable_action_error,
     _record_required_file_placement_error,
 )
-from .actions.registry import REPORT_ACTION_ADAPTERS
+from .actions.registry import report_action_adapter
 from .actions.results import (
     _diagnostic_entity,
 )
@@ -57,6 +57,7 @@ def run_report(report, user, ensure_active=None):
         allow_empty_submission_updates=True,
         allow_pending_submissions=False,
         user=user,
+        allow_legacy_schema=True,
     )
     fingerprint = proposal_fingerprint(proposal)
     existing = report.result if isinstance(report.result, dict) else {}
@@ -103,7 +104,7 @@ def run_report(report, user, ensure_active=None):
     for index, action in enumerate(proposal.get("actions", [])):
         ensure_active()
         action_record = result["actions"][index]
-        adapter = REPORT_ACTION_ADAPTERS[action["type"]]
+        adapter = report_action_adapter(action["type"])
         if action_record.get("status") in {"complete", "skipped"}:
             state = adapter.inspect_applied(action, report, user, action_record)
             if action_record.get("status") == "complete" and state != ACTION_APPLIED:
@@ -123,7 +124,12 @@ def run_report(report, user, ensure_active=None):
             continue
 
         try:
-            if action_record.get("status") in {"applying", "failed"}:
+            dependencies = action.get("depends_on", [])
+            if any(record.get("status") == "skipped" and (record.get("type") == "update_form_schema" or record.get("schema_dependency_skipped")) for dependency in dependencies if (record := context["action_records"].get(dependency, {}))):
+                action_record.update(status="skipped", schema_dependency_skipped=True, note="Required schema update was skipped.")
+                Entities.save(report)
+                continue
+            if action_record.get("status") in {"applying", "failed"} and not action_record.get("migration_id"):
                 state = adapter.inspect_applied(action, report, user, action_record)
                 if state == ACTION_APPLIED:
                     action_record["status"] = "complete"
@@ -190,6 +196,14 @@ def run_report(report, user, ensure_active=None):
                 DeferredJobInfrastructureError,
             )
 
+            from lagniappe.core.tools.deferred_jobs.errors import DeferredJobDependencyPendingError
+
+            if isinstance(error, DeferredJobDependencyPendingError):
+                action_record["status"] = "waiting"
+                result["status"] = "waiting"
+                report.result = result
+                Entities.save(report)
+                raise
             if isinstance(
                 error,
                 (

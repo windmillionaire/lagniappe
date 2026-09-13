@@ -255,6 +255,11 @@ export class Header {
 					{ replaceErrorPage: false },
 				);
 				if (this._destroyed) return false;
+				if (response?.rejected_change) {
+					this._saveAttempt = null;
+					this.message(response.rejected_change.error, { persistent: true });
+					return false;
+				}
 				if (response?.ok === true && response.draft && response.baseline) {
 					this.builder.draft.acknowledge(state, response);
 					this._saveAttempt = null;

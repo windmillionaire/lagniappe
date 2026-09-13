@@ -183,7 +183,7 @@ def _record_completed_task_event(
     context,
 ):
     action_record = context.get("action_record") or {}
-    completed_on = _parse_completed_task_completed_on(data)
+    completed_on = _parse_completed_task_completed_on(data, user=user)
     submission = data.get("submission") if "submission" in data else None
 
     task, created_task = _find_or_create_completed_task(
@@ -724,8 +724,9 @@ def _ensure_task_form_from_model(task, model=None):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_invalid_completed_task_events_and_continues
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_completed_event_dates_use_actor_timezone_without_request
 # @matrix ai-report : completed-task validation
-def _parse_completed_task_completed_on(data):
+def _parse_completed_task_completed_on(data, *, user=None):
     raw = data.get("completed_on") or data.get("completed-on")
     if not raw and data.get("completed") is True:
         return None
@@ -735,7 +736,7 @@ def _parse_completed_task_completed_on(data):
             "Completed task evidence requires completed: true or a date."
         )
 
-    completed_on = dates.parse_imported_date_as_utc(raw)
+    completed_on = dates.parse_imported_date_as_utc(raw, user=user)
     if not completed_on:
         raise exceptions.ValidationError(
             "Completed task evidence completion date is invalid."

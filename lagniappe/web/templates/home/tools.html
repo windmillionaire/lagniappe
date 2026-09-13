@@ -221,7 +221,7 @@
                 {%- if operation_status.error -%}
                   {{ operation_status.phase_label }}: {{ operation_status.error }}
                 {%- elif operation_status.recovering -%}
-                  {{ operation_status.phase_label }}. Automatic recovery is active.
+                  {{ operation_status.phase_label }}. Taking longer than expected.
                 {%- else -%}
                   {{ operation_status.phase_label }}
                 {%- endif -%}

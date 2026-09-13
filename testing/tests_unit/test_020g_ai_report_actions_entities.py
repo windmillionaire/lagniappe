@@ -18,7 +18,7 @@ def test_toggle_proposal_action_indexes_can_skip_exact_indexes_without_dependenc
         "actions": [
             {
                 "id": "schema",
-                "type": "extend_form_schema",
+                "type": "update_form_schema",
                 "data": {
                     "form": "invoice-form",
                     "operations": [

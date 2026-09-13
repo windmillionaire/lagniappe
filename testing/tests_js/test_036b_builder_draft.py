@@ -1,6 +1,32 @@
 """Draft-only builder state, generation, and stable nested identity."""
 
 
+# @source src/script/views/builder/draft.mjs::BuilderDraft
+# @matrix forms : draft-history
+def test_conversion_instructions_follow_draft_undo_redo_and_publication(run_node):
+    run_node(r'''
+const assert = await import("node:assert/strict").then(module => module.default);
+const { BuilderDraft } = await import(process.cwd() + "/src/script/views/builder/draft.mjs");
+const initial = {name: "Conversion", form_type: "task", schema: [{id: "notes", type: "textarea", title: "Notes"}], html_fields: {}};
+const draft = new BuilderDraft(initial, "before");
+draft.record({...initial, schema: [{...initial.schema[0], type: "todo"}], conversion_instructions: {notes: "Keep order"}});
+assert.equal(draft.dirty, true);
+draft.undo();
+assert.equal(draft.state.schema[0].type, "textarea");
+assert.equal(draft.state.conversion_instructions, undefined);
+assert.equal(draft.dirty, false);
+draft.redo();
+assert.equal(draft.state.conversion_instructions.notes, "Keep order");
+const submitted = structuredClone(draft.state);
+const published = {...structuredClone(submitted)};
+delete published.conversion_instructions;
+draft.acknowledge(submitted, {draft: published, baseline: "published"});
+assert.equal(draft.state.conversion_instructions, undefined);
+assert.equal(draft.state.schema[0].type, "todo");
+assert.equal(draft.dirty, false);
+''')
+
+
 # @matrix forms : draft-history stable-identity schema-generation
 def test_builder_draft_history_and_generation(run_node):
     run_node(

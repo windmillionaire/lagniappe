@@ -1094,7 +1094,7 @@ def test_ai_report_proposal_display_actions_group_schema_updates_separately(
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "extend_form_schema",
+                        "type": "update_form_schema",
                         "data": {
                             "form": "invoice-form",
                             "form_name": "Invoice",
@@ -1147,7 +1147,7 @@ def test_ai_report_proposal_display_actions_group_schema_updates_separately(
     ]
     schema_group = actions[0]
     assert schema_group["display_label"] == "Schema Updates"
-    assert schema_group["skip_dependencies"] is False
+    assert schema_group["skip_dependencies"] is True
     assert schema_group["action_index"] == 1
     assert schema_group["group_action_indexes"] == [1]
     assert schema_group["support"] == [

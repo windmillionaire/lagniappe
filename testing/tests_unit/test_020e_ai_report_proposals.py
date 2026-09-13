@@ -983,7 +983,7 @@ def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
         "actions": [
             {
                 "id": "add_payment_reference",
-                "type": "extend_form_schema",
+                "type": "update_form_schema",
                 "data": {
                     "form": "invoice-form",
                     "operations": [
@@ -1011,7 +1011,7 @@ def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
         _with_validator(fake_generate),
     )
     prompt = SimpleNamespace(
-        allowed_actions=("extend_form_schema", "needs_review"),
+        allowed_actions=("update_form_schema", "needs_review"),
         output_format={"type": "JSON", "description": "Return report JSON."},
         prompt_type="organize report",
         user=None,
@@ -1494,7 +1494,7 @@ def test_validate_proposal_rejects_unsafe_schema_update_operations():
         "actions": [
             {
                 "id": "delete_payment_reference",
-                "type": "extend_form_schema",
+                "type": "update_form_schema",
                 "data": {
                     "form": "invoice-form",
                     "operations": [

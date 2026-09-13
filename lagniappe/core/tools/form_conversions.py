@@ -13,7 +13,7 @@ import phonenumbers
 from ..exceptions import ValidationError
 
 
-VERSION = 1
+VERSION = 2
 MISSING = object()
 INPUTS = frozenset({"text", "number", "email", "tel", "date", "time"})
 CHOICE = frozenset({"radio", "select", "multiple"})
@@ -177,9 +177,23 @@ def classify_changes(previous, proposed, mappings=None):
                 )
             continue
         rule = conversion_rule(source, target)
-        if not rule or rule == "ai":
+        if not rule:
             raise ValidationError(
                 "This conversion is not available yet. Choose another type or delete the element."
+            )
+        if (
+            rule == "ai"
+            and field_kind(target) == "table"
+            and (
+                not target.get("columns")
+                or any(
+                    field_kind(column) not in INPUTS | {"checkbox", "out", "bookmark"}
+                    for column in target["columns"]
+                )
+            )
+        ):
+            raise ValidationError(
+                "AI table conversion requires destination scalar, checkbox or external-link columns. Configure the columns before Save."
             )
         mapping = mappings.get(field_id, {})
         if not isinstance(mapping, dict) or any(
@@ -437,7 +451,7 @@ def convert_value(value, source, target, *, mapping=None, zone="UTC"):
 # @tests tests_unit/test_004j_form_conversions.py::test_submission_notice_preserves_first_values_and_unrelated_answers
 # @matrix form-migration : notice preservation presence repeated-change
 def convert_submission(
-    values, changes, *, previous_notice=None, generation=0, zone="UTC"
+    values, changes, *, previous_notice=None, generation=0, zone="UTC", ai_values=None
 ):
     """Patch planned paths and retain one cumulative informational before-state."""
     result = deepcopy(values)
@@ -445,9 +459,25 @@ def convert_submission(
     for change in changes:
         field_id = change["id"]
         before = values.get(field_id, MISSING)
-        after, reason = convert_value(
-            before, change["source"], change["target"], mapping=change["map"], zone=zone
-        )
+        if change["rule"] == "ai":
+            from .form_schema_updates import needs_ai_value
+
+            if before is MISSING or not needs_ai_value(before):
+                after, reason = MISSING, "unset"
+            else:
+                candidate = (ai_values or {}).get(field_id)
+                if candidate is None:
+                    raise ValidationError("A prepared AI conversion is missing.")
+                after = validate_ai_candidate(candidate, change["target"])
+                reason = "invalid" if after is MISSING else "ai"
+        else:
+            after, reason = convert_value(
+                before,
+                change["source"],
+                change["target"],
+                mapping=change["map"],
+                zone=zone,
+            )
         if after is MISSING:
             result.pop(field_id, None)
         else:
@@ -471,3 +501,111 @@ def convert_submission(
         ) == json.dumps(after, sort_keys=True):
             notice.pop(field_id, None)
     return result, notice
+
+
+# @testable true
+# @tests tests_unit/test_004l_form_schema_updates.py::test_ai_candidates_validate_exact_shapes_without_truthiness_coercion
+# @matrix form-migration : ai-value strict-validation table todo
+def validate_ai_candidate(candidate, target):
+    """Accept exact destination values or an explicit unresolved outcome."""
+    if not isinstance(candidate, dict):
+        raise ValidationError("AI conversion must return an object.")
+    if "unresolved_reason" in candidate:
+        reason = candidate["unresolved_reason"]
+        if "value" in candidate or not isinstance(reason, str) or not reason.strip():
+            raise ValidationError(
+                "An unresolved conversion requires a reason and no value."
+            )
+        return MISSING
+    if "value" not in candidate:
+        raise ValidationError("AI conversion requires a value or unresolved_reason.")
+    value = candidate["value"]
+    if not isinstance(value, dict):
+        raise ValidationError(
+            "AI conversion must use the destination collection envelope."
+        )
+    if field_kind(target) == "todo":
+        if set(value) != {"items"} or not isinstance(value["items"], list):
+            raise ValidationError("Todo conversion requires an items array.")
+        for item in value["items"]:
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"text", "checked"}
+                or not isinstance(item["text"], str)
+                or not item["text"].strip()
+                or not isinstance(item["checked"], bool)
+            ):
+                raise ValidationError(
+                    "Todo items require nonempty text and a boolean checked value."
+                )
+    elif field_kind(target) == "table":
+        if set(value) != {"rows"} or not isinstance(value["rows"], list):
+            raise ValidationError("Table conversion requires a rows array.")
+        columns = {column["id"]: column for column in target.get("columns", [])}
+        if not columns:
+            raise ValidationError("AI table conversion requires destination columns.")
+        for row_number, row in enumerate(value["rows"], start=1):
+            if not isinstance(row, dict) or not row or set(row) - set(columns):
+                raise ValidationError(
+                    "Table conversion must use exact destination column IDs."
+                )
+            for field_id, cell in row.items():
+                kind = field_kind(columns[field_id])
+                try:
+                    if kind == "checkbox":
+                        valid = isinstance(cell, bool)
+                    elif kind == "number":
+                        valid = (
+                            isinstance(cell, (int, float))
+                            and not isinstance(cell, bool)
+                            and math.isfinite(cell)
+                        )
+                    elif kind in {"out", "bookmark"}:
+                        valid = (
+                            isinstance(cell, dict)
+                            and set(cell) <= {"url", "title"}
+                            and isinstance(cell.get("url"), str)
+                            and isinstance(cell.get("title", ""), str)
+                            and _parse(cell["url"], columns[field_id], "UTC")
+                            is not MISSING
+                        )
+                    elif kind == "date":
+                        valid = (
+                            isinstance(cell, str)
+                            and datetime.fromisoformat(cell).tzinfo is not None
+                        )
+                    else:
+                        valid = (
+                            kind in INPUTS
+                            and isinstance(cell, str)
+                            and _parse(cell, columns[field_id], "UTC") is not MISSING
+                        )
+                except (
+                    ValueError,
+                    TypeError,
+                    OverflowError,
+                    phonenumbers.NumberParseException,
+                ):
+                    valid = False
+                if not valid:
+                    title = columns[field_id].get("title") or "Untitled column"
+                    expected = {
+                        "checkbox": "a checked or unchecked value",
+                        "number": "a number",
+                        "date": "a date with a timezone",
+                        "time": "a time",
+                        "email": "an email address",
+                        "tel": "a phone number",
+                        "out": "a web link",
+                        "bookmark": "a web link",
+                    }.get(kind, "text")
+                    raise ValidationError(
+                        f'“{title}”, row {row_number}: the converted value must be {expected}.'
+                    )
+    else:
+        raise ValidationError("Unsupported AI conversion destination.")
+    if not value.get("rows", value.get("items")):
+        raise ValidationError(
+            "Use unresolved_reason to clear a populated source; do not return an empty collection."
+        )
+    return deepcopy(value)

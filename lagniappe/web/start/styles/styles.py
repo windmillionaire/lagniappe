@@ -164,7 +164,7 @@ STYLES = {
 			"list": "flex min-w-0 flex-col gap-1",
 			"row": "flex min-h-8 min-w-0 items-center gap-2 rounded-md bg-white/60 px-2 py-1 sm:text-sm",
 			"text": "min-w-0 flex-1 text-left text-base-dark [overflow-wrap:anywhere]",
-			"completeText": "text-base-medium line-through",
+			"completeText": "text-base-dark",
 			"inlineInput": "min-w-0 flex-1 border-b border-dashed border-base-medium bg-transparent px-1 py-0.5 text-base-dark focus:border-kind-default focus:outline-none",
 			"actions": "ml-auto flex shrink-0 flex-row items-center gap-1"
 		},

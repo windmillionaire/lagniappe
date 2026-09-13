@@ -255,3 +255,15 @@ Across workflows:
 
 Keep these semantics in shared guidelines and validators so workflow prompts do
 not drift into different workspace models.
+
+## Reviewed Form schema updates
+
+Both site AI and external agents use `update_form_schema`. Read the
+`schema_evolution` guideline and call `preview_form_schema_update` before proposing
+changes to saved values. The shared preparation layer records complete affected
+identities and source preconditions for review, and the Form-change adapter
+handles deterministic and AI conversions in the same guarded mutation workflow.
+Site reports generate AI candidates after approval; external reports supply
+strict candidates before approval and execute without a provider. Builder AI
+conversion uses the same adapter without a report. See
+[the external contract](AI_EXTERNAL_API.md) and [Form jobs](BACKEND_JOBS.md).

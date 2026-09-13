@@ -115,7 +115,7 @@ ORGANIZE_ACTION_TYPES = frozenset(
         "create_task",
         "add_form_to_page",
         "add_page_category",
-        "extend_form_schema",
+        "update_form_schema",
         "update_form_values",
         "attach_file",
         "append_page_document",
@@ -354,7 +354,7 @@ guideline reads:
   model-task forms.
 - You MUST call get_guidelines("page_form") or get_guidelines("task_form")
   before writing a new form schema, matching the create_form form_type.
-- You MUST call get_guidelines("schema_evolution") before proposing additive
+- You MUST call get_guidelines("schema_evolution") before proposing
   changes to an existing form schema.
 - get_guidelines("page_document") before adding optional document Markdown.
 

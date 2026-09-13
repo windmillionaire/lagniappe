@@ -38,6 +38,7 @@ from .function_definitions import (
     get_guidelines,
     get_schema,
     get_form_instances,
+    preview_form_schema_update,
     list_resources,
     workspace_filter,
 )
@@ -71,6 +72,7 @@ DECLARATIONS = {
     "get_guidelines": get_guidelines.GET_GUIDELINES,
     "get_schema": get_schema.GET_SCHEMA,
     "get_form_instances": get_form_instances.GET_FORM_INSTANCES,
+    "preview_form_schema_update": preview_form_schema_update.PREVIEW_FORM_SCHEMA_UPDATE,
     "list_workspace_resources": list_resources.LIST_WORKSPACE_RESOURCES,
     "get_filter_schema": workspace_filter.GET_FILTER_SCHEMA,
     "query_workspace_filter": workspace_filter.QUERY_WORKSPACE_FILTER,
@@ -104,6 +106,7 @@ HANDLERS = {
     "get_guidelines": get_guidelines.execute_get_guidelines,
     "get_schema": get_schema.execute_get_schema,
     "get_form_instances": get_form_instances.execute_get_form_instances,
+    "preview_form_schema_update": preview_form_schema_update.execute_preview_form_schema_update,
     "list_workspace_resources": list_resources.execute_list_workspace_resources,
     "get_filter_schema": workspace_filter.execute_get_filter_schema,
     "query_workspace_filter": workspace_filter.execute_query_workspace_filter,

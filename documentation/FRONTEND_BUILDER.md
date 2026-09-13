@@ -66,7 +66,7 @@ listener.
 
 **`selectElement(id)`** -- sets `selectedElement`, highlights the item in the model panel, and shows its settings.
 
-**`removeElement()`** -- stages removal of an element and repairs its conditions as an undoable draft change. The **Replace or Delete** action opens the existing options panel below Model. It uses the standard site combobox for deterministic conversions and disabled AI choices, followed by side-by-side **Convert** and **Delete** buttons. Conversion retains the field ID. Removing saved options/columns also requires migration on Save. Reserved Page fields remain protected.
+**`removeElement()`** -- stages removal of an element and repairs its conditions as an undoable draft change. The **Replace or Delete** action opens the existing options panel below Model. It uses the standard site combobox for deterministic and AI conversions, followed by side-by-side **Convert** and **Delete** buttons. Conversion retains the field ID. Removing saved options/columns also requires migration on Save. Reserved Page fields remain protected.
 
 The panel is titled **Replace or Delete** and uses the table column selector's
 type labels and icons. Its help button uses the shared help modal with the
@@ -98,7 +98,9 @@ submissions. Each reviewed pair has its own explanation; checkbox → Radio seed
 `True`/`False` options. Internal links, signatures, Documents and Status have no
 replacement controls: the replacement paragraph and selector are replaced by the
 red **This component type cannot be converted** message, with Delete as the only
-action. AI choices remain visible and disabled.
+action. AI choices require Create AI access. Selecting one reveals optional
+per-field instructions (up to 4000 characters). Instructions participate in Form
+Undo/Redo and are sent as migration intent, never stored in the schema.
 
 `BuilderDraft` keeps at most 100 commands covering schema, name and field order,
 with selection restored alongside them. A generated schema change is one command.
@@ -124,8 +126,11 @@ The conversion catalog depends only on schemas. Opening Replace or Delete or sel
 conversion never enumerates submissions or displays affected-value counts.
 `draftPayload()` attaches versioned migration intent to Save when required; the
 server independently classifies and validates the change. Invalid deterministic
-values and unmatched options are cleared. Unsupported AI conversions cannot be
-submitted through the same endpoint.
+values and unmatched options are cleared. Supported AI conversions use
+synchronous utility-model batches after Save; no AIReport is created. The server
+requires Form edit access, site AI entitlement, and visibility of every attached
+live Page/Task for AI conversions. Manual deterministic migrations retain their
+Form-only authority.
 
 Save stages a durable `form-change` job. `FormChangeStatus` pauses editing and
 uses the shared PollingCoordinator to refresh authoritative status. Reload restores
@@ -141,11 +146,13 @@ state. This also applies to later migrations saved in the same builder session.
 The existing notification
 slot shows **Schema migration in progress, Save temporarily disabled** until the
 job finishes. Save remains aria-disabled across acknowledgement and reload.
-There is no separate status panel or cancellation control. Failed updates retain
-the Form lock and show an inline Retry action in the same slot.
+There is no separate status panel or cancellation control. Failures after application starts retain
+the Form lock and show an inline Retry action in the same slot. An initial
+visibility/staleness rejection releases the unapplied change and preserves the
+local draft for correction.
 The saved source definition remains published until
 all live submissions have moved to the target generation. See
-[BACKEND_JOBS.md](BACKEND_JOBS.md#deterministic-form-changes).
+[BACKEND_JOBS.md](BACKEND_JOBS.md#form-changes).
 
 Page and active Task forms show an informational **View changes** modal for stored
 `pre_migration` values. It lists changed values/cells only, with no selection or

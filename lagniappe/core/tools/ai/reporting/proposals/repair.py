@@ -123,7 +123,7 @@ def _complete_form_schema_fields(proposal):
         fields = []
         if action.get("type") == "create_form" and isinstance(data.get("schema"), list):
             fields = data["schema"]
-        elif action.get("type") == "extend_form_schema" and isinstance(
+        elif action.get("type") == "update_form_schema" and isinstance(
             data.get("operations"), list
         ):
             fields = [
@@ -484,7 +484,7 @@ def _report_needs_review_proposal(
     is_ask = report_label == "Ask"
     is_form_error = not is_ask and any(
         marker in validation_error
-        for marker in ("create_form", "extend_form_schema", "data.schema")
+        for marker in ("create_form", "update_form_schema", "data.schema")
     )
     if is_ask:
         display_label = "Suggested changes"
@@ -886,7 +886,7 @@ table-payments; do not return schema fields without ids.
 When get_guidelines is available, call get_guidelines("page_form") or
 get_guidelines("task_form") before repairing a create_form action, matching its
 data.form_type. Call get_guidelines("schema_evolution") before repairing an
-extend_form_schema action. An add_field operation has the same id, type, and
+update_form_schema action. An add_field operation has the same id, type, and
 title requirements as a create_form schema field, and input fields must also
 include an input subtype. Do not merely claim a schema was corrected in the
 summary; put every correction in the returned action data.

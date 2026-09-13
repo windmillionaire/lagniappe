@@ -383,7 +383,7 @@ class Restrictions(Property):
                     can_edit_tasks,
                 )
             ),
-            "can_extend_form_schemas": can_edit_forms,
+            "can_update_form_schemas": can_edit_forms,
             "can_update_submissions": can_edit_pages or can_edit_tasks,
             "can_delete_pages": (
                 can_delete_categories

@@ -228,7 +228,7 @@
   {% set can_revise = report.origin != "api" and report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" and ((is_ask and can_ask_ai) or (not is_ask and can_create_ai)) %}
   {% set completed_result_actions = report.result.actions|selectattr("status", "equalto", "complete")|list if report.result and report.result.actions else [] %}
   {% set can_retry = report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
-  {% set can_undo = report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone %}
+  {% set can_undo = report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone and not migration_started %}
   {% set revise_button_label = "Revise Response" if is_ask else "Revise Plan" %}
   {% set revise_heading = "Revise Response" if is_ask else "Revise Proposal" %}
   {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
@@ -331,7 +331,7 @@
                       {%- if operation_status.error -%}
                         {{ operation_status.phase_label }}: {{ operation_status.error }}
                       {%- elif operation_status.recovering -%}
-                        {{ operation_status.phase_label }}. Automatic recovery is active.
+                        {{ operation_status.phase_label }}. Taking longer than expected.
                       {%- else -%}
                         {{ operation_status.phase_label }}
                       {%- endif -%}
@@ -356,6 +356,55 @@
             </div>
           {% endif %}
 
+          {% if schema_impacts %}
+            <section id="schema-impact" data-role="schema-impact" class="flex flex-col gap-3">
+              <h2 class="text-base font-semibold">Form schema changes</h2>
+              {% for action in report.proposal.actions %}
+                {% set impact = schema_impacts.get(action.id) %}
+                {% if impact %}
+                  <div data-role="schema-impact-action" data-schema-action-index="{{ loop.index }}" class="flex flex-col gap-3">
+                    {% if impact.form_url %}
+                      <h3 class="font-semibold"><a class="underline" href="{{ impact.form_url }}">{{ impact.form_name }}</a></h3>
+                    {% endif %}
+                    <p data-role="schema-impact-skipped" data-visible="{{ 'true' if action.skip else 'false' }}" class="text-sm text-base-medium">Skipped — the form and saved submissions will stay unchanged.</p>
+                    <div data-role="schema-impact-details" data-visible="{{ 'false' if action.skip else 'true' }}" class="flex flex-col gap-3">
+                      {% if impact.form_url %}
+                        {% for operation in impact.review %}
+                          <p class="text-sm"><strong>{{ operation.label }}</strong>: {{ operation.detail }}</p>
+                          {% if operation.instructions %}<p class="text-sm whitespace-pre-wrap">Conversion instructions: {{ operation.instructions }}</p>{% endif %}
+                        {% endfor %}
+                      {% endif %}
+                      {% if impact.migration %}
+                        <p class="text-sm text-delete-default">Removed and unconvertible values will be cleared. Submission migrations cannot be undone.</p>
+                        <p class="text-sm">{{ impact.total }} affected Pages/Tasks</p>
+                      {% endif %}
+                      {% for item in impact['items'] %}
+                        {% if item.unavailable %}
+                          <p class="text-sm text-base-medium">An affected item is unavailable.</p>
+                        {% else %}
+                          <details data-role="schema-impact-item" class="rounded-md bg-base-bg p-3">
+                            <summary><a href="{{ item.url }}" class="font-semibold underline">{{ item.name }}</a></summary>
+                            {% for field in item.fields %}
+                              <p class="mt-2 text-sm">{{ field.title }} · {{ 'AI conversion' if field.rule == 'ai' else 'Deterministic conversion' }}</p>
+                              {% if field.candidate %}
+                                <pre class="whitespace-pre-wrap break-words text-sm">{{ 'Will be cleared: ' if field.cleared else '' }}{{ field.candidate }}</pre>
+                              {% elif field.rule == 'ai' %}
+                                <p class="text-sm text-base-medium">Values will be generated after approval.</p>
+                              {% endif %}
+                            {% endfor %}
+                          </details>
+                        {% endif %}
+                      {% endfor %}
+                      <nav class="flex gap-3 text-sm" aria-label="Affected submissions">
+                        {% if impact.page > 1 %}<a class="underline" href="{{ url_for('tools.report', key=report.urlsafe_key, schema_page=impact.page - 1) }}#schema-impact">Previous</a>{% endif %}
+                        {% if impact.has_more %}<a class="underline" href="{{ url_for('tools.report', key=report.urlsafe_key, schema_page=impact.page + 1) }}#schema-impact">Next</a>{% endif %}
+                      </nav>
+                    </div>
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </section>
+          {% endif %}
           {% if report.input_files %}
             <div class="flex flex-col gap-1">
               <h2 class="text-base font-semibold text-base-dark">Files</h2>
@@ -483,8 +532,8 @@
                         {% else %}
                           {{ "Updated submissions" if action.updates.applied else "No submission changes applied" }}
                         {% endfor %}
-                      {% elif action.status == "complete" and action.entity and action.type == "extend_form_schema" %}
-                        Extended schema for {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.type == "update_form_schema" %}
+                        Updated schema for {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.type == "append_page_document" %}
                         Page Document Updated: {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.type == "complete_task" %}
@@ -571,12 +620,11 @@
                   data-role="{{ 'retry-report-form' if can_retry else 'run-report-form' }}"
                   class="flex flex-col gap-2">
               {% if can_retry %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />{% endif %}
-              {% if can_retry and report.error %}
-                <div data-role="error"
-                     data-visible="true"
-                     data-kind="error"
-                     class="{{ styles.message }} mb-4">{{ report.error }}</div>
-              {% endif %}
+              <div data-role="error"
+                   role="alert"
+                   data-visible="{{ 'true' if can_retry and report.error else 'false' }}"
+                   data-kind="error"
+                   class="{{ styles.message }} my-4">{{ report.error if can_retry and report.error else '' }}</div>
               <button type="submit"
                       data-kind="{{ 'report' if can_retry else 'success' }}"
                       class="{{ styles.button.submit }}">{{ "Retry Proposal" if can_retry else "" }}</button>

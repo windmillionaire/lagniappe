@@ -69,7 +69,7 @@ def _expected_action_state(action, record):
         }.values())
     if action_type == "rename_entity":
         expected["name"] = str(_data(action).get("name") or "").strip()
-    if action_type == "extend_form_schema":
+    if action_type in {"update_form_schema", "extend_form_schema"}:
         expected["schema_fingerprint"] = record.get("schema_fingerprint")
     if action_type == "summarize_file":
         data = _data(action)
@@ -234,7 +234,7 @@ def _inspect_action_applied(action, report, user, record):
             if current["value"] != update.get("value"):
                 return ACTION_DRIFTED
         return ACTION_APPLIED
-    if action_type == "extend_form_schema":
+    if action_type in {"update_form_schema", "extend_form_schema"}:
         return (
             ACTION_APPLIED
             if _value_fingerprint(entity.schema or [])
@@ -379,7 +379,7 @@ def _inspect_action_compensated(record, report, user):
             ] != previous.get("previous_value"):
                 return ACTION_NOT_APPLIED
         return ACTION_APPLIED
-    if action_type == "extend_form_schema":
+    if action_type in {"update_form_schema", "extend_form_schema"}:
         return (
             ACTION_APPLIED
             if _value_fingerprint(entity.schema or [])
@@ -415,6 +415,8 @@ def _inspect_action_compensated(record, report, user):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason recoverable action errors are asserted through full report execution
 def _is_recoverable_action_error(_action, error):
+    if _action.get("type") in {"update_form_schema", "extend_form_schema"}:
+        return False
     if _action.get("type") == "update_form_values" and str(error) != SUBMISSION_UPDATE_ROWS_ERROR:
         return False  # Invalid patches must block dependent completions and remain retryable.
     if _action.get("type") == "append_page_document":

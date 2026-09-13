@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 import json
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -617,12 +618,15 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
 
 # @matrix ai-report task-completion tasks : completed-task duplicate-task-prevention explicit-task-identity
 @pytest.mark.unit
+@pytest.mark.parametrize("actor_zone", ["UTC", "America/Los_Angeles"])
 def test_run_report_reuses_one_created_task_for_multiple_completed_events(
     monkeypatch,
     get_schema,
+    actor_zone,
 ):
     _patch_fake_keys(monkeypatch)
     user = _test_user("history-cache-owner")
+    user.db["timezone"] = actor_zone
     file_one = _test_file("2023-06-24 jeep registration.pdf", "application/pdf")
     file_two = _test_file("2018_06_07 jeep registration.pdf", "application/pdf")
     report = TestEntities.get(
@@ -757,11 +761,15 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
     assert forms[0].generation == tracker_task.generation == histories[0].generation == 0
     assert json.loads(tracker_task.db["completed_submission"])["generation"] == 0
     assert tracker_task.completed is True
-    assert tracker_task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert tracker_task.completed_on == datetime(
+        2023, 6, 24, tzinfo=ZoneInfo(actor_zone)
+    ).astimezone(timezone.utc)
     assert tracker_task.due_date is None
     assert tracker_task.files == [file_one]
     assert tracker_task.submission == {"input-textab12": "2023 event"}
-    assert histories[0].completed_on == datetime(2018, 6, 7, tzinfo=timezone.utc)
+    assert histories[0].completed_on == datetime(
+        2018, 6, 7, tzinfo=ZoneInfo(actor_zone)
+    ).astimezone(timezone.utc)
     assert histories[0].name == "Registration"
     assert histories[0].description == "Vehicle registration renewal payment."
     assert histories[0].submission == {"input-textab12": "2018 event"}
@@ -1900,3 +1908,28 @@ def test_run_report_skips_invalid_completed_task_events_and_continues(monkeypatc
         )
         assert result["actions"][1]["status"] == "complete"
         assert result["actions"][1]["entity"]["name"] == "Still Runs"
+
+
+# @matrix ai-report : completed-task validation
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "date_text,utc_hour",
+    [
+        ("2026-01-15", 8), ("2026-07-15", 7),
+        ("2026-03-08", 8), ("2026-03-09", 7),
+        ("2026-11-01", 7), ("2026-11-02", 8),
+    ],
+)
+def test_completed_event_dates_use_actor_timezone_without_request(date_text, utc_hour):
+    from flask import has_request_context
+    from lagniappe.core.tools.ai.reporting.execution.actions.completed_tasks import (
+        _parse_completed_task_completed_on,
+    )
+
+    assert not has_request_context()
+    actor = _test_user("date-actor")
+    actor.db["timezone"] = "America/Los_Angeles"
+    actual = _parse_completed_task_completed_on({"completed_on": date_text}, user=actor)
+    expected = datetime.fromisoformat(date_text).replace(hour=utc_hour, tzinfo=timezone.utc)
+    assert actual == expected
+    assert actual.astimezone(ZoneInfo("America/Los_Angeles")).date().isoformat() == date_text

@@ -1424,8 +1424,9 @@ def test_get_guidelines_returns_named_bundle():
 
     assert schema_evolution["task"] == "schema_evolution"
     assert "Schema Evolution Guidelines" in schema_evolution["guidelines"]
-    assert "additive, non-destructive" in schema_evolution["guidelines"]
-    assert "Do not delete, rename, reorder" in schema_evolution["guidelines"]
+    assert "preview_form_schema_update" in schema_evolution["guidelines"]
+    assert "remove_field" in schema_evolution["guidelines"]
+    assert "user reviews" in schema_evolution["guidelines"]
 
     page_document = ai_get_guidelines.execute_get_guidelines(
         {"task": "page_document"},
@@ -2167,9 +2168,8 @@ def test_get_schema_includes_values_by_id_without_label_collisions(monkeypatch, 
         {"id": entity.urlsafe_key, "include_values": True}, user
     )
 
-    # Values use the existing AI representation, not raw stored keys. Explicit
-    # negative answers must remain present (checkbox AI text is "False").
-    assert result["values"] == {**expected, "checkbox-confirmed": "False"}
+    # Exact IDs and explicit boolean answers survive the schema-value read.
+    assert result["values"] == expected
     assert result["schema"] == form.schema
     assert set(result) == {
         "entity",
@@ -2197,6 +2197,50 @@ def test_get_schema_includes_values_by_id_without_label_collisions(monkeypatch, 
     assert ai_get_schema.execute_get_schema(
         {"id": entity.urlsafe_key, "include_values": True}, user
     ) == {"error": "Access denied"}
+
+
+# @matrix ai form-schema : schema tool-context
+@pytest.mark.unit
+def test_get_schema_preserves_collection_rows_and_typed_cells(monkeypatch):
+    form = TestEntities.get("FORM", {"name": "Inventory", "hash": "typed-form"})
+    form.form_type = "task"
+    form.schema = [
+        {"id": "table-items", "type": "table", "title": "Items", "columns": [
+            {"id": "row-name", "type": "input", "input": "text", "title": "Same"},
+            {"id": "row-qty", "type": "input", "input": "number", "title": "Same"},
+            {"id": "row-done", "type": "checkbox", "title": "Done"},
+            {"id": "row-link", "type": "link", "location": "out", "title": "Source"},
+        ]},
+        {"id": "todo-items", "type": "todo", "title": "Checklist"},
+    ]
+    task = TestEntities.get("TASK", {"name": "Stock", "hash": "typed-task"})
+    task.page = TestEntities.get("PAGE", {"name": "Stock Page"})
+    task.form = form
+    task.properties.submission.value = {
+        "table-items": {"rows": [
+            {"row-name": "Pens", "row-qty": 0, "row-done": False,
+             "row-link": {"title": "Catalog", "url": "https://example.com/catalog"}},
+            {"row-name": "Folders", "row-qty": 7, "row-done": True},
+            {"row-done": False},
+            {"row-name": "Unknown quantity"},
+        ]},
+        "todo-items": {"items": [{"text": "Order stock", "checked": False}]},
+    }
+    expected = task.properties.submission.form_value
+    user = SimpleNamespace(is_authenticated=True, is_owner=True, has_permission=lambda *a, **k: True)
+    monkeypatch.setattr(ai_get_schema.Entities, "fetch_one", lambda identifier, request: task if isinstance(identifier, str) else identifier)
+    result = ai_get_schema.execute_get_schema({"id": task.urlsafe_key, "include_values": True}, user)
+    assert result["values"] == expected
+    rows = result["values"]["table-items"]["rows"]
+    assert len(rows) == 4
+    assert type(rows[0]["row-qty"]) in (int, float)
+    assert rows[0]["row-qty"] == 0
+    assert rows[0]["row-done"] is False
+    assert rows[1]["row-done"] is True
+    assert rows[2] == {"row-done": False}
+    assert "row-qty" not in rows[3]
+    assert rows[0]["row-name"] == "Pens"
+    assert rows[0]["row-link"] == {"title": "Catalog", "url": "https://example.com/catalog"}
 
 
 # @matrix ai form-schema : autofill category-forms schema

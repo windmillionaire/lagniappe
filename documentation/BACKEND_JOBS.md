@@ -1,7 +1,7 @@
 # Backend Deferred Jobs
 
 Deferred jobs provide one durable execution model for report generation and
-execution, deterministic Form changes, Page/Task autofill, file OCR, file summary, AI
+execution, Form changes, Page/Task autofill, file OCR, file summary, AI
 email handoff, and selected site work. Ingress, filter-cache maintenance,
 notification email, and scheduled task uncompletion use focused workflows.
 
@@ -82,6 +82,23 @@ and proposal fingerprint.
 
 ## Retry and recovery
 
+Dependency checks use the `waiting_dependency` phase. Report execution labels
+this as “Waiting for form update”; other dependencies use “Waiting for related
+work.” A normally scheduled dependency check is not presented as automatic
+recovery. Stale work, pending dispatch repair and actual failure retries display
+“Taking longer than expected” without claiming that a recovery worker is active.
+Status projection also corrects older dependency-wait
+records that used the file-summarization phase.
+
+Server dependency checks are separate from the browser's status polling.
+`ReportExecutionAdapter` checks again after 5, 10, 20, then 30 seconds, retaining
+the 30-second interval for longer migrations. Other adapters default to 60
+seconds. Each adapter declares its nonempty `dependency_retry_delays` tuple;
+the runner uses the saved dependency-wait count to select a delay, persists the
+due time, and dispatches the continuation with the same delay. These checks do
+not consume the provider retry budget. The existing job leases, publication
+guards and per-action ledger still protect dependent actions and repeated work.
+
 Provider calls inside jobs make at most two SDK attempts; durable retry owns
 longer outages. Quota failures use 60- and 300-second delays plus positive
 jitter. Other retryable provider failures use 60, 180, and 600 seconds.
@@ -122,14 +139,15 @@ recovery, stage, safe entity references, and AI-generation summaries correlated
 by an opaque ID. It excludes prompts, parameters, checkpoints, generated
 content, authorization data, and provider/tool payloads.
 
-## Deterministic Form changes
+## Form changes
 
 `form_changes.py` and `adapters/form_change.py` implement one Form update without
-an AI report or approval plan. Builder Save uses `start_writes()` to persist the
+a separate migration subsystem. Builder Save uses `start_writes()` to persist the
 Form's `pending_form_change`, DeferredJob, Notification and Form-scoped lock in
 one guarded transaction. The pending payload owns the proposed schema/content,
 conversion operations, actor timezone and source/target generations. Selection
-in the builder and Save itself do not query submissions.
+in the builder does not query submissions. AI Save and AI report preparation
+check complete population visibility before reservation.
 
 The worker enumerates all live Page/Task rows attached to the Form, including
 completed Tasks, in cursor batches of 50. Edit access to the Form authorizes its
@@ -142,6 +160,39 @@ checks the current job lease, Form owner marker and exact submission row, then
 patches only answer/generation/notice/receipt fields and required projections.
 Task links, list owners and caches use normal mutation effects. Rows with this
 change's receipt skip conversion on retry but retry their display effects.
+
+AI conversions (textarea→table/todo and table↔todo) share this worker. Site
+calls use the utility tier synchronously for one target's affected fields at a
+time, with bounded input/output and one malformed-output repair. A prepared
+`ai_batch` checkpoint precedes the live write; a replay verifies source hashes
+and reuses those results. External candidates come from an immutable approved
+report; no provider is invoked. Retry carries any pending prepared batch to the
+replacement worker. Every AI-originated migration, deterministic included, checks
+Form edit and complete population view access before application and rechecks
+current access per target. This does not require per-target edit access. Site AI
+calls additionally require AI.CREATE. Initial restricted/stale preflight failure
+releases only an unapplied change using guarded rejection state; partial changes
+retain ownership. Manual deterministic builder migrations retain Form-only
+authority as described above.
+
+The on-site utility prompt requires absent table cells to omit their column keys.
+Its output boundary also treats null and blank-string cells in known columns as
+absent, preserving explicit zero/false and rejecting populated values of the wrong
+type. Unknown columns and empty rows/collections remain validation failures;
+external reviewed candidates retain exact-shape validation without normalization.
+Validation failures name the field, column, row and expected type where available.
+The worker retains target/field references in private job error context; builder
+status resolves an affected Page/Task link only after checking current visibility
+and Form membership. Existing errors containing only column IDs are translated
+using the pending schema. Retry continues unfinished work and preserves receipts
+for already-converted answers.
+
+`update_form_schema` report actions record the child migration ID before starting
+it. The report runner raises the existing dependency-pending signal and releases
+its worker while the child runs. Retry checks the pending owner/publication
+receipt, and dependent actions proceed only after publication. Candidates remain
+inside the linked report, whose fingerprint is rechecked by the worker. No bulk
+Undo is allowed after a migration starts, and deletion is fenced while pending.
 
 `pre_migration` retains the earliest before-value and schema for changed fields.
 Table notices display only changed cells. Completion envelopes are preserved;

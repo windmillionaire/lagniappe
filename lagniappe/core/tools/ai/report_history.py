@@ -15,6 +15,11 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 # @matrix ai-report : delete file-cleanup guarded-delete
 def delete_report_record(report, *, guarded=False):
     """Reuse ordinary deletion, with a revision fence for bulk/API requests."""
+    from .reporting.schema_updates import migration_pending
+
+    if migration_pending(report):
+        return agent_api_store.PLAN_OPERATION_BUSY
+    guarded = guarded or any((action.get("_schema_change") or {}).get("migration") for action in (getattr(report, "proposal", None) or {}).get("actions", []))
     if report.origin == "api" and (report.deferred_job or report.status == "undoing"):
         return agent_api_store.PLAN_OPERATION_BUSY
 

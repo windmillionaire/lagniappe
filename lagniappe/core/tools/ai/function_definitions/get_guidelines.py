@@ -1,6 +1,7 @@
 """Function declaration and handler for on-demand AI guideline bundles."""
 
 from google.genai import types
+from ..guidelines.schema_evolution import EXTERNAL_SCHEMA_EVOLUTION_GUIDELINES
 
 from lagniappe.core.tools.ai.debug import ai_debug
 from lagniappe.core.tools.ai.guidelines import (
@@ -14,9 +15,6 @@ from lagniappe.core.tools.ai.guidelines import (
     ORGANIZE_PLANNING_POLICY,
     ORGANIZE_PLANNING_PREFLIGHT,
     ORGANIZE_PLANNING_TOOLS,
-    PAGE_FORM_CONTENT_GUIDELINES,
-    PAGE_FORM_REQUIREMENTS,
-    PAGE_FORM_SCHEMA_FORMAT,
     PROJECT_COMPLEXITY_GUIDELINES,
     PROJECT_GENERATION_GUIDELINES,
     REPORT_OUTPUT_REQUIREMENTS,
@@ -25,9 +23,6 @@ from lagniappe.core.tools.ai.guidelines import (
     SCHEMA_EVOLUTION_GUIDELINES,
     SUBMISSION_OUTPUT_REQUIREMENTS,
     SUMMARY_GENERATION_GUIDELINES,
-    TASK_FORM_CONTENT_GUIDELINES,
-    TASK_FORM_REQUIREMENTS,
-    TASK_FORM_SCHEMA_FORMAT,
 )
 
 
@@ -44,6 +39,44 @@ SCHEMA_FIELD_TYPES = (
     "textarea",
     "todo",
 )
+
+SCHEMA_DEFINITION_RULES = {
+    "input": "Specify input: text, number, email, tel, date or time.",
+    "textarea": "Multi-line plain text. Use for narrative answers.",
+    "checkbox": (
+        "Boolean answer. A required checkbox must be checked to complete the task: "
+        "use it for mandatory affirmative acknowledgements, not questions where No is valid. "
+        "For a required Yes/No answer, use a radio or single selection with distinct "
+        "non-empty string option values. An optional checkbox may remain unchecked."
+    ),
+    "radio": "Supply options as {value, label} objects with unique nonempty string values.",
+    "select": (
+        "Supply options as {value, label} objects with unique nonempty string values. "
+        "Set multiple: true only for multiple choices."
+    ),
+    "table": (
+        "Supply columns with exact row-prefixed IDs, titles and types. Columns allow "
+        "input (with its input subtype), checkbox, and link. Include the actual "
+        "column types in field_types when requesting guidance."
+    ),
+    "todo": "Ordered checklist; available only in Task Forms.",
+    "link": "Specify location: in for a related workspace entity, out for an external URL.",
+    "location": "Address field with place lookup. Use for geographic addresses.",
+    "signature": "Electronic signature capture for consent or approval.",
+    "html": (
+        "Supply nonempty content_markdown, never raw html. Use only essential static "
+        "information; omit generic instructions and filler."
+    ),
+}
+
+FORM_DESIGN_GUIDELINES = """
+### Form purpose
+
+Add structured answers specific to the Page or Task. Avoid duplicating its name,
+description, category, files, document, parent Page, project, assignee or due date
+unless the user requests a separate field. Prefer useful repeatable data over
+generic filler. Mark a field required only when its answer is necessary.
+"""
 ACTION_GUIDELINES = {
     "set_task_due_date": "Set an exact editable, incomplete Task's calendar due date with data.task and data.due_date (YYYY-MM-DD in the acting user's timezone, or null to clear). Resolve relative wording to a date using the plan's current date/timezone. Preserve recurrence rules, completion state, and form values. This uses the Task editor's calendar-date behavior. Browser review, fresh permissions, retry, and undo apply.",
     "append_page_document": "Add only the requested text in document_markdown to one editable Page (page or page_action). Starts a missing document; never replaces existing text. The server adds trusted source/time attribution. Read existing content first. Unsaved collaborative edits or an uninitialized older document stop execution for a safe retry; undo stops if content has since changed.",
@@ -56,7 +89,7 @@ ACTION_GUIDELINES = {
     "create_task": "Use an editable Page or earlier page action, a stable work name, task Forms only, and a source-backed completed_on date only for completed evidence. To check off an existing Task while preserving its details use complete_task, not historical-occurrence import.",
     "add_form_to_page": "Reference one editable existing Page and one page Form; this does not require a Category.",
     "add_page_category": "Reference both the editable existing Page and additional existing Category; readable names are not executable references.",
-    "extend_form_schema": "Use additive fields or select/radio options only and place the schema update before actions that use it.",
+    "update_form_schema": "Preview exact-ID schema operations, explain destructive changes, and place the update before actions that use it. The user reviews the plan.",
     "update_form_values": (
         "Put the target inside every data.updates row, alongside schema_id and "
         "new_value. Each row requires exactly one of page, task, page_action, or "
@@ -101,10 +134,7 @@ GUIDELINE_BUNDLES = {
         "description": "Rules for proposing a new category and optional page form.",
         "sections": (
             CATEGORY_GENERATION_GUIDELINES,
-            PAGE_FORM_REQUIREMENTS,
-            PAGE_FORM_SCHEMA_FORMAT,
-            PAGE_FORM_CONTENT_GUIDELINES,
-            SCHEMA_TYPE_GUIDELINES,
+            "Read page_form guidance if proposing a default Page Form; a category does not require one.",
         ),
     },
     "project": {
@@ -112,29 +142,16 @@ GUIDELINE_BUNDLES = {
         "sections": (
             PROJECT_GENERATION_GUIDELINES,
             PROJECT_COMPLEXITY_GUIDELINES,
-            TASK_FORM_REQUIREMENTS,
-            TASK_FORM_SCHEMA_FORMAT,
-            TASK_FORM_CONTENT_GUIDELINES,
-            SCHEMA_TYPE_GUIDELINES,
+            "Read task_form guidance if proposing a Form for a model task.",
         ),
     },
     "page_form": {
         "description": "Rules for proposing a reusable page form schema.",
-        "sections": (
-            PAGE_FORM_REQUIREMENTS,
-            PAGE_FORM_SCHEMA_FORMAT,
-            PAGE_FORM_CONTENT_GUIDELINES,
-            SCHEMA_TYPE_GUIDELINES,
-        ),
+        "sections": (FORM_DESIGN_GUIDELINES,),
     },
     "task_form": {
         "description": "Rules for proposing a reusable task form schema.",
-        "sections": (
-            TASK_FORM_REQUIREMENTS,
-            TASK_FORM_SCHEMA_FORMAT,
-            TASK_FORM_CONTENT_GUIDELINES,
-            SCHEMA_TYPE_GUIDELINES,
-        ),
+        "sections": (FORM_DESIGN_GUIDELINES,),
     },
     "form_autofill": {
         "description": "Rules for filling a page or task submission from context/files.",
@@ -153,8 +170,8 @@ GUIDELINE_BUNDLES = {
         "sections": (SUMMARY_GENERATION_GUIDELINES,),
     },
     "schema_evolution": {
-        "description": "Rules for bounded additive form schema updates.",
-        "sections": (SCHEMA_EVOLUTION_GUIDELINES, SCHEMA_TYPE_GUIDELINES),
+        "description": "Rules for reviewed schema edits, affected-entity previews and AI conversions.",
+        "sections": (SCHEMA_EVOLUTION_GUIDELINES,),
     },
     "report_actions": {
         "description": "Detailed report action and output contract.",
@@ -271,7 +288,7 @@ SUBMISSION_PATCH_BUNDLE = {
         "and values, or get_schema(include_values=true) when needed. Include only "
         "requested, evidence-supported changes; omitted fields remain unchanged. "
         "Do not invent missing facts or silently resolve conflicting evidence. "
-        "For newly added fields, depend on the preceding extend_form_schema action. "
+        "For newly added fields, depend on the preceding update_form_schema action. "
         "Every data.updates row must include its own page/task (or "
         "page_action/task_action), schema_id, and new_value; a top-level target "
         "does not apply to the rows.",
@@ -302,8 +319,9 @@ GET_GUIDELINES = types.FunctionDeclaration(
                 "type": "array",
                 "items": {"type": "string", "enum": list(SCHEMA_FIELD_TYPES)},
                 "description": (
-                    "Optional actual schema element types. For bundles containing "
-                    "Form value guidance, return only matching type sections."
+                    "Optional actual schema element types, including nested table "
+                    "column types. For schema_evolution include source and destination "
+                    "types. Filters both schema definitions and value guidance."
                 ),
             },
             "actions": {
@@ -357,6 +375,8 @@ def _guidelines_result(args, *, external):
         bundle = EXTERNAL_ORGANIZE_BUNDLE
     elif external and task == "form_autofill":
         bundle = EXTERNAL_FORM_AUTOFILL_BUNDLE
+    elif external and task == "schema_evolution":
+        bundle = {**bundle, "sections": (EXTERNAL_SCHEMA_EVOLUTION_GUIDELINES,)}
     if not bundle:
         ai_debug(
             "tool.get_guidelines.result",
@@ -385,6 +405,15 @@ def _guidelines_result(args, *, external):
         bundle = SUBMISSION_PATCH_BUNDLE
     elif actions is not None and task != "report_actions":
         return {"error": "actions is supported only for task=report_actions or form_autofill."}
+
+    if task in {"page_form", "task_form", "schema_evolution"}:
+        bundle = {
+            **bundle,
+            "sections": (
+                *bundle["sections"],
+                _schema_definition_guidance(field_types, page_form=task == "page_form"),
+            ),
+        }
 
     sections = []
     for section in bundle["sections"]:
@@ -479,6 +508,29 @@ def _schema_type_guidance(field_types):
         if applies & wanted:
             selected.append(f"#### {chunk.strip()}")
     return "\n\n".join(selected)
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
+# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
+# @reason schema-only guidance and field filtering are asserted through both tool entry points
+def _schema_definition_guidance(field_types, *, page_form=False):
+    selected = SCHEMA_FIELD_TYPES if field_types is None else field_types
+    sections = [
+        "### Form schema definitions\n\n"
+        "A Form schema is an array of field objects with id, type and title. "
+        "New IDs use type- plus eight alphanumeric characters starting with a letter; "
+        "table column IDs use row- instead. Preserve existing IDs during updates. "
+        "Optional shared settings include placeholder and required (boolean). "
+        "Visibility/status conditions must reference actual field IDs."
+    ]
+    for field_type in selected:
+        if page_form and field_type in {"todo", "signature", "html"}:
+            continue
+        sections.append(
+            f"#### `{field_type}` schema\n\n{SCHEMA_DEFINITION_RULES[field_type]}"
+        )
+    return "\n\n".join(sections)
 
 
 # @testable false

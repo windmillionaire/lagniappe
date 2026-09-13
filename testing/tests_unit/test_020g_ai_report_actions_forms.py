@@ -788,7 +788,7 @@ def test_submission_batch_persists_all_fields_with_fresh_entity_reads(
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "extend_form_schema",
+                        "type": "update_form_schema",
                         "data": {
                             "form": "batch-form",
                             "operations": [
@@ -1102,7 +1102,7 @@ def test_run_report_rejects_schema_update_without_form_edit_permission(monkeypat
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "extend_form_schema",
+                        "type": "update_form_schema",
                         "data": {
                             "form": "restricted-invoice-form",
                             "operations": [

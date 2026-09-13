@@ -39,6 +39,7 @@ LIFECYCLE_TOOLS = (
     "upload_local_files",
     "submit_plan",
 )
+# Contract v8 updates the declared version bounds in lifecycle results.
 # Reviewed conversational contracts: plan-free context, optional brief revisions,
 # execution receipts, and compact/selected schemas in starter/upload context.
 # Optional Create action selection uses the contract reader's identifier schema;
@@ -54,31 +55,31 @@ LIFECYCLE_SCHEMA_SHA256 = {
     ),
     "start_ask": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "1e7baa7baf7af2baef56465deb16baa50f38d35ec6e4317f9b72edab83bbda1f",
+        "6816cc7c761769bf62f02bcdfff9551eec5aa94677f4fb13004b645b1cbdbcc2",
     ),
     "start_create": (
         "6ad98deac652b8e18d90e813977bfa39667d284bc0ed00171b5c4ae0a96e8c20",
-        "1e7baa7baf7af2baef56465deb16baa50f38d35ec6e4317f9b72edab83bbda1f",
+        "6816cc7c761769bf62f02bcdfff9551eec5aa94677f4fb13004b645b1cbdbcc2",
     ),
     "start_organize": (
         "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "1e7baa7baf7af2baef56465deb16baa50f38d35ec6e4317f9b72edab83bbda1f",
+        "6816cc7c761769bf62f02bcdfff9551eec5aa94677f4fb13004b645b1cbdbcc2",
     ),
     "get_plan": (
         "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
-        "93ac7fd41d6414596b6c4a9ad555af53fe97f37c410f44a8bd736f67a562c287",
+        "409ade01190ecef168a86d29ff300787de6dda5a78a0a43b0957add82405f076",
     ),
     "get_plan_contract": (
         "5b95dc7a76a81e9dea530ba2519c92c1de410e59d6e1e7f115068c604c961553",
-        "ca7162560fcd6af6d04feb38860f43c10e55111951428d2dccf22baa029205c8",
+        "12d01bad44fc99bd72931d32e8383817bfbd617a61f1475edcfb1619bea1fff2",
     ),
     "upload_local_files": (
         "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
-        "df2b7f84087a1b347b92bf2035fb7897d2dc689069fb780182afb4bae430a04a",
+        "4a5d9aa1443971f18fd6169a27a4d678180954076153685571eff1e8162889bc",
     ),
     "submit_plan": (
         "18e44236fd78c5fa56314d6df698b339be168781d967947a7ac9efcfee57a9ef",
-        "0062860fc35ce6a61f7a49c702558356f99553f6b8834e37816e63966e7fe062",
+        "7de596c08b72d6550afb5c07f6cef05f2a84475a69b374eeeab0324c375d0765",
     ),
 }
 PLAN_KEYS = {
@@ -316,7 +317,7 @@ def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
         "proposal_schema",
         "instructions",
     }
-    assert submission["contract_version"] == contract["contract_version"] == 7
+    assert submission["contract_version"] == contract["contract_version"] == 8
     assert submission["proposal"] == {}
     assert submission["proposal_schema"] == "$.proposal_schema"
     assert submission["instructions"].startswith("Call submit_plan")
@@ -623,8 +624,8 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert submission["url"] == (
             f"{expected_api_origin}/api/v1/plans/{invalid_plan['id']}/submit"
         )
-        assert submission["contract_version"] == forwarded["contract_version"] == 7
-        assert submission["body"] == {"contract_version": 7, "proposal": {}}
+        assert submission["contract_version"] == forwarded["contract_version"] == 8
+        assert submission["body"] == {"contract_version": 8, "proposal": {}}
         assert set(submission) == {"method", "url", "contract_version", "body", "rule"}
         assert "credential-thief.invalid" not in json.dumps(forwarded)
 
@@ -715,7 +716,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert selected_contract["schema_scope"] == "selected"
         assert "workflow_rules" not in selected_contract
         assert "submission_format" not in selected_contract
-        assert selected_contract["mcp_submission"]["contract_version"] == 7
+        assert selected_contract["mcp_submission"]["contract_version"] == 8
         assert set(selected_contract["proposal_schema"]["$defs"]) == {"create_page", "create_task"}
         create_receipt = _assert_safe_receipt(
             workflow["create"]["receipt"], status="ready"

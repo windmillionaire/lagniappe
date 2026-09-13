@@ -176,7 +176,7 @@ def _capture_action_before(action, report, user, created, context=None):
                 }
             )
         return {"updates": previous}
-    if action_type == "extend_form_schema":
+    if action_type in {"update_form_schema", "extend_form_schema"}:
         form = _resolve_entity(
             _first_data_reference(data, "form"), created, expected=Entities.FORM
         )
@@ -252,7 +252,7 @@ def _prepare_action_checkpoint(action, report, user, created, context, record):
         if existing is None:
             output_key = database_utility.create_key("task", None)
         else:
-            completed_on = _parse_completed_task_completed_on(_data(action))
+            completed_on = _parse_completed_task_completed_on(_data(action), user=user)
             if _completed_event_belongs_in_history(existing, completed_on):
                 output_key = database_utility.create_key("task_history", existing)
             elif _should_archive_live_completion(existing):
@@ -348,7 +348,7 @@ def _record_action_result(record, action, entity, to_save, metadata, created, co
     ):
         if key in metadata:
             record[key] = metadata[key]
-    if action.get("type") == "extend_form_schema" and entity is not None:
+    if action.get("type") in {"update_form_schema", "extend_form_schema"} and entity is not None:
         record["schema_fingerprint"] = _value_fingerprint(entity.schema or [])
     if metadata.get("note"):
         record["note"] = metadata["note"]

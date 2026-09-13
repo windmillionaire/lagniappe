@@ -14,7 +14,7 @@ import {
 import { FormChangeStatus } from "./changeStatus";
 import { loadCondition } from "./conditions/loader";
 import { BuilderDraft } from "./draft";
-import { needsMigration, repairConditions } from "./migrations";
+import { fieldKind, needsMigration, repairConditions } from "./migrations";
 import { ComponentsPanel } from "./panels/components";
 import { ConditionPanel } from "./panels/condition";
 import { ElementSettings } from "./panels/elementSettings";
@@ -39,6 +39,9 @@ class FormBuilder {
 			document.getElementById("builder-draft")?.textContent || "null",
 		);
 		this.htmlFields = structuredClone(this.bootstrap?.html_fields || {});
+		this.conversionInstructions = structuredClone(
+			this.bootstrap?.conversion_instructions || {},
+		);
 		this.conversionCatalog = JSON.parse(
 			document.getElementById("builder-conversions")?.textContent || "null",
 		);
@@ -231,12 +234,31 @@ class FormBuilder {
 	}
 
 	captureDraft() {
+		const instructions = Object.fromEntries(
+			Object.entries(this.conversionInstructions || {}).filter(
+				([id, value]) => {
+					const source = this.savedField(id);
+					const target = this.schema.find((field) => field.id === id);
+					return (
+						value &&
+						source &&
+						target &&
+						this.conversionCatalog?.rules[fieldKind(source)]?.[
+							fieldKind(target)
+						] === "ai"
+					);
+				},
+			),
+		);
 		return {
 			name: this.header.nameHidden.value,
 			schema: this.schema,
 			form_type: this.elt.dataset.formType,
 			html_fields: structuredClone(this.htmlFields),
 			selected_id: this.selectedElement?.schema.id || null,
+			...(Object.keys(instructions).length
+				? { conversion_instructions: instructions }
+				: {}),
 		};
 	}
 
@@ -307,6 +329,7 @@ class FormBuilder {
 				JSON.stringify({
 					version: this.conversionCatalog?.version || 1,
 					clear_invalid: true,
+					instructions: state.conversion_instructions || {},
 				}),
 			);
 		data.set("html_fields", JSON.stringify(state.html_fields));
@@ -421,6 +444,9 @@ class FormBuilder {
 		this.selectedElement = null;
 		const state = this.draft.state;
 		this.htmlFields = structuredClone(state.html_fields);
+		this.conversionInstructions = structuredClone(
+			state.conversion_instructions || {},
+		);
 		this.header.nameHidden.value = state.name;
 		this.header.nameInput.value = state.name;
 		this.header.nameDisplay.textContent = state.name;

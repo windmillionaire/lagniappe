@@ -23,6 +23,12 @@ Dates are stored in UTC and projected in the user's timezone. `Completed`,
 `CompletedOn`, and `DueDate` remain separate values so a recurring task can
 stay active while temporarily completed.
 
+AI report imports interpret date-only completion evidence as local midnight for
+the acting user, then store UTC. Both checkpoint allocation and event recording
+pass that user explicitly so background execution uses the same calendar day
+for live completions and older history, including across daylight-saving changes.
+Existing imported timestamps are not rewritten.
+
 The reviewed Organize action `set_task_due_date` sets or clears only the due
 date of an editable, incomplete Task. Calendar dates use the Task editor's
 current-local-time behavior and retain recurrence and postponement metadata.

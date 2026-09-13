@@ -227,7 +227,7 @@ def test_start_stages_intent_without_enumerating_submissions(migration, monkeypa
         "target_batch",
         lambda *args: pytest.fail("Save enumerated submissions"),
     )
-    monkeypatch.setattr(changes, "change_response", lambda form: {"accepted": True})
+    monkeypatch.setattr(changes, "change_response", lambda form, actor: {"accepted": True})
 
     def start(spec):
         writes, guards = FormChangeAdapter().start_writes(spec, migration.context.job)
@@ -494,7 +494,7 @@ def test_recovery_retains_partial_changes_and_cancels_only_before_apply(
     monkeypatch.setattr(
         changes,
         "change_response",
-        lambda form: {"pending": bool(form.db.get(changes.PENDING))},
+        lambda form, actor: {"pending": bool(form.db.get(changes.PENDING))},
     )
     assert changes.recover_change(migration.form, migration.actor, "cancel") == {
         "pending": False

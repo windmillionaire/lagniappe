@@ -50,15 +50,25 @@ export class FormChangeStatus {
 			change.status,
 		);
 		message.textContent = failed
-			? "Schema migration needs attention. Save temporarily disabled."
+			? "Form update needs attention."
 			: "Schema migration in progress, Save temporarily disabled";
 		this.node.replaceChildren(message);
 		if (failed && change.error) {
 			message.textContent += ` ${change.error}`;
 		}
+		if (failed && change.failed_entity) {
+			const affected = this.node.appendChild(document.createElement("span"));
+			affected.textContent = ` Affected ${change.failed_entity.kind}: `;
+			const link = affected.appendChild(document.createElement("a"));
+			link.href = change.failed_entity.url;
+			link.textContent = change.failed_entity.name;
+		}
 		header.message("", { persistent: true });
 		header.notification.append(this.node);
 		if (failed) {
+			const help = this.node.appendChild(document.createElement("span"));
+			help.textContent =
+				" Retry continues unfinished work and keeps answers already updated. Save will be available when the update finishes.";
 			const button = this.node.appendChild(document.createElement("button"));
 			button.type = "button";
 			button.className = "ml-2 font-semibold underline";
@@ -119,6 +129,21 @@ export class FormChangeStatus {
 			return;
 		}
 		this.show(null);
+		if (result.rejected_change) {
+			// The staged draft was rejected before any values changed. Preserve
+			// local edits while restoring the real saved baseline for another Save.
+			this.builder.draft.saved = structuredClone(result.draft);
+			this.builder.draft.baseline = result.baseline;
+			this.builder.draft.formDirty = !this.builder.draft.equalForm(
+				this.builder.draft.state,
+				result.draft,
+			);
+			this.builder.refreshDraftControls();
+			this.builder.header.message(result.rejected_change.error, {
+				persistent: true,
+			});
+			return;
+		}
 		this.builder.draft.acknowledge(this.builder.draft.saved, result);
 		await this.builder.restoreDraft();
 		this.builder.header.message("Form update finished.");

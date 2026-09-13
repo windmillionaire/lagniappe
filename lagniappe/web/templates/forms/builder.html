@@ -152,6 +152,7 @@
        data-key="{{ form.urlsafe_key }}"
        data-fingerprint="{{ form.fingerprint }}"
        data-form-type="{{ form.form_type }}"
+       data-ai-conversion="{{ 'true' if can_generate_form else 'false' }}"
        data-schema='{{ form.schema|tojson }}'
        data-name='{{ form.name }}'
        data-description="{{ form.description }}"

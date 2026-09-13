@@ -17,6 +17,125 @@ from lagniappe.core.tools.ai.reporting.contracts import schema
 from lagniappe.core.tools.ai.reporting.schedules import validate_task_schedule
 
 
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
+# @matrix ai agent-api : guidelines tool-dispatch
+@pytest.mark.unit
+def test_schema_conversion_guidance_is_selected_by_trusted_invocation():
+    actor = SimpleNamespace()
+    onsite, _ = functions.execute_registered_tool(
+        "get_guidelines", {"task": "schema_evolution", "external": True}, actor
+    )
+    external, _ = functions.execute_registered_tool(
+        "get_guidelines",
+        {"task": "schema_evolution", "external": False},
+        actor,
+        external=True,
+    )
+    assert "conversion_instructions" in onsite["guidelines"]
+    assert "data.conversions" not in onsite["guidelines"]
+    assert "include_values=true" not in onsite["guidelines"]
+    assert "data.conversions" in external["guidelines"]
+    assert "unresolved_reason" in external["guidelines"]
+    assert "conversion_instructions" not in external["guidelines"]
+    assert "conversion happens after" not in external["guidelines"]
+    for result in (onsite, external):
+        assert "On-site proposals" not in result["guidelines"]
+        assert "For external" not in result["guidelines"]
+    native_schema = schema.report_proposal_response_schema(
+        allowed_actions=["update_form_schema"]
+    )
+    public_schema = schema.external_report_proposal_response_schema(
+        allowed_actions=["update_form_schema"]
+    )
+    assert '"conversions"' not in json.dumps(native_schema)
+    assert '"conversion_instructions"' in json.dumps(native_schema)
+    assert '"conversion_instructions"' not in json.dumps(public_schema)
+    assert '"conversions"' in json.dumps(public_schema)
+
+
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
+# @matrix ai agent-api : guidelines tool-dispatch
+@pytest.mark.unit
+@pytest.mark.parametrize("external", [False, True])
+def test_schema_guidance_filters_definitions_without_submission_rules(external):
+    read = (
+        get_guidelines.execute_external_get_guidelines
+        if external else get_guidelines.execute_get_guidelines
+    )
+    actor = SimpleNamespace()
+    args = {"field_types": ["textarea", "table", "input", "checkbox"]}
+    for task in ("page_form", "task_form", "schema_evolution"):
+        result = read({**args, "task": task}, actor)
+        text = result["guidelines"]
+        assert "#### `table` schema" in text
+        assert "#### `input` schema" in text
+        assert "#### `checkbox` schema" in text
+        assert "#### `signature`" not in text
+        assert "#### `location`" not in text
+        assert "#### `link`" not in text
+        assert "#### `html`" not in text
+        assert "Submission Value Guidelines" not in text
+        assert "Input element values are strings" not in text
+        if task == "schema_evolution":
+            assert "scope_fingerprint" in text
+            assert ("finite JSON numbers" in text) is external
+            assert ("conversion_instructions" in text) is not external
+        else:
+            assert "data.conversions" not in text
+            assert "conversion_instructions" not in text
+        full = read({"task": task}, actor)
+        assert result["content_bytes"] < full["content_bytes"]
+        if task == "page_form":
+            for unsupported in ("todo", "signature", "html"):
+                assert f"#### `{unsupported}` schema" not in full["guidelines"]
+        elif task == "task_form":
+            assert "#### `todo` schema" in full["guidelines"]
+
+    for task in ("category", "project"):
+        text = read({"task": task}, actor)["guidelines"]
+        assert "Submission Value Guidelines" not in text
+        assert "#### `input`" not in text
+    text = read({"task": "form_autofill", "field_types": ["input"]}, actor)["guidelines"]
+    assert "Number inputs use JSON" in text
+    assert "numeric strings" in text
+    assert "data.conversions" not in text
+
+
+# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
+# @matrix agent-api ai-report : external-schema proposal-contract structured-output
+@pytest.mark.unit
+def test_external_schema_patch_uses_standard_nullable_values():
+    public = schema.external_report_proposal_response_schema(
+        allowed_actions=["update_form_schema"]
+    )
+    assert '"nullable"' not in json.dumps(public)
+    proposal = {
+        "summary": "Clear optional field settings",
+        "confidence": 1,
+        "actions": [
+            {
+                "id": "schema",
+                "type": "update_form_schema",
+                "data": {
+                    "form": "hash:form",
+                    "operations": [
+                        {
+                            "op": "update_field",
+                            "schema_id": "notes",
+                            "patch": {"required": None, "placeholder": None},
+                        }
+                    ],
+                },
+            }
+        ],
+    }
+    assert external_api._schema_errors(proposal, public, public, "$.proposal") == []
+    proposal["actions"][0]["data"]["operations"][0]["patch"] = {"title": None}
+    assert external_api._schema_errors(proposal, public, public, "$.proposal")
+
+
 # @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
 def test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow():
@@ -119,6 +238,14 @@ def test_task_form_guidance_preserves_negative_answers_for_both_workflows(task):
 
     assert internal == external
     guidance = internal["guidelines"]
+    if task == "project":
+        assert "Read task_form guidance" in guidance
+        internal = get_guidelines.execute_get_guidelines({"task": "task_form"}, actor)
+        external = get_guidelines.execute_external_get_guidelines(
+            {"task": "task_form"}, actor
+        )
+        assert internal == external
+        guidance = internal["guidelines"]
     assert "A required checkbox must be checked to complete the task" in guidance
     assert "mandatory affirmative acknowledgements" in guidance
     assert "not questions where No is valid" in guidance
@@ -450,6 +577,14 @@ def test_external_contract_reuses_known_guidance_and_exposes_canonical_schedulin
             if item["request"]["task"] == "report_actions"
         )
         assert action_guidance["when"]["action_guidance_needed"] is True
+        schema_guidance = [
+            rule for rule in contract["guidance_requirements"]["conditional"]
+            if rule["request"]["task"] == "schema_evolution"
+        ]
+        assert len(schema_guidance) == 1
+        type_source = schema_guidance[0]["derived_request_arguments"]["field_types"]["source"]
+        assert "source and destination" in type_source
+        assert "nested table column types" in type_source
 
     public = get_guidelines.execute_external_get_guidelines(
         {"task": "report_actions", "actions": ["create_task"]}, actor

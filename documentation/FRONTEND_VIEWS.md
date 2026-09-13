@@ -99,6 +99,21 @@ forms only when present. Page activates its photo widget only when the card is
 visible or selected. These optimizations preserve the same published view and
 widget contracts.
 
+Report schema previews follow each action's saved skip selection. Skipping a
+schema action hides its conversion details, affected-submission list, warning
+and pagination, replacing them with an explicit unchanged-submissions message.
+Restoring the action brings its preview back. Both the initial template render
+and the successful skip response apply this state; a failed request leaves the
+preview unchanged.
+
+Before starting a ready report, schema approval checks that its reviewed form
+and submissions still match saved state. A stale review leaves the same plan
+ready without starting an execution job. The browser explains that another
+review is needed, directing external-plan users to the originating assistant
+and on-site users to Revise Plan. API validation retains its tool-specific
+guidance. The run/retry form reserves an accessible error slot with vertical
+spacing around the message; a rejected approval does not hide proposal actions.
+
 Page owns image visibility state, with the controls at the top of the Info form
 and absent from other tabs. Form rendering retains the controls before the
 fields and restores their current visibility state; revision comparison previews

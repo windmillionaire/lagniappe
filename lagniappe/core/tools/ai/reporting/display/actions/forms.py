@@ -43,8 +43,8 @@ FORM_ACTION_DISPLAYS = (
         label_detail="Form",
     ),
     ProposalActionDisplay(
-        "extend_form_schema",
-        "Extend Form Schema",
+        "update_form_schema",
+        "Update Form Schema",
         schema_details,
         grouping=ProposalActionGrouping.SCHEMA,
     ),

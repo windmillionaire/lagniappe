@@ -58,6 +58,7 @@ class DeferredJobPhase(Enum):
     VALIDATING = "validating"
     PREPARED = "prepared"
     APPLYING = "applying"
+    WAITING_DEPENDENCY = "waiting_dependency"
     RETRY_WAIT = "retry_wait"
     COMPLETE = "complete"
     FAILED = "failed"

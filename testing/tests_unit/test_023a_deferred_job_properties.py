@@ -869,6 +869,37 @@ def test_status_projection_is_bounded_and_marks_stale_work():
     assert "private authored content" not in json.dumps(status)
 
 
+# @matrix deferred-jobs : progress recovery dependency-wait
+@pytest.mark.parametrize("phase", ["waiting_dependency", "summarizing"])
+def test_dependency_status_distinguishes_form_waits_from_recovery(phase):
+    now = datetime(2026, 9, 12, 12, tzinfo=timezone.utc)
+    job = SimpleNamespace(
+        urlsafe_key="operation", job_type=DeferredJobType.REPORT_EXECUTION.value,
+        status="retry_wait", progress={"phase": phase, "updated_at": now.isoformat()},
+        modified=now, dispatch_state="dispatched", next_attempt_at=now + timedelta(seconds=60),
+        error={"type": "DeferredJobDependencyPendingError", "message": "private dependency details"},
+    )
+    status = deferred_job_lifecycle.status_projection(job, now=now)
+    assert status["phase"] == "waiting_dependency"
+    assert status["phase_label"] == "Waiting for form update"
+    assert status["recovering"] is False
+    assert "private dependency" not in json.dumps(status)
+
+    job.job_type = DeferredJobType.AUTOFILL.value
+    assert deferred_job_lifecycle.status_projection(job, now=now)["phase_label"] == "Waiting for related work"
+    job.modified = now - timedelta(minutes=3)
+    assert deferred_job_lifecycle.status_projection(job, now=now)["recovering"] is True
+    job.modified = now
+    job.error = {"type": "TimeoutError"}
+    job.progress["phase"] = "retry_wait"
+    assert deferred_job_lifecycle.status_projection(job, now=now)["recovering"] is True
+    job.status = "running"
+    job.progress["phase"] = "summarizing"
+    status = deferred_job_lifecycle.status_projection(job, now=now)
+    assert status["phase_label"] == "Summarizing files"
+    assert status["recovering"] is False
+
+
 # @matrix deferred-jobs : diagnostics privacy
 def test_admin_projection_exposes_diagnostics_without_payload_content():
     now = datetime(2026, 7, 19, 12, tzinfo=timezone.utc)

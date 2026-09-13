@@ -12,7 +12,9 @@ from ..errors import DeferredJobDriftError
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
+# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_waits_for_dependency_without_consuming_provider_retry
 # @matrix ai-access deferred-jobs : tier-declaration
+# @matrix deferred-jobs : dependency-wait backoff
 class DeferredJobAdapter:
     """Domain boundary plugged into the shared job lifecycle."""
 
@@ -23,6 +25,8 @@ class DeferredJobAdapter:
     queued_message = "Working..."
     retry_message = "Work is temporarily delayed; retrying shortly..."
     dependency_message = "Waiting for required background work..."
+    # Seconds between dependency checks; repeat the final delay for longer waits.
+    dependency_retry_delays = (60,)
     active_message = (
         "Still working. This is taking longer than usual; we'll keep trying."
     )

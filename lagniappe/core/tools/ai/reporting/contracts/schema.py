@@ -88,7 +88,18 @@ def _report_schema_field_response_schema():
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
 # @reason nested operation contract is asserted through the public response schema
 def _report_schema_operation_response_schema():
-    """Return typed provider variants for bounded additive schema operations."""
+    """Return typed provider variants for exact-ID schema operations."""
+    patch = {
+        key: {**value, **({"nullable": True} if key not in {"type", "title"} else {})}
+        for key, value in _report_schema_field_response_schema()["properties"].items()
+        if key not in {"id", "content_markdown"}
+    }
+    patch.update(
+        visibility={"type": "array", "items": {"type": "object"}, "nullable": True},
+        status={"type": "array", "items": {"type": "object"}, "nullable": True},
+        layout={"type": "string", "nullable": True},
+        checked={"type": "boolean", "nullable": True},
+    )
     add_field = {
         "type": "object",
         "properties": {
@@ -120,7 +131,43 @@ def _report_schema_operation_response_schema():
         "additionalProperties": False,
     }
     return {
-        "anyOf": [add_field, add_select_option],
+        "anyOf": [
+            add_field,
+            add_select_option,
+            {
+                "type": "object",
+                "properties": {
+                    "op": {"type": "string", "enum": ["update_field"]},
+                    "schema_id": {"type": "string"},
+                    "patch": {
+                        "type": "object",
+                        "properties": patch,
+                        "minProperties": 1,
+                        "additionalProperties": False,
+                    },
+                },
+                "required": ["op", "schema_id", "patch"],
+                "additionalProperties": False,
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "op": {"type": "string", "enum": ["remove_field"]},
+                    "schema_id": {"type": "string"},
+                },
+                "required": ["op", "schema_id"],
+                "additionalProperties": False,
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "op": {"type": "string", "enum": ["reorder_fields"]},
+                    "ids": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["op", "ids"],
+                "additionalProperties": False,
+            },
+        ],
     }
 
 
@@ -228,6 +275,27 @@ def _report_action_data_properties():
             "items": _report_schema_operation_response_schema(),
             "minItems": 1,
         },
+        "baseline": {"type": "string"},
+        "scope_fingerprint": {"type": "string"},
+        "conversion_instructions": {
+            "type": "object",
+            "additionalProperties": {"type": "string", "maxLength": 4000},
+        },
+        "conversions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "entity": {"type": "string"},
+                    "schema_id": {"type": "string"},
+                    "source_fingerprint": {"type": "string"},
+                    "value": {},
+                    "unresolved_reason": {"type": "string"},
+                },
+                "required": ["entity", "schema_id", "source_fingerprint"],
+                "additionalProperties": False,
+            },
+        },
         "updates": {
             "type": "array",
             "items": _report_submission_update_response_schema(),
@@ -286,7 +354,8 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
         schema["required"] = required
     if action_type == "set_task_due_date":
         schema["properties"]["due_date"] = {
-            "type": "string", "nullable": True,
+            "type": "string",
+            "nullable": True,
             "description": "Calendar date YYYY-MM-DD in the acting user's timezone, or null to clear.",
         }
 
@@ -300,7 +369,9 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
 # @reason action variants are asserted through the public response schema
-def _report_action_response_schema(action_type, include_submission_fields):
+def _report_action_response_schema(
+    action_type, include_submission_fields, *, external=False
+):
     """Return one discriminated action variant with its exact data contract."""
     properties = {
         "id": {"type": "string"},
@@ -313,6 +384,11 @@ def _report_action_response_schema(action_type, include_submission_fields):
             include_submission_fields,
         ),
     }
+    if action_type == "update_form_schema":
+        properties["data"]["properties"].pop(
+            "conversion_instructions" if external else "conversions", None
+        )
+        properties["data"]["propertyOrdering"] = list(properties["data"]["properties"])
     return {
         "type": "object",
         "properties": properties,
@@ -469,7 +545,9 @@ def external_task_schedule_response_schema():
                     {
                         "if": {
                             "required": ["pattern_type"],
-                            "properties": {"pattern_type": {"const": "ordinal_weekday"}},
+                            "properties": {
+                                "pattern_type": {"const": "ordinal_weekday"}
+                            },
                         },
                         "then": {
                             "required": ["ordinal", "weekday"],
@@ -511,6 +589,7 @@ def _external_report_action_response_schema(
     schema = _report_action_response_schema(
         action_type,
         include_submission_fields,
+        external=True,
     )
     schema["properties"]["type"] = {
         "type": "string",
@@ -523,8 +602,7 @@ def _external_report_action_response_schema(
     )
     if required_groups:
         data_schema["allOf"] = [
-            _external_required_group_schema(group)
-            for group in required_groups
+            _external_required_group_schema(group) for group in required_groups
         ]
 
     if action_type == "update_form_values" and include_submission_fields:
@@ -568,7 +646,9 @@ def _external_report_action_response_schema(
             "Exact hash token of an editable, incomplete Task."
         )
         data_schema["properties"]["due_date"].pop("nullable", None)
-        data_schema["properties"]["due_date"].update(type=["string", "null"], format="date")
+        data_schema["properties"]["due_date"].update(
+            type=["string", "null"], format="date"
+        )
 
     if action_type == "summarize_file":
         terms_schema = data_schema["properties"]["retrieval_terms"]
@@ -587,13 +667,16 @@ def _external_report_action_response_schema(
 # @covered-by lagniappe/core/tools/ai/external_api.py::plan_contract
 # @reason provider-only ordering hints are removed through the public external serializer
 def _standard_json_schema(value):
-    """Remove provider-only annotations from an ordinary JSON Schema tree."""
+    """Translate provider annotations into standard JSON Schema semantics."""
     if isinstance(value, dict):
-        return {
+        result = {
             key: _standard_json_schema(child)
             for key, child in value.items()
-            if key != "propertyOrdering"
+            if key not in {"propertyOrdering", "nullable"}
         }
+        if value.get("nullable") is True:
+            return {"anyOf": [result, {"type": "null"}]}
+        return result
     if isinstance(value, list):
         return [_standard_json_schema(child) for child in value]
     return value
@@ -633,10 +716,7 @@ def external_report_proposal_response_schema(
         )
         for action_type in action_types
     }
-    mapping = {
-        action_type: f"#/$defs/{action_type}"
-        for action_type in action_types
-    }
+    mapping = {action_type: f"#/$defs/{action_type}" for action_type in action_types}
     schema["$defs"] = definitions
     schema["properties"]["actions"]["items"] = {
         "oneOf": [{"$ref": reference} for reference in mapping.values()],

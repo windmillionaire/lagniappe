@@ -735,8 +735,8 @@ def test_replacement_choices_and_explanations_match_component_types(get_user):
         }, []),
         "location": ({"Text": "Values will be converted to plain-text addresses"}, []),
         "text": ({"Text": "Values will be converted to text; newlines will be lost"}, [
-            "Table (requires AI — not available yet)",
-            "Todo list (requires AI — not available yet)",
+            "Table (requires AI)",
+            "Todo list (requires AI)",
         ]),
         "radio": ({
             "Text": "Values will be converted to the plain-text label of the option selected",
@@ -751,10 +751,10 @@ def test_replacement_choices_and_explanations_match_component_types(get_user):
             "Radio": "Component will be converted into a Radio component with the same options",
         }, []),
         "table": ({"Textarea": "Values will be converted to a table with Markdown formatting"}, [
-            "Todo list (requires AI — not available yet)",
+            "Todo list (requires AI)",
         ]),
         "todo": ({"Textarea": "Values will be converted to a todo list with Markdown formatting"}, [
-            "Table (requires AI — not available yet)",
+            "Table (requires AI)",
         ]),
         "internal": ({}, []),
         "signature": ({}, []),
@@ -778,7 +778,7 @@ def test_replacement_choices_and_explanations_match_component_types(get_user):
             panel = select.open()
             expect(panel.get_by_role("option")).to_have_count(len(messages) + len(ai_choices))
             for label in ai_choices:
-                expect(panel.get_by_role("option", name=label, exact=True)).to_be_disabled()
+                expect(panel.get_by_role("option", name=label, exact=True)).to_be_enabled()
             for label, message in messages.items():
                 select.select_by_name(label)
                 description = builder.condition.locator("[data-role='conversion-description']")
@@ -916,19 +916,17 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_user, tmp_
     type_select = Select(builder.condition.locator("[data-combobox-id]"))
     panel = type_select.open()
     expect(panel.get_by_role("option")).to_have_count(3)
-    expect(panel.get_by_role("option", name="Todo list (requires AI — not available yet)", exact=True)).to_be_disabled()
+    expect(panel.get_by_role("option", name="Todo list (requires AI)", exact=True)).to_be_enabled()
     expect(panel.get_by_role("option", name="Multiple select", exact=True)).to_have_count(0)
     ai_option = panel.get_by_role(
-        "option", name="Table (requires AI — not available yet)", exact=True
+        "option", name="Table (requires AI)", exact=True
     )
-    expect(ai_option).to_be_disabled()
-    # Keyboard activation must not select an unavailable AI conversion.
+    expect(ai_option).to_be_enabled()
     type_select._choose_option(panel, ai_option)
-    type_select.input.press("Escape")
-    expect(type_select.input).to_have_attribute("placeholder", "Choose a new component...")
-    expect(
-        builder.condition.get_by_role("button", name="Convert", exact=True)
-    ).to_be_disabled()
+    instructions = builder.condition.locator("textarea[name='conversion-instructions']")
+    expect(instructions).to_be_visible()
+    instructions.fill("One row per item; preserve quantities.")
+    expect(builder.condition.get_by_role("button", name="Convert", exact=True)).to_be_enabled()
     builder.condition.locator("button[data-role='close']").click()
     expect(builder.condition).to_be_hidden()
     builder.select_field(notes)

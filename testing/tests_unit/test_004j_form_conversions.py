@@ -30,7 +30,7 @@ def field(kind, **settings):
 # @matrix form-migration : capabilities no-submission-read
 def test_capabilities_are_schema_only():
     catalog = conversion_catalog()
-    assert catalog["version"] == 1
+    assert catalog["version"] == 2
     assert catalog["rules"]["textarea"]["table"] == "ai"
     assert catalog["rules"]["textarea"]["todo"] == "ai"
     for source, replacements in {
@@ -93,8 +93,6 @@ def test_schema_diff_preserves_ids_and_rejects_unsupported_changes():
     assert converted[0]["id"] == "answer"
     assert converted[0]["source"]["input"] == "text"
     for before, after in [
-        (field("textarea"), field("table")),
-        (field("textarea"), field("todo")),
         (field("signature"), field("text")),
         (field("checkbox"), field("time")),
         (field("checkbox"), field("select")),

@@ -1,2 +1,95 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.1.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="94272f9e-1fce-4025-b2e9-cb40105e180c",e._sentryDebugIdIdentifier="sentry-dbid-94272f9e-1fce-4025-b2e9-cb40105e180c");}catch(e){}}();import{p as i}from"./primitives.js?v=b473a21c";import{g as s}from"./foundation.js?v=b473a21c";import"./connectivity.js?v=b473a21c";import{C as o}from"./base2.js?v=b473a21c";import"./styles.js?v=b473a21c";import"./icons.js?v=b473a21c";import"./upstreamUnavailable.js?v=b473a21c";import"./baseForm.js?v=b473a21c";import"./loader.js?v=b473a21c";import"./select2.js?v=b473a21c";import"./combobox.js?v=b473a21c";import"./results.js?v=b473a21c";import"./storage.js?v=b473a21c";import"./formatting.js?v=b473a21c";import"./submitter.js?v=b473a21c";class n extends o{constructor(t){super(t),this.key="options",this.messages={submit:"Add Option"}}init(){this.index!==-1?(this.setTitle("Edit Option"),this.messages.submit="Update Option",this.setting={...this.element.schema.options?.[this.index]}):(this.setTitle("Create Option"),this.messages.submit="Add Option",this.setting={}),super.init(),this.showProgress()}showProgress(){this.addOptionName(),this.setting.label&&(this.complete=!0),super.showProgress()}addOptionName(){if(this.options.has("name"))return;const t=i.input({label:"Option Name",placeholder:"enter option name...",name:"option-name",type:"text",value:this.setting.label||null});this.options.set("name",t),this.focusTarget=t,t.addEventListener("input",e=>{this.setting.label=e.target.value,this.showProgress()})}validate(){if(!this.setting.label)return this.form.showError("Please enter an option name."),!1;if(!this.setting.value)do this.setting.value=s("option");while(this.element.schema.options?.some(t=>t.value===this.setting.value));return!0}}export{n as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { p as primitives } from './primitives.js?v=b5fa0583';
+import { g as generateElementId } from './foundation.js?v=b5fa0583';
+import './connectivity.js?v=b5fa0583';
+import { C as Condition } from './base2.js?v=b5fa0583';
+import './styles.js?v=b5fa0583';
+import './icons.js?v=b5fa0583';
+import './upstreamUnavailable.js?v=b5fa0583';
+import './baseForm.js?v=b5fa0583';
+import './loader.js?v=b5fa0583';
+import './select2.js?v=b5fa0583';
+import './combobox.js?v=b5fa0583';
+import './results.js?v=b5fa0583';
+import './storage.js?v=b5fa0583';
+import './formatting.js?v=b5fa0583';
+import './submitter.js?v=b5fa0583';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
+ * @pair forms:builder-select-options
+ * @matrix forms : stable-identity
+ */
+class Options extends Condition {
+	constructor(builder) {
+		super(builder);
+		this.key = "options";
+		this.messages = {
+			submit: "Add Option",
+		};
+	}
+
+	init() {
+		if (this.index !== -1) {
+			this.setTitle("Edit Option");
+			this.messages.submit = "Update Option";
+			this.setting = { ...this.element.schema.options?.[this.index] };
+		} else {
+			this.setTitle("Create Option");
+			this.messages.submit = "Add Option";
+			this.setting = {};
+		}
+
+		super.init();
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		this.addOptionName();
+		if (this.setting.label) {
+			this.complete = true;
+		}
+		super.showProgress();
+	}
+
+	addOptionName() {
+		if (this.options.has("name")) return;
+
+		const optionName = primitives.input({
+			label: "Option Name",
+			placeholder: "enter option name...",
+			name: "option-name",
+			type: "text",
+			value: this.setting.label || null,
+		});
+
+		this.options.set("name", optionName);
+		this.focusTarget = optionName;
+
+		optionName.addEventListener("input", (e) => {
+			this.setting.label = e.target.value;
+			this.showProgress();
+		});
+	}
+
+	validate() {
+		if (!this.setting.label) {
+			this.form.showError("Please enter an option name.");
+			return false;
+		}
+		if (!this.setting.value) {
+			do {
+				this.setting.value = generateElementId("option");
+			} while (
+				this.element.schema.options?.some(
+					(option) => option.value === this.setting.value,
+				)
+			);
+		}
+		return true;
+	}
+}
+
+export { Options as default };

@@ -129,7 +129,7 @@ def view(key, **kwargs):
     from lagniappe.core.tools import form_changes, form_conversions
     draft = form_drafts.builder_draft(form)
     if form.db.get(form_changes.PENDING):
-        result = form_changes.change_response(form)
+        result = form_changes.change_response(form, current_user)
         draft.update(result["draft"], pending_change=result["pending_change"])
     return render_template("forms/builder.html", form=form, builder_draft=draft,
                            conversion_catalog=form_conversions.conversion_catalog())
@@ -143,7 +143,7 @@ def view(key, **kwargs):
 def form_change(key, **kwargs):
     from lagniappe.core.tools import form_changes
     try:
-        result = (form_changes.change_response(kwargs["entity"]) if request.method == "GET"
+        result = (form_changes.change_response(kwargs["entity"], current_user) if request.method == "GET"
                   else form_changes.recover_change(kwargs["entity"], current_user,
                       (request.get_json(silent=True) or request.form).get("action")))
         return responses.json_response(result)

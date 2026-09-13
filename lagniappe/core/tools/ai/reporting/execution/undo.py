@@ -4,7 +4,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 
 from .actions.base import ACTION_APPLIED, ACTION_DRIFTED
-from .actions.registry import REPORT_ACTION_ADAPTERS
+from .actions.registry import report_action_adapter
 from .ledger import REPORT_LEDGER_VERSION
 
 
@@ -22,6 +22,10 @@ from .ledger import REPORT_LEDGER_VERSION
 # @matrix agent-api ai-report : browser-review cas compensation delete undo
 def undo_report(report, user, *, save=None):
     """Compensate a complete report or the completed prefix of a failed report."""
+    from ..schema_updates import migration_started
+
+    if migration_started(report):
+        raise exceptions.ValidationError("This report started a submission migration and cannot be undone. Retry an unfinished migration instead.")
     save = save or Entities.save
     result = report.result if isinstance(report.result, dict) else {}
     if result.get("ledger_version") != REPORT_LEDGER_VERSION:
@@ -66,7 +70,7 @@ def undo_report(report, user, *, save=None):
 
     for undo_record in undo["actions"]:
         action = result["actions"][undo_record["action_index"]]
-        adapter = REPORT_ACTION_ADAPTERS[action["type"]]
+        adapter = report_action_adapter(action["type"])
         if undo_record.get("status") == "complete":
             continue
         try:

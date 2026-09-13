@@ -57,6 +57,7 @@ KNOWN_TOOL_NAMES = {
     "get_guidelines",
     "get_schema",
     "get_form_instances",
+    "preview_form_schema_update",
     "list_workspace_resources",
     "get_filter_schema",
     "query_workspace_filter",

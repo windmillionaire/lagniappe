@@ -61,7 +61,7 @@ def complete_organize_submissions(
         if not isinstance(action, dict):
             continue
         action_type = action.get("type")
-        if action_type == "extend_form_schema":
+        if action_type == "update_form_schema":
             prior_schema_updates.append(action)
             continue
         if action_type not in {

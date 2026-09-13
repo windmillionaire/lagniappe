@@ -6,6 +6,9 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.mixins import AIMixin
+from lagniappe.core.properties.form_checkbox import Checkbox
+from lagniappe.core.properties.form_table import Table
+from lagniappe.core.properties.form_todo import TodoList
 from ..debug import ai_debug
 from ..references import hash_reference
 
@@ -18,7 +21,8 @@ GET_SCHEMA = types.FunctionDeclaration(
         "exact field ids and value shapes. Use this after the compact workspace "
         "inventory or a search result identifies the likely structure. Set "
         "include_values=true on a Page or Task to read its current values keyed "
-        "by those same field ids, without unrelated entity details."
+        "by those same field ids. Tables use rows keyed by column id; Todo lists "
+        "use items. Numbers and booleans retain their JSON types."
     ),
     parameters={
         "type": "object",
@@ -40,6 +44,7 @@ GET_SCHEMA = types.FunctionDeclaration(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_schema_returns_schema_for_form_bearing_entities
 # @tests tests_unit/test_015_ai_tools.py::test_get_schema_includes_values_by_id_without_label_collisions
+# @tests tests_unit/test_015_ai_tools.py::test_get_schema_preserves_collection_rows_and_typed_cells
 # @matrix ai form-schema : form model-task page task tool-context
 # @matrix ai form-schema : permissions schema
 def execute_get_schema(args, user):
@@ -115,18 +120,38 @@ def execute_get_schema(args, user):
         submission = entity.properties.get("submission")
         result["values"] = None
         if submission is not None:
-            # Match the normal AI field projection, but key by schema id rather
-            # than display label (labels can be duplicated or renamed).
+            # Keep collection structure and typed values, using normal AI
+            # projections for references rather than exposing raw stored keys.
             entity.form = form
             values = {}
             for field_id, field in submission.fields.items():
                 if isinstance(field, AIMixin) and field.is_set:
-                    field.user = user
-                    value = field.ai_value
+                    value = _schema_value(field, user)
                     if value is not None:
                         values[field_id] = value
             result["values"] = values
     return result
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
+# @reason typed collection and reference projections are exercised through schema reads
+def _schema_value(field, user):
+    field.user = user
+    if isinstance(field, Table):
+        rows = []
+        for row in field.rows:
+            values = {}
+            for column_id, cell in row.fields.items():
+                if isinstance(cell, AIMixin) and cell.is_set:
+                    value = _schema_value(cell, user)
+                    if value is not None:
+                        values[column_id] = value
+            rows.append(values)
+        return {"rows": rows}
+    if isinstance(field, (Checkbox, TodoList)):
+        return field.form_value
+    return field.ai_value
 
 
 # @testable false

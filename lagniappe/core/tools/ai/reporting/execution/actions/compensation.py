@@ -17,9 +17,9 @@ from .completed_tasks import _undo_reused_completed_task
 # @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason undo dispatch is exercised through public undo tests
 def _undo_result_action(action, report, user):
-    from .registry import REPORT_ACTION_ADAPTERS
+    from .registry import report_action_adapter
 
-    return REPORT_ACTION_ADAPTERS[action["type"]].compensate(action, report, user)
+    return report_action_adapter(action["type"]).compensate(action, report, user)
 
 
 # @testable false

@@ -6,6 +6,7 @@ from lagniappe.core.definitions import (
     DEFERRED_JOB_HEARTBEAT_SECONDS,
     DeferredJobPhase,
     DeferredJobStatus,
+    DeferredJobType,
 )
 
 from .deferred_job_request import JSONValue
@@ -37,6 +38,7 @@ PHASE_LABELS = {
     DeferredJobPhase.VALIDATING.value: "Validating",
     DeferredJobPhase.PREPARED.value: "Ready to save",
     DeferredJobPhase.APPLYING.value: "Saving",
+    DeferredJobPhase.WAITING_DEPENDENCY.value: "Waiting for related work",
     DeferredJobPhase.RETRY_WAIT.value: "Waiting to retry",
     DeferredJobPhase.COMPLETE.value: "Complete",
     DeferredJobPhase.FAILED.value: "Failed",
@@ -98,7 +100,8 @@ def elapsed_seconds(start, now):
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_status_projection_is_bounded_and_marks_stale_work
-# @matrix deferred-jobs : privacy progress stale-state status timing
+# @tests tests_unit/test_023a_deferred_job_properties.py::test_dependency_status_distinguishes_form_waits_from_recovery
+# @matrix deferred-jobs : privacy progress stale-state status timing dependency-wait recovery
 def status_projection(job, *, now):
     progress = dict(getattr(job, "progress", None) or {})
     client = dict(getattr(job, "client", None) or {})
@@ -110,13 +113,26 @@ def status_projection(job, *, now):
         and (now - modified).total_seconds() >= DEFERRED_JOB_HEARTBEAT_SECONDS * 2
     )
     error = getattr(job, "error", None) or {}
+    dependency_wait = bool(
+        getattr(job, "status", None) == DeferredJobStatus.RETRY_WAIT.value
+        and (
+            phase == DeferredJobPhase.WAITING_DEPENDENCY.value
+            or error.get("type") == "DeferredJobDependencyPendingError"
+        )
+    )
+    if dependency_wait:
+        # Older jobs recorded all dependency waits as file summarization.
+        phase = DeferredJobPhase.WAITING_DEPENDENCY.value
+    phase_label = PHASE_LABELS.get(phase, "Working")
+    if dependency_wait and getattr(job, "job_type", None) == DeferredJobType.REPORT_EXECUTION.value:
+        phase_label = "Waiting for form update"
     next_attempt = datetime_value(getattr(job, "next_attempt_at", None))
     result = {
         "key": job.urlsafe_key,
         "type": getattr(job, "job_type", None),
         "status": getattr(job, "status", None),
         "phase": phase,
-        "phase_label": PHASE_LABELS.get(phase, "Working"),
+        "phase_label": phase_label,
         "attempt": int(getattr(job, "attempt", 0) or 0),
         "elapsed_seconds": elapsed_seconds(getattr(job, "created", None), now),
         "phase_elapsed_seconds": elapsed_seconds(progress.get("updated_at"), now),
@@ -128,7 +144,10 @@ def status_projection(job, *, now):
         "recovering": bool(
             stale
             or getattr(job, "dispatch_state", None) == "pending"
-            or getattr(job, "status", None) == DeferredJobStatus.RETRY_WAIT.value
+            or (
+                getattr(job, "status", None) == DeferredJobStatus.RETRY_WAIT.value
+                and not dependency_wait
+            )
         ),
         "source_widget": client.get("source_widget"),
         "destination": client.get("destination"),

@@ -559,8 +559,8 @@ form:
       intent: todo item text in normal and editable presentations
       surfaces: [frontend]
     completeText:
-      classes: text-base-medium line-through
-      intent: completed todo item text treatment
+      classes: text-base-dark
+      intent: keep completed todo text the same color as unchecked items
       surfaces: [frontend]
     inlineInput:
       classes: min-w-0 flex-1 border-b border-dashed border-base-medium bg-transparent px-1 py-0.5 text-base-dark focus:border-kind-default focus:outline-none

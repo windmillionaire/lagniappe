@@ -584,7 +584,7 @@ def _plan_payload(report, *, include_proposal=True):
         ),
     }
     if include_proposal:
-        payload["proposal"] = external_api.public_plan_proposal(report)
+        payload["proposal"] = external_api.public_plan_proposal(report, g.agent_api_user)
         if report.tool != "ask":
             payload["execution"] = external_api.public_execution_receipt(
                 report, g.agent_api_user

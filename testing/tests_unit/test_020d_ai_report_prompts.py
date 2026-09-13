@@ -197,7 +197,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
         "create_task",
         "add_form_to_page",
         "add_page_category",
-        "extend_form_schema",
+        "update_form_schema",
         "update_form_values",
         "attach_file",
         "append_page_document",
@@ -848,7 +848,7 @@ def test_report_prompts_attach_provider_json_schema():
         "type",
         "title",
     ]
-    update_form_data = all_actions["extend_form_schema"]["properties"]["data"]
+    update_form_data = all_actions["update_form_schema"]["properties"]["data"]
     operation_schemas = {
         variant["properties"]["op"]["enum"][0]: variant
         for variant in update_form_data["properties"]["operations"]["items"][
@@ -1077,7 +1077,7 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "can_add_forms_to_pages": True,
         "can_attach_files_to_tasks": True,
         "can_add_page_categories": True,
-        "can_extend_form_schemas": False,
+        "can_update_form_schemas": False,
         "can_update_submissions": True,
         "can_delete_pages": False,
     }

@@ -7,6 +7,7 @@ from flask import (
     make_response,
     redirect,
     render_template,
+    request,
     url_for,
 )
 from flask_login import current_user
@@ -718,7 +719,12 @@ def deferred_tool_report(report, notification, job=None):
 # @reason report route coverage owns status hydration and full-page rendering
 def tool_report(report):
     render_operation_statuses((report,), current_user)
-    return render_template("tools/report.html", report=report), 200
+    from lagniappe.core.tools.ai.reporting.schema_updates import report_impact, migration_started
+
+    page = max(1, request.args.get("schema_page", 1, type=int))
+    return render_template("tools/report.html", report=report,
+                           schema_impacts=report_impact(report, current_user, page=page),
+                           migration_started=migration_started(report)), 200
 
 
 # @testable true

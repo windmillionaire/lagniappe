@@ -392,6 +392,8 @@ class ProposalDisplayProjector:
             elif grouping is ProposalActionGrouping.SCHEMA:
                 if schema_group is None:
                     schema_group = self._proposal_schema_group(roots)
+                if action.get("type") == "update_form_schema":
+                    schema_group["skip_dependencies"] = True
                 support = self._proposal_action_support(
                     "Schema Update",
                     action,

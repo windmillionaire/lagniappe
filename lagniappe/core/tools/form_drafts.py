@@ -440,7 +440,7 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
     pending = json_value(current.db, PENDING)
     if pending:
         if pending["id"] == save_id and pending["digest"] == payload_digest:
-            return change_response(current)
+            return change_response(current, actor)
         raise FormDraftConflict("A form change is already saved. Wait for it to finish before saving another draft.")
     schema = validate_draft_schema(draft.get("schema"), current.form_type)
     if requires_submission_conversion(current.schema, schema):

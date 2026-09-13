@@ -114,6 +114,7 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 
 	const editor = new Editor({
 		element: target,
+		injectCSS: false,
 		editable,
 		extensions,
 	});
@@ -181,6 +182,7 @@ export const independentEditor = (target, content = "") => {
 
 	const editor = new Editor({
 		element: target,
+		injectCSS: false,
 		editable: true,
 		content,
 		extensions,

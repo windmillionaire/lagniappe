@@ -78,6 +78,10 @@ permission-readonly Task forms use this mode.
 Table, Todo, Html, and Status implement their own `create()` because they do
 not follow the normal read/edit field shape.
 
+Todo item text keeps the same normal color in checked and unchecked states,
+without strikethrough. The checkbox indicates completion in both interactive
+and read-only displays.
+
 Location selections are verified through the Places detail endpoint before an
 ID is stored. If details are temporarily unavailable, the submitted name or
 address and secondary address are retained as free text with a warning; an
@@ -92,7 +96,8 @@ Common schema keys are `id`, `type`, `title`, `placeholder`, `required`,
 
 Todo values use `{items: [{text, checked}]}`. Enter or forward Tab commits a
 nonempty draft and opens a new one; Shift+Tab exits. The history action restores
-the latest item text with all checkboxes unchecked.
+the latest item text with all checkboxes unchecked. Completion is shown by the
+checkbox; item text has no strikethrough in editable or read-only displays.
 
 Empty submission-bearing fields on a reopened Task can restore their most
 recent history value. Static HTML, computed status, and signature assets do not

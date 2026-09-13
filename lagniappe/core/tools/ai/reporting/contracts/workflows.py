@@ -6,7 +6,7 @@ REMOTE_UPDATE_ACTIONS = frozenset(
         "set_task_due_date",
         "append_page_document",
         "update_form_values",
-        "extend_form_schema",
+        "update_form_schema",
         "rename_entity",
         "move_page",
         "move_task",
@@ -30,7 +30,7 @@ exact tool-returned references in the proposal; execution does not search again.
 
 Use only the allowed actions. Fetch get_guidelines(task="report_actions",
 actions=[...]) for the selected operations when details are needed, and the
-schema_evolution bundle before additive Form changes. Fetch only relevant field
+schema_evolution bundle before Form schema changes. Fetch only relevant field
 types for form_autofill guidance. Do not load file-organization or task-creation
 guidance for a simple existing-record update.
 

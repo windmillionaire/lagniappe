@@ -79,20 +79,22 @@ export class TableVisibilityState {
 			JSON.stringify(this.hiddenColumns),
 		);
 		if (!this.stylesheet) {
-			this.stylesheet = document.createElement("style");
-			this.stylesheet.id = `column-visibility-${this.view.hash}`;
-			document.head.appendChild(this.stylesheet);
+			// CSSOM keeps dynamic rules compatible with a CSP that blocks <style>.
+			this.stylesheet = new CSSStyleSheet();
+			document.adoptedStyleSheets.push(this.stylesheet);
 		}
 
 		const id = this.component.elt.id;
 		const rowSelector = `#${id} tr:not([data-widget], [data-embedded], [data-role="empty"]) > td:not([data-column="delete"])`;
 		const thSelector = `#${id} th:not([data-column="selector"], [data-embedded])`;
-		this.stylesheet.textContent = this.hiddenColumns
-			.map(
-				(index) =>
-					`${rowSelector}:nth-child(${index}), ${thSelector}:nth-child(${index}) { display: none; }`,
-			)
-			.join("\n");
+		this.stylesheet.replaceSync(
+			this.hiddenColumns
+				.map(
+					(index) =>
+						`${rowSelector}:nth-child(${index}), ${thSelector}:nth-child(${index}) { display: none; }`,
+				)
+				.join("\n"),
+		);
 	}
 
 	destroy() {
@@ -100,7 +102,9 @@ export class TableVisibilityState {
 			"toggle-column-visibility",
 			this._toggle,
 		);
-		this.stylesheet?.remove();
+		document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
+			(sheet) => sheet !== this.stylesheet,
+		);
 		this.stylesheet = null;
 		this.initialized = false;
 	}

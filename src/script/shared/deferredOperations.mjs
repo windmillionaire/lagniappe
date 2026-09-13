@@ -369,7 +369,7 @@ export class DeferredOperationManager {
 				phase.textContent = status.error
 					? `${status.phase_label}: ${status.error}`
 					: status.recovering
-						? `${status.phase_label}. Automatic recovery is active.`
+						? `${status.phase_label}. Taking longer than expected.`
 						: status.phase_label;
 			}
 			const elapsed = node.querySelector("[data-role='deferred-elapsed']");
