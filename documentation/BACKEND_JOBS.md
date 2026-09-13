@@ -119,6 +119,13 @@ Terminal state is split into cleanup, notification, and visibility checkpoints.
 A delivery retry resumes at the first incomplete marker without repeating
 provider preparation or domain apply.
 
+Elapsed time in status and AI Analytics measures the job lifetime from creation,
+including queue and retry waits. Active jobs use the current time; succeeded,
+failed, cancelled, and superseded jobs stop at the terminal `progress.updated_at`
+timestamp. Later cleanup or notification writes do not extend that duration.
+Older terminal records without a valid progress timestamp use stored `modified`;
+records without either timestamp return zero instead of continuing to count.
+
 Every client-visible status revision publishes a small Redis hint after the
 Datastore transaction. `/l/poll` returns bounded phase, retry, terminal, and
 destination metadata; it never returns inputs, checkpoint data, model output,

@@ -101,12 +101,23 @@ def elapsed_seconds(start, now):
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_status_projection_is_bounded_and_marks_stale_work
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_dependency_status_distinguishes_form_waits_from_recovery
+# @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_stays_fixed_after_completion
+# @tests tests_unit/test_023a_deferred_job_properties.py::test_active_job_elapsed_time_advances_with_the_clock
+# @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_uses_stored_fallbacks
 # @matrix deferred-jobs : privacy progress stale-state status timing dependency-wait recovery
 def status_projection(job, *, now):
     progress = dict(getattr(job, "progress", None) or {})
     client = dict(getattr(job, "client", None) or {})
     phase = progress.get("phase") or getattr(job, "status", None) or "queued"
     modified = datetime_value(getattr(job, "modified", None))
+    terminal = getattr(job, "status", None) in TERMINAL_STATUSES
+    # Terminal progress records when execution ended; later delivery bookkeeping
+    # can still advance modified. Legacy jobs fall back to their stored modified.
+    elapsed_until = (
+        datetime_value(progress.get("updated_at")) or modified
+        if terminal
+        else now
+    )
     stale = bool(
         getattr(job, "status", None) in ACTIVE_STATUSES
         and modified
@@ -134,12 +145,18 @@ def status_projection(job, *, now):
         "phase": phase,
         "phase_label": phase_label,
         "attempt": int(getattr(job, "attempt", 0) or 0),
-        "elapsed_seconds": elapsed_seconds(getattr(job, "created", None), now),
-        "phase_elapsed_seconds": elapsed_seconds(progress.get("updated_at"), now),
+        "elapsed_seconds": (
+            elapsed_seconds(getattr(job, "created", None), elapsed_until)
+            if elapsed_until else 0
+        ),
+        "phase_elapsed_seconds": (
+            elapsed_seconds(progress.get("updated_at"), elapsed_until)
+            if elapsed_until else 0
+        ),
         "updated_at": modified.isoformat() if modified else None,
         "next_attempt_at": next_attempt.isoformat() if next_attempt else None,
         "revision": int(getattr(job, "status_revision", 0) or 0),
-        "terminal": getattr(job, "status", None) in TERMINAL_STATUSES,
+        "terminal": terminal,
         "stale": stale,
         "recovering": bool(
             stale
@@ -160,7 +177,8 @@ def status_projection(job, *, now):
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_admin_projection_exposes_diagnostics_without_payload_content
-# @matrix deferred-jobs : diagnostics privacy
+# @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_stays_fixed_after_completion
+# @matrix deferred-jobs : diagnostics privacy timing
 def admin_projection(job, *, now):
     """Extend owner-visible status with bounded operational diagnostics."""
     projection = status_projection(job, now=now)
