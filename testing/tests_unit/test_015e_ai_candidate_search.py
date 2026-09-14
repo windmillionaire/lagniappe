@@ -184,7 +184,9 @@ def _actor():
 # @source lagniappe/core/tools/ai/functions.py::execute_registered_tool
 # @source lagniappe/core/tools/ai/functions.py::execute_function_calls
 # @source lagniappe/core/tools/ai/function_definitions/search.py::execute_search
-# @matrix ai search : candidate-routing candidate-ranking term-relaxation permissions
+# @source lagniappe/core/tools/cache/query.py::candidate_search
+# @matrix ai search : candidate-routing
+# @matrix search : candidate-ranking term-relaxation permissions
 # @matrix ai agent-api : tool-dispatch
 @pytest.mark.parametrize("external", [False, True], ids=["on-site", "mcp"])
 def test_registered_search_returns_ranked_partial_matches_in_both_ai_paths(

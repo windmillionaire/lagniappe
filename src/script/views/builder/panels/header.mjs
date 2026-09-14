@@ -149,7 +149,7 @@ export class Header {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
-	 * @pair forms:builder-preview
+	 * @matrix forms : builder-preview focus-recovery
 	 */
 	async togglePreviewPanel() {
 		if (this._destroyed) return;

@@ -120,7 +120,7 @@ def test_generation_is_one_undoable_unsaved_command(get_user):
     assert dict(Entities.fetch_one(form.key, request=Fetch.root()).db) == saved_form
 
 
-# @source src/script/views/builder/panels/header.mjs::Header.saveForm
+# @source src/script/views/builder/panels/header.mjs::Header.togglePreviewPanel
 # @matrix forms : builder-preview focus-recovery
 # @template forms/builder.html::header
 # @style builder.switch.container
@@ -211,6 +211,7 @@ def test_save_feedback_retains_keyboard_focus(
     expect(save).to_have_attribute("data-saved", "true")
 
 
+# @source src/script/views/builder/panels/header.mjs::Header.saveForm
 # @matrix forms : builder-save builder-reload
 # @template forms/builder.html::header
 # @template forms/builder.html::main
@@ -564,6 +565,7 @@ def test_image_layout_survives_builder_save_and_reload(get_user, position, float
 
 # @source lagniappe/core/tools/files/html.py::render_markdown
 # @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
+# @source src/script/views/builder/panels/header.mjs::Header.saveForm
 # @matrix forms : schema-generation builder-save builder-reload
 # @matrix form-html security : html-sanitization owned-image
 # @template forms/builder.html::header
