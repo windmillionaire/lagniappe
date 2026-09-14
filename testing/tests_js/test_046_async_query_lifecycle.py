@@ -401,7 +401,11 @@ def test_builder_destroys_owned_search_modal_and_panels_during_startup(run_node)
             const searchReady = new Promise((resolve) => { resolveSearch = resolve; });
             const destroyed = [];
             const panelClass = (name) => class {
-              constructor() { this.name = name; this.saveButton = { dataset: {} }; this.nameHidden = { value: "Form" }; }
+              constructor() {
+                this.name = name;
+                this.saveButton = { dataset: {}, getAttribute() { return null; }, setAttribute() {} };
+                this.nameHidden = { value: "Form" };
+              }
               init() {}
               saved() {}
               unsaved() {}

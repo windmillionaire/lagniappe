@@ -62,7 +62,13 @@ export class Header {
 		this.saveButton.dataset.kind = "unsaved";
 		this.saveButton.setAttribute(
 			"aria-disabled",
-			String(Boolean(this._savePromise || this.builder.pendingChange)),
+			String(
+				Boolean(
+					this._savePromise ||
+						this.builder.pendingChange ||
+						this.builder.online === false,
+				),
+			),
 		);
 	}
 
@@ -214,6 +220,7 @@ export class Header {
 	saveForm() {
 		if (this.builder.pendingChange) return Promise.resolve(false);
 		if (this._savePromise) return this._savePromise;
+		if (this.builder.online === false) return Promise.resolve(false);
 		if (this._destroyed || !this.saveButton || !this.schemaForm) {
 			return Promise.resolve(false);
 		}
@@ -301,6 +308,7 @@ export class Header {
 						),
 					);
 					button.removeAttribute("aria-busy");
+					this.builder.offline?.(!this.builder.online);
 					if (
 						hadFocus &&
 						(!document.activeElement ||

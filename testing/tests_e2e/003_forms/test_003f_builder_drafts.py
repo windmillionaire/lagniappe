@@ -153,7 +153,10 @@ def test_preview_toggle_retains_keyboard_focus(get_user):
 # @matrix forms : builder-save focus-recovery
 # @template forms/builder.html::header
 # @style nav.button
-def test_save_feedback_retains_keyboard_focus(get_user):
+@pytest.mark.parametrize("reconnect_during_save", [False, True])
+def test_save_feedback_retains_keyboard_focus(
+    get_user, browser_failures, reconnect_during_save,
+):
     user = get_user(Users.OWNER)
     form, notes = _form(user, "Save keyboard focus")
     builder = form.builder
@@ -170,6 +173,15 @@ def test_save_feedback_retains_keyboard_focus(get_user):
             expect(save.locator("[data-icon='spinner']")).to_be_visible()
             expect(save.locator("[data-icon='builder.unsaved']")).to_be_hidden()
             expect(save.locator("[data-icon='builder.saved']")).to_be_hidden()
+            if reconnect_during_save:
+                with browser_failures.expect_offline(user, max_ping_count=3):
+                    try:
+                        user.offline = True
+                        expect(user.locate("[data-role='offline']")).to_be_visible()
+                        expect(save).to_be_focused()
+                    finally:
+                        user.offline = False
+                expect(user.locate("[data-role='offline']")).to_be_hidden()
             expect(save).to_be_focused()
             expect(save).to_have_css("opacity", "1")
             assert save.bounding_box() == before

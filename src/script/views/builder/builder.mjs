@@ -186,6 +186,7 @@ class FormBuilder {
 	/**
 	 * @testable false
 	 * @covered-by src/script/views/builder/builder.mjs::FormBuilder.sync
+	 * @covered-by src/script/views/builder/panels/header.mjs::Header.saveForm
 	 * @reason builder connectivity controls are applied through the shared view lifecycle
 	 */
 	offline(offline) {
@@ -199,7 +200,22 @@ class FormBuilder {
 		}
 		if (search) search.dataset.visible = offline ? "false" : "true";
 		const saveButton = this.header.saveButton;
-		if (saveButton) saveButton.dataset.visible = offline ? "false" : "true";
+		if (saveButton) {
+			// Keep the control in the tab order through health transitions.
+			const saving = saveButton.getAttribute("aria-busy") === "true";
+			saveButton.dataset.visible = "true";
+			saveButton.setAttribute(
+				"aria-disabled",
+				String(
+					Boolean(
+						offline ||
+							saving ||
+							this.pendingChange ||
+							saveButton.dataset.saved === "true",
+					),
+				),
+			);
+		}
 	}
 
 	updateSchema(silent = false, group = null) {

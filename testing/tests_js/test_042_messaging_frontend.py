@@ -431,6 +431,65 @@ if (!prevented || actions[0]?.[0] !== "compose" || actions[0]?.[1] !== menu.view
     )
 
 
+# @matrix notifications : menu-open reconnect
+def test_notification_refresh_waits_for_pending_connectivity(run_node):
+    run_node(
+        r"""
+(async () => {
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const calls = [];
+const html = {};
+const context = {
+  window: {},
+  ENDPOINTS: { notifications: "/l/notifications" },
+  request: { async get(path) { calls.push(path); return { ok: true, html }; } },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/elements/notifications.mjs", "utf8");
+source = source.replace(/^import .*;$/gm, "");
+source = source.replace("export class Notifications", "class Notifications");
+source += "\nglobalThis.Notifications = Notifications;";
+vm.runInContext(source, context);
+
+const menu = Object.create(context.Notifications.prototype);
+menu.view = { online: false };
+menu.dropdown = {};
+menu._optionsFromHtml = (received) => {
+  assert.equal(received, html);
+  return [{ key: "notification" }];
+};
+const rendered = [];
+menu._updateDropdown = () => rendered.push(menu.notifications);
+let recover;
+context.window.__CONNECTIVITY_READY__ = new Promise((resolve) => { recover = resolve; });
+const opening = menu.refresh();
+assert.deepEqual(calls, [], "A recovering view must wait for its health check");
+menu.view.online = true;
+recover();
+assert.equal(await opening, true, "The first open must survive an in-flight reconnect");
+assert.deepEqual(calls, ["/l/notifications"]);
+assert.equal(menu.loaded, true);
+assert.equal(rendered[0][0].key, "notification");
+
+menu.view.online = false;
+context.window.__CONNECTIVITY_READY__ = Promise.resolve();
+assert.equal(await menu.refresh(), false, "A settled offline view must not fetch");
+assert.equal(calls.length, 1);
+
+context.window.__CONNECTIVITY_READY__ = new Promise((resolve) => { recover = resolve; });
+const destroyed = menu.refresh();
+menu.dropdown = null;
+menu.view.online = true;
+recover();
+assert.equal(await destroyed, false, "A menu destroyed during recovery must not publish");
+assert.equal(calls.length, 1);
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+"""
+    )
+
+
 # @matrix messaging : active-polling clear-confirmation inline-reply list-race polling-revision preserve-selection read-race responsive-peer-selector selection-race
 def test_messages_view_refreshes_read_races_and_uses_delete_modal(run_node):
     run_node(

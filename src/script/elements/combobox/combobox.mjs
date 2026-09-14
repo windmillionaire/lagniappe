@@ -19,7 +19,9 @@ import { primitives } from "../primitives";
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_copies_only_supported_dataset_configuration
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_positioning_stops_after_destroy
+ * @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
  * @matrix combobox : aria dataset-configuration dismissal empty-results keyboard pointer positioning positioning-readiness readiness teardown transition-race
+ * @pair editor:history-positioning
  */
 export class Combobox {
 	constructor(element) {
@@ -216,8 +218,9 @@ export class Combobox {
 			const request = ++positionRequest;
 			const middleware = [
 				offset(4),
-				shift({ padding: 5 }),
+				// Try the opposite alignment before shifting away from the anchor.
 				flip({ padding: 5 }),
+				shift({ padding: 5 }),
 			];
 
 			if (this.matchReferenceWidth) {
@@ -229,10 +232,11 @@ export class Combobox {
 			}
 
 			computePosition(reference, panel, {
+				// Reconsider the preferred placement after each resize or move.
 				placement: this.placement,
 				middleware: middleware,
 			})
-				.then(({ x, y, placement }) => {
+				.then(({ x, y }) => {
 					if (!active || this._destroyed || this.panel !== panel) {
 						settleReady(false);
 						return;
@@ -242,7 +246,6 @@ export class Combobox {
 						left: `${x}px`,
 						top: `${y}px`,
 					});
-					this.placement = placement;
 					settleReady(true);
 				})
 				.catch((error) => {

@@ -434,6 +434,7 @@ def test_add_category_to_page(get_user):
 
 
 # @matrix pages : delete parentless title-menu
+# @pair entity-menu:title-positioning
 # @template pages/page.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
@@ -451,6 +452,12 @@ def test_delete_page_from_title_menu(get_user):
     expect(menu).to_be_visible()
     expect(menu).to_have_attribute("data-positioned", "true")
     expect(trigger).not_to_have_attribute("aria-busy", "true")
+    title_box = user.locate(page.PAGE_TITLE).bounding_box()
+    menu_box = menu.bounding_box()
+    assert title_box and menu_box
+    assert abs(menu_box["x"] - title_box["x"]) <= 1
+    assert abs(menu_box["y"] - title_box["y"] - title_box["height"] - 4) <= 1
+    assert menu_box["width"] >= title_box["width"]
     delete_item = menu.get_by_role("menuitem", name="Delete")
     delete_item.click()
 

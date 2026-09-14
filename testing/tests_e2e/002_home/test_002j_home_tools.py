@@ -539,8 +539,11 @@ def test_tools_create_form_has_expected_controls(get_user):
     instructions.fill("Sort this into the right place.")
     expect(explain_button).to_be_visible()
     expect(explain_button).to_have_accessible_name("Initial Prompt")
-    explain_button.click()
-    expect(user.page.get_by_text("Organize Planning Output")).to_be_visible()
+    with user.page.expect_response("**/tools/organize"):
+        explain_button.click()
+    expect(user.page.locator("#modal")).to_contain_text(
+        "planning updates to existing records."
+    )
     Modal(user.page).close()
     switcher.get_by_role("button", name="Ask").click()
     expect(dropzone).not_to_be_visible()

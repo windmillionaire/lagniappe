@@ -166,6 +166,10 @@ until the first authoritative projection, then shows the exact count including
 zero. Opening the menu loads ordinary Notifications and the durable aggregate.
 A changed cursor marks an already-loaded list stale; the list refreshes
 immediately only while open.
+If the first menu click arrives during a pending connectivity recovery, loading
+waits for that cycle to settle and then checks the view's current online state.
+It does not discard the click based on the previous offline state or send a
+request when the cycle finishes offline.
 
 The Messages entry represents the aggregate and cannot be cleared with
 ordinary Notifications. **Clear All** affects ordinary rows only. Message

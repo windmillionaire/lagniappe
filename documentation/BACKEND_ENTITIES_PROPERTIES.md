@@ -69,6 +69,12 @@ Removing the model does not promote another selected category. A Page with no
 model or categories uses `Uncategorized Pages`; a Page with categories but no
 model uses its first category only for parent display projections.
 
+Page creation and updates register page-specific forms on ordinary categories
+for filtering. `Uncategorized Pages` is a grab-bag and is excluded from that
+registration, whether assigned automatically or supplied explicitly. Its pages
+can still have their own forms; creation and updates do not read or extend any
+legacy `forms` references on the fallback category.
+
 ## Submissions
 
 `FormSubmission` and `RowSubmission` build fields from the attached schema.

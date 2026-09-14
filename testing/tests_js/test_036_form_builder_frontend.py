@@ -123,6 +123,13 @@ builder.updateSchema();
 if (!builder.draft.dirty || button.disabled || button.attributes["aria-disabled"] !== "false") {
   throw new Error("Editing a saved form did not enable Save");
 }
+builder.online = false;
+header.unsaved();
+if (button.attributes["aria-disabled"] !== "true" || await header.saveForm() !== false || requests.length) {
+  throw new Error("Offline Save started publication or advertised availability");
+}
+builder.online = true;
+header.unsaved();
 const first = header.saveForm();
 const duplicate = header.saveForm();
 await new Promise(setImmediate);
@@ -432,7 +439,11 @@ const indicator = {
   dataset: {},
   setAttribute(name, value) { this[name] = value; },
 };
-const saveButton = { dataset: {} };
+const saveButton = {
+  dataset: {},
+  getAttribute(name) { return this[name] ?? null; },
+  setAttribute(name, value) { this[name] = value; },
+};
 const context = {
   connectivity: {
     hidden: false,
@@ -474,7 +485,8 @@ if (builder.online !== false || builder.hidden !== true) {
 if (
   indicator.dataset.visible !== "true" ||
   search.dataset.visible !== "false" ||
-  saveButton.dataset.visible !== "false"
+  saveButton.dataset.visible !== "true" ||
+  saveButton["aria-disabled"] !== "true"
 ) {
   throw new Error("Builder controls did not enter their offline state");
 }
@@ -487,7 +499,8 @@ if (builder.online !== true || builder.hidden !== false) {
 if (
   indicator.dataset.visible !== "false" ||
   search.dataset.visible !== "true" ||
-  saveButton.dataset.visible !== "true"
+  saveButton.dataset.visible !== "true" ||
+  saveButton["aria-disabled"] !== "false"
 ) {
   throw new Error("Builder controls did not recover their online state");
 }

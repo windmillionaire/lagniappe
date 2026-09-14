@@ -159,6 +159,12 @@ styles may position, color, stack, or hide the icon.
 Document editor toolbar menus use compact icon-and-arrow triggers at every
 viewport size, with History last and Align immediately before Insert. History
 opens from the start edge of its trigger, subject to viewport collision handling.
+Toolbar menu widths depend on their content, capped by the viewport, so moving
+a menu does not change its measured width. Shared combobox positioning tries
+an alignment flip before shifting into the viewport and retains the configured
+preferred placement across resize updates. Title anchoring and minimum title
+width remain explicit options used by entity action menus; toolbar menus and
+notifications use their own triggers.
 Buttons and menus share one wrapping row so each control uses the available
 width, including Style and Headings beside the buttons on smaller screens.
 Menu glyphs use the standard dropdown size rather than the larger toolbar size.

@@ -114,7 +114,7 @@ def test_document_history_restore(get_user):
     expect(project.editor.text_entry).to_have_text("Original content to preserve")
 
 
-# @matrix editor : confirmation current-content history-clear history-pin parent-scope validation
+# @matrix editor : confirmation current-content history-clear history-pin history-positioning parent-scope validation
 # @pair request-errors:plain-validation
 # @template delete/document_history.html::confirmation
 def test_pin_and_clear_document_history(get_user, browser_failures):
@@ -241,3 +241,24 @@ def test_pin_and_clear_document_history(get_user, browser_failures):
             "option", name=re.compile(r"Release checkpoint — .+")
         )
     ).to_be_visible()
+
+    # History is the last toolbar control. Its populated menu must flip to
+    # the trigger's end edge when space is tight, and use the start again
+    # when a wider viewport makes the preferred placement available.
+    history_button = editor.toolbar.get_by_role("combobox", name="History")
+    for width, edge in [(1280, "right"), (1920, "left"), (1280, "right")]:
+        user.page.set_viewport_size({"width": width, "height": 900})
+        user.page.wait_for_function(
+            """({button, panel, edge}) => {
+                const anchor = document.getElementById(button).getBoundingClientRect();
+                const menu = document.getElementById(panel).getBoundingClientRect();
+                return Math.abs(menu[edge] - anchor[edge]) <= 1 &&
+                    Math.abs(menu.top - anchor.bottom - 4) <= 1 &&
+                    menu.left >= 5 && menu.right <= innerWidth - 5;
+            }""",
+            arg={
+                "button": history_button.get_attribute("id"),
+                "panel": refreshed.get_attribute("id"),
+                "edge": edge,
+            },
+        )

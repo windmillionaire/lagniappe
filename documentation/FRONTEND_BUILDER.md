@@ -303,6 +303,10 @@ with no changes returns without publishing or rebuilding the open editor.
 Save always stays at full opacity. While pending, the standard spinner replaces
 the cloud; once settled, the cloud/check reflects the saved state. Only Undo/Redo
 fade when disabled.
+Save stays visible and focusable through offline/reconnect transitions so a
+health check cannot discard its keyboard focus, including when a response
+settles during recovery. Offline state sets `aria-disabled` and prevents new
+publication attempts; an in-flight Save retains its single-flight guard.
 An edited draft publishes the complete name/schema/HTML/image snapshot, saved
 baseline and request identity through one single-flight promise. While pending,
 it is aria-disabled and exposes `aria-busy`. The backend recognizes a retry before

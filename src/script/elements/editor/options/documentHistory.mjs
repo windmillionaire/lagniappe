@@ -7,7 +7,8 @@ import { createMenuButton } from "../dropdowns";
  * @testable true
  * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_saves_do_not_create_automatic_history
  * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
- * @matrix editor : history-list history-restore
+ * @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
+ * @matrix editor : history-list history-positioning history-restore
  */
 class DocumentHistoryButton {
 	constructor(toolbar) {
@@ -29,7 +30,7 @@ class DocumentHistoryButton {
 			loadOptions: this._loadEntries,
 			placement: "bottom-start",
 			styles: {
-				panel: `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext}`,
+				panel: `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext} w-max max-w-[calc(100vw-0.625rem)]`,
 			},
 		});
 	}

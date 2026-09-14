@@ -630,10 +630,21 @@ if (dropdown.panel.style.minWidth !== "198px") {
 const middleware = computePositionCalls[1].options.middleware;
 if (
   middleware[0].name !== "offset" || middleware[0].value !== 4 ||
-  middleware[1].name !== "shift" || middleware[1].options.padding !== 5 ||
-  middleware[2].name !== "flip" || middleware[2].options.padding !== 5
+  middleware[1].name !== "flip" || middleware[1].options.padding !== 5 ||
+  middleware[2].name !== "shift" || middleware[2].options.padding !== 5
 ) {
   throw new Error(`Position safeguards changed: ${JSON.stringify(middleware)}`);
+}
+
+context.setComputePosition(() => Promise.resolve({
+  placement: "bottom-end", x: 25, y: 30,
+}));
+autoUpdateCalls[1].callback();
+await Promise.resolve();
+autoUpdateCalls[1].callback();
+await Promise.resolve();
+if (computePositionCalls.at(-1).options.placement !== "bottom-start") {
+  throw new Error("A previous flip replaced the preferred placement on subsequent updates");
 }
 """,
     )

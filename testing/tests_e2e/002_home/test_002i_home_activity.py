@@ -16,6 +16,7 @@ from lagniappe.core.tools.notifications.service import (
     create_ordinary_notification,
     publish_notification_aggregate,
 )
+from lagniappe.web.start.styles.fonts import FONTS
 from testing.definitions import DueDates, Pages, SitePages, Users
 from testing.definitions.task_definitions import TaskDefinition
 from testing.definitions.user_definitions import UserDefinition
@@ -24,6 +25,7 @@ from testing.resources import Task
 from testing.utility.network import (
     assert_lagniappe_error_response,
     manual_mutation_headers,
+    scoped_browser_route,
 )
 from testing.utility.offline import wait_for_offline_mutations
 from testing.utility.test_file import TestFile as _TestFile
@@ -472,9 +474,12 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     ) <= 2
 
 
-# @matrix notifications : accessible-state clear-all delete dropdown-refresh menu-open ownership
+# @matrix notifications : accessible-state clear-all delete dropdown-refresh menu-open ownership reconnect
 # @template nav.html::navbar
-def test_notification_menu_deletes_and_clears(get_user):
+@pytest.mark.parametrize("reconnect_before_open", [False, True])
+def test_notification_menu_deletes_and_clears(
+    get_user, browser_failures, reconnect_before_open,
+):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
     user = get_user(
@@ -498,7 +503,24 @@ def test_notification_menu_deletes_and_clears(get_user):
     expect(notifications).to_have_attribute("aria-hidden", "false")
     expect(notifications).to_have_attribute("tabindex", "0")
 
-    notifications.click()
+    if reconnect_before_open:
+        with browser_failures.expect_offline(user, max_ping_count=3):
+            user.offline = True
+            expect(user.locate("[data-role='offline']")).to_be_visible()
+        pending = []
+        with scoped_browser_route(
+            user.page.context, "**/l/ping", lambda route: pending.append(route),
+        ):
+            try:
+                with user.page.expect_request("**/l/ping"):
+                    user.offline = False
+                notifications.click()
+            finally:
+                user.offline = False
+                for route in pending:
+                    route.continue_()
+    else:
+        notifications.click()
     panel = user.page.locator("[role='listbox'][data-visible='true']")
     expect(panel).to_be_visible()
 
@@ -551,7 +573,7 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
     with browser_failures.expect_http_error(
         user,
         status=503,
-        path="/fonts/source-sans-italic-latin.woff2",
+        path=FONTS["source-sans-italic-latin"],
     ):
         with browser_failures.expect_http_error(
             user,
