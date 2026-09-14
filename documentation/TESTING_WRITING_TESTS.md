@@ -128,6 +128,11 @@ Use `expect_poll_result()` to observe a natural `/l/poll` result for one exact
 subscription. Do not inspect private manager state or poll application entities
 from Python while waiting for a browser workflow.
 
+The next poll may legitimately report `unchanged` when it overlaps a mutation.
+For a reconciliation story, prefer the published DOM revision or another
+completion marker that proves reconciliation finished; do not require the
+mutation to finish before the first observed poll.
+
 Use `expect_offline_sync_replay()` when reconnect/reload must replay a specific
 persisted mutation. Match the sync identity and request content, then assert the
 fresh visible or persisted result. Queue internals and replay idempotence belong

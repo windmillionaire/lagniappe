@@ -1,9 +1,13 @@
 from contextlib import contextmanager
+from dataclasses import replace
 import re
+from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
 
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Uploads, Users
 from testing.elements import UploadDropdown, Tabs
 from testing.resources import Page
@@ -35,7 +39,9 @@ def _upload_image_from_prompt(user, page):
     form = _photo_form(user)
     expect(user.locate(page.PHOTO_NEW_IMAGE)).to_be_visible()
 
-    with user.page.expect_response("**/add-page-image"):
+    with expect_successful_response(
+        user.page, method="POST", path=f"/assets/{page.key}/add-page-image"
+    ):
         with user.page.expect_file_chooser() as chooser:
             form.locator("[data-role='dropzone']").click()
         chooser.value.set_files(Uploads.editor_test_image.definition.file.path)
@@ -393,48 +399,63 @@ def test_cancel_generation_restores_previous_image_visibility(get_user):
 # @source src/script/widgets/pagePhoto.mjs::PagePhoto._removeImage
 @pytest.mark.parametrize("dirty", [False, True])
 def test_image_changes_preserve_page_info_dom_and_draft(get_user, dirty):
-    from testing.utility.polling import expect_poll_result
-
     user = get_user(Users.OWNER)
-    page = Pages.test_offline_sync_form_page.get(user)
-    page.entity.properties.image.delete()
-    page.entity.save()
-    user.go(page)
-    info = page.info_form
-    original = info.element_handle()
-    if dirty:
-        for selector, value in (
-            (Page.INFO_NAME, "Unsaved image page name"),
-            (Page.INFO_DESCRIPTION, "Unsaved image page description"),
-            ("[id^='sync-text-renderer-']", "Unsaved custom field"),
-        ):
-            field = info.locator(selector)
-            field.locator("[data-role='label']").click()
-            field.locator("input, textarea").fill(value)
+    page = Page(
+        user=user,
+        definition=replace(
+            Pages.test_offline_sync_form_page.value.definition,
+            name=f"Image reconciliation {uuid4().hex}",
+        ),
+    ).create()
+    try:
+        user.go(page).wait_for_interaction_readiness()
+        info = page.info_form
+        original = info.element_handle()
+        if dirty:
+            for selector, value in (
+                (Page.INFO_NAME, "Unsaved image page name"),
+                (Page.INFO_DESCRIPTION, "Unsaved image page description"),
+                ("[id^='sync-text-renderer-']", "Unsaved custom field"),
+            ):
+                field = info.locator(selector)
+                field.locator("[data-role='label']").click()
+                field.locator("input, textarea").fill(value)
 
-    for action in ("add", "replace", "remove"):
-        before = user.locate("[lp-view]").get_attribute("data-fingerprint")
-        # Entity polls start at 15 seconds and back off while quiet; the natural
-        # poll is the causal boundary proving image-only revision reconciliation.
-        with expect_poll_result(user.page, subscription_id=f"view:entity:{page.key}", timeout=60000):
+        for action in ("add", "replace", "remove"):
+            before = user.locate("[lp-view]").get_attribute("data-fingerprint")
             if action == "add":
                 _upload_image_from_prompt(user, page)
             elif action == "replace":
-                with user.page.expect_response("**/add-page-image"):
+                with expect_successful_response(
+                    user.page, method="POST", path=f"/assets/{page.key}/add-page-image"
+                ):
                     with user.page.expect_file_chooser() as chooser:
                         UploadDropdown.REPLACE.select(_photo_form(user))
                     chooser.value.set_files(Uploads.editor_test_image.definition.file.path)
             else:
-                with user.page.expect_response("**/remove-page-image"):
+                with expect_successful_response(
+                    user.page, method="DELETE", path=f"/assets/{page.key}/remove-page-image"
+                ):
                     UploadDropdown.REMOVE.select(_photo_form(user))
-        expect(user.locate("[lp-view]")).not_to_have_attribute("data-fingerprint", before)
-        page.wait_for_interaction_readiness()
-        assert original.evaluate("element => element.isConnected")
-        expect(info.locator("[lp-edited-marker]")).to_be_hidden()
-        if dirty:
-            expect(info.locator("input[name='name']")).to_have_value("Unsaved image page name")
-            expect(info.locator("textarea[name='description']")).to_have_value("Unsaved image page description")
-            expect(info.locator("input[name='sync-text']")).to_have_value("Unsaved custom field")
+            # The image response does not acknowledge the entity revision.
+            # EditWatcher publishes this fingerprint after probing the form;
+            # an earlier natural poll may correctly report unchanged.
+            expect(user.locate("[lp-view]")).not_to_have_attribute(
+                "data-fingerprint", before, timeout=60000
+            )
+            page.wait_for_interaction_readiness()
+            assert original.evaluate("element => element.isConnected")
+            expect(info.locator("[lp-edited-marker]")).to_be_hidden()
+            if dirty:
+                expect(info.locator("input[name='name']")).to_have_value("Unsaved image page name")
+                expect(info.locator("textarea[name='description']")).to_have_value("Unsaved image page description")
+                expect(info.locator("input[name='sync-text']")).to_have_value("Unsaved custom field")
+    finally:
+        # Browser uploads changed the persisted assets, not this resource's
+        # original entity object. Cleanup must load the current asset references.
+        saved = Entities.fetch_one(page.key, request=Fetch.root())
+        if saved is not None:
+            Entities.delete(saved)
 
 
 # @matrix pages : image-replace upload-error
