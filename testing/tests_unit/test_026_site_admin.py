@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from google.cloud.datastore import Key
+from google.cloud.datastore import Entity as DatastoreEntity, Key
 import pytest
 
 from lagniappe.core.definitions import FetchDepth, FetchReason
@@ -11,6 +11,8 @@ from lagniappe.core.definitions.manual import MANUAL_SECTIONS
 from lagniappe.core.entities.group import UserGroup
 from lagniappe.core.entities.page import Page
 from lagniappe.core.entities.user import User
+from lagniappe.core.entities.task import Task
+from lagniappe.core.exceptions import UnloadedRelationError
 from lagniappe.core.tools.site import admin as site_admin
 from lagniappe.core.tools.site import cache_rebuild
 from lagniappe.core.tools.site import recovery
@@ -534,6 +536,111 @@ def _stored_entity(entity_class, key, **values):
         **values,
     }
     return entity
+
+
+def _cache_rows(monkeypatch, rows, stored):
+    monkeypatch.setattr(cache_rebuild.database_migrations, "get_migration_status",
+                        lambda: {"status": "current", "cache_refresh_allowed": True})
+    monkeypatch.setattr(cache_rebuild.cache, "delete_cache", lambda: None)
+    monkeypatch.setattr(cache_rebuild.database_get, "all_models", lambda: iter(()))
+    monkeypatch.setattr(cache_rebuild.database_get, "all_instances", lambda: iter(rows))
+    monkeypatch.setattr(cache_rebuild.database_get, "all_files", lambda: iter(()))
+    monkeypatch.setattr(cache_rebuild.database_get, "all_users", lambda: iter(()))
+    monkeypatch.setattr(cache_rebuild.database_get, "entities",
+                        lambda keys: [stored[key] for key in keys if key in stored])
+
+
+# @matrix cache : failure-isolation actionable-links
+@pytest.mark.parametrize("missing_type", [False, True])
+def test_cache_rebuild_reports_bad_records_and_continues(monkeypatch, missing_type):
+    project = "cache-rebuild-unit-test"
+    good = _stored_entity(Page, Key("page", "good", project=project), hash="good", name="Good page")
+    bad = _stored_entity(Task, Key("task", "bad", project=project), hash="bad", name="Orphan task")
+    bad_key = bad.urlsafe_key
+    if missing_type:
+        bad = DatastoreEntity(key=bad.key)
+        bad.update({"kind": "task", "name": "Orphan task"})
+    later = _stored_entity(Page, Key("page", "later", project=project), hash="later", name="Later page")
+    _cache_rows(monkeypatch, [good, bad, later], {e.key: e for e in [good, bad, later]})
+    cached = {}
+    captured = []
+    def update(*entities, update):
+        projections = {e.key: dict(e.to_cache) for e in entities}
+        cached.update(projections)
+    monkeypatch.setattr(cache_rebuild.cache, "update", update)
+    monkeypatch.setattr(cache_rebuild, "capture", lambda error, **kwargs: captured.append(error))
+    result = cache_rebuild.rebuild_application_cache(chunk_size=2)
+    assert result.rebuilt
+    assert set(cached) == {good.key, later.key}
+    assert result.cache_status["status"] == "partial"
+    assert result.cache_status["processed"] == 2
+    assert result.cache_status["failed"] == 1
+    detail = result.cache_status["errors"][0]
+    assert detail["url"] == f"/tasks/{bad_key}"
+    assert detail["link_label"] == "Orphan task"
+    assert detail["message"] == ("Entity type is missing." if missing_type else "task.page is required")
+    assert len(captured) == 1
+
+
+# @matrix cache : failure-isolation actionable-links
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_cache_rebuild_does_not_hide_provider_failures(monkeypatch, wrapped):
+    _cache_rows(monkeypatch, ["one"], {})
+    monkeypatch.setattr(cache_rebuild.Entities, "fetch", lambda *args, **kwargs: ["one"])
+    def unavailable(*args, **kwargs):
+        try:
+            raise ConnectionError("Redis unavailable")
+        except ConnectionError as error:
+            if wrapped:
+                raise ValueError("Projection unavailable") from error
+            raise
+    monkeypatch.setattr(cache_rebuild.cache, "update", unavailable)
+    with pytest.raises(ValueError if wrapped else ConnectionError, match="unavailable"):
+        cache_rebuild.rebuild_application_cache()
+
+
+# @matrix permissions relations : deleted-form recalculation
+# @matrix cache : nested-relations
+def test_cache_rebuild_recalculates_restrictions_after_form_deletion(monkeypatch):
+    project = "cache-rebuild-unit-test"
+    form_key = Key("form", "deleted", project=project)
+    page = _stored_entity(Page, Key("page", "stale", project=project),
+                          hash="stale", name="Page with deleted form", form=form_key,
+                          restricted_to=["staff"])
+    task = _stored_entity(Task, Key("task", "child", project=project),
+                          hash="child", name="Child task", page=page.key)
+    _cache_rows(monkeypatch, [page, task], {page.key: page, task.key: task})
+    with pytest.raises(UnloadedRelationError, match="page.form must be loaded"):
+        _ = page.restricted_to
+    cached = {}
+    def update(*entities, update):
+        cached.update({e.key: dict(e.to_cache) for e in entities})
+    monkeypatch.setattr(cache_rebuild.cache, "update", update)
+    result = cache_rebuild.rebuild_application_cache(chunk_size=1)
+    assert result.cache_status["failed"] == 0
+    assert result.cache_status["processed"] == 2
+    assert page.form is None
+    assert page.db["form"] == form_key
+    assert page.restricted_to == {"page": ["staff"]}
+    assert task.restricted_to == {"page": ["staff"]}
+    assert cached[page.key]["restricted_to_page"] == "staff"
+    assert cached[task.key]["restricted_to_page"] == "staff"
+    assert "restricted_to_page_form" not in cached[page.key]
+
+
+# @matrix permissions relations : unloaded-relation
+# @source lagniappe/core/tools/auth/restrictions.py::permission_relation
+def test_unloaded_optional_form_is_not_mistaken_for_a_deleted_form(monkeypatch):
+    from lagniappe.core.mixins import related
+    page = _stored_entity(Page, Key("page", "unloaded", project="cache-rebuild-unit-test"),
+                          hash="unloaded", name="Unloaded Form", form="not-fetched")
+    captured = []
+    monkeypatch.setattr(related, "capture_unloaded_relation", lambda *args, **kwargs: captured.append(True))
+    assert page.form is None
+    assert captured == [True]
+    assert not page.properties.form.is_set
+    with pytest.raises(UnloadedRelationError, match="page.form must be loaded"):
+        _ = page.restricted_to
 
 
 # @matrix cache : batching current nested-relations

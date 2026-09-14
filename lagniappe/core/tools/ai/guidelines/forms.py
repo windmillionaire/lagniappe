@@ -296,7 +296,9 @@ SCHEMA_TYPE_GUIDELINES = """
 
 #### `input` Submission Value Guidelines
 
-- Input element values are strings
+- Text, email and telephone input values are strings. Number inputs use JSON
+  numbers; ordinary submission entry also accepts numeric strings and stores
+  them as numbers.
 - Only fill with information that matches the input type (`text`, `email`, `date`, `number`, `tel`)
 - Dates should be in format YYYY-MM-DD, times in HH:MM (e.g., 17:00 for 5 PM), tel numbers in 123-456-7890
 
@@ -340,7 +342,7 @@ SCHEMA_TYPE_GUIDELINES = """
 ```
 {{
   "rows": [
-    {{"column-1-rating-id": "5", "column-2-publication-id": "Some Publication", "column-3-link-id": {{"title": "display title", "url": "https://example.com"}}, "column-4-internal-link-id": "entity-id-from-tool"}}
+    {{"column-1-rating-id": 5, "column-2-publication-id": "Some Publication", "column-3-link-id": {{"title": "display title", "url": "https://example.com"}}, "column-4-internal-link-id": "entity-id-from-tool"}}
   ]
 }}
 ```

@@ -23,6 +23,12 @@ Dates are stored in UTC and projected in the user's timezone. `Completed`,
 `CompletedOn`, and `DueDate` remain separate values so a recurring task can
 stay active while temporarily completed.
 
+AI report imports interpret date-only completion evidence as local midnight for
+the acting user, then store UTC. Both checkpoint allocation and event recording
+pass that user explicitly so background execution uses the same calendar day
+for live completions and older history, including across daylight-saving changes.
+Existing imported timestamps are not rewritten.
+
 The reviewed Organize action `set_task_due_date` sets or clears only the due
 date of an editable, incomplete Task. Calendar dates use the Task editor's
 current-local-time behavior and retain recurrence and postponement metadata.
@@ -51,22 +57,84 @@ Duplicate or stale deliveries are successful no-ops. Manual uncompletion and
 schedule clearing remove the durable marker. Backup/restore regenerates only
 Cloud Tasks represented by these durable markers.
 
-Task completion creates immutable `TaskHistory` snapshots. A history row keeps
-the task/form schema, submission, attachments, relationships, name,
-description, and completion metadata from that event. Its `modified` value is
-fixed at creation, so its entity fingerprint remains stable even if the live
-Form later changes.
+Completing a Task stores one `completed_submission` JSON envelope containing
+the original `submission`, integer Form `generation`, and `form_key`, including
+when completion does not post new answers. The flat Task submission and generation
+remain the current values. Ordinary Task views, tables, filters, and AI projections
+use that current submission with the current Form, even while the Task is
+completed. Completion does not create a FormHistory record or copy Form assets.
 
-## Defaults and reopening
+`tools/form_definitions.py` separates current reads from explicitly requested
+originals. **View Original Submission** is offered to editors only when a completed
+Task's current submission has advanced beyond the envelope's generation and its
+values differ. The live Task's completion-details endpoint also requires edit
+access; immutable history retains its existing view permission.
+A changed Form version or generation alone does not establish a converted Task.
+The explicit view reads the envelope and uses the current Form when the recorded
+generation matches, resolving FormHistory only for a different or missing Form.
+Labels, HTML and other presentation changes within
+one generation remain visible in original views. Old `schema_version` hashes
+do not select history; legacy rows without a generation start at zero.
 
-`default_submission` stores selected values that should repeat when a task is
-reopened. `SubmitterMixin.save_default_field()` writes one field through a
-root-only property mask. A later submit keeps unchanged defaults and removes
-values that changed or disappeared.
+Manual reopening defaults to archiving the current modified submission. Opening
+the original view reveals a radio choice, initially original; the chosen source
+is sent as `completion_submission` when the existing completion checkbox is
+clicked. Automatic/scheduled reopening always uses the original envelope.
+`Task.uncomplete(submission_source=...)` keeps that automatic default; manual
+routes explicitly supply their modified/original choice. Both paths archive the
+chosen raw values and matching Form generation into flat TaskHistory, preserving
+attachments, relationships, name, description and completion metadata. Reopening
+removes the envelope and clears all submission values. TaskHistory has no completion envelope, and
+its `modified` value is fixed at creation. History readers use each record's
+generation and batch distinct older-definition lookups.
+History rows sort by completion date, then by archive creation time, newest first.
+Generation tables follow their newest row, so multiple completions on the same
+date retain their creation order rather than Datastore query order.
 
-Todo fields never repeat as defaults. History retains the completed checklist;
-the reopened Task starts with no todo items. Assignment remains in place across
-completion and reopening.
+Ordinary answer/default edits and Form reassignment still require reopening a
+completed Task. A later transfer workflow may update flat current values on
+completed Tasks; it must preserve their envelopes and TaskHistory originals.
+That transfer engine is outside Step 1. Task construction and ordinary reads
+do not capture or clone rows. Completion, reopening and guarded writes fetch
+the persisted state at their mutation boundary and compare the protected
+completion fields to reject stale or direct changes to original answers.
+
+Missing archived definitions or historical static content produce an explicit unavailable
+state, retaining raw original answers for review. Historical images are authorized
+through the Task/TaskHistory that references them. After
+a live Form is deleted, its restriction clause no longer applies. Tasks, Pages,
+and retained completion/history content use the remaining live permission
+sources. Loading a stale Form key resolves it to `None` without requiring a
+record re-save; a relation that was never loaded still raises an unloaded-relation
+error. Reads do not silently rewrite stored relationship keys.
+
+A completed Task whose stored Form key no longer resolves shows **This
+submission's form has been deleted. Load the archived version**. Ordinary Task
+reads do not query FormHistory. The explicit `archived-submission` GET checks
+Task view access, then resolves the Task's current stored generation and renders
+its saved values readonly. Original-completion review remains an editor-only
+action when earlier answers differ. Loading either view does not save the Task;
+missing archived definitions expose the existing unavailable state and raw answers.
+
+## Fresh submissions and reopening
+
+Every uncompletion opens a fresh submission. The attached Form, Page/Project,
+assignment and other task settings remain in place; answer fields and completed
+Todo items do not repeat. Legacy `default_submission` data is discarded on
+uncompletion and ordinary submission saves.
+
+**Fill from latest history** is an explicit, local form action. It restores one
+field for the current submission, which is persisted through the normal Update
+or completion flow. It creates no repeating defaults.
+
+History fill discovers saved field IDs without rejecting the whole submission.
+Each click requests one field and converts it from the archived definition to the
+current schema using the deterministic migration rules. Table cells are converted
+by column ID; removed columns are omitted. Missing definitions and unconvertible
+values return HTTP 422 with specific feedback, retaining the original history and
+current answers. Invalid cells or selections reject that field's fill instead of
+silently clearing part of it. Reopening stages
+source-asset cleanup after the guarded durable archive/reset commit.
 
 ## Move and combine
 

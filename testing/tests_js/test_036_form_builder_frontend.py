@@ -39,12 +39,14 @@ const notification = {
   dataset: { visible: "false" },
   textContent: "",
   setAttribute(name, value) { this.attributes[name] = value; },
+  append(link) { this.link = link; },
 };
 const previewToggle = { dataset: {} };
 const previewPanel = { dataset: {} };
 const document = {
   activeElement: button,
   body: {},
+  createElement() { return { dataset: {} }; },
   getElementById(id) {
     return {
       "form-name-display": nameDisplay,
@@ -62,6 +64,8 @@ const document = {
 };
 const context = {
   areEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); },
+  crypto: require("node:crypto").webcrypto,
+  structuredClone,
   captureError() {},
   clearTimeout() {},
   console,
@@ -87,10 +91,24 @@ source += "\nglobalThis.Header = Header;";
 vm.runInContext(source, context);
 
 (async () => {
+const { BuilderDraft } = await import(process.cwd() + "/src/script/views/builder/draft.mjs");
 let schema = [{ id: "first", type: "text" }];
+let restores = 0;
+let settingRefreshes = 0;
+let conditionRefreshes = 0;
+let controlRefreshes = 0;
+const restoredOptions = [];
 const builder = {
   get schema() { return schema; },
+  captureDraft() { return { schema: structuredClone(schema), name: nameHidden.value, form_type: "task", html_fields: {} }; },
+  updateSchema() { this.draft.record(this.captureDraft()); this.draft.dirty ? header.unsaved() : header.saved(); },
+  async draftPayload(state) { return structuredClone(state); },
+  settings: { refreshSavedState() { settingRefreshes++; } },
+  conditions: { condition: { refreshSavedState() { conditionRefreshes++; } } },
+  refreshDraftControls() { controlRefreshes++; this.draft.dirty ? header.unsaved() : header.saved(); },
+  restoreDraft(options) { restores++; restoredOptions.push(options); schema = structuredClone(this.draft.state.schema); this.draft.dirty ? header.unsaved() : header.saved(); },
 };
+builder.draft = new BuilderDraft(builder.captureDraft(), "initial");
 const header = new context.Header(builder);
 if (
   button.attributes["aria-describedby"] !== "notification" ||
@@ -100,20 +118,38 @@ if (
   throw new Error("Builder save errors are not exposed as an accessible status");
 }
 
+schema = [{ ...schema[0], title: "Edited notes" }];
+builder.updateSchema();
+if (!builder.draft.dirty || button.disabled || button.attributes["aria-disabled"] !== "false") {
+  throw new Error("Editing a saved form did not enable Save");
+}
+builder.online = false;
+header.unsaved();
+if (button.attributes["aria-disabled"] !== "true" || await header.saveForm() !== false || requests.length) {
+  throw new Error("Offline Save started publication or advertised availability");
+}
+builder.online = true;
+header.unsaved();
 const first = header.saveForm();
 const duplicate = header.saveForm();
+await new Promise(setImmediate);
 if (first !== duplicate || requests.length !== 1) {
   throw new Error("Concurrent saves were not coalesced");
 }
-if (!button.disabled || button.attributes["aria-busy"] !== "true") {
-  throw new Error("Save did not expose its pending state");
+if (button.disabled || button.attributes["aria-disabled"] !== "true" || button.attributes["aria-busy"] !== "true") {
+  throw new Error("Save did not stay focusable while exposing its pending state");
+}
+if (classes.has("opacity-50")) {
+  throw new Error("Saving dimmed the Save control");
 }
 if (requests[0].args[2]?.replaceErrorPage !== false) {
   throw new Error("Builder save did not preserve its retryable page on HTTP errors");
 }
 
 schema = [...schema, { id: "second", type: "number" }];
-requests.shift().resolve({ ok: true });
+builder.updateSchema();
+const firstRequest = requests.shift();
+firstRequest.resolve({ ok: true, draft: firstRequest.args[1], baseline: "saved-1" });
 if (await first !== true) throw new Error("Successful request was not reported");
 if (button.dataset.saved !== "false") {
   throw new Error("A stale save response acknowledged newer builder edits");
@@ -121,8 +157,15 @@ if (button.dataset.saved !== "false") {
 if (button.disabled || button.attributes["aria-busy"] !== undefined) {
   throw new Error("Successful stale save did not release the control");
 }
+if (restores || settingRefreshes !== 1 || conditionRefreshes !== 1 || controlRefreshes !== 1) {
+  throw new Error("A save receipt rebuilt newer edits instead of refreshing the saved restrictions and controls");
+}
+if (schema.length !== 2 || builder.draft.state.schema.length !== 2 || builder.draft.saved.schema.length !== 1) {
+  throw new Error("A save receipt discarded newer edits or included them in the saved baseline");
+}
 
 const rejected = header.saveForm();
+await new Promise(setImmediate);
 button.dataset.visible = "false";
 requests.shift().reject(new Error("transport failed"));
 if (await rejected !== false || button.disabled) {
@@ -134,6 +177,7 @@ if (button.dataset.visible !== "false") {
 button.dataset.visible = "true";
 
 const failed = header.saveForm();
+await new Promise(setImmediate);
 requests.shift().resolve({ ok: false, error: "Temporary save failure" });
 if (await failed !== false) throw new Error("Failed request was not reported");
 if (button.disabled || notification.dataset.visible !== "true") {
@@ -143,19 +187,76 @@ if (notification.textContent !== "Temporary save failure") {
   throw new Error(`Unexpected save error: ${notification.textContent}`);
 }
 
+const conflicted = header.saveForm();
+await new Promise(setImmediate);
+requests.shift().resolve({ ok: false, code: "stale_form_draft", error: "Changed elsewhere", saved_url: "/forms/current" });
+if (await conflicted !== false || notification.link?.href !== "/forms/current" || notification.link.target !== "_blank") {
+  throw new Error("Stale Save did not preserve the draft with a separate saved-form link");
+}
+if (builder.draft.state.schema.length !== 2 || !builder.draft.dirty) {
+  throw new Error("Stale Save discarded the current local draft");
+}
+
 const retry = header.saveForm();
+await new Promise(setImmediate);
 if (retry === failed || requests.length !== 1) {
   throw new Error("Released save could not be retried");
 }
-requests.shift().resolve({ ok: true });
+const retriedRequest = requests.shift();
+retriedRequest.resolve({ ok: true, draft: retriedRequest.args[1], baseline: "saved-2" });
 if (await retry !== true || button.dataset.saved !== "true") {
   throw new Error("Retry did not acknowledge the current builder state");
 }
 if (notification.dataset.visible !== "false" || notification.textContent !== "") {
   throw new Error("Successful retry did not clear the prior error");
 }
+if (button.disabled || button.attributes["aria-disabled"] !== "true") {
+  throw new Error("Saved status did not remain focusable and aria-disabled");
+}
+if (restores || settingRefreshes !== 2 || conditionRefreshes !== 2 || controlRefreshes !== 2) {
+  throw new Error("An ordinary Save rebuilt the panel instead of refreshing its saved restrictions and controls");
+}
+if (classes.has("opacity-50")) {
+  throw new Error("The saved control remained dimmed");
+}
 
+const savedRestores = restores;
+const savedRevision = builder.draft.revision;
+if (await header.saveForm() !== true) {
+  throw new Error("Saving an unchanged form was not treated as already saved");
+}
+if (requests.length || restores !== savedRestores || builder.draft.revision !== savedRevision) {
+  throw new Error("Saving an unchanged form submitted or rebuilt the saved draft");
+}
+if (button.disabled || button.dataset.saved !== "true" || button.attributes["aria-disabled"] !== "true") {
+  throw new Error("An unchanged Save disturbed the saved control state");
+}
+
+schema = schema.map((field) => field.id === "first" ? { ...field, title: "   Normalized notes   " } : field);
+builder.updateSchema();
+const normalized = header.saveForm();
+await new Promise(setImmediate);
+const normalizationRequest = requests.shift();
+const accepted = structuredClone(normalizationRequest.args[1]);
+accepted.schema[0].title = "Normalized notes";
+normalizationRequest.resolve({ ok: true, draft: accepted, baseline: "saved-3" });
+if (await normalized !== true || restores !== 1 || restoredOptions[0]?.preserveFocus !== true) {
+  throw new Error("A server-normalized schema did not reconcile the visible form while preserving its panel");
+}
+if (schema[0].title !== "Normalized notes" || builder.draft.dirty || button.dataset.saved !== "true") {
+  throw new Error("The server-normalized saved form was not reflected in the builder");
+}
+if (settingRefreshes !== 2 || conditionRefreshes !== 2 || controlRefreshes !== 2) {
+  throw new Error("Normalization incorrectly used the unchanged-panel path");
+}
+
+schema = schema.map((field) => field.id === "first" ? { ...field, title: "Edited after saving" } : field);
+builder.updateSchema();
+if (button.disabled || button.attributes["aria-disabled"] !== "false") {
+  throw new Error("A new edit did not reenable Save after a successful retry");
+}
 const late = header.saveForm();
+await new Promise(setImmediate);
 header.destroy();
 requests.shift().resolve({ ok: true });
 if (await late !== false) {
@@ -180,6 +281,7 @@ let finishRequest;
 let requestCount = 0;
 const context = {
   BaseForm: class {},
+  crypto: require("node:crypto").webcrypto,
   captureError() {},
   console,
   ENDPOINTS: { createSchema: "/forms/create-schema" },
@@ -187,6 +289,7 @@ const context = {
   FormData: class {
     get(name) { return name === "description" ? "Create a form" : null; }
     append() {}
+    set() {}
   },
   Modal: class {},
   request: {
@@ -221,6 +324,9 @@ const settings = {
   _destroyed: false,
   _generationPromise: null,
   builder: {
+    updateSchema() {},
+    draft: { revision: 0, baseline: "source" },
+    captureDraft() { return { schema: [], html_fields: {} }; },
     header: {
       saveButton: { dataset: { saved: "true" } },
       persistenceState: { name: "Generated Form", schema: [] },
@@ -333,7 +439,11 @@ const indicator = {
   dataset: {},
   setAttribute(name, value) { this[name] = value; },
 };
-const saveButton = { dataset: {} };
+const saveButton = {
+  dataset: {},
+  getAttribute(name) { return this[name] ?? null; },
+  setAttribute(name, value) { this[name] = value; },
+};
 const context = {
   connectivity: {
     hidden: false,
@@ -375,7 +485,8 @@ if (builder.online !== false || builder.hidden !== true) {
 if (
   indicator.dataset.visible !== "true" ||
   search.dataset.visible !== "false" ||
-  saveButton.dataset.visible !== "false"
+  saveButton.dataset.visible !== "true" ||
+  saveButton["aria-disabled"] !== "true"
 ) {
   throw new Error("Builder controls did not enter their offline state");
 }
@@ -388,7 +499,8 @@ if (builder.online !== true || builder.hidden !== false) {
 if (
   indicator.dataset.visible !== "false" ||
   search.dataset.visible !== "true" ||
-  saveButton.dataset.visible !== "true"
+  saveButton.dataset.visible !== "true" ||
+  saveButton["aria-disabled"] !== "false"
 ) {
   throw new Error("Builder controls did not recover their online state");
 }

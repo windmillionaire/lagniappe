@@ -15,6 +15,7 @@ from ..properties import (
 from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.context import current_context_user
 from ..tools.tasks.ordering import sort_tasks
+from .category import UNCATEGORIZED_PAGES_NAME
 from .entity import Entity
 
 
@@ -34,6 +35,8 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     def exclude_from_index(self):
         exclude = {
             "submission",
+            "pre_migration",
+            "form_change_receipt",
             "description",
             "assets",
             "schema_version",
@@ -204,10 +207,12 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_008_page_properties.py::test_page_update_registers_form_with_model_category_for_filters
+    # @tests tests_unit/test_008_page_properties.py::test_page_update_skips_uncategorized_form_registration
     # @tests tests_unit/test_008_page_properties.py::test_page_update_tracks_old_and_current_category_owners_for_save
     # @tests tests_unit/test_008_page_properties.py::test_page_update_keeps_current_user_before_page_without_dependency_cycle
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_select_includes_form_from_created_page
     # @matrix category filters page : form-registration related-forms save-relations
+    # @pair page:default-category
     def update(self, data):
         previous_owners = self.page_list_owners
 
@@ -227,6 +232,9 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 if not key or key in category_keys:
                     continue
                 category_keys.add(key)
+                # The fallback category is a grab-bag, not a form registry.
+                if category.name == UNCATEGORIZED_PAGES_NAME:
+                    continue
                 if category.properties.forms.add(self.form):
                     self.add_mutation_intents(
                         MutationIntent.patch(

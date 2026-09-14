@@ -113,8 +113,13 @@ export class ModelPanel {
 		});
 	}
 
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle
+	 */
 	deselectItem() {
-		this.builder.selectedElement.item.dataset.selected = "false";
+		const selected = this.builder.selectedElement;
+		if (selected) selected.item.dataset.selected = "false";
 	}
 
 	/**
@@ -125,19 +130,29 @@ export class ModelPanel {
 	hasUniqueElement(type) {
 		return (
 			this.uniqueElements.includes(type) &&
-			this.panel.querySelector(`[id^="${type}"]`)
+			Array.from(this.builder.elements.values()).some(
+				(element) => element.schema.type === type,
+			)
 		);
 	}
 
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle
+	 */
 	focusItem() {
 		const selected = this.builder.selectedElement.item;
 		this.elements.forEach((element) => {
 			element.dataset.visible = element === selected ? "true" : "false";
 		});
-		this.panel.classList.remove("min-h-[300px]");
+		this.panel.classList.remove("min-h-75");
 		this.defaultPanel.dataset.visible = "false";
 	}
 
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle
+	 */
 	blurItem() {
 		this.elements.forEach((element) => {
 			element.dataset.visible = "true";
@@ -145,7 +160,7 @@ export class ModelPanel {
 		if (this.defaultPanel.children.length > 0) {
 			this.defaultPanel.dataset.visible = "true";
 		}
-		this.panel.classList.add("min-h-[300px]");
+		this.panel.classList.add("min-h-75");
 	}
 
 	destroy() {

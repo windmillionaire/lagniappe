@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from copy import deepcopy
 
 from .entity import Entity, EntityProperties
 from ..mixins import AssetMixin, SubmitterMixin
@@ -14,6 +15,9 @@ from ..properties import (
 )
 from ..tools.files.html import strip_tags
 from ..tools.auth.restrictions import permission_relation
+from ..tools.database.assets import cleanup_rejected_attempt, record_attempt_asset
+from ..tools import form_definitions
+from ..tools.database import get as database_get
 
 
 # @testable true
@@ -34,6 +38,10 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     """
 
     entity_kind = "task_history"
+
+    @property
+    def readonly(self):
+        return True
 
     # @testable true
     # @tests tests_unit/test_009g_restriction_reconciliation.py::test_history_permissions_follow_live_task
@@ -70,12 +78,12 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         return self.created
 
     @property
-    def version(self):
-        return self.db.get("schema_version")
+    def generation(self):
+        return self.db.get("generation", 0) or 0
 
-    @version.setter
-    def version(self, value):
-        self.db["schema_version"] = value
+    @generation.setter
+    def generation(self, value):
+        self.db["generation"] = value
 
     def _get_properties(self):
         properties = {
@@ -100,9 +108,16 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     # @matrix task-completion : asset-copy history
     # @pair signature:asset-copy
     def copy_assets(self, task):
-        for name in list(getattr(task, "assets", {}).keys()):
-            asset = task.get_asset(name)
-            self.copy_asset(asset)
+        try:
+            for name in list(getattr(task, "assets", {}).keys()):
+                asset = task.get_asset(name)
+                copied = self.copy_asset(asset, isolated=True) if asset else None
+                if not copied:
+                    raise ValidationError("A saved answer attachment could not be preserved. Try reopening again.")
+                record_attempt_asset(self, copied.definition)
+        except Exception:
+            cleanup_rejected_attempt(self)
+            raise
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
@@ -110,9 +125,10 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
     # @matrix task-combine : asset-copy attachments existing-history metadata schema-version source-snapshot
     # @matrix task-completion : asset-copy snapshot
+    # @matrix task-completion : history schema-version
     # @pair signature:asset-copy
     @classmethod
-    def create(cls, task, overrides=None, *, source=None):
+    def create(cls, task, overrides=None, *, source=None, submission_source="original"):
         overrides = dict(overrides or {})
         source = source or task
         history_key = overrides.pop("_key", None)
@@ -134,21 +150,30 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         new_history.files = list(overrides.get("files", source.files) or [])
 
         form = overrides.get("form", source.form)
-        if form:
-            new_history.form = form
-            source_version = getattr(source, "version", None)
-            new_history.version = overrides.get(
-                "version", source_version or form.version
-            )
-
-        if "submission" in overrides:
-            submission = overrides.get("submission")
-            if submission is not None:
-                new_history.ai_submission(submission)
-            else:
-                new_history.submission = None
+        explicit_answers = "submission" in overrides
+        envelope = (
+            form_definitions.completed_envelope(source)
+            if submission_source == "original" else None
+        )
+        if envelope is not None and not explicit_answers and "form" not in overrides:
+            form_key = source.properties.form.key
+            if envelope.get("form_key") != database_get.urlsafe_key(form_key):
+                form_key = database_get.datastore_key(envelope.get("form_key"))
+            generation = envelope.get("generation", 0) or 0
+            submission = envelope["submission"]
         else:
-            new_history.submission = source.submission
+            form_key = form.key if "form" in overrides and form else source.properties.form.key
+            generation = form.generation if explicit_answers and form else source.generation
+            submission = overrides.get("submission", source.submission)
+        if form_key:
+            new_history.db["form"] = form_key
+            if form is not None and form.key == form_key:
+                new_history.form = form
+        new_history.generation = overrides.get("generation", generation)
+        if explicit_answers and submission is not None:
+            new_history.ai_submission(submission)
+        else:
+            new_history.submission = submission
 
         if "created" in overrides:
             new_history.created = overrides["created"]
@@ -164,22 +189,68 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
 
 
 # @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_save_records_schema_history_on_version_change
-# @pair form:schema-history
-class FormHistory(Entity):
+# @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
+# @matrix form-schema html-field : history generation immutable-assets
+class FormHistory(Entity, AssetMixin):
     entity_kind = "form_history"
+
+    # @testable true
+    # @tests tests_unit/test_004f_form_drafts.py::test_definition_snapshot_requires_submitter_scoped_authorization
+    # @matrix form-schema html-field : history permission-boundary
+    def allowed(self, action, user=None):
+        # An internal definition is not a standalone resource. Readers must
+        # authorize the live Task/TaskHistory that selected this exact version.
+        return False
 
     @property
     def exclude_from_index(self):
         exclude = {
             "schema",
             "schema_format",
+            "assets",
+            "source_asset_urls",
         }
         return frozenset(exclude)
 
     @property
     def hash(self):
-        return None
+        return short_hash(self.urlsafe_key) if self.key else None
+
+    @property
+    def form_type(self):
+        return self.db.get("form_type")
+
+    @property
+    def content_available(self):
+        return self.db.get("form_content_version") == 1
+
+    @property
+    def source_form_key(self):
+        return self.db.get("form") or self.key.parent
+
+    @property
+    def fields(self):
+        return self.properties.schema.fields
+
+    @property
+    def html_fields(self):
+        return self.properties.schema.html_fields
+
+    # @testable true
+    # @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
+    # @matrix html-field : history immutable-assets
+    def get_html_field(self, field_id):
+        if not self.content_available:
+            return None
+        asset = self.get_asset(field_id)
+        content = asset.html() if asset else None
+        if not content:
+            return content
+        for name, source_url in self.db.get("source_asset_urls", {}).items():
+            image = self.get_asset(name)
+            if image and source_url:
+                content = content.replace(source_url, image.url)
+        return content
 
     @property
     def required(self):
@@ -190,15 +261,17 @@ class FormHistory(Entity):
         return self.created
 
     @property
-    def version(self):
-        return self.db.get("schema_version")
+    def generation(self):
+        return self.db.get("generation", 0) or 0
 
-    @version.setter
-    def version(self, value):
-        self.db["schema_version"] = value
+    @generation.setter
+    def generation(self, value):
+        self.db["generation"] = value
 
     def _get_properties(self):
         properties = {
+            "created": common_entity.Created,
+            "name": common_entity.Name,
             "form": common_related.AttachedForm,
             "kind": common_entity.Kind,
             "schema": schema.Schema,
@@ -206,15 +279,24 @@ class FormHistory(Entity):
         }
         return EntityProperties(self, properties)
 
+    # @testable true
+    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_form_history_create_copies_explicit_saved_definition_without_asset_copy
+    # @matrix form-schema html-field : history content-version
     @classmethod
-    def create(cls, form, previous_version):
-        new_history = cls(parent=form)
-        new_history.kind = cls.entity_kind
-        new_history.form = form
-        new_history.version = previous_version
-        new_history.schema = form.properties.schema.previous
-
-        return new_history
+    def create(cls, source, previous_generation):
+        """Build the old definition from the saved source supplied by Form Save."""
+        history = cls(parent=source)
+        history.kind = cls.entity_kind
+        history.form = source
+        history.generation = previous_generation
+        history.schema = deepcopy(source.schema)
+        history.schema_format = source.schema_format
+        history.name = source.name
+        history.created = datetime.now(timezone.utc)
+        history.db["form_type"] = source.form_type
+        if source.db.get("form_content_version") is not None:
+            history.db["form_content_version"] = source.db["form_content_version"]
+        return history
 
 
 # @testable true

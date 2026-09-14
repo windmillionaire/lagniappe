@@ -423,7 +423,9 @@ const pythonStyleModuleSource = (name, registry) => {
 /**
  * @testable true
  * @tests tests_js/test_018_style_pipeline.py::test_style_pipeline_contract_names_authored_inputs_and_outputs
+ * @tests tests_js/test_022_build_chunk_versioning.py::test_text_fonts_share_css_preload_and_asset_identity
  * @pair style-build:pipeline-contract
+ * @pair frontend-build:font-delivery
  */
 const buildStyles = () => {
 	const virtualModules = new Map([
@@ -445,6 +447,10 @@ const buildStyles = () => {
 			return virtualModules.get(id) ?? null;
 		},
 		generateBundle() {
+			atomicWriteFileSync(
+				`./${STYLE_PIPELINE.registry.python_fonts}`,
+				pythonStyleModuleSource("FONTS", fontUrls),
+			);
 			atomicWriteFileSync(
 				`./${STYLE_PIPELINE.registry.python_icons}`,
 				pythonStyleModuleSource("ICONS", iconsYaml),
@@ -678,74 +684,76 @@ const emitThirdPartyLicenses = () => {
 	};
 };
 
-const materialSymbolsFontPath = "./src/fonts/material-symbols-rounded.woff2";
-const materialSymbolsFontSource = readFileSync(materialSymbolsFontPath);
-const materialSymbolsFontHash = createHash("sha256")
-	.update(materialSymbolsFontSource)
-	.digest("hex")
-	.slice(0, 12);
-const materialSymbolsFontFileName = `fonts/material-symbols-rounded.${materialSymbolsFontHash}.woff2`;
+const fontAssets = readdirSync("./src/fonts")
+	.filter((fileName) => fileName.endsWith(".woff2"))
+	.sort()
+	.map((fileName) => {
+		const name = fileName.slice(0, -6);
+		const source = readFileSync(`./src/fonts/${fileName}`);
+		const hash = createHash("sha256").update(source).digest("hex").slice(0, 12);
+		return { name, source, fileName: `fonts/${name}.${hash}.woff2` };
+	});
+const fontUrls = Object.fromEntries(
+	fontAssets.map((asset) => [asset.name, `/${asset.fileName}`]),
+);
 
 /**
- * Rewrites the authored stable Material Symbols font URL to the content-hashed
- * asset emitted by Rollup.
+ * Resolve every authored font URL through the same content-addressed inventory
+ * used by font emission and server-side preload links.
  *
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_material_symbols_css_points_to_the_content_hashed_font
+ * @tests tests_js/test_022_build_chunk_versioning.py::test_text_fonts_share_css_preload_and_asset_identity
  * @matrix frontend-build icons : css-url-resolution font-delivery
  */
-const resolveMaterialSymbolsFont = () => ({
-	postcssPlugin: "resolve-material-symbols-font",
+const resolveFonts = () => ({
+	postcssPlugin: "resolve-fonts",
 	Declaration(declaration) {
-		if (!declaration.value.includes("material-symbols-rounded.woff2")) return;
 		declaration.value = declaration.value.replace(
-			"/fonts/material-symbols-rounded.woff2",
-			`/${materialSymbolsFontFileName}`,
+			/\/fonts\/([a-z0-9-]+)\.woff2/g,
+			(url, name) => {
+				if (!fontUrls[name])
+					throw declaration.error(`Missing vendored font: ${url}`);
+				return fontUrls[name];
+			},
 		);
 	},
 });
 
 /**
- * Emits the vendored, officially subsetted Material Symbols font with a
- * content-derived filename so adding glyphs cannot reuse an older cached font,
- * then removes stale generated variants from the output font directory.
+ * Emit all vendored text and icon webfonts with digest-derived filenames, then
+ * remove obsolete fonts. Upstream maintenance inputs are never browser assets.
  *
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_material_symbols_subset_font_is_emitted_with_content_hash
+ * @tests tests_js/test_022_build_chunk_versioning.py::test_text_fonts_share_css_preload_and_asset_identity
  * @matrix frontend-build icons : cache font-delivery stale-cleanup subset
  */
-const emitMaterialSymbols = () => {
-	return {
-		name: "emit-material-symbols",
-		generateBundle() {
-			this.emitFile({
-				type: "asset",
-				fileName: materialSymbolsFontFileName,
-				source: materialSymbolsFontSource,
-			});
-		},
-		writeBundle(outputOptions) {
-			if (!outputOptions.dir) return;
-			const fontsDirectory = path.join(outputOptions.dir, "fonts");
-			if (!existsSync(fontsDirectory)) return;
-
-			for (const fileName of readdirSync(fontsDirectory)) {
-				if (
-					/^material-symbols-rounded(?:-[a-z0-9-]+)?(?:\.[a-f0-9]{12})?\.woff2$/.test(
-						fileName,
-					) &&
-					fileName !== path.basename(materialSymbolsFontFileName)
-				) {
-					unlinkSync(path.join(fontsDirectory, fileName));
-				}
+const emitFonts = () => ({
+	name: "emit-fonts",
+	generateBundle() {
+		for (const { source, fileName } of fontAssets) {
+			this.emitFile({ type: "asset", fileName, source });
+		}
+	},
+	writeBundle(outputOptions) {
+		if (!outputOptions.dir) return;
+		const fontsDirectory = path.join(outputOptions.dir, "fonts");
+		if (!existsSync(fontsDirectory)) return;
+		const current = new Set(
+			fontAssets.map((asset) => path.basename(asset.fileName)),
+		);
+		for (const fileName of readdirSync(fontsDirectory)) {
+			if (fileName.endsWith(".woff2") && !current.has(fileName)) {
+				unlinkSync(path.join(fontsDirectory, fileName));
 			}
-		},
-	};
-};
+		}
+	},
+});
 
 export {
 	buildStyles,
-	emitMaterialSymbols,
+	emitFonts,
 	emitPdfWorker,
 	emitThirdPartyLicenses,
 	generateBuildId,
@@ -754,7 +762,7 @@ export {
 	normalizeStyleRegistry,
 	precacheUrls,
 	pythonStyleModuleSource,
-	resolveMaterialSymbolsFont,
+	resolveFonts,
 	STYLE_PIPELINE,
 	updateConstantsBuildId,
 	updateServiceWorker,

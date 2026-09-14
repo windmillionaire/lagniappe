@@ -332,7 +332,7 @@ def test_task_facet_includes_task_and_model_results_with_links(get_user):
         model,
         f"{token} completed task",
     )
-    completed_task.completed = True
+    completed_task.complete(user=user.entity)
     completed_task.save()
     _go_to_search_page(user, token)
     user.locate(f"{SEARCH_FACET}[data-kind='task']").click()
@@ -382,7 +382,7 @@ def test_navbar_task_results_render_current_completion_state(get_user):
         model,
         f"{token} completed task",
     )
-    completed_task.completed = True
+    completed_task.complete(user=user.entity)
     completed_task.save()
     active_task = _create_project_task(
         user,

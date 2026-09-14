@@ -28,7 +28,11 @@ Entity and collection revisions can be reconstructed after Redis loss. Cached
 details retain the base modification digest, effective restrictions, own form
 version, and final fingerprint. Collection refresh loads the parent revision
 first and queries membership only when that revision or viewer authorization
-changes. Otherwise it compares cached projections for the existing rows.
+changes. Otherwise it compares cached projections for the existing rows,
+including a batched lookup of their distinct Forms' cached versions. When
+membership is refreshed, one root-depth Form batch uses the durable versions
+even if the Form cache write is still pending. Form content edits therefore
+refresh visible submissions without scheduling permission reconciliation.
 An absent or stale cache row
 falls back to loading and authorizing that entity. Root entity polling still
 loads the canonical permission graph.
@@ -178,6 +182,11 @@ Permission fingerprints participate in collection revisions, so access changes
 invalidate a viewer's list even when membership is unchanged. Home widgets use
 independent channels. Personal Starred and Tool Reports channels combine their
 narrow User/report authorities.
+
+The Page Tasks fragment ETag combines the Page fingerprint with the Forms
+collection revision. A saved Task Form can change labels and static content
+without changing its Tasks or their Page, so this bounded revision read prevents
+reusing old fragment HTML after publication. It does not load or touch Tasks.
 
 Saved filtered Task indexes subscribe to both their Filter entity and the Tasks
 channel, periodically while active. Filter entity revisions include their parent

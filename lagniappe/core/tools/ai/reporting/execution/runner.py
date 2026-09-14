@@ -17,7 +17,7 @@ from .actions.recovery import (
     _record_recoverable_action_error,
     _record_required_file_placement_error,
 )
-from .actions.registry import REPORT_ACTION_ADAPTERS
+from .actions.registry import report_action_adapter
 from .actions.results import (
     _diagnostic_entity,
 )
@@ -42,7 +42,7 @@ from .ledger import (
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_stops_when_completed_prefix_permission_is_revoked
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
+# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_loads_attached_inputs_only_for_pending_file_work
@@ -57,6 +57,7 @@ def run_report(report, user, ensure_active=None):
         allow_empty_submission_updates=True,
         allow_pending_submissions=False,
         user=user,
+        allow_legacy_schema=True,
     )
     fingerprint = proposal_fingerprint(proposal)
     existing = report.result if isinstance(report.result, dict) else {}
@@ -103,7 +104,7 @@ def run_report(report, user, ensure_active=None):
     for index, action in enumerate(proposal.get("actions", [])):
         ensure_active()
         action_record = result["actions"][index]
-        adapter = REPORT_ACTION_ADAPTERS[action["type"]]
+        adapter = report_action_adapter(action["type"])
         if action_record.get("status") in {"complete", "skipped"}:
             state = adapter.inspect_applied(action, report, user, action_record)
             if action_record.get("status") == "complete" and state != ACTION_APPLIED:
@@ -123,7 +124,12 @@ def run_report(report, user, ensure_active=None):
             continue
 
         try:
-            if action_record.get("status") in {"applying", "failed"}:
+            dependencies = action.get("depends_on", [])
+            if any(record.get("status") == "skipped" and (record.get("type") == "update_form_schema" or record.get("schema_dependency_skipped")) for dependency in dependencies if (record := context["action_records"].get(dependency, {}))):
+                action_record.update(status="skipped", schema_dependency_skipped=True, note="Required schema update was skipped.")
+                Entities.save(report)
+                continue
+            if action_record.get("status") in {"applying", "failed"} and not action_record.get("migration_id"):
                 state = adapter.inspect_applied(action, report, user, action_record)
                 if state == ACTION_APPLIED:
                     action_record["status"] = "complete"
@@ -190,6 +196,14 @@ def run_report(report, user, ensure_active=None):
                 DeferredJobInfrastructureError,
             )
 
+            from lagniappe.core.tools.deferred_jobs.errors import DeferredJobDependencyPendingError
+
+            if isinstance(error, DeferredJobDependencyPendingError):
+                action_record["status"] = "waiting"
+                result["status"] = "waiting"
+                report.result = result
+                Entities.save(report)
+                raise
             if isinstance(
                 error,
                 (

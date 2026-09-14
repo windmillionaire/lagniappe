@@ -255,7 +255,7 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
 
 # @matrix cache : build-id etag missing-fingerprint standard-header
 # @matrix web-headers : conditional-request etag missing-fingerprint security
-def test_authenticated_home_response_headers_include_etag(get_user):
+def test_authenticated_home_response_headers_include_etag(get_user, browser_failures):
     """Authenticated app responses should carry the common header envelope."""
     user = get_user(Users.OWNER)
     with user.page.expect_response("**/l/update-session") as session_info:
@@ -290,9 +290,31 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     csp = headers["content-security-policy"]
     assert "script-src 'self' https://accounts.google.com/gsi/client" in csp
     assert (
-        "style-src 'self' 'unsafe-inline' "
+        "style-src 'self' "
         "https://accounts.google.com/gsi/style" in csp
     )
+    assert (
+        "style-src-elem 'self' https://accounts.google.com/gsi/style" in csp
+    )
+    assert "style-src-attr 'unsafe-inline'" in csp
+    assert csp.count("'unsafe-inline'") == 1
+    with browser_failures.expect(
+        user,
+        kind="console",
+        console_type="error",
+        text_contains="style-src-elem",
+    ):
+        probe = user.page.evaluate("""() => {
+            const container = document.createElement("div");
+            container.innerHTML = '<div id="csp-style-probe" style="position:fixed;left:-10000px;width:17px;height:19px"></div>' +
+                '<style>#csp-style-probe { height: 42px !important; }</style>';
+            document.body.appendChild(container);
+            const computed = getComputedStyle(container.firstElementChild);
+            const result = { width: computed.width, height: computed.height };
+            container.remove();
+            return result;
+        }""")
+    assert probe == {"width": "17px", "height": "19px"}
     assert (
         "connect-src 'self' https://*.googleapis.com "
         "https://accounts.google.com/gsi/" in csp

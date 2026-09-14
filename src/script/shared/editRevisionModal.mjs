@@ -1,5 +1,6 @@
 import { STYLES } from "styles";
 import { loadRevisionPreview } from "../widgets/loader";
+import { compatibleField } from "./formRepresentation";
 import { Modal } from "./modal";
 import { areEqual } from "./utilities";
 
@@ -84,7 +85,18 @@ export class FormRevisionModal extends Modal {
 	 */
 	async _differences(localResponse) {
 		const [localPreview, savedPreview] = await Promise.all([
-			loadRevisionPreview(this.widget, localResponse, { readonly: true }),
+			loadRevisionPreview(
+				this.widget,
+				{
+					...localResponse,
+					schema: this.widget.schema,
+					submission: {
+						...localResponse.submission,
+						...this.widget.captureFormState().renderer_submission,
+					},
+				},
+				{ readonly: true },
+			),
 			loadRevisionPreview(this.widget, this.state.response, { readonly: true }),
 		]);
 		if (!localPreview || !savedPreview) {
@@ -102,10 +114,20 @@ export class FormRevisionModal extends Modal {
 				);
 			const localElements = elements(localPreview);
 			const savedElements = elements(savedPreview);
-			const localSubmission = localResponse.submission ?? {};
+			const localSubmission = {
+				...localResponse.submission,
+				...this.widget.captureFormState().renderer_submission,
+			};
 			const savedSubmission = this.state.response.submission ?? {};
 
-			return (this.state.response.schema ?? [])
+			return [
+				...new Map(
+					[
+						...(this.widget.schema || []),
+						...(this.state.response.schema || []),
+					].map((field) => [field.id, field]),
+				).values(),
+			]
 				.filter(
 					(field) =>
 						field?.id &&
@@ -117,6 +139,10 @@ export class FormRevisionModal extends Modal {
 				.map((field) => ({
 					id: field.id,
 					label: field.title || field.label || "Untitled field",
+					compatible: compatibleField(
+						this.widget.schema.find((item) => item.id === field.id),
+						this.state.response.schema.find((item) => item.id === field.id),
+					),
 					local: this._value(localElements.get(field.id)),
 					saved: this._value(savedElements.get(field.id)),
 				}));
@@ -153,6 +179,13 @@ export class FormRevisionModal extends Modal {
 					? "Queued value"
 					: "Value in this tab";
 		button.appendChild(value);
+		if (source === "local" && !field.compatible) {
+			button.disabled = true;
+			const explanation = button.appendChild(document.createElement("p"));
+			explanation.className = "mt-2 text-xs text-base-medium";
+			explanation.textContent =
+				"This field changed type or was removed. Keep this earlier value for reference and re-enter it in the updated form if needed.";
+		}
 
 		button.addEventListener("click", () => {
 			const group = button.closest("[role='radiogroup']");

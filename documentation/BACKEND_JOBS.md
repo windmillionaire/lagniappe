@@ -1,7 +1,7 @@
 # Backend Deferred Jobs
 
 Deferred jobs provide one durable execution model for report generation and
-execution, Page/Task autofill, file OCR, file summary, AI
+execution, Form changes, Page/Task autofill, file OCR, file summary, AI
 email handoff, and selected site work. Ingress, filter-cache maintenance,
 notification email, and scheduled task uncompletion use focused workflows.
 
@@ -82,6 +82,23 @@ and proposal fingerprint.
 
 ## Retry and recovery
 
+Dependency checks use the `waiting_dependency` phase. Report execution labels
+this as “Waiting for form update”; other dependencies use “Waiting for related
+work.” A normally scheduled dependency check is not presented as automatic
+recovery. Stale work, pending dispatch repair and actual failure retries display
+“Taking longer than expected” without claiming that a recovery worker is active.
+Status projection also corrects older dependency-wait
+records that used the file-summarization phase.
+
+Server dependency checks are separate from the browser's status polling.
+`ReportExecutionAdapter` checks again after 5, 10, 20, then 30 seconds, retaining
+the 30-second interval for longer migrations. Other adapters default to 60
+seconds. Each adapter declares its nonempty `dependency_retry_delays` tuple;
+the runner uses the saved dependency-wait count to select a delay, persists the
+due time, and dispatches the continuation with the same delay. These checks do
+not consume the provider retry budget. The existing job leases, publication
+guards and per-action ledger still protect dependent actions and repeated work.
+
 Provider calls inside jobs make at most two SDK attempts; durable retry owns
 longer outages. Quota failures use 60- and 300-second delays plus positive
 jitter. Other retryable provider failures use 60, 180, and 600 seconds.
@@ -102,6 +119,13 @@ Terminal state is split into cleanup, notification, and visibility checkpoints.
 A delivery retry resumes at the first incomplete marker without repeating
 provider preparation or domain apply.
 
+Elapsed time in status and AI Analytics measures the job lifetime from creation,
+including queue and retry waits. Active jobs use the current time; succeeded,
+failed, cancelled, and superseded jobs stop at the terminal `progress.updated_at`
+timestamp. Later cleanup or notification writes do not extend that duration.
+Older terminal records without a valid progress timestamp use stored `modified`;
+records without either timestamp return zero instead of continuing to count.
+
 Every client-visible status revision publishes a small Redis hint after the
 Datastore transaction. `/l/poll` returns bounded phase, retry, terminal, and
 destination metadata; it never returns inputs, checkpoint data, model output,
@@ -121,6 +145,124 @@ The Administrator diagnostic projection contains bounded timing, dispatch,
 recovery, stage, safe entity references, and AI-generation summaries correlated
 by an opaque ID. It excludes prompts, parameters, checkpoints, generated
 content, authorization data, and provider/tool payloads.
+
+In Analytics, expand a Recent Run to see its report link when available, elapsed job time,
+and the individual AI stages recorded for the selected period. Each stage
+separates model requests, tool rounds/calls, input and cached tokens, output
+and reasoning tokens, and duration. Cached tokens are a subset of input tokens;
+stage durations are not the whole job's elapsed time. Tool names appear once
+each, with repeated calls labelled by count; this is not an ordered transcript.
+The JSON export preserves the original tool-name entries. Missing summaries
+are shown as unavailable.
+
+Recent Runs omits report-execution jobs without AI generation summaries. Those
+jobs apply reviewed actions, including exact schema-conversion candidates for
+both on-site and external reports. Builder utility conversions run under their
+separate Form Change job. Execution diagnostics remain accessible through the
+existing diagnostic route, and executions still retain their ordinary job and
+report history. Missing summaries for AI planning jobs remain visible.
+The Form Change worker supplies its own telemetry ID at the utility-model
+boundary, so new conversion summaries join to that job's run JSON.
+
+Result processing is separate from job success. `normalized` (shown as
+**Formatted / normalized**) means validation changed the representation, for
+example by rendering Markdown as HTML or adding default fields. Explicit local
+corrections still record `local_repair`; **Locally adjusted** also accommodates
+older records that used that value for ordinary normalization. `model_repair`
+means the workflow requested a separate model repair. Explicit repair/review
+outcomes take precedence over subsequent normalization. Historical JSON is not
+rewritten, and the export retains these machine-readable outcome values.
+
+**Copy run JSON** reads the existing owner-only operation diagnostic endpoint
+and copies its indented JSON, including available retained stages for the run
+and the query-limit indicator. A selectable text field appears if clipboard
+access fails. This is the preferred handoff for per-run evaluation; it does
+not require a separate cloud query or capture additional content.
+
+Report links are offered only for reports owned by the current user, matching
+the report route's existing access rules. Other users' jobs still expose the
+owner diagnostic JSON and its safe references.
+
+## Form changes
+
+`form_changes.py` and `adapters/form_change.py` implement one Form update without
+a separate migration subsystem. Builder Save uses `start_writes()` to persist the
+Form's `pending_form_change`, DeferredJob, Notification and Form-scoped lock in
+one guarded transaction. The pending payload owns the proposed schema/content,
+conversion operations, actor timezone and source/target generations. Selection
+in the builder does not query submissions. AI Save and AI report preparation
+check complete population visibility before reservation.
+
+The worker enumerates all live Page/Task rows attached to the Form, including
+completed Tasks, in cursor batches of 50. Edit access to the Form authorizes its
+deterministic schema migration across all attached submissions, including those
+on restricted Pages. The job rechecks Form edit access; it does not require the
+actor to view or edit each Page/Task. Submission restrictions still govern viewing
+values, notices and history, and directly editing answers. Preflight validates
+generations and record sizes before application starts. Each application write
+checks the current job lease, Form owner marker and exact submission row, then
+patches only answer/generation/notice/receipt fields and required projections.
+Task links, list owners and caches use normal mutation effects. Rows with this
+change's receipt skip conversion on retry but retry their display effects.
+
+AI conversions (textarea→table/todo and table↔todo) share this worker. Builder
+calls use the utility tier synchronously for one target's affected fields at a
+time, with bounded input/output and one malformed-output repair. A prepared
+`ai_batch` checkpoint precedes the live write; a replay verifies source hashes
+and reuses those results. On-site Organize and external candidates come from an
+immutable approved report; no provider is invoked. The presence of a linked
+report selects prepared conversion, independently of report origin. Retry carries
+any pending prepared batch to the replacement worker. Every AI-originated
+migration, deterministic included, checks
+Form edit and complete population view access before application and rechecks
+current access per target. This does not require per-target edit access. Builder AI
+calls additionally require AI.CREATE. Initial restricted/stale preflight failure
+releases only an unapplied change using guarded rejection state; partial changes
+retain ownership. Manual deterministic builder migrations retain Form-only
+authority as described above.
+
+The on-site utility prompt requires absent table cells to omit their column keys.
+Its output boundary also treats null and blank-string cells in known columns as
+absent, preserving explicit zero/false and rejecting populated values of the wrong
+type. Unknown columns and empty rows/collections remain validation failures;
+all reviewed report candidates retain exact-shape validation without normalization.
+Validation failures name the field, column, row and expected type where available.
+The worker retains target/field references in private job error context; builder
+status resolves an affected Page/Task link only after checking current visibility
+and Form membership. Existing errors containing only column IDs are translated
+using the pending schema. Retry continues unfinished work and preserves receipts
+for already-converted answers.
+
+`update_form_schema` report actions record the child migration ID before starting
+it. The report runner raises the existing dependency-pending signal and releases
+its worker while the child runs. Retry checks the pending owner/publication
+receipt, and dependent actions proceed only after publication. Candidates remain
+inside the linked report, whose fingerprint is rechecked by the worker. No bulk
+Undo is allowed after a migration starts, and deletion is fenced while pending.
+
+`pre_migration` retains the earliest before-value and schema for changed fields.
+Table notices display only changed cells. Completion envelopes are preserved;
+legacy completed Tasks receive an original envelope before conversion. TaskHistory
+is never a migration target. The source definition stays published until all
+rows are converted, then ordinary Form publication archives its retired generation
+and commits the target definition with a Save receipt.
+
+During application, readers select source or target schema by each row's
+generation. Typed filter/aggregate fields are withheld while their Form is pending.
+The mutation executor fences affected full saves, answer patches, attachment
+changes, completion/reopening and deletes at commit, including writers that began
+before the lock. New attachments adopt the published generation; stale answers
+must reconcile before saving.
+
+The builder exposes progress and Retry through its notification slot, with Save
+disabled and no cancellation control. The backend's pre-application cancellation
+guard still revokes the job, removes the pending marker and cleans owned attempt
+assets. After application starts, there is no bulk
+rollback: terminal failure/expiry keeps the durable pending marker and lock. Any
+current Form editor can Retry after a terminal or missing job. A fresh job takes
+over the same change ID, rechecks targets and skips converted receipts. This
+remains recoverable even after normal job retention removes the previous job.
+`before_cancel()` prevents generic cancellation from discarding partial work.
 
 ## Adapter checklist
 

@@ -119,7 +119,17 @@ export class Notifications {
 		this._updateDropdown();
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_deletes_and_clears
+	 * @tests tests_js/test_042_messaging_frontend.py::test_notification_refresh_waits_for_pending_connectivity
+	 * @matrix notifications : menu-open reconnect
+	 */
 	async refresh() {
+		if (!this.dropdown) return false;
+		// A click during recovery belongs to the pending health cycle, not its
+		// previous offline snapshot. Do not require a second click to load.
+		if (!this.view.online) await window.__CONNECTIVITY_READY__;
 		if (!this.dropdown || !this.view.online) return false;
 
 		const response = await request.get(ENDPOINTS.notifications);

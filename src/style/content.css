@@ -25,6 +25,7 @@
 }
 
 /* @style dropdown.option.flow dropdown.search.link dropdown.search.result */
+.dropdown-option-flow > span:last-child,
 .dropdown-option-flow > p:first-child > span:last-child {
 	vertical-align: middle;
 }
@@ -145,4 +146,102 @@ li[lp-component][data-open="false"] {
 			background-color: var(--kind-bg);
 		}
 	}
+}
+
+/* Debug error details, served through the shared stylesheet under the CSP. */
+/* @style error.debug.section */
+.error-debug-section {
+	margin-top: 1.5rem;
+	border: 1px solid #e5e7eb;
+	border-radius: 0.5rem;
+	overflow: hidden;
+}
+
+/* @style error.debug.section */
+.error-debug-section summary {
+	padding: 0.75rem 1rem;
+	background: linear-gradient(to right, #f9fafb, #f3f4f6);
+	cursor: pointer;
+	font-weight: 600;
+	color: #374151;
+	border-bottom: 1px solid #e5e7eb;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+/* @style error.debug.section */
+.error-debug-section summary:hover {
+	background: linear-gradient(to right, #f3f4f6, #e5e7eb);
+}
+
+/* @style error.debug.section */
+.error-debug-section[open] summary {
+	background: linear-gradient(to right, #dbeafe, #eff6ff);
+	color: #1e40af;
+}
+
+/* @style error.debug.content */
+.error-debug-content {
+	padding: 1rem;
+	background: #fff;
+	font-family: ui-monospace, SFMono-Regular, monospace;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	overflow-x: auto;
+}
+
+/* @style error.debug.content */
+.error-debug-content pre {
+	margin: 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+/* @style error.debug.badge.base */
+.error-debug-badge {
+	display: inline-block;
+	padding: 0.125rem 0.5rem;
+	border-radius: 9999px;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+/* @style error.debug.badge.error */
+.error-debug-badge-error {
+	background: #fee2e2;
+	color: #991b1b;
+}
+
+/* @style error.debug.badge.request */
+.error-debug-badge-request {
+	background: #dbeafe;
+	color: #1e40af;
+}
+
+/* @style error.debug.badge.entity */
+.error-debug-badge-entity {
+	background: #d1fae5;
+	color: #065f46;
+}
+
+/* @style error.debug.type */
+.error-debug-type {
+	display: inline-block;
+	padding: 0.25rem 0.75rem;
+	background: #fee2e2;
+	color: #991b1b;
+	border-radius: 0.25rem;
+	font-family: ui-monospace, SFMono-Regular, monospace;
+	font-size: 0.875rem;
+	font-weight: 600;
+	margin-bottom: 0.5rem;
+}
+
+/* @style error.debug.timestamp */
+.error-debug-timestamp {
+	font-size: 0.75rem;
+	color: #6b7280;
+	margin-top: 0.5rem;
 }

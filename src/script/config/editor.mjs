@@ -1,28 +1,9 @@
 const TOOLBAR_TOOLS = [
 	{ command: "toggleBold", icon: "bold", title: "Bold", name: "bold" },
 	{ command: "toggleItalic", icon: "italic", title: "Italic", name: "italic" },
-	{
-		command: "toggleBulletList",
-		icon: "listUl",
-		title: "Bullet List",
-		name: "bulletList",
-	},
-	{
-		command: "toggleOrderedList",
-		icon: "listOl",
-		title: "Ordered List",
-		name: "orderedList",
-	},
-	{
-		command: "toggleTaskList",
-		icon: "checklist",
-		title: "Task List",
-		name: "taskList",
-	},
 	{ command: "undo", icon: "undo", title: "Undo" },
 	{ command: "redo", icon: "redo", title: "Redo" },
 	{ command: "toggleFocus", icon: "maximize", title: "Toggle Focus" },
-	{ command: "documentHistory", icon: "history", title: "History" },
 ];
 
 const TOOLBAR_MENUS = {
@@ -103,37 +84,64 @@ const TOOLBAR_MENUS = {
 			{ command: "setParagraph", title: "Paragraph", icon: "paragraph" },
 		],
 	},
-	insert: {
-		icon: "insert",
-		title: "Insert",
+	lists: {
+		icon: "lists",
+		title: "Lists",
 		items: [
-			{ command: "addLink", title: "Link", icon: "link", form: true },
-			{ command: "addImage", title: "Image", icon: "image", form: true },
 			{
-				command: "addYouTube",
-				title: "YouTube Video",
-				icon: "youtube",
-				form: true,
+				command: "toggleBulletList",
+				icon: "listUl",
+				title: "Bullet List",
+				name: "bulletList",
 			},
 			{
-				command: "generateText",
-				title: "Generate Text",
-				icon: "generate",
-				form: true,
-			},
-			{ command: "setHorizontalRule", title: "Horizontal Rule", icon: "minus" },
-			{
-				command: "toggleCodeBlock",
-				title: "Code Block",
-				icon: "code",
-				name: "language:null",
+				command: "toggleOrderedList",
+				icon: "listOl",
+				title: "Ordered List",
+				name: "orderedList",
 			},
 			{
-				command: "toggleBlockquote",
-				title: "Blockquote",
-				icon: "quoteRight",
-				name: "blockquote",
+				command: "toggleTaskList",
+				icon: "checklist",
+				title: "Task List",
+				name: "taskList",
 			},
+		],
+	},
+	table: {
+		icon: "table",
+		title: "Table",
+		items: [
+			{
+				command: "insertTable",
+				icon: "table",
+				title: "Insert Table",
+				args: { rows: 3, cols: 3, withHeaderRow: true },
+			},
+			{
+				command: "toggleHeaderRow",
+				icon: "tableHeader",
+				title: "Toggle Header Row",
+			},
+			{
+				command: "addRowBefore",
+				icon: "tableRowAbove",
+				title: "Add Row Above",
+			},
+			{ command: "addRowAfter", icon: "tableRowBelow", title: "Add Row Below" },
+			{
+				command: "addColumnBefore",
+				icon: "tableColumnLeft",
+				title: "Add Column Left",
+			},
+			{
+				command: "addColumnAfter",
+				icon: "tableColumnRight",
+				title: "Add Column Right",
+			},
+			{ command: "deleteRow", icon: "delete", title: "Delete Row" },
+			{ command: "deleteColumn", icon: "delete", title: "Delete Column" },
+			{ command: "deleteTable", icon: "delete", title: "Delete Table" },
 		],
 	},
 	align: {
@@ -170,6 +178,40 @@ const TOOLBAR_MENUS = {
 			},
 		],
 	},
+	insert: {
+		icon: "insert",
+		title: "Insert",
+		items: [
+			{ command: "addLink", title: "Link", icon: "link", form: true },
+			{ command: "addImage", title: "Image", icon: "image", form: true },
+			{
+				command: "addYouTube",
+				title: "YouTube Video",
+				icon: "youtube",
+				form: true,
+			},
+			{
+				command: "generateText",
+				title: "Generate Text",
+				icon: "generate",
+				form: true,
+			},
+			{ command: "setHorizontalRule", title: "Horizontal Rule", icon: "minus" },
+			{
+				command: "toggleCodeBlock",
+				title: "Code Block",
+				icon: "code",
+				name: "language:null",
+			},
+			{
+				command: "toggleBlockquote",
+				title: "Blockquote",
+				icon: "quoteRight",
+				name: "blockquote",
+			},
+		],
+	},
+	history: { command: "documentHistory", icon: "history", title: "History" },
 };
 
 const IMAGE_GROUPS = [

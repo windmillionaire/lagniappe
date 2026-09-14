@@ -16,7 +16,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.ai import external_operations
-from lagniappe.core.tools.ai.reporting.contracts.workflows import is_remote_organize_update
+from lagniappe.core.tools.ai.reporting.contracts.workflows import is_organize_update
 from lagniappe.core.tools.database import agent_api as agent_api_store
 
 from .base import DeferredJobAdapter
@@ -104,6 +104,9 @@ class ReportAdapter(DeferredJobAdapter):
         self.validate_apply(context)
         report = context.input("report")
         proposal = deepcopy(context.checkpoint["proposal"])
+        from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_updates
+
+        prepare_schema_updates(proposal, context.actor)
         report.properties.process.set_proposal(
             proposal,
             status=context.checkpoint.get("status") or "ready",
@@ -222,7 +225,7 @@ class OrganizeReportAdapter(ReportAdapter):
             )
             stage_index = 1
 
-        update_only = is_remote_organize_update(report)
+        update_only = is_organize_update(report)
         if not report.input_files and not update_only:
             raise exceptions.ValidationError("Organize requires at least one uploaded file in the UI.")
         if update_only and stage_index < 2:
@@ -363,6 +366,7 @@ class CreateReportAdapter(ReportAdapter):
 
 # @testable true
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_adapter_runs_the_reviewed_proposal
+# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_schedules_report_dependency_checks_with_backoff
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_failure_preserves_a_retryable_ledger
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_execution_start_rejects_stale_browser_snapshot
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal
@@ -373,10 +377,12 @@ class CreateReportAdapter(ReportAdapter):
 # @matrix deferred-jobs : cancellation provider-boundary report-execution tier-declaration
 # @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution terminal-delivery
 # @matrix ai-report : input-files no-extra-read fresh-read
+# @matrix deferred-jobs : dependency-wait backoff
 class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 
     job_type = DeferredJobType.REPORT_EXECUTION
+    dependency_retry_delays = (5, 10, 20, 30)
     synchronous_testing = True
     queued_message = "Saving report changes..."
     retry_message = "Saving is taking longer than expected; retrying safely..."

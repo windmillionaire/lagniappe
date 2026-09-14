@@ -174,11 +174,8 @@ listener in `main.mjs` clears cached recent search results, publishes the
 current connectivity state to the replacement controller, and runs
 `syncView()` when the new service worker takes control.
 
-Authenticated pages schedule registration only after the concrete view has
-published and the browser reaches an idle slot (with a one-second maximum).
-This keeps activation's chunk-warming request burst from competing with the
-structural view and its first widget imports. Public pages do not register the
-authenticated service-worker lifecycle.
+Registration starts before view loading and does not block it. Public pages
+skip the authenticated health-check and synchronization lifecycle.
 
 `main.mjs` sends the worker a versioned `connectivity-state` message with four
 independent fields: browser link state, application-server reachability,
@@ -186,6 +183,13 @@ document visibility, and controller availability. The worker validates the
 protocol/version and all four field values before using browser/server state to
 choose network or cached behavior. `/l/ping` remains the authority for server
 reachability; `navigator.onLine` remains a scheduling hint.
+
+Every foreground sync publishes the document's current state before starting
+view loading, then publishes the health-check result when it settles. A new
+document starts with server reachability `unknown`. Publishing that initial
+state matters: navigation can cancel the previous document's pending ping and
+leave the shared worker with its `offline` result. The new view's lazy GETs must
+perform normal network validation while its own health check is pending.
 
 ### Fetch
 

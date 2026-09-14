@@ -239,7 +239,7 @@ def rebuild_cache():
             {"migration_status": result.migration_status},
             status=409,
         )
-    return responses.ok()
+    return responses.json_response({"cache_status": result.cache_status})
 
 
 # @testable true

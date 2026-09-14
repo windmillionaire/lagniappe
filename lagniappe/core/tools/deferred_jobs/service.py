@@ -252,7 +252,9 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             }
         )
         lock = adapter.start_lock(spec, job)
-        creation = database_deferred_jobs.create_deferred_job_if_absent(job, notification, lock)
+        writes, guards = adapter.start_writes(spec, job)
+        options = {"writes": writes, "guards": guards} if writes or guards else {}
+        creation = database_deferred_jobs.create_deferred_job_if_absent(job, notification, lock, **options)
         if not creation.get("created"):
             raw = creation.get("entity")
             existing = Entities.DEFERRED_JOB(raw) if raw is not None else None
@@ -444,6 +446,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
 
         if job.status in TERMINAL_STATUSES:
             return True
+        self.adapter(job.job_type).before_cancel(job)
         if not isinstance(status, DeferredJobStatus):
             status = DeferredJobStatus(status)
         if status not in {

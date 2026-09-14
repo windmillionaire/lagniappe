@@ -39,8 +39,8 @@ def allowed_report_actions(user):
         allowed.add("move_file")
     if capabilities["can_rename_entities"]:
         allowed.add("rename_entity")
-    if capabilities["can_extend_form_schemas"]:
-        allowed.add("extend_form_schema")
+    if capabilities["can_update_form_schemas"]:
+        allowed.add("update_form_schema")
     if capabilities["can_update_submissions"]:
         allowed.add("update_form_values")
     if capabilities["can_delete_pages"]:
@@ -103,9 +103,9 @@ def report_action_permission_context(user, allowed_actions=None):
         "can_rename_entities": (
             user_capabilities["can_rename_entities"] and "rename_entity" in allowed_set
         ),
-        "can_extend_form_schemas": (
-            user_capabilities["can_extend_form_schemas"]
-            and "extend_form_schema" in allowed_set
+        "can_update_form_schemas": (
+            user_capabilities["can_update_form_schemas"]
+            and "update_form_schema" in allowed_set
         ),
         "can_update_submissions": (
             user_capabilities["can_update_submissions"]
@@ -144,8 +144,8 @@ def report_action_permission_context(user, allowed_actions=None):
         rules.append("Moving files requires editable source and target pages or tasks.")
     if "rename_entity" in allowed_set:
         rules.append("Renaming requires an exact editable entity target.")
-    if "extend_form_schema" in allowed_set:
-        rules.append("Schema edits are additive only and require editable forms.")
+    if "update_form_schema" in allowed_set:
+        rules.append("Schema edits require editable forms and user review. Preview migrations across every affected Page/Task, explain destructive changes, and require visibility of the complete population.")
     if "update_form_values" in allowed_set:
         rules.append("Submission updates require exact editable page/task targets.")
     if "suggest_page_deletion" in allowed_set:

@@ -786,9 +786,11 @@ class RestrictedTo(DBProperty):
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_index_lists_group_restricted_form_only_for_group_member
     # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources
     # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
+    # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_recalculates_restrictions_after_form_deletion
     # @tests tests_unit/test_002_entity_general_properties.py::test_task_file_restrictions_use_stored_hashes_without_group_reads
     # @matrix permissions : source-clauses inherited-restrictions
     # @matrix task permissions : source-clauses admin-only
+    # @matrix permissions relations : deleted-form recalculation
     # @matrix permissions relations : stored-restrictions group-free no-extra-read
     # @matrix forms permissions : access-restrictions group-restricted index-filter inheritance owner-restricted restricted-access side-effect-free stable-order
     @property

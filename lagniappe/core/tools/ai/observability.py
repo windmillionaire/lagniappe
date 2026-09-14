@@ -26,21 +26,25 @@ KNOWN_TRAFFIC_TYPES = {
     "PROVISIONED_THROUGHPUT": "provisioned_throughput",
     "PAYGO": "paygo",
 }
-KNOWN_OUTCOMES = {
-    "not_validated",
-    "validated",
-    "local_repair",
-    "model_repair",
-    "review_fallback",
-    "validation_failed",
+OUTCOME_LABELS = {
+    "not_validated": "Not validated",
+    "validated": "Validated",
+    "normalized": "Formatted / normalized",
+    # Older records also used local_repair for ordinary normalization.
+    "local_repair": "Locally adjusted",
+    "model_repair": "Model repair",
+    "review_fallback": "Needs review",
+    "validation_failed": "Validation failed",
 }
+KNOWN_OUTCOMES = set(OUTCOME_LABELS)
 OUTCOME_PRIORITY = {
     "not_validated": 0,
     "validated": 1,
-    "local_repair": 2,
-    "model_repair": 3,
-    "review_fallback": 4,
-    "validation_failed": 5,
+    "normalized": 2,
+    "local_repair": 3,
+    "model_repair": 4,
+    "review_fallback": 5,
+    "validation_failed": 6,
 }
 KNOWN_PROVIDER_STAGES = {"initial", "tool", "structured_final"}
 KNOWN_TOOL_NAMES = {
@@ -57,6 +61,7 @@ KNOWN_TOOL_NAMES = {
     "get_guidelines",
     "get_schema",
     "get_form_instances",
+    "preview_form_schema_update",
     "list_workspace_resources",
     "get_filter_schema",
     "query_workspace_filter",
@@ -335,6 +340,7 @@ def _error_category(error):
 # @tests tests_unit/test_015c_ai_observability.py::test_nested_model_repair_gets_its_own_summary
 # @tests tests_unit/test_015c_ai_observability.py::test_observability_failures_never_change_generation_result_or_error
 # @tests tests_unit/test_015c_ai_observability.py::test_deferred_generation_overwrites_correlated_live_snapshots
+# @tests tests_unit/test_015c_ai_observability.py::test_ask_formatting_is_normalization_and_preserves_explicit_repairs
 # @matrix observability : cache correlation deferred-context disabled empty-response error-normalization exception-transparency in-flight nested-generation persistence-failure privacy provider-calls provider-stage pruning-failure quota review-fallback tokens tools validation
 class GenerationObserver:
     """Mutable in-memory reducer for one public ``generate_content`` call."""
@@ -505,7 +511,7 @@ class GenerationObserver:
             return
         self.summary.validated_result_chars = _size(after)
         changed = self.validation_fingerprint != _fingerprint(after)
-        self.outcome("local_repair" if changed else "validated")
+        self.outcome("normalized" if changed else "validated")
 
     # @testable false
     # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
@@ -687,7 +693,7 @@ def aggregate_records(records, *, query_limit=QUERY_LIMIT):
         for row in grouped.values():
             row["success_rate"] = percent(row.pop("successes"), row["count"])
             row["outcomes"] = [
-                {"name": name.replace("_", " ").title(), "count": value}
+                {"name": OUTCOME_LABELS[name], "count": value}
                 for name, value in sorted(row["outcomes"].items())
             ]
             rows.append(row)

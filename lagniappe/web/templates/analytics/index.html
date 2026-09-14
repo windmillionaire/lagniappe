@@ -1,6 +1,5 @@
 {% set view_entry = "analytics" %}
 {% extends "layouts/base.html" %}
-{% import 'controls.html' as controls %}
 
 {% macro stat(label, value, kind="page") %}
   <div class="rounded-md border border-base-light/50 bg-base-bg px-4 py-3 shadow-sm"
@@ -24,32 +23,15 @@
 {% endmacro %}
 
 {% macro retention_controls(dataset, label, endpoint) %}
-  <section class="flex flex-col gap-3 rounded-md border border-base-light/50 px-3 py-2"
+  <details class="rounded-md border border-base-light/50 px-3 py-2"
            data-role="analytics-retention"
-           data-dataset="{{ dataset }}"
-           data-open="false">
-    <header class="flex flex-row items-center justify-between gap-4">
-      <h2 class="flex flex-row items-center gap-2 font-semibold text-base-dark">
-        <button class="{{ styles.toggle.container }}"
-                data-kind="delete"
-                data-open="false"
-                data-role="analytics-retention-toggle"
-                aria-expanded="false"
-                aria-controls="analytics-retention-panel-{{ dataset }}"
-                type="button"
-                aria-label="Retention controls"
-                title="Retention controls">
-          {{ render_icon("expand", "invisible group-data-[open=false]/toggle:visible") }}
-          {{ render_icon("contract", "invisible group-data-[open=true]/toggle:visible") }}
-        </button>
-        <span>{{ label }}</span>
-      </h2>
-    </header>
+           data-dataset="{{ dataset }}">
+    <summary class="cursor-pointer font-semibold text-base-dark"
+             data-role="analytics-retention-toggle">{{ label }}</summary>
     <div id="analytics-retention-panel-{{ dataset }}"
-         class="flex flex-col gap-3"
+         class="mt-3 flex flex-col gap-3"
          data-role="analytics-retention-panel"
-         data-dataset="{{ dataset }}"
-         data-visible="false">
+         data-dataset="{{ dataset }}">
       <p class="text-sm text-base-medium">Choose how old records must be before they are deleted, or delete every record.</p>
       <div class="{{ styles.attributes.container }}">
         {% for value, option in retention_options.items() %}
@@ -67,7 +49,7 @@
            data-role="analytics-clear-status"
            data-visible="false"></div>
     </div>
-  </section>
+  </details>
 {% endmacro %}
 
 {% macro job_id(value, role) %}
@@ -99,7 +81,7 @@
                   <th class="px-3 py-2 text-right">Success</th>
                   <th class="px-3 py-2 text-right">Requests</th>
                   <th class="px-3 py-2 text-right">Tokens</th>
-                  <th class="px-3 py-2">Validation / Repair</th>
+                  <th class="px-3 py-2">Result processing</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-base-light/50">
@@ -122,6 +104,103 @@
           </div>
         {% endif %}
       </div>
+    {% endfor %}
+  </section>
+{% endmacro %}
+
+{% macro run_metric(label, value) %}
+  <div>
+    <dt class="text-base-medium">{{ label }}</dt>
+    <dd class="font-semibold tabular-nums text-base-dark">{{ "{:,}".format(value) if value is number else (value if value is not none else "Unavailable") }}</dd>
+  </div>
+{% endmacro %}
+
+{% macro ai_runs() %}
+  <section class="flex flex-col gap-3" data-role="deferred-operations">
+    <div>
+      <h3 class="font-semibold text-base-dark">Recent Runs</h3>
+      <p class="text-sm text-base-medium">Open a run to inspect its stages or copy JSON for analysis. Metrics shown here use the selected period; JSON includes available retained stages for the run.</p>
+    </div>
+    {% for operation in deferred_operations %}
+      {% set generations = ai_records_by_telemetry.get(operation.telemetry_id, []) %}
+      {% set report = operation.input_refs.get('report') %}
+      <details class="min-w-0 rounded-md border border-base-light/50"
+               data-role="ai-run" data-job-id="{{ operation.key }}"
+               data-operation-status="{{ operation.status }}">
+        <summary class="cursor-pointer px-3 py-3 text-base-dark">
+          <span class="font-semibold">{{ operation.type|replace('-', ' ')|title }}</span>
+          <span class="ml-2 text-sm text-base-medium">{{ operation.status|replace('_', ' ')|title }}{% if operation.recovering %} · recovering{% endif %}</span>
+          {% if operation.created_at %}
+            <time class="ml-2 text-sm text-base-medium" datetime="{{ operation.created_at }}">{{ operation.created_at[:19]|replace('T', ' ') }} UTC</time>
+          {% endif %}
+        </summary>
+        <div class="flex min-w-0 flex-col gap-4 border-t border-base-light/50 p-3 text-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            {% if report and report.id in own_report_keys %}
+              <a class="font-semibold text-base-default" data-role="ai-run-report"
+                 href="{{ url_for('tools.report', key=report.id) }}">Open report</a>
+            {% endif %}
+            <button type="button" class="{{ styles.attributes.button }}" data-kind="page"
+                    data-role="ai-run-copy"
+                    data-route="{{ url_for('analytics.operation_diagnostic', job_id=operation.key) }}">Copy run JSON</button>
+            <a class="font-semibold text-base-default" data-role="deferred-operation-json"
+               href="{{ url_for('analytics.operation_diagnostic', job_id=operation.key) }}"
+               target="_blank" rel="noopener">View JSON</a>
+            <span role="status" aria-live="polite" data-role="ai-run-copy-status" class="text-base-medium"></span>
+          </div>
+          <textarea readonly aria-label="Run JSON" rows="12" data-role="ai-run-json-fallback"
+                    data-visible="false" class="w-full rounded-md border border-base-light/50 p-3 font-mono text-xs"></textarea>
+          <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {{ run_metric("User", operation.actor) }}
+            {{ run_metric("Job elapsed", operation.elapsed_seconds ~ " s") }}
+            {{ run_metric("Attempt", operation.attempt) }}
+            {{ run_metric("Phase", operation.phase_label) }}
+          </dl>
+          {% for generation in generations %}
+            <section class="flex min-w-0 flex-col gap-3 rounded-md bg-base-light/20 p-3" data-role="ai-run-generation">
+              <div>
+                <h4 class="font-semibold text-base-dark">{{ generation.workflow|title }} · {{ generation.stage }}</h4>
+                <p class="break-all text-base-medium">{{ generation.get('resolved_model', 'Unknown model') }} · {{ generation.get('state', 'unknown')|title }} · {{ ai_outcome_labels.get(generation.get('outcome'), 'Not validated') }}</p>
+                {% if generation.get('outcome') == 'normalized' %}
+                  <p class="text-base-medium">The validated answer was formatted or normalized for use, such as rendering Markdown as HTML.</p>
+                {% elif generation.get('outcome') == 'local_repair' %}
+                  <p class="text-base-medium">The application adjusted the result locally. Older records include ordinary formatting and normalization in this category.</p>
+                {% endif %}
+              </div>
+              <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {{ run_metric("Model requests", generation.get('provider_requests')) }}
+                {{ run_metric("Tool rounds", generation.get('tool_rounds')) }}
+                {{ run_metric("Tool calls", generation.get('tool_calls')) }}
+                {{ run_metric("AI duration", ((generation.duration_ms / 1000)|round(2)) ~ " s" if generation.get('duration_ms') is not none else none) }}
+                {{ run_metric("Input tokens", generation.get('prompt_tokens')) }}
+                {{ run_metric("Cached input tokens", generation.get('cached_tokens')) }}
+                {{ run_metric("Output tokens", generation.get('output_tokens')) }}
+                {{ run_metric("Reasoning tokens", generation.get('thought_tokens')) }}
+                {{ run_metric("Total tokens", generation.get('total_tokens')) }}
+                {{ run_metric("Empty-response retries", generation.get('empty_response_retries')) }}
+                {{ run_metric("Exact tool-cache hits", generation.get('exact_call_cache_hits')) }}
+                {{ run_metric("Calls per tool round", generation.calls_per_round|join(' → ') if generation.get('calls_per_round') else 'None recorded') }}
+              </dl>
+              <p class="text-base-medium">Cached tokens are included in input tokens. Counts accumulate across model requests; AI duration covers this stage, while job elapsed covers the whole operation.</p>
+              {% if generation.get('tool_names') %}
+                <p data-role="ai-run-tools" class="break-words text-base-medium">
+                  <strong>Tools used:</strong>
+                  {% for tool_name in generation.tool_names|unique %}
+                    {%- set call_count = generation.tool_names.count(tool_name) -%}
+                    {{ tool_name }}{% if call_count > 1 %} ({{ call_count }} calls){% endif %}{{ ', ' if not loop.last else '. ' }}
+                  {%- endfor %}
+                  Names are grouped, not shown in call order.
+                </p>
+              {% endif %}
+            </section>
+          {% else %}
+            <p class="text-base-medium" data-role="ai-run-missing">No AI summary is available for this run in the selected period.</p>
+          {% endfor %}
+          {{ job_id(operation.key, "deferred-operation-id") }}
+        </div>
+      </details>
+    {% else %}
+      <p class="text-sm text-base-medium">No deferred operations recorded.</p>
     {% endfor %}
   </section>
 {% endmacro %}
@@ -161,54 +240,11 @@
         </div>
       </section>
     {% endif %}
-    {{ ai_groups() }}
-    <section class="flex flex-col gap-2" data-role="deferred-operations">
-      <div>
-        <h3 class="font-semibold text-base-dark">Deferred Operations</h3>
-        <p class="text-sm text-base-medium">Latest durable jobs, including active recovery state.</p>
-      </div>
-      <div class="overflow-x-auto rounded-md border border-base-light/50">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-base-light/20 text-base-medium">
-            <tr>
-              <th class="px-3 py-2">Workflow</th>
-              <th class="px-3 py-2">Job ID</th>
-              <th class="px-3 py-2">User</th>
-              <th class="px-3 py-2">State</th>
-              <th class="px-3 py-2">Phase</th>
-              <th class="px-3 py-2 text-right">Attempt</th>
-              <th class="px-3 py-2 text-right">Elapsed</th>
-              <th class="px-3 py-2">Output</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-base-light/50">
-            {% for operation in deferred_operations %}
-              <tr data-operation-status="{{ operation.status }}">
-                <td class="px-3 py-2 font-semibold text-base-dark">{{ operation.type }}</td>
-                <td class="px-3 py-2">{{ job_id(operation.key, "deferred-operation-id") }}</td>
-                <td class="px-3 py-2 text-base-medium">{{ operation.actor }}</td>
-                <td class="px-3 py-2">
-                  {{ operation.status|replace('_', ' ')|title }}
-                  {% if operation.recovering %}<span class="text-kind-default"> · recovering</span>{% endif %}
-                </td>
-                <td class="px-3 py-2 text-base-medium">{{ operation.phase_label }}</td>
-                <td class="px-3 py-2 text-right tabular-nums">{{ operation.attempt }}</td>
-                <td class="px-3 py-2 text-right tabular-nums">{{ operation.elapsed_seconds }}s</td>
-                <td class="px-3 py-2">
-                  <a class="font-semibold text-base-default"
-                     data-role="deferred-operation-json"
-                     href="{{ url_for('analytics.operation_diagnostic', job_id=operation.key) }}"
-                     target="_blank"
-                     rel="noopener">JSON</a>
-                </td>
-              </tr>
-            {% else %}
-              <tr><td class="px-3 py-2 text-base-medium" colspan="8">No deferred operations recorded.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    {{ ai_runs() }}
+    <details class="rounded-md border border-base-light/50 p-3">
+      <summary class="cursor-pointer font-semibold text-base-dark">Breakdowns by workflow, model, and contract</summary>
+      <div class="mt-3">{{ ai_groups() }}</div>
+    </details>
     <section class="flex flex-col gap-2" data-role="ai-inflight">
       <div>
         <h3 class="font-semibold text-base-dark">In-flight AI Generations</h3>
@@ -280,30 +316,22 @@
     {% if dashboard.groups %}
       <div class="divide-y divide-base-light/50 rounded-md border border-base-light/50">
         {% for group in dashboard.groups %}
-          <section data-role="analytics-prefix"
+          <details data-role="analytics-prefix"
                    data-prefix="{{ group.prefix }}"
                    data-kind="{{ group.kind }}"
-                   data-open="false"
                    data-route="{{ url_for('analytics.events', prefix=group.prefix, period=period) }}">
-            <header class="flex flex-row items-center justify-between gap-4 px-3 py-2">
-              <div class="flex min-w-0 flex-row items-center gap-3">
-                {{ controls.expand() }}
-                <h3 class="{{ styles.iconLabel.wrapper }} font-semibold text-base-dark">
-                  {{ render_icon(group.icon, (styles.iconLabel.icon) ~ " " ~ (styles.icon.default)) }}
-                  <span>{{ group.label }}</span>
-                </h3>
-              </div>
-              <span class="shrink-0 text-lg font-bold tabular-nums text-kind-default">{{ group.count }}</span>
-            </header>
+            <summary class="cursor-pointer px-3 py-2 font-semibold text-base-dark">
+              {{ group.label }}
+              <span class="ml-2 tabular-nums text-kind-default">{{ group.count }}</span>
+            </summary>
             <div data-role="analytics-events"
-                 data-visible="false"
                  class="border-t border-base-light/50"
                  aria-live="polite">
               <div class="px-3 py-2 text-sm text-base-medium">
                 {{ render_icon("spinner") }} Loading events...
               </div>
             </div>
-          </section>
+          </details>
         {% endfor %}
       </div>
     {% else %}

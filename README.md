@@ -2,8 +2,7 @@
 
 Lagniappe is a private web app for individuals and small organizations that supports collaborative documents, files, structured records, contextual tasks, permissions, and search. It runs in a Google Cloud project and connects to a Redis Cloud database, both controlled by the owner. Optional, user-invoked AI is limited to the invoking user's existing permissions.
 
-[Tour](https://lagniappe.site/pages/public/74faecaf) · [Manual](https://lagniappe.site/manual/) · [Install](https://lagniappe.site/manual/installation) · [Approach to AI](https://lagniappe.site/pages/public/9a10ae4c) ·
-  [Manual](https://lagniappe.site/manual/) · [Latest release](https://github.com/windmillionaire/lagniappe/releases/latest)
+[Tour](https://lagniappe.site/pages/public/74faecaf) · [Manual](https://lagniappe.site/manual/) · [Install](https://lagniappe.site/manual/installation) · [Approach to AI](https://lagniappe.site/pages/public/9a10ae4c) · [Latest release](https://github.com/windmillionaire/lagniappe/releases/latest)
 
 The tour and manual are public, although the demo examples linked to in the tour require you to log in.
 

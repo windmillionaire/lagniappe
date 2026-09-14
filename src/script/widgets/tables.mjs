@@ -1,3 +1,4 @@
+import { STYLES } from "styles";
 import { BaseTable, EmbeddedTable } from "../elements/base/baseTable";
 
 /**
@@ -231,7 +232,9 @@ export class IndexTable extends BaseTable {
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_appears_after_completion_cycle
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
  * @matrix tasks : completion-cycle history reload
+ * @matrix task-completion : history readonly generation
  * @pair embedded-table:table-cell-expand
  */
 export class TaskHistory extends EmbeddedTable {
@@ -245,7 +248,9 @@ export class TaskHistory extends EmbeddedTable {
 	}
 
 	async updated(response) {
-		this._updated = response.html.querySelector("table");
+		this._updated = response.html.querySelector(
+			"[data-role='completion-history']",
+		);
 	}
 
 	postreconcile() {
@@ -255,10 +260,10 @@ export class TaskHistory extends EmbeddedTable {
 		this.target.dataset.visible = "true";
 		this.table.replaceChildren(this._updated);
 		this._updated.dataset.visible = "true";
-		this.initVisibility(
-			this._updated,
-			`columns-${this.component.name}-history`,
-		);
+		for (const table of this._updated.querySelectorAll("table")) {
+			table.dataset.visible = "true";
+			this.initVisibility(table, `columns-${this.component.name}-history`);
+		}
 		this._updated = null;
 	}
 }
@@ -310,8 +315,7 @@ export class FilterResults extends EmbeddedTable {
 
 		this.container = document.createElement("div");
 		this.container.dataset.role = "results-table";
-		this.container.className =
-			"min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white";
+		this.container.className = STYLES.table.container;
 		this.tableContainer = document.createElement("div");
 		this.tableContainer.className = "table-container px-4";
 		this.tableContainer.dataset.role = "table";

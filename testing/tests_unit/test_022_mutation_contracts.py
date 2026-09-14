@@ -1,14 +1,18 @@
 """Executable entity mutation contract and ordering regressions."""
 
 from datetime import datetime, timezone
+from copy import deepcopy
 
 from google.cloud import datastore
 import pytest
 
 from lagniappe.core.definitions import (
+    MutationEffect,
     MutationEffectType,
     MutationIntent,
     MutationOperation,
+    MutationPhase,
+    MutationPlan,
 )
 from lagniappe.core.definitions.mutation_contracts import (
     ENTITY_MUTATION_CONTRACTS,
@@ -44,6 +48,20 @@ def _writes(plan):
         for effect in plan.effects
         if effect.effect in {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
     ]
+
+
+def _saved_permission_form(monkeypatch, *, name, identity):
+    """Use a valid saved empty definition while isolating its storage lookup."""
+    row = datastore.Entity(key=datastore.Key("models", identity, project="test-project"))
+    row.update(type="form", form_type="task", hash=identity, name=name,
+               schema="[]", schema_format=1)
+    form = Entities.FORM(row)
+    form.properties.version.update()
+    saved = deepcopy(form.db)
+    monkeypatch.setattr(Entities, "fetch_one", lambda key, *, request: (
+        Entities.FORM(deepcopy(saved)) if key == form.key else None
+    ))
+    return form
 
 
 # @matrix mutations : write-identity dependency-order
@@ -89,20 +107,22 @@ def test_report_save_does_not_touch_input_files(monkeypatch):
 def test_permission_source_marker_is_consumed_only_after_durable_success(monkeypatch, kind):
     from lagniappe.core.tools.database import get as database_get
 
-    source = TestEntities.get(kind, {"hash": "permission-source"})
+    source = (_saved_permission_form(monkeypatch, name="Permission source", identity="permission-source")
+              if kind == "FORM" else TestEntities.get(kind, {"hash": "permission-source"}))
     source.properties.restricted_to.materialize(admin_only=True)
     assert source._permission_sources_changed is True
+    monkeypatch.setattr(database_get, "entity", lambda key: deepcopy(source.db) if key == source.key else None)
     monkeypatch.setattr(database_get, "form_users", lambda *_forms: [])
     monkeypatch.setattr(Entities, "fetch", lambda *items, request: list(items))
     monkeypatch.setattr(mutation_executor, "execute_post_commit", lambda _plan: ([], []))
     plan = plan_mutation(MutationOperation.SAVE, source, registry=Entities)
     assert [effect.entity for effect in _writes(plan)] == [source]
     monkeypatch.setattr(mutation_executor.database_utility, "save_mutations",
-                        lambda _writes: (_ for _ in ()).throw(RuntimeError("save failed")))
+                        lambda _writes, **kwargs: (_ for _ in ()).throw(RuntimeError("save failed")))
     with pytest.raises(RuntimeError, match="save failed"):
         execute_mutation(plan)
     assert source._permission_sources_changed is True
-    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", lambda _writes: None)
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", lambda _writes, **kwargs: None)
     execute_mutation(plan)
     assert source._permission_sources_changed is False
     source.properties.restricted_to.materialize()
@@ -112,7 +132,8 @@ def test_permission_source_marker_is_consumed_only_after_durable_success(monkeyp
 # @matrix permissions mutations : owner-reuse no-extra-read repeated-save
 @pytest.mark.parametrize("kind", ["PAGE", "FORM"])
 def test_permission_save_reuses_resolved_collection_owner_keys(monkeypatch, kind):
-    source = TestEntities.get(kind, {"name": "Permission source", "hash": "owner-source"})
+    source = (_saved_permission_form(monkeypatch, name="Permission source", identity="owner-source")
+              if kind == "FORM" else TestEntities.get(kind, {"name": "Permission source", "hash": "owner-source"}))
     category = TestEntities.get("CATEGORY", {"name": "Category", "hash": "owner-category"})
     other = TestEntities.get("PROJECT" if kind == "FORM" else "CATEGORY", {
         "name": "Other collection", "hash": "other-owner",
@@ -660,6 +681,50 @@ def test_job_delete_removes_operation_projection_after_commit(monkeypatch):
     assert deleted == [job]
     assert projected == [job]
     assert outcome.complete is True
+
+
+# @source lagniappe/core/mutations/executor.py::execute_mutation
+# @pair mutations:durable-first
+def test_mixed_delete_keeps_form_archive_atomic_and_deletes_other_root_once(monkeypatch):
+    form_key = datastore.Key("models", "mixed-form", project="unit-project")
+    form_row = datastore.Entity(key=form_key)
+    form_row.update(type="form", form_type="task", name="Form", generation=0)
+    form = Entities.FORM(form_row)
+    other_row = datastore.Entity(key=datastore.Key("models", "mixed-category", project="unit-project"))
+    other_row.update(type="category", name="Other root")
+    other = Entities.CATEGORY(other_row)
+    archive_row = datastore.Entity(key=datastore.Key("history", "archive", parent=form_key))
+    archive_row.update(type="form_history", name="Archived Form", generation=0)
+    archive = Entities.FORM_HISTORY(archive_row)
+    guard = (form_key, mutation_executor.database_utility.ExactEntityState(dict(form_row)))
+    archive._form_save_guard = guard
+    plan = MutationPlan(MutationOperation.DELETE, [
+        MutationEffect(MutationEffectType.UPSERT, MutationPhase.DURABLE, entity=archive),
+        MutationEffect(MutationEffectType.DELETE, MutationPhase.DURABLE,
+                       entity=form, reasons=("delete-cascade",)),
+        MutationEffect(MutationEffectType.DELETE, MutationPhase.DURABLE,
+                       entity=other, reasons=("delete-cascade",)),
+    ])
+    calls = []
+
+    def save_mutations(writes, **options):
+        calls.append(("save", list(writes), options))
+
+    def delete_entities(entities):
+        calls.append(("delete", list(entities)))
+
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", save_mutations)
+    monkeypatch.setattr(mutation_executor.database_utility, "delete_entities", delete_entities)
+
+    from lagniappe.core.tools.database import get as database_get
+    monkeypatch.setattr(database_get, "entity", lambda key: form_row if key == form.key else other_row)
+    outcome = execute_mutation(plan)
+
+    assert calls == [
+        ("save", [(archive, None)], {"guards": [(form.key, {"pending_form_change": None}), guard], "deletes": [form, other]}),
+    ]
+    assert outcome.complete is True
+    assert outcome.completed_effects.count(MutationEffectType.DELETE) == 1
 
 
 # @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save

@@ -347,26 +347,26 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { emitMaterialSymbols } from "./build/utility.mjs";
+import { emitFonts } from "./build/utility.mjs";
 
 const source = readFileSync(
   "./src/fonts/material-symbols-rounded.woff2",
 );
 const hash = createHash("sha256").update(source).digest("hex").slice(0, 12);
 const emitted = [];
-emitMaterialSymbols().generateBundle.call({
+emitFonts().generateBundle.call({
   emitFile(asset) {
     emitted.push(asset);
   },
 });
 
-assert.equal(emitted.length, 1);
-assert.equal(emitted[0].type, "asset");
+const icon = emitted.find((asset) => asset.fileName.startsWith("fonts/material-symbols-rounded."));
+assert.equal(icon.type, "asset");
 assert.equal(
-  emitted[0].fileName,
+  icon.fileName,
   `fonts/material-symbols-rounded.${hash}.woff2`,
 );
-assert.deepEqual(emitted[0].source, source);
+assert.deepEqual(icon.source, source);
 
 const outputDirectory = mkdtempSync(join(tmpdir(), "lagniappe-icons-"));
 const fontsDirectory = join(outputDirectory, "fonts");
@@ -390,11 +390,10 @@ writeFileSync(
 );
 writeFileSync(join(fontsDirectory, "source-sans-latin.woff2"), "other");
 
-emitMaterialSymbols().writeBundle({ dir: outputDirectory });
+emitFonts().writeBundle({ dir: outputDirectory });
 
 assert.deepEqual(readdirSync(fontsDirectory).sort(), [
   currentFont,
-  "source-sans-latin.woff2",
 ].sort());
 rmSync(outputDirectory, { recursive: true });
 """,
@@ -408,9 +407,9 @@ def test_material_symbols_css_points_to_the_content_hashed_font(run_node):
         r"""
 import assert from "node:assert/strict";
 import postcss from "postcss";
-import { resolveMaterialSymbolsFont } from "./build/utility.mjs";
+import { resolveFonts } from "./build/utility.mjs";
 
-const result = await postcss([resolveMaterialSymbolsFont()]).process(`
+const result = await postcss([resolveFonts()]).process(`
   @font-face {
     font-family: "Material Symbols Rounded";
     src: url("/fonts/material-symbols-rounded.woff2") format("woff2");
@@ -424,6 +423,46 @@ assert.match(
 assert.doesNotMatch(
   result.css,
   /url\("\/fonts\/material-symbols-rounded\.woff2"\)/,
+);
+""",
+        module=True,
+    )
+
+
+# @matrix frontend-build icons : cache css-url-resolution font-delivery subset
+def test_text_fonts_share_css_preload_and_asset_identity(run_node):
+    run_node(
+        r"""
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
+import postcss from "postcss";
+import { buildStyles, emitFonts, resolveFonts } from "./build/utility.mjs";
+
+const assets = [];
+emitFonts().generateBundle.call({ emitFile: (asset) => assets.push(asset) });
+const sources = readdirSync("src/fonts").filter((name) => name.endsWith(".woff2"));
+assert.equal(assets.length, sources.length);
+for (const fileName of sources) {
+  const bytes = readFileSync(`src/fonts/${fileName}`);
+  const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 12);
+  const asset = assets.find((item) => item.fileName === `fonts/${fileName.slice(0, -6)}.${hash}.woff2`);
+  assert.ok(asset, `Font is missing from the publication inventory: ${fileName}`);
+  assert.equal(bytes.subarray(0, 4).toString(), "wOF2");
+  assert.deepEqual(asset.source, bytes);
+}
+buildStyles().generateBundle();
+const python = readFileSync("lagniappe/web/start/styles/fonts.py", "utf8");
+const preloads = JSON.parse(python.slice(python.indexOf("{")));
+const css = await postcss([resolveFonts()]).process(readFileSync("src/style/fonts.css", "utf8"), { from: undefined });
+const urls = [...css.css.matchAll(/url\("([^"\)]+)"\)/g)].map((match) => match[1]);
+assert.deepEqual(new Set(urls), new Set(assets.map((asset) => `/${asset.fileName}`)));
+assert.deepEqual(new Set(Object.values(preloads)), new Set(urls));
+assert.match(preloads["source-sans-latin"], /^\/fonts\/source-sans-latin\.[a-f0-9]{12}\.woff2$/);
+assert.ok(!assets.some((asset) => asset.fileName.includes("upstream")));
+await assert.rejects(
+  postcss([resolveFonts()]).process('a { src: url("/fonts/unvendored.woff2"); }', { from: undefined }),
+  /Missing vendored font/,
 );
 """,
         module=True,

@@ -21,6 +21,7 @@ const DEBOUNCE_DELAY_MS = 100;
  */
 export class Toolbar {
 	constructor(document) {
+		this._destroyed = false;
 		this.document = document;
 		this.editor = document.editor;
 		this.kind = document.kind || "default";
@@ -28,6 +29,7 @@ export class Toolbar {
 		this.publicLimited = document.target?.dataset?.publicLimited === "true";
 		this.aiCreate = document.target?.dataset?.aiCreate === "true";
 		this.element = null;
+		this.editorDom = null;
 		this.options = {};
 		this.forms = {};
 		this.toggles = {};
@@ -61,12 +63,10 @@ export class Toolbar {
 		this.userManager = new UserManager(this);
 		this.element.addEventListener("submit", this.formSubmit);
 		this.editor.on("transaction", this.editorState);
-		this.editor.view.dom.addEventListener("click", this.editorClick);
-		this.editor.view.dom.addEventListener("keydown", this.editorKeydown);
-		this.editor.view.dom.addEventListener(
-			"editor-link-edit",
-			this.editorLinkEdit,
-		);
+		this.editorDom = this.editor.view.dom;
+		this.editorDom.addEventListener("click", this.editorClick);
+		this.editorDom.addEventListener("keydown", this.editorKeydown);
+		this.editorDom.addEventListener("editor-link-edit", this.editorLinkEdit);
 		document.addEventListener("click", this.windowClick, { capture: true });
 	}
 
@@ -121,6 +121,7 @@ export class Toolbar {
 	}
 
 	async _editorState() {
+		if (this._destroyed || this.editor.isDestroyed) return;
 		const { selection, storedMarks } = this.editor.state;
 		const { $from } = selection;
 		const marks = [...$from.marks()];
@@ -224,14 +225,14 @@ export class Toolbar {
 
 	async _createTools() {
 		const toolRow = document.createElement("div");
-		toolRow.className = `${STYLES.editor.toolbar.tools}`;
+		toolRow.className = STYLES.editor.toolbar.section;
 
 		const primaryTools = document.createElement("div");
-		primaryTools.className = STYLES.editor.toolbar.section;
+		primaryTools.className = "contents";
 		toolRow.appendChild(primaryTools);
 
 		const menuTools = document.createElement("div");
-		menuTools.className = STYLES.editor.toolbar.section;
+		menuTools.className = "contents";
 		menuTools.dataset.role = "toolbar-menus";
 		toolRow.appendChild(menuTools);
 		this.element.appendChild(toolRow);
@@ -246,10 +247,15 @@ export class Toolbar {
 				return await this._createToolbarMenu(menu);
 			}),
 		);
-		menuTools.append(...dropdownButtons);
+		menuTools.append(...dropdownButtons.filter(Boolean));
 	}
 
 	_toolAllowed(tool) {
+		if (
+			this.document.draftOnly &&
+			["documentHistory", "toggleFocus", "generateText"].includes(tool.command)
+		)
+			return false;
 		if (this.publicLimited && tool.command === "addImage") return false;
 		if (!this.aiCreate && tool.command === "generateText") return false;
 		return true;
@@ -268,6 +274,7 @@ export class Toolbar {
 	}
 
 	async _createToolbarMenu(menu) {
+		if (menu.command) return this._createToolbarButton(menu);
 		const menuItems = menu.items.filter((item) => this._toolAllowed(item));
 		const items = await Promise.all(
 			menuItems.map((item) => this._loadOption(item.command, item)),
@@ -281,7 +288,9 @@ export class Toolbar {
 			}
 		});
 
-		const dropdownButton = toolbarDropdown(menu, items);
+		const dropdownButton = toolbarDropdown(menu, items, () =>
+			this._editorState(),
+		);
 		return dropdownButton;
 	}
 
@@ -308,7 +317,16 @@ export class Toolbar {
 		);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_045_browser_persistence.py::test_editor_teardown_releases_toolbar_before_editor_view
+	 * @matrix editor html-field : listener-teardown builder-save
+	 */
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.editorState.cancel?.();
+		this.toggleForm.cancel?.();
 		this.markdownPastePrompt?.destroy();
 		Object.values(this.forms).forEach((form) => {
 			if (form.destroy) form.destroy();
@@ -316,13 +334,14 @@ export class Toolbar {
 		if (this.userManager) {
 			this.userManager.destroy();
 		}
-		this.editor.off("selectionUpdate", this.editorState);
-		this.editor.view.dom.removeEventListener("click", this.editorClick);
-		this.editor.view.dom.removeEventListener("keydown", this.editorKeydown);
-		this.editor.view.dom.removeEventListener(
+		this.editor.off("transaction", this.editorState);
+		this.editorDom?.removeEventListener("click", this.editorClick);
+		this.editorDom?.removeEventListener("keydown", this.editorKeydown);
+		this.editorDom?.removeEventListener(
 			"editor-link-edit",
 			this.editorLinkEdit,
 		);
+		this.element?.removeEventListener("submit", this.formSubmit);
 		document.removeEventListener("click", this.windowClick, { capture: true });
 	}
 }

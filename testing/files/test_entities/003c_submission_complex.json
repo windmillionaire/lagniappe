@@ -18,7 +18,7 @@
 							"value": true,
 							"form_value": true,
 							"filter_value": true,
-							"ai_value": "True"
+							"ai_value": true
 						},
 						"status-ab12": {
 							"value": ["Completed"],
@@ -46,7 +46,7 @@
 							"value": false,
 							"form_value": false,
 							"filter_value": false,
-							"ai_value": "False"
+							"ai_value": false
 						},
 						"status-ab12": {
 							"value": [],

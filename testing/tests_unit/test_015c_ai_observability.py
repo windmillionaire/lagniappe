@@ -165,8 +165,53 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     assert summary["traffic_types"] == ["on_demand"]
     assert summary["provider_result_chars"] > 0
     assert summary["validated_result_chars"] > summary["provider_result_chars"]
-    assert summary["outcome"] == "local_repair"
+    assert summary["outcome"] == "normalized"
     assert summary["success"] is True
+
+
+# @matrix observability : validation
+@pytest.mark.parametrize("marked_outcome", [None, "local_repair", "model_repair"])
+def test_ask_formatting_is_normalization_and_preserves_explicit_repairs(
+    monkeypatch, marked_outcome
+):
+    from lagniappe.core.tools.ai.ask import validate_ask_response
+
+    persisted, _ = _capture(monkeypatch)
+    answer = {
+        "summary": "Inventory checked",
+        "confidence": 1,
+        "answer_markdown": "**Pens**: 0; Tape: missing.",
+    }
+
+    class Models:
+        def generate_content(self, **kwargs):
+            return _response(text=json.dumps(answer), usage=_usage())
+
+    def validate(value):
+        if marked_outcome:
+            observability.mark_outcome(marked_outcome)
+        return validate_ask_response(value)
+
+    generator = ai_core.GenAI()
+    generator._client = SimpleNamespace(models=Models())
+    prompt = Prompt("Inspect inventory", type="ask report").set_output_format("JSON")
+    result = generator.generate_content(prompt, validator=validate)
+
+    assert "<strong>Pens</strong>" in result["answer_html"]
+    assert "answer_markdown" not in result
+    assert result["actions"] == []
+    assert result["issues"] == []
+    assert persisted[-1]["success"] is True
+    assert persisted[-1]["outcome"] == (marked_outcome or "normalized")
+    assert persisted[-1]["provider_requests"] == 1
+    dashboard = observability.aggregate_records(persisted)
+    workflow = next(group for group in dashboard["groups"] if group["field"] == "workflow")
+    expected_label = {
+        None: "Formatted / normalized",
+        "local_repair": "Locally adjusted",
+        "model_repair": "Model repair",
+    }[marked_outcome]
+    assert workflow["rows"][0]["outcomes"] == [{"name": expected_label, "count": 1}]
 
 
 # @matrix observability : empty-response error-normalization quota
@@ -563,8 +608,8 @@ def test_ai_observability_dashboard_aggregation():
     assert workflow["rows"][0]["value"] == "ask"
     assert workflow["rows"][0]["count"] == 2
     assert workflow["rows"][0]["outcomes"] == [
-        {"name": "Model Repair", "count": 1},
-        {"name": "Validation Failed", "count": 1},
+        {"name": "Model repair", "count": 1},
+        {"name": "Validation failed", "count": 1},
     ]
 
 

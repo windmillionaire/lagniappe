@@ -24,7 +24,7 @@ class Form(Entity, AssetMixin):
 
     @property
     def exclude_from_index(self):
-        return frozenset({"schema", "schema_format", "version"})
+        return frozenset({"schema", "schema_format", "version", "form_draft_receipt", "pending_form_change"})
 
     @property
     def required(self):
@@ -47,6 +47,7 @@ class Form(Entity, AssetMixin):
                 "restricted_to": common_entity.RestrictedTo,
                 "groups": common_related.Groups,
                 "version": form.SchemaVersion,
+                "generation": form.FormGeneration,
             }
         )
         return properties
@@ -59,17 +60,26 @@ class Form(Entity, AssetMixin):
     def table_fields(self):
         return self.properties.schema.table_fields
 
+    # @testable true
+    # @matrix forms html-field : draft no-write
     def get_html_field(self, field_id):
+        pending = getattr(self, "_pending_html", {})
+        if field_id in pending:
+            return pending[field_id] or None
         html_asset = self.get_asset(field_id)
         if not html_asset:
             return None
         return html_asset.html()
 
     # @testable true
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_html_calls_set_html_field
-    # @matrix html-field : ai-value validation
+    # @tests tests_unit/test_004f_form_drafts.py::test_builder_draft_and_staged_html_are_read_only
+    # @matrix forms html-field : draft baseline no-write
     def set_html_field(self, field_id, html):
-        return self.save_asset(html, field_id, "html")
+        if not isinstance(field_id, str) or not isinstance(html, (str, type(None))):
+            raise ValueError("HTML fields require a field ID and text content.")
+        if not hasattr(self, "_pending_html"):
+            self._pending_html = {}
+        self._pending_html[field_id] = html or ""
 
     # @testable true
     # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field

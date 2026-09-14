@@ -77,7 +77,6 @@ export const ENDPOINTS = {
 	TaskForm: (settings) => {
 		return {
 			latestHistorySubmission: `/tasks/${settings.key}/history/latest-submission`,
-			saveDefaultField: `/tasks/${settings.key}/default-submission`,
 		};
 	},
 	TaskUpload: (settings) => {

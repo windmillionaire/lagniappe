@@ -396,6 +396,73 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     assert batch.mutations[4].upsert is fingerprint
 
 
+# @matrix forms mutations : archive atomic-delete concurrency
+@pytest.mark.unit
+@pytest.mark.parametrize("source_changed", [False, True])
+def test_form_archive_and_deletion_share_the_guarded_transaction(monkeypatch, source_changed):
+    from contextlib import nullcontext
+    from copy import deepcopy
+    from google.cloud.datastore import Entity
+    from google.cloud.datastore.batch import Batch
+    from lagniappe.core.exceptions import MutationConflict
+
+    form_key = Key("models", "form", project="unit-project")
+    form_row = Entity(form_key)
+    form_row.update(type="form", schema="saved schema", generation=0)
+    form = SimpleNamespace(key=form_key, db=form_row)
+    archive_key = Key("history", "archive", parent=form_key)
+    archive_row = Entity(archive_key)
+    archive_row.update(type="form_history", schema="saved schema", generation=0)
+    archive = SimpleNamespace(key=archive_key, db=archive_row)
+    fingerprint = Entity(Key("site", "forms", project="unit-project"))
+    fingerprint["fingerprint"] = "after-deletion"
+    persisted = deepcopy(form_row)
+    if source_changed:
+        persisted["requires"] = ["new restriction"]
+
+    transaction = Batch(SimpleNamespace(project="unit-project", namespace=None, database=None))
+    transaction.begin()
+    opened, reads, fingerprinted = [], [], []
+
+    def open_transaction():
+        opened.append(transaction)
+        return nullcontext(transaction)
+
+    def get_row(key, **kwargs):
+        assert key == form_key and kwargs["transaction"] is transaction
+        reads.append(key)
+        return deepcopy(persisted)
+
+    monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=SimpleNamespace(
+        transaction=open_transaction, get=get_row,
+    )))
+    monkeypatch.setattr(utility, "update_site_fingerprints", lambda *rows: (
+        fingerprinted.extend(rows) or [fingerprint]
+    ))
+    guards = [(form_key, utility.ExactEntityState(dict(form_row)))]
+    if source_changed:
+        with pytest.raises(MutationConflict):
+            utility.save_mutations(((archive, None),), guards=guards, deletes=(form,))
+        assert transaction.mutations == []
+    else:
+        utility.save_mutations(((archive, None),), guards=guards, deletes=(form,))
+        upserts = [
+            mutation.upsert for mutation in transaction.mutations
+            if mutation._pb.WhichOneof("operation") == "upsert"
+        ]
+        deleted = [
+            mutation.delete for mutation in transaction.mutations
+            if mutation._pb.WhichOneof("operation") == "delete"
+        ]
+        assert {row.key.path[-1].name for row in upserts} == {"archive", "forms"}
+        assert upserts[0].properties["schema"].string_value == "saved schema"
+        assert len(deleted) == 1 and deleted[0].path[-1].name == "form"
+        assert len(transaction.mutations) == 3
+    assert opened == [transaction]
+    assert reads == [form_key]
+    assert fingerprinted == [archive_row, form_row]
+
+
 # @matrix permissions mutations : channel-invalidation no-descendant-writes
 @pytest.mark.unit
 @pytest.mark.parametrize("kind", ["page", "form"])

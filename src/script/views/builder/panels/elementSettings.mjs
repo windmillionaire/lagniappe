@@ -328,7 +328,7 @@ const columns = (schema) => {
 	const toggle = _toggle("add", "add");
 	title.append(label, toggle);
 
-	if (schema.columns) {
+	if (schema.columns?.length) {
 		const columnList = document.createElement("ul");
 		columnList.className = `flex flex-col gap-1`;
 		const length = schema.columns.length;
@@ -382,9 +382,10 @@ const checked = (schema) => {
  */
 const deleteButton = () => {
 	const button = document.createElement("button");
-	button.textContent = "Delete";
-	button.dataset.kind = "delete";
+	button.textContent = "Replace or Delete";
+	button.dataset.kind = "form";
 	button.dataset.role = "delete";
+	button.dataset.setting = "deleteButton";
 	button.className = `${STYLES.button.submit}`;
 	return button;
 };
@@ -422,14 +423,14 @@ export class ElementSettings {
 		this.panel.addEventListener("input", this._input);
 		this.panel.addEventListener("change", this._change);
 		this.panel.addEventListener("click", this._click);
-		this.panel.addEventListener("blur", this._blur);
+		this.panel.addEventListener("blur", this._blur, true);
 	}
 
 	destroy() {
 		this.panel.removeEventListener("input", this._input);
 		this.panel.removeEventListener("change", this._change);
 		this.panel.removeEventListener("click", this._click);
-		this.panel.removeEventListener("blur", this._blur);
+		this.panel.removeEventListener("blur", this._blur, true);
 	}
 
 	_input(e) {
@@ -439,6 +440,7 @@ export class ElementSettings {
 		} else if (e.target.closest("[data-setting=placeholder]")) {
 			this._setPlaceholder(element, e.target.value);
 		}
+		this.builder.updateSchema(false, `${element.schema.id}:${e.target.name}`);
 	}
 
 	_change(e) {
@@ -464,6 +466,7 @@ export class ElementSettings {
 	 * @matrix forms : builder-field-visibility builder-select-options
 	 */
 	_click(e) {
+		if (e.target.closest("button")?.disabled) return;
 		const element = this.builder.selectedElement;
 		const role = e.target.closest("[data-role]")?.dataset.role;
 		const setting = e.target.closest("[data-index]");
@@ -477,14 +480,13 @@ export class ElementSettings {
 		} else if (["add", "edit", "open"].includes(role)) {
 			this.builder.showCondition(name, index);
 		} else if (role === "delete") {
-			this.builder.removeElement();
-			this.deselectItem();
-			this.builder.formSettings.visible = true;
+			this.builder.showCondition("modify");
 		}
 	}
 
 	_blur() {
 		this.builder.updateSchema();
+		if (this.builder.draft) this.builder.draft.group = null;
 	}
 
 	_removeSchemaListItem(schema, index) {
@@ -567,6 +569,21 @@ export class ElementSettings {
 	}
 
 	create(schema) {
+		const display = { ...schema };
+		for (const key of ["visibility", "status"]) {
+			if (Array.isArray(schema[key]))
+				display[key] = schema[key].map((condition) => {
+					const target = this.builder.elements.get(condition.id)?.schema;
+					return {
+						...condition,
+						name: target?.title ?? condition.name,
+						label:
+							target?.options?.find(
+								(option) => option.value === condition.value,
+							)?.label ?? condition.label,
+					};
+				});
+		}
 		const settings = CONFIG.DEFAULT_SETTINGS[schema.type].map((setting) => {
 			if (
 				["name", "description"].includes(schema.id) &&
@@ -574,13 +591,73 @@ export class ElementSettings {
 			) {
 				return null;
 			}
-			return SettingsElement[setting](schema);
+			return SettingsElement[setting](display);
 		});
-		return settings.filter(Boolean);
+		const sections = settings.filter(Boolean);
+		this.refreshSavedState(schema, sections);
+		return sections;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
+	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_inputs_use_replacement_panel_after_first_save
+	 * @matrix forms : builder-save stable-identity
+	 */
+	refreshSavedState(
+		schema = this.builder.selectedElement?.schema,
+		sections = this.panel.children,
+	) {
+		if (!schema) return;
+		const saved = this.builder.savedField(schema.id);
+		if (!saved) return;
+		for (const section of sections) {
+			const setting = section.dataset.setting;
+			if (setting === "input") {
+				if (!section.querySelector("[data-role='saved-input-type']")) {
+					const notice = document.createElement("p");
+					notice.dataset.role = "saved-input-type";
+					notice.className = "text-sm text-base-medium";
+					if (["name", "description"].includes(schema.id)) {
+						notice.textContent = "This input's type cannot be changed.";
+					} else {
+						const action = document.createElement("strong");
+						action.textContent = "Replace or Delete";
+						notice.append(
+							"Click ",
+							action,
+							" in order to change this input's type.",
+						);
+					}
+					section.replaceChildren(notice);
+				}
+			}
+			if (["multiple", "location"].includes(setting)) {
+				const controls = section.matches("button, input, select")
+					? [section]
+					: section.querySelectorAll("button, input, select");
+				for (const control of controls) control.disabled = true;
+			}
+			if (["options", "columns"].includes(setting)) {
+				for (const row of section.querySelectorAll("[data-index]")) {
+					const item = schema[setting][Number(row.dataset.index)];
+					const key = setting === "options" ? "value" : "id";
+					if (saved[setting]?.some((original) => original[key] === item[key])) {
+						const remove = row.querySelector("[data-role='remove']");
+						if (remove) {
+							remove.disabled = false;
+							remove.title =
+								"Save will clear values for this removed choice or column.";
+						}
+					}
+				}
+			}
+		}
 	}
 
 	selectItem() {
 		const item = this.builder.selectedElement;
+		item.settings = this.create(item.schema);
 		this.panel.replaceChildren(...item.settings);
 		this.panel.dataset.visible = "true";
 		this.builder.formSettings.visible = false;

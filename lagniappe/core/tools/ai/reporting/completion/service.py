@@ -33,6 +33,8 @@ from ..proposals.references import _first_data_reference, _has_form_reference_or
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_unreadable_pdf_is_saved_skipped_and_reported
 # @matrix ai-report : evidence-mapping existing-task focused-prompt issue partial-update persistence preservation submission-completion unreadable-pdf
 # @matrix form-schema submission : empty issue preservation submission-completion
+# @tests tests_unit/test_020f_ai_report_completion.py::test_submission_completion_repairs_invalid_table_once
+# @matrix form-table : ai-value validation
 def complete_organize_submissions(
     proposal,
     report,
@@ -59,7 +61,7 @@ def complete_organize_submissions(
         if not isinstance(action, dict):
             continue
         action_type = action.get("type")
-        if action_type == "extend_form_schema":
+        if action_type == "update_form_schema":
             prior_schema_updates.append(action)
             continue
         if action_type not in {
@@ -127,17 +129,21 @@ def complete_organize_submissions(
             completion_context,
             service_tier=service_tier,
         )
-        if generate:
-            raw_result = generate(prompt)
-            results = validate_organize_submission_results(raw_result, targets)
-        else:
-            results = ai_model.generate_content(
-                prompt,
-                validator=lambda result: validate_organize_submission_results(
-                    result,
-                    targets,
-                ),
-            )
+        for attempt in range(2):
+            raw_result = generate(prompt) if generate else ai_model.generate_content(prompt)
+            try:
+                results = validate_organize_submission_results(raw_result, targets)
+                break
+            except exceptions.AIException as error:
+                if attempt:
+                    raise
+                prompt.add_context("invalid_submission_result", raw_result)
+                prompt.add_instructions(
+                    f"Correct this submission validation error: {error}\n"
+                    "Return all requested submissions again using the original evidence. "
+                    "For tables, return actual data rows keyed by exact column ids; "
+                    "never return column headings as row values."
+                )
         ai_debug(
             "organize.submission_completion.complete",
             target_count=len(targets),

@@ -60,8 +60,6 @@ class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty):
 
     _icon = "checklist"
     _ordering = Ordering.EXISTS
-    repeating_default = False
-    restore_on_uncomplete = False
 
     @property
     def value(self):
@@ -117,7 +115,7 @@ class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty):
 
     @property
     def ai_value(self):
-        return deepcopy(self.items) or None
+        return deepcopy(self.value) or None
 
     @property
     def search_key(self):

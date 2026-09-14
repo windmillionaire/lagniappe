@@ -254,6 +254,7 @@ export class EditWatcher {
 			if (!widget) {
 				form.dataset.operation = descriptor.operation;
 				form.dataset.operationRevision = String(descriptor.revision ?? 0);
+				form.dataset.operationScope = descriptor.scope || "";
 				form.dataset.deferredLock = "form";
 			}
 			tracked.push({

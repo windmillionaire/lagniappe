@@ -39,6 +39,7 @@ class Scope(DBProperty):
     _id = "scope"
 
     AUTOFILL_FORM = "form-autofill"
+    FORM_CHANGE = "form-change"
 
     @staticmethod
     # @testable true

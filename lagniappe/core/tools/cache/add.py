@@ -57,6 +57,10 @@ def _redis_details(entity):
     elif kind in {"page", "task"}:
         form = entity.form
         details["form_version"] = (form.version or "") if form else ""
+        if form is None and getattr(entity, "db", {}).get("form"):
+            details.pop("form_hash", None)
+        else:
+            details["form_hash"] = form.hash if form and not form.reserved else None
     if kind == "file":
         owner = entity.owner
         if owner:

@@ -87,7 +87,6 @@ def test_report_phases_reuse_current_report_without_loading_input_files(monkeypa
 # @matrix deferred-jobs : checkpoint
 @pytest.mark.parametrize("origin", ["email", "api", "web"])
 def test_organize_fileless_remote_pipeline_and_resume(monkeypatch, origin):
-    from lagniappe.core import exceptions
     from testing.utility.ai_report_fakes import _test_user
     actor = _test_user("email-update-owner")
     report = SimpleNamespace(
@@ -108,11 +107,6 @@ def test_organize_fileless_remote_pipeline_and_resume(monkeypatch, origin):
     context = DeferredJobContext(job=SimpleNamespace(attempt=1), actor=actor, notification=None,
         inputs={"report": report}, parameters={}, checkpoint={})
     adapter = report_adapters.OrganizeReportAdapter()
-    if origin == "web":
-        with pytest.raises(exceptions.ValidationError, match="uploaded file in the UI"):
-            adapter.prepare(context)
-        assert not generated
-        return
     adapter.prepare(context)
     assert context.checkpoint["stage"] == "ready_to_apply"
     assert context.checkpoint["proposal"] == proposal

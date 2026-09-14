@@ -37,6 +37,36 @@ name narrow dependent changes; cache-state and search-delete intents are
 post-commit effects. Intents are consumed only after all durable writes and
 deletes succeed, so a failed commit can be retried from the same domain state.
 
+Form publication stages new HTML at isolated Storage paths, then atomically
+commits its references and Form changes with exact source-row guards. Publication
+reads the saved Form at the explicit save boundary; Form construction and ordinary
+row access do not retain a second row or intercept database reads. The saved
+source supplies the compatibility check, prior generation, restriction comparison,
+and concurrency guard. Creating a Form never queues permission reconciliation:
+there are no existing submissions to update. Content edits invalidate submission
+revisions without queuing permission work. An existing Form's restriction change
+queues reconciliation after the durable save, with failed dispatches remaining
+retryable.
+A conversion preserves the previous Form generation and its independent HTML/image
+assets in FormHistory; compatible saves only refresh the content fingerprint.
+`ExactEntityState` includes the absence of additional
+properties, so concurrently adding a restriction is detected even if the
+modified timestamp is unchanged. Document checkpoints retain their narrower
+property-subset guards. The shared executor also collects history-creation
+and completion guards. A rejected compare-and-set raises `MutationConflict`
+before any durable Datastore mutation. Builder Save rechecks its baseline on retry and
+preserves concurrent restrictions. Known rejected attempt blobs are removed
+with generation-qualified deletion; ambiguous commit failures retain objects
+until their references can be reconciled. Replaced live HTML is deleted only after
+an accepted commit; independently archived generation assets remain intact.
+
+Representation-changing builder Saves stage a `pending_form_change` and deferred
+job rather than publishing the schema immediately. The executor fences affected
+writes and deletes using the current pending marker and generation. Migration
+application uses explicit, lease-guarded answer masks and normal projection/cache
+effects; successful publication uses the same archive and exact-source guards
+above. See [BACKEND_JOBS.md](BACKEND_JOBS.md#deterministic-form-changes).
+
 ## Property masks
 
 Masked writes use Datastore `update`, not a partial upsert. A missing row is
@@ -69,6 +99,12 @@ lifecycle. See [SYNC_DOCUMENTS.md](SYNC_DOCUMENTS.md).
 4. runs cache, search, and blob cleanup; and
 5. returns a `MutationOutcome` that separates durable commit from post-commit
    completion.
+
+Deleting a Form archives its current generation and deletes the Form in the same
+guarded Datastore transaction. A concurrent Form edit rejects both operations.
+The mutation writer accepts explicit `deletes` alongside writes for this atomic
+boundary. When a plan has concurrency guards, its remaining durable deletes also
+commit with the guarded writes so that a racing migration cannot be bypassed.
 
 A post-commit Redis or Storage failure never rolls back or obscures the durable
 result. Callers must inspect and report post-commit errors when their workflow

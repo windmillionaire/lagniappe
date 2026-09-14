@@ -1424,8 +1424,9 @@ def test_get_guidelines_returns_named_bundle():
 
     assert schema_evolution["task"] == "schema_evolution"
     assert "Schema Evolution Guidelines" in schema_evolution["guidelines"]
-    assert "additive, non-destructive" in schema_evolution["guidelines"]
-    assert "Do not delete, rename, reorder" in schema_evolution["guidelines"]
+    assert "preview_form_schema_update" in schema_evolution["guidelines"]
+    assert "remove_field" in schema_evolution["guidelines"]
+    assert "user reviews" in schema_evolution["guidelines"]
 
     page_document = ai_get_guidelines.execute_get_guidelines(
         {"task": "page_document"},
@@ -2167,9 +2168,8 @@ def test_get_schema_includes_values_by_id_without_label_collisions(monkeypatch, 
         {"id": entity.urlsafe_key, "include_values": True}, user
     )
 
-    # Values use the existing AI representation, not raw stored keys. Explicit
-    # negative answers must remain present (checkbox AI text is "False").
-    assert result["values"] == {**expected, "checkbox-confirmed": "False"}
+    # Exact IDs and explicit boolean answers survive the schema-value read.
+    assert result["values"] == expected
     assert result["schema"] == form.schema
     assert set(result) == {
         "entity",
@@ -2197,6 +2197,56 @@ def test_get_schema_includes_values_by_id_without_label_collisions(monkeypatch, 
     assert ai_get_schema.execute_get_schema(
         {"id": entity.urlsafe_key, "include_values": True}, user
     ) == {"error": "Access denied"}
+
+
+# @matrix ai form-schema : schema tool-context
+# @pair form-table:typed-values
+@pytest.mark.unit
+def test_get_schema_preserves_collection_rows_and_typed_cells(monkeypatch):
+    form = TestEntities.get("FORM", {"name": "Inventory", "hash": "typed-form"})
+    form.form_type = "task"
+    form.schema = [
+        {"id": "table-items", "type": "table", "title": "Items", "columns": [
+            {"id": "row-name", "type": "input", "input": "text", "title": "Same"},
+            {"id": "row-qty", "type": "input", "input": "number", "title": "Same"},
+            {"id": "row-done", "type": "checkbox", "title": "Done"},
+            {"id": "row-link", "type": "link", "location": "out", "title": "Source"},
+        ]},
+        {"id": "todo-items", "type": "todo", "title": "Checklist"},
+    ]
+    task = TestEntities.get("TASK", {"name": "Stock", "hash": "typed-task"})
+    task.page = TestEntities.get("PAGE", {"name": "Stock Page"})
+    task.form = form
+    task.properties.submission.value = {
+        "table-items": {"rows": [
+            {"row-name": "Pens", "row-qty": 0, "row-done": False,
+             "row-link": {"title": "Catalog", "url": "https://example.com/catalog"}},
+            {"row-name": "Folders", "row-qty": 7, "row-done": True},
+            {"row-done": False},
+            {"row-name": "Unknown quantity"},
+        ]},
+        "todo-items": {"items": [{"text": "Order stock", "checked": False}]},
+    }
+    expected = task.properties.submission.form_value
+    user = SimpleNamespace(is_authenticated=True, is_owner=True, has_permission=lambda *a, **k: True)
+    monkeypatch.setattr(ai_get_schema.Entities, "fetch_one", lambda identifier, request: task if isinstance(identifier, str) else identifier)
+    result = ai_get_schema.execute_get_schema({"id": task.urlsafe_key, "include_values": True}, user)
+    assert result["values"] == expected
+    rows = result["values"]["table-items"]["rows"]
+    assert len(rows) == 4
+    assert type(rows[0]["row-qty"]) in (int, float)
+    assert rows[0]["row-qty"] == 0
+    assert rows[0]["row-done"] is False
+    assert rows[1]["row-done"] is True
+    assert rows[2] == {"row-done": False}
+    assert "row-qty" not in rows[3]
+    assert rows[0]["row-name"] == "Pens"
+    assert rows[0]["row-link"] == {"title": "Catalog", "url": "https://example.com/catalog"}
+    # The ordinary entity/history projection uses the same typed collection
+    # values as exact-ID schema reads, without a second raw-value copy.
+    projected = task.to_ai(user)
+    assert projected["Items"] == expected["table-items"]
+    assert projected["Checklist"] == expected["todo-items"]
 
 
 # @matrix ai form-schema : autofill category-forms schema
@@ -2983,6 +3033,7 @@ def test_ai_get_file_reports_unsupported_original_file(monkeypatch):
 
 
 # @matrix ai tasks : context files task-history tool-context
+# @matrix submission task-completion : ai missing-schema raw-values
 @pytest.mark.unit
 def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     user = TestEntities.get(
@@ -3102,10 +3153,9 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     )
     assert "completed_at" not in result["history"][0]
     assert result["history"][0]["description"] == "Completed at the service shop."
-    assert result["history"][0]["Form"]["hash"] == "hash:history-service-form"
-    assert result["history"][0]["Form"]["form_name"] == "Service Form"
-    assert result["history"][0]["Form"]["schema"] == form.schema
+    assert result["history"][0]["Form"] == {"schema": form.schema, "generation": 0}
     assert result["history"][0]["Service Notes"] == "Synthetic oil"
+    assert "Saved answers (original labels unavailable)" not in result["history"][0]
     assert "input-service-notes" not in result["history"][0]
     assert "submission" not in result["history"][0]
     assert result["history"][0]["Attachments"] == [
@@ -3132,6 +3182,66 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     assert ai_get_task_history.execute_get_task_history({}, user) == {
         "error": "id is required"
     }
+
+
+# @matrix ai tasks : original-completion permissions schema-version
+@pytest.mark.unit
+def test_get_task_history_original_answers_use_saved_schema_and_permissions(monkeypatch):
+    from copy import deepcopy
+    from lagniappe.core.definitions import Action
+    from lagniappe.core.tools import form_drafts, form_definitions
+
+    monkeypatch.setattr(form_definitions.database_get, "urlsafe_key", lambda key: key)
+    user = TestEntities.get("USER", {"name": "Owner", "owner": True, "hash": "original-owner"})
+    task = TestEntities.get("TASK", {"name": "Inventory", "hash": "original-task"})
+    task.page = TestEntities.get("PAGE", {"name": "Stock", "hash": "original-page"})
+    form = TestEntities.get("FORM", {"name": "Inventory", "hash": "original-form"})
+    old_schema = [
+        {"id": "count", "type": "input", "input": "text", "title": "Count"},
+        {"id": "signed", "type": "signature", "title": "Signed"},
+        {"id": "inventory", "type": "table", "title": "Inventory", "columns": [
+            {"id": "name", "type": "input", "input": "text", "title": "Same"},
+            {"id": "quantity", "type": "input", "input": "number", "title": "Same"},
+            {"id": "done", "type": "checkbox", "title": "Done"},
+        ]},
+    ]
+    original_values = {"count": "007", "signed": True, "inventory": {"rows": [{"name": "Pens", "quantity": 0, "done": False}]}}
+    form.schema = [{"id": "count", "type": "input", "input": "number", "title": "Count"}]
+    form.generation = 1
+    task.form = form
+    task.submission = {"count": 7}
+    task.db.update(completed=True, generation=1, completed_submission={
+        "form_key": form.urlsafe_key, "generation": 0, "submission": deepcopy(original_values),
+    })
+    monkeypatch.setattr(ai_get_task_history.Entities, "fetch_one", lambda *a, **k: task)
+    monkeypatch.setattr(task.__class__, "history", property(lambda self: []))
+    monkeypatch.setattr(form_drafts, "resolve_form_generation", lambda *args: SimpleNamespace(schema=old_schema))
+    before = deepcopy(task.db)
+    result = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)
+    assert result["task"]["Count"] == 7
+    assert result["original_completion"] == {"generation": 0, "schema": old_schema, "schema_available": True, "values": original_values}
+    assert result["original_completion"]["values"]["inventory"]["rows"][0]["done"] is False
+    assert task.db == before
+    assert "original_completion" not in ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key}, user)
+    monkeypatch.setattr(task, "allowed", lambda action, user=None: action == Action.VIEW)
+    denied = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)
+    assert denied == {"error": "Original completed answers require edit access to this Task."}
+    assert "task" in ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key}, user)
+    monkeypatch.setattr(task, "allowed", lambda *a, **k: True)
+    task._submission_definition = None
+    monkeypatch.setattr(form_drafts, "resolve_form_generation", lambda *args: None)
+    unavailable = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)["original_completion"]
+    assert unavailable["schema_available"] is False
+    assert unavailable["values"] is None
+    assert "007" not in str(unavailable)
+    task.db["completed_submission"] = "not-json"
+    assert ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user) == {"error": "The saved completion is invalid and needs review."}
+    task.db.pop("completed_submission")
+    legacy = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)["original_completion"]
+    assert legacy["generation"] == 1
+    assert legacy["values"] == {"count": 7}
+    task.completed = False
+    assert ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)["original_completion"] is None
 
 
 # @matrix ai : category citations project schedule schema validation

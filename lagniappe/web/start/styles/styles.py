@@ -13,7 +13,7 @@ STYLES = {
 		"icon": "icon-base text-kind-default"
 	},
 	"builder": {
-		"view": "group/builder mx-auto flex max-w-7xl flex-row justify-center gap-8 px-4 pt-4 sm:px-0 sm:pt-6 lg:pt-8",
+		"view": "group/builder mx-auto hidden max-w-7xl flex-row justify-center gap-8 px-4 pt-4 sm:px-0 sm:pt-6 lg:flex lg:pt-8",
 		"component": "text-md flex cursor-move flex-row items-center gap-3 rounded-md bg-form-bg px-3 py-1.5 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark",
 		"header": {
 			"model": "h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold",
@@ -26,7 +26,7 @@ STYLES = {
 		},
 		"name": "border-b border-dashed focus:outline-none ml-2 w-auto max-w-xs bg-transparent border-base-medium focus:border-form-default",
 		"switch": {
-			"container": "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default",
+			"container": "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default",
 			"toggle": "pointer-events-none h-5 w-5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out grid place-items-center group-data-[active=true]/toggle:translate-x-5"
 		},
 		"model": "form-element rounded-md bg-base-bg p-2 text-sm data-[selected=true]:outline-2 data-[selected=true]:outline-kind-default",
@@ -92,7 +92,7 @@ STYLES = {
 				"default": "group/toolbar mt-4 border-base-light/50 bg-base-bg"
 			},
 			"divider": "mx-1 hidden h-6 w-px bg-base-light/50 md:block md:first:hidden md:last:hidden",
-			"section": "flex flex-row items-center gap-2",
+			"section": "flex flex-row flex-wrap items-center gap-2",
 			"tool": "grid size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm",
 			"menu": "flex min-h-8 w-fit flex-row items-center gap-1 rounded-md bg-white outline outline-base-light/50 px-2 py-1 text-center text-base font-semibold shadow-sm",
 			"optionHeader": "text-lg font-bold pt-2 text-kind-default pb-1",
@@ -107,7 +107,6 @@ STYLES = {
 			"iconContext": "editor-toolbar-icon-context",
 			"portalIconContext": "editor-toolbar-portal-icon-context",
 			"menuIcon": "editor-toolbar-menu-icon",
-			"historyIcon": "editor-toolbar-history-icon",
 			"caret": "editor-toolbar-caret opacity-50"
 		},
 		"container": "html-content min-h-50 px-4 pt-6 pb-4 focus:outline-none sm:px-6 sm:pt-8 sm:pb-6"
@@ -164,7 +163,7 @@ STYLES = {
 			"list": "flex min-w-0 flex-col gap-1",
 			"row": "flex min-h-8 min-w-0 items-center gap-2 rounded-md bg-white/60 px-2 py-1 sm:text-sm",
 			"text": "min-w-0 flex-1 text-left text-base-dark [overflow-wrap:anywhere]",
-			"completeText": "text-base-medium line-through",
+			"completeText": "text-base-dark",
 			"inlineInput": "min-w-0 flex-1 border-b border-dashed border-base-medium bg-transparent px-1 py-0.5 text-base-dark focus:border-kind-default focus:outline-none",
 			"actions": "ml-auto flex shrink-0 flex-row items-center gap-1"
 		},
@@ -302,6 +301,20 @@ STYLES = {
 			"item": "group/item flex flex-row items-center justify-between gap-2 px-4 py-2 text-sm font-semibold hover:bg-kind-bg sm:px-6 sm:py-3"
 		}
 	},
+	"error": {
+		"debug": {
+			"section": "error-debug-section",
+			"content": "error-debug-content",
+			"badge": {
+				"base": "error-debug-badge",
+				"error": "error-debug-badge-error",
+				"request": "error-debug-badge-request",
+				"entity": "error-debug-badge-entity"
+			},
+			"type": "error-debug-type",
+			"timestamp": "error-debug-timestamp"
+		}
+	},
 	"siteSettings": {
 		"migration": {
 			"releaseSummary": "cursor-pointer font-semibold",
@@ -384,6 +397,7 @@ STYLES = {
 		"reset": "absolute top-2 left-2 px-2 py-1 text-base sm:text-sm border rounded shadow-sm text-base-dark border-base-light hover:bg-delete-default hover:text-white"
 	},
 	"table": {
+		"container": "min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white",
 		"default": "w-full table-auto border-collapse divide-y sm:text-sm mt-4",
 		"embedded": "w-full table-auto border-collapse divide-y sm:text-sm min-w-max bg-white",
 		"body": "sm:divide-y w-full sm:divide-base-light/50",

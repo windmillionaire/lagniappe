@@ -18,6 +18,7 @@ from lagniappe.core.tools.auth.references import (
     UNAVAILABLE_REFERENCE_ERROR,
 )
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
+from lagniappe.core.tools.polling.projections import page_tasks_revision
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -123,7 +124,7 @@ def document_settings(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
 # @matrix tasks : basic create
 @pages.route("<key>/tasks", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=page_tasks_revision)
 def tasks(key, **kwargs):
     page = kwargs["entity"]
 
@@ -457,6 +458,8 @@ def patch(key, **kwargs):
         locked = deferred_autofill.locked_response(page)
         if locked:
             return locked
+        if str(patch_data.get("form_generation", "0")) != str(page.generation):
+            return responses.error("The form fields changed. Reload this table before editing the value.")
 
     if schema_id in page.properties:
         field = page.properties[schema_id]
@@ -489,6 +492,7 @@ def patch(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_from_category_index
+# @matrix pages : required-name
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
 # @matrix pages : category-index create mobile-tools
@@ -498,6 +502,9 @@ def patch(key, **kwargs):
 def create(key, **kwargs):
     """Create a page within a category. Key is the category key, not a page key."""
     category = kwargs["entity"]
+
+    if not (request.form.get("name") or "").strip():
+        return responses.error("Name this page before creating it.")
 
     try:
         create_data = _page_data(request.form, category=category)

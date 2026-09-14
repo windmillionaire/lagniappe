@@ -1,7 +1,10 @@
+import { mergeAttributes } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 
 /**
- * @testable infrastructure
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_image_layout_survives_builder_save_and_reload
+ * @matrix editor html-field : image-layout
  */
 const getImageStyles = (attrs) => {
 	const styles = [`width: ${attrs.width || "100%"}`, "display: block"];
@@ -34,14 +37,17 @@ export const CustomImage = Image.extend({
 			...Image.config.addAttributes(),
 			width: {
 				default: "100%",
+				rendered: false,
 				parseHTML: (element) => element.style.width || "100%",
 			},
 			float: {
 				default: "none",
+				rendered: false,
 				parseHTML: (element) => element.style.float || "none",
 			},
 			alignment: {
 				default: "center",
+				rendered: false,
 				parseHTML: (element) => {
 					const style = element.style;
 					if (style.marginLeft === "auto" && style.marginRight === "auto")
@@ -52,6 +58,15 @@ export const CustomImage = Image.extend({
 				},
 			},
 		};
+	},
+
+	renderHTML({ node, HTMLAttributes }) {
+		return [
+			"img",
+			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
+				style: getImageStyles(node.attrs),
+			}),
+		];
 	},
 
 	addNodeView() {

@@ -43,6 +43,9 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from playwright.sync_api import expect
+from lagniappe.core.entities import Entities
+from testing.definitions.form_definitions import FormDefinition
+from testing.resources.form import Form
 
 from testing.definitions import Forms, ModelTasks, SubmissionFields, Tasks, Users
 from testing.elements import Buttons, FormSelect, Modal, SpinnerButtons
@@ -145,7 +148,8 @@ def _status_filter_context(user):
     completed_task = Tasks.test_status_filter_completed.get(user)
     in_progress_task = Tasks.test_status_filter_in_progress.get(user)
     if not completed_task.entity.completed:
-        completed_task.mark_completed()
+        completed_task.entity.complete(user=Entities.USER.load(user.email))
+        completed_task.entity.save()
 
     model_task = ModelTasks.test_status_filter_model_task.get(user)
     user.go(model_task.project)
@@ -243,6 +247,30 @@ def test_in_progress_button(get_user):
     expect(
         results.locator(f"tr[data-key='{completed_task.key}']")
     ).not_to_be_visible()
+
+
+# @matrix model-tasks : status-filter nested-relations
+# @template tasks/index.html::view
+def test_status_filter_loads_task_page_form_permissions(get_user):
+    user = get_user(Users.OWNER)
+    model_task = ModelTasks.test_status_filter_model_task.get(user)
+    form = Form(user=user, definition=FormDefinition(
+        name=f"Status page form {uuid4().hex}", form_type="page",
+    )).create()
+    page = Entities.PAGE.create({"name": f"Status page {uuid4().hex}", "form": form.entity})
+    page.save()
+    task = Entities.TASK.create({"page": page, "name": "Task on a page with a form",
+                                "model": model_task.entity, "project": model_task.project.entity})
+    task.save()
+    try:
+        user.go(model_task.project)
+        results = _click_status_filter(model_task, "In Progress")
+        row = results.locator(f"tr[data-key='{task.urlsafe_key}']")
+        expect(row).to_be_visible()
+        expect(row).to_have_attribute("data-fingerprint", re.compile(r".+"))
+        expect(row).to_contain_text(task.name)
+    finally:
+        Entities.delete(page, form.entity)
 
 
 # @pair model-tasks:delete

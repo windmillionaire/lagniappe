@@ -30,7 +30,7 @@ from testing.utility.test_entities import TestEntities
 @pytest.mark.unit
 def test_remote_organize_update_contract_and_submission(monkeypatch):
     from lagniappe.core.tools.ai.reporting.contracts.workflows import (
-        is_remote_organize_update,
+        is_organize_update,
     )
 
     _patch_fake_keys(monkeypatch)
@@ -96,13 +96,13 @@ def test_remote_organize_update_contract_and_submission(monkeypatch):
         external_api.validate_external_proposal(
             {**proposal, "actions": []}, report, actor
         )
-    for origin, expected in (("api", True), ("email", True), ("web", False)):
+    for origin, expected in (("api", True), ("email", True), ("web", True)):
         report.origin = origin
-        assert is_remote_organize_update(report) is expected
+        assert is_organize_update(report) is expected
     report.origin = "api"
     report.input_files = [_test_file("uploaded.txt", "text/plain")]
     file_contract = external_api.plan_contract(report, actor, view="summary", **kwargs)
-    assert not is_remote_organize_update(report)
+    assert not is_organize_update(report)
     assert "summarize_file" in file_contract["permissions"]["allowed_actions"]
     assert len(file_contract["file_checklist"]) == 1
     assert file_contract["guidance_requirements"]["required_before_analysis"] == [
@@ -1487,8 +1487,8 @@ def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
 
     seen = {}
 
-    def execute(arguments, user):
-        seen.update(arguments=arguments, user=user)
+    def execute(arguments, user, *, candidate_search=False):
+        seen.update(arguments=arguments, user=user, candidate_search=candidate_search)
         return {"items": ["one"]}, [{"uri": "gs://private/one"}]
 
     actor = object()
@@ -1508,6 +1508,7 @@ def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
     assert seen == {
         "arguments": {"query": "one", "normalized": True},
         "user": actor,
+        "candidate_search": True,
     }
     assert result == {"items": ["one"]}
     assert parts == [{"uri": "gs://private/one"}]

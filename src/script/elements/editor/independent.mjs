@@ -303,18 +303,20 @@ export class IndependentDocument {
 		return normalizeHTML(this.editor.getHTML());
 	}
 
+	/**
+	 * @testable true
+	 * @matrix editor : initial-load
+	 */
 	_initEditor(html) {
 		return new Promise((resolve) => {
-			this.editor = independentEditor(this.container);
+			this.editor = independentEditor(this.container, html);
 
 			this.editor.on("create", () => {
 				if (this._destroyed) {
 					resolve(false);
 					return;
 				}
-				if (html.length > 0) {
-					this.editor.commands.setContent(html);
-				} else {
+				if (!html.length) {
 					this.container
 						.querySelector(".ProseMirror")
 						.classList.add("min-h-[200px]");
@@ -353,13 +355,19 @@ export class IndependentDocument {
 		this.target.classList.remove("hidden");
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_045_browser_persistence.py::test_editor_teardown_releases_toolbar_before_editor_view
+	 * @matrix editor html-field : listener-teardown builder-save
+	 */
 	destroy() {
+		if (this._destroyed) return;
 		this._destroyed = true;
 		this.retryButton?.removeEventListener("click", this._retry);
 		this.pendingContent = null;
 		this._pendingKeepalive = false;
-		this.editor?.destroy();
 		this.toolbar?.destroy();
+		this.editor?.destroy();
 		this.editor = null;
 		this.toolbar = null;
 	}

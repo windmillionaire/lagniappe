@@ -9,9 +9,9 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from lagniappe.core.definitions.asset import AssetVisibility
-from lagniappe.core.definitions import MutationEffectType, MutationOperation
+from lagniappe.core.definitions import MutationEffectType, MutationOperation, MutationIntentType
 from lagniappe.core.entities import Entities
-from lagniappe.core.entities.history import DocumentHistory, TaskHistory
+from lagniappe.core.entities.history import DocumentHistory, FormHistory, TaskHistory
 from lagniappe.core.entities.task import Task
 from lagniappe.core.exceptions import TaskCompletionError, ValidationError
 from lagniappe.core.mutations import plan_mutation
@@ -197,13 +197,16 @@ def test_task_uncomplete_after_complete(get_test_entities):
     assert task.db.get("files", []) == []
     assert file_entity.task is task
     assert file_entity.db["task"] == task.key
-    delete_asset.assert_called_once_with("task-signature-field")
+    delete_asset.assert_not_called()
+    cleanup = [intent for intent in task.mutation_intents if intent.intent is MutationIntentType.BLOB_DELETE]
+    assert [(intent.path, intent.visibility) for intent in cleanup] == [("signature.png", "private")]
+    assert task.assets == {}
     assert task.db.get("history") is True
 
 
-# @matrix task-completion : assignment repeating-default uncomplete
+# @matrix task-completion : assignment field-reset uncomplete
 @pytest.mark.unit
-def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
+def test_task_uncomplete_clears_submission_and_legacy_defaults_preserving_assignment(get_schema):
     assignee = TestEntities.get(
         "PAGE", {"name": "Persistent assignee", "hash": "persistent_assignee"}
     )
@@ -213,10 +216,10 @@ def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
     task = TestEntities.get(
         "TASK",
         {
-            "name": "Repeating submission task",
-            "hash": "repeating_submission_task",
-            "page": {"name": "Parent", "hash": "repeating_submission_parent"},
-            "form": {"name": "Inputs", "hash": "repeating_submission_form"},
+            "name": "Fresh submission task",
+            "hash": "fresh_submission_task",
+            "page": {"name": "Parent", "hash": "fresh_submission_parent"},
+            "form": {"name": "Inputs", "hash": "fresh_submission_form"},
         },
     )
     task.form.schema = get_schema("basic_inputs")
@@ -224,7 +227,7 @@ def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
     task.db["assigned_to"] = assignee.key
     task.properties.assigned_by._value = assigner
     task.db["assigned_by"] = assigner.key
-    task.db["default_submission"] = json.dumps({"input-textab12": "Repeat this value"})
+    task.db["default_submission"] = json.dumps({"input-textab12": "Legacy saved value"})
     task.properties.submission.value = {
         "input-textab12": "Completed value",
         "input-numgh78": 12,
@@ -233,10 +236,10 @@ def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
 
     task.uncomplete()
 
-    assert task.submission == {"input-textab12": "Repeat this value"}
-    assert task.properties.submission.form_value == {
-        "input-textab12": "Repeat this value"
-    }
+    assert task.submission == {}
+    assert task.properties.submission.form_value == {}
+    assert "submission" not in task.db
+    assert "default_submission" not in task.db
     assert task.assigned_to is assignee
     assert task.assigned_by is assigner
     assert task.db["assigned_to"] == assignee.key
@@ -326,11 +329,13 @@ def test_task_history_create_snapshots_completed_task_state():
         get=lambda: b"signature-bytes",
     )
 
-    task.form.version = "schema-v1"
+    task.form.generation = 2
+    task.db["generation"] = 2
+    task.db["schema_version"] = "schema-v1"
+    task.submission = submission
     task.completed = True
     task.completed_on = completed_on
     task.completed_by = completed_by
-    task.submission = submission
     task.page = parent
     task.description = "Finished carefully"
     task.properties.linked_pages._value = [linked_page]
@@ -362,18 +367,19 @@ def test_task_history_create_snapshots_completed_task_state():
     assert history.files == [file_entity]
     assert file_entity.task is task
     assert history.form is task.form
-    assert history.version == "schema-v1"
+    assert history.generation == 2
     assert history.db["completed_by"] == completed_by.page.key
     assert history.db["page"] == parent.key
     assert history.db["name"] == "Completed form task"
     assert history.db["linked_pages"] == [linked_page.key]
     assert history.db["files"] == [file_entity.key]
-    assert history.db["schema_version"] == "schema-v1"
+    assert history.db["generation"] == 2
+    assert "schema_version" not in history.db
     assert history.db["completed_on"] == completed_on
     assert "hash" not in history.db
     assert "completed" not in history.db
 
-    copy_asset.assert_called_once_with(signature_asset)
+    copy_asset.assert_called_once_with(signature_asset, isolated=True)
 
 
 # @matrix task-combine : completed-on deterministic-tie modified winner
@@ -411,7 +417,7 @@ def test_task_history_create_clones_another_task_and_existing_history():
     main_page = TestEntities.get("PAGE", {"name": "Main Page", "hash": "pgcmb2"})
     linked_page = TestEntities.get("PAGE", {"name": "Linked Page", "hash": "pgcmb3"})
     form = TestEntities.get("FORM", {"name": "Combine Form", "hash": "frmcmb1"})
-    form.version = "source-schema-v2"
+    form.generation = 2
     file_entity = TestEntities.get(
         "FILE", {"name": "Source attachment", "hash": "filcmb1"}
     )
@@ -426,6 +432,7 @@ def test_task_history_create_clones_another_task_and_existing_history():
     source.form = form
     source.completed_on = completed_on
     source.submission = {"notes": "source submission"}
+    source.db["generation"] = 2
     source.properties.linked_pages._value = [linked_page]
     source.db["linked_pages"] = [linked_page.key]
     source.files = [file_entity]
@@ -442,7 +449,8 @@ def test_task_history_create_clones_another_task_and_existing_history():
     ):
         source_history = TaskHistory.create(source)
         source_history.created = datetime(2024, 8, 1, tzinfo=timezone.utc)
-        source_history.version = "source-schema-v1"
+        source_history.generation = 1
+        form.generation = 3
         source_history._assets = {
             "source-signature": SimpleNamespace(name="source-signature")
         }
@@ -457,14 +465,14 @@ def test_task_history_create_clones_another_task_and_existing_history():
     assert current_clone.completed_on == completed_on
     assert current_clone.created == completed_on
     assert current_clone.form is form
-    assert current_clone.version == "source-schema-v2"
+    assert current_clone.generation == 2
     assert current_clone.submission == {"notes": "source submission"}
     assert current_clone.files == [file_entity]
     assert current_clone.linked_pages == [linked_page]
 
     assert history_clone.task is main
     assert history_clone.created == source_history.created
-    assert history_clone.version == "source-schema-v1"
+    assert history_clone.generation == 1
     assert history_clone.submission == source_history.submission
     assert copy_asset.call_count == 3
 
@@ -527,6 +535,15 @@ def test_asset_mixin_copy_asset_copies_storage_and_updates_definition(monkeypatc
         "large": False,
     }
     assert json.loads(target.db["assets"]) == target.assets
+
+    first_attempt = target.copy_asset(source_asset, isolated=True)
+    second_attempt = target.copy_asset(source_asset, isolated=True)
+    assert first_attempt.path != copied.path
+    assert second_attempt.path != first_attempt.path
+    assert first_attempt.path.endswith(".png")
+    assert second_attempt.path.endswith(".png")
+    assert calls[-1][2] == second_attempt.path
+    assert target.assets["task-signature-field"]["path"] == second_attempt.path
 
 
 # @pair document-history:asset-copy
@@ -654,6 +671,7 @@ def test_task_create_history_entry_accepts_completion_overrides(
     page = TestEntities.get("PAGE", {"name": "Parent Page", "hash": "pgth03"})
     form = TestEntities.get("FORM", {"name": "Task Form", "hash": "frmth3"})
     form.schema = get_schema("text_input_only")
+    form.generation = 7
     live_file = TestEntities.get("FILE", {"name": "Live File", "hash": "filth3a"})
     event_file = TestEntities.get("FILE", {"name": "Event File", "hash": "filth3b"})
     task = TestEntities.get(
@@ -686,12 +704,19 @@ def test_task_create_history_entry_accepts_completion_overrides(
     assert history.description == "Older inspection"
     assert history.files == [event_file]
     assert history.form is form
+    assert history.generation == 7
     assert history.submission == {"input-textab12": "Older event"}
     assert task.completed_on == datetime(2025, 8, 5, 14, 30, tzinfo=timezone.utc)
     assert task.name == "Inspection"
     assert task.description == "Current completion"
     assert task.files == [live_file]
-    plan = plan_mutation(MutationOperation.SAVE, task, registry=Entities)
+    persisted_task = SimpleNamespace(db=dict(task.db))
+    with patch.object(
+        Entities,
+        "fetch_one",
+        side_effect=lambda key, **kwargs: persisted_task if key == task.key else None,
+    ):
+        plan = plan_mutation(MutationOperation.SAVE, task, registry=Entities)
     writes = {
         effect.entity.key: effect
         for effect in plan.effects
@@ -806,7 +831,7 @@ def test_task_complete_with_near_term_schedule_uncompletes_immediately():
         task.complete()
 
     create_task.assert_not_called()
-    create_history_entry.assert_called_once_with()
+    create_history_entry.assert_called_once_with(history_key=None, submission_source="original")
     assert task.completed is False
     assert task.completed_on is None
     assert task.properties.completed_by.value is None
@@ -906,3 +931,29 @@ def test_manual_uncomplete_clears_pending_scheduled_delivery():
         intent.intent.value == "scheduled-uncomplete-dispatch"
         for intent in task.mutation_intents
     )
+
+
+# @matrix form-schema html-field : history content-version
+@pytest.mark.unit
+@pytest.mark.parametrize("content_flag", [None, 1])
+def test_form_history_create_copies_explicit_saved_definition_without_asset_copy(content_flag):
+    source = TestEntities.get("FORM", {"name": "Saved definition", "hash": "old-form-definition"})
+    source.schema = [{"id": "previous", "type": "input", "title": "Discarded draft"}]
+    source.schema = [{"id": "intro", "type": "html"}, {"id": "note", "type": "input", "title": "Saved label"}]
+    source.generation = 0
+    source.form_type = "task"
+    if content_flag is not None:
+        source.db["form_content_version"] = content_flag
+    with patch("lagniappe.core.entities.entity.database_utility.create_key", return_value="old-form-history"), patch("lagniappe.core.tools.database.assets.copy_file") as copy_file:
+        history = FormHistory.create(source, 0)
+    assert history.form is source
+    assert history.schema == source.schema
+    assert history.generation == 0
+    assert history.name == "Saved definition"
+    assert history.form_type == "task"
+    assert history.db.get("form_content_version") == content_flag
+    assert history.content_available is (content_flag == 1)
+    assert history.assets == {}
+    source.schema = [{"id": "note", "type": "input", "title": "Later label"}]
+    assert history.schema[1]["title"] == "Saved label"
+    copy_file.assert_not_called()

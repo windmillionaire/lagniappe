@@ -4,6 +4,7 @@ import re
 
 from lagniappe.core import exceptions
 from lagniappe.core.properties.schema import SchemaFields
+from lagniappe.core.properties.form_table import validate_ai_table
 from lagniappe.core.tools import dates
 
 from ...debug import ai_debug
@@ -69,6 +70,8 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_invalid_static_form_content
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_create_task_page_reference
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_remote_organize_repairs_malformed_table_patch
+# @tests tests_unit/test_004l_form_schema_updates.py::test_organize_repairs_prepared_conversions_before_returning_plan
 # @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission task-page validation
 # @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
@@ -83,6 +86,8 @@ def validate_proposal(
     user=None,
     preserve_document_markdown=False,
     resolved_reference_details=None,
+    allow_legacy_schema=False,
+    prepare_schema_changes=False,
 ):
     """Validate the JSON action proposal returned by the organize prompt."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
@@ -127,9 +132,10 @@ def validate_proposal(
             raise exceptions.AIException("Each report action must be an object.")
 
         action_type = action.get("type")
-        if action_type not in ALLOWED_ACTIONS:
+        legacy_schema = allow_legacy_schema and action_type == "extend_form_schema"
+        if action_type not in ALLOWED_ACTIONS and not legacy_schema:
             raise exceptions.AIException(f"Unknown report action: {action_type}")
-        if action_type not in allowed:
+        if action_type not in allowed and not legacy_schema:
             raise exceptions.AIException(
                 f"Report action not allowed for this user: {action_type}"
             )
@@ -144,8 +150,10 @@ def validate_proposal(
                 )
 
         action_label = f"{action_id or index + 1} ({action_type})"
+        if legacy_schema and any(operation.get("op") not in {"add_field", "add_select_option"} for operation in action.get("data", {}).get("operations", [])):
+            raise exceptions.AIException("Legacy schema actions only support additive operations.")
         _validate_action_data_shape(
-            action,
+            {**action, "type": "update_form_schema"} if legacy_schema else action,
             action_label,
             allow_empty_submission_updates=allow_empty_submission_updates,
             require_pending_submission_target=require_pending_submission_target,
@@ -255,6 +263,14 @@ def validate_proposal(
                     "input file. Duplicate report_file_ref values: "
                     f"{', '.join(str(file_ref) for file_ref in duplicate_summary_refs)}"
                 )
+
+    if prepare_schema_changes:
+        from ..schema_updates import prepare_schema_updates
+
+        try:
+            prepare_schema_updates(proposal, user)
+        except exceptions.ValidationError as error:
+            raise exceptions.AIException(f"update_form_schema: {error}") from error
 
     return proposal
 
@@ -409,8 +425,8 @@ def _validate_action_data_shape(
     if action_type == "attach_file":
         if set(data) - {"entity", "entity_action", "entity_name", "file", "display_name"}:
             raise exceptions.AIException(f"Action {action_label} uses entity/entity_action for its attachment target.")
-    if action_type == "extend_form_schema":
-        _validate_extend_form_schema_action_data(data, action_label)
+    if action_type == "update_form_schema":
+        _validate_update_form_schema_action_data(data, action_label)
     if action_type == "create_page" and not _proposal_string(data.get("name")):
         raise exceptions.AIException(f"Action {action_label} requires data.name.")
     if action_type in {"create_page", "create_task"}:
@@ -548,7 +564,7 @@ def _validate_create_form_action_data(data, action_label):
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unsafe_schema_update_operations
 # @matrix form-schema : proposal schema-update validation
-def _validate_extend_form_schema_action_data(data, action_label):
+def _validate_update_form_schema_action_data(data, action_label):
     if not _first_data_reference(data, "form"):
         raise exceptions.AIException(f"Action {action_label} requires data.form.")
 
@@ -598,6 +614,14 @@ def _validate_extend_form_schema_action_data(data, action_label):
                     f"Action {action_label} {operation_label} option requires "
                     "value and label."
                 )
+            continue
+        if operation_type in {"update_field", "remove_field"}:
+            if not _proposal_string(operation.get("schema_id")):
+                raise exceptions.AIException(f"Action {action_label} requires an exact schema_id.")
+            if operation_type == "update_field" and (not isinstance(operation.get("patch"), dict) or not operation["patch"]):
+                raise exceptions.AIException(f"Action {action_label} requires a nonempty field patch.")
+            continue
+        if operation_type == "reorder_fields" and isinstance(operation.get("ids"), list):
             continue
         raise exceptions.AIException(
             f"Action {action_label} {operation_label} has unsupported op."
@@ -860,3 +884,11 @@ def _validate_submission_update_action_data(
             raise exceptions.AIException(
                 f"Action {action_label} {row_label} requires new_value."
             )
+        value = update["new_value"]
+        if isinstance(value, dict) and "rows" in value:
+            try:
+                validate_ai_table(value)
+            except ValueError as error:
+                raise exceptions.AIException(
+                    f"Action {action_label} {row_label}: {error}"
+                ) from error

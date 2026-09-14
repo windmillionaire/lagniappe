@@ -6,6 +6,7 @@ import pytest
 from playwright.sync_api import expect
 
 from lagniappe.core.entities import Entities
+from lagniappe.core.definitions import Fetch
 from testing.definitions import (
     CommonFormFields,
     Forms,
@@ -285,9 +286,9 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     """
     Make one real provider call through the form builder Generate path.
 
-    The generated schema is saved by ``/forms/create-schema``. The builder should
-    therefore show the saved state immediately and keep the generated fields
-    after reload. The ``ai`` mark saves the prompt and response under
+    Generation changes only the current draft. The builder remains unsaved and
+    the durable Form is unchanged until the user explicitly saves. The ``ai``
+    mark saves the prompt and response under
     reports/test_reports/ for review.
     """
     user = get_user(Users.OWNER)
@@ -300,6 +301,8 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     ).create()
 
     builder = form.builder
+    persisted_before = Entities.fetch_one(form.key, request=Fetch.root())
+    before = dict(persisted_before.db)
     prompt = (
         "Create a compact volunteer intake form with full name, email, "
         "phone number, preferred role, availability, and notes."
@@ -327,7 +330,10 @@ def test_generate_form_schema_live_saved_state(get_user, request):
 
     assert generated_response.ok, response_text
     response_body = json.loads(response_text)
-    schema = response_body["schema"]
+    assert isinstance(response_body["operations"], list)
+    expect(generate.get_by_role("button", name="Generated", exact=True)).to_be_visible()
+    expect(user.locate(builder.SAVE_BUTTON)).to_have_attribute("data-saved", "false")
+    schema = builder.schema
     default_schema = [
         field for field in schema if field["id"] in {"name", "description"}
     ]
@@ -336,9 +342,7 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     ]
     report.record("schema", schema)
 
-    expect(generate).to_be_hidden()
-    expect(user.locate(builder.SAVE_BUTTON)).to_have_attribute("data-saved", "true")
-    assert builder.schema == schema
+    assert dict(Entities.fetch_one(form.key, request=Fetch.root()).db) == before
     expect(builder.default.locator(".form-element")).to_have_count(
         len(default_schema)
     )
@@ -346,7 +350,8 @@ def test_generate_form_schema_live_saved_state(get_user, request):
         len(generated_schema)
     )
 
-    user.page.reload()
+    builder.save()
+    form.reload()
     builder = Builder(user)
     expect(user.locate(builder.SAVE_BUTTON)).to_have_attribute("data-saved", "true")
     assert builder.schema == schema

@@ -12,6 +12,7 @@ Related Files:
 """
 
 from datetime import datetime, timedelta, timezone
+import json
 import re
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -74,7 +75,21 @@ def _save_ai_record(telemetry_id, created):
             "active_provider_stage": "structured_final",
             "resolved_model": "managed-test-model",
             "success": True,
-            "provider_requests": 1,
+            "provider_requests": 4,
+            "provider_responses": 4,
+            "tool_rounds": 2,
+            "calls_per_round": [1, 3],
+            "tool_calls": 4,
+            "tool_names": ["get_entity", "get_guidelines", "get_guidelines", "get_guidelines"],
+            "prompt_tokens": 31558,
+            "cached_tokens": 7847,
+            "output_tokens": 1118,
+            "thought_tokens": 1900,
+            "total_tokens": 34576,
+            "duration_ms": 29991,
+            "empty_response_retries": 0,
+            "exact_call_cache_hits": 0,
+            "outcome": "local_repair",
             "private_payload": "must not be exported",
         }
     )
@@ -213,13 +228,16 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(
     home_group = owner.locate("[data-role='analytics-prefix'][data-prefix='home']")
     expect(home_group).to_be_visible()
     with owner.page.expect_response("**/analytics/events/home*"):
-        home_group.locator("[data-role='expand']").click()
+        home_group.locator("summary").click()
 
     events = home_group.locator("[data-role='analytics-events']")
     expect(events).to_contain_text("Home")
     expect(events).to_contain_text("View")
     expect(events).to_contain_text(visitor.name)
-    expect(events).not_to_contain_text(owner.name)
+    view_rows = events.get_by_role("listitem").filter(
+        has=owner.page.get_by_text("View", exact=True)
+    )
+    expect(view_rows).not_to_contain_text(owner.name)
 
     retention_toggle = activity_retention.locator(
         "[data-role='analytics-retention-toggle']"
@@ -263,18 +281,61 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(
     assert DATA.datastore.get(recent_key) is None
 
 
+# @pair analytics:internal-request-exclusion
+@pytest.mark.e2e
+def test_analytics_excludes_internal_requests(get_user):
+    owner = get_user(Users.OWNER)
+    owner.go(SitePages.HOME)
+    marker = f"internal-exclusion-{uuid4().hex}"
+    ignored = ["/api", "/api/v1/tools/get_entity", "/mcp", "/mcp/tools", "/l", "/l/poll", "/l/update", "/analytics/"]
+    included = ["/", "/pages/example", "/tools/api-plan/example", "/links"]
+    result = owner.page.evaluate(
+        """async ({paths, marker}) => {
+            const statuses = [];
+            for (const path of paths) {
+                const response = await fetch('/analytics/track', {
+                    method: 'POST', credentials: 'include',
+                    headers: {'Content-Type': 'application/json',
+                        'X-CSRFToken': document.getElementById('token').value},
+                    body: JSON.stringify({action: 'update', path, page_title: marker}),
+                });
+                statuses.push(response.status);
+            }
+            return statuses;
+        }""",
+        {"paths": ignored + included, "marker": marker},
+    )
+    assert result == [200] * (len(ignored) + len(included))
+    from google.cloud.datastore.query import PropertyFilter
+
+    query = DATA.datastore.query(kind=KINDS.analytics.value)
+    query.add_filter(filter=PropertyFilter("page_title", "=", marker))
+    saved = list(query.fetch())
+    try:
+        assert sorted(row["path"] for row in saved) == sorted(included)
+    finally:
+        DATA.datastore.delete_multi([row.key for row in saved])
+
+
 # @matrix ai-observability : ai-only independent-clear independent-flags job-correlation
 # @pairs analytics:page-tracking deferred-jobs:diagnostics
+# @pair frontend-build:font-delivery
 # @template analytics/index.html::ai_observability
+# @template analytics/index.html::ai_runs
 @pytest.mark.e2e
 def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     get_user,
     browser_failures,
+    tmp_path,
 ):
     owner = get_user(Users.OWNER)
     telemetry_id = f"analytics-{uuid4().hex}"
     activity_key = _save_analytics_event("AI Clear Control", datetime.now(timezone.utc))
     ai_key = _save_ai_record(telemetry_id, datetime.now(timezone.utc))
+    report = Entities.REPORT.create(
+        {"user": owner.entity, "tool": "organize", "name": "Analytics run review"}
+    )
+    Entities.save(report)
     job = Entities.DEFERRED_JOB.create(
         {
             "actor": owner.entity,
@@ -283,11 +344,34 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
             "idempotency_key": telemetry_id,
             "dispatch_state": "complete",
             "telemetry_id": telemetry_id,
-            "inputs": {"report": {"kind": "report", "id": "opaque-report-key"}},
+            "inputs": {"report": {"kind": "report", "id": report.urlsafe_key}},
             "progress": {"phase": "finalizing"},
         }
     )
     Entities.save(job)
+    unmeasured_job = Entities.DEFERRED_JOB.create(
+        {
+            "actor": owner.entity,
+            "job_type": "report-organize",
+            "status": "succeeded",
+            "idempotency_key": f"unmeasured-{telemetry_id}",
+            "telemetry_id": f"unmeasured-{telemetry_id}",
+            "inputs": {"report": {"kind": "report", "id": "opaque-report-key"}},
+        }
+    )
+    Entities.save(unmeasured_job)
+
+    execution_job = Entities.DEFERRED_JOB.create(
+        {
+            "actor": owner.entity,
+            "job_type": "report-execution",
+            "status": "succeeded",
+            "idempotency_key": f"execution-{telemetry_id}",
+            "telemetry_id": f"execution-{telemetry_id}",
+            "inputs": {"report": {"kind": "report", "id": report.urlsafe_key}},
+        }
+    )
+    Entities.save(execution_job)
 
     owner.go(SitePages.HOME)
     response = owner.page.goto(f"{SETTINGS.test_config['BASE_URL']}/analytics/")
@@ -296,16 +380,85 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     expect(owner.locate("[data-role='analytics-summary']")).to_be_visible()
     expect(owner.page.locator("body")).to_contain_text(job.urlsafe_key)
     expect(owner.page.locator("body")).to_contain_text("Delete AI Generation Records")
+    expect(owner.locate(
+        f"[data-role='ai-run'][data-job-id='{execution_job.urlsafe_key}']"
+    )).to_have_count(0)
+    execution_diagnostic = _analytics_request(
+        owner, f"/analytics/ai/operations/{execution_job.urlsafe_key}.json"
+    )
+    assert execution_diagnostic["status"] == 200
+    assert execution_diagnostic["data"]["operation"]["status"] == "succeeded"
+    assert execution_diagnostic["data"]["ai_generations"] == []
+    assert DATA.datastore.get(execution_job.key) is not None
+
+    run = owner.locate(f"[data-role='ai-run'][data-job-id='{job.urlsafe_key}']")
+    run.locator(":scope > summary").click()
+    expect(run.locator("[data-role='ai-run-generation']")).to_contain_text("managed-test-model")
+    expect(run).to_contain_text("34,576")
+    expect(run).to_contain_text("7,847")
+    expect(run).to_contain_text("1 → 3")
+    expect(run.locator("[data-role='ai-run-tools']")).to_have_text(
+        "Tools used: get_entity, get_guidelines (3 calls). "
+        "Names are grouped, not shown in call order."
+    )
+    expect(run).to_contain_text("Locally adjusted")
+    expect(run).to_contain_text("Older records include ordinary formatting")
+    owner.page.evaluate("document.fonts.ready")
+    assert owner.page.evaluate("""() => [...document.fonts].some(font =>
+        font.family.replaceAll('"', '') === 'Source Sans 3' && font.status === 'loaded'
+    )""")
+    preload = owner.page.locator("link[rel='preload'][as='font']")
+    expect(preload).to_have_count(1)
+    expect(preload).to_have_attribute("href", re.compile(r"/fonts/source-sans-latin\."))
+    expect(run.locator("[data-role='ai-run-report']")).to_have_attribute(
+        "href", f"/tools/reports/{report.urlsafe_key}"
+    )
 
     diagnostic_path = f"/analytics/ai/operations/{job.urlsafe_key}.json"
     diagnostic = _analytics_request(owner, diagnostic_path)
     assert diagnostic["status"] == 200
     assert diagnostic["data"]["job_id"] == job.urlsafe_key
     assert diagnostic["data"]["operation"]["input_refs"]["report"]["id"] == (
-        "opaque-report-key"
+        report.urlsafe_key
     )
     assert len(diagnostic["data"]["ai_generations"]) == 1
     assert "must not be exported" not in str(diagnostic["data"])
+
+    with owner.page.expect_response(f"**{diagnostic_path}"):
+        run.get_by_role("button", name="Copy run JSON").click()
+    expect(run.get_by_role("status")).to_have_text("Run JSON copied.")
+    copied = json.loads(owner.page.evaluate("navigator.clipboard.readText()"))
+    assert copied["job_id"] == job.urlsafe_key
+    assert copied["ai_generations"] == diagnostic["data"]["ai_generations"]
+    assert copied["ai_generations"][0]["calls_per_round"] == [1, 3]
+    assert copied["ai_generations"][0]["tool_names"] == [
+        "get_entity", "get_guidelines", "get_guidelines", "get_guidelines"
+    ]
+    assert "must not be exported" not in str(copied)
+    run.screenshot(path=str(tmp_path / "ai-run-desktop.png"))
+
+    owner.page.set_viewport_size({"width": 390, "height": 844})
+    run.screenshot(path=str(tmp_path / "ai-run-mobile.png"))
+    owner.page.evaluate("""Object.defineProperty(navigator, 'clipboard', {
+        configurable: true, value: {writeText: () => Promise.reject(new Error('denied'))}
+    })""")
+    try:
+        with owner.page.expect_response(f"**{diagnostic_path}"):
+            run.get_by_role("button", name="Copy run JSON").click()
+        expect(run.get_by_role("status")).to_have_text("Select and copy the JSON below.")
+        fallback = run.get_by_role("textbox", name="Run JSON")
+        expect(fallback).to_be_visible()
+        assert json.loads(fallback.input_value())["job_id"] == job.urlsafe_key
+    finally:
+        owner.page.evaluate("delete navigator.clipboard")
+
+    unmeasured = owner.locate(
+        f"[data-role='ai-run'][data-job-id='{unmeasured_job.urlsafe_key}']"
+    )
+    unmeasured.locator(":scope > summary").click()
+    expect(unmeasured.locator("[data-role='ai-run-missing']")).to_be_visible()
+    expect(unmeasured.locator("[data-role='ai-run-generation']")).to_have_count(0)
+    expect(unmeasured.locator("[data-role='ai-run-report']")).to_have_count(0)
 
     missing_path = "/analytics/ai/operations/missing-job.json"
     with browser_failures.expect_http_error(owner, status=404, path=missing_path):

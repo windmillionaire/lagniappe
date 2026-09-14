@@ -17,6 +17,7 @@ from google.cloud import datastore
 import pytest
 
 from lagniappe.core.entities import Entities
+from lagniappe.core.entities.category import UNCATEGORIZED_PAGES_NAME
 from lagniappe.core.definitions import (
     Fetch,
     FetchReason,
@@ -353,6 +354,50 @@ def test_page_update_registers_form_with_model_category_for_filters():
     assert category.properties.forms.value == [form]
     assert form.hash in category.filters.entity_fields
     assert any(c["label"] == form.name for c in category.filters.conditions)
+
+
+# @matrix page : default-category form-registration
+@pytest.mark.unit
+@pytest.mark.parametrize("selection", ["fallback", "model", "additional"])
+@pytest.mark.parametrize("legacy_forms", [False, True])
+def test_page_update_skips_uncategorized_form_registration(
+    monkeypatch, selection, legacy_forms,
+):
+    uncategorized = TestEntities.get(
+        "CATEGORY", {"name": UNCATEGORIZED_PAGES_NAME, "hash": "uncategorized008forms"},
+    )
+    legacy_keys = ["legacy-page-form"] if legacy_forms else []
+    if legacy_keys:
+        # Match the raw fallback lookup: stored references, no attached forms.
+        uncategorized.db["forms"] = legacy_keys.copy()
+    monkeypatch.setattr(
+        Entities.CATEGORY, "get_uncategorized_pages", lambda: uncategorized,
+    )
+    category = TestEntities.get(
+        "CATEGORY", {"name": "Explicit Category", "hash": "explicit008forms"},
+    )
+    categories = {
+        "fallback": {},
+        "model": {"model": uncategorized},
+        "additional": {"model": category, "categories": [uncategorized]},
+    }[selection]
+    page = TestEntities.get("PAGE", {"name": "Loose Page", "hash": "loose008forms"})
+    forms = [
+        TestEntities.get("FORM", {"name": name, "hash": f"{name}008forms"})
+        for name in ("initial", "replacement")
+    ]
+
+    for form in forms:
+        page.update({"name": "Loose Page", "form": form, **categories})
+
+        assert page.form is form
+        assert uncategorized in page.categories
+        assert uncategorized.db.get("forms", []) == legacy_keys
+        assert all(intent.entity is not uncategorized for intent in page.mutation_intents)
+
+    if selection == "additional":
+        assert category.properties.forms.value == forms
+        assert category.db["forms"] == [form.key for form in forms]
 
 
 # @pair page:default-category

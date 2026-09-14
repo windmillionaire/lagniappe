@@ -295,6 +295,9 @@ export class PageInfo extends PageForm {
 		}
 		this.schema = response.schema;
 		this.submission = response.submission;
+		this.initialTarget.dataset.formGeneration = String(
+			response.generation || 0,
+		);
 
 		const nextFormSelect = this.initialTarget.querySelector(
 			'[data-action="select-form"]',
@@ -324,6 +327,7 @@ export class PageInfo extends PageForm {
  * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filters_hide_create_page_tool
  * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
  * @matrix pages : category-index create mobile-tools related-forms tool-switch
+ * @matrix pages : required-name
  * @pair deferred-jobs:hosted-e2e
  */
 export class CreatePage extends PageForm {
@@ -334,6 +338,17 @@ export class CreatePage extends PageForm {
 			submitting: "Creating Page",
 			submitted: "Page Created",
 		};
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/pageInfo.mjs::CreatePage
+	 * @reason page creation requires a name even when its fields come from an attached form
+	 */
+	async init() {
+		await super.init();
+		const name = this.target.querySelector("input[name='name']");
+		if (name) name.required = true;
 	}
 
 	get html() {

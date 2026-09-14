@@ -5,7 +5,11 @@ import copy
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
 from lagniappe.core.entities import Entities
-from lagniappe.core.properties.schema import SchemaValidationError, canonicalize_schema
+from lagniappe.core.properties.schema import (
+    SchemaFields,
+    SchemaValidationError,
+    canonicalize_schema,
+)
 
 from .common import (
     SUBMISSION_UPDATE_ROWS_ERROR,
@@ -26,11 +30,13 @@ from .references import (
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_skips_empty_submission_update_and_continues
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_persists_all_fields_with_fresh_entity_reads
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_runs_submission_updates
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_adds_schema_fields_persists_all_task_values_and_completes
 # @matrix ai-report submission : batch-field-patch persistence
 # @matrix ai-report : batch-field-patch deterministic-run empty-update
 # @matrix submission : continue deterministic-run empty-update recoverable
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_validation_preserves_values_and_blocks_completion
+# @matrix ai-report submission : validation failure-isolation
 def _update_form_values(action, _report, user, created):
     data = _data(action)
     updates = data.get("updates") or []
@@ -44,6 +50,7 @@ def _update_form_values(action, _report, user, created):
     previous = []
     to_save = []
     working_entities = {}
+    prepared = []
     for index, update in enumerate(updates, 1):
         if not isinstance(update, dict):
             skipped.append({"index": index, "reason": "Update row must be an object."})
@@ -63,23 +70,43 @@ def _update_form_values(action, _report, user, created):
             continue
         schema_id = schema_id.strip()
 
-        before = _submission_previous_value(entity, schema_id)
-        try:
-            changed, note = _apply_submission_field_update(
-                entity,
-                schema_id,
-                update.get("new_value"),
-            )
-        except Exception as error:
+        if not getattr(entity, "form", None):
+            skipped.append({"index": index, "reason": "Target has no form."})
+            continue
+        field = entity.properties.submission.fields.get(schema_id)
+        if field is None:
             skipped.append(
                 {
                     "index": index,
-                    "entity": _entity_result(entity),
                     "schema_id": schema_id,
-                    "reason": str(error),
+                    "reason": "Field is not in the target's current form schema.",
                 }
             )
             continue
+        # Validate every patch on a detached field before changing any target.
+        # A later malformed value must not save or erase earlier values.
+        candidate = SchemaFields.create_field(dict(field), entity)
+        candidate.user = user
+        try:
+            candidate.validate_ai(update.get("new_value"))
+            if candidate.errors:
+                raise exceptions.ValidationError("; ".join(map(str, candidate.errors)))
+        except Exception as error:
+            raise exceptions.ValidationError(
+                f"Could not update {entity.name}, field {schema_id}: {error}"
+            ) from error
+        prepared.append((index, entity, schema_id, candidate))
+
+    if not prepared:
+        raise exceptions.ValidationError(
+            "No submission fields could be updated. Review the targets and form fields."
+        )
+
+    for index, entity, schema_id, validated_field in prepared:
+        before = _submission_previous_value(entity, schema_id)
+        changed, note = _apply_submission_field_update(
+            entity, schema_id, validated_field
+        )
 
         if not changed:
             skipped.append(
@@ -125,7 +152,117 @@ def _update_form_values(action, _report, user, created):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_adds_schema_fields_persists_all_task_values_and_completes
 # @matrix ai-report submission : schema-update
 # @matrix ai-report form-schema : deterministic-run permission-failure schema-update
-def _extend_form_schema(action, _report, user, created):
+def _update_form_schema(action, report, user, created, context):
+    from lagniappe.core.definitions import Fetch
+    from lagniappe.core.tools import (
+        form_changes,
+        form_conversions,
+        form_drafts,
+        form_schema_updates,
+    )
+    from lagniappe.core.tools.deferred_jobs.errors import (
+        DeferredJobDependencyPendingError,
+        DeferredJobDependencyFailedError,
+    )
+
+    data = _data(action)
+    form = _resolve_entity(
+        data.get("form") or data.get("form_action"), created, expected=Entities.FORM
+    )
+    _require_allowed(
+        form.allowed(Action.EDIT, user=user),
+        "You do not have permission to update this form schema.",
+    )
+    record = context["action_record"]
+    migration_id = record.get("migration_id")
+    pending = form_changes.json_value(form.db, form_changes.PENDING)
+    receipt = form_changes.json_value(form.db, "form_draft_receipt")
+    if migration_id and pending.get("id") == migration_id:
+        job = Entities.fetch_one(pending.get("job"), request=Fetch.direct())
+        if job is None or job.status in {"failed", "cancelled", "superseded"}:
+            raise DeferredJobDependencyFailedError(
+                "The Form migration needs attention. Retry this report to resume it."
+            )
+        raise DeferredJobDependencyPendingError(
+            "Waiting for Form migration publication."
+        )
+    if migration_id and receipt.get("id") == migration_id:
+        return (
+            form,
+            [],
+            {
+                "form": _entity_result(form),
+                "schema_updates": {"applied": data["operations"], "skipped": []},
+                "note": "Form schema and submissions updated.",
+            },
+        )
+    if (
+        data.get("baseline")
+        and data["baseline"] != form_drafts.builder_draft(form)["baseline"]
+    ):
+        raise exceptions.ValidationError(form_schema_updates.STALE_MESSAGE)
+    previous = copy.deepcopy(form.schema)
+    schema = form_schema_updates.apply_operations(
+        previous, data["operations"], form.form_type
+    )
+    changes = form_conversions.classify_changes(previous, schema)
+    if not changes:
+        form.set_schema(schema)
+        return (
+            form,
+            [form],
+            {
+                "form": _entity_result(form),
+                "previous_schema": previous,
+                "schema_updates": {"applied": data["operations"], "skipped": []},
+            },
+        )
+    if not action.get("_schema_change"):
+        raise exceptions.ValidationError(
+            "This schema migration needs a fresh preview and user review before execution."
+        )
+    migration_id = migration_id or record["idempotency_key"]
+    record.update(migration_id=migration_id, migration_form=form.urlsafe_key)
+    Entities.save(report)
+    draft = form_drafts.builder_draft(form)
+    draft.pop("baseline")
+    draft.update(
+        schema=schema,
+        image_manifest=[],
+        migration={
+            "version": form_conversions.VERSION,
+            "clear_invalid": True,
+        },
+    )
+    response = form_changes.start_change(
+        form, draft, migration_id, user, report=report, schema_action=action
+    )
+    if response.get("pending_change"):
+        raise DeferredJobDependencyPendingError(
+            "Waiting for Form migration publication."
+        )
+    if response.get("rejected_change"):
+        raise exceptions.ValidationError(response["rejected_change"]["error"])
+    form = Entities.fetch_one(form.key, request=Fetch.direct())
+    if form_changes.json_value(form.db, "form_draft_receipt").get("id") != migration_id:
+        raise DeferredJobDependencyFailedError(
+            "The Form migration did not publish. Refresh the schema preview and review a new proposal."
+        )
+    return (
+        form,
+        [],
+        {
+            "form": _entity_result(form),
+            "schema_updates": {"applied": data["operations"], "skipped": []},
+            "note": "Form schema and submissions updated.",
+        },
+    )
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
+# @reason stored pre-version-8 actions retain their additive execution and recovery semantics
+def _legacy_form_schema(action, _report, user, created):
     data = _data(action)
     form = _resolve_entity(
         data.get("form")
@@ -224,7 +361,7 @@ def _submission_previous_value(entity, schema_id):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_values
 # @reason validation behavior is covered through batch submission report-run tests
-def _apply_submission_field_update(entity, schema_id, value):
+def _apply_submission_field_update(entity, schema_id, validated_field):
     if not getattr(entity, "form", None):
         return False, "Target has no form."
 
@@ -234,8 +371,7 @@ def _apply_submission_field_update(entity, schema_id, value):
         return False, "Field is not in the target's current form schema."
 
     before = _submission_previous_value(entity, schema_id)
-    field.reset()
-    field.validate_ai(value)
+    submission.fields[schema_id] = validated_field
     entity.save_submission()
     after = _submission_previous_value(entity, schema_id)
     changed = (
@@ -247,7 +383,7 @@ def _apply_submission_field_update(entity, schema_id, value):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_extend_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
 # @reason schema operation parsing is covered through schema update report-run tests
 def _schema_add_field(schema, raw_field):
     field = _safe_schema_field(raw_field)
@@ -265,7 +401,7 @@ def _schema_add_field(schema, raw_field):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_extend_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
 # @reason schema operation parsing is covered through schema update report-run tests
 def _schema_add_select_option(schema, operation):
     schema_id = operation.get("schema_id") or operation.get("field_id")
@@ -314,7 +450,7 @@ def _schema_add_select_option(schema, operation):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_extend_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
 # @reason field sanitization is covered through schema update report-run tests
 def _safe_schema_field(raw_field):
     if not isinstance(raw_field, dict):
@@ -337,7 +473,7 @@ def _safe_schema_field(raw_field):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_values
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_extend_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
 # @reason user-facing notes are asserted through report-run result tests
 def _update_summary_note(prefix, applied, skipped):
     count = len(applied or [])

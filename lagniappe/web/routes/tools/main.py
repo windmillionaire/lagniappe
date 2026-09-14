@@ -124,6 +124,8 @@ def _preview_report_files():
 # @reason explain modal shares the real organize prompt assembly
 def _explain_organize_prompt():
     report = SimpleNamespace(
+        tool="organize",
+        origin="web",
         instructions=request.form.get("instructions"),
         input_files=_preview_report_files(),
     )
@@ -239,9 +241,9 @@ def _start_tool_report(
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_refreshes_stage_labels
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_uses_ask
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_plans_updates
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
-# @matrix ai-report : ask-fallback async create http-boundary text-only upload validation
+# @matrix ai-report : remote-update async create http-boundary text-only upload validation
 # @matrix ai-report : list stage-labels
 @tools.route("/organize", methods=["POST"])
 @ai_access(AI.CREATE)
@@ -259,9 +261,9 @@ def create_organize_report():
         return responses.error("Add files or instructions before creating a report.")
     if not input_files and not upload_manifest:
         return _start_tool_report(
-            "ask",
+            "organize",
             instructions,
-            default_name=ai.ask_report_name(instructions),
+            default_name="Organize: " + _create_report_name(instructions).removeprefix("Create: "),
         )
 
     uploaded_filenames = [file.filename for file in input_files] + [
@@ -365,7 +367,7 @@ def _external_plan_mutation_error(outcome):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_report_detail_shows_revision_and_manual_execution
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_review_only_proposal_without_execute
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_runs_submission_updates
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
@@ -387,7 +389,9 @@ def report(key):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_run_start_error_does_not_save_stale_report
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_stale_schema_plan_keeps_review_and_explains_recovery
 # @matrix ai-report : detail deterministic-run entitlement-independent idempotent recovery repeat-run retry
+# @matrix ai-report : browser-review stale-proposal
 # @matrix agent-api ai-report : browser-review error-isolation report-execution
 @tools.route("/reports/<key>/run", methods=["POST"])
 @logged_in
@@ -425,6 +429,32 @@ def run_report(key):
 
     if report.status != "ready" and not retryable:
         return responses.error("Only ready or recoverable failed reports can be run.")
+
+    from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_updates
+    from lagniappe.core.tools import form_changes, form_schema_updates
+
+    try:
+        if not retryable:
+            prepare_schema_updates(report.proposal, current_user, verify=True)
+        else:
+            for record in result.get("actions", []):
+                if record.get("migration_id"):
+                    form = Entities.fetch_one(record.get("migration_form"), request=Fetch.direct())
+                    if form and form.db.get(form_changes.PENDING):
+                        form_changes.recover_change(form, current_user, "retry")
+    except exceptions.ValidationError as error:
+        if not retryable and str(error).startswith(form_schema_updates.STALE_MESSAGE):
+            recovery = (
+                "Ask the assistant that created it to refresh this same plan, "
+                "then review the updated conversions."
+                if report.origin == "api"
+                else "Use Revise Plan to refresh it, then review the updated conversions."
+            )
+            return responses.error(
+                "This plan needs another review because the form or saved answers changed. "
+                "Execution hasn't started. " + recovery
+            )
+        return responses.error(str(error))
 
     try:
         job, notification = DeferredJobs.start(

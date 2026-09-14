@@ -1,11 +1,12 @@
 import { primitives } from "../../../elements/primitives";
-import { simpleHash } from "../../../shared";
+import { generateElementId } from "../../../shared";
 import { Condition } from "./base";
 
 /**
  * @testable true
  * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
  * @pair forms:builder-select-options
+ * @matrix forms : stable-identity
  */
 export default class Options extends Condition {
 	constructor(builder) {
@@ -17,12 +18,10 @@ export default class Options extends Condition {
 	}
 
 	init() {
-		this.element.schema.options ??= [];
-
 		if (this.index !== -1) {
 			this.setTitle("Edit Option");
 			this.messages.submit = "Update Option";
-			this.setting = { ...this.element.schema.options[this.index] };
+			this.setting = { ...this.element.schema.options?.[this.index] };
 		} else {
 			this.setTitle("Create Option");
 			this.messages.submit = "Add Option";
@@ -44,7 +43,6 @@ export default class Options extends Condition {
 
 	addOptionName() {
 		if (this.options.has("name")) return;
-		delete this.setting.value;
 
 		const optionName = primitives.input({
 			label: "Option Name",
@@ -69,7 +67,13 @@ export default class Options extends Condition {
 			return false;
 		}
 		if (!this.setting.value) {
-			this.setting.value = `o${simpleHash(this.setting.label)}`;
+			do {
+				this.setting.value = generateElementId("option");
+			} while (
+				this.element.schema.options?.some(
+					(option) => option.value === this.setting.value,
+				)
+			);
 		}
 		return true;
 	}

@@ -4,7 +4,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 
 from .actions.base import ACTION_APPLIED, ACTION_DRIFTED
-from .actions.registry import REPORT_ACTION_ADAPTERS
+from .actions.registry import report_action_adapter
 from .ledger import REPORT_LEDGER_VERSION
 
 
@@ -13,7 +13,7 @@ from .ledger import REPORT_LEDGER_VERSION
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_adds_form_to_existing_page_with_undo
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @tests tests_unit/test_020h_ai_report_execution.py::test_undo_report_compensates_completed_prefix_of_failed_report
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
+# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_renames_entity_without_submission_and_undoes
 # @tests tests_unit/test_020h_ai_report_execution.py::test_undo_report_stops_before_compensation_when_initial_save_is_rejected
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_report_undo_preserves_category_editor_access_and_uploaded_file
@@ -22,6 +22,10 @@ from .ledger import REPORT_LEDGER_VERSION
 # @matrix agent-api ai-report : browser-review cas compensation delete undo
 def undo_report(report, user, *, save=None):
     """Compensate a complete report or the completed prefix of a failed report."""
+    from ..schema_updates import migration_started
+
+    if migration_started(report):
+        raise exceptions.ValidationError("This report started a submission migration and cannot be undone. Retry an unfinished migration instead.")
     save = save or Entities.save
     result = report.result if isinstance(report.result, dict) else {}
     if result.get("ledger_version") != REPORT_LEDGER_VERSION:
@@ -66,7 +70,7 @@ def undo_report(report, user, *, save=None):
 
     for undo_record in undo["actions"]:
         action = result["actions"][undo_record["action_index"]]
-        adapter = REPORT_ACTION_ADAPTERS[action["type"]]
+        adapter = report_action_adapter(action["type"])
         if undo_record.get("status") == "complete":
             continue
         try:

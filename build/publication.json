@@ -17,6 +17,7 @@
 		"lagniappe/web/static/pdfjs/wasm"
 	],
 	"required_artifacts": [
+		"lagniappe/web/start/styles/fonts.py",
 		"lagniappe/web/start/styles/icons.py",
 		"lagniappe/web/start/styles/styles.py",
 		"lagniappe/web/static/login.js",
@@ -30,7 +31,9 @@
 	"required_artifact_prefixes": [
 		"lagniappe/web/static/chunks/",
 		"lagniappe/web/static/chunks/views/",
+		"lagniappe/web/static/fonts/bitter-latin.",
 		"lagniappe/web/static/fonts/material-symbols-rounded.",
+		"lagniappe/web/static/fonts/source-sans-latin.",
 		"lagniappe/web/static/pdfjs/wasm/"
 	]
 }

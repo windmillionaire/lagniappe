@@ -50,6 +50,71 @@ vm.runInContext(source, context);
 ''')
 
 
+# @matrix polling startup : subscription-lifecycle deferred-services
+def test_page_task_subscription_survives_list_loading_before_polling_service(run_node):
+    run_node(r'''
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const context = { console };
+vm.createContext(context);
+let pageSource = fs.readFileSync("src/script/views/page.mjs", "utf8")
+  .replace(/^import [\s\S]*?(?=\/\*\*)/, "class Entity { async reconcilePollingSubscriptions() {} }\n")
+  .replace("export default class Page", "class Page");
+vm.runInContext(pageSource + "\nglobalThis.Page = Page;", context);
+let services = fs.readFileSync("src/script/views/base/services.mjs", "utf8")
+  .replace(/^import .*;\n/gm, "")
+  .replaceAll("export ", "")
+  .replace('import("../../shared/polling")', "globalThis.pollingModule");
+vm.runInContext(services + "\nglobalThis.ensurePollingCoordinator = ensurePollingCoordinator;", context);
+
+let completed = false;
+process.on("beforeExit", () => {
+  if (!process.exitCode) assert.ok(completed, "Polling startup waited for background reconciliation");
+});
+(async () => {
+  for (const listFirst of [true, false]) {
+    let releasePolling;
+    context.pollingModule = new Promise(resolve => { releasePolling = resolve; });
+    const descriptors = [];
+    const reconciliations = [];
+    const page = new context.Page();
+    const list = { name: "PageTaskList", loaded: listFirst };
+    Object.assign(page, {
+      key: "page-key", elt: { dataset: {} },
+      components: { tasks: { widgets: { list } } },
+      _initPollingSubscription() {},
+      schedulePollingReconciliation() {
+        reconciliations.push(this.reconcilePollingSubscriptions());
+        // Deferred background work must not block service availability.
+        return new Promise(() => {});
+      },
+    });
+    if (listFirst) await page.reconcilePollingSubscriptions();
+    const first = context.ensurePollingCoordinator(page);
+    const second = context.ensurePollingCoordinator(page);
+    releasePolling({ PollingCoordinator: class {
+      init() { return this; }
+      subscribe(descriptor) {
+        descriptors.push(descriptor);
+        return () => {};
+      }
+    } });
+    assert.equal(await first, await second);
+    if (!listFirst) {
+      list.loaded = true;
+      page.schedulePollingReconciliation();
+    }
+    await Promise.all(reconciliations);
+    await context.ensurePollingCoordinator(page);
+    assert.deepEqual(descriptors.map(({id}) => id), ["page:tasks:page-key"],
+      `Task list lost or duplicated its subscription (list first: ${listFirst})`);
+  }
+  completed = true;
+})().catch(error => { console.error(error); process.exitCode = 1; });
+''')
+
+
 # @matrix reconnect-refresh : manifest
 # @source src/script/widgets/tables.mjs::IndexTable.refreshDescriptor
 def test_collection_manifests_include_hash_and_fingerprint(run_node):
@@ -63,7 +128,7 @@ for (const [path, base, exported] of [
   ["src/script/widgets/pageTaskList.mjs", "class BaseList {}", "PageTaskList"],
 ]) {
   let source = fs.readFileSync(path, "utf8").replace(/^import [\s\S]*?(?=\/\*\*)/, base + "\n");
-  source = source.replaceAll("export class ", "class ");
+  source = source.replaceAll("export class ", "class ").replaceAll("export async function ", "async function ");
   source += `\nglobalThis.${exported} = ${exported};`;
   vm.runInContext(source, context);
   const widget = Object.create(context[exported].prototype);
@@ -96,7 +161,8 @@ source = source.replace(
   'import { BaseTable, EmbeddedTable } from "../elements/base/baseTable";',
   "class BaseTable {} class EmbeddedTable {}",
 );
-source = source.replaceAll("export class ", "class ");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replaceAll("export class ", "class ").replaceAll("export async function ", "async function ");
 source += "\nglobalThis.IndexTable = IndexTable;";
 vm.runInContext(source, context);
 

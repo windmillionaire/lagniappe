@@ -91,6 +91,10 @@ def _line_references(
         (DATA_ICON_RE, "context"),
     ):
         for match in pattern.finditer(line):
+            if pattern is CONTEXT_LITERAL_RE and re.match(
+                r"\s*(?:[!=]=+|[<>]=?)", line[match.end():]
+            ):
+                continue
             icon_id = match.group("path").lstrip(".")
             if icon_id in {"get", "items", "keys", "values"}:
                 continue
@@ -115,6 +119,11 @@ def _line_references(
         if value_end < 0:
             value_end = len(line)
         for match in QUOTED_LITERAL_RE.finditer(line, value_start, value_end):
+            # A comparison operand selects an icon; it is not an icon ID.
+            if re.search(r"(?:[!=]=+|[<>]=?)\s*$", line[value_start:match.start()]) or re.match(
+                r"\s*(?:[!=]=+|[<>]=?)", line[match.end():value_end]
+            ):
+                continue
             icon_id = match.group("path")
             if icon_id == "icon":
                 continue

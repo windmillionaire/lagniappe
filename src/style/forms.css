@@ -134,7 +134,14 @@ input[role="combobox"] {
 
 /* @style form.default form.tools */
 [data-readonly="true"] {
-	& :where(input:not([data-role="complete-toggle"]), select, textarea) {
+	&
+		:where(
+			input:not([data-role="complete-toggle"]):not(
+				[data-role="completion-submission-choice"]
+			),
+			select,
+			textarea
+		) {
 		&:focus-visible,
 		&:hover {
 			outline: none;

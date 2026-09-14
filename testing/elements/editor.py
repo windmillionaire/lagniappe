@@ -16,9 +16,6 @@ class EditorOption:
 class EditorToggleOptions(Enum):
     BOLD = EditorOption(title="Bold")
     ITALIC = EditorOption(title="Italic")
-    BULLET_LIST = EditorOption(title="Bullet List")
-    ORDERED_LIST = EditorOption(title="Ordered List")
-    TASK_LIST = EditorOption(title="Task List")
     UNDO = EditorOption(title="Undo")
     REDO = EditorOption(title="Redo")
     FOCUS = EditorOption(title="Toggle Focus")
@@ -39,6 +36,11 @@ class EditorToggleOptions(Enum):
 
 
 class EditorMenuOptions(Enum):
+    # Lists menu
+    BULLET_LIST = EditorOption(menu="Lists", title="Bullet List")
+    ORDERED_LIST = EditorOption(menu="Lists", title="Ordered List")
+    TASK_LIST = EditorOption(menu="Lists", title="Task List")
+
     # Style menu
     UNDERLINE = EditorOption(menu="Style", title="Underline")
     STRIKE = EditorOption(menu="Style", title="Strikethrough")

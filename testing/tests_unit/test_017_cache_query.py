@@ -365,7 +365,28 @@ def test_redis_details_store_parent_key_not_parent_blob():
         "parent_key": "category-hash",
         "fingerprint": "page-fingerprint",
         "form_version": "",
+        "form_hash": None,
     }
+
+
+# @source lagniappe/core/tools/cache/add.py::_redis_details
+# @matrix cache : details redis-storage
+@pytest.mark.unit
+@pytest.mark.parametrize("state", ["attached", "reserved", "none", "missing"])
+def test_redis_details_store_own_form_pointer_without_resolving_relations(state):
+    form = SimpleNamespace(hash="own-form", version="version-1", reserved=state == "reserved")
+    entity = SimpleNamespace(
+        entity_kind="task", fingerprint="task-fingerprint", restricted_to={},
+        details={"id": "task", "kind": "task"},
+        form=form if state in {"attached", "reserved"} else None,
+        db={"form": "form-key"} if state != "none" else {},
+    )
+    details = cache_add._redis_details(entity)
+    if state == "missing":
+        assert "form_hash" not in details
+    else:
+        assert details["form_hash"] == ("own-form" if state == "attached" else None)
+    assert details["form_version"] == ("version-1" if state in {"attached", "reserved"} else "")
 
 
 # @matrix cache : details redis-storage source-clauses
@@ -592,12 +613,14 @@ def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch
                 "hash": "page-hash",
                 "name": "Page",
                 "parent_key": "category-hash",
+                "form_hash": "own-form-hash",
             },
             "category-hash": {
                 "id": "category-id",
                 "kind": "category",
                 "hash": "category-hash",
                 "name": "Fresh Category",
+                "form_hash": "internal-pointer",
             },
             "orphan-hash": {
                 "id": "orphan-id",
@@ -617,6 +640,8 @@ def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch
     assert details["page-hash"]["parent"]["name"] == "Fresh Category"
     assert "parent_key" not in details["page-hash"]
     assert "parent_key" not in details["page-hash"]["parent"]
+    assert "form_hash" not in details["page-hash"]
+    assert "form_hash" not in details["page-hash"]["parent"]
 
     fake_cache.hmget_calls.clear()
     details = cache_details.get_details_by_hash(["page-hash", "category-hash"])

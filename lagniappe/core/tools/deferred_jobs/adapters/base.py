@@ -12,7 +12,9 @@ from ..errors import DeferredJobDriftError
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
+# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_waits_for_dependency_without_consuming_provider_retry
 # @matrix ai-access deferred-jobs : tier-declaration
+# @matrix deferred-jobs : dependency-wait backoff
 class DeferredJobAdapter:
     """Domain boundary plugged into the shared job lifecycle."""
 
@@ -23,6 +25,8 @@ class DeferredJobAdapter:
     queued_message = "Working..."
     retry_message = "Work is temporarily delayed; retrying shortly..."
     dependency_message = "Waiting for required background work..."
+    # Seconds between dependency checks; repeat the final delay for longer waits.
+    dependency_retry_delays = (60,)
     active_message = (
         "Still working. This is taking longer than usual; we'll keep trying."
     )
@@ -100,6 +104,16 @@ class DeferredJobAdapter:
     # @testable infrastructure
     def start_lock(self, spec, job):
         """Return an optional target-scoped lock created with the job."""
+        return None
+
+    # @testable infrastructure
+    def start_writes(self, spec, job):
+        """Optional guarded domain writes committed atomically with job creation."""
+        return (), ()
+
+    # @testable infrastructure
+    def before_cancel(self, job):
+        """Allow domains with partially applied work to retain their write fence."""
         return None
 
     # @testable infrastructure

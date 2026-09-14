@@ -57,10 +57,6 @@ export class BaseElement {
 		return !NON_HISTORY_FILLABLE_TYPES.has(this.schema?.type);
 	}
 
-	get historyFillPersistsDefault() {
-		return true;
-	}
-
 	get canHistoryFill() {
 		return Boolean(
 			this.renderer.historyFillEnabled &&
@@ -153,7 +149,13 @@ export class BaseElement {
 		return true;
 	}
 
-	historyFillButton(value, onFill = null) {
+	/**
+	 * @testable true
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_history_fill_waits_without_overwriting_new_input
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
+	 * @matrix tasks : history-fill stale-response element-matrix
+	 */
+	historyFillButton(value) {
 		if (!this.canHistoryFill || !this.historyValueAvailable(value)) return null;
 
 		const button = document.createElement("button");
@@ -168,19 +170,34 @@ export class BaseElement {
 			"icon-sm",
 		);
 
-		button.addEventListener("click", (event) => {
+		button.addEventListener("click", async (event) => {
 			event.preventDefault();
 			event.stopPropagation();
-			if (this.fillFromHistory(value)) {
-				if (this.historyFillPersistsDefault) onFill?.(this.schema.id);
+			if (button.disabled) return;
+			if (typeof value !== "function") {
+				this.fillFromHistory(value);
+				return;
+			}
+			const before = JSON.stringify(this.value ?? this.submission);
+			button.disabled = true;
+			try {
+				const restored = await value();
+				if (
+					button.isConnected &&
+					this.canHistoryFill &&
+					JSON.stringify(this.value ?? this.submission) === before
+				)
+					this.fillFromHistory(restored);
+			} finally {
+				button.disabled = false;
 			}
 		});
 
 		return button;
 	}
 
-	addHistoryFill(value, onFill = null) {
-		const button = this.historyFillButton(value, onFill);
+	addHistoryFill(value) {
+		const button = this.historyFillButton(value);
 		if (!button) return false;
 
 		const elt = this.elt;

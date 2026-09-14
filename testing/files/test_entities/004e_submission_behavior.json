@@ -46,7 +46,7 @@
 							},
 							"column_value": { "num_rows": 1 },
 							"ai_value": {
-								"Items": [{ "Note": "Row one" }]
+								"Items": {"rows": [{ "row_note": "Row one" }]}
 							},
 							"filter_value": { "row_note": ["Row one"] }
 						}

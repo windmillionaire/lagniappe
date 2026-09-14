@@ -24,6 +24,7 @@ from lagniappe.core.tools.deferred_jobs import retry as deferred_retry
 from lagniappe.core.tools.deferred_jobs.adapters.base import DeferredJobAdapter
 from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 from lagniappe.core.tools.deferred_jobs.adapters import registry_defaults
+from lagniappe.core.tools.deferred_jobs.adapters.reports import ReportExecutionAdapter
 from lagniappe.core.tools.deferred_jobs.adapters.registry import (
     DeferredJobAdapterRegistry,
 )
@@ -447,7 +448,7 @@ def test_runner_classifies_wrapped_transient_errors_and_schedules_retry(monkeypa
     assert dispatched == [(job, 2, 60)]
 
 
-# @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry
+# @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry backoff
 def test_runner_waits_for_dependency_without_consuming_provider_retry(monkeypatch):
     job = RunnerJob(attempt=2)
     job.parameters = {"_dependency_waits": 1}
@@ -475,8 +476,57 @@ def test_runner_waits_for_dependency_without_consuming_provider_retry(monkeypatc
     assert result.state is DeferredJobRunState.RETRY_SCHEDULED
     assert job.status == DeferredJobStatus.RETRY_WAIT.value
     assert job.parameters["_dependency_waits"] == 2
-    assert job.progress["phase"] == DeferredJobPhase.SUMMARIZING.value
+    assert job.progress["phase"] == DeferredJobPhase.WAITING_DEPENDENCY.value
     assert dispatched == [(job, 3, 60)]
+    scheduled_at = datetime.fromisoformat(job.progress["updated_at"])
+    assert job.next_attempt_at == scheduled_at + timedelta(seconds=60)
+    assert captured == []
+    assert deferred_retry._provider_retry_attempt(job) == 1
+
+
+# @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry backoff
+@pytest.mark.parametrize(
+    "prior_waits,expected_delay", [(0, 5), (1, 10), (2, 20), (3, 30), (20, 30)]
+)
+def test_runner_schedules_report_dependency_checks_with_backoff(
+    monkeypatch, prior_waits, expected_delay
+):
+    class WaitingReportAdapter(RecordingAdapter):
+        job_type = ReportExecutionAdapter.job_type
+        dependency_retry_delays = ReportExecutionAdapter.dependency_retry_delays
+
+    job = RunnerJob(attempt=prior_waits + 1)
+    job.job_type = WaitingReportAdapter.job_type.value
+    job.authorization["policy"] = job.job_type
+    job.parameters = {"_dependency_waits": prior_waits}
+    adapter = WaitingReportAdapter(
+        error=DeferredJobDependencyPendingError("related work is still processing")
+    )
+    registry = make_runner(monkeypatch, job, adapter)
+    dispatched = []
+    captured = []
+    monkeypatch.setattr(
+        registry,
+        "dispatch",
+        lambda current, *, attempt, delay_seconds=0: dispatched.append(
+            (current, attempt, delay_seconds)
+        ),
+    )
+    monkeypatch.setattr(
+        exceptions,
+        "capture",
+        lambda *args, **kwargs: captured.append((args, kwargs)),
+    )
+
+    result = registry.run(job.urlsafe_key)
+
+    assert result.state is DeferredJobRunState.RETRY_SCHEDULED
+    assert job.status == DeferredJobStatus.RETRY_WAIT.value
+    assert job.parameters["_dependency_waits"] == prior_waits + 1
+    assert job.progress["phase"] == DeferredJobPhase.WAITING_DEPENDENCY.value
+    assert dispatched == [(job, prior_waits + 2, expected_delay)]
+    scheduled_at = datetime.fromisoformat(job.progress["updated_at"])
+    assert job.next_attempt_at == scheduled_at + timedelta(seconds=expected_delay)
     assert captured == []
     assert deferred_retry._provider_retry_attempt(job) == 1
 

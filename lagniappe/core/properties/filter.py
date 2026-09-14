@@ -65,6 +65,7 @@ class Creator(RelatedEntityMixin, DBProperty):
 # @testable true
 # @tests tests_unit/test_011_filters.py::test_filter_table_derives_parent_fields_and_related_forms
 # @matrix filter : category project related-forms table
+# @matrix form-migration : pending-projection removed-field typed-filter
 class FilterTable(Columns):
     _id = "table"
 
@@ -87,4 +88,5 @@ class FilterTable(Columns):
         self._fields["name"].selected = True
 
         for e in [e for e in self.entity.related if isinstance(e, Entities.FORM)]:
-            self.update_fields(e.fields)
+            if not e.db.get("pending_form_change"):
+                self.update_fields(e.fields)

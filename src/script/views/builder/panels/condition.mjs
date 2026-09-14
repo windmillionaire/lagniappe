@@ -10,11 +10,22 @@ export class ConditionPanel {
 		this.loading = false;
 		this.condition = null;
 		this._click = this._click.bind(this);
+		this._draftInput = this._draftInput.bind(this);
 		this.init();
 	}
 
 	init() {
 		this.panel.addEventListener("click", this._click);
+		for (const event of ["input", "change", "updated"])
+			this.panel.addEventListener(event, this._draftInput);
+	}
+
+	_draftInput() {
+		if (this.builder._restoringDraft || !this.condition?.key) return;
+		// Dialog buffers are applied with Add/Update, but already count as newer
+		// user work when deciding whether an asynchronous proposal can replace UI.
+		this.builder.draft.revision += 1;
+		this.builder.draft.group = null;
 	}
 
 	_click(e) {
@@ -52,6 +63,8 @@ export class ConditionPanel {
 
 	destroy() {
 		this.panel?.removeEventListener("click", this._click);
+		for (const event of ["input", "change", "updated"])
+			this.panel?.removeEventListener(event, this._draftInput);
 		this.loading = false;
 		this.condition = null;
 	}

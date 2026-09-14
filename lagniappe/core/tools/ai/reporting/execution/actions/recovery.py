@@ -69,7 +69,7 @@ def _expected_action_state(action, record):
         }.values())
     if action_type == "rename_entity":
         expected["name"] = str(_data(action).get("name") or "").strip()
-    if action_type == "extend_form_schema":
+    if action_type in {"update_form_schema", "extend_form_schema"}:
         expected["schema_fingerprint"] = record.get("schema_fingerprint")
     if action_type == "summarize_file":
         data = _data(action)
@@ -126,7 +126,7 @@ def _urlsafe_key_value(value):
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix[move]
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix[update]
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
+# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_persists_all_fields_with_fresh_entity_reads
 # @matrix ai-report : batch-field-patch completed-prefix completed-task moves permissions post-commit-checkpoint recovery
 # @pair ai-report:skipped-prefix
@@ -234,7 +234,7 @@ def _inspect_action_applied(action, report, user, record):
             if current["value"] != update.get("value"):
                 return ACTION_DRIFTED
         return ACTION_APPLIED
-    if action_type == "extend_form_schema":
+    if action_type in {"update_form_schema", "extend_form_schema"}:
         return (
             ACTION_APPLIED
             if _value_fingerprint(entity.schema or [])
@@ -379,7 +379,7 @@ def _inspect_action_compensated(record, report, user):
             ] != previous.get("previous_value"):
                 return ACTION_NOT_APPLIED
         return ACTION_APPLIED
-    if action_type == "extend_form_schema":
+    if action_type in {"update_form_schema", "extend_form_schema"}:
         return (
             ACTION_APPLIED
             if _value_fingerprint(entity.schema or [])
@@ -415,6 +415,10 @@ def _inspect_action_compensated(record, report, user):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason recoverable action errors are asserted through full report execution
 def _is_recoverable_action_error(_action, error):
+    if _action.get("type") in {"update_form_schema", "extend_form_schema"}:
+        return False
+    if _action.get("type") == "update_form_values" and str(error) != SUBMISSION_UPDATE_ROWS_ERROR:
+        return False  # Invalid patches must block dependent completions and remain retryable.
     if _action.get("type") == "append_page_document":
         return False  # A document conflict must remain retryable, not be skipped.
     return isinstance(error, exceptions.ValidationError) and not str(error).startswith(

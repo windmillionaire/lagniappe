@@ -248,7 +248,13 @@ export class DeferredOperationManager {
 		icon.setAttribute("aria-hidden", "true");
 		const phase = document.createElement("span");
 		phase.dataset.role = "deferred-phase";
-		phase.textContent = autofillTarget ? "Autofill queued" : "Waiting to start";
+		phase.textContent =
+			node.dataset.operationPhaseLabel ||
+			(node.dataset.operationScope === "form-change"
+				? "Schema migration in progress"
+				: autofillTarget
+					? "Autofill queued"
+					: "Waiting to start");
 		const separator = document.createElement("span");
 		separator.setAttribute("aria-hidden", "true");
 		separator.textContent = " · ";
@@ -363,7 +369,7 @@ export class DeferredOperationManager {
 				phase.textContent = status.error
 					? `${status.phase_label}: ${status.error}`
 					: status.recovering
-						? `${status.phase_label}. Automatic recovery is active.`
+						? `${status.phase_label}. Taking longer than expected.`
 						: status.phase_label;
 			}
 			const elapsed = node.querySelector("[data-role='deferred-elapsed']");

@@ -28,6 +28,11 @@ class ValidationError(Exception):
     """Raised when entity data fails validation (import, form submission)."""
 
 
+# @testable infrastructure
+class MutationConflict(ValidationError):
+    """A compare-and-set rejected a stale mutation before durable writes."""
+
+
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
 # @pair ai:error-context
@@ -172,6 +177,7 @@ __all__ = [
     "AIQuotaError",
     "DeploymentSettingsError",
     "NetworkError",
+    "MutationConflict",
     "PropertyError",
     "SiteImageError",
     "TaskCompletionError",

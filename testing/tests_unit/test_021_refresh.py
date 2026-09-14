@@ -26,6 +26,7 @@ from lagniappe.core.tools.cache.add import _redis_details
 def cached_refresh_boundaries(monkeypatch):
     monkeypatch.setattr("lagniappe.core.tools.polling.refresh._load_cached_details", lambda _hashes: {})
     monkeypatch.setattr("lagniappe.core.tools.polling.refresh.channel_revisions", lambda channels, _user: {channel: "tasks-revision" for channel in channels})
+    monkeypatch.setattr("lagniappe.core.tools.polling.refresh.cache.update", lambda *entities, **kwargs: None)
 
 
 def _cached_row(entity, fingerprint=None):
@@ -469,6 +470,132 @@ def test_warm_refresh_preserves_rows_without_expanding_relations(monkeypatch, ki
     fetch.assert_not_called()
     assert delta.order == (entity.urlsafe_key,)
     assert delta.upsert == delta.remove == ()
+
+
+# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
+# @matrix reconnect-refresh permissions : cached-fingerprint authorization no-extra-read
+@pytest.mark.unit
+@pytest.mark.parametrize("source_state", ["current", "missing", "legacy-pointer", "before-cache-write"])
+def test_form_version_refresh_batches_sources_without_expanding_unchanged_rows(monkeypatch, source_state):
+    modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    form = TestEntities.get("FORM", {"name": "Shared", "hash": "refresh-form"})
+    form.version = "version-1"
+    form.schema = [{"id": "note", "type": "input", "title": "Original"}]
+    affected = [_task("First", "form-first", modified), _task("Second", "form-second", modified)]
+    unrelated = _task("Unrelated", "no-form", modified)
+    for task in affected:
+        task.form = form
+        task.allowed = lambda *_args, **_kwargs: True
+    rows = [_manifest(task) for task in [*affected, unrelated]]
+    cached = {task.hash: _cached_row(task) for task in [*affected, unrelated]}
+    cached[form.hash] = _cached_row(form)
+    form.version = "version-2"
+    form.schema = [{"id": "note", "type": "input", "title": "Current"}]
+    if source_state == "current":
+        cached[form.hash] = _cached_row(form)
+    elif source_state == "missing":
+        cached.pop(form.hash)
+    elif source_state == "legacy-pointer":
+        for task in affected:
+            cached[task.hash].pop("form_hash")
+    reads, fetches, writes = [], [], []
+
+    def read(hashes):
+        reads.append(tuple(hashes))
+        return {h: cached[h] for h in hashes if h in cached}
+
+    def fetch(*keys, request):
+        fetches.append((keys, request))
+        if request == Fetch.root():
+            assert keys == (form.key,)
+            return [form]
+        assert request == Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION)
+        return affected
+
+    def update(*entities, update):
+        assert update is False
+        writes.append(entities)
+        for entity in entities:
+            cached[entity.hash] = _cached_row(entity)
+
+    monkeypatch.setattr("lagniappe.core.tools.polling.refresh._load_cached_details", read)
+    monkeypatch.setattr("lagniappe.core.tools.polling.refresh.cache.update", update)
+    monkeypatch.setattr(Entities, "fetch", fetch)
+    roots = tuple([*affected, unrelated]) if source_state == "before-cache-write" else None
+    delta = resolve_refresh_delta(RefreshCollection("page-tasks", None, roots), rows, _viewer())
+    assert delta.upsert == tuple(affected)
+    assert delta.order == tuple(row["key"] for row in rows)
+    assert delta.remove == ()
+    assert all(task.form.schema[0]["title"] == "Current" for task in delta.upsert)
+    assert len(fetches) == (2 if roots else 1)
+    assert fetches[-1][0] == (tuple(affected) if roots else tuple(task.urlsafe_key for task in affected))
+    assert len(writes) == 1 and set(writes[0]) == {*affected, form}
+    if source_state in {"current", "missing"}:
+        assert reads[1] == (form.hash,)
+
+    # The repaired pointer/version lets the next unchanged-parent pass stay warm.
+    reads.clear()
+    fetches.clear()
+    writes.clear()
+    current_rows = [_manifest(task) for task in [*affected, unrelated]]
+    delta = resolve_refresh_delta(RefreshCollection("page-tasks", None, None), current_rows, _viewer())
+    assert delta.upsert == delta.remove == ()
+    assert delta.order == tuple(row["key"] for row in current_rows)
+    assert reads[1] == (form.hash,)
+    assert fetches == writes == []
+
+
+# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
+# @matrix reconnect-refresh : cached-fingerprint no-extra-read
+@pytest.mark.unit
+@pytest.mark.parametrize("reserved", [False, True], ids=["no-form", "reserved-form"])
+def test_warm_refresh_needs_no_form_source_for_no_form_or_reserved_form(monkeypatch, reserved):
+    task = _task("Unchanged", "optional-form", datetime(2026, 1, 1, tzinfo=timezone.utc))
+    if reserved:
+        form = TestEntities.get("FORM", {"name": "Installation Form", "hash": "reserved", "reserved": True})
+        form.version = "reserved-version"
+        task.form = form
+    cached = _cached_row(task)
+    reads = []
+
+    def read(hashes):
+        reads.append(hashes)
+        return {task.hash: cached}
+
+    monkeypatch.setattr("lagniappe.core.tools.polling.refresh._load_cached_details", read)
+    with patch.object(Entities, "fetch") as fetch:
+        delta = resolve_refresh_delta(
+            RefreshCollection("page-tasks", None, None), [_manifest(task)], _viewer(),
+        )
+    assert reads == [[task.hash]]
+    fetch.assert_not_called()
+    assert delta.upsert == delta.remove == ()
+    assert delta.order == (task.urlsafe_key,)
+
+
+# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
+# @matrix reconnect-refresh : cached-fingerprint no-extra-read
+@pytest.mark.unit
+def test_legacy_empty_form_version_requires_one_authorized_refresh(monkeypatch):
+    task = _task("Legacy", "legacy-no-form", datetime(2026, 1, 1, tzinfo=timezone.utc))
+    task.allowed = lambda *_args, **_kwargs: True
+    cached = _cached_row(task)
+    cached.pop("form_hash")
+    assert cached["form_version"] == ""
+
+    def update(*entities, update):
+        cached.update(_cached_row(task))
+
+    monkeypatch.setattr("lagniappe.core.tools.polling.refresh._load_cached_details", lambda hashes: {task.hash: cached})
+    monkeypatch.setattr("lagniappe.core.tools.polling.refresh.cache.update", update)
+    collection = RefreshCollection("page-tasks", None, None)
+    with patch.object(Entities, "fetch", return_value=[task]) as fetch:
+        first = resolve_refresh_delta(collection, [_manifest(task)], _viewer())
+        second = resolve_refresh_delta(collection, [_manifest(task)], _viewer())
+    fetch.assert_called_once_with(task.urlsafe_key, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    assert first.upsert == (task,)
+    assert second.upsert == second.remove == ()
+    assert cached["form_hash"] is None
 
 
 # @matrix reconnect-refresh : entity-view root-fingerprint

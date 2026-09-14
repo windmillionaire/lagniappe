@@ -43,7 +43,6 @@ from .retry import (
 )
 
 
-DEPENDENCY_RETRY_DELAY_SECONDS = 60
 MISSING_INPUT_MESSAGE = (
     "This operation stopped because the item it was working on was deleted."
 )
@@ -521,7 +520,8 @@ class DeferredJobRunner:
 
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_waits_for_dependency_without_consuming_provider_retry
-    # @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry
+    # @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry backoff
+    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_schedules_report_dependency_checks_with_backoff
     def _schedule_dependency_wait(
         self,
         job,
@@ -533,13 +533,12 @@ class DeferredJobRunner:
     ):
         attempt = int(job.attempt or 0)
         scheduled_at = max(_utc(), now)
-        next_attempt_at = scheduled_at + timedelta(
-            seconds=DEPENDENCY_RETRY_DELAY_SECONDS
-        )
         parameters = dict(job.parameters or {})
-        parameters["_dependency_waits"] = (
-            int(parameters.get("_dependency_waits", 0) or 0) + 1
-        )
+        waits = max(0, int(parameters.get("_dependency_waits", 0) or 0))
+        delays = adapter.dependency_retry_delays
+        delay = delays[min(waits, len(delays) - 1)]
+        next_attempt_at = scheduled_at + timedelta(seconds=delay)
+        parameters["_dependency_waits"] = waits + 1
         self._persist_claimed(
             job,
             lease_token,
@@ -551,7 +550,7 @@ class DeferredJobRunner:
             parameters=parameters,
             error=_error_record(error, retryable=True, attempt=attempt),
             progress={
-                "phase": DeferredJobPhase.SUMMARIZING.value,
+                "phase": DeferredJobPhase.WAITING_DEPENDENCY.value,
                 "updated_at": scheduled_at.isoformat(),
             },
             status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
@@ -560,7 +559,7 @@ class DeferredJobRunner:
             task_identity = self.dispatch(
                 job,
                 attempt=attempt + 1,
-                delay_seconds=DEPENDENCY_RETRY_DELAY_SECONDS,
+                delay_seconds=delay,
             )
             self._persist_claimed(
                 job,

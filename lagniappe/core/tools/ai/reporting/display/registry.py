@@ -31,6 +31,6 @@ def proposal_action_display(action_type):
     """Return registered behavior or a conservative unknown-action fallback."""
 
     return ACTION_DISPLAY_REGISTRY.get(
-        action_type,
+        "update_form_schema" if action_type == "extend_form_schema" else action_type,
         ProposalActionDisplay(action_type or "", ""),
     )

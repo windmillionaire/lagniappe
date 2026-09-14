@@ -35,7 +35,8 @@ For a changed active form, `EditReconciler` renders the focused response in a
 detached preview and compares normalized submissions:
 
 - an unchanged saved baseline and schema leave the live form and draft intact;
-- otherwise, equal state installs automatically;
+- otherwise, equal state installs automatically unless projecting an unsaved or
+  queued draft omitted incompatible fields;
 - schema-only change projects stable local field IDs into the current schema;
 - renderer-capable value drift offers field-by-field saved/local choices;
 - a dirty non-renderer form offers **Reset form**;
@@ -90,6 +91,12 @@ A loaded Page task list owns a periodic Tasks channel subscription. Its
 restriction/schema changes invalidate the list without changing the Page's
 form revision.
 
+Polling service startup also schedules widget subscription reconciliation.
+A cached list can finish rendering before the deferred coordinator loads;
+its render-time reconciliation cannot subscribe yet. Revisiting loaded widgets
+when the coordinator becomes available prevents that ordering from permanently
+losing the list's subscription. This background pass does not delay rendering.
+
 `ToolReportList` owns a panel containing filter controls, empty-state messaging,
 and a nested `ul[data-role="report-items"]`. Report rows expose `data-tool` and
 `data-status`; filtering changes row visibility locally without dropping hidden
@@ -140,7 +147,12 @@ widget key where repeated widget names exist.
 
 PageInfo and TaskForm also consume `form-lock`. A reload or another tab can
 restore the active job and progress state even when the target fingerprint did
-not change. The terminal result may replace an active form automatically only
+not change. The lock scope is retained as `data-operation-scope` before the
+deferred manager starts, so its initial DOM scan uses the correct progress text:
+form changes show
+**Schema migration in progress**, while autofill keeps its own queued message.
+Subsequent operation responses supply the current phase.
+The terminal result may replace an active form automatically only
 when the operation matches its durable lock and the form has no unsaved or
 queued state. Otherwise normal form reconciliation protects the draft.
 
@@ -160,6 +172,10 @@ until the first authoritative projection, then shows the exact count including
 zero. Opening the menu loads ordinary Notifications and the durable aggregate.
 A changed cursor marks an already-loaded list stale; the list refreshes
 immediately only while open.
+If the first menu click arrives during a pending connectivity recovery, loading
+waits for that cycle to settle and then checks the view's current online state.
+It does not discard the click based on the previous offline state or send a
+request when the cycle finishes offline.
 
 The Messages entry represents the aggregate and cannot be cleared with
 ordinary Notifications. **Clear All** affects ordinary rows only. Message

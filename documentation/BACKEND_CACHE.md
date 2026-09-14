@@ -10,8 +10,9 @@ background jobs.
 Filter previews and saved-filter runs use normal permission-scoped ETags.
 Saving a changed Page/Form restriction, changing a Page's attached Form, or
 changing a Form schema advances the Tasks collection fingerprint with the
-source save. This index invalidation does not load descendants. Asynchronous
-restriction reconciliation updates their search and detail projections.
+source save. This index invalidation does not load descendants. Only restriction
+changes dispatch asynchronous reconciliation of inherited search and detail
+permissions; Form creation and schema/content edits do not queue that work.
 
 Project filter result ETags include the Tasks fingerprint, so a permission
 change cannot return a stale 304. Mounted Project filter pages watch both their
@@ -22,7 +23,14 @@ participates in both kinds of filtered result revision.
 Collection refresh loads the parent revision and queries membership only when
 that revision or viewer authorization changed. With an unchanged parent, it
 compares the supplied row fingerprints against cached details without loading
-the collection's entities. Changed rows load for authorization and rendering.
+the collection's entities. Page/Task details include an internal `form_hash`;
+one batched cache read obtains the current versions of their distinct Forms.
+When the collection revision changes, root relation keys instead supply a
+batched durable Form read, so refresh cannot acknowledge a new revision using
+an old Form cache row before publication finishes. Changed rows load for
+authorization and rendering. Their existing cache projections are refreshed
+after authorization, including missing legacy Form pointers; unchanged rows
+need no entity expansion or cache write.
 Restrictions participate in the row fingerprint,
 so inherited permission changes do not require rewriting descendant content or
 its durable modification timestamp. Only changed/new authorized rows are
@@ -97,7 +105,9 @@ scope. See [BACKEND_FILTERS.md](BACKEND_FILTERS.md).
 Cached details include `modified` (the MD5 of the durable ISO timestamp), the
 calculated `fingerprint`, effective `restricted_to` when nonempty, and
 `form_version` for Forms, Pages, and Tasks. A Form stores its own version; a
-Page/Task stores its attached Form's version or an empty string. Datastore
+Page/Task stores its attached Form's version or an empty string, plus the
+internal Form hash used by collection refresh. Public detail hydration removes
+that pointer. Datastore
 modification timestamps and browser timestamp fields remain datetimes/ISO strings.
 
 The shared fingerprint helper hashes `base:form_version:restrictions` for
@@ -119,9 +129,13 @@ administrators; ordinary ungrouped users send `Restriction.BELONGS_TO_NONE` and
 match only unrestricted records. `Restriction.UNRESTRICTED` omits the independent
 required-access predicate.
 
-After a Form/Page/Task restriction source changes, the save writes its source
-projection and dispatches `process/reconcile-restrictions`. Form schema changes
-also dispatch, because attached entity fingerprints include the schema version.
+After an existing Form's restrictions or a Page/Task restriction source changes,
+the save writes its source projection and dispatches `process/reconcile-restrictions`.
+Form publication compares restrictions with the saved Form at the explicit save
+boundary, including when its cache row is missing. A new Form has no existing
+submissions to reconcile. Schema/content changes invalidate submission revisions
+without dispatching permission work. A stale existing restriction projection or
+a pending Redis marker can recover an unsuccessful dispatch on a later Save.
 The task carries a source key, the Category/Project owner keys already resolved
 during the save, and a continuation cursor/offset. It rereads current source
 state. Matching Page/Task instances load at root depth in batches of 100. Local

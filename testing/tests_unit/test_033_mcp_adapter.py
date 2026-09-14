@@ -2684,6 +2684,62 @@ def test_create_start_schema_recovery_preserves_selection_and_created_plan(failu
     asyncio.run(exercise())
 
 
+# @pair mcp-adapter:product-contract
+# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+@pytest.mark.parametrize("failure", [None, "disallowed", "transport"])
+def test_organize_start_selected_schemas_reuses_plan_on_recovery(failure):
+    class OrganizeREST(_SelectedStartREST):
+        async def request_json(self, method, target, *, body=None, **kwargs):
+            value, request_id = await super().request_json(method, target, body=body, **kwargs)
+            if "tool" in value:
+                value["tool"] = "organize"
+            return value, request_id
+
+    async def exercise():
+        rest = OrganizeREST()
+        rest.allowed = ["complete_task", "rename_entity"]
+        if failure == "disallowed":
+            rest.allowed = ["rename_entity"]
+        elif failure == "transport":
+            rest.failure = TransportError("offline", "private detail")
+        adapter = LagniappeAdapter(ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"), rest=rest)
+        await adapter.initialize()
+        with pytest.raises(SchemaError):
+            await adapter.execute("start_organize", {"instructions": "Complete this task", "actions": []})
+        assert rest.requests == []
+        result = await adapter.execute("start_organize", {"instructions": "Complete this task", "actions": ["complete_task"]})
+        assert result.value["tool"] == "organize"
+        if failure:
+            recovery = result.value["context"]["recovery"]
+            assert recovery["arguments"]["actions"] == ["complete_task"]
+            assert recovery["arguments"]["plan_id"] == result.value["id"]
+            rest.failure = None
+            rest.allowed = ["complete_task", "rename_entity"]
+            contract = (await adapter.execute(recovery["tool"], recovery["arguments"])).value
+        else:
+            contract = result.value["context"]["contract"]
+        assert contract["schema_actions"] == ["complete_task"]
+        assert contract["permissions"]["allowed_actions"] == ["complete_task", "rename_entity"]
+        assert sum(target == "plans" for _, target, _ in rest.requests) == 1
+        assert rest.requests[0][2]["tool"] == "organize"
+        receipt = await adapter.execute("submit_plan", {"plan_id": result.value["id"], "contract_version": CONTRACT_VERSION_MAX, "proposal": {"actions": [{"type": "complete_task"}]}})
+        assert receipt.value["status"] == "ready"
+        assert rest.requests[-2][1] == "plans/abcdefghijkl/contract"
+    asyncio.run(exercise())
+
+
+# @pair mcp-adapter:product-contract
+# @source mcp/src/lagniappe_mcp/schema.py::validate_value
+@pytest.mark.parametrize("bound, limit, value", [("maximum", 50, 100), ("minimum", 1, 0), ("maxLength", 2, "private"), ("maxItems", 1, ["private", "value"])])
+def test_validation_errors_expose_only_safe_bounds(bound, limit, value):
+    schema = {"type": "object", "properties": {"limit": {bound: limit}}}
+    with pytest.raises(SchemaError) as caught:
+        validate_value(schema, {"limit": value}, phase="input")
+    assert caught.value.details == {"path": "$.limit", "validator": bound, bound: limit}
+    assert "private" not in caught.value.render()
+
+
 class _LifecycleContextREST(_WorkflowREST):
     """Deterministic REST boundary for post-write context reads."""
 

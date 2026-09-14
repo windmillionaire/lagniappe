@@ -1093,6 +1093,7 @@ def test_task_move_updates_history_only_file_page_without_consuming_pending_move
     task._testing = False
     monkeypatch.setattr(database_get, "task_files", lambda key: [file] if key == task.key else [])
     monkeypatch.setattr(Entities, "fetch", lambda *items, request: list(items))
+    monkeypatch.setattr(Entities, "fetch_one", lambda key, *, request: task if key == task.key else None)
 
     plan = plan_mutation(MutationOperation.SAVE, task, registry=Entities)
 

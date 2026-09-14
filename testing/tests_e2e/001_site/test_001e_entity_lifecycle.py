@@ -6,7 +6,6 @@ and verify the datastore, cache, and storage effects owned by that machinery.
 """
 
 import json
-from datetime import datetime, timezone
 from io import BytesIO
 from uuid import uuid4
 
@@ -286,6 +285,10 @@ def test_entity_save_persists_relations_process_payloads_and_cache():
 # @matrix categories : cascade model-category shared-page
 @pytest.mark.parametrize("category_as_model", [False, True])
 def test_entity_delete_cascades_dependents_assets_and_cache(category_as_model):
+    completer = Entities.USER.create(
+        {"name": _name("completer"), "email": f"complete-{uuid4().hex}@example.test"}
+    )
+    completer.save()
     creator = _create_page("category-filter-creator", [])
     page_form = _create_form("category-page-form")
     task_form = _create_form("category-task-form", form_type="task")
@@ -321,8 +324,7 @@ def test_entity_delete_cascades_dependents_assets_and_cache(category_as_model):
             "submission": {FIELD_ID: "task value"},
         }
     )
-    task.completed = True
-    task.completed_on = datetime.now(timezone.utc)
+    task.complete(user=completer)
     task_history = task.create_history_entry()
     task.save()
 

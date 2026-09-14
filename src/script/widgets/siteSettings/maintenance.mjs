@@ -17,6 +17,7 @@ export class SiteMaintenance extends SiteSetting {
 	constructor(attributes) {
 		super(attributes);
 		this._migrationStatus = null;
+		this._cacheStatus = null;
 	}
 
 	init() {
@@ -30,6 +31,7 @@ export class SiteMaintenance extends SiteSetting {
 
 	postreconcile() {
 		this._renderMigrationStatus(this._migrationStatus);
+		this._renderCacheStatus(this._cacheStatus);
 	}
 
 	_initActions() {
@@ -51,6 +53,8 @@ export class SiteMaintenance extends SiteSetting {
 
 		rebuildCache.element.addEventListener("click", async () => {
 			rebuildCache.activate();
+			this._cacheStatus = null;
+			this._renderCacheStatus(null);
 			const response = await request.post(this.endpoints.rebuildCache);
 			if (response?.migration_status) {
 				this._migrationStatus = response.migration_status;
@@ -65,7 +69,13 @@ export class SiteMaintenance extends SiteSetting {
 				);
 				return;
 			}
-			rebuildCache.deactivate();
+			this._cacheStatus = response.cache_status || null;
+			this._renderCacheStatus(this._cacheStatus);
+			rebuildCache.deactivate(
+				this._cacheStatus?.failed
+					? "Cache Refreshed — Review Errors"
+					: undefined,
+			);
 			clearRecentSearchResults();
 		});
 
@@ -104,6 +114,45 @@ export class SiteMaintenance extends SiteSetting {
 			);
 			clearRecentSearchResults();
 		});
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_cache_refresh_displays_linked_failures
+	 * @matrix cache : failure-isolation actionable-links
+	 */
+	_renderCacheStatus(status) {
+		const panel = this.target.querySelector("[data-role='cache-status']");
+		if (!panel) return;
+		panel.dataset.visible = status ? "true" : "false";
+		if (!status) return;
+		panel.querySelector("[data-role='cache-status-title']").textContent =
+			status.failed ? "Cache refreshed with errors" : "Cache refreshed";
+		const errors = status.errors || [];
+		panel.querySelector("[data-role='cache-status-summary']").textContent =
+			`${status.processed} records processed; ${status.failed} skipped.` +
+			(status.failed
+				? " Skipped records could not be safely cached. Review them, then refresh again."
+				: "") +
+			(status.failed > errors.length
+				? ` Showing ${errors.length} errors.`
+				: "");
+		const list = panel.querySelector("[data-role='cache-status-errors']");
+		list.replaceChildren();
+		for (const error of errors) {
+			const item = document.createElement("li");
+			item.textContent = `${error.message} `;
+			if (error.url) {
+				const link = document.createElement("a");
+				link.href = error.url;
+				link.textContent = error.link_label || "Open record";
+				link.className = STYLES.link.emphasized;
+				item.appendChild(link);
+			} else {
+				item.textContent += error.key || "";
+			}
+			list.appendChild(item);
+		}
 	}
 
 	_initConfiguration() {

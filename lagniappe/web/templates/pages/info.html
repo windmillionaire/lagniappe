@@ -293,7 +293,9 @@
           data-operation="{{ page.deferred_job.key }}" data-operation-revision="{{ page.deferred_job.revision|default(0, true) }}" data-deferred-lock="form"
         {% endif %}
         {% if page.description %}data-description="{{ page.description }}"{% endif %}
-        {% if page.form %}data-schema='{{ page.form.schema|tojson }}'{% endif %}
+        {% if page.form %}data-schema='{{ page.submission_schema|tojson }}'{% endif %}
+        data-migration-notice='{{ page.migration_notice|tojson }}'
+        data-form-generation="{{ page.generation }}"
         {% if page.form %}data-submission='{{ page.properties.submission.form_value|tojson }}'{% endif %}
         class="{{ styles.form.default }} mt-4 sm:mt-0">
     {% set can_edit_image = page.allowed(Action.EDIT) and not current_user.is_public %}

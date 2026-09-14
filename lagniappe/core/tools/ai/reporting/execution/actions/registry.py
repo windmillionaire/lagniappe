@@ -32,7 +32,8 @@ from .files import (
 from .forms import (
     _undo_form_schema_update,
     _undo_submission_updates,
-    _extend_form_schema,
+    _update_form_schema,
+    _legacy_form_schema,
     _update_form_values,
 )
 from .compensation import (
@@ -99,9 +100,10 @@ REPORT_ACTION_ADAPTERS = {
             _without_report(_undo_submission_updates),
         ),
         ReportActionAdapter(
-            "extend_form_schema",
-            _extend_form_schema,
+            "update_form_schema",
+            _update_form_schema,
             _without_report(_undo_form_schema_update),
+            uses_context=True,
         ),
         ReportActionAdapter(
             "attach_file",
@@ -136,3 +138,12 @@ def validate_report_action_registry():
 
 
 validate_report_action_registry()
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
+# @reason stored legacy actions are executable without advertising them to new proposals
+def report_action_adapter(action_type):
+    if action_type == "extend_form_schema":
+        return ReportActionAdapter(action_type, _legacy_form_schema, _without_report(_undo_form_schema_update))
+    return REPORT_ACTION_ADAPTERS[action_type]

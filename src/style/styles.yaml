@@ -47,8 +47,8 @@ badge:
 
 builder:
   view:
-    classes: group/builder mx-auto flex max-w-7xl flex-row justify-center gap-8 px-4 pt-4 sm:px-0 sm:pt-6 lg:pt-8
-    intent: view presentation within builder
+    classes: group/builder mx-auto hidden max-w-7xl flex-row justify-center gap-8 px-4 pt-4 sm:px-0 sm:pt-6 lg:flex lg:pt-8
+    intent: desktop builder layout hidden below the desktop-only notice breakpoint
     surfaces: [server]
   component:
     classes: text-md flex cursor-move flex-row items-center gap-3 rounded-md bg-form-bg px-3 py-1.5 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark
@@ -86,7 +86,7 @@ builder:
     surfaces: [server]
   switch:
     container:
-      classes: "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default"
+      classes: "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default"
       intent: container presentation within builder switch
       surfaces: [server]
     toggle:
@@ -295,7 +295,7 @@ editor:
       intent: divider presentation within editor toolbar
       surfaces: [frontend]
     section:
-      classes: flex flex-row items-center gap-2
+      classes: flex flex-row flex-wrap items-center gap-2
       intent: section presentation within editor toolbar
       surfaces: [frontend]
     tool:
@@ -350,7 +350,7 @@ editor:
       css: [src/style/icons.css]
     portalIconContext:
       classes: editor-toolbar-portal-icon-context
-      intent: extends matched editor icon geometry into body-portaled toolbar menus and form panels
+      intent: matches standard dropdown icon sizing in body-portaled editor menus and form panels
       surfaces: [frontend]
       hooks: [editor-toolbar-portal-icon-context]
       css: [src/style/icons.css]
@@ -359,12 +359,6 @@ editor:
       intent: optically centers primary toolbar menu glyphs
       surfaces: [frontend]
       hooks: [editor-toolbar-menu-icon]
-      css: [src/style/icons.css]
-    historyIcon:
-      classes: editor-toolbar-history-icon
-      intent: optically centers the document history glyph within its toolbar control
-      surfaces: [frontend]
-      hooks: [editor-toolbar-history-icon]
       css: [src/style/icons.css]
     caret:
       classes: editor-toolbar-caret opacity-50
@@ -559,8 +553,8 @@ form:
       intent: todo item text in normal and editable presentations
       surfaces: [frontend]
     completeText:
-      classes: text-base-medium line-through
-      intent: completed todo item text treatment
+      classes: text-base-dark
+      intent: keep completed todo text the same color as unchecked items
       surfaces: [frontend]
     inlineInput:
       classes: min-w-0 flex-1 border-b border-dashed border-base-medium bg-transparent px-1 py-0.5 text-base-dark focus:border-kind-default focus:outline-none
@@ -978,6 +972,58 @@ list:
       intent: item presentation within list links
       surfaces: [server]
 
+error:
+  debug:
+    section:
+      classes: error-debug-section
+      intent: expandable diagnostic section on the server error page
+      surfaces: [server]
+      hooks: [error-debug-section]
+      css: [src/style/content.css]
+    content:
+      classes: error-debug-content
+      intent: readable diagnostic payload and traceback content
+      surfaces: [server]
+      hooks: [error-debug-content]
+      css: [src/style/content.css]
+    badge:
+      base:
+        classes: error-debug-badge
+        intent: compact label identifying a diagnostic section
+        surfaces: [server]
+        hooks: [error-debug-badge]
+        css: [src/style/content.css]
+      error:
+        classes: error-debug-badge-error
+        intent: traceback diagnostic badge color
+        surfaces: [server]
+        hooks: [error-debug-badge-error]
+        css: [src/style/content.css]
+      request:
+        classes: error-debug-badge-request
+        intent: request diagnostic badge color
+        surfaces: [server]
+        hooks: [error-debug-badge-request]
+        css: [src/style/content.css]
+      entity:
+        classes: error-debug-badge-entity
+        intent: entity diagnostic badge color
+        surfaces: [server]
+        hooks: [error-debug-badge-entity]
+        css: [src/style/content.css]
+    type:
+      classes: error-debug-type
+      intent: exception type displayed above diagnostic details
+      surfaces: [server]
+      hooks: [error-debug-type]
+      css: [src/style/content.css]
+    timestamp:
+      classes: error-debug-timestamp
+      intent: occurrence time displayed above diagnostic details
+      surfaces: [server]
+      hooks: [error-debug-timestamp]
+      css: [src/style/content.css]
+
 siteSettings:
   migration:
     releaseSummary:
@@ -1158,7 +1204,7 @@ radio:
     column:
       classes: flex flex-col gap-1 sm:text-sm font-semibold
       intent: column presentation within radio fieldset
-      surfaces: [frontend]
+      surfaces: [server, frontend]
   label:
     classes: flex items-center gap-2 font-semibold sm:text-sm text-base-dark
     intent: label presentation within radio
@@ -1227,6 +1273,10 @@ signature:
     surfaces: [frontend]
 
 table:
+  container:
+    classes: min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white
+    intent: thin bordered container for embedded history and filter result tables
+    surfaces: [server, frontend]
   default:
     classes: w-full table-auto border-collapse divide-y sm:text-sm mt-4
     intent: default presentation within table

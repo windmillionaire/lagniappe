@@ -1,6 +1,7 @@
 """Kind-specific save planners."""
 
 from ..definitions import Fetch, FetchReason
+from ..tools.form_definitions import validate_completion_write
 from .base import StandardMutation
 
 
@@ -57,6 +58,9 @@ class TaskMutation(StandardMutation):
     # @matrix permissions search files : task-move ancestor-tags
     # @matrix files : ownership history parent-key retry
     def plan_save(self, entity, builder, *, reason, depends_on=()):
+
+        persisted = builder.entities.fetch_one(entity.key, request=Fetch.root())
+        validate_completion_write(entity, persisted.db if persisted is not None else None)
         super().plan_save(
             entity,
             builder,
@@ -78,6 +82,9 @@ class TaskMutation(StandardMutation):
 class TaskHistoryMutation(StandardMutation):
     # @testable infrastructure
     def plan_save(self, entity, builder, *, reason, depends_on=()):
+
+        persisted = builder.entities.fetch_one(entity.key, request=Fetch.root())
+        validate_completion_write(entity, persisted.db if persisted is not None else None)
         super().plan_save(
             entity,
             builder,
@@ -109,19 +116,16 @@ class UserMutation(StandardMutation):
 # @testable infrastructure
 class FormMutation(StandardMutation):
     # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_save_records_schema_history_on_version_change
+    # @tests tests_unit/test_004_form_properties.py::test_form_save_refreshes_content_version_without_archiving_compatible_edits
     # @tests tests_unit/test_022_mutation_contracts.py::test_permission_save_reuses_resolved_collection_owner_keys
     # @matrix permissions mutations : owner-reuse no-extra-read repeated-save
-    # @matrix form : relations save schema-history
+    # @matrix form : relations save content-fingerprint generation
+    # @matrix forms mutations : guarded-save publication
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         entity.properties.restricted_to.materialize()
-        previous_version = entity.version
-        entity.properties.version.update()
-        if previous_version != entity.version:
-            entity._permission_sources_changed = True
-        if previous_version != entity.version and entity.properties.schema.previous:
-            history = builder.entities.FORM_HISTORY.create(entity, previous_version)
-            builder.plan_standard(history, reason="form-schema-history")
+        from ..tools.form_drafts import prepare_form_publication
+
+        prepare_form_publication(entity, builder)
 
         super().plan_save(
             entity,

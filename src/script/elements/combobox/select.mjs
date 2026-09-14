@@ -58,7 +58,13 @@ export class SelectBox extends Submitter(Combobox) {
 				name: option.textContent,
 				kind: this.select.dataset.kind || "default",
 				...JSON.parse(option.dataset.details || "{}"),
+				disabled: option.disabled || option.parentElement?.disabled || false,
 			}));
+	}
+
+	selectOption(option) {
+		if (option.getAttribute("aria-disabled") === "true") return;
+		super.selectOption(option);
 	}
 
 	elementClick(event) {

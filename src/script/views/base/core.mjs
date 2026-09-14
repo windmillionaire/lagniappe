@@ -611,6 +611,11 @@ export default class Core extends ShellView {
 		);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/007_categories/test_007a_category_index.py::test_page_creation_requires_name_and_rows_do_not_follow_attached_form
+	 * @matrix pages : row-navigation
+	 */
 	_click(e) {
 		const menuTrigger = e.target.closest("[data-role='menu-trigger']");
 		const menu = menuTrigger?.closest("[lp-menu]");
@@ -682,7 +687,10 @@ export default class Core extends ShellView {
 
 		const link = e.target.closest("[lp-link]");
 		if (link) {
-			link.querySelector("[data-role='title']")?.click();
+			const title = link.matches("tr[lp-entity]")
+				? "td[data-column='name'] [data-role='title']"
+				: "[data-role='title']";
+			link.querySelector(title)?.click();
 			return;
 		}
 	}

@@ -19,6 +19,11 @@
 	contain: layout;
 }
 
+/* @style table.default table.embedded */
+tr[data-embedded="true"] > td:has(> .table-container[data-embedded="true"]) {
+	padding-bottom: 0.75rem;
+}
+
 /* @style form.table.rowActions */
 .table-row-actions {
 	width: max-content;

@@ -13,7 +13,8 @@ forms; a root form reuses the root entity subscription.
 When a fingerprint changes, the watcher loads the form's focused replacement
 route and delegates normalized comparison to `EditReconciler`:
 
-- equivalent values acknowledge automatically;
+- equivalent values acknowledge automatically unless the comparison omits
+  incompatible fields from an unsaved or queued draft;
 - schema change projects stable local field IDs into the current schema;
 - renderer-backed value drift offers per-field saved/local choices;
 - dirty simple forms offer reset;
@@ -75,6 +76,28 @@ reload or in another tab even when the entity fingerprint is unchanged.
 On terminal state, a matching clean form may reconcile automatically. Unsaved
 or queued state retains the ordinary saved/local review boundary. A stale
 rendered lock is also cleared from authoritative terminal state.
+
+A pending deterministic Form change also pauses every attached Page/Task. Its
+Form-owned marker remains authoritative after job failure or expiry, so an old
+terminal autofill descriptor cannot unlock partially converted submissions.
+Builder recovery finishes or cancels the Form change through its dedicated route.
+
+Submission forms and quick-edit requests carry their rendered generation. The
+server rejects old representations after publication. Reconciliation checks field
+type, cardinality, option identities and table columns before carrying local
+values forward. Removed or incompatible local fields remain visible in the
+saved/local review, but cannot be selected into a schema that cannot represent
+them. A dirty or queued form requires explicit review before discarding those
+values. Compatible local fields can still be retained.
+
+Check schema compatibility before accepting matching projected values. Projection
+omits incompatible local fields, so equality with the saved submission does not
+mean the original draft is safe to discard. Keep its original schema and values,
+and any queued command, until the user resolves the review.
+
+The `pre_migration` notice is a separate, read-only display of saved changes. It
+does not resolve an offline/concurrent conflict, and closing it never saves or
+clears the notice.
 
 ## Service worker boundary
 

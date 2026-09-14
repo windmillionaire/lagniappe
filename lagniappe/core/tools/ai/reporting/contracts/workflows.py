@@ -1,12 +1,12 @@
 """Shared Organize profiles; transport origin is assigned by trusted intake."""
 
-REMOTE_UPDATE_ACTIONS = frozenset(
+ORGANIZE_UPDATE_ACTIONS = frozenset(
     {
         "complete_task",
         "set_task_due_date",
         "append_page_document",
         "update_form_values",
-        "extend_form_schema",
+        "update_form_schema",
         "rename_entity",
         "move_page",
         "move_task",
@@ -20,7 +20,7 @@ REMOTE_UPDATE_ACTIONS = frozenset(
 ORGANIZE_UPDATE_GUIDELINES = """
 Propose updates to existing workspace records for authenticated browser review;
 do not execute changes or say they have been performed. No upload is required
-for this remote Organize profile. Creation requests belong in Create instead.
+for this Organize update profile. Creation requests belong in Create instead.
 
 Discover the intended records with permission-bounded reads. Compare approximate
 names, descriptions and parent context rather than assuming the user's wording
@@ -30,7 +30,7 @@ exact tool-returned references in the proposal; execution does not search again.
 
 Use only the allowed actions. Fetch get_guidelines(task="report_actions",
 actions=[...]) for the selected operations when details are needed, and the
-schema_evolution bundle before additive Form changes. Fetch only relevant field
+schema_evolution bundle before Form schema changes. Fetch only relevant field
 types for form_autofill guidance. Do not load file-organization or task-creation
 guidance for a simple existing-record update.
 
@@ -49,6 +49,12 @@ not a rewritten copy of the document. The server prefixes source/time attributio
 Replacement/deletion of existing document text is not supported.
 
 Return a complete proposal, not a conversational answer or an intermediate plan.
+Check every requested outcome against the actions, target by target. Updating
+two tasks requires patches for both; completing them requires complete_task
+actions depending on those updates; adding a link requires append_page_document.
+Submission completion cannot add missing targets or actions later. Write the
+summary from the final actions. Explain unplanned work in issues and needs_review
+instead of promising it in the summary or silently omitting it.
 Every mutation still requires the user's browser approval and live permissions.
 If files are uploaded, use the file Organize profile instead: inspect, summarize
 and place every supplied file; update requests do not waive those obligations.
@@ -58,11 +64,11 @@ and place every supplied file; update requests do not waive those obligations.
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_remote_organize_update_contract_and_submission
 # @matrix agent-api ai-report : remote-update transport-boundary
-def is_remote_organize_update(report):
-    """Allow fileless edits only on API/email reports, never on UI reports."""
+def is_organize_update(report):
+    """Use the same fileless update profile for every trusted report intake."""
     return (
         getattr(report, "tool", None) == "organize"
-        and getattr(report, "origin", None) in {"api", "email"}
+        and getattr(report, "origin", None) in {"api", "email", "web"}
         and not getattr(report, "input_files", None)
         and not getattr(report, "upload_manifest", None)
     )

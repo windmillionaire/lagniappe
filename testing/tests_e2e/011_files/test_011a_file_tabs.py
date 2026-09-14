@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 import time
 from uuid import uuid4
+from urllib.parse import urlsplit
 
 from playwright.sync_api import expect
 import pytest
@@ -169,12 +170,14 @@ def test_file_page_shows_linked_page_and_task_badges(get_user):
 
 # @pairs file:badge file:delete mutations:delete
 # @pairs tasks:badge tasks:list-owner-fingerprint tasks:unlink
+# @matrix connectivity service-worker : state-publication startup
 # @template files/file.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
 # @template pages/tasks.html::task_details
 # @template badge.html::entity_badge
-def test_delete_file_removes_attached_task_badge(get_user):
+@pytest.mark.parametrize("pending_navigation_ping", [False, True])
+def test_delete_file_removes_attached_task_badge(get_user, pending_navigation_ping):
     user = get_user(Users.OWNER)
     page, file = _upload_file(user, Uploads.plain_text_file)
     file_entity = Entities.fetch_one(file.key, request=Fetch.direct())
@@ -201,22 +204,45 @@ def test_delete_file_removes_attached_task_badge(get_user):
     menu = user.page.get_by_role("menu", name="File actions")
     expect(menu).to_be_visible()
     menu.get_by_role("menuitem", name="Delete").click()
-    with expect_successful_response(
-        user.page,
-        method="DELETE",
-        path=f"/files/{file.key}/delete",
-    ):
-        Modal(user.page).delete()
+    held_pings = []
 
-    user.go(page)
+    def hold_home_ping(route):
+        if pending_navigation_ping and urlsplit(
+            route.request.headers.get("referer", "")
+        ).path == "/":
+            held_pings.append(route)
+        else:
+            route.continue_()
+
+    with scoped_browser_route(user.page.context, "**/l/ping", hold_home_ping):
+        try:
+            with expect_successful_response(
+                user.page,
+                method="DELETE",
+                path=f"/files/{file.key}/delete",
+            ):
+                Modal(user.page).delete()
+
+            if pending_navigation_ping:
+                # Leaving Home cancels its still-pending health request. The next
+                # Page must validate its cached task list before its own ping ends.
+                user.page.wait_for_function(
+                    "() => location.pathname === '/' && Boolean(window.__PING_PENDING__)"
+                )
+            user.go(page)
+        finally:
+            for route in held_pings:
+                route.abort("aborted")
+    if pending_navigation_ping:
+        assert held_pings
+
+    persisted_task = Entities.fetch_one(task_entity.key, request=Fetch.root())
+    assert file_entity.key not in persisted_task.properties.files.keys
     task_item = page.active_task_list.list.locator(
         f"li[lp-entity][data-key='{task_entity.urlsafe_key}']"
     )
     expect(task_item).to_be_visible()
     expect(task_item).not_to_contain_text(file_entity.name)
-
-    persisted_task = Entities.fetch_one(task_entity.key, request=Fetch.root())
-    assert file_entity.key not in persisted_task.properties.files.keys
 
 
 # @matrix file : add linked-pages reload remove

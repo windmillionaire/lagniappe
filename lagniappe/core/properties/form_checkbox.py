@@ -23,7 +23,7 @@ class Checkbox(ColumnMixin, AIMixin, FilterMixin, SchemaProperty):
     Get:
         value (bool): True if checked, False otherwise.
         filter_value (bool): True/False (never None).
-        ai_value (str): String representation of filter_value.
+        ai_value (bool): Same as filter_value; unset answers remain absent.
         db_value (bool): Same as filter_value.
     """
 
@@ -93,7 +93,7 @@ class Checkbox(ColumnMixin, AIMixin, FilterMixin, SchemaProperty):
     def ai_value(self):
         if not self.is_set:
             return None
-        return str(self.filter_value)
+        return self.filter_value
 
     @property
     def filter_value(self):

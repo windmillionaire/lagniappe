@@ -69,7 +69,7 @@
   {% set completed = t.completed %}
   {% set form_readonly = t.readonly or completed %}
   {% set show_settings = not form_readonly %}
-  {% set show_form = t.form and ((not completed) or t.submission) %}
+  {% set show_form = completed or t.form %}
   {% set can_move = t.allowed(Action.EDIT) %}
   {% set can_combine = t.allowed(Action.DELETE) %}
   <li id="{{ t.hash }}"
@@ -176,8 +176,8 @@
        {% if show_form %}data-form="{{ t.hash }}:TaskForm"{% endif %}
        {% if show_settings %}data-task="{{ t.hash }}:TaskSettings"{% endif %}
        data-route="{{ url_for('tasks.history', key=t.urlsafe_key) }}"
-       class="min-w-0 overflow-hidden max-w-full mx-4 mb-4 rounded-md outline-2 outline-task-default">
-    <div class="table-container px-4" data-role="table"></div>
+       class="min-w-0 max-w-full mx-4 mb-4 sm:mx-2">
+    <div data-role="table"></div>
   </div>
 {% endmacro %}
 
@@ -196,14 +196,61 @@
         data-history="{{ t.hash }}:TaskHistory"
         data-deferred-route="{{ url_for('tasks.get', key=t.urlsafe_key) }}"
         data-destination="{{ t.hash }}:TaskForm"
-        data-schema='{{ t.form.schema|tojson }}'
+        data-schema='{{ t.submission_schema|tojson }}'
+        {% if not t.completed %}data-migration-notice='{{ t.migration_notice|tojson }}'{% endif %}
+        data-form-generation="{{ t.generation }}"
+        {% if t.submission_schema_error %}data-schema-error="{{ t.submission_schema_error }}"{% endif %}
+        {% if t.submission_schema_error %}data-raw-submission='{{ t.properties.submission.value|tojson }}'{% endif %}
         data-submission='{{ t.properties.submission.form_value|tojson }}'
         data-close="{{ t.hash }}"
         class="{{ styles.form.default }}">
     {% if t.allowed(Action.EDIT) and not t.completed %}
       {{ autofill(enabled=current_user.access(AI.CREATE)) }}
     {% endif %}
-    {{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}
+    {% if t.completed and t.properties.form.key and not t.form %}
+      <section data-role="archived-submission-controls" class="flex flex-col gap-3">
+        <p role="status" class="rounded-md px-3 py-2 text-sm bg-amber-50 text-amber-900 ring-1 ring-amber-400">
+          This submission's form has been deleted.
+          <button type="button" data-role="load-archived-submission"
+                  data-route="{{ url_for('tasks.archived_submission', key=t.urlsafe_key) }}"
+                  class="font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2">Load the archived version</button>.
+        </p>
+        <div data-role="archived-submission-detail" hidden></div>
+      </section>
+    {% elif t.completed and not t.properties.submission.value and not t.has_converted_completion %}
+      <p data-role="empty-completed-submission" role="status" class="text-sm text-base-medium">Task was completed with an empty submission</p>
+    {% endif %}
+    {% if t.allowed(Action.EDIT) and t.has_converted_completion %}
+      <section data-role="original-completion-controls" class="flex flex-col gap-3" {% if not t.form %}hidden{% endif %}>
+        <div data-role="submission-changed-warning" role="status"
+           class="rounded-md px-3 py-2 text-sm bg-amber-50 text-amber-900 ring-1 ring-amber-400">
+          <p>
+            This form was modified after this task was completed.
+            <button type="button" data-role="view-original-completion"
+                    data-route="{{ url_for('tasks.completion_details', key=t.urlsafe_key) }}"
+                    class="font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2">View Original Submission</button>.
+          </p>
+          <fieldset data-role="completion-submission-options" hidden
+                    class="{{ styles.radio.fieldset.column }} mt-3">
+            <legend class="mb-2 font-semibold">When Reopened</legend>
+            <label class="{{ styles.radio.label }}">
+              <input type="radio" name="completion_submission" value="original"
+                     data-role="completion-submission-choice" disabled
+                     class="{{ styles.radio.default }}">
+              Archive original submission
+            </label>
+            <label class="{{ styles.radio.label }}">
+              <input type="radio" name="completion_submission" value="modified"
+                     data-role="completion-submission-choice" disabled
+                     class="{{ styles.radio.default }}">
+              Archive modified submission
+            </label>
+          </fieldset>
+        </div>
+        <div data-role="original-completion-detail" hidden></div>
+      </section>
+    {% endif %}
+    {% if not t.completed %}{{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}{% endif %}
   </form>
 {% endmacro %}
 

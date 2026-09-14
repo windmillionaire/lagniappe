@@ -84,7 +84,7 @@ def _normalize_handler_result(result):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason action dispatch is exercised through deterministic report-run tests
 def _execute_action(action, report, user, created, context=None):
-    from .registry import REPORT_ACTION_ADAPTERS
+    from .registry import report_action_adapter
 
-    adapter = REPORT_ACTION_ADAPTERS[action["type"]]
+    adapter = report_action_adapter(action["type"])
     return adapter._apply(action, report, user, created, context or {})

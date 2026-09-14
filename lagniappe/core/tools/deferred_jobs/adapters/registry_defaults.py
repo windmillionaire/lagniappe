@@ -3,6 +3,7 @@
 from .autofill import AutofillAdapter
 from .email import EmailIngestAdapter
 from .files import FileExtractAdapter, FileSummarizeAdapter
+from .form_change import FormChangeAdapter
 from .reports import (
     AskReportAdapter,
     CreateReportAdapter,
@@ -24,5 +25,6 @@ def register_adapters(registry):
         AutofillAdapter(),
         FileExtractAdapter(),
         FileSummarizeAdapter(),
+        FormChangeAdapter(),
     ):
         registry.register(adapter)

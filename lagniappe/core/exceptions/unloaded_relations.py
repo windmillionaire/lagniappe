@@ -120,6 +120,12 @@ def capture_unloaded_relation(prop, *, relation_type, keys):
         return
 
     key_labels = [_debug_key(key) for key in keys if key]
+    reported_keys = (relation_type, tuple(key_labels))
+    if (
+        getattr(prop, "_reported_unloaded_keys", None) == reported_keys
+        and not getattr(CONFIG, "STRICT_RELATION_LOADS", False)
+    ):
+        return
     context = {
         "relation_type": relation_type,
         "entity": _entity_context(_safe_attr(prop, "entity")),
@@ -143,5 +149,6 @@ def capture_unloaded_relation(prop, *, relation_type, keys):
     )
     error = UnloadedRelationError(message)
     capture(error, context, level="warning")
+    prop._reported_unloaded_keys = reported_keys
     if getattr(CONFIG, "STRICT_RELATION_LOADS", False):
         raise error

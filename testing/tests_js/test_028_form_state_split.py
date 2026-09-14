@@ -1,6 +1,78 @@
 """Node-backed checks for the document/form state boundary."""
 
 
+# @matrix form-migration : informational-notice
+def test_migration_notice_survives_form_replacement_and_discard(run_node):
+    run_node(r'''
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const modals = [];
+function node(dataset = {}) {
+  return {
+    dataset: {...dataset}, children: [],
+    cloneNode() { return node(this.dataset); },
+    appendChild(child) { child.parent = this; this.children.push(child); return child; },
+    prepend(child) { child.parent = this; this.children.unshift(child); },
+    remove() { this.parent?.children.splice(this.parent.children.indexOf(this), 1); },
+    replaceWith() {}, setAttribute() {}, addEventListener() {},
+    querySelector() { return null; }, matches() { return false; },
+  };
+}
+const context = {
+  document: {createElement: () => node()},
+  BaseForm: class {async init() {} destroy() {}},
+  Modal: class {
+    constructor() { this.destroyed = 0; modals.push(this); }
+    destroy() { this.destroyed += 1; }
+  },
+};
+vm.createContext(context);
+for (const path of ["src/script/shared/formMigrationNotice.mjs", "src/script/elements/form.mjs"]) {
+  vm.runInContext(fs.readFileSync(path, "utf8")
+    .replace(/^import .*;\n/gm, "").replace(/export /g, ""), context);
+}
+vm.runInContext("globalThis.FormElement = FormElement;", context);
+(async () => {
+  const values = JSON.stringify([{label: "Quantity", before: "invalid", after: "", reason: "invalid"}]);
+  const widget = new context.FormElement({target: node({migrationNotice: values})});
+  widget.revisionSnapshot = () => "baseline";
+  await widget.init();
+  const original = widget.target;
+  const banner = original.children[0];
+  assert.equal(banner.dataset.role, "migration-notice");
+
+  const replacement = node({migrationNotice: values});
+  await widget.prepareReset({nextTarget: replacement});
+  assert.equal(original.children[0], banner, "Preparing a refresh must leave the live notice intact");
+  assert.equal(modals[0].destroyed, 0);
+  const newBanner = replacement.children[0];
+  widget.commitReset();
+  assert.equal(widget.target, replacement);
+  assert.equal(replacement.children[0], newBanner, "Committing a refresh must retain the new notice");
+  assert.equal(newBanner.dataset.role, "migration-notice");
+  assert.equal(modals[0].destroyed, 1);
+  assert.equal(modals[1].destroyed, 0);
+
+  const discarded = node({migrationNotice: values});
+  await widget.prepareReset({nextTarget: discarded});
+  widget.discardPreparedReset();
+  assert.equal(widget.target, replacement);
+  assert.equal(replacement.children[0], newBanner);
+  assert.equal(modals[1].destroyed, 0);
+  assert.equal(discarded.children.length, 0);
+  assert.equal(modals[2].destroyed, 1);
+
+  await widget.prepareReset({nextTarget: node({migrationNotice: "[]"})});
+  widget.commitReset();
+  assert.equal(widget.target.children.length, 0, "A response clearing the notice must remove it");
+  assert.equal(modals[1].destroyed, 1);
+  widget.destroy();
+  assert.equal(modals[1].destroyed, 1, "Old modal ownership must not survive replacement");
+})().catch(error => { console.error(error); process.exitCode = 1; });
+''')
+
+
 # @matrix offline : database-upgrade legacy-record-discard mutation-store
 def test_offline_database_upgrade_discards_legacy_activity_records(run_node):
     run_node(
@@ -61,6 +133,7 @@ const indexedDB = {
 };
 const context = { console, indexedDB, queueMicrotask };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offline.mjs", "utf8");
 source = source.replace(/export function /g, "function ");
 source += "\nglobalThis.getOfflineMutations = getOfflineMutations;";
@@ -110,6 +183,7 @@ const context = {
   HTMLFormElement: FakeHTMLFormElement,
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class FormElement", "class FormElement");
@@ -158,6 +232,12 @@ vm.runInContext(source, context);
   if (await widget.prepareSubmit()) {
     throw new Error("Durably locked autofill form was allowed to submit");
   }
+  widget.lockDeferredOperation({ operation: "migration-1", revision: 0, scope: "form-change" });
+  if ([widget.target, widget.initialTarget].some(
+    (node) => node.dataset.operationScope !== "form-change"
+  )) {
+    throw new Error("Form migration scope was not retained for immediate and restored progress");
+  }
 })().catch((error) => {
   console.error(error);
   process.exit(1);
@@ -196,6 +276,7 @@ const context = {
   console,
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class FormElement", "class FormElement");
@@ -258,6 +339,7 @@ const target = {
 };
 const context = { BaseForm: class {}, console, structuredClone };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class FormElement", "class FormElement");
@@ -353,6 +435,7 @@ const context = {
   setOfflineMutation: async () => {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -455,6 +538,7 @@ const context = {
   setOfflineMutation: async () => {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -555,6 +639,7 @@ const context = {
   setOfflineMutation: async () => {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -642,6 +727,7 @@ const context = {
   setOfflineMutation: async () => {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -767,6 +853,7 @@ const context = {
   window: { dispatchEvent() {} },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -906,6 +993,7 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
@@ -959,22 +1047,9 @@ vm.runInContext(source, context);
     },
   );
   const schemaState = watcher._reconciler._state(schemaMarker);
-  const schemaApplication = events.find((event) => event.type === "apply-schema");
-  if (
-    events.filter((event) => event.type === "apply-schema").length !== 1 ||
-    schemaState.submissionChoice ||
-    schemaState.mode !== "dismiss" ||
-    schemaApplication.schema[0].label !== "Updated label" ||
-    schemaApplication.submission.retained !== "Local value" ||
-    schemaApplication.submission.added !== "New saved value" ||
-    Object.hasOwn(schemaApplication.submission, "removed")
-  ) {
-    throw new Error(
-      `Schema-only drift was not applied around local values: ${JSON.stringify({
-        state: schemaState,
-        application: schemaApplication,
-      })}`,
-    );
+  if (events.some(event => event.type === "apply-schema") ||
+      !schemaState.submissionChoice || schemaState.mode !== "review") {
+    throw new Error("A removed field must retain the local form for explicit review");
   }
 
   const valueWidget = makeWidget([{ id: "same" }], { same: "local" });
@@ -997,7 +1072,7 @@ vm.runInContext(source, context);
   if (!valueState.submissionChoice || valueState.mode !== "review") {
     throw new Error("A later saved submission did not request a value choice");
   }
-  if (events.filter((event) => event.type === "apply-schema").length !== 1) {
+  if (events.filter((event) => event.type === "apply-schema").length !== 0) {
     throw new Error("Later saved values were applied before review");
   }
 
@@ -1057,7 +1132,7 @@ vm.runInContext(source, context);
   ) {
     throw new Error("An active clean form did not offer revision review");
   }
-  if (events.filter((event) => event.type === "apply-schema").length !== 1) {
+  if (events.filter((event) => event.type === "apply-schema").length !== 0) {
     throw new Error("An active clean form applied saved values before review");
   }
 
@@ -1164,6 +1239,7 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
@@ -1253,6 +1329,7 @@ const view = {
 };
 const context = { console, Modal: class {} };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
@@ -1281,6 +1358,21 @@ vm.runInContext(source, context);
   }
   if (tracked.length !== 1 || tracked[0].options.node !== widget.target) {
     throw new Error("EditWatcher did not restore deferred progress tracking");
+  }
+  await watcher._lockEntity(
+    { markers: new Set([marker]) },
+    { operation: "migration-1", revision: 0, scope: "form-change", locked: true },
+  );
+  if (locked[1]?.scope !== "form-change") {
+    throw new Error("EditWatcher did not forward the migration scope to the form lock");
+  }
+  delete form._lp_widget;
+  await watcher._lockEntity(
+    { markers: new Set([marker]) },
+    { operation: "migration-2", revision: 0, scope: "form-change", locked: true },
+  );
+  if (form.dataset.operationScope !== "form-change" || tracked[2]?.options.node !== form) {
+    throw new Error("An uninitialized form lost the migration scope before the manager scan");
   }
 })().catch((error) => {
   console.error(error);
@@ -1372,6 +1464,7 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
@@ -1457,6 +1550,7 @@ const context = {
   },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let replaySource = fs.readFileSync(
   "src/script/views/base/offlineReplay.mjs",
@@ -1593,6 +1687,7 @@ const context = {
   loadWidget: async () => null,
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/views/base/component.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export default class ViewComponent", "class ViewComponent");
@@ -1659,6 +1754,7 @@ const context = {
   primitives: {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PermissionsForm", "class PermissionsForm");
@@ -1727,6 +1823,7 @@ const context = {
   primitives: {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PermissionsForm", "class PermissionsForm");
@@ -1809,6 +1906,7 @@ const context = {
   primitives: {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PermissionsForm", "class PermissionsForm");
@@ -1883,6 +1981,7 @@ const context = {
   primitives: {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PermissionsForm", "class PermissionsForm");
@@ -1935,6 +2034,7 @@ const context = {
   primitives: {},
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PermissionsForm", "class PermissionsForm");
@@ -1996,6 +2096,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -2120,6 +2221,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -2197,6 +2299,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -2268,6 +2371,7 @@ const context = {
   FormData,
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -2318,6 +2422,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -2403,6 +2508,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");

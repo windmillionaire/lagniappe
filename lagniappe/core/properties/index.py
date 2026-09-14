@@ -66,11 +66,13 @@ class TaskHistoryTable(Columns):
             field = f(entity=self.entity)
             fields[field.id] = field
 
-        if self.entity.form:
+        definition = getattr(self.entity, "submission_definition", None)
+        form = definition.source if definition is not None else self.entity.form
+        if form and not form.db.get("pending_form_change"):
             fields.update(
                 {
                     f.id: f
-                    for f in self.entity.form.fields.values()
+                    for f in form.fields.values()
                     if isinstance(f, ColumnMixin)
                 }
             )

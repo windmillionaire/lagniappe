@@ -273,10 +273,9 @@ def _add_catalog_field(catalog, source, field, allowed_value=None):
         entry.allowed_values[allowed_value.hash] = allowed_value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @covered-by lagniappe/core/tools/filters/contract.py::describe_filter_contract
-# @reason authorized catalog behavior is asserted through compilation and AI schema
+# @testable true
+# @matrix form-migration : pending-projection removed-field typed-filter
+# @tests tests_unit/test_004k_form_changes.py::test_pending_and_removed_fields_are_withheld_from_tables_and_filters
 def field_catalog(parent, user):
     """Return the filter surface visible under ``parent`` to ``user``."""
     _validate_parent(parent, user)
@@ -296,6 +295,8 @@ def field_catalog(parent, user):
             continue
         _add_catalog_field(catalog, parent, relation_field, allowed_value=related)
         if getattr(related, "kind", None) == "form":
+            if getattr(related, "db", {}).get("pending_form_change"):
+                continue
             for field in related.filters.fields.values():
                 _add_catalog_field(catalog, related, field)
     return catalog

@@ -194,7 +194,7 @@ const manager = new context.DeferredOperationManager(view).init();
   nodes.push(newer, older);
   manager.scan();
   for (const node of [nodes[0], newer, older]) {
-    if (node.phase.textContent !== "Checking context. Automatic recovery is active." ||
+    if (node.phase.textContent !== "Checking context. Taking longer than expected." ||
         node.dataset.operationRevision !== "5") {
       throw new Error("An older sibling snapshot replaced the shared latest status");
     }
@@ -227,6 +227,37 @@ const manager = new context.DeferredOperationManager(view).init();
   manager.track("operation-next", { node: owner, immediate: false });
   if (subscriptions.has("operation:operation-owned") || owner.dataset.operation !== "operation-next") {
     throw new Error("Generated progress kept a replaced operation subscribed");
+  }
+
+  for (const [scope, expected] of [
+    ["form-change", "Schema migration in progress"],
+    ["form-autofill", "Autofill queued"],
+  ]) {
+    const form = operationNode(`operation-${scope}`);
+    const submit = { replaceWith(progress) { form.progress = progress; } };
+    const autofill = { remove() {} };
+    form.dataset.deferredLock = "form";
+    form.dataset.operationScope = scope;
+    form.setAttribute = () => {};
+    form.querySelector = (selector) => {
+      if (selector === "[data-role='autofill']") return autofill;
+      if (selector === "[data-role='submit-group']") return submit;
+      return form.progress?.children.find((child) =>
+        selector === `[data-role='${child.dataset?.role}']`);
+    };
+    nodes.push(form);
+    // A newly started manager scans the DOM before the explicit tracking call.
+    manager.scan({ querySelectorAll() { return [form]; } });
+    if (form.querySelector("[data-role='deferred-phase']")?.textContent !== expected) {
+      throw new Error(`Initial progress did not respect the form lock scope: ${scope}`);
+    }
+    await manager.receive({
+      key: form.dataset.operation, revision: 1, status: "running",
+      phase_label: "Applying changes", terminal: false,
+    });
+    if (form.querySelector("[data-role='deferred-phase']").textContent !== "Applying changes") {
+      throw new Error("Polled progress did not replace the initial form-lock message");
+    }
   }
 
   manager.destroy();

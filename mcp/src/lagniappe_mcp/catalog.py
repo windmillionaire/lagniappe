@@ -82,6 +82,17 @@ PLAN_FILE_SCHEMA = {
     "additionalProperties": False,
 }
 
+ACTION_SUMMARY_SCHEMA = {
+    "type": "object",
+    "required": ["total", "by_type"],
+    "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "by_type": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "maximum": {"type": "integer", "minimum": 1},
+    },
+    "additionalProperties": False,
+}
+
 SAFE_PLAN_SCHEMA = {
     "type": "object",
     "required": [
@@ -128,6 +139,7 @@ SAFE_PLAN_SCHEMA = {
         "proposal": {"type": ["object", "null"]},
         "execution": {"type": ["object", "null"]},
         "original_brief": {"type": ["object", "null"]},
+        "action_summary": ACTION_SUMMARY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -209,6 +221,7 @@ SAFE_RECEIPT_SCHEMA = {
         "proposal_fingerprint",
     ],
     "properties": {
+        "action_summary": ACTION_SUMMARY_SCHEMA,
         "id": {"type": "string"},
         "status": {"enum": ["ready", "complete"]},
         "preview_url": {"type": "string"},
@@ -717,8 +730,8 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_organize",
-            f"Start an Organize Plan to update existing records (complete tasks, patch submissions, rename or move records) or inspect and place uploaded files. Remote updates do not require a file. {common_start} Returns compact context.contract with allowed action names; fetch get_plan_contract(actions=[...]) for selected details. Discover exact targets with read tools before proposing updates. For uploads, read get_guidelines(task=organize), inspect complete evidence, and summarize and place every finalized file. {review_only}",
-            _plan_input_schema(),
+            f"Start an Organize Plan to update existing records (complete tasks, patch submissions, rename or move records) or inspect and place uploaded files. Remote updates do not require a file. {common_start} Pass actions=[\"complete_task\"] or other known action names for exact permitted schemas in context.contract. Omit actions for a summary; get_plan_contract(actions=[...]) can load additional schemas on this same Plan. Discover exact targets with read tools before proposing updates. For uploads, read get_guidelines(task=organize), inspect complete evidence, and summarize and place every finalized file. {review_only}",
+            _plan_input_schema(selected_actions=True),
             START_RESULT_SCHEMA,
             "start_organize",
             START_ANNOTATIONS,

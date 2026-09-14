@@ -169,17 +169,14 @@ const vm = require("node:vm");
 
 const storage = new Map([["columns-tasks", "[2]"]]);
 let toggleListener = null;
-const styles = [];
+const unrelatedStyle = {};
 const context = {
   console,
+  CSSStyleSheet: class {
+    replaceSync(css) { this.textContent = css; }
+  },
   document: {
-    createElement() {
-      return {
-        remove() { this.removed = true; },
-        textContent: "",
-      };
-    },
-    head: { appendChild(style) { styles.push(style); } },
+    adoptedStyleSheets: [unrelatedStyle],
   },
   localStorage: {
     getItem(key) { return storage.get(key) || null; },
@@ -226,18 +223,20 @@ const state = new context.TableVisibilityState({
   })),
 }).init();
 
-if (!styles[0].textContent.includes("nth-child(2)")) {
+const stylesheet = context.document.adoptedStyleSheets[1];
+if (!stylesheet.textContent.includes("nth-child(2)")) {
   throw new Error("Saved visibility was not applied eagerly");
 }
 if (state.visibleColumns.join(",") !== "name,owner") {
   throw new Error(`Saved visible columns changed: ${state.visibleColumns}`);
 }
 toggleListener({ detail: { active: true, column: "status" } });
-if (styles[0].textContent || storage.get("columns-tasks") !== "[]") {
+if (stylesheet.textContent || storage.get("columns-tasks") !== "[]") {
   throw new Error("The lazy controller event did not update eager state");
 }
 state.destroy();
-if (!styles[0].removed || toggleListener) {
+if (context.document.adoptedStyleSheets.length !== 1 ||
+    context.document.adoptedStyleSheets[0] !== unrelatedStyle || toggleListener) {
   throw new Error("Column state did not remove its lifecycle resources");
 }
 '''

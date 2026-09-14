@@ -69,6 +69,12 @@ Removing the model does not promote another selected category. A Page with no
 model or categories uses `Uncategorized Pages`; a Page with categories but no
 model uses its first category only for parent display projections.
 
+Page creation and updates register page-specific forms on ordinary categories
+for filtering. `Uncategorized Pages` is a grab-bag and is excluded from that
+registration, whether assigned automatically or supplied explicitly. Its pages
+can still have their own forms; creation and updates do not read or extend any
+legacy `forms` references on the fallback category.
+
 ## Submissions
 
 `FormSubmission` and `RowSubmission` build fields from the attached schema.
@@ -99,10 +105,10 @@ Checkboxes illustrate the unset contract: an absent stored checkbox projects
 as `None`; a complete submit without the checkbox input validates it to
 explicit `False`.
 
-Task defaults live in `default_submission`. Saving one default uses a masked
-root write, and a later task submit removes defaults whose values changed or
-disappeared. Todo fields never repeat as defaults; reopening starts a fresh
-checklist while history preserves completed items.
+Uncompleting a Task clears its submission while retaining its Form and task
+settings. History preserves completed answers and checklist items. Filling from
+history is a manual action for the current form; it does not establish repeating
+submission defaults.
 
 ## Canonical form schemas
 
@@ -112,20 +118,58 @@ conditions, supplies defaults, and enforces unique IDs without mutating its
 input. The `todo` type is valid only on task forms.
 
 All durable assignment flows converge on `Schema.value` and should prefer
-`Form.set_schema()`: builder saves, AI generation, ingress-created forms,
+`Form.set_schema()`: builder saves, accepted AI form creation, ingress-created forms,
 category/report operations, and direct updates. Browser builder defaults are a
 presentation convenience, not a persistence contract.
 
 AI-generated static task-form fields use `content_markdown` only at the model
 boundary. `Schema.validate_ai()` removes that model-only field, renders it
-through the shared AI Markdown policy, and stores the resulting HTML sidecar
-after the Form object has been created. Raw model `html`, non-string Markdown,
+through the shared AI Markdown policy, and stages the resulting HTML sidecar
+on the Form. `Form.set_html_field()` does not write Storage; the common Form
+save mutation publishes staged content with the schema. Raw model `html`, non-string Markdown,
 static content on generated Page forms, and static fields in additive report
 schema updates are rejected. Existing stored sidecars are not migrated; Form
 read projections apply the Form-content policy before browser `innerHTML` use.
 
-`schema_format` records the storage format independently from the form's
-user-facing version. During a data update, readable rows remain projectable so
+`tools/form_drafts.py` validates builder drafts and guards every ordinary Form
+save against removal or representation changes to saved fields, options, and
+table columns until migration support is available. Relabeling preserves IDs
+and stored option values. Builder Save supplies the complete schema/HTML draft,
+an opaque saved baseline, and a request identity; a receipt recognizes a retry
+before its image uploads are consumed. Copy publishes an independent Form and
+never saves the source draft.
+
+Forms have two independent change indicators in `properties/form.py`:
+
+- `version` is a content fingerprint for cache invalidation. Schema metadata,
+  field order, form type, and published HTML/image fingerprints affect it;
+  the display name and Storage paths do not.
+- `generation` is the integer representation generation for saved answers.
+  Missing values default to zero, including legacy Forms. Publication advances
+  it only when `requires_submission_conversion()` finds that existing answers
+  need conversion: removed answer fields/options/columns or changed value
+  representations. Labels, additions, ordering, static HTML, and computed status
+  do not advance it. Older `version` and `schema_version` values are not
+  interpreted as generations.
+
+Before replacing a generation, publication preserves its FormHistory schema
+and independent private HTML/image objects. Deleting a Form preserves its last
+generation at the deletion boundary. Compatible saves do not create history.
+Original-completion and TaskHistory readers use the current Form while its
+generation matches, and resolve FormHistory only for an older or missing Form.
+Presentation changes within one generation therefore remain visible in those
+readers. Historical asset requests authorize the referencing Task or TaskHistory;
+FormHistory is not directly viewable through generic entity or asset endpoints.
+An unavailable generation is reported explicitly without guessing from old
+content-version records or changing saved answers.
+
+The later transfer workflow will advance affected flat current submissions,
+including completed Tasks, to the new generation while preserving their original
+completion envelopes and TaskHistory records. Step 1 keeps incompatible saves
+blocked; it does not implement that transfer engine.
+
+`schema_format` records the storage format independently from the content
+fingerprint and submission generation. During a data update, readable rows remain projectable so
 the Administrator workflow can report malformed values instead of silently
 discarding them. See [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md).
 

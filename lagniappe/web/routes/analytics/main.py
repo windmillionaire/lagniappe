@@ -4,14 +4,17 @@ from datetime import datetime, time, timedelta, timezone
 from flask import abort, g, render_template, request
 from flask_login import current_user
 
+from config.datastore import decode_urlsafe_key
 from lagniappe import CONFIG
 from lagniappe.core.definitions import (
     Action,
     DEFERRED_JOB_HEARTBEAT_SECONDS,
+    DeferredJobType,
     Resource,
 )
 from lagniappe.core.tools.database import analytics as analytics_database
 from lagniappe.core.tools.ai.observability import (
+    OUTCOME_LABELS,
     aggregate_records,
     operation_diagnostic_payload,
 )
@@ -225,15 +228,15 @@ def _activity_details(events, limit=DETAIL_LIMIT):
     return details[:limit]
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::track
-# @reason event write shape is covered by dashboard readback
+# @testable true
+# @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_excludes_internal_requests
+# @pair analytics:internal-request-exclusion
 def _save_event(data):
     if not enabled():
         return None
 
     path = data.get("path") or request.path
-    if path.startswith("/analytics"):
+    if _route_prefix(path) in {"analytics", "api", "mcp", "l"}:
         return None
 
     return analytics_database.create_event(
@@ -460,6 +463,24 @@ def index():
     completed_ai_records = [
         record for record in ai_records if record.get("state") != "running"
     ]
+    ai_records_by_telemetry = defaultdict(list)
+    for record in reversed(ai_records):
+        if record.get("telemetry_id"):
+            ai_records_by_telemetry[record["telemetry_id"]].append(record)
+    deferred_operations = [
+        operation for operation in deferred_operations
+        if operation.get("type") != DeferredJobType.REPORT_EXECUTION.value
+        or ai_records_by_telemetry.get(operation.get("telemetry_id"))
+    ]
+    own_report_keys = set()
+    for operation in deferred_operations:
+        report_ref = operation.get("input_refs", {}).get("report", {})
+        report_key = report_ref.get("id")
+        try:
+            if decode_urlsafe_key(report_key).parent == current_user.key:
+                own_report_keys.add(report_key)
+        except ValueError:
+            pass
     return (
         render_template(
             "analytics/index.html",
@@ -480,6 +501,9 @@ def index():
                 else []
             ),
             deferred_operations=deferred_operations,
+            ai_records_by_telemetry=ai_records_by_telemetry,
+            ai_outcome_labels=OUTCOME_LABELS,
+            own_report_keys=own_report_keys,
             period=period,
             periods=PERIODS,
             retention_options=CLEAR_RETENTION_OPTIONS,

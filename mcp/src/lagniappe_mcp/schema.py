@@ -674,8 +674,15 @@ def validate_value(schema: dict[str, Any], value: Any, *, phase: str) -> None:
             f"[{part}]" if isinstance(part, int) else f".{part}"
             for part in error.absolute_path
         )
+        details = {"path": path, "validator": error.validator}
+        # Return only public bounds, never submitted values or nested schemas.
+        if error.validator in {
+            "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+            "minLength", "maxLength", "minItems", "maxItems",
+        } and isinstance(error.validator_value, (int, float)):
+            details[error.validator] = error.validator_value
         raise SchemaError(
             f"{phase}_validation_failed",
             f"Value does not match the published schema at {path}.",
-            details={"path": path, "validator": error.validator},
+            details=details,
         ) from error

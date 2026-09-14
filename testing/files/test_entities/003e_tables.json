@@ -36,13 +36,15 @@
 							},
 							"column_value": { "num_rows": 1 },
 							"ai_value": {
-								"Contacts": [
-									{
-										"Name": "John Doe",
-										"Email": "john@example.com",
-										"Primary": "True"
-									}
-								]
+								"Contacts": {
+									"rows": [
+										{
+											"row-namecd12": "John Doe",
+											"row-emailef34": "john@example.com",
+											"row-primarygh": true
+										}
+									]
+								}
 							},
 							"filter_value": {
 								"row-namecd12": ["John Doe"],
@@ -115,18 +117,20 @@
 							},
 							"column_value": { "num_rows": 2 },
 							"ai_value": {
-								"Contacts": [
-									{
-										"Name": "Alice",
-										"Email": "alice@example.com",
-										"Primary": "True"
-									},
-									{
-										"Name": "Bob",
-										"Email": "bob@example.com",
-										"Primary": "False"
-									}
-								]
+								"Contacts": {
+									"rows": [
+										{
+											"row-namecd12": "Alice",
+											"row-emailef34": "alice@example.com",
+											"row-primarygh": true
+										},
+										{
+											"row-namecd12": "Bob",
+											"row-emailef34": "bob@example.com",
+											"row-primarygh": false
+										}
+									]
+								}
 							},
 							"filter_value": {
 								"row-namecd12": ["Alice", "Bob"],
@@ -204,13 +208,15 @@
 							},
 							"column_value": { "num_rows": 1 },
 							"ai_value": {
-								"Contacts": [
-									{
-										"Name": "Jane Doe",
-										"Email": "jane@example.com",
-										"Primary": "True"
-									}
-								]
+								"Contacts": {
+									"rows": [
+										{
+											"row-namecd12": "Jane Doe",
+											"row-emailef34": "jane@example.com",
+											"row-primarygh": true
+										}
+									]
+								}
 							},
 							"filter_value": {
 								"row-namecd12": ["Jane Doe"],
@@ -273,18 +279,20 @@
 							},
 							"column_value": { "num_rows": 2 },
 							"ai_value": {
-								"Contacts": [
-									{
-										"Name": "Alice Smith",
-										"Email": "alice@test.com",
-										"Primary": "True"
-									},
-									{
-										"Name": "Bob Jones",
-										"Email": "bob@test.com",
-										"Primary": "False"
-									}
-								]
+								"Contacts": {
+									"rows": [
+										{
+											"row-namecd12": "Alice Smith",
+											"row-emailef34": "alice@test.com",
+											"row-primarygh": true
+										},
+										{
+											"row-namecd12": "Bob Jones",
+											"row-emailef34": "bob@test.com",
+											"row-primarygh": false
+										}
+									]
+								}
 							},
 							"filter_value": {
 								"row-namecd12": ["Alice Smith", "Bob Jones"],
@@ -394,14 +402,16 @@
 							"column_value": { "num_rows": 1 },
 							"search_value": { "[Type grid] Label": "Acme" },
 							"ai_value": {
-								"Type grid": [
-									{
-										"Label": "Acme",
-										"At time": "15:30",
-										"Amount": 3.5,
-										"Phone": "+12015550123"
-									}
-								]
+								"Type grid": {
+									"rows": [
+										{
+											"cx_label": "Acme",
+											"cx_time": "15:30",
+											"cx_amt": 3.5,
+											"cx_phone": "+12015550123"
+										}
+									]
+								}
 							},
 							"filter_value": {
 								"cx_label": ["Acme"],
@@ -454,14 +464,16 @@
 							"column_value": { "num_rows": 1 },
 							"search_value": { "[Type grid] Label": "Acme" },
 							"ai_value": {
-								"Type grid": [
-									{
-										"Label": "Acme",
-										"At time": "15:30",
-										"Amount": 3.5,
-										"Phone": "+12015550123"
-									}
-								]
+								"Type grid": {
+									"rows": [
+										{
+											"cx_label": "Acme",
+											"cx_time": "15:30",
+											"cx_amt": 3.5,
+											"cx_phone": "+12015550123"
+										}
+									]
+								}
 							},
 							"filter_value": {
 								"cx_label": ["Acme"],

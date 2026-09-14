@@ -16,6 +16,11 @@ from lagniappe.core.definitions.default import DefaultEnum
 PREFIX = CONFIG.PREFIX
 
 
+# @testable infrastructure
+class ExactEntityState(dict):
+    """Guard a complete saved row, including absence of additional properties."""
+
+
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_database_initialize_only_marks_new_content_stores_as_fresh
 # @matrix database-migrations setup : detection fresh-install reserved-seeding
@@ -173,22 +178,28 @@ def acknowledge_user_cache(key, revision):
 # @tests tests_unit/test_018_database_utility.py::test_permission_source_save_invalidates_tasks_without_descendant_writes
 # @matrix permissions mutations : channel-invalidation no-descendant-writes
 # @tests tests_unit/test_018_database_utility.py::test_notification_save_and_delete_skip_site_fingerprints
+# @tests tests_unit/test_018_database_utility.py::test_form_archive_and_deletion_share_the_guarded_transaction
 # @matrix database mutations : document-checkpoint full-upsert property-mask site-fingerprint update
 # @matrix notifications : mutation site-fingerprint-isolation
-def save_mutations(writes, *, guards=None):
+# @matrix forms mutations : archive atomic-delete concurrency
+def save_mutations(writes, *, guards=None, deletes=()):
     """Persist full and property-masked writes with their collection revisions.
 
     ``writes`` contains ``(typed_entity, property_mask)`` pairs. A ``None`` mask
     is a normal full upsert. A non-empty mask is converted to an ``update``
     mutation so a missing row fails rather than being recreated with only the
-    selected properties.
+    selected properties. Optional typed ``deletes`` commit with these writes;
+    when guards are supplied, both use the same transaction.
     """
     writes = [
         (entity, None if mask is None else tuple(dict.fromkeys(mask)))
         for entity, mask in writes
         if getattr(entity, "key", None)
     ]
-    if not writes:
+    deletes = list({
+        entity.key: entity for entity in deletes if getattr(entity, "key", None)
+    }.values())
+    if not writes and not deletes:
         return
 
     for entity, mask in writes:
@@ -200,6 +211,9 @@ def save_mutations(writes, *, guards=None):
     fingerprint_entities = [
         entity.db for entity, mask in writes if _advances_site_fingerprint(entity, mask)
     ]
+    fingerprint_entities.extend(
+        entity.db for entity in deletes if _advances_site_fingerprint(entity, None)
+    )
     if any(
         mask is None and entity.db.get("type") in {"page", "form"}
         and getattr(entity, "_permission_sources_changed", False)
@@ -211,31 +225,52 @@ def save_mutations(writes, *, guards=None):
         update_site_fingerprints(*fingerprint_entities) if fingerprint_entities else []
     )
     if guards:
-        return _save_guarded_mutations(writes, fingerprints, guards)
+        return _save_guarded_mutations(writes, fingerprints, guards, deletes=deletes)
     with DATA.datastore.batch() as batch:
         for entity, mask in writes:
             _put_mutation(batch, entity.db, mask)
 
         for fingerprint in fingerprints:
             batch.put(fingerprint)
+        for entity in deletes:
+            batch.delete(entity.key)
 
 
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_guarded_checkpoint_rejects_a_concurrent_asset_change
+# @tests tests_unit/test_004f_form_drafts.py::test_exact_publication_guard_rejects_new_properties_but_document_guard_is_subset
+# @tests tests_unit/test_018_database_utility.py::test_form_archive_and_deletion_share_the_guarded_transaction
 # @matrix mutations sync : document checkpoint cas conflict
+# @matrix forms mutations permissions : guarded-save concurrent-restrictions
+# @matrix forms mutations : archive atomic-delete concurrency
 @retry_aborted
-def _save_guarded_mutations(writes, fingerprints, guards):
+def _save_guarded_mutations(writes, fingerprints, guards, *, deletes=()):
     with DATA.datastore.transaction() as transaction:
-        for key, expected in guards:
-            current = DATA.datastore.get(key, transaction=transaction)
-            if current is None or any(current.get(name) != value for name, value in expected.items()):
-                from lagniappe.core.exceptions import ValidationError
-
-                raise ValidationError("Document changed while saving; sync and retry.")
+        check_mutation_guards(transaction, guards)
         for entity, mask in writes:
             _put_mutation(transaction, entity.db, mask)
         for fingerprint in fingerprints:
             transaction.put(fingerprint)
+        for entity in deletes:
+            transaction.delete(entity.key)
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/database/utility.py::_save_guarded_mutations
+# @reason the same transaction preconditions protect ordinary writes and atomic job starts
+def check_mutation_guards(transaction, guards):
+    for key, expected in guards:
+        current = DATA.datastore.get(key, transaction=transaction)
+        conflict = (
+            current is not None if expected is None else
+            current is None or (
+                dict(current) != expected if isinstance(expected, ExactEntityState) else
+                any(current.get(name) != value for name, value in expected.items())
+            )
+        )
+        if conflict:
+            from lagniappe.core.exceptions import MutationConflict
+            raise MutationConflict("Saved state changed while saving; reload and retry.")
 
 
 # @testable true

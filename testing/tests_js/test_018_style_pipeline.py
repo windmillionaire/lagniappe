@@ -475,7 +475,7 @@ assert.match(
 assert.doesNotMatch(css, /\.task-control-icon/);
 assert.match(
   css,
-  /\.editor-toolbar-icon-context \.icon,\s*\.editor-toolbar-portal-icon-context \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-base-box-size\);[\s\S]*?--icon-default-size: var\(--icon-lg-glyph-size\);[\s\S]*?--icon-size: var\(--icon-lg-glyph-size\);/,
+  /\.editor-toolbar-icon-context \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-base-box-size\);[\s\S]*?--icon-default-size: var\(--icon-lg-glyph-size\);[\s\S]*?--icon-size: var\(--icon-lg-glyph-size\);/,
 );
 assert.match(
   css,
@@ -483,7 +483,7 @@ assert.match(
 );
 assert.match(
   css,
-  /\.editor-toolbar-icon-context \.editor-toolbar-history-icon\s*\{\s*--icon-offset-y: 1px;/,
+  /\.editor-toolbar-portal-icon-context \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-base-box-size\);[\s\S]*?--icon-default-size: var\(--icon-base-glyph-size\);[\s\S]*?--icon-size: var\(--icon-base-glyph-size\);/,
 );
 assert.match(
   css,

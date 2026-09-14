@@ -33,6 +33,16 @@ Global application behavior includes:
   cache must be cleared; and
 - the versioned `/l/poll` state endpoint.
 
+The CSP allows stylesheet elements only from the same origin and the Google
+Identity Services `/gsi/style` URL. Only `style-src-attr` permits
+`'unsafe-inline'`, for style attributes in rendered content. Table column
+visibility uses a constructed `CSSStyleSheet` adopted by the document and
+removes it when the view is destroyed. Tiptap's runtime CSS injection is
+disabled; its base rules and the debug error-page styles live in the compiled
+stylesheet. When upgrading Tiptap, check its `src/style.ts` against the copied
+base rules in `src/style/editor.css`. The service worker's self-contained outage
+page uses style attributes so it also works when it inherits the application CSP.
+
 Flask-Login resolves a session email to a `User` entity. Jinja receives the
 lazy `current_user` global from `web/start/jinja.py`, avoiding an eager user
 load on static and health-check requests.

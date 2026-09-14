@@ -160,6 +160,10 @@ Used by the `SelectElement` form element for dropdown selects. Replaces the nati
 
 **`elementClick()`** toggles the panel (no search -- just shows all options).
 
+Disabled native options (including disabled optgroups) remain visible with
+`aria-disabled` and muted styling. `SelectBox` rejects their pointer/keyboard
+activation rather than submitting an unavailable choice.
+
 **`addOption(option)`** dynamically adds a new option to the items list and refreshes the panel.
 
 ### FacetsBox (`facets.mjs`)

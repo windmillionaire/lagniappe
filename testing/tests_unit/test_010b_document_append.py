@@ -51,6 +51,8 @@ def test_document_save_retires_only_superseded_blobs_after_commit(monkeypatch, f
         "snapshot": {"type": "ydoc", "path": "old.ydoc"},
         "image_keep": {"type": "image", "path": "image.png"},
     }), document_history=True)
+    from lagniappe.core.tools.database import get as database_get
+    monkeypatch.setattr(database_get, "entity", lambda key: row)
     page = Entities.PAGE(row)
     stored = {"old.html": "old", "old.ydoc": "old", "image.png": "image", "named.html": "pinned"}
     events = []
@@ -74,7 +76,7 @@ def test_document_save_retires_only_superseded_blobs_after_commit(monkeypatch, f
     monkeypatch.setattr(executor.database_utility, "save_mutations", commit)
     monkeypatch.setattr(executor.database_utility, "delete_blobs", cleanup)
     monkeypatch.setattr(executor.cache, "update", refresh)
-    monkeypatch.setattr(restrictions, "previous_restrictions", lambda entities: [])
+    monkeypatch.setattr(restrictions, "prepare_changes", lambda entities: [])
     monkeypatch.setattr(executor.cache, "update_owner_projection", lambda *args: None)
     monkeypatch.setattr(executor, "capture", lambda *args, **kwargs: None)
     for text in ("first", "second", "third"):
@@ -359,7 +361,7 @@ def test_guarded_checkpoint_rejects_a_concurrent_asset_change(monkeypatch):
         utility, "_put_mutation", lambda writer, row, mask: writes.append(row)
     )
     entity = SimpleNamespace(db={"assets": "loser"})
-    with pytest.raises(exceptions.ValidationError, match="Document changed"):
+    with pytest.raises(exceptions.MutationConflict, match="Saved state changed"):
         utility._save_guarded_mutations(
             [(entity, ("assets",))], [], [("page", {"assets": "old"})]
         )

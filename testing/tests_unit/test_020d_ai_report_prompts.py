@@ -27,7 +27,8 @@ from testing.utility.test_entities import TestEntities
 # @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_proposal_repair_prompt
 # @matrix ai-report : remote-update prompt tools revision repair
 @pytest.mark.unit
-def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance():
+@pytest.mark.parametrize("origin", ["email", "web"])
+def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance(origin):
     from lagniappe.core.tools.ai.reporting.proposals.repair import _proposal_repair_prompt
     user = _test_user("remote-prompt-owner")
     report = TestEntities.get("REPORT", {
@@ -35,7 +36,7 @@ def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance():
         "origin": "email", "tool": "organize", "instructions": "Complete CLI and add notes",
         "proposal": {"summary": "Update CLI", "confidence": 1, "actions": []},
     })
-    report.origin = "email"
+    report.origin = origin
     report.tool = "organize"
     initial = organize.organize_prompt(report, user)
     revised = organize.revise_organize_prompt(report, user, "Use the newer notes")
@@ -47,8 +48,11 @@ def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance():
         assert "attach_file" not in schemas
         assert "updates" in schemas["update_form_values"]["properties"]["data"]["properties"]
         assert "search_entities" in prompt.tools
+        assert "get_task_history" in prompt.tools
         text = str(prompt.preview())
         assert "normal completion rules" in text
+        assert "Check every requested outcome against the actions" in text
+        assert "Write the\nsummary from the final actions" in text
         assert "Do not preserve or generate data.submission" not in text
         assert "A separate completion stage fills" not in text
     assert "Use the newer notes" in _prompt_context(revised, "User Feedback")
@@ -195,7 +199,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
         "create_task",
         "add_form_to_page",
         "add_page_category",
-        "extend_form_schema",
+        "update_form_schema",
         "update_form_values",
         "attach_file",
         "append_page_document",
@@ -846,7 +850,7 @@ def test_report_prompts_attach_provider_json_schema():
         "type",
         "title",
     ]
-    update_form_data = all_actions["extend_form_schema"]["properties"]["data"]
+    update_form_data = all_actions["update_form_schema"]["properties"]["data"]
     operation_schemas = {
         variant["properties"]["op"]["enum"][0]: variant
         for variant in update_form_data["properties"]["operations"]["items"][
@@ -1075,7 +1079,7 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "can_add_forms_to_pages": True,
         "can_attach_files_to_tasks": True,
         "can_add_page_categories": True,
-        "can_extend_form_schemas": False,
+        "can_update_form_schemas": False,
         "can_update_submissions": True,
         "can_delete_pages": False,
     }

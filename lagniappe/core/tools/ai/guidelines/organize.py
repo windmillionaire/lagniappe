@@ -141,7 +141,7 @@ REPORT_PREFLIGHT_CHECKS = """
   omit the disputed submission field and preserve the conflict for human review.
 - Make sure a completed task date is not later than the supplied current date;
   future-dated work must remain open.
-- Make sure any extend_form_schema action needed for submission completion
+- Make sure any update_form_schema action needed for submission completion
   appears before the page/task action that uses the updated form.
 - Review the whole proposal for coherence before returning: pages, files,
   tasks, projects, model tasks, forms, submissions, summaries, and issues should
@@ -294,7 +294,7 @@ Common data shapes:
 - create_task: {"name": string, "description": string, "page": entity_or_action_ref, "task": existing_task_ref_for_completed_occurrence, "task_action": root_new_task_action_for_completed_occurrence, "project": entity_or_action_ref, "model": entity_or_action_ref, "form": task_form_ref_only, "submission": object, "due_date": "YYYY-MM-DD", "completed": true, "completed_on": "YYYY-MM-DD"}
 - add_form_to_page: {"page": entity_ref, "form": entity_or_action_ref}
 - add_page_category: {"page": entity_ref, "category": entity_ref}
-- extend_form_schema: {"form": entity_ref, "operations": [{"op": "add_field", "field": object} or {"op": "add_select_option", "schema_id": string, "option": {"value": string, "label": string}}]}
+- update_form_schema: {"form": entity_ref, "operations": [{"op": "add_field", "field": object} or {"op": "add_select_option", "schema_id": string, "option": {"value": string, "label": string}}]}
 - attach_file: {"entity": page_task_or_history_ref, "file": report_file_ref}; use entity_action for an earlier create_page/create_task action
 - suggest_page_deletion: {"page": entity_ref}
 - skip: {"note": string}
@@ -382,8 +382,8 @@ not skip the existing-page checks before proposing a new page.
    only for one unambiguous matching page/model/name family. Use an exact task
    hash only when a specific existing task matters.
 8. Choose structured forms after the page/task target is settled. Reuse a close
-   existing or inherited form, inspect its schema, and propose only bounded
-   additive changes when needed. Never split a coherent subject to make a form
+   existing or inherited form, inspect its schema, and propose bounded
+   schema changes when needed, explaining destructive effects for review. Never split a coherent subject to make a form
    fit. Give a category a default form only when the user requests it or its pages
    are unambiguously repeated instances of one type with a small stable schema.
    When uploaded evidence should populate the form on an exact existing page or
@@ -411,7 +411,7 @@ ORGANIZE_PLANNING_TOOLS = """
 - Always read the page_form or task_form guideline bundle before returning a
   create_form action of that type.
 - Always read the schema_evolution guideline bundle before returning an
-  extend_form_schema action.
+  update_form_schema action.
 - Read category, project, or page_document guideline bundles when proposing
   that kind of structure.
 - Do not request form_autofill or report_actions guidelines; the base planning
@@ -452,10 +452,10 @@ ORGANIZE_PLANNING_ACTIONS = """
   page or task reference; omit data.updates.
 - Attach report uploads with attach_file using the explicit entity/entity_action target and
   exact report_file_ref. Filenames and display names are labels, not refs.
-- Use extend_form_schema only for additive fields or select/radio options.
+- Use update_form_schema for reviewed exact-ID edits following schema_evolution.
 - Missing schema syntax is not a user decision. Use the relevant guidelines to
   supply stable ids, titles, types, and input subtypes; use needs_review only
-  when the intended field meaning or safe additive change is genuinely unclear.
+  when the intended field meaning or intended schema change is genuinely unclear.
 - Use suggest_page_deletion only as a manual cleanup suggestion after useful content has
   been preserved.
 """
@@ -464,6 +464,9 @@ ORGANIZE_PLANNING_ACTIONS = """
 ORGANIZE_PLANNING_PREFLIGHT = """
 ### Before Completing Structure Planning
 
+- Match every requested outcome to an executable action and target. Submission
+  completion cannot add missing targets or document actions later. Write the
+  summary from the final actions; explain missing work in issues and needs_review.
 - Internal hash tokens appear only in executable action data, never in the
   user-facing summary, issues, display labels, or reasons.
 - The complete upload set was clustered by stable subject before page actions
@@ -488,7 +491,7 @@ ORGANIZE_PLANNING_PREFLIGHT = """
 - Category default forms appear only for unambiguous homogeneous collections;
   context-oriented or heterogeneous categories have no default form.
 - Every create_form action was built after reading its page_form or task_form
-  guidelines, and every extend_form_schema action was built after reading the
+  guidelines, and every update_form_schema action was built after reading the
   schema_evolution guidelines.
 - Every new schema field has a unique stable id, supported type, and title;
   input fields also have an input subtype.
@@ -524,7 +527,7 @@ Common data shapes:
   optional "completed_on"}
 - add_form_to_page: {"page" or "page_action", "form" or "form_action"}
 - add_page_category: {"page" or "page_action", "category" or "category_action"}
-- extend_form_schema: {"form", "operations"}
+- update_form_schema: {"form", "operations"}
 - append_page_document: {"page" or "page_action", "document_markdown"}; requested addition only, with server-supplied source/time quote
 - update_form_values: {"page" or "task"}; omit "updates" during planning
 - attach_file: {"entity" or "entity_action", "file"}

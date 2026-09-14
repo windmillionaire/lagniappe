@@ -36,6 +36,16 @@ The shell also delegates copy controls for the Manual command-block component,
 so its padded, scrollable, copyable presentation can be reused in views such as
 Admin without view-specific clipboard code.
 
+Analytics uses native `details`/`summary` disclosures for retention controls,
+activity groups, run details, and aggregate breakdowns. Its delegated capture
+listener loads activity rows when a group opens; a failed load can be retried
+by closing and reopening the group. Run JSON is fetched on demand from the
+existing diagnostic route, with a selectable-text fallback for denied clipboard
+access. Both the browser tracker and the server event writer exclude the
+`/analytics`, `/api`, `/mcp`, and `/l` route families from activity records,
+including exact root paths. Human report-review pages under `/tools` remain
+eligible for normal tracking. Existing historical records are not rewritten.
+
 ## Core
 
 `views/base/core.mjs` adds components and private application services. It owns:
@@ -56,7 +66,9 @@ view is interactive.
 
 Controls are delegated from the view root. `lp-control` handles help, star,
 delete, pagination, close, and routed component controls; `lp-show` navigates
-between widgets; `lp-link` forwards a row click to its title link. Local widget
+between widgets; `lp-link` forwards a row click to its title link. Entity table
+rows use only the name column's title, so a nameless row cannot follow a related
+form's link. Local widget
 behavior such as table expansion stays with the widget instead of growing the
 Core switch.
 
@@ -96,6 +108,21 @@ Manual imports its section dropdown only in mobile mode. Report initializes
 forms only when present. Page activates its photo widget only when the card is
 visible or selected. These optimizations preserve the same published view and
 widget contracts.
+
+Report schema previews follow each action's saved skip selection. Skipping a
+schema action hides its conversion details, affected-submission list, warning
+and pagination, replacing them with an explicit unchanged-submissions message.
+Restoring the action brings its preview back. Both the initial template render
+and the successful skip response apply this state; a failed request leaves the
+preview unchanged.
+
+Before starting a ready report, schema approval checks that its reviewed form
+and submissions still match saved state. A stale review leaves the same plan
+ready without starting an execution job. The browser explains that another
+review is needed, directing external-plan users to the originating assistant
+and on-site users to Revise Plan. API validation retains its tool-specific
+guidance. The run/retry form reserves an accessible error slot with vertical
+spacing around the message; a rejected approval does not hide proposal actions.
 
 Page owns image visibility state, with the controls at the top of the Info form
 and absent from other tabs. Form rendering retains the controls before the

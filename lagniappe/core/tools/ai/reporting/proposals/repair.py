@@ -123,7 +123,7 @@ def _complete_form_schema_fields(proposal):
         fields = []
         if action.get("type") == "create_form" and isinstance(data.get("schema"), list):
             fields = data["schema"]
-        elif action.get("type") == "extend_form_schema" and isinstance(
+        elif action.get("type") == "update_form_schema" and isinstance(
             data.get("operations"), list
         ):
             fields = [
@@ -484,7 +484,7 @@ def _report_needs_review_proposal(
     is_ask = report_label == "Ask"
     is_form_error = not is_ask and any(
         marker in validation_error
-        for marker in ("create_form", "extend_form_schema", "data.schema")
+        for marker in ("create_form", "update_form_schema", "data.schema")
     )
     if is_ask:
         display_label = "Suggested changes"
@@ -615,7 +615,8 @@ def generate_validated_proposal(
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_reviews_files_missing_after_repair
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_plan_leaves_form_submission_for_completion
 # @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_repairs_unusable_answers
-# @matrix ai-report : ask fallback file-placement repair submission validate
+# @tests tests_unit/test_004l_form_schema_updates.py::test_organize_repairs_prepared_conversions_before_returning_plan
+# @matrix ai-report : ask fallback file-placement repair submission validate schema-update
 def validate_or_repair_proposal(
     prompt,
     proposal,
@@ -645,6 +646,7 @@ def validate_or_repair_proposal(
         )
         if validator is validate_proposal:
             validation_options["validate_reference_kinds"] = True
+            validation_options["prepare_schema_changes"] = True
     original_proposal = copy.deepcopy(proposal)
     proposal = _complete_form_schema_fields(proposal)
     proposal = _complete_unambiguous_add_form_references(proposal)
@@ -886,7 +888,7 @@ table-payments; do not return schema fields without ids.
 When get_guidelines is available, call get_guidelines("page_form") or
 get_guidelines("task_form") before repairing a create_form action, matching its
 data.form_type. Call get_guidelines("schema_evolution") before repairing an
-extend_form_schema action. An add_field operation has the same id, type, and
+update_form_schema action. An add_field operation has the same id, type, and
 title requirements as a create_form schema field, and input fields must also
 include an input subtype. Do not merely claim a schema was corrected in the
 summary; put every correction in the returned action data.

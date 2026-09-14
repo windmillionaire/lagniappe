@@ -375,6 +375,7 @@ export class TableEditor {
 		this._clearError(cell);
 		const response = await request.patch(this._route(cell), {
 			schema_id: edit.element.schema.id,
+			form_generation: cell.dataset.formGeneration || "0",
 			value,
 			column: edit.column,
 		});
@@ -416,6 +417,7 @@ export class TableEditor {
 		this._clearError(cell);
 		const response = await request.patch(this._route(cell), {
 			schema_id: edit.element.schema.id,
+			form_generation: cell.dataset.formGeneration || "0",
 			value,
 			column: edit.column,
 		});

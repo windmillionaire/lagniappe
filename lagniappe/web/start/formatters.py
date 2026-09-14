@@ -1,4 +1,14 @@
-"""Jinja template filters for date, time, phone, and number formatting."""
+"""Jinja template filters for text, date, time, phone, and number formatting."""
+
+from lagniappe.core.tools.files.html import render_markdown, strip_tags
+
+
+# @testable true
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_snippets_are_plain_text_and_at_most_five_lines
+# @pair ai-report:list-snippets
+def format_markdown_text(value):
+    """Flatten Markdown into escaped-by-Jinja text for compact previews."""
+    return strip_tags(render_markdown(value))
 
 
 # @testable true

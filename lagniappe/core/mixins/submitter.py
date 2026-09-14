@@ -1,12 +1,15 @@
 """Submitter mixin for entities with form submissions."""
 
-from copy import deepcopy
 import hashlib
 import json
 
 from ..definitions.fingerprints import restricted_fingerprint
 from ..exceptions import ValidationError
 from ..entities import Entities
+from ..tools.form_definitions import (
+    definition_for,
+    require_mutable_submission,
+)
 from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.references import (
     SubmittedReferenceResolver,
@@ -124,8 +127,6 @@ class SubmitterMixin:
         ai_submission(submission): Validate and save AI-generated field values.
         import_submission(submission): Validate and save CSV-imported field values.
         save_submission(): Persist ``submission.db_value`` and form metadata.
-        save_default_field(field_id, submission): Persist one field as a repeating
-            default without running the entity's normal save plan.
         fingerprint: MD5 combining the base entity revision, its own Form's
             schema version, and every effective restriction group.
     """
@@ -135,9 +136,13 @@ class SubmitterMixin:
     # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
     # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
     # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit submit-boundary
+    # @matrix form-migration : stale-generation direct-write
     def form_submission(self, values, *, actor=None):
+        require_mutable_submission(self)
         submission = self.properties.submission
         form_values = getattr(values, "form", values)
+        if actor is not None and str(form_values.get("form-generation", "0")) != str(self.submission_definition.generation):
+            raise ValidationError("The form fields changed. Your answers were not saved. Review the updated form before trying again.")
         files = getattr(values, "files", None)
         updated = normalize_submission_values(form_values, submission.fields)
         preserved = (
@@ -251,6 +256,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004d_submitter.py::test_patch_submission_merges_multiple_fields
     # @matrix submission : json-payload multiple-fields patch single-field
     def patch_submission(self, update, *, actor=None):
+        require_mutable_submission(self)
         updated = json.loads(update) if isinstance(update, str) else update
         if actor is not None:
             self.validate_browser_submission_references(
@@ -263,7 +269,14 @@ class SubmitterMixin:
 
         self.save_submission()
 
+    # @testable true
+    # @tests tests_unit/test_004i_form_definitions.py::test_generated_answers_reject_unknown_fields_before_resetting_values
+    # @matrix submission : ai unknown-fields preservation
     def ai_submission(self, generated_submission):
+        require_mutable_submission(self)
+        unknown = set(generated_submission) - set(self.properties.submission.fields)
+        if unknown:
+            raise ValidationError("Generated answers include unavailable fields and need review.")
         for field_id, field in self.properties.submission.fields.items():
             field.reset()
             field.validate_ai(generated_submission.get(field_id, None))
@@ -278,6 +291,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
     # @matrix form-table submission text-input : error-message fuzzy-match import list-normalization save validation
     def import_submission(self, imported_submission, import_process):
+        require_mutable_submission(self)
         for field_id, field in self.properties.submission.fields.items():
             try:
                 field.reset()
@@ -302,81 +316,64 @@ class SubmitterMixin:
 
         self.save_submission()
 
+    # @testable false
+    # @covered-by lagniappe/core/tools/form_definitions.py::original_completion
+    # @reason cache revision metadata remains independent from original-completion generation
     @property
     def schema_version(self):
         return self.db.get("schema_version")
 
-    # @testable true
-    # @tests tests_unit/test_004d_submitter.py::test_save_default_field_copies_db_value_and_saves_only_submitter
-    # @tests tests_unit/test_004d_submitter.py::test_save_submission_removes_changed_repeating_defaults
-    # @matrix submission : repeating-default storage
+    # @testable false
+    # @covered-by lagniappe/core/tools/form_definitions.py::definition_for
+    # @reason missing generation is the shared legacy baseline for flat submissions
     @property
-    def default_submission(self):
-        value = self.db.get("default_submission")
-        if isinstance(value, str):
-            try:
-                value = json.loads(value)
-            except (TypeError, json.JSONDecodeError):
-                return {}
-        return value if isinstance(value, dict) else {}
+    def generation(self):
+        return self.db.get("generation", 0) or 0
 
     # @testable false
-    # @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.save_default_field
-    # @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.save_submission
-    # @reason repeating-default storage normalization is owned by its public mutation methods
-    def _set_default_submission(self, submission):
-        if submission:
-            self.db["default_submission"] = json.dumps(submission)
-        else:
-            self.db.pop("default_submission", None)
+    # @covered-by lagniappe/core/tools/form_definitions.py::definition_for
+    # @reason shared read boundary delegates exact-version resolution
+    @property
+    def submission_definition(self):
+        return definition_for(self)
 
-    # @testable true
-    # @tests tests_unit/test_004d_submitter.py::test_save_default_field_copies_db_value_and_saves_only_submitter
-    # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_cannot_be_saved_as_repeating_default
-    # @matrix submission : direct-save field-copy repeating-default
-    # @pair form-todo:repeating-default
-    def save_default_field(self, field_id, submission=None):
-        """Persist one field's DB value as a repeating submission default."""
-        submission = submission or self.properties.submission
-        field = submission.fields.get(field_id)
-        if field is None:
-            raise ValidationError(f"Submission field {field_id!r} does not exist.")
-        if not getattr(field, "repeating_default", True):
-            raise ValidationError(
-                f"Submission field {field_id!r} cannot repeat automatically."
-            )
-        submission_value = submission.db_value
-        if field_id not in submission_value:
-            raise ValidationError(f"Submission field {field_id!r} has no saved value.")
+    @property
+    def submission_schema(self):
+        return self.submission_definition.schema
 
-        defaults = deepcopy(self.default_submission)
-        value = deepcopy(submission_value[field_id])
-        defaults[field_id] = value
-        self._set_default_submission(defaults)
-        Entities.save_root(self, property_mask=("default_submission",))
-        return value
+    @property
+    def submission_schema_error(self):
+        return self.submission_definition.error
 
     # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_stored_explicit_checkbox_false_survives_load_save
     # @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
     # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
-    # @tests tests_unit/test_004d_submitter.py::test_save_submission_removes_changed_repeating_defaults
-    # @matrix submission : blank-persistence empty-submission load-save normalization reconciliation repeating-default stored-false stored-null
+    # @tests tests_unit/test_004d_submitter.py::test_save_submission_discards_legacy_defaults_and_keeps_current_answers
+    # @matrix submission : blank-persistence empty-submission load-save normalization reconciliation stored-false stored-null
     def save_submission(self):
+        require_mutable_submission(self)
+        if self.entity_kind in {"page", "task"}:
+            self._submission_input_generation = self.generation
         submission_value = self.properties.submission.db_value
         self.properties.submission.value = submission_value
-        defaults = {
-            field_id: value
-            for field_id, value in self.default_submission.items()
-            if field_id in submission_value and submission_value[field_id] == value
-        }
-        self._set_default_submission(defaults)
-        if self.form:
+        self.db.pop("default_submission", None)
+        self.db.pop("pre_migration", None)
+        if self.form and self.entity_kind != "task_history":
             self.db["schema_version"] = self.form.version
+            self.db["generation"] = self.form.generation
         if "name" in submission_value:
             self.name = submission_value["name"]
         if "description" in submission_value:
             self.description = submission_value["description"]
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/form_changes.py::notice_projection
+    # @reason shared Page and Task read-only template projection
+    @property
+    def migration_notice(self):
+        from ..tools.form_changes import notice_projection
+        return notice_projection(self) if self.db.get("pre_migration") else []
 
     # @testable true
     # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
@@ -400,10 +397,15 @@ class SubmitterMixin:
     @property
     def fingerprint(self):
         form = self.form
+        version = (
+            str(self.generation)
+            if self.entity_kind == "task_history"
+            else (form.version if form else "")
+        )
         return restricted_fingerprint(
             super().fingerprint,
             self.restricted_to,
-            form_version=(form.version or "") if form else "",
+            form_version=version or "",
         )
 
     # @testable true
@@ -430,7 +432,6 @@ class SubmitterMixin:
                 "form_version": getattr(form, "version", None),
                 "schema_version": self.schema_version,
                 "submission": self.properties.submission.value or {},
-                "default_submission": self.default_submission,
                 "mirrored": mirrored,
             },
             sort_keys=True,

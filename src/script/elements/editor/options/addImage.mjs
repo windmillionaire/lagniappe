@@ -91,6 +91,14 @@ class Image extends BaseUpload {
 	}
 
 	async submit(submitter) {
+		if (this.toolbar.document.addDraftImage) {
+			const file = this.fileInput?.element?.files?.[0];
+			if (!file) return;
+			const src = this.toolbar.document.addDraftImage(file);
+			this.toolbar.editor.chain().focus().setImage({ src }).run();
+			this.toolbar.toggleForm(this.name);
+			return;
+		}
 		const prepared = await this.prepareSubmit({
 			route: this.toolbar.endpoints.addImage,
 		});

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from collections import Counter
 
 from ..tools.files.html import sanitize_html
 from .ai_report_process import ReportProcessValue
@@ -29,6 +30,19 @@ class Proposal(ReportProcessValue):
 
     _id = "proposal"
 
+    # @testable true
+    # @tests tests_unit/test_020a_ai_report_properties.py::test_proposal_action_summary_counts_actions_without_predicting_records
+    # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
+    # @matrix ai-report : proposal action-counts
+    @property
+    def action_summary(self):
+        maximum = None
+        if self.entity.origin == "api":
+            from ..tools.ai.external_api import MAX_PROPOSAL_ACTIONS
+
+            maximum = MAX_PROPOSAL_ACTIONS
+        return summarize_actions(self.value, maximum=maximum)
+
     @property
     # @testable infrastructure
     # @covered-by lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector.display_actions
@@ -47,3 +61,15 @@ class Proposal(ReportProcessValue):
             return None
 
         return sanitize_html(answer)
+
+
+# @testable false
+# @covered-by lagniappe/core/properties/ai_report_proposal.py::Proposal.action_summary
+# @reason the website and external receipts count the same saved action list
+def summarize_actions(proposal, *, maximum=None):
+    actions = (proposal or {}).get("actions", [])
+    counts = Counter(action["type"] for action in actions)
+    result = {"total": len(actions), "by_type": dict(sorted(counts.items()))}
+    if maximum is not None:
+        result["maximum"] = maximum
+    return result

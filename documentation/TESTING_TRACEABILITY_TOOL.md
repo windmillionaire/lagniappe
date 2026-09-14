@@ -133,6 +133,9 @@ Place tags in the comment or docstring immediately preceding a durable Python
 or JavaScript symbol. Annotated exported JavaScript declarations such as
 `export const Extension = Factory.create(...)` are inventoried too.
 
+Python property accessors share one source ID. Keep their combined getter/setter
+test links and behavior tags in one block above the getter.
+
 Tested behavior:
 
 ```python

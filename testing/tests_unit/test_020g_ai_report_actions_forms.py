@@ -20,6 +20,61 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
+# @matrix ai-report submission : validation failure-isolation
+@pytest.mark.parametrize("bad_rows", [["Airline & Flight #"], [{"Flight": "UA1458"}]])
+@pytest.mark.unit
+def test_submission_batch_validation_preserves_values_and_blocks_completion(monkeypatch, bad_rows):
+    user = _test_user("table-patch-owner")
+    page = TestEntities.get("PAGE", {"name": "Trip", "hash": "trip-page"})
+    form = TestEntities.get("FORM", {"name": "Flights", "hash": "flight-form"})
+    form.form_type = "task"
+    form.schema = [
+        {"id": "input-notes", "type": "input", "input": "text", "title": "Notes"},
+        {"id": "table-flights", "type": "table", "title": "Flights", "columns": [
+            {"id": "input-flight", "type": "input", "input": "text", "title": "Flight"},
+        ]},
+    ]
+    task = TestEntities.get("TASK", {"name": "Book Plane Tickets", "hash": "flight-task"}, page=page)
+    task.form = form
+    original = {"input-notes": "Keep me", "table-flights": {"rows": [{"input-flight": "Original flight"}]}}
+    task.submission = copy.deepcopy(original)
+    report = TestEntities.get("REPORT", {"name": "Travel details", "hash": "flight-report", "user": user, "parent": user,
+        "status": "ready", "pending": False})
+    report.proposal = {"summary": "Update and complete flights", "confidence": 1, "actions": [
+        {"id": "flights", "type": "update_form_values", "data": {"updates": [
+            {"task": task.urlsafe_key, "schema_id": "input-notes", "new_value": "Changed"},
+            {"task": task.urlsafe_key, "schema_id": "table-flights", "new_value": {"rows": bad_rows}},
+        ]}},
+        {"id": "complete", "type": "complete_task", "depends_on": ["flights"], "data": {"task": task.urlsafe_key}},
+    ]}
+    monkeypatch.setattr(report_runner.Entities, "fetch_one", _fetch_one_from({task.urlsafe_key: task}))
+    saved = []
+    monkeypatch.setattr(report_runner.Entities, "save", lambda *entities: saved.extend(entities))
+    if isinstance(bad_rows[0], str):
+        with pytest.raises(exceptions.AIException, match="Table row 1 must be an object"):
+            report_runner.run_report(report, user)
+    else:
+        result = report_runner.run_report(report, user)
+        assert result["status"] == "failed"
+        assert result["actions"][0]["status"] == "failed"
+        assert "unknown column ids" in result["actions"][0]["error"]
+        assert result["actions"][1]["status"] != "complete"
+    assert task.submission == original
+    assert not task.completed
+    assert all(entity is report for entity in saved)
+
+
+# @matrix ai-report : validation result
+@pytest.mark.unit
+def test_report_result_exposes_legacy_skipped_submission_errors():
+    user = _test_user("legacy-owner")
+    report = TestEntities.get("REPORT", {"name": "Legacy result", "hash": "legacy-result", "user": user, "parent": user})
+    report.result = {"status": "complete", "actions": [{"type": "update_form_values", "display_label": "Flight details",
+        "updates": {"applied": [], "skipped": [{"schema_id": "table-flights", "reason": "'str' object has no attribute 'get'"},
+            {"schema_id": "input-notes", "reason": "Value did not change after validation."}]}}]}
+    assert report.properties.result.submission_issues == [{"action_label": "Flight details", "schema_id": "table-flights", "reason": "'str' object has no attribute 'get'"}]
+
+
 # @matrix ai-report : attachments create-order default-category deterministic-run execute file-summary grouping partial-result persistence result skip-action
 @pytest.mark.unit
 def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
@@ -348,7 +403,6 @@ def test_run_report_uses_category_form_from_stored_key_for_page_submission(
                             "category": category.urlsafe_key,
                             "submission": {
                                 "input-textab12": "Pediatric hospital provider.",
-                                "unknown-field": "must not persist",
                             },
                         },
                     }
@@ -734,7 +788,7 @@ def test_submission_batch_persists_all_fields_with_fresh_entity_reads(
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "extend_form_schema",
+                        "type": "update_form_schema",
                         "data": {
                             "form": "batch-form",
                             "operations": [
@@ -1048,7 +1102,7 @@ def test_run_report_rejects_schema_update_without_form_edit_permission(monkeypat
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "extend_form_schema",
+                        "type": "update_form_schema",
                         "data": {
                             "form": "restricted-invoice-form",
                             "operations": [

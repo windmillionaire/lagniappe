@@ -3,7 +3,7 @@
 from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
 
 from lagniappe import CONFIG
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from ..http import HTML_METADATA_POLICY, OutboundStatus, fetch_user_content
 from . import metadata as link_metadata
@@ -177,7 +177,11 @@ def _route_preview(parsed):
     if not expected_kinds:
         return {"recognized": False}
 
-    entity = Entities.fetch_one(parts[1], request=Fetch.direct())
+    entity = Entities.fetch_one(
+        parts[1],
+        request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION)
+        if parts[0] in {"tasks", "files"} else Fetch.direct(),
+    )
     if not entity or entity.kind not in expected_kinds:
         return {
             "recognized": True,
@@ -277,6 +281,8 @@ def _external_preview(parsed):
 # @tests tests_unit/test_019_link_preview.py::test_external_preview_rejects_unsafe_urls
 # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_editor_preview_rejects_private_targets_without_disrupting_popover
 # @matrix editor link-preview : external internal metadata permissions url-safety
+# @tests tests_unit/test_019_link_preview.py::test_task_preview_loads_page_form_before_permission_check
+# @pair link-preview:nested-relations
 def preview_for_url(url, user=None, base_url=None):
     value = str(url or "")
     if not value.strip():

@@ -131,7 +131,7 @@ class AssetMixin:
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_asset_mixin_copy_asset_copies_storage_and_updates_definition
     # @matrix asset-storage : copy metadata visibility
-    def copy_asset(self, asset, name=None):
+    def copy_asset(self, asset, name=None, *, isolated=False):
         if not asset:
             return None
 
@@ -152,6 +152,8 @@ class AssetMixin:
         source_extension = getattr(asset, "extension", None)
         if not copied.extension and source_extension:
             copied._path = f"{self.hash}_{name}.{source_extension}"
+        if isolated:
+            copied._path = f"{self.hash}_{name}_{uuid4().hex}.{copied.extension}"
 
         blob = database_assets.copy_file(
             source_path,

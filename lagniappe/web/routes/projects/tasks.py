@@ -7,7 +7,7 @@ from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.core.tools.filters import compile_filter_contract
 from lagniappe.core.tools.tasks.ordering import sort_tasks
-from lagniappe.core.definitions import Action, Fetch, Resource
+from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
 from lagniappe.web.auth import permission
 from lagniappe.web import responses
 
@@ -179,7 +179,9 @@ def _status_filter(project, model, completed):
 # @testable true
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_completed_button
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_in_progress_button
+# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_status_filter_loads_task_page_form_permissions
 # @matrix model-tasks : completed in-progress status-filter
+# @pair model-tasks:nested-relations
 @projects.route("<key>/status/<task_key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def status(key, task_key, **kwargs):
@@ -196,7 +198,10 @@ def status(key, task_key, **kwargs):
         hashes=current_user.properties.restrictions.task,
         limit=None,
     )
-    cached = Entities.fetch(*db.results, request=Fetch.direct())
+    cached = Entities.fetch(
+        *db.results,
+        request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+    )
     filter.route = request.full_path.removesuffix("?")
 
     return responses.filtered_task_index(sort_tasks(cached), filter)

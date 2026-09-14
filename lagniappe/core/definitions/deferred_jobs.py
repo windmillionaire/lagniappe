@@ -31,6 +31,7 @@ class DeferredJobType(Enum):
     AUTOFILL = "autofill"
     FILE_EXTRACT = "file-extract"
     FILE_SUMMARIZE = "file-summarize"
+    FORM_CHANGE = "form-change"
 
 
 class DeferredJobStatus(Enum):
@@ -57,6 +58,7 @@ class DeferredJobPhase(Enum):
     VALIDATING = "validating"
     PREPARED = "prepared"
     APPLYING = "applying"
+    WAITING_DEPENDENCY = "waiting_dependency"
     RETRY_WAIT = "retry_wait"
     COMPLETE = "complete"
     FAILED = "failed"

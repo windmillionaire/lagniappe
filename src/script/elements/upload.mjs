@@ -389,17 +389,26 @@ const directUploadRoute = (route) => {
 };
 
 /**
- * @testable false
- * @covered-by src/script/elements/base/baseUpload.mjs::BaseUpload.prepareSubmit
- * @reason session creation uses the shared request envelope and server auth
+ * @testable true
+ * @tests tests_js/test_014_direct_upload_retry.py::test_builder_direct_upload_failure_preserves_owner_page
+ * @matrix direct-upload forms : retryable-action persistent-error
  */
-const createDirectUploadSession = async ({ route, file, inputName }) => {
-	const response = await request.post(directUploadRoute(route), {
-		filename: file.name,
-		content_type: file.type || "application/octet-stream",
-		size: file.size,
-		input_name: inputName,
-	});
+const createDirectUploadSession = async ({
+	route,
+	file,
+	inputName,
+	replaceErrorPage = true,
+}) => {
+	const response = await request.post(
+		directUploadRoute(route),
+		{
+			filename: file.name,
+			content_type: file.type || "application/octet-stream",
+			size: file.size,
+			input_name: inputName,
+		},
+		{ replaceErrorPage },
+	);
 	if (!response?.ok) {
 		throw new Error(response?.error || "Could not start direct upload");
 	}

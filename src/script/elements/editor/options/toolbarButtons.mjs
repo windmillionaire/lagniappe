@@ -4,8 +4,7 @@ import { setIcon } from "../../../shared/icons";
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004d_document.py::test_formatting_persists
- * @tests tests_e2e/004_projects/test_004d_document.py::test_task_list_persists
- * @matrix editor : formatting task-list
+ * @matrix editor : formatting
  */
 class ToolbarButton {
 	constructor(toolbar) {
@@ -23,12 +22,6 @@ class ToolbarButton {
 			"superscript",
 			"subscript",
 		].includes(this.name);
-	}
-
-	_isListToggle() {
-		return ["toggleBulletList", "toggleOrderedList", "toggleTaskList"].includes(
-			this.command,
-		);
 	}
 
 	_addButtonIcon(icon) {
@@ -55,7 +48,7 @@ class ToolbarButton {
 		const editor = this.toolbar.editor;
 		const chain = editor.chain().focus();
 		const shouldCollapseEmptySelection =
-			editor.isEmpty && (this._isInlineMarkToggle() || this._isListToggle());
+			editor.isEmpty && this._isInlineMarkToggle();
 		if (shouldCollapseEmptySelection) chain.setTextSelection(1);
 		chain[this.command](this.args).run();
 		this.active ? this.disable() : this.enable();
@@ -96,9 +89,6 @@ export {
 	ToolbarButton,
 	ToolbarButton as toggleBold,
 	ToolbarButton as toggleItalic,
-	ToolbarButton as toggleBulletList,
-	ToolbarButton as toggleOrderedList,
-	ToolbarButton as toggleTaskList,
 	ToolbarButton as undo,
 	ToolbarButton as redo,
 };

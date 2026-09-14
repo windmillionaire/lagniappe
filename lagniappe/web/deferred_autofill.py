@@ -35,7 +35,8 @@ def locked_response(entity, form=None):
         {
             "deferred": True,
             **descriptor,
-            "message": "Autofill is already running. These changes were not saved.",
+            "message": ("This Form is being updated. These changes were not saved; try again when the update finishes."
+                        if descriptor["scope"] == "form-change" else "Autofill is already running. These changes were not saved."),
         },
         status=409,
     )

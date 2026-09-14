@@ -408,8 +408,8 @@ def test_submission_values():
 
         if isinstance(field, mixins.AIMixin) and "ai_value" in expected:
             if isinstance(field, Table):
-                # Table row values keep human column labels, but the outer field
-                # key follows AIMixin like every other submission field.
+                # Fixture expectations include the outer human field label;
+                # the row envelope itself uses exact column IDs and JSON types.
                 table_values = next(iter(expected["ai_value"].values()), None)
                 assert to_ai.get(field.ai_key) == table_values, (
                     f"{entity.name}: {field.ai_key} = {to_ai.get(field.ai_key)!r}, "

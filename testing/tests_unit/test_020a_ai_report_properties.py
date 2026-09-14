@@ -1094,7 +1094,7 @@ def test_ai_report_proposal_display_actions_group_schema_updates_separately(
                 "actions": [
                     {
                         "id": "schema",
-                        "type": "extend_form_schema",
+                        "type": "update_form_schema",
                         "data": {
                             "form": "invoice-form",
                             "form_name": "Invoice",
@@ -1147,7 +1147,7 @@ def test_ai_report_proposal_display_actions_group_schema_updates_separately(
     ]
     schema_group = actions[0]
     assert schema_group["display_label"] == "Schema Updates"
-    assert schema_group["skip_dependencies"] is False
+    assert schema_group["skip_dependencies"] is True
     assert schema_group["action_index"] == 1
     assert schema_group["group_action_indexes"] == [1]
     assert schema_group["support"] == [
@@ -1170,3 +1170,24 @@ def test_ai_report_proposal_display_actions_group_schema_updates_separately(
         {"label": "Updates", "value": "1 field update", "kind": "default"}
     ]
     assert actions[1]["group_action_indexes"] == [1, 2]
+
+
+# @matrix ai-report : proposal action-counts
+@pytest.mark.unit
+@pytest.mark.parametrize("origin", ["api", "email", "web"])
+def test_proposal_action_summary_counts_actions_without_predicting_records(origin):
+    user = _test_user("action-count-owner")
+    report = TestEntities.get("REPORT", {"name": "Count actions", "hash": "count-actions", "parent": user, "user": user})
+    report.origin = origin
+    report.proposal = {"actions": [
+        {"id": "current", "type": "create_task", "data": {"completed": True}},
+        {"type": "create_task", "skip": True, "data": {"task_action": "current", "completed": True}},
+        {"type": "needs_review", "data": {"note": "Check identity"}},
+    ]}
+    expected = {"total": 3, "by_type": {"create_task": 2, "needs_review": 1}}
+    if origin == "api":
+        expected["maximum"] = 100
+    assert report.properties.proposal.action_summary == expected
+    report.proposal = None
+    expected.update(total=0, by_type={})
+    assert report.properties.proposal.action_summary == expected

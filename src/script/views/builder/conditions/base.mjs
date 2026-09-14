@@ -32,6 +32,11 @@ export class Condition {
 
 	init() {
 		this.destroy();
+		if (this.draftSetting) {
+			this.setting = structuredClone(this.draftSetting);
+			delete this.draftSetting;
+		}
+		this.complete = false;
 		this.form = new BaseForm(this);
 		this.form.init();
 	}

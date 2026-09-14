@@ -1,6 +1,7 @@
 """Cloud Storage file upload, download, and deletion helpers."""
 
 import base64
+from copy import deepcopy
 import datetime
 import io
 import re
@@ -27,6 +28,35 @@ DIRECT_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 DIRECT_UPLOAD_SALT = "lagniappe-direct-upload"
 GENERIC_CONTENT_TYPES = {"", None, "application/octet-stream"}
 DIRECT_UPLOAD_ASSET_NONCE = re.compile(r"^[a-f0-9]{32}$")
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/form_drafts.py::save_form_draft
+# @covered-by lagniappe/core/tools/form_drafts.py::copy_form_draft
+# @reason attempt ownership bounds cleanup to newly allocated objects
+def record_attempt_asset(owner, definition):
+    owned = getattr(owner, "_form_attempt_assets", None)
+    if owned is None:
+        owner._form_attempt_assets = owned = []
+    owned.append(deepcopy(definition))
+
+
+# @testable true
+# @tests tests_unit/test_004f_form_drafts.py::test_rejected_save_cleans_only_attempt_blobs_and_ambiguous_commit_retains_them
+# @matrix html-field : isolated-assets cleanup
+def cleanup_rejected_attempt(owner):
+    """Retire known rejected attempt objects, never accepted/history objects."""
+    for definition in getattr(owner, "_form_attempt_assets", None) or []:
+        if not definition.get("generation"):
+            continue
+        try:
+            delete_file_generation(
+                definition["path"], definition.get("visibility", "private"), definition["generation"],
+            )
+        except Exception:
+            # A cleanup failure never authorizes deletion without its generation.
+            pass
+    owner._form_attempt_assets = []
 
 
 class DirectUploadError(ValueError):

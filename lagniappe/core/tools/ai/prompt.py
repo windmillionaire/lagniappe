@@ -18,6 +18,7 @@ HEADING_RE = re.compile(r"^(#{2,6})\s+(.+?)\s*$", re.MULTILINE)
 # These identities are code-authored contracts. Unknown or user-authored prompt types
 # intentionally receive no identity and are normalized to ``unknown`` at persistence.
 PROMPT_OBSERVABILITY_CONTRACTS = {
+    "form conversion": ("forms", "conversion", "form-conversion", 1),
     "file summary": ("files", "summary", "file-summary", 1),
     "organize submission completion": (
         "organize",

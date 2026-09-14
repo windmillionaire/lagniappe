@@ -13,6 +13,7 @@ READ_ONLY_CONTEXT_TOOLS = (
     "get_page_file_list",
     "get_page_tasks",
     "get_form_instances",
+    "preview_form_schema_update",
     "get_category_details",
 )
 
@@ -178,8 +179,8 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "required": ("name",),
         "required_groups": (("entity", "entity_action"),),
     },
-    "extend_form_schema": {
-        "fields": ("form", "form_action", "form_name", "operations"),
+    "update_form_schema": {
+        "fields": ("form", "form_action", "form_name", "operations", "baseline", "scope_fingerprint", "conversions"),
         "required": ("operations",),
         "required_groups": (("form", "form_action"),),
     },

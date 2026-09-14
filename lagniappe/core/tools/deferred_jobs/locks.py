@@ -56,6 +56,20 @@ def deferred_job_lock_descriptors(targets, scope=AUTOFILL_FORM_LOCK_SCOPE):
             active[target_key] = (lock, job)
         elif lock:
             database_deferred_jobs.release_deferred_job_lock(lock.key, lock.operation)
+    if scope == AUTOFILL_FORM_LOCK_SCOPE:
+        from types import SimpleNamespace
+        from ..form_changes import json_value, PENDING
+        form_keys = {target.db.get("form") for target in targets
+                     if getattr(target, "entity_kind", None) in {"page", "task"}} - {None}
+        forms = {form.key: form for form in Entities.fetch(*form_keys, request=Fetch.root())} if form_keys else {}
+        pending = {key: json_value(form.db, PENDING) for key, form in forms.items() if form.db.get(PENDING)}
+        pending_jobs = {job.urlsafe_key: job for job in Entities.fetch(
+            *(change["job"] for change in pending.values()), request=Fetch.direct())} if pending else {}
+        for target in targets:
+            change = pending.get(getattr(target, "db", {}).get("form"))
+            if change:
+                job = pending_jobs.get(change["job"]) or SimpleNamespace(urlsafe_key=change["job"], status_revision=0)
+                active[target.urlsafe_key] = (SimpleNamespace(scope=Scope.FORM_CHANGE), job)
     return active
 
 

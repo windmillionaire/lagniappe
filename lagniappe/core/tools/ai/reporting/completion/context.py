@@ -194,9 +194,10 @@ def _form_info_with_schema_updates(form_info, schema_actions, context):
         form_ref = _first_data_reference(data, "form")
         if not _form_reference_matches(form_info, form_ref, context):
             continue
-        for operation in data.get("operations") or []:
-            changed = _apply_completion_schema_operation(schema, operation)
-            applied = applied or changed
+        from lagniappe.core.tools.form_schema_updates import apply_operations
+
+        schema = apply_operations(schema, data.get("operations"), form_info.get("form_type") or "task")
+        applied = True
     if not applied:
         return form_info
     updated = dict(form_info)

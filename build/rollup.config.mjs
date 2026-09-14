@@ -15,12 +15,12 @@ import { resolveSentryBuild } from "./sentry.mjs";
 import { startupBudget } from "./startupBudget.mjs";
 import {
 	buildStyles,
-	emitMaterialSymbols,
+	emitFonts,
 	emitPdfWorker,
 	emitThirdPartyLicenses,
 	generateBuildId,
 	interactionFoundationChunk,
-	resolveMaterialSymbolsFont,
+	resolveFonts,
 	STYLE_PIPELINE,
 	updateServiceWorker,
 	versionChunkImports,
@@ -163,7 +163,7 @@ export default [
 				extract: STYLE_PIPELINE.css.output,
 				plugins: [
 					tailwindcss(),
-					resolveMaterialSymbolsFont(),
+					resolveFonts(),
 					cssnano({
 						preset: "default",
 					}),
@@ -182,7 +182,7 @@ export default [
 				},
 			}),
 			buildStyles(),
-			emitMaterialSymbols(),
+			emitFonts(),
 			emitPdfWorker(),
 			emitThirdPartyLicenses(),
 			startupBudget(),
@@ -203,6 +203,7 @@ export default [
 				version: settings.VERSION,
 				extraArtifacts: [
 					"lagniappe/web/start/styles/icons.py",
+					"lagniappe/web/start/styles/fonts.py",
 					"lagniappe/web/start/styles/styles.py",
 					"lagniappe/web/static/sw.js",
 				],

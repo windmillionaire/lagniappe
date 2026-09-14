@@ -8,6 +8,24 @@ from .form_links import Link
 from .row_submission import RowSubmission, TableColumnFields
 
 
+# @testable true
+# @tests tests_unit/test_003e_tables.py::test_table_ai_rejects_malformed_rows_without_losing_values
+# @tests tests_unit/test_020f_ai_report_completion.py::test_submission_completion_rejects_malformed_table_rows
+# @matrix form-table : ai-value validation
+def validate_ai_table(value, columns=None):
+    """Check the table envelope and exact column keys before consuming AI values."""
+    if value is None:
+        return
+    if not isinstance(value, dict) or not isinstance(value.get("rows"), list):
+        raise ValueError('Table value must be an object with a "rows" array.')
+    allowed = {column["id"] for column in columns} if columns is not None else None
+    for index, row in enumerate(value["rows"], 1):
+        if not isinstance(row, dict):
+            raise ValueError(f"Table row {index} must be an object keyed by column ids, not column headings.")
+        if allowed is not None and set(row) - allowed:
+            raise ValueError(f"Table row {index} contains unknown column ids; use the exact ids from the form schema.")
+
+
 # @testable false
 # @covered-by lagniappe/core/properties/form_table.py::Table.value
 # @covered-by lagniappe/core/properties/form_table.py::Table.fields
@@ -32,7 +50,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
         fields (dict): {field_id: TableColumnField} from column definitions.
         rows (list[RowSubmission]): Validated row submission objects.
         filter_value (dict): {field_id: [values across all rows]}.
-        ai_value (dict): {field_id: [AI values across all rows]}.
+        ai_value (dict): {rows: [{column_id: typed AI value}]}.
         db_value (dict | None): {rows: [row dicts]}, or None if empty.
     """
 
@@ -149,8 +167,11 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # AI Attributes
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
+    # @tests tests_unit/test_003e_tables.py::test_table_ai_rejects_malformed_rows_without_losing_values
     # @matrix form-table : ai-value multiple-rows
+    # @pair form-table:validation
     def validate_ai(self, ai_submission):
+        validate_ai_table(ai_submission, self.columns)
         self.reset()
         if not ai_submission:
             return
@@ -166,19 +187,22 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
     # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
+    # @tests tests_unit/test_015_ai_tools.py::test_get_schema_preserves_collection_rows_and_typed_cells
     # @matrix form-table : ai-value multiple-rows
+    # @pair form-table:typed-values
     @property
     def ai_value(self):
         rows = []
         for row in self.rows:
             row_dict = {}
-            for field in self.fields.values():
-                value = row.fields[field.id].ai_value
-                if value:
-                    row_dict[field.get("title")] = value
-            if row_dict:
-                rows.append(row_dict)
-        return rows or None
+            for column_id, field in row.fields.items():
+                field.user = self.user
+                if isinstance(field, AIMixin) and field.is_set:
+                    value = field.ai_value
+                    if value is not None:
+                        row_dict[column_id] = value
+            rows.append(row_dict)
+        return {"rows": rows} if rows else None
 
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox

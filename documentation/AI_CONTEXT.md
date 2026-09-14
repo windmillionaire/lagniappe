@@ -67,15 +67,16 @@ direct handler value; REST preserves its `{result: ...}` success envelope. Exter
 catalog selection can return exact definitions or names only, but it never
 creates a second handler registry.
 
-Internal `search_entities` defaults to the unchanged full-text search. The
-external API selects bounded candidate discovery through trusted dispatch:
+On-site and external `search_entities` share the same tool description and
+select bounded candidate discovery through registered tool dispatch:
 sparse multiword queries may receive ranked OR matches in the same tool result,
 with cached parent/snippet and Task completion context. This does not load every
 candidate again to attach edit/create permissions. The automatic Organize
 retrieval prepass retains native full-text matching. Both paths preserve the
-explicit `exact_name` mode; external Page candidates can also use the existing
-Category `parent_id` scope. The model cannot select the internal/external
-dispatch context through tool arguments.
+explicit `exact_name` mode; Page candidates in either AI path can also use the
+existing Category `parent_id` scope. Ordinary website search is unchanged. The
+lower-level search handler retains full-text mode for the automatic prepass;
+model-facing dispatch selects ranked candidates for both AI entry points.
 
 ## Structured output
 
@@ -120,7 +121,20 @@ with `actions=["update_form_values"]` and actual `field_types`; this returns
 patch-specific guidance in both native and external flows, without the blank-only
 Autofill/file-reading workflow. `get_schema(include_values=true)` joins current
 AI-readable values to exact schema ids in one read. Neither option adds a tool
-name or a required model round. Prefer projections and reuse over splitting one
+name or a required model round. Shared submission projections also preserve
+Table rows with exact column IDs, Todo `items` envelopes, numeric zero, and JSON
+booleans in entity, task-list, and history reads. Human field labels remain the
+outer keys in entity projections; use `get_schema` for exact outer field IDs.
+These are actor-aware projections, not raw storage exports.
+
+`get_task_history(include_original=true)` adds the completed Task's original
+answers keyed by field ID, its recorded schema and generation. It requires edit
+access, matching the website's Original answers view. Ordinary history reads
+retain their existing view permission. Open Tasks return `original_completion:
+null`; an unavailable historical schema is explicit and omits unsafe raw values.
+The option is shared by native Ask/Organize and external clients.
+
+Prefer projections and reuse over splitting one
 natural read into several dependent calls: each extra Gemini round sends another
 provider request and replays prior tool output. Tool count alone is not the useful
 measure; observe rounds, cumulative tokens, latency and provider errors.

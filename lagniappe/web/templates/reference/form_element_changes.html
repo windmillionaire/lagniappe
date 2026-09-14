@@ -1,0 +1,44 @@
+{% from "manual/macros.html" import subheading %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Converting and deleting form elements") %}
+  <section>
+    {{ subheading("Before You Save") }}
+    <p class="text-sm text-base-dark">
+      Replace and Delete change your draft. Existing submissions stay as they are
+      until you save the form. Use Undo to reverse a draft change before saving;
+      it does not restore submission values after a saved change has been applied.
+    </p>
+  </section>
+  <section>
+    {{ subheading("Converting Values") }}
+    <p class="text-sm text-base-dark">
+      Choose a new component under Replace With, then select Convert. Available conversions
+      use fixed rules: for example, an input containing “42” can become a number, while
+      “unknown” cannot. Values that do not fit the new type are cleared.
+      Choices marked as requiring AI are available with Create AI access. You can
+      add conversion instructions before Save. For a Table, configure the destination
+      columns first. AI conversion requires access to every affected Page or Task.
+      For Select, configure its options and Multiple setting before saving.
+      Conversion uses those final settings.
+      Components with no supported replacements show a red notice and only offer Delete.
+    </p>
+  </section>
+  <section>
+    {{ subheading("Deleting an Element") }}
+    <p class="text-sm text-base-dark">
+      Delete removes the element without converting its answers. After you save,
+      its values are cleared from current submissions on pages and tasks that use
+      this form. Original completed submissions and all history entries are
+      preserved, including values from deleted or converted elements.
+    </p>
+  </section>
+  <section>
+    {{ subheading("After You Save") }}
+    <p class="text-sm text-base-dark">
+      The update runs in the background. Affected submissions pause editing while
+      it applies. Submissions that have changed will carry a notice that can display
+      before-and-after values for reference. The notice clears when the submission
+      is next updated or the task is completed or reopened.
+    </p>
+  </section>
+{% endcall %}

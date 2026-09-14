@@ -149,6 +149,14 @@ component HTML, prepares its replacement, and commits replacement plus nav and
 visibility in one transition. Unloaded widget targets may be replaced directly;
 loaded widgets retain their instance and run their update contract.
 
+Task-row updates remove missing widgets only when the Task component owns them.
+Nested components keep their own widgets, so an already-loaded history table
+retains its rows and column controls during ordinary updates.
+
+Completion and reopening wait for server acceptance, then replace the Task with
+a closed row and move it in one transition. That commit destroys the old widgets;
+opening history again loads the latest archived completions.
+
 An offline update stores the mutation and keeps the form in `Queued Sync`.
 Successful replay triggers a fresh poll/EditWatcher pass; it does not directly
 install the replay response as authoritative form state.
@@ -161,6 +169,13 @@ install the replay response as authoritative form state.
 - `error` for widget/component validation display;
 - `modal` for returned modal HTML; and
 - `html` for detached fragment parsing.
+
+Validation failures at the Task update route's final save, including migration
+locks, return the normal plain-text HTTP 422 response. The current Task stays in
+place. Open widgets display their own errors; closed components use the component
+message slot even when a previously opened widget is still loaded. These errors
+stay visible while the user waits or retries. An accepted completion/reopening
+replaces the task row and clears its error along with the old row.
 
 A deferred acknowledgement is handled separately from ordinary create/update
 reconciliation. It marks the source successful as configured and registers the

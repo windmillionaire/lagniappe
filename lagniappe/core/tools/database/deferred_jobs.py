@@ -373,7 +373,7 @@ def get_deferred_job_scheduler_control():
 # @matrix deferred-jobs : get-or-create idempotency notification start
 # @pair notifications:aggregate-count
 @retry_aborted
-def create_deferred_job_if_absent(job, notification=None, lock=None):
+def create_deferred_job_if_absent(job, notification=None, lock=None, *, writes=(), guards=()):
     """Atomically insert one prepared job, notification, and optional lock."""
     key = _deferred_job_key(job)
     if key is None:
@@ -441,6 +441,9 @@ def create_deferred_job_if_absent(job, notification=None, lock=None):
             if lock is not None:
                 result["lock"] = lock.db
             return result
+        from .utility import check_mutation_guards, _put_mutation
+
+        check_mutation_guards(transaction, guards)
         scheduler_control = _update_deferred_job_scheduler_tracking(
             transaction,
             key,
@@ -456,6 +459,9 @@ def create_deferred_job_if_absent(job, notification=None, lock=None):
             )
         for entity in entities:
             transaction.put(entity.db)
+        for entity, mask in writes:
+            entity.db.exclude_from_indexes = entity.exclude_from_index
+            _put_mutation(transaction, entity.db, mask)
         result = {
             "created": True,
             "reason": "created",

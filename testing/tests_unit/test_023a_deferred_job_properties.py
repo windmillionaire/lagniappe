@@ -869,6 +869,123 @@ def test_status_projection_is_bounded_and_marks_stale_work():
     assert "private authored content" not in json.dumps(status)
 
 
+# @matrix deferred-jobs : timing
+@pytest.mark.parametrize(
+    "status, phase",
+    [
+        ("succeeded", "complete"),
+        ("failed", "failed"),
+        ("cancelled", "cancelled"),
+        ("superseded", "superseded"),
+    ],
+)
+def test_terminal_job_elapsed_time_stays_fixed_after_completion(status, phase):
+    created = datetime(2026, 9, 1, 12, tzinfo=timezone.utc)
+    finished = created + timedelta(seconds=148)
+    job = SimpleNamespace(
+        urlsafe_key="finished-operation",
+        status=status,
+        created=created,
+        modified=finished + timedelta(seconds=10),
+        progress={"phase": phase, "updated_at": finished.isoformat()},
+    )
+
+    for projection in (
+        deferred_job_lifecycle.status_projection,
+        deferred_job_lifecycle.admin_projection,
+    ):
+        for days_later in (1, 30):
+            # Cleanup/notification delivery can update modified after completion.
+            job.modified = finished + timedelta(days=days_later, seconds=-1)
+            result = projection(job, now=finished + timedelta(days=days_later))
+            assert result["terminal"] is True
+            assert result["elapsed_seconds"] == 148
+            assert result["phase_elapsed_seconds"] == 0
+
+
+# @matrix deferred-jobs : timing
+@pytest.mark.parametrize("status", ["queued", "running", "retry_wait"])
+def test_active_job_elapsed_time_advances_with_the_clock(status):
+    created = datetime(2026, 9, 1, 12, tzinfo=timezone.utc)
+    job = SimpleNamespace(
+        urlsafe_key="active-operation",
+        status=status,
+        created=created,
+        modified=created + timedelta(seconds=120),
+        progress={
+            "phase": status,
+            "updated_at": (created + timedelta(seconds=120)).isoformat(),
+        },
+    )
+
+    for elapsed in (148, 208):
+        result = deferred_job_lifecycle.status_projection(
+            job, now=created + timedelta(seconds=elapsed)
+        )
+        assert result["terminal"] is False
+        assert result["elapsed_seconds"] == elapsed
+        assert result["phase_elapsed_seconds"] == elapsed - 120
+
+
+# @matrix deferred-jobs : timing
+@pytest.mark.parametrize(
+    "updated_at, modified, expected",
+    [
+        (None, datetime(2026, 9, 1, 12, 2, 28), 148),
+        ("invalid", "2026-09-01T12:02:28Z", 148),
+        (None, None, 0),
+        ("invalid", "invalid", 0),
+    ],
+)
+def test_terminal_job_elapsed_time_uses_stored_fallbacks(updated_at, modified, expected):
+    created = datetime(2026, 9, 1, 12, tzinfo=timezone.utc)
+    job = SimpleNamespace(
+        urlsafe_key="legacy-operation",
+        status="succeeded",
+        created=created,
+        modified=modified,
+        progress={"phase": "complete", "updated_at": updated_at},
+    )
+
+    for days_later in (1, 30):
+        result = deferred_job_lifecycle.status_projection(
+            job, now=created + timedelta(days=days_later)
+        )
+        assert result["elapsed_seconds"] == expected
+        assert result["phase_elapsed_seconds"] == 0
+
+
+# @matrix deferred-jobs : progress recovery dependency-wait
+@pytest.mark.parametrize("phase", ["waiting_dependency", "summarizing"])
+def test_dependency_status_distinguishes_form_waits_from_recovery(phase):
+    now = datetime(2026, 9, 12, 12, tzinfo=timezone.utc)
+    job = SimpleNamespace(
+        urlsafe_key="operation", job_type=DeferredJobType.REPORT_EXECUTION.value,
+        status="retry_wait", progress={"phase": phase, "updated_at": now.isoformat()},
+        modified=now, dispatch_state="dispatched", next_attempt_at=now + timedelta(seconds=60),
+        error={"type": "DeferredJobDependencyPendingError", "message": "private dependency details"},
+    )
+    status = deferred_job_lifecycle.status_projection(job, now=now)
+    assert status["phase"] == "waiting_dependency"
+    assert status["phase_label"] == "Waiting for form update"
+    assert status["recovering"] is False
+    assert "private dependency" not in json.dumps(status)
+
+    job.job_type = DeferredJobType.AUTOFILL.value
+    assert deferred_job_lifecycle.status_projection(job, now=now)["phase_label"] == "Waiting for related work"
+    job.modified = now - timedelta(minutes=3)
+    assert deferred_job_lifecycle.status_projection(job, now=now)["recovering"] is True
+    job.modified = now
+    job.error = {"type": "TimeoutError"}
+    job.progress["phase"] = "retry_wait"
+    assert deferred_job_lifecycle.status_projection(job, now=now)["recovering"] is True
+    job.status = "running"
+    job.progress["phase"] = "summarizing"
+    status = deferred_job_lifecycle.status_projection(job, now=now)
+    assert status["phase_label"] == "Summarizing files"
+    assert status["recovering"] is False
+
+
 # @matrix deferred-jobs : diagnostics privacy
 def test_admin_projection_exposes_diagnostics_without_payload_content():
     now = datetime(2026, 7, 19, 12, tzinfo=timezone.utc)

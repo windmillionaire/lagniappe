@@ -73,6 +73,7 @@ TASK_LIST_METADATA = _object(
 )
 
 OUTPUT_SCHEMAS = {
+    "preview_form_schema_update": _object(properties={"instances": ENTITY_LIST, "baseline": {"type": "string"}, "scope_fingerprint": {"type": "string"}, "has_more": {"type": "boolean"}, "next_cursor": {"type": ["string", "null"]}}),
     "search_entities": ENTITY_LIST,
     "get_entity": ENTITY,
     "get_file": _object(
@@ -156,6 +157,18 @@ OUTPUT_SCHEMAS = {
             "limit": {"type": "integer"},
             "truncated": {"type": "boolean"},
             "history": ENTITY_LIST,
+            "original_completion": {
+                "type": ["object", "null"],
+                "required": ["generation", "schema", "schema_available", "values"],
+                "properties": {
+                    "generation": {"type": "integer"},
+                    "schema": {"type": "array", "items": {"type": "object"}},
+                    "schema_available": {"type": "boolean"},
+                    "values": {"type": ["object", "null"]},
+                    "error": {"type": "string"},
+                },
+                "additionalProperties": False,
+            },
         },
     ),
     "get_category_details": ENTITY,
@@ -249,6 +262,7 @@ OUTPUT_SCHEMAS = {
 
 
 RESULT_PATHS = {
+    "preview_form_schema_update": {"primary_collection": "$.instances", "pagination": {"has_more": "$.has_more", "next_cursor": "$.next_cursor", "returned": "$.returned", "total": "$.affected"}},
     "search_entities": {"primary_collection": "$", "pagination": None},
     "get_entity": {"primary_entity": "$", "pagination": None},
     "get_file": {"primary_entity": "$", "pagination": None},

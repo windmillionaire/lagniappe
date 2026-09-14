@@ -302,6 +302,11 @@ class RelatedEntityMixin:
         return self.value.name if self.value else None
 
     # Property Attributes
+    # @testable true
+    # @tests tests_unit/test_026_site_admin.py::test_unloaded_optional_form_is_not_mistaken_for_a_deleted_form
+    # @tests tests_unit/test_006b_ingress_entity.py::test_related_entity_setter_rejects_values_without_key
+    # @matrix permissions relations : unloaded-relation
+    # @matrix relations : key-validation validation
     @property
     def value(self):
         if self.is_set:
@@ -311,15 +316,15 @@ class RelatedEntityMixin:
             key = self.entity.db.get(self.id)
             if key:
                 capture_unloaded_relation(self, relation_type="single", keys=[key])
+                # A diagnostic fallback is not a completed lookup. Only attach()
+                # can establish that a stored reference was checked and is missing.
+                return None
             self._value = None
         else:
             self._value = None
 
         return self._value
 
-    # @testable true
-    # @tests tests_unit/test_006b_ingress_entity.py::test_related_entity_setter_rejects_values_without_key
-    # @matrix relations : key-validation validation
     @value.setter
     def value(self, value):
         if value is not None and not getattr(value, "key", None):

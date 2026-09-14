@@ -2,7 +2,7 @@
 AI tool declarations and execution handlers for Gemini function calling.
 
 Provides tools that let the AI query the app's data at generation time:
-- search_entities: full-text search across the workspace
+- search_entities: ranked candidate search across the workspace
 - get_entity: load full details of a specific entity
 - get_file: retrieve file content and attach supported small files for analysis
 - get_category_pages: sample pages from a category to understand its content
@@ -19,7 +19,6 @@ Provides tools that let the AI query the app's data at generation time:
 - get_guidelines: retrieve detailed prompt guidelines on demand
 """
 
-from copy import deepcopy
 import json
 
 from google.genai import types
@@ -38,6 +37,7 @@ from .function_definitions import (
     get_guidelines,
     get_schema,
     get_form_instances,
+    preview_form_schema_update,
     list_resources,
     workspace_filter,
 )
@@ -71,6 +71,7 @@ DECLARATIONS = {
     "get_guidelines": get_guidelines.GET_GUIDELINES,
     "get_schema": get_schema.GET_SCHEMA,
     "get_form_instances": get_form_instances.GET_FORM_INSTANCES,
+    "preview_form_schema_update": preview_form_schema_update.PREVIEW_FORM_SCHEMA_UPDATE,
     "list_workspace_resources": list_resources.LIST_WORKSPACE_RESOURCES,
     "get_filter_schema": workspace_filter.GET_FILTER_SCHEMA,
     "query_workspace_filter": workspace_filter.QUERY_WORKSPACE_FILTER,
@@ -104,6 +105,7 @@ HANDLERS = {
     "get_guidelines": get_guidelines.execute_get_guidelines,
     "get_schema": get_schema.execute_get_schema,
     "get_form_instances": get_form_instances.execute_get_form_instances,
+    "preview_form_schema_update": preview_form_schema_update.execute_preview_form_schema_update,
     "list_workspace_resources": list_resources.execute_list_workspace_resources,
     "get_filter_schema": workspace_filter.execute_get_filter_schema,
     "query_workspace_filter": workspace_filter.execute_query_workspace_filter,
@@ -157,21 +159,6 @@ def tool_catalog(*, names=None, names_only=False, transport=None):
     catalog = []
     for name in selected:
         definition = TOOL_DEFINITIONS[name]
-        if transport == "rest" and name == "search_entities":
-            definition = {
-                **definition,
-                "description": search.CANDIDATE_SEARCH_DESCRIPTION,
-                "input_schema": deepcopy(definition["input_schema"]),
-            }
-            definition["input_schema"]["properties"]["parent_id"]["description"] = (
-                'Optional viewable Category hash token when kinds is exactly ["page"]. '
-                "Applies to keyword candidates and exact-name lookup."
-            )
-            definition["input_schema"]["properties"]["match_mode"]["description"] = (
-                "keywords returns bounded ranked candidates and may relax sparse "
-                "multiword queries; exact_name requires normalized full-name "
-                "equality. Defaults to keywords."
-            )
         if transport == "rest" and name == "get_file":
             definition = {
                 **definition,
@@ -190,7 +177,7 @@ def tool_catalog(*, names=None, names_only=False, transport=None):
 # @tests tests_unit/test_032_agent_api.py::test_external_tool_catalog_and_dispatch_share_registered_tools
 # @matrix agent-api ai : permission-context provider-neutral-dispatch tool-registry
 # @tests tests_unit/test_032d_external_guidance.py::test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow
-# @tests tests_unit/test_032d_external_guidance.py::test_external_search_dispatch_selects_candidates_without_changing_provider_default
+# @tests tests_unit/test_032d_external_guidance.py::test_search_dispatch_and_catalog_match_across_ai_entry_points
 # @matrix ai agent-api : guidelines tool-dispatch
 def execute_registered_tool(name, args, user, *, external=False):
     """Execute one registered read tool without constructing provider parts."""
@@ -202,8 +189,8 @@ def execute_registered_tool(name, args, user, *, external=False):
     normalized_args = normalize_hash_references(args)
     if external and name == "get_guidelines":
         result = get_guidelines.execute_external_get_guidelines(normalized_args, user)
-    elif external and name == "search_entities":
-        result = search.execute_search(normalized_args, user, candidate_search=True)
+    elif name == "search_entities":
+        result = HANDLERS[name](normalized_args, user, candidate_search=True)
     else:
         result = HANDLERS[name](normalized_args, user)
     if isinstance(result, tuple):

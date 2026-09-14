@@ -1,0 +1,17 @@
+{% from 'table.html' import table %}
+
+{% macro completion_history(groups) %}
+  <div data-role="completion-history" class="flex flex-col gap-4">
+    {% for group in groups %}
+      <section data-role="history-group" data-generation="{{ group.definition.generation }}"
+               class="{{ styles.table.container }}">
+        {% if group.definition.error %}<p role="status" class="px-4 py-2">{{ group.definition.error }}</p>{% endif %}
+        <div class="table-container px-4" data-embedded="true">
+          {{ table(group.records, group.index, 'history-table-' ~ loop.index) }}
+        </div>
+      </section>
+    {% else %}
+      <p>No completed history yet.</p>
+    {% endfor %}
+  </div>
+{% endmacro %}

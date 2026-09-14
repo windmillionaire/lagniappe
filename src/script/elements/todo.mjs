@@ -40,16 +40,11 @@ export class TodoElement extends BaseElement {
 		this._renamingIndex = null;
 		this._renameValue = "";
 		this._historyValue = null;
-		this._historyOnFill = null;
 
 		this._click = this._click.bind(this);
 		this._change = this._change.bind(this);
 		this._inputEvent = this._inputEvent.bind(this);
 		this._keydown = this._keydown.bind(this);
-	}
-
-	get historyFillPersistsDefault() {
-		return false;
 	}
 
 	get value() {
@@ -259,10 +254,7 @@ export class TodoElement extends BaseElement {
 					}),
 				);
 			} else {
-				const historyButton = super.historyFillButton(
-					this._historyValue,
-					this._historyOnFill,
-				);
+				const historyButton = super.historyFillButton(this._historyValue);
 				if (historyButton) controls.appendChild(historyButton);
 				controls.appendChild(
 					this._button({
@@ -457,9 +449,11 @@ export class TodoElement extends BaseElement {
 		return true;
 	}
 
-	addHistoryFill(value, onFill = null) {
-		this._historyValue = normalizeTodoValue(value, { resetChecked: true });
-		this._historyOnFill = onFill;
+	addHistoryFill(value) {
+		this._historyValue =
+			typeof value === "function"
+				? value
+				: normalizeTodoValue(value, { resetChecked: true });
 		this._render();
 		return Boolean(this._elt?.querySelector("[data-role='history-fill']"));
 	}

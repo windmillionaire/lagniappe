@@ -8,9 +8,10 @@ from ..definitions import (
     MutationPhase,
     MutationPlan,
 )
-from ..exceptions import capture
+from ..exceptions import MutationConflict, capture
 from ..tools import cache
 from lagniappe.core.tools.database import utility as database_utility
+from lagniappe.core.tools.database.assets import cleanup_rejected_attempt
 from ..tools.notifications import service as notification_service
 
 
@@ -48,8 +49,10 @@ def _prepare_write(effect):
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_permission_source_marker_is_consumed_only_after_durable_success
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_cold_source_details_preserve_programmatic_restriction_changes
+# @tests tests_unit/test_009g_restriction_reconciliation.py::test_form_creation_and_content_edits_do_not_queue_reconciliation
 # @matrix permissions : invalidation-retry
 # @matrix permissions cache : cache-miss source-intent programmatic-save
+# @matrix permissions cache : new-form content-only no-queue
 def consume_mutation_intents(plan):
     for owner, captured in plan.consumed_intents:
         current = list(getattr(owner, "mutation_intents", ()))
@@ -59,11 +62,23 @@ def consume_mutation_intents(plan):
         ]
     for effect in plan.effects:
         if effect.effect is MutationEffectType.UPSERT and effect.property_mask is None:
-            if getattr(effect.entity, "_permission_sources_changed", False):
+            # Form publication distinguishes restriction changes from content
+            # changes; both invalidate submissions, but only restrictions queue work.
+            if effect.entity.kind != "form" and getattr(effect.entity, "_permission_sources_changed", False):
                 effect.entity._reconcile_restrictions = True
             effect.entity._permission_sources_changed = False
             if effect.entity.kind == "task":
                 effect.entity._page_changed = False
+            if effect.entity.kind in {"task", "task_history"}:
+                effect.entity._completion_transition = None
+                effect.entity._completion_write_guards = []
+            if effect.entity.kind == "form":
+                effect.entity._pending_html = {}
+                effect.entity._form_save_guard = None
+                effect.entity._form_additional_guards = []
+                effect.entity._form_attempt_assets = []
+            if effect.entity.kind in {"form_history", "task_history"}:
+                effect.entity._form_attempt_assets = []
 
 
 # @testable infrastructure
@@ -107,10 +122,10 @@ def execute_post_commit(plan):
         if effect.effect is MutationEffectType.CACHE_REFRESH
     ]
     if refresh:
-        from ..tools.cache.restrictions import previous_restrictions, dispatch_changes
-        previous = previous_restrictions(refresh)
+        from ..tools.cache.restrictions import prepare_changes, dispatch_changes
+        changes = prepare_changes(refresh)
         cache.update(*refresh)
-        dispatch_changes(previous)
+        dispatch_changes(changes)
         cache.update_owner_projection(*refresh)
         complete(MutationEffectType.CACHE_REFRESH)
 
@@ -250,13 +265,35 @@ def execute_mutation(plan, *, guards=None):
         effect for effect in durable if effect.effect is MutationEffectType.DELETE
     ]
 
-    if writes:
-        options = {"guards": guards} if guards else {}
-        database_utility.save_mutations(
-            ((effect.entity, effect.property_mask) for effect in writes), **options
-        )
+    from ..tools.form_changes import mutation_guards
+    form_change_guards = mutation_guards(writes, deletes)
+
+    if writes or (deletes and (guards or form_change_guards)):
+        mutation_guards = [*(guards or []), *form_change_guards]
+        for effect in writes:
+            guard = getattr(effect.entity, "_form_save_guard", None)
+            if guard is not None:
+                mutation_guards.append(guard)
+            for attribute in ("_completion_write_guards", "_form_additional_guards"):
+                mutation_guards.extend(getattr(effect.entity, attribute, None) or [])
+        options = {"guards": mutation_guards} if mutation_guards else {}
+        form_deletes = deletes if mutation_guards else [effect for effect in deletes if effect.entity.entity_kind == "form"]
+        if form_deletes:
+            # A Form's last generation and its deletion must commit together.
+            options["deletes"] = [effect.entity for effect in form_deletes]
+        try:
+            database_utility.save_mutations(
+                ((effect.entity, effect.property_mask) for effect in writes), **options
+            )
+        except MutationConflict:
+            for effect in writes:
+                cleanup_rejected_attempt(effect.entity)
+            raise
         for effect in writes:
             _completed(outcome, effect.effect)
+        if form_deletes:
+            _completed(outcome, MutationEffectType.DELETE)
+            deletes = [effect for effect in deletes if effect not in form_deletes]
 
     if deletes:
         database_utility.delete_entities(effect.entity for effect in deletes)

@@ -59,6 +59,12 @@ Create and Organize expose optional Page rich text to models as
 editor-compatible `document` HTML before the proposal is stored. Existing
 ready reports that already contain `document` HTML remain executable.
 
+Updates to normal Page documents use `append_page_document`: preserve existing
+content and append the requested text with a server-generated source/time quote
+before the addition. Form-builder generation uses a separate prompt and may
+replace static instruction text in its local draft; that replacement behavior
+does not apply to normal document updates.
+
 ## Organize
 
 Organize evaluates an upload batch as a whole:
@@ -70,6 +76,16 @@ Organize evaluates an upload batch as a whole:
 5. validate file coverage, references, action shapes, and ordering;
 6. repair locally or through one model pass when needed; and
 7. run a focused form-completion generation only for form-backed targets.
+
+Planning preflight compares each requested outcome with its executable target
+actions; summaries must describe only those actions and omissions belong in
+review issues. Form completion cannot add missing tasks or document actions.
+Table submissions validate their rows and exact column ids before the proposal
+is accepted, with one corrective generation on malformed output. Execution
+validates all patches on detached fields before changing a submission. Invalid
+values fail the action and block dependent completions; they are not successful
+skips. Older reports with skipped submission errors display those errors instead
+of an unconditional “Work done.”
 
 Finalized uploads remain report-only evidence before browser execution. They
 are addressable through the owning report and its exact file references, but
@@ -92,10 +108,10 @@ exact target. If repair cannot produce complete safe coverage, the result is a
 review-only proposal. Large or unreadable Files remain represented by metadata
 and visible issues so the proposal does not silently drop evidence.
 
-UI Organize remains file-backed; its instruction-only fallback remains Ask.
-API/MCP and email Organize also support a fileless existing-record update
-profile. Trusted intake origin and the absence of uploads select that profile;
-clients cannot opt a UI report into it. The email classifier can choose
+Website, API/MCP, and email Organize support the same fileless existing-record
+update profile. Trusted intake origin and the absence of uploads select that
+profile. Instruction-only website Organize requests now produce reviewed update
+proposals. The email classifier can choose
 Organize for an update without attachments, but does not discover targets itself.
 The planner discovers exact editable records, reads relevant schemas, and
 proposes bounded updates for the same browser approval and execution pipeline.
@@ -105,7 +121,11 @@ The update profile omits upload summaries, retrieval prepasses, and secondary
 form completion. Its planner authors final field patches directly, including
 on revision or validation repair. Once uploads are supplied, normal file
 coverage and completion obligations apply. External starters return a compact
-action contract; clients request selected schemas and guidance on demand.
+action contract; `start_organize(actions=[...])` can include selected schemas in
+that first response. Clients request additional schemas and guidance on demand.
+Table-shaped patches are checked during proposal validation, so malformed row
+arrays enter the existing proposal repair flow before browser review. Execution
+also checks the current Form's exact column ids before saving any field patches.
 
 ## Autofill
 
@@ -158,6 +178,16 @@ proposals. All Ask reports stay in Ask regardless of status. Counts include
 hidden reports. The browser remembers each user's choices, initially Active and
 Ask, and reveals a newly created report's category.
 
+List snippets flatten Markdown to plain text and show at most five lines at
+the current screen width. Full summaries remain available in each report.
+
+On-site and external schema plans carry exact converted values or explicit
+unresolved reasons in `conversions`. The planning model prepares these from the
+complete preview; the server validates them before review. Execution applies
+the reviewed candidates without another model call. Todo conversion preserves
+identifiable list items and tasks, but treats prose reporting an absence of items
+as unresolved. Summaries describe proposed values, not changes already saved.
+
 Selecting Executed alone exposes bulk history deletion with one count-based
 confirmation. `DELETE /tools/reports/executed` accepts JSON `{"keys": [...]}`
 and returns `deleted`, `skipped`, and `failed` key lists. The server rechecks
@@ -209,8 +239,20 @@ retry safety. Put field updates before completion and make it depend on them.
 The existing scheduling policy is unchanged: near-term tasks reopen immediately
 so the next occurrence appears on the homepage; other production completions
 retain their midnight reopening job. Nonproduction still reopens immediately.
-Already-completed Tasks are unchanged. Undo restores the prior task without
-ordinary reopening's form/file reset and refuses conflicting later changes.
+Already-completed Tasks are unchanged. Undo reopens through the normal archive
+boundary and restores compatible prior active answers and
+attachments. The original completion remains in history, including for an
+occurrence that recurrence already reopened. Later edits or incompatible form
+changes stop the undo. Repeating an undo after an interrupted save recognizes
+the restored active state without deleting or duplicating the completion.
+
+Undoing an imported event on a reused Task would rewrite a recorded completion;
+that correction remains unavailable and fails before changing answer assets.
+New imported completion events save their answers before capturing the original
+answers and Form generation. Unknown generated field IDs are rejected before
+existing values are reset. Normal Task AI reads use flat current values and the
+current Form. Historical AI reads resolve the recorded generation; missing
+originals are marked unavailable and recoverable answers use their saved IDs.
 
 ## Workspace semantics
 
@@ -224,3 +266,28 @@ Across workflows:
 
 Keep these semantics in shared guidelines and validators so workflow prompts do
 not drift into different workspace models.
+
+## Reviewed Form schema updates
+
+Both site AI and external agents use `update_form_schema`. Read the
+`schema_evolution` guideline and call `preview_form_schema_update` before proposing
+changes to saved values. The shared preparation layer records complete affected
+identities and source preconditions for review, and the Form-change adapter
+handles deterministic and AI conversions in the same guarded mutation workflow.
+Both report origins supply strict candidates before approval and execute without
+a provider. Native Organize binds and validates candidates inside its existing
+one-pass proposal repair boundary, before the planning result is checkpointed.
+Malformed candidates can be corrected before review; unsuccessful repair yields
+a non-executable review result. Publication and execution still recheck current
+preconditions. Missing, invalid or stale candidates prevent proposal publication
+or execution; execution never fills in missing conversions. Builder AI conversion
+uses the same adapter without a report and retains its utility-model instructions
+and resumable batches. The 750 KiB schema-proposal limit applies to both report
+origins; oversized changes require a smaller scope or Builder. See
+[the external contract](AI_EXTERNAL_API.md) and [Form jobs](BACKEND_JOBS.md).
+
+Schema preparation assigns stable, collision-free IDs when the author omitted
+an action ID, including when approving an older saved proposal. Existing IDs and
+conversion values are preserved. Schema-impact review uses the original action
+positions, matching the skip controls, so opening an ID-less report does not
+mutate it or require regeneration.

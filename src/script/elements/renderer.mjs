@@ -96,12 +96,12 @@ export class Renderer {
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
 	 * @matrix tasks : element-matrix history-fill latest-submission
 	 */
-	addHistoryFillButtons(submission, onFill = null) {
+	addHistoryFillButtons(submission) {
 		if (!this.historyFillEnabled || !submission) return;
 
 		for (const [fieldId, value] of Object.entries(submission)) {
 			const element = this.elements.get(`${fieldId}-${this.id}`);
-			element?.addHistoryFill?.(value, onFill);
+			element?.addHistoryFill?.(value);
 		}
 	}
 

@@ -1,6 +1,9 @@
 """Prompt and response contract for Organize submission completion."""
 
 
+from lagniappe.core import exceptions
+from lagniappe.core.properties.form_table import validate_ai_table
+
 from ...autofill import validate_submission
 from ...guidelines import SCHEMA_TYPE_GUIDELINES
 from ...prompt import Prompt
@@ -81,6 +84,8 @@ def organize_submission_completion_prompt(context, service_tier=None):
 # @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_uses_one_focused_prompt
 # @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_preserves_empty_form_records
 # @matrix ai-report : empty partial submission-completion validation
+# @tests tests_unit/test_020f_ai_report_completion.py::test_submission_completion_rejects_malformed_table_rows
+# @matrix form-table : ai-value validation
 def validate_organize_submission_results(result, targets):
     """Return action-keyed, schema-filtered completion results."""
     target_map = {target["action_id"]: target for target in targets}
@@ -112,6 +117,14 @@ def validate_organize_submission_results(result, targets):
                 if isinstance(key, str) and key in allowed
             }
         )
+        for field in schema:
+            if isinstance(field, dict) and field.get("type") == "table" and field.get("id") in submission:
+                try:
+                    validate_ai_table(submission[field["id"]], field.get("columns", []))
+                except ValueError as error:
+                    raise exceptions.AIException(
+                        f"Submission {action_id}, field {field['id']}: {error}"
+                    ) from error
         results[action_id] = {
             "submission": submission,
             "empty_reason": None

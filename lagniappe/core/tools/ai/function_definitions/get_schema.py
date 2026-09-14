@@ -5,9 +5,9 @@ from google.genai import types
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.mixins import AIMixin
 from ..debug import ai_debug
 from ..references import hash_reference
+from ..submission_values import values_by_id
 
 
 GET_SCHEMA = types.FunctionDeclaration(
@@ -18,7 +18,8 @@ GET_SCHEMA = types.FunctionDeclaration(
         "exact field ids and value shapes. Use this after the compact workspace "
         "inventory or a search result identifies the likely structure. Set "
         "include_values=true on a Page or Task to read its current values keyed "
-        "by those same field ids, without unrelated entity details."
+        "by those same field ids. Tables use rows keyed by column id; Todo lists "
+        "use items. Numbers and booleans retain their JSON types."
     ),
     parameters={
         "type": "object",
@@ -40,6 +41,7 @@ GET_SCHEMA = types.FunctionDeclaration(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_schema_returns_schema_for_form_bearing_entities
 # @tests tests_unit/test_015_ai_tools.py::test_get_schema_includes_values_by_id_without_label_collisions
+# @tests tests_unit/test_015_ai_tools.py::test_get_schema_preserves_collection_rows_and_typed_cells
 # @matrix ai form-schema : form model-task page task tool-context
 # @matrix ai form-schema : permissions schema
 def execute_get_schema(args, user):
@@ -115,17 +117,10 @@ def execute_get_schema(args, user):
         submission = entity.properties.get("submission")
         result["values"] = None
         if submission is not None:
-            # Match the normal AI field projection, but key by schema id rather
-            # than display label (labels can be duplicated or renamed).
+            # Keep collection structure and typed values, using normal AI
+            # projections for references rather than exposing raw stored keys.
             entity.form = form
-            values = {}
-            for field_id, field in submission.fields.items():
-                if isinstance(field, AIMixin) and field.is_set:
-                    field.user = user
-                    value = field.ai_value
-                    if value is not None:
-                        values[field_id] = value
-            result["values"] = values
+            result["values"] = values_by_id(submission.fields, user)
     return result
 
 

@@ -44,7 +44,7 @@ def test_todo_list_submission_projections():
     assert field.value == expected
     assert field.form_value == expected
     assert field.db_value == expected
-    assert field.ai_value == expected["items"]
+    assert field.ai_value == expected
     assert field.search_key == ["Work", "Work"]
     assert field.search_value == ["First step", "Second step"]
     assert field.column_value == "1 of 2 complete"
@@ -122,21 +122,7 @@ def _todo_task(hash_suffix):
     return task
 
 
-# @matrix form-todo submission : repeating-default
-@pytest.mark.unit
-def test_todo_list_cannot_be_saved_as_repeating_default():
-    task = _todo_task("default")
-    submission = task.properties.submission
-    submission.value = {
-        "todo-work": {"items": [{"text": "Old work", "checked": True}]}
-    }
-
-    with pytest.raises(ValidationError, match="cannot repeat automatically"):
-        task.save_default_field("todo-work", submission)
-    assert task.default_submission == {}
-
-
-# @matrix task-completion : history repeating-default
+# @matrix task-completion : history field-reset
 # @pair form-todo:field-reset
 @pytest.mark.unit
 def test_uncomplete_archives_then_clears_todo_items():
@@ -152,7 +138,7 @@ def test_uncomplete_archives_then_clears_todo_items():
     }
     task.properties.submission.value = current
     task.db["default_submission"] = json.dumps(current)
-    task.completed = True
+    task.complete(user=TestEntities.get("USER", {"name": "Todo owner", "hash": "todo-owner"}))
     archived = []
 
     def capture_history(**_kwargs):
@@ -162,5 +148,6 @@ def test_uncomplete_archives_then_clears_todo_items():
         task.uncomplete()
 
     assert archived == [current]
-    assert task.submission == {"repeat-note": "Keep this"}
-    assert "todo-work" not in task.default_submission
+    assert task.submission == {}
+    assert "submission" not in task.db
+    assert "default_submission" not in task.db

@@ -11,6 +11,7 @@ const REPORT_FORM_SELECTOR =
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_report_detail_shows_revision_and_manual_execution
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
@@ -379,6 +380,19 @@ export default class Report extends Core {
 						skipped.has(Number(item.dataset.actionIndex)),
 					);
 				});
+				this.elt
+					.querySelectorAll("[data-schema-action-index]")
+					.forEach((impact) => {
+						const isSkipped = skipped.has(
+							Number(impact.dataset.schemaActionIndex),
+						);
+						impact.querySelector(
+							"[data-role='schema-impact-skipped']",
+						).dataset.visible = isSkipped ? "true" : "false";
+						impact.querySelector(
+							"[data-role='schema-impact-details']",
+						).dataset.visible = isSkipped ? "false" : "true";
+					});
 			},
 			{ label: "report:toggle-skipped-actions" },
 		);

@@ -611,7 +611,9 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_user
 
     task.complete()
 
-    task_form = task.element.locator(task.TASK_FORM)
+    expect(task.element).to_have_attribute("data-open", "false")
+    expect(task.element.locator(task.TASK_FORM)).to_be_hidden()
+    task_form = task.task_form
     expect(task.element).to_have_attribute("data-completed", "true")
     expect(task.element).not_to_have_attribute("data-readonly", "true")
     expect(task.element).to_have_attribute("data-content-readonly", "true")
@@ -634,7 +636,7 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_user
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::settings_form
-def test_completed_task_with_empty_form_is_readonly(get_user):
+def test_completed_task_with_empty_form_is_readonly(get_user, tmp_path):
     user = get_user(Users.OWNER)
     task = Tasks.test_completed_task_readonly_form.get(user)
     page = Pages.test_create_page_task.get(user)
@@ -647,15 +649,27 @@ def test_completed_task_with_empty_form_is_readonly(get_user):
     expect(task.element).to_have_attribute("data-completed", "true")
     expect(task.element).not_to_have_attribute("data-readonly", "true")
     expect(task.element).to_have_attribute("data-content-readonly", "true")
-    expect(task.element.locator(task.TASK_FORM)).to_have_count(0)
+    expect(task.element).to_have_attribute("data-open", "false")
+    expect(task.element.locator(task.TASK_FORM)).to_be_hidden()
+    completed_form = task.task_form
+    expect(completed_form).to_have_attribute("data-readonly", "true")
+    expect(completed_form.locator("[lp-edited-marker]")).to_have_count(0)
+    expect(completed_form.get_by_text("Task was completed with an empty submission", exact=True)).to_be_visible()
+    expect(completed_form.locator("input:not([type='hidden'])")).to_have_count(0)
+    expect(completed_form).not_to_contain_text("Not provided")
     expect(task.element.locator(task.SETTINGS_FORM)).to_have_count(0)
     expect(task.element.locator("[data-role='show-autofill']")).to_have_count(0)
     expect(task.element.locator("[data-widget='TaskMove']")).to_have_count(1)
+
+    task.element.screenshot(path=tmp_path / "empty-completed-submission.png")
 
     task.uncomplete()
     expect(task.element).to_have_attribute("data-completed", "false")
     expect(task.element).to_have_attribute("data-content-readonly", "false")
     expect(_open_page_task_form(page, task)).to_be_visible()
+
+    expect(task.task_form.locator("[lp-edited-marker]")).to_have_count(1)
+    expect(task.task_form.locator("[data-role='empty-completed-submission']")).to_have_count(0)
 
 
 # @matrix tasks : attached-form complete empty-fields partial-submission readonly
@@ -671,17 +685,20 @@ def test_completed_task_with_partial_submission_omits_empty_fields(get_user):
 
     task.complete()
 
-    task_form = task.element.locator(task.TASK_FORM)
+    expect(task.element).to_have_attribute("data-open", "false")
+    task_form = task.task_form
     expect(task.element).to_have_attribute("data-completed", "true")
     expect(task.element).not_to_have_attribute("data-readonly", "true")
     expect(task.element).to_have_attribute("data-content-readonly", "true")
     expect(task_form).to_have_attribute("data-readonly", "true")
     expect(task_form).to_be_visible()
     expect(task_form).to_contain_text("Partial completed task text")
+    expect(task_form.locator("[lp-edited-marker]")).to_have_count(0)
+    expect(task_form.locator("[data-role='empty-completed-submission']")).to_have_count(0)
     expect(task_form.locator("[id^='input-textab12'].form-element")).to_have_count(1)
     expect(task_form.locator("[id^='input-datecd34'].form-element")).to_have_count(0)
     expect(task_form).not_to_contain_text("Not provided")
-    expect(task_form.locator("input")).to_have_count(0)
+    expect(task_form.locator("input:not([type='hidden'])")).to_have_count(0)
 
     task.uncomplete()
     active_form = task.task_form

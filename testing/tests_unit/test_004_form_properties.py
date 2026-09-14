@@ -2,13 +2,13 @@
 
 Covers: ``FormType``, ``Schema`` → ``fields``, ``table_fields``, ``html_fields``,
 ``FormFilters.conditions``, schema-change cache behavior, ``Form.update``, and
-``Form.save`` schema history, and ``SchemaVersion.update``.
+``Form.save`` publication, and ``SchemaVersion.update``.
 
 Out of scope here: ``get_html_field`` / ``set_html_field`` (e2e).
 """
 
 import json
-from types import SimpleNamespace
+from copy import deepcopy
 from unittest.mock import patch
 
 import pytest
@@ -16,8 +16,10 @@ import pytest
 from lagniappe.core.definitions import MutationEffectType, MutationOperation
 from lagniappe.core.entities import form as form_module
 from lagniappe.core.entities import Entities
+from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.mutations import plan_mutation
 from lagniappe.core.properties.schema import SCHEMA_FORMAT_VERSION
+from lagniappe.core.properties.form import FormGeneration, requires_submission_conversion
 from testing.utility.test_entities import TestEntities
 
 
@@ -116,64 +118,230 @@ def test_form_schema_write_gateway_canonicalizes_without_adding_page_fields():
 
 # @matrix form : schema-version update
 @pytest.mark.unit
-def test_schema_version_update_changes_when_schema_changes(get_schema):
-    """``SchemaVersion.update`` returns prior hash or ``False`` when unchanged."""
+def test_schema_version_update_changes_when_schema_changes():
+    """Initial publication and changed schemas refresh the content fingerprint."""
     form = TestEntities.get("FORM", {"name": "Ver", "hash": "form_ver"})
     form.db.pop("version", None)
-    form.schema = get_schema("integration_one_text")
-    first = form.properties.version.update()
-    assert first is None or first is False
+    form.schema = [{"id": "answer", "type": "input", "input": "text"}]
+    assert form.properties.version.update() is None
     assert form.version
-
-    same = form.properties.version.update()
-    assert same is False
-
-    form.schema = get_schema("number_input_only")
+    assert form.properties.version.update() is False
+    form.schema = [{"id": "answer", "type": "input", "input": "number"}]
     previous_hash = form.version
-    bumped = form.properties.version.update()
-    assert bumped == previous_hash
+    assert form.properties.version.update() == previous_hash
     assert form.version != previous_hash
+    assert form.properties.version.update() is False
 
 
-# @matrix form : relations save schema-history
+# @matrix form : generation value-conversion
 @pytest.mark.unit
-def test_form_save_records_schema_history_on_version_change(get_schema):
-    """The Form planner should stage history for the previous schema."""
-    form = TestEntities.get("FORM", {"name": "History", "hash": "form_history"})
-    form.schema = get_schema("integration_one_text")
-    form.properties.version.update()
-    previous_version = form.version
-    previous_schema = form.schema
-    form.schema = get_schema("number_input_only")
-    history = SimpleNamespace(
-        key="fake-form-history-key",
-        entity_kind="form_history",
-        properties={},
-        processes={},
-        mutation_intents=[],
+@pytest.mark.parametrize("previous,proposed", [
+    ([{"id": "answer", "type": "textarea"}], []),
+    ([{"id": "reference", "type": "bookmark"}], []),
+    ([{"id": "answer", "type": "textarea"}], [{"id": "answer", "type": "checkbox"}]),
+    ([{"id": "answer", "type": "input", "input": "text"}], [{"id": "answer", "type": "input", "input": "number"}]),
+    ([{"id": "choice", "type": "select", "options": [{"value": "a", "label": "A"}]}],
+     [{"id": "choice", "type": "select", "multiple": True, "options": [{"value": "a", "label": "A"}]}]),
+    ([{"id": "link", "type": "link", "location": "out"}], [{"id": "link", "type": "link", "location": "in"}]),
+    ([{"id": "choice", "type": "radio", "options": [{"value": "a", "label": "A"}, {"value": "b", "label": "B"}]}],
+     [{"id": "choice", "type": "radio", "options": [{"value": "b", "label": "B"}]}]),
+    ([{"id": "table", "type": "table", "columns": [{"id": "answer", "type": "input", "input": "text"}]}],
+     [{"id": "table", "type": "table", "columns": []}]),
+    ([{"id": "table", "type": "table", "columns": [{"id": "answer", "type": "input", "input": "text"}]}],
+     [{"id": "table", "type": "table", "columns": [{"id": "answer", "type": "input", "input": "number"}]}]),
+])
+def test_submission_conversion_requires_changes_to_existing_values(previous, proposed):
+    assert requires_submission_conversion(previous, proposed)
+
+
+# @matrix form : generation value-conversion
+@pytest.mark.unit
+def test_submission_conversion_preserves_presentation_and_additions():
+    form = TestEntities.get("FORM", {"name": "Presentation", "hash": "versioned-labels"})
+    form.schema = [
+        {"id": "answer", "type": "input", "input": "text", "title": "Answer"},
+        {"id": "choice", "type": "select", "options": [{"value": "a", "label": "A"}, {"value": "b", "label": "B"}]},
+        {"id": "table", "type": "table", "columns": [{"id": "item", "type": "input", "input": "text", "title": "Item"}]},
+        {"id": "instructions", "type": "html", "title": "Instructions"},
+    ]
+    saved = deepcopy(form.schema)
+    proposed = deepcopy(saved)
+    proposed[0].update(title="Updated answer", placeholder="More guidance", required=True)
+    proposed[1]["options"] = [{"value": "b", "label": "Second"}, {"value": "a", "label": "First"}, {"value": "c", "label": "New"}]
+    proposed[2]["columns"][0]["title"] = "Equipment"
+    proposed[2]["columns"].append({"id": "quantity", "type": "input", "input": "number"})
+    proposed[3]["title"] = "Updated instructions"
+    proposed.append({"id": "additional", "type": "textarea"})
+    form.schema = list(reversed(proposed))
+    assert not requires_submission_conversion(saved, form.schema)
+    assert not requires_submission_conversion([], form.schema)
+
+
+# @matrix form : generation value-conversion
+@pytest.mark.unit
+def test_submission_conversion_ignores_fields_without_answers_and_unused_link_setting():
+    """Static fields have no answers; Link always stores one value dictionary."""
+    for kind in ("html", "status"):
+        previous = [{"id": "display", "type": kind}]
+        assert not requires_submission_conversion(previous, [])
+        assert not requires_submission_conversion(
+            previous, [{"id": "display", "type": "textarea"}],
+        )
+        assert requires_submission_conversion(
+            [{"id": "answer", "type": "textarea"}], [{"id": "answer", "type": kind}],
+        )
+    previous = [{"id": "link", "type": "link", "location": "in"}]
+    proposed = [{"id": "link", "type": "link", "location": "in", "multiple": True}]
+    assert not requires_submission_conversion(previous, proposed)
+    assert not requires_submission_conversion(
+        [{"id": "table", "type": "table", "columns": previous}],
+        [{"id": "table", "type": "table", "columns": proposed}],
     )
 
+
+# @matrix form : generation defaults
+@pytest.mark.unit
+@pytest.mark.parametrize("legacy", [{}, {"version": "legacy-hash"}, {"schema_version": "older-hash"}])
+def test_form_generation_defaults_to_zero_without_reinterpreting_legacy_versions(legacy):
+    form = TestEntities.get("FORM", {"name": "Generation", "hash": "form-generation"})
+    form.db.pop("generation", None)
+    form.db.update(legacy)
+    before = dict(form.db)
+    generation = FormGeneration(entity=form)
+    assert generation.value == 0
+    assert form.db == before
+
+
+# @matrix form : generation validation
+@pytest.mark.unit
+def test_form_generation_stores_nonnegative_integers():
+    form = TestEntities.get("FORM", {"name": "Generation", "hash": "generation-value"})
+    generation = FormGeneration(entity=form)
+    generation.value = 0
+    assert generation.value == form.db["generation"] == 0
+    generation.value = 2
+    assert FormGeneration(entity=form).value == 2
+    for invalid in (-1, True, 1.5, "2", None):
+        with pytest.raises(ValidationError, match="nonnegative integer"):
+            generation.value = invalid
+        assert generation.value == form.db["generation"] == 2
+
+
+# @matrix form : schema-version update content-fingerprint
+@pytest.mark.unit
+def test_schema_version_tracks_metadata_and_static_content():
+    form = TestEntities.get("FORM", {
+        "name": "Content", "hash": "form-content-version", "assets": {},
+    })
+    form.schema = [
+        {"id": "answer", "type": "input", "title": "Answer"},
+        {"id": "instructions", "type": "html"},
+    ]
+    form.assets.update({
+        "instructions": {"type": "html", "fingerprint": "first-html"},
+        "image_instructions_one": {"type": "image", "fingerprint": "first-image"},
+    })
+    form.properties.version.update()
+    previous = form.version
+
+    edited = deepcopy(form.schema)
+    edited[0]["title"] = "Updated label"
+    form.schema = edited
+    assert form.properties.version.update() == previous
+    assert form.version != previous
+    previous = form.version
+
+    form.form_type = "page" if form.form_type == "task" else "task"
+    assert form.properties.version.update() == previous
+    assert form.version != previous
+    previous = form.version
+
+    form.assets["instructions"]["fingerprint"] = "second-html"
+    assert form.properties.version.update() == previous
+    assert form.version != previous
+    previous = form.version
+
+    form.assets["image_instructions_one"]["fingerprint"] = "second-image"
+    assert form.properties.version.update() == previous
+    assert form.version != previous
+    assert FormGeneration(entity=form).value == 0
+    assert form.properties.version.update() is False
+
+
+# @matrix form : schema-version update content-fingerprint
+@pytest.mark.unit
+def test_schema_version_ignores_name_storage_paths_and_unrelated_assets():
+    form = TestEntities.get("FORM", {
+        "name": "Content", "hash": "form-content-stable", "assets": {},
+    })
+    form.schema = [{"id": "instructions", "type": "html"}]
+    form.assets.update({
+        "instructions": {"type": "html", "fingerprint": "same-html", "path": "before.html"},
+        "image_instructions_one": {"type": "image", "fingerprint": "same-image", "path": "before.png"},
+    })
+    form.properties.version.update()
+    before = form.version
+    form.name = "Updated display name"
+    form.assets["instructions"]["path"] = "copied.html"
+    form.assets["image_instructions_one"]["path"] = "copied.png"
+    form.assets["unrelated"] = {"type": "image", "fingerprint": "other-content"}
+    generation = FormGeneration(entity=form)
+    generation.value = 3
+    assert form.properties.version.update() is False
+    assert form.version == before
+
+
+# @matrix form : schema-version update content-fingerprint
+@pytest.mark.unit
+def test_schema_version_requires_static_content_fingerprints():
+    form = TestEntities.get("FORM", {
+        "name": "Content", "hash": "form-content-missing", "assets": {},
+    })
+    form.schema = [{"id": "instructions", "type": "html"}]
+    form.assets["instructions"] = {"type": "html", "fingerprint": "saved-html"}
+    form.properties.version.update()
+    before = form.version
+    form.assets["instructions"].pop("fingerprint")
+    with pytest.raises(ValidationError, match="fingerprint"):
+        form.properties.version.update()
+    assert form.version == before
+
+
+# @matrix form : relations save content-fingerprint generation
+@pytest.mark.unit
+def test_form_save_refreshes_content_version_without_archiving_compatible_edits(get_schema):
+    """A label edit changes cached content without archiving an answer generation."""
+    from google.cloud import datastore
+
+    row = datastore.Entity(key=datastore.Key("models", "history-form", project="test-project"))
+    row.update(type="form", form_type="task", hash="history-form", name="History",
+               schema=json.dumps(get_schema("integration_one_text")),
+               version="legacy-before", generation=4)
+    source = Entities.FORM(row)
+    form = Entities.FORM(deepcopy(row))
+    previous_schema = deepcopy(source.schema)
+    edited = deepcopy(previous_schema)
+    edited[0]["title"] = "Updated label"
+    form.schema = edited
     with (
-        patch.object(
-            form_module.Entities.FORM_HISTORY,
-            "create",
-            return_value=history,
-        ) as create_history,
         patch.object(form_module.database_get, "form_users", return_value=[]),
         patch.object(form_module.Entities, "fetch", return_value=[]),
+        patch.object(form_module.Entities, "fetch_one", return_value=source),
     ):
         plan = plan_mutation(MutationOperation.SAVE, form, registry=Entities)
 
-    create_history.assert_called_once_with(form, previous_version)
     assert form.properties.schema.previous == previous_schema
-    assert form.version != previous_version
+    assert form.schema[0]["title"] == "Updated label"
+    assert form.version != source.version == "legacy-before"
+    assert form.generation == source.generation == 4
+    assert source.schema == previous_schema
     writes = [
         effect
         for effect in plan.effects
         if effect.effect is MutationEffectType.UPSERT
     ]
-    assert [effect.entity for effect in writes[:2]] == [history, form]
-    assert all(effect.property_mask is None for effect in writes[:2])
+    assert [effect.entity for effect in writes] == [form]
+    assert all(effect.property_mask is None for effect in writes)
 
 
 # @matrix forms cache : owner-reuse no-extra-read
@@ -223,7 +391,8 @@ def test_form_save_refreshes_users_with_edited_form_schema(monkeypatch, kind):
     assert owner.form.schema == form.schema
     assert owner.form.schema[-1]["title"] == "Updated subject"
     assert owner.form.version == form.version != "old-version"
-    assert form_key not in reads
+    assert reads.count(form_key) == 1
+    assert form.generation == 0
     assert persisted_form["version"] == "old-version"
 
 
