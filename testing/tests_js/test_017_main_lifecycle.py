@@ -573,6 +573,38 @@ if (syncCalls.length !== 2 || connectivityState.browser !== "online") {
     )
 
 
+# @matrix connectivity service-worker : state-publication startup
+def test_startup_publishes_worker_state_before_loading_view_with_pending_ping(run_node):
+    run_main_check(
+        run_node,
+        """
+let workerState = { browser: "online", server: "offline" };
+serviceWorker.controller = { postMessage(message) {
+  controllerMessages.push(message);
+  workerState = message.state;
+} };
+let stateWhenViewLoads;
+setView({ dataset: { kind: "page" }, isConnected: true });
+context.setViewLoader(async () => ({ default: class {
+  async init() { stateWhenViewLoads = { ...workerState }; }
+  async sync() {}
+} }));
+let releasePing;
+context.fetch = () => new Promise(resolve => { releasePing = resolve; });
+const cycle = syncView();
+await flushPaint();
+if (!stateWhenViewLoads) throw new Error("View rendering waited for the health check");
+releasePing(new Response(null, { status: 200 }));
+await cycle;
+if (stateWhenViewLoads.server !== "unknown" ||
+    stateWhenViewLoads.controller !== "controlled") {
+  throw new Error(`New view inherited the previous document's worker state: ${JSON.stringify(stateWhenViewLoads)}`);
+}
+if (workerState.server !== "online") throw new Error("Settled health result was not published");
+""",
+    )
+
+
 # @matrix connectivity service-worker : controller-replacement state-publication version
 def test_controller_replacement_receives_current_versioned_connectivity_state(run_node):
     run_main_check(

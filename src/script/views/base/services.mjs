@@ -37,7 +37,11 @@ export const ensureOfflineQueue = (view) =>
 		return queue;
 	});
 
-/** @testable infrastructure */
+/**
+ * @testable true
+ * @tests tests_js/test_022_refresh_frontend.py::test_page_task_subscription_survives_list_loading_before_polling_service
+ * @matrix polling startup : subscription-lifecycle deferred-services
+ */
 export const ensurePollingCoordinator = (view) =>
 	loadOnce(view, "_pollingPromise", "PollingCoordinator", async () => {
 		const { PollingCoordinator } = await import("../../shared/polling");
@@ -45,6 +49,9 @@ export const ensurePollingCoordinator = (view) =>
 		const coordinator = new PollingCoordinator(view).init();
 		view.PollingCoordinator = coordinator;
 		view._initPollingSubscription();
+		// Cached widgets can render before this deferred module arrives. Revisit
+		// their subscriptions now that the coordinator is available.
+		void view.schedulePollingReconciliation();
 		return coordinator;
 	});
 

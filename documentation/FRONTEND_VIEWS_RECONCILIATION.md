@@ -91,6 +91,12 @@ A loaded Page task list owns a periodic Tasks channel subscription. Its
 restriction/schema changes invalidate the list without changing the Page's
 form revision.
 
+Polling service startup also schedules widget subscription reconciliation.
+A cached list can finish rendering before the deferred coordinator loads;
+its render-time reconciliation cannot subscribe yet. Revisiting loaded widgets
+when the coordinator becomes available prevents that ordering from permanently
+losing the list's subscription. This background pass does not delay rendering.
+
 `ToolReportList` owns a panel containing filter controls, empty-state messaging,
 and a nested `ul[data-role="report-items"]`. Report rows expose `data-tool` and
 `data-status`; filtering changes row visibility locally without dropping hidden

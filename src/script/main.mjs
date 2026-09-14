@@ -223,14 +223,10 @@ function documentInactive() {
  * @covered-by src/script/main.mjs::suspendCurrentView
  * @reason connectivity publication is owned by the visible/hidden sync lifecycle
  */
-function updateConnectivity(patch, { notifyController = true } = {}) {
+function updateConnectivity(patch) {
 	const state = connectivity.transition(patch);
 	window.__CONNECTIVITY__ = state;
-	if (notifyController) {
-		navigator.serviceWorker?.controller?.postMessage(
-			connectivityMessage(state),
-		);
-	}
+	navigator.serviceWorker?.controller?.postMessage(connectivityMessage(state));
 	return state;
 }
 
@@ -272,6 +268,9 @@ function queueSync({
  * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
  * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
  * @tests tests_js/test_017_main_lifecycle.py::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
+ * @tests tests_js/test_017_main_lifecycle.py::test_startup_publishes_worker_state_before_loading_view_with_pending_ping
+ * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_delete_file_removes_attached_task_badge
+ * @matrix connectivity service-worker : state-publication startup
  * @matrix offline : browser-state coalescing indicator rapid-transitions reconnect server-health transitions view-reset visible-blur
  */
 async function syncViewOnce({
@@ -284,14 +283,13 @@ async function syncViewOnce({
 	const controller = navigator.serviceWorker?.controller
 		? "controlled"
 		: "uncontrolled";
-	updateConnectivity(
-		{
-			browser,
-			controller,
-			visibility: hidden ? "hidden" : "visible",
-		},
-		{ notifyController: hidden },
-	);
+	// Publish before view loading can issue a cached GET. A navigation may have
+	// canceled the previous document's ping and left its worker state offline.
+	updateConnectivity({
+		browser,
+		controller,
+		visibility: hidden ? "hidden" : "visible",
+	});
 	const viewPromise = getView();
 	if (hidden) {
 		stopPolling();
