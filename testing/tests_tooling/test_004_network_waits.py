@@ -637,6 +637,7 @@ class FakeUser:
 def test_reconnect_wait_uses_native_offline_state_and_requires_refresh(monkeypatch):
     page = FakePage()
     events = []
+    page.evaluate = lambda expression: events.append(("evaluate", expression))
     user = FakeUser(page, events)
 
     class FakeExpectation:
@@ -659,6 +660,7 @@ def test_reconnect_wait_uses_native_offline_state_and_requires_refresh(monkeypat
 
     assert response_info.value.url == "http://test.local/l/refresh"
     assert events == [
+        ("evaluate", "() => window.__CONNECTIVITY_READY__"),
         "expect-offline",
         "offline=True",
         "visible=[data-role='offline']",
