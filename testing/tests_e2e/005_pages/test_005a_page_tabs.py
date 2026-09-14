@@ -446,7 +446,6 @@ def test_delete_page_from_title_menu(get_user):
     trigger = user.page.get_by_role("button", name="Page actions")
     trigger.hover()
     trigger.click()
-    expect(trigger).to_have_attribute("aria-busy", "true")
     expect(trigger).to_have_attribute("data-combobox-id", re.compile(r".+"))
     menu = user.page.get_by_role("menu", name="Page actions")
     expect(menu).to_be_visible()

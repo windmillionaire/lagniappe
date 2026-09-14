@@ -48,6 +48,14 @@ class PostponeDropdown(Enum):
         return dropdown, panel
 
     def select(self, task_item):
+        # Postponing requires the view's current server-health check to settle online.
+        task_item.page.evaluate("() => window.__CONNECTIVITY_READY__")
+        task_item.page.wait_for_function(
+            """() => {
+                const state = window.__CONNECTIVITY__;
+                return state?.browser === "online" && state.server === "online";
+            }"""
+        )
         scope, label = self.value
         if scope == "this-week":
             dropdown, panel = self.open_this_week(task_item)
