@@ -19,6 +19,8 @@ def expect_reconnect_refresh(user, browser_failures, *, timeout=None):
     user.page.wait_for_function(
         "() => !document.fonts || document.fonts.status === 'loaded'"
     )
+    # Finish the current health cycle before rejecting the reconnect probe.
+    user.page.evaluate("() => window.__CONNECTIVITY_READY__")
     with browser_failures.expect_offline(user):
         user.offline = True
         expect(offline_indicator).to_be_visible()

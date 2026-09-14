@@ -351,7 +351,7 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     )
 
     builder.save()
-    user.page.reload()
+    form.reload()
     builder = Builder(user)
     expect(user.locate(builder.SAVE_BUTTON)).to_have_attribute("data-saved", "true")
     assert builder.schema == schema

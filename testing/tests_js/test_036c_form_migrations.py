@@ -88,6 +88,7 @@ const clock = {
 const element = () => ({
   dataset: {}, children: [],
   setAttribute(name, value) { this[name] = value; },
+  getAttribute(name) { return this[name] ?? null; },
   isConnected: true,
   checkVisibility() { return !this.hidden; },
   append(...children) { this.children.push(...children); },
