@@ -15357,9 +15357,23 @@
       "/home/swifty/lagniappe/venv/bin/python",
       "/home/swifty/lagniappe/run.py",
       "test",
-      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_adds_schema_fields_persists_all_task_values_and_completes"
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_document_previews_are_plain_text_and_at_most_ten_lines",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_lazy_report_list_reconciles_active_job_status",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_proposed_submission_values",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_review_only_proposal_without_execute",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_refreshes_stage_labels",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_list_snippets_are_plain_text_and_at_most_five_lines",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_stale_schema_plan_keeps_review_and_explains_recovery",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_plans_updates",
+      "testing/tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls"
     ],
-    "generated_at": "2026-09-15T20:40:34.194789+00:00"
+    "generated_at": "2026-09-15T20:50:36.264366+00:00"
   },
   "schema_version": 3,
   "sessions": [
@@ -15368,46 +15382,26 @@
         "/home/swifty/lagniappe/venv/bin/python",
         "/home/swifty/lagniappe/run.py",
         "test",
-        "testing/tests_tooling/test_014_dependency_upgrade.py",
-        "testing/tests_tooling/test_003_config.py::test_dependency_upgrade_updates_node_version_pin",
-        "testing/tests_tooling/test_003_config.py::test_dependency_upgrade_resolves_and_rewrites_all_requirement_files",
-        "testing/tests_tooling/test_003_config.py::test_dependency_upgrade_report_includes_setup_pins"
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_document_previews_are_plain_text_and_at_most_ten_lines",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_lazy_report_list_reconciles_active_job_status",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_proposed_submission_values",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_review_only_proposal_without_execute",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_refreshes_stage_labels",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_list_snippets_are_plain_text_and_at_most_five_lines",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_stale_schema_plan_keeps_review_and_explains_recovery",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_plans_updates",
+        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls"
       ],
       "exit_status": 0,
-      "generated_at": "2026-09-15T16:44:35.624613+00:00",
-      "snapshot": "210f4ad17c4119700a69eaf09e8df484a7c04619ca54376b4ee95d65b8b6c19b",
-      "tests": 12
-    },
-    {
-      "command": [
-        "/workspace/venv/bin/python",
-        "/workspace/run.py",
-        "test",
-        "--strict",
-        "unit",
-        "js",
-        "tooling",
-        "e2e",
-        "-m",
-        "not unfinished",
-        "--junitxml=/workspace/reports/hosted-e2e/junit.xml"
-      ],
-      "exit_status": 1,
-      "generated_at": "2026-09-15T18:41:30.076986+00:00",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830",
-      "tests": 152
-    },
-    {
-      "command": [
-        "/home/swifty/lagniappe/venv/bin/python",
-        "/home/swifty/lagniappe/run.py",
-        "test",
-        "testing/tests_e2e/002_home/test_002j_home_tools.py::test_report_adds_schema_fields_persists_all_task_values_and_completes"
-      ],
-      "exit_status": 0,
-      "generated_at": "2026-09-15T20:40:34.194789+00:00",
+      "generated_at": "2026-09-15T20:50:36.264366+00:00",
       "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99",
-      "tests": 1
+      "tests": 18
     }
   ],
   "snapshots": {
@@ -31451,9 +31445,9 @@
       "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes": {
-      "duration": 5.3170464439999705,
+      "duration": 14.797269083999709,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal": {
       "duration": 0.45931587200084323,
@@ -31466,14 +31460,14 @@
       "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report[False]": {
-      "duration": 4.389071049999984,
+      "duration": 9.680783963995054,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report[True]": {
-      "duration": 4.592396062000262,
+      "duration": 12.507203375003883,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_email_report_detail_collapses_message_behind_subject_and_sender": {
       "duration": 0.49272470100004284,
@@ -31486,19 +31480,19 @@
       "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_lazy_report_list_reconciles_active_job_status": {
-      "duration": 1.3532817059995068,
+      "duration": 4.398069122995366,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification[home]": {
-      "duration": 6.725044279000031,
+      "duration": 11.406247160997737,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification[report]": {
-      "duration": 5.369151332000001,
+      "duration": 11.17394044500179,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder": {
       "duration": 1.193301453999993,
@@ -31526,14 +31520,14 @@
       "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_proposed_submission_values": {
-      "duration": 0.5260342990004574,
+      "duration": 1.506907109000167,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_review_only_proposal_without_execute": {
-      "duration": 1.1935700129997713,
+      "duration": 1.5258139530051267,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies": {
       "duration": 1.4380777840005976,
@@ -31541,9 +31535,9 @@
       "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates": {
-      "duration": 31.279559753002104,
+      "duration": 30.736494008997397,
       "outcome": "passed",
-      "snapshot": "4311235e58b5378f50462deecddd42aad9604ba33333bdd98f50605f3f11c730"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_surfaces_legacy_skipped_submission_error": {
       "duration": 0.629660255998715,
@@ -31551,24 +31545,24 @@
       "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_document_previews_are_plain_text_and_at_most_ten_lines": {
-      "duration": 1.7974807609998606,
+      "duration": 6.737956445005693,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file": {
-      "duration": 6.85577945499972,
+      "duration": 20.714853730001778,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_refreshes_stage_labels": {
-      "duration": 11.943230587000471,
+      "duration": 24.87712784299947,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_list_snippets_are_plain_text_and_at_most_five_lines": {
-      "duration": 6.598604293999415,
+      "duration": 6.846372803000122,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion": {
       "duration": 2.6705065070000273,
@@ -31576,29 +31570,29 @@
       "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access": {
-      "duration": 9.715550164000888,
+      "duration": 30.375131974000396,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_stale_schema_plan_keeps_review_and_explains_recovery[api]": {
-      "duration": 2.8525368900000103,
+      "duration": 12.294329082000331,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_stale_schema_plan_keeps_review_and_explains_recovery[web]": {
-      "duration": 2.126560698000503,
+      "duration": 11.569357255004434,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_plans_updates": {
-      "duration": 3.3685315699995044,
+      "duration": 8.452828745004808,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls": {
-      "duration": 7.134463983999012,
+      "duration": 9.24397314000089,
       "outcome": "passed",
-      "snapshot": "05375e218d65679fad2a85cf3263fe4fc5b2ab24ecf78943b2d4825bc1f36830"
+      "snapshot": "5c402941547fb4668f69f22cd205dda19d7c62262d07d3631eb6622058196a99"
     },
     "tests_e2e/002_home/test_002k_home_pages.py::test_create_page_from_home": {
       "duration": 2.692578535999928,
