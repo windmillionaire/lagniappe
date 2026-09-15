@@ -149,6 +149,15 @@ Autofill is a direct mutation for one Page or Task form. Its prompt includes:
 - the target document where applicable; and
 - readable Files attached directly to the target.
 
+Existing answers use the same exact field-ID projection as `get_schema`, including
+typed table cells. Labels are context, never submission keys. Autofill validates
+the response against the target's effective schema using the same detached field
+validator as Organize. Unknown IDs and invalid values enter the shared conversation
+correction loop (at most two corrections); generation is marked validated only
+after this check succeeds. Existing nonempty answers, including false and zero,
+remain authoritative. Guarded apply validates all new values before mutation and
+preserves existing stored answers without converting them through AI text again.
+
 It excludes Task history, sibling Tasks, completed Page Tasks, parent-Page Files,
 and general workspace lookup. Google Search may supply focused public facts.
 `get_file` appears only when a stored target attachment exists and is capped at

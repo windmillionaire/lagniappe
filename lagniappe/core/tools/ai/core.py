@@ -647,7 +647,7 @@ class GenAI:
 
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_loop_limit_exception_includes_trace
-    # @matrix ai : error-context tool-dispatch trace
+    # @matrix ai : error-context tool-dispatch trace validation repair
     def _tool_loop(
         self,
         response,
@@ -703,13 +703,13 @@ class GenAI:
                         contents.append(response.candidates[0].content)
                     contents.append(types.Content(role="user", parts=[
                         types.Part.from_text(text=(
-                            f"Proposal validation failed: {error}\n"
+                            f"Response validation failed: {error}\n"
                             "Correct the executable data using the evidence, exact "
                             "references and schemas already in this conversation. "
                             "You may read tools for missing information. Return the "
-                            "complete corrected proposal, preserving all requested "
-                            "outcomes and valid actions. Check every requested outcome "
-                            "against the final actions and make the summary match them. "
+                            "complete corrected JSON response, preserving all requested "
+                            "outcomes and valid values. Follow the original output "
+                            "contract and make any summary match the final content. "
                             "Do not turn a formatting or validation error into a "
                             "question for the user or a needs_review action."
                         )),

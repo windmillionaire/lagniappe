@@ -199,7 +199,10 @@ export class EditWatcher {
 			}
 			return;
 		}
-		if (result.status === "unchanged" && this._deferredCompletions.has(key)) {
+		// Task jobs can name their parent page as the operation owner. Probe
+		// mounted markers so their exact operation lock can match that completion
+		// even when the task's saved revision arrived before terminal status.
+		if (result.status === "unchanged" && this._deferredCompletions.size) {
 			const revision = this._latestRevisions.get(key) ?? {
 				fingerprint: result.revision ?? null,
 				modified: null,

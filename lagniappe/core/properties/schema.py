@@ -8,6 +8,7 @@ from config.form_schema import (
 )
 
 from ..mixins import AIMixin
+from ..exceptions import ValidationError
 from .base_db import DBProperty
 from .base_schema import SchemaProperty
 from .form_inputs import (
@@ -82,6 +83,22 @@ class SchemaFields(Enum):
         if name not in cls.__members__:
             return None
         return cls[name].value(definition, entity=entity)
+
+    # @testable true
+    # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_validation_preserves_values_and_blocks_completion
+    # @matrix ai-report submission : validation failure-isolation
+    # @matrix submission : ai preservation
+    @classmethod
+    def prepare_ai_field(cls, definition, value, entity, *, user=None):
+        """Validate an AI value on a detached field using the acting user's context."""
+        candidate = cls.create_field(deepcopy(dict(definition)), entity)
+        if candidate is None:
+            raise ValidationError("Field is not available in the target schema.")
+        candidate.user = user
+        candidate.validate_ai(value)
+        if candidate.errors:
+            raise ValidationError("; ".join(map(str, candidate.errors)))
+        return candidate
 
     # @testable true
     # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_filters_invalid_top_level

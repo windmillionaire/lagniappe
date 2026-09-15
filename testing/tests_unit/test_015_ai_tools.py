@@ -2562,7 +2562,7 @@ def test_ai_exception_context_survives_autofill_wrapper_without_duplicate_captur
     source_error = exceptions.AIException("limit reached", context=source_context)
     captured = []
 
-    def generate_content(prompt, *, validator=None):
+    def generate_content(prompt, *, validator=None, validation_retries=0):
         raise source_error
 
     monkeypatch.setattr(
@@ -2573,7 +2573,7 @@ def test_ai_exception_context_survives_autofill_wrapper_without_duplicate_captur
     )
 
     with pytest.raises(exceptions.AIException) as exc:
-        autofill.generate_autofilled_submission(Prompt("Generate"))
+        autofill.generate_autofilled_submission(Prompt("Generate"), entity=None, user=None)
 
     assert str(exc.value) == "Generation failed. Please try again.  limit reached"
     assert exc.value.context == source_context

@@ -29,7 +29,7 @@ PROMPT_OBSERVABILITY_CONTRACTS = {
     "organize report": ("organize", "planning", "organize-report", 2),
     "category generation": ("categories", "generation", "category-generation", 1),
     "image aspect ratio": ("images", "aspect-ratio", "image-aspect-ratio", 1),
-    "autofill": ("autofill", "generation", "form-autofill", 3),
+    "autofill": ("autofill", "generation", "form-autofill", 4),
     "scheduling": ("scheduling", "generation", "schedule-generation", 1),
     "document text": ("documents", "generation", "document-text", 1),
     "project generation": ("projects", "generation", "project-generation", 1),

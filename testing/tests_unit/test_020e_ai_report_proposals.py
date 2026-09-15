@@ -661,8 +661,8 @@ def test_organize_conversation_validation_preserves_complete_proposal(monkeypatc
     if mode != "valid":
         history = requests[-1]["contents"]
         text = "\n".join(part.text or "" for content in history if not isinstance(content, str) for part in content.parts)
-        assert "Proposal validation failed" in text
-        assert "complete corrected proposal" in text
+        assert "Response validation failed" in text
+        assert "complete corrected JSON response" in text
         assert any(part.function_response for content in history if not isinstance(content, str) for part in content.parts)
         assert len(history) > len(requests[1]["contents"])
 

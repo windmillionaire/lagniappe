@@ -699,7 +699,7 @@ def test_organize_repairs_prepared_conversions_before_returning_plan(
         with pytest.raises(exceptions.AIException):
             organize.generate_organize_plan(prompt)
     assert len(calls) == (2 if repair_succeeds else 3)
-    assert "Proposal validation failed" in calls[-1][-1].parts[0].text
+    assert "Response validation failed" in calls[-1][-1].parts[0].text
     assert len(summaries) == 1
     assert summaries[-1]["success"] is repair_succeeds
     assert summaries[-1]["structured_final_used"] is False

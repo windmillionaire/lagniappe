@@ -1792,7 +1792,7 @@ def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_us
     Entities.save(report)
 
     report_page = user.go(Report.for_entity(user, report))
-    report_page.execute()
+    report_page.execute(timeout=60_000)
     expect(user.page.get_by_text("Work done.")).to_be_visible()
 
     saved = Entities.fetch_one(task.urlsafe_key, request=Fetch.direct())

@@ -1391,6 +1391,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 const applications = [];
+const mountedMarkers = [];
 function formCase({ unsaved = false, entityKey = "page-one" } = {}) {
   const anchor = {
     dataset: {
@@ -1418,7 +1419,7 @@ function formCase({ unsaved = false, entityKey = "page-one" } = {}) {
       applications.push({ widget, response });
     },
   };
-  widget.component = { active: widget };
+  widget.component = { active: widget, visible: true, elt: { parentElement: null } };
   const form = { dataset: { widget: "PageInfo" }, _lp_widget: widget };
   const marker = {
     isConnected: true,
@@ -1483,7 +1484,7 @@ vm.runInContext(source, context);
   const watcher = new context.EditWatcher({
     addFlash() {},
     components: {},
-    elt: { addEventListener() {}, querySelectorAll() { return []; } },
+    elt: { addEventListener() {}, querySelectorAll() { return mountedMarkers; } },
   });
 
   const clean = formCase({ entityKey: "task-one" });
@@ -1501,6 +1502,27 @@ vm.runInContext(source, context);
     throw new Error("A clean active form did not apply its own deferred completion");
   }
 
+  // A task revision can be observed before the parent page's job completes.
+  // Its next entity result is unchanged, but the owned completion must still
+  // install the saved values and release the form lock.
+  const staged = formCase({ entityKey: "task-two" });
+  mountedMarkers.push(staged.marker);
+  await watcher.receiveEntityResult("task-two", {
+    status: "changed",
+    payload: { fingerprint: "saved-fingerprint", modified: "2026-07-22T11:00:00+00:00" },
+  });
+  if (applications.length !== 1 || staged.marker.dataset.visible !== "true") {
+    throw new Error("An active form bypassed review before its completion arrived");
+  }
+  watcher.expectDeferredCompletion("page-one", "operation-one");
+  await watcher.receiveEntityResult("task-two", {
+    status: "unchanged", revision: "saved-fingerprint",
+  });
+  if (applications.length !== 2 || staged.marker.dataset.visible !== "false" ||
+      watcher._deferredCompletions.has("page-one")) {
+    throw new Error("An unchanged task revision lost its parent page's deferred completion");
+  }
+
   const dirty = formCase({ unsaved: true, entityKey: "task-one" });
   watcher.expectDeferredCompletion("page-one", "operation-one");
   await watcher._reconciler.probe(
@@ -1509,7 +1531,7 @@ vm.runInContext(source, context);
     "2026-07-22T12:00:00+00:00",
   );
   if (
-    applications.length !== 1 ||
+    applications.length !== 2 ||
     dirty.marker.dataset.visible !== "true" ||
     watcher._reconciler._state(dirty.marker).mode !== "reset"
   ) {

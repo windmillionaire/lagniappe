@@ -85,12 +85,10 @@ def _update_form_values(action, _report, user, created):
             continue
         # Validate every patch on a detached field before changing any target.
         # A later malformed value must not save or erase earlier values.
-        candidate = SchemaFields.create_field(dict(field), entity)
-        candidate.user = user
         try:
-            candidate.validate_ai(update.get("new_value"))
-            if candidate.errors:
-                raise exceptions.ValidationError("; ".join(map(str, candidate.errors)))
+            candidate = SchemaFields.prepare_ai_field(
+                field, update.get("new_value"), entity, user=user
+            )
         except Exception as error:
             raise exceptions.ValidationError(
                 f"Could not update {entity.name}, field {schema_id}: {error}"

@@ -1,6 +1,7 @@
 """AI-powered form autofill using context, files, and web search."""
 
 import re
+from functools import partial
 
 from ... import exceptions
 from ...definitions import Action
@@ -12,6 +13,8 @@ from .guidelines import (
     SUBMISSION_OUTPUT_REQUIREMENTS,
 )
 from .prompt import Prompt
+from .submission_values import values_by_id
+from ...properties.schema import SchemaFields
 
 citations = re.compile(r"\. \[.*?\]")
 
@@ -135,7 +138,7 @@ def autofill_prompt_data(
     if form:
         submission_property = entity.properties.submission
         submission_property.user = user
-        submission = submission_property.ai_value
+        submission = values_by_id(submission_property.fields, user)
 
     document = None
     if page and page.properties.document:
@@ -148,7 +151,7 @@ def autofill_prompt_data(
         "mimetype": mimetype,
         "document": document,
         "submission": submission,
-        "schema": form.schema if form else None,
+        "schema": entity.submission_schema if form else None,
         "form_name": form.name if form else None,
         "target": target,
         "parent_page": parent_page,
@@ -161,8 +164,31 @@ def autofill_prompt_data(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
 # @matrix ai : citations validation
-def validate_submission(submission):
-    """Strip citation markers from textarea values in a submission."""
+def validate_submission(submission, *, entity=None, user=None):
+    """Validate exact target fields without mutation and clean text citations."""
+    if not isinstance(submission, dict):
+        raise exceptions.AIException("Submission must be a JSON object keyed by exact field ids.")
+    submission = dict(submission)
+    if entity is not None:
+        fields = entity.properties.submission.fields
+        unknown = set(submission) - set(fields)
+        if unknown:
+            raise exceptions.AIException(
+                f"Submission contains unavailable field ids: {', '.join(sorted(unknown))}. "
+                f"Use only these exact field ids: {', '.join(fields)}. "
+                "Field titles are not keys; return the submission object without a wrapper."
+            )
+        # Autofill owns blank fields only. Existing answers remain authoritative
+        # even when the model omits or rewrites them.
+        submission.update({
+            key: value for key, value in values_by_id(fields, user).items()
+            if value not in (None, "", [], {})
+        })
+        for field_id, value in submission.items():
+            try:
+                SchemaFields.prepare_ai_field(fields[field_id], value, entity, user=user)
+            except (ValueError, TypeError, AttributeError, exceptions.ValidationError) as error:
+                raise exceptions.AIException(f"Submission field {field_id}: {error}") from error
     textareas = [
         (schema_id, v)
         for schema_id, v in submission.items()
@@ -180,11 +206,15 @@ def validate_submission(submission):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
-# @matrix ai : error-context terminal-capture
-def generate_autofilled_submission(prompt):
+# @matrix ai : error-context terminal-capture validation repair
+def generate_autofilled_submission(prompt, *, entity, user):
     """Generate and validate an autofilled form submission from a Prompt."""
     try:
-        return ai_model.generate_content(prompt, validator=validate_submission)
+        return ai_model.generate_content(
+            prompt,
+            validator=partial(validate_submission, entity=entity, user=user),
+            validation_retries=2,
+        )
     except Exception as e:
         raise exceptions.AIException(
             f"{GENERIC_MESSAGE} {str(e)}",

@@ -328,12 +328,8 @@ def validate_existing_table_updates(proposal, user):
             definition = next((field for field in schema if field.get("id") == schema_id), None)
             if not definition or definition.get("type") != "table":
                 raise exceptions.AIException(f"{label}: {schema_id} is not a table in the target schema.")
-            candidate = SchemaFields.create_field(dict(definition), entity)
-            candidate.user = user
             try:
-                candidate.validate_ai(value)
-                if candidate.errors:
-                    raise ValueError("; ".join(map(str, candidate.errors)))
+                SchemaFields.prepare_ai_field(definition, value, entity, user=user)
             except (ValueError, TypeError, AttributeError, exceptions.ValidationError) as error:
                 raise exceptions.AIException(f"{label}, field {schema_id}: {error}") from error
 
