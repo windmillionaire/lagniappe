@@ -105,7 +105,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
     assert prompt.thinking_budget is None
     assert prompt.service_tier is None
     assert organize.ai_model.create_config(prompt).thinking_config is None
-    assert prompt.tools == list(organize.READ_ONLY_CONTEXT_TOOLS)
+    assert prompt.tools == [*organize.READ_ONLY_CONTEXT_TOOLS, "get_task_history"]
     assert "get_task_history" not in organize.READ_ONLY_CONTEXT_TOOLS
     assert _prompt_context(prompt, "User Instructions") == (
         "```\nThis is probably a receipt.\n```"
@@ -138,58 +138,13 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
     normalized_preview = " ".join(preview.split())
     semantic_preview = normalized_preview.replace("`", "")
     assert "never include internal entity hash tokens" in preview
-    assert "Keep hash\ntokens exclusively in executable action data" in preview
-    workflow_markers = [
-        "1. Establish the evidence",
-        "2. Cluster the uploads by stable subject",
-        "3. Choose the collection scope",
-        "4. Check page candidates for the chosen category",
-        "5. Search for any remaining page candidate",
-        "6. Choose the page target",
-        "7. Decide whether the evidence belongs on the page or on a task",
-        "8. Choose structured forms after the page/task target is settled",
-        "9. Build the ordered proposal",
-    ]
-    workflow_positions = [
-        semantic_preview.index(marker) for marker in workflow_markers
-    ]
-    assert workflow_positions == sorted(workflow_positions)
-    assert (
-        "get_category_pages with that category, compact=true, and limit=10"
-        in semantic_preview
-    )
-    assert "Start with the bounded workspace_searches" in semantic_preview
-    assert (
-        "list_workspace_resources only when the prefetched candidates are absent"
-        in (semantic_preview)
-    )
-    assert "Batch get_entity calls for plausible candidates only" in semantic_preview
-    assert 'search_entities with kinds=["page"]' in semantic_preview
-    assert "a wording difference does not justify a duplicate" in semantic_preview
-    assert "Propose create_page only after steps 4 and 5" in semantic_preview
-    assert "something specific was done or needs to be done" in semantic_preview
-    assert "set completed: true" in semantic_preview
-    assert "solely because the exact date is unknown" in semantic_preview
-    assert "Future-dated work is not complete" in semantic_preview
-    assert "If the matching page cannot be edited, use needs_review" in (
-        semantic_preview
-    )
-    assert "no broad category-level catch-all" in semantic_preview
-    assert "New page names are concise subject labels" in semantic_preview
-    assert "Review/skip may supplement but never replace" in semantic_preview
-    assert "Category default forms appear only" in semantic_preview
-    assert (
-        "add_page_category requires both the existing page and the additional existing "
-        "category"
-    ) in semantic_preview
-    assert (
-        'add_page_category: {"page" or "page_action", "category" or '
-        '"category_action"}'
-    ) in semantic_preview
-    assert (
-        "Every add_page_category action has both an executable page/page_action "
-        "reference and an executable category/category_action reference"
-    ) in semantic_preview
+    assert "Keep hash tokens exclusively in executable action data" in normalized_preview
+    assert "Return one complete executable proposal" in semantic_preview
+    assert "There is no later form-completion stage" in semantic_preview
+    assert "Table rows must be objects keyed by exact column ids" in semantic_preview
+    assert "Check each file for duplicate records or occurrences" in semantic_preview
+    assert "a nearby topic alone is not a match" in semantic_preview
+    assert "Completion owns form values" not in semantic_preview
     assert set(prompt.allowed_actions) == {
         "create_form",
         "create_category",
@@ -197,6 +152,8 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
         "create_model_task",
         "create_page",
         "create_task",
+        "complete_task",
+        "set_task_due_date",
         "add_form_to_page",
         "add_page_category",
         "update_form_schema",
@@ -222,11 +179,12 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
     assert tuple(action_schemas) == prompt.allowed_actions
     for action_schema in action_schemas.values():
         data_properties = action_schema["properties"]["data"]["properties"]
-        assert "submission" not in data_properties
-        assert "submission_empty_reason" not in data_properties
         assert "submission_needed" not in data_properties
         assert "submission_request" not in data_properties
         assert "submission_context" not in data_properties
+    for action in ("create_page", "create_task"):
+        assert "submission" in action_schemas[action]["properties"]["data"]["properties"]
+    assert "updates" in action_schemas["update_form_values"]["properties"]["data"]["properties"]
     assert action_schemas["create_task"]["properties"]["data"]["properties"][
         "completed"
     ] == {
@@ -238,21 +196,19 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit(monkey
         block.get("role")
         for block in prompt.instruction_blocks
         if block.get("role")
-    } >= {"action_permissions", "tool_use", "action_planning"}
+    } >= {"action_permissions", "action_planning"}
     assert any(
         block.get("title") == "On-demand guidelines"
         for block in prompt.instruction_blocks
     )
     assert 'MUST call get_guidelines("page_form")' in prompt.preview()
     assert 'MUST call get_guidelines("schema_evolution")' in prompt.preview()
-    assert "input fields also have an input subtype" in prompt.preview()
-    assert "do not say records were created" in prompt.preview()
-    assert "Missing schema syntax is not a user decision" in prompt.preview()
+    assert "No workspace action has been executed" in normalized_preview
     assert prompt.audit()["duplicate_headings"] == []
     assert "get_form_instances" in prompt.tools
     assert prompt.files == []
     assert len(organize.organize_prompt(report, user).preview()) < 21_000
-    assert "Completion owns form values" in prompt.preview()
+    assert "Completion owns form values" not in prompt.preview()
 
 
 
@@ -634,7 +590,7 @@ def test_revise_organize_prompt_includes_feedback_and_current_proposal():
         prompt.max_tool_file_parts_per_turn
         == organize.ORGANIZE_MAX_TOOL_FILE_PARTS_PER_TURN
     )
-    assert prompt.tools == list(organize.READ_ONLY_CONTEXT_TOOLS)
+    assert prompt.tools == [*organize.READ_ONLY_CONTEXT_TOOLS, "get_task_history"]
     assert "get_task_history" not in organize.READ_ONLY_CONTEXT_TOOLS
     assert _prompt_context(prompt, "User Feedback") == (
         "```\nThese are articles, not books.\n```"
@@ -1049,6 +1005,8 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "add_form_to_page",
         "add_page_category",
         "update_form_values",
+        "complete_task",
+        "set_task_due_date",
         "attach_file",
         "skip",
         "needs_review",

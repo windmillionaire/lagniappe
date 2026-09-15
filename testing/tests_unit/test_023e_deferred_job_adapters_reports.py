@@ -178,9 +178,7 @@ def test_organize_retry_uses_priority_for_every_generation_stage(monkeypatch):
     assert retrieval_calls == [(report, actor), (report, actor)]
     assert generated == [
         ("plan", None),
-        ("submissions", None),
         ("plan", "priority"),
-        ("submissions", "priority"),
     ]
 
 
@@ -902,3 +900,28 @@ def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypat
     assert report.proposal is not completed
     assert report.status == "ready"
     assert saved == [(report, actor)]
+
+
+# @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::OrganizeReportAdapter
+# @matrix ai-report : plan-resume proposal-publication status
+@pytest.mark.unit
+def test_organize_resumes_complete_upload_proposal_without_generation(monkeypatch):
+    report = SimpleNamespace(input_files=[SimpleNamespace()])
+    proposal = {"summary": "Complete upload proposal", "actions": [
+        {"id": "page", "type": "create_page", "data": {"name": "Receipt", "submission": {"merchant": "Acme"}}},
+    ]}
+    def unexpected(*args, **kwargs):
+        pytest.fail("A complete proposal must not run another generation stage.")
+    for name in ("generate_organize_plan", "complete_organize_submissions", "summarize_report_input_files"):
+        monkeypatch.setattr(report_adapters.ai, name, unexpected)
+    context = DeferredJobContext(
+        job=SimpleNamespace(attempt=2), actor=SimpleNamespace(), notification=None,
+        inputs={"report": report}, parameters={},
+        checkpoint={"schema_version": 1, "stage": "plan_ready", "proposal_complete": True, "proposal": proposal},
+    )
+    adapter = report_adapters.OrganizeReportAdapter()
+    adapter.prepare(context)
+    assert context.checkpoint["stage"] == "ready_to_apply"
+    assert context.checkpoint["proposal"] == proposal
+    assert context.checkpoint["status"] == "ready"
+    assert adapter.checkpoint_ready(context)

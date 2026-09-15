@@ -128,7 +128,7 @@ def test_selected_update_guidance_example_satisfies_external_contract():
         SimpleNamespace(tool="organize", origin="web", input_files=[object()]), actor,
     ) == []
     assert "Put the target inside every data.updates row" in guidance
-    assert "internal pending planning only" in guidance
+    assert "legacy pending checkpoints only" in guidance
     patches = get_guidelines.execute_external_get_guidelines(
         {"task": "form_autofill", "actions": ["update_form_values"],
          "field_types": ["table", "textarea"]}, actor,

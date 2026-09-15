@@ -139,15 +139,18 @@ natural read into several dependent calls: each extra Gemini round sends another
 provider request and replays prior tool output. Tool count alone is not the useful
 measure; observe rounds, cumulative tokens, latency and provider errors.
 
-The API route selects external dispatch through server-owned context, never a
-model-supplied argument. In particular, `get_guidelines(task="organize")`
-has separate compositions. Built-in Gemini receives structural-planning rules:
-the server already prepared summaries/retrieval terms and will complete form
-values afterward. External clients receive full inspection, summary-authoring
-and final-submission responsibilities. Shared domain guidance remains reusable;
-MCP lifecycle names and REST submission instructions do not belong in built-in
-provider prompts. The external schedule schema adds conditional requirements
-without changing Gemini's provider-compatible schema.
+`get_guidelines(task="organize")` shares complete-proposal guidance across
+built-in Gemini and external clients. The current contract selects the allowed
+actions and file responsibilities. Native jobs prepare summaries/retrieval terms
+before generation; external clients author `summarize_file` actions when their
+contract allows them. Both author final form values and requested task/document
+updates themselves. Native validation feeds precise errors back into the same
+conversation with its tool results/cache intact, for at most two corrections.
+It does not rewrite a valid proposal in a separate structured-final model call.
+The response schema remains visible in the conversation while local validation
+enforces executable shapes. MCP lifecycle names and REST submission instructions
+do not belong in built-in provider prompts. The external schedule schema adds
+conditional requirements without changing Gemini's provider-compatible schema.
 The external `form_autofill` bundle permits grounded corrections and emits only
 selected field updates; built-in Autofill retains its blank-only completion
 policy and preserves non-empty partial values.
@@ -165,17 +168,18 @@ integer calls and exposes that choice through `effective_limit`.
 Initial attachments and tool-returned files use the `FileConsumer` boundary.
 Autofill receives readable files directly attached to its target. It prefers
 saved summaries, may request extracted text for an unresolved field, and may
-request an original file only when text is insufficient. Organize planning
-uses saved summaries and bounded retrieval candidates; its final form
-completion stage does not reread original files.
+request an original file only when text is insufficient. Organize starts from
+saved summaries and bounded retrieval candidates, then reads further evidence
+as needed in the same conversation that authors the complete proposal.
 
 ## Validation and cleanup
 
 `reporting/contracts/` defines action-specific schemas and ordering.
 `reporting/proposals/` normalizes and validates. Narrow deterministic repairs
-handle values such as stable field IDs and one unambiguous reference. Unsafe
-actions become visible review items; an unusable plan becomes a review-only
-proposal rather than executable partial work.
+handle values such as stable field IDs and one unambiguous reference. Native
+Organize returns remaining errors to the same conversation for bounded
+correction; exhausted correction fails generation. The legacy separate-prompt
+repair path used by other workflows may return review-only fallback proposals.
 
 `GenAI.cleanup()` removes citation-shaped numeric markers while preserving
 ordinary bracketed text. Add only exact provider syntax to cleanup rules.

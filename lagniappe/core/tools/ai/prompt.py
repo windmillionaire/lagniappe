@@ -26,7 +26,7 @@ PROMPT_OBSERVABILITY_CONTRACTS = {
         "organize-submission-completion",
         1,
     ),
-    "organize report": ("organize", "planning", "organize-report", 1),
+    "organize report": ("organize", "planning", "organize-report", 2),
     "category generation": ("categories", "generation", "category-generation", 1),
     "image aspect ratio": ("images", "aspect-ratio", "image-aspect-ratio", 1),
     "autofill": ("autofill", "generation", "form-autofill", 3),

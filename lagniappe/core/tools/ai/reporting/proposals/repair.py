@@ -613,7 +613,7 @@ def generate_validated_proposal(
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_invalid_action_type_once
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_reviews_files_missing_after_repair
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_plan_leaves_form_submission_for_completion
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_legacy_organize_validation_accepts_pending_submission
 # @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_repairs_unusable_answers
 # @tests tests_unit/test_004l_form_schema_updates.py::test_organize_repairs_prepared_conversions_before_returning_plan
 # @matrix ai-report : ask fallback file-placement repair submission validate schema-update
@@ -625,8 +625,13 @@ def validate_or_repair_proposal(
     require_pending_submission_target=False,
     allow_pending_submissions=True,
     validator=None,
+    repair=True,
 ):
-    """Validate, repair once with the model, then fall back to human review."""
+    """Apply mechanical corrections, optionally using the legacy repair/fallback.
+
+    Native Organize sets repair=False: validation errors return to its existing
+    model conversation. Other callers retain the separate repair prompt.
+    """
     validator = validator or validate_proposal
     validation_options = {
         "allowed_actions": getattr(prompt, "allowed_actions", None),
@@ -647,6 +652,7 @@ def validate_or_repair_proposal(
         if validator is validate_proposal:
             validation_options["validate_reference_kinds"] = True
             validation_options["prepare_schema_changes"] = True
+            validation_options["validate_table_values"] = not repair
     original_proposal = copy.deepcopy(proposal)
     proposal = _complete_form_schema_fields(proposal)
     proposal = _complete_unambiguous_add_form_references(proposal)
@@ -655,6 +661,8 @@ def validate_or_repair_proposal(
     try:
         return validator(proposal, **validation_options)
     except exceptions.AIException as error:
+        if not repair:
+            raise
         ai_debug(
             "report.generate.validation_failed",
             report_label=report_label,

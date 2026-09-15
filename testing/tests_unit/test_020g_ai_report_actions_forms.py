@@ -64,6 +64,74 @@ def test_submission_batch_validation_preserves_values_and_blocks_completion(monk
     assert all(entity is report for entity in saved)
 
 
+# @source lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_existing_table_updates
+# @source lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
+# @source lagniappe/core/properties/form_table.py::Table.validate_ai
+# @source lagniappe/core/properties/form_links.py::Link.validate_ai
+# @source lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_values
+# @matrix ai-report form-table : validation internal-link schema-update
+# @matrix link submission : ai-value entity-resolution internal
+@pytest.mark.unit
+@pytest.mark.parametrize("hotel_value", ["Confirmed Hotel", {"id": "missing-hotel-page"}])
+def test_unresolved_table_link_rejects_proposal_and_blocks_completion(monkeypatch, hotel_value):
+    from lagniappe.core.tools.ai.reporting.proposals.validation import (
+        validate_proposal, validate_existing_table_updates,
+    )
+    from lagniappe.core.tools.files import find_page
+
+    user = _test_user("hotel-patch-owner")
+    page = TestEntities.get("PAGE", {"name": "College trip"})
+    form = TestEntities.get("FORM", {"name": "Hotels"})
+    form.form_type = "task"
+    form.schema = [{"id": "table-hotels", "type": "table", "title": "Hotels", "columns": [
+        {"id": "row-hotel", "type": "link", "location": "in", "title": "Hotel"},
+        {"id": "row-confirmation", "type": "input", "input": "text", "title": "Confirmation"},
+    ]}]
+    task = TestEntities.get("TASK", {"name": "Book Hotels"}, page=page)
+    task.form = form
+    original = {"table-hotels": {"rows": [{"row-confirmation": "Original confirmation"}]}}
+    task.submission = copy.deepcopy(original)
+    proposal = {"summary": "Update hotels and complete booking", "confidence": 1, "actions": [
+        {"id": "hotels", "type": "update_form_values", "data": {"updates": [{
+            "task": task.urlsafe_key, "schema_id": "table-hotels", "new_value": {"rows": [
+                {"row-hotel": hotel_value, "row-confirmation": "ABC123"},
+            ]},
+        }]}},
+        {"id": "done", "type": "complete_task", "depends_on": ["hotels"], "data": {"task": task.urlsafe_key}},
+    ]}
+    monkeypatch.setattr(find_page.cache, "kind_search", lambda *args, **kwargs: [])
+    monkeypatch.setattr(report_runner.Entities, "fetch_one", _fetch_one_from({task.urlsafe_key: task, form.urlsafe_key: form}))
+    saved = []
+    monkeypatch.setattr(report_runner.Entities, "save", lambda *entities: saved.extend(entities))
+    with pytest.raises(exceptions.AIException, match="data.updates\\[1\\].*row-hotel|data.updates\\[1\\].*Hotel"):
+        validate_proposal(copy.deepcopy(proposal), user=user, validate_table_values=True)
+    assert task.submission == original
+    assert saved == []
+
+    # An already-saved proposal still fails atomically if the reference is gone.
+    report = TestEntities.get("REPORT", {"name": "Hotel report", "user": user, "parent": user,
+        "status": "ready", "pending": False, "proposal": proposal})
+    result = report_runner.run_report(report, user)
+    assert result["status"] == "failed"
+    assert result["actions"][0]["status"] == "failed"
+    assert result["actions"][1]["status"] != "complete"
+    assert task.submission == original
+    assert not task.completed
+    assert all(entity is report for entity in saved)
+
+    # Validate against a preceding schema correction, not the old link column.
+    corrected = copy.deepcopy(proposal)
+    corrected["actions"][0]["data"]["updates"][0]["new_value"]["rows"][0]["row-hotel"] = "Confirmed Hotel"
+    columns = copy.deepcopy(form.schema[0]["columns"])
+    columns[0] = {"id": "row-hotel", "type": "input", "input": "text", "title": "Hotel"}
+    corrected["actions"].insert(0, {"id": "schema", "type": "update_form_schema", "data": {
+        "form": form.urlsafe_key, "operations": [{"op": "update_field", "schema_id": "table-hotels", "patch": {"columns": columns}}],
+    }})
+    validate_existing_table_updates(corrected, user)
+    assert form.schema[0]["columns"][0]["type"] == "link"
+    assert task.submission == original
+
+
 # @matrix ai-report : validation result
 @pytest.mark.unit
 def test_report_result_exposes_legacy_skipped_submission_errors():

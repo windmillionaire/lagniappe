@@ -3,6 +3,8 @@
 import re
 
 from lagniappe.core import exceptions
+from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.entities import Entities
 from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.properties.form_table import validate_ai_table
 from lagniappe.core.tools import dates
@@ -70,7 +72,7 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_invalid_static_form_content
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_create_task_page_reference
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_remote_organize_repairs_malformed_table_patch
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_organize_conversation_validation_preserves_complete_proposal
 # @tests tests_unit/test_004l_form_schema_updates.py::test_organize_repairs_prepared_conversions_before_returning_plan
 # @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission task-page validation
 # @pairs ai-report:reference-kind permissions:personal-page
@@ -88,6 +90,7 @@ def validate_proposal(
     resolved_reference_details=None,
     allow_legacy_schema=False,
     prepare_schema_changes=False,
+    validate_table_values=False,
 ):
     """Validate the JSON action proposal returned by the organize prompt."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
@@ -272,7 +275,67 @@ def validate_proposal(
         except exceptions.ValidationError as error:
             raise exceptions.AIException(f"update_form_schema: {error}") from error
 
+    if validate_table_values:
+        validate_existing_table_updates(proposal, user)
     return proposal
+
+
+# @testable true
+# @matrix ai-report form-table : validation internal-link schema-update
+def validate_existing_table_updates(proposal, user):
+    """Preflight existing table patches on detached fields, without saving values."""
+    from lagniappe.core.tools.form_schema_updates import apply_operations
+
+    schemas = {}
+    reassigned_pages = set()
+    for action in proposal.get("actions", []):
+        if action.get("skip"):
+            continue
+        data = action.get("data") or {}
+        if action.get("type") == "add_form_to_page":
+            page_reference = _first_data_reference(data, "page")
+            if isinstance(page_reference, str):
+                reassigned_pages.add(page_reference)
+        if action.get("type") == "update_form_schema" and data.get("form"):
+            form = Entities.fetch_one(data["form"], request=Fetch.direct())
+            if isinstance(form, Entities.FORM) and form.allowed(Action.EDIT, user=user):
+                schemas[form.key] = apply_operations(
+                    form.schema, data["operations"], form.form_type
+                )
+        if action.get("type") != "update_form_values":
+            continue
+        for index, update in enumerate(data.get("updates", []), 1):
+            value = update.get("new_value")
+            if not isinstance(value, dict) or "rows" not in value:
+                continue
+            # New targets and newly assigned forms are checked during execution.
+            if any(_data_action_reference(update, root) for root in ("page", "task")):
+                continue
+            reference = next((update[key] for key in (
+                "page", "page_id", "page_ref", "task", "task_id", "task_ref"
+            ) if update.get(key)), None)
+            if reference is None or reference in reassigned_pages:
+                continue
+            label = f"Action {action.get('id')} data.updates[{index}]"
+            entity = Entities.fetch_one(reference, request=Fetch.direct())
+            if not isinstance(entity, (Entities.PAGE, Entities.TASK)) or not entity.allowed(
+                Action.EDIT, user=user
+            ):
+                raise exceptions.AIException(f"{label}: table target is not editable.")
+            form = entity.form
+            schema_id = update.get("schema_id") or update.get("field_id")
+            schema = schemas.get(form.key, form.schema) if form else []
+            definition = next((field for field in schema if field.get("id") == schema_id), None)
+            if not definition or definition.get("type") != "table":
+                raise exceptions.AIException(f"{label}: {schema_id} is not a table in the target schema.")
+            candidate = SchemaFields.create_field(dict(definition), entity)
+            candidate.user = user
+            try:
+                candidate.validate_ai(value)
+                if candidate.errors:
+                    raise ValueError("; ".join(map(str, candidate.errors)))
+            except (ValueError, TypeError, AttributeError, exceptions.ValidationError) as error:
+                raise exceptions.AIException(f"{label}, field {schema_id}: {error}") from error
 
 
 # @testable false

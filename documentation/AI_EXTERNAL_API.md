@@ -606,12 +606,12 @@ coercion. Migration candidates require exact JSON types. On-site and external
 schema planners receive the same strict candidate-authoring rules and prepare
 the exact values before review; execution never invokes another conversion model.
 
-External Organize guidance is selected by the API route, not by a public client
-or workflow flag. File-backed on-site/email Gemini retains its separate server-managed
-summary, retrieval, structure-planning and form-completion stages. Those
-internal planning instructions must not tell an external client to omit final
-form values, and external no-server-model instructions must not replace the
-built-in pipeline's responsibilities.
+Organize uses shared complete-proposal guidance for native and external callers.
+The contract determines allowed actions and file-summary responsibilities. Native
+jobs prepare summaries and retrieval context before generation; both callers
+author final values themselves. Native correction turns retain the conversation,
+while external clients receive validation errors for their next submission.
+The server never calls a model to complete or repair an external submission.
 
 For Organize, `upload_inventory` is the authoritative finalized file scope even
 when natural-language instructions mention fewer filenames. Its deterministic
@@ -681,7 +681,7 @@ including multiple fields on the same entity. Omitted fields retain their values
 }
 ```
 
-The internal Organize planning stage uses a top-level `data.page` or `data.task`
+Legacy internal Organize checkpoints may use a top-level `data.page` or `data.task`
 while values are pending. That shape is not an external submission: MCP/API
 clients author final update rows. The external schema rejects top-level targets,
 missing row targets, and multiple targets in one row before semantic validation.
@@ -1056,7 +1056,7 @@ organize_guidelines = api_json(
     json={"arguments": {"task": "organize"}},
 )["result"]
 contract = api_json("GET", plan["contract_url"])
-# Give the model the plan, tools, shared two-phase Organize guidelines, and
+# Give the model the plan, tools, shared complete-proposal Organize guidelines, and
 # contract. Run requested reads; settle structure first; then apply form_autofill
 # and exact schemas to add final values before POSTing to plan["submit_url"].
 ```

@@ -101,11 +101,9 @@ def test_validate_proposal_accepts_add_form_to_page_without_category():
 
 
 
-# @matrix ai-report : generate pipeline submission-completion
-# @matrix submission : evidence-mapping focused-prompt
-# @pair form-schema:structured-output
+# @matrix ai-report : generate pipeline submission
 @pytest.mark.unit
-def test_generate_organize_report_completes_planned_submissions(monkeypatch):
+def test_generate_organize_report_preserves_final_submissions_without_completion(monkeypatch):
     user = _test_user("complete-pipeline-owner")
     file = _test_file("pipeline-receipt.pdf", "application/pdf")
     file.summary = "Receipt from Acme dated 2026-07-10 for $42.00."
@@ -153,20 +151,13 @@ def test_generate_organize_report_completes_planned_submissions(monkeypatch):
             },
         ],
     }
+    planned["actions"][2]["data"]["form_action"] = "receipt_form"
+    planned["actions"][2]["data"]["submission"] = {"input-merchant": "Acme"}
     calls = []
 
     def generate(prompt):
         calls.append(prompt)
-        if len(calls) == 1:
-            return planned
-        return {
-            "submissions": [
-                {
-                    "action_id": "receipt_page",
-                    "submission": {"input-merchant": "Acme"},
-                }
-            ]
-        }
+        return planned
 
     monkeypatch.setattr(
         organize.ai_model,
@@ -191,8 +182,7 @@ def test_generate_organize_report_completes_planned_submissions(monkeypatch):
 
     result = organize.generate_organize_report(prompt, report, user)
 
-    assert len(calls) == 2
-    assert calls[1].prompt_type == "organize submission completion"
+    assert len(calls) == 1
     assert result["actions"][2]["data"]["submission"] == {
         "input-merchant": "Acme"
     }

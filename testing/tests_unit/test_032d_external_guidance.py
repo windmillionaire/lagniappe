@@ -137,7 +137,7 @@ def test_external_schema_patch_uses_standard_nullable_values():
 
 # @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
-def test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow():
+def test_organize_guidance_is_shared_across_provider_and_external_dispatch():
     actor = SimpleNamespace()
     provider_parts, media = functions.execute_function_calls(
         [
@@ -156,20 +156,14 @@ def test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow():
     assert internal == get_guidelines.execute_get_guidelines(
         {"task": "organize"}, actor
     )
-    assert "server performs focused form completion afterward" in internal["guidelines"]
-    assert "No action contains submission-generation fields" in internal["guidelines"]
+    assert internal == external
+    assert "same proposal" in internal["guidelines"]
+    assert "Return one complete executable proposal" in internal["guidelines"]
+    assert "No action contains submission-generation fields" not in internal["guidelines"]
+    assert "server performs focused form completion afterward" not in internal["guidelines"]
     assert "/submit" not in internal["guidelines"]
     assert "submit_plan" not in internal["guidelines"]
-    assert "server will not call a model" not in internal["guidelines"]
     assert "exactly one summarize_file action per file" in external["guidelines"]
-    assert (
-        "author the final summaries and form submissions or updates yourself"
-        in external["guidelines"]
-    )
-    assert (
-        "No action contains submission-generation fields" not in external["guidelines"]
-    )
-    assert "leave data.updates to the completion stage" not in external["guidelines"]
     assert "summarize_file" not in functions.DECLARATIONS
     for result in (internal, external):
         assert result["content_bytes"] == len(result["guidelines"].encode("utf-8"))
@@ -274,8 +268,7 @@ def test_external_duplicate_check_reuses_evidence_without_a_filename_search_ritu
     assert "does not require a separate filename search per file" in external
     assert "unresolved identity or occurrence" in external
     assert "similar filename or topic alone as proof of a match" in external
-    assert "duplicate_check" not in internal
-    assert "server performs focused form completion afterward" in internal
+    assert internal == external
 
 
 # @matrix ai agent-api : guidelines tool-dispatch provider-neutral-schema tool-catalog

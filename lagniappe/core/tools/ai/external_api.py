@@ -1240,6 +1240,7 @@ def validate_external_proposal(proposal, report, user, *, resolved_references=No
         user=user,
         preserve_document_markdown=True,
         resolved_reference_details=resolved_details,
+        validate_table_values=True,
     )
     from .reporting.schema_updates import prepare_schema_updates
 

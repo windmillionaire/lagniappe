@@ -161,8 +161,13 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
                     lookup = value
                     if isinstance(value, dict):
                         lookup = value.get("name") or value.get("title")
+                    error_count = len(self.errors)
                     if not self._validate_internal_import(lookup):
                         self.value = lookup
+                        if self.value:
+                            del self.errors[error_count:]
+                if value and not self.value and not self.errors:
+                    self.errors.append(f"Could not resolve internal link in {self.label}.")
                 return
 
             if isinstance(value, str):
